@@ -1,0 +1,17 @@
+
+set -e
+
+builddir=`mktemp -d /tmp/build.XXXX`
+
+for i in `cat mgitmods`
+do
+	submoddir=`basename $i`
+	packagedir=$builddir/$submoddir
+	mkdir $packagedir
+	if [ -e $submoddir/BUILD ]
+	then
+		cd $submoddir
+		prefix=$packagedir bindir=~/.local/bin ./BUILD
+	fi
+done
+
