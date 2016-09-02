@@ -10,8 +10,10 @@ do
 	mkdir $packagedir
 	if [ -e $submoddir/BUILD ]
 	then
+		echo "############### Building: $submoddir"
 		cd $submoddir
-		prefix=$packagedir bindir=~/.local/bin ./BUILD
+		PKGDIR=$packagedir BINDIR=~/.local/bin ./BUILD
+		cd ..
 	fi
 done
 
