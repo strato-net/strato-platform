@@ -1,18 +1,36 @@
+#!/bin/bash
 
 set -e
+exec 2> >(while read line; do echo -e "\e[01;31m$line\e[0m" >&2; done)
 
 builddir=`mktemp -d /tmp/build.XXXX`
+
+packages=`pwd`/packages
 
 for i in `cat mgitmods`
 do
 	submoddir=`basename $i`
 	packagedir=$builddir/$submoddir
-	mkdir $packagedir
 	if [ -e $submoddir/BUILD ]
 	then
+		mkdir $packagedir
 		echo "############### Building: $submoddir"
 		cd $submoddir
-		PKGDIR=$packagedir BINDIR=~/.local/bin ./BUILD
+		case $1 in
+		     install) 
+		     	PKGDIR=$packagedir BINDIR=~/.local/bin ./BUILD
+			;;
+		     dpkg)
+			mkdir -p $packages
+		     	PKGDIR=$packagedir ./BUILD
+			dpkg --build $packagedir $packages/$submoddir.deb
+			;;
+		     *)
+		        echo "you need to supply the install type" >&2
+			exit 1
+			;;
+		esac
+			
 		cd ..
 	fi
 done
