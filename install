@@ -7,6 +7,11 @@ builddir=`mktemp -d /tmp/build.XXXX`
 
 packages=`pwd`/packages
 
+if [ "$1" == "install" ]
+then
+    bindir=~/.local/bin
+fi
+
 for i in `cat mgitmods`
 do
 	submoddir=`basename $i`
@@ -16,22 +21,23 @@ do
 		mkdir $packagedir
 		echo "############### Building: $submoddir"
 		cd $submoddir
-		case $1 in
-		     install) 
-		     	PKGDIR=$packagedir BINDIR=~/.local/bin ./BUILD
-			;;
-		     dpkg)
+       	     	PKGDIR=$packagedir BINDIR=$bindir ./BUILD
+		if [ "$1" == "dpkg" -o "$1" == "docker" ]
+		then
+		    if [ ! -e "$packages/$submoddir.deb" ]
+		    then
 			mkdir -p $packages
-		     	PKGDIR=$packagedir ./BUILD
 			dpkg --build $packagedir $packages/$submoddir.deb
-			;;
-		     *)
-		        echo "you need to supply the install type" >&2
-			exit 1
-			;;
-		esac
-			
+		    fi
+		fi
 		cd ..
+
+		if [ "$1" == "docker" ]
+		then
+		    cp $packages/$submoddir.deb buildDocker/package.deb
+		    docker build -t $submoddir buildDocker
+		fi
+
 	fi
 done
 
