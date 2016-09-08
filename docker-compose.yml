@@ -1,7 +1,36 @@
-
 version: '2'
 
 services:
   zookeeper:
+    image: zookeeper-packager
+    restart: always
+  kafka:
     image: kafka-packager
     restart: always
+    links:
+      - zookeeper
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_HOST_NAME: "kafka"
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 2147483647
+  postgres-packager:
+    image: postgres-packager
+    restart: always
+#  strato:
+#    image: strato
+#    depends_on:
+#      - kafka-packager
+#      - postgres-packager
+#    restart: always
+#    ports:
+#      - "30303:30303"
+#      - "30303:30303/udp"
+#    environment:
+#      fqdn : "${fqdn}"
+#      mode : "${mode}"
+#      networkId : "${networkId}"
+#      peers : "${peers}"
+#      genesisBlock: "${genesisBlock}"
