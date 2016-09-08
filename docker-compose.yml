@@ -19,18 +19,18 @@ services:
   postgres-packager:
     image: postgres-packager
     restart: always
-#  strato:
-#    image: strato
-#    depends_on:
-#      - kafka-packager
-#      - postgres-packager
-#    restart: always
-#    ports:
-#      - "30303:30303"
-#      - "30303:30303/udp"
-#    environment:
-#      fqdn : "${fqdn}"
-#      mode : "${mode}"
-#      networkId : "${networkId}"
-#      peers : "${peers}"
-#      genesisBlock: "${genesisBlock}"
+  strato:
+    image: strato
+    links:
+      - kafka
+      - postgres-packager
+    restart: always
+    ports:
+      - "30303:30303"
+      - "30303:30303/udp"
+    environment:
+      fqdn : "${fqdn}"
+      mode : "${mode}"
+      networkId : "${networkId}"
+      peers : "${peers}"
+      genesisBlock: "${genesisBlock}"
