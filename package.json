@@ -23,7 +23,7 @@
     "faker": "^3.0.1",
     "graphql": "^0.4.16",
     "graphql-relay": "^0.3.6",
-    "lodash": "^4.2.1",
+    "lodash": "^4.15.0",
     "pg": "^4.4.4",
     "pg-hstore": "^2.3.2",
     "sequelize": "^3.19.1"
@@ -33,7 +33,8 @@
     "babel-eslint": "^6.1.2",
     "eslint": "^3.0.1",
     "flow-bin": "^0.29.0",
-    "nodemon": "^1.9.2"
+    "nodemon": "^1.9.2",
+    "request-promise": "^4.1.1"
   },
   "pre-commit": [
     "eslint"
