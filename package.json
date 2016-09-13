@@ -31,9 +31,11 @@
   "devDependencies": {
     "babel-cli": "^6.10.1",
     "babel-eslint": "^6.1.2",
-    "eslint": "^3.0.1",
+    "eslint": "^3.5.0",
+    "eslint-plugin-lodash-fp": "^2.0.1",
     "flow-bin": "^0.29.0",
     "nodemon": "^1.9.2",
+    "pg": "^4.5.6",
     "request-promise": "^4.1.1"
   },
   "pre-commit": [
