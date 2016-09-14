@@ -1,0 +1,23 @@
+postgres:
+  image: postgres:9.6
+  environment:
+    POSTGRES_DB: cirrus
+
+postgrest:
+  image: begriffs/postgrest
+  environment:
+    PG_ENV_POSTGRES_DB: cirrus
+  links:
+    - postgres:postgres
+service:
+  build: .
+  command: node_modules/.bin/nodemon cirrus.js
+  environment:
+    NODE_ENV: development
+  ports:
+    - '3333:3333'
+  volumes:
+    - .:/home/app/cirrus
+    - /home/app/cirrus/node_modules
+  links:
+    - postgrest:postgrest

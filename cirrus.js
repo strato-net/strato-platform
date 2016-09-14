@@ -20,9 +20,6 @@ var router = express.Router();
 var app = express();
 app.use(bodyParser.json())
 
-// add to this as we cover more contracts
-var typeMapping = {'String':'text', 'Int':'integer', 'Address':'text', 'json' : 'json'}
-
 ////////////////
 
 app.post('/', function (req, res, next) {
@@ -34,6 +31,11 @@ app.post('/', function (req, res, next) {
   }
   console.log(schema)
   res.send(schema);
+  pool
+    .query(schema)
+    .then(function() {
+      console.log("Hello")
+    })
   next()
 });
 
@@ -53,10 +55,11 @@ app.listen(3333, cors(), function (req, res) {
 
 // you can optionally supply other values
 var config = {
-  host: 'localhost',
+  host: '0.0.0.0',
   user: 'kejace',
   //password: 'bar',
   database: 'cirrus',
+  port: 5432
 };
 
 // create the pool somewhere globally so its lifetime
@@ -83,14 +86,6 @@ var pool = new Pool(config)
 //     });
 //   });
 // });
-
-
-pool
-  .query('BEGIN; CREATE TABLE "Sample" ("address" text PRIMARY KEY, "currentVendor" text, "fsm" text, "sampleType" text, "currentState" text, "currentLocationType" text, "trackingNumbers" json, "startDepthFeet" integer, "buid" integer, "wellName" text, "endDepthFeet" integer, "startDepthMeter" integer, "_owner" text, "endDepthMeter" integer ); COMMIT;')
-  .then(function() {
-    console.log("Hello")
-  })
-
 
 module.exports = app;
 
