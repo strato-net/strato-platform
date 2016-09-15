@@ -47,34 +47,35 @@ var randomString = function(N){
   return Array(N).join().split(',').map(function() { return s.charAt(Math.floor(Math.random() * s.length)); }).join('');
 }
 
-// var toUpload = _.flatten(
-//   copyJ.map(v=>{
-//     var n = 10000; // this is about as many we can do without choking
-//     var tt = [...Array(n).keys()].map(n=>{
-//       var t = JSON.parse(JSON.stringify(v)); // clone()
-//       t.address = v.address + "_" + n + "_" + randomString(6);
-//       return t;
-//     });
+console.log(chalk.yellow("Contract name: " + json_meta.name))
+var toUpload = _.flatten(
+  copyJ2.map(v=>{
+    var n = 5000; // this is about as many we can do without choking
+    var tt = [...Array(n).keys()].map(n=>{
+      var t = JSON.parse(JSON.stringify(v)); // clone()
+      t.address = v.address + "_" + n + "_" + randomString(6);
+      return t;
+    });
     
-//     var options = { method: 'POST',
-//       url: 'http://localhost:3000/' + ,
-//       headers: 
-//        { 'cache-control': 'no-cache',
-//          'content-type': 'application/json' },
-//       body: tt,
-//       json: true };
+    var options = { method: 'POST',
+      url: 'http://localhost:3000/' + json_meta.name,
+      headers: 
+       { 'cache-control': 'no-cache',
+         'content-type': 'application/json' },
+      body: tt,
+      json: true };
 
-//       console.log("Creating an " + n + " upload promise")
-//       return rp(options).promise();
-//   })
-// )
+      console.log("Creating an " + n + " upload promise")
+      return rp(options).promise();
+  })
+)
 
-//console.log("toUpload is " + JSON.stringify(toUpload))
+console.log("toUpload is " + JSON.stringify(toUpload))
 
-// Promise.all(toUpload).then(function (error, response, body) {
-//   if (error) throw new Error(error);
-//   console.log(body);
-// });
+Promise.all(toUpload).then(function (error, response, body) {
+  if (error) throw new Error(error);
+  console.log(body);
+});
 
 
 

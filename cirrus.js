@@ -45,7 +45,6 @@ app.get('/', function (req, res, next) {
   next()
 });
 
-
 app.listen(3333, cors(), function (req, res) {
   console.log('Example app listening on port 3333!');
 });
@@ -55,8 +54,8 @@ app.listen(3333, cors(), function (req, res) {
 
 // you can optionally supply other values
 var config = {
-  host: '0.0.0.0',
-  user: 'kejace',
+  host: 'postgres',
+  user: 'postgres',
   //password: 'bar',
   database: 'cirrus',
   port: 5432
