@@ -57,8 +57,9 @@ var toUpload = _.flatten(
       return t;
     });
     
+    var host = process.env.HOST || 'localhost'
     var options = { method: 'POST',
-      url: 'http://localhost:3000/' + json_meta.name,
+      url: 'http://' + host + '/' + json_meta.name,
       headers: 
        { 'cache-control': 'no-cache',
          'content-type': 'application/json' },
