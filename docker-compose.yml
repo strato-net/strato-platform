@@ -6,7 +6,7 @@ postgres:
     PG_ENV_POSTGRES_DB: cirrus
     PG_ENV_POSTGRES_USER: postgres    
   ports:
-    - '5432:5432'
+    - '5433:5432'
 
 postgrest:
   image: cirrus-postgrest
@@ -15,6 +15,7 @@ postgrest:
     POSTGRES_USER: postgres
     PG_ENV_POSTGRES_DB: cirrus
     PG_ENV_POSTGRES_USER: postgres
+    PG_PORT_5433_TCP_PORT: 5433
   links:
     - postgres:postgres
   ports:

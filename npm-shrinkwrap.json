@@ -597,6 +597,11 @@
       "from": "core-util-is@>=1.0.0 <1.1.0",
       "resolved": "https://registry.npmjs.org/core-util-is/-/core-util-is-1.0.2.tgz"
     },
+    "cors": {
+      "version": "2.8.1",
+      "from": "cors@latest",
+      "resolved": "https://registry.npmjs.org/cors/-/cors-2.8.1.tgz"
+    },
     "create-error-class": {
       "version": "3.0.2",
       "from": "create-error-class@>=3.0.1 <4.0.0",
@@ -2869,6 +2874,11 @@
       "version": "2.3.2",
       "from": "pg-hstore@>=2.3.2 <3.0.0",
       "resolved": "https://registry.npmjs.org/pg-hstore/-/pg-hstore-2.3.2.tgz"
+    },
+    "pg-pool": {
+      "version": "1.5.0",
+      "from": "pg-pool@latest",
+      "resolved": "https://registry.npmjs.org/pg-pool/-/pg-pool-1.5.0.tgz"
     },
     "pg-types": {
       "version": "1.11.0",
