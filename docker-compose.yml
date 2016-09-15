@@ -32,6 +32,7 @@ service:
   volumes:
     - .:/home/app/cirrus
     - /home/app/cirrus/node_modules
+    - /home/app/cirrus/lib
   links:
     - postgrest:postgrest
     - postgres:postgres

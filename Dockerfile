@@ -13,6 +13,7 @@ RUN npm install
 
 USER root
 COPY . $HOME/cirrus
+COPY lib $HOME/cirrus/lib
 RUN chown -R app:app $HOME/*
 USER app
 
