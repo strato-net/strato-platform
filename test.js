@@ -22,12 +22,7 @@ var json_meta = {"bin":"60606040526040516121623803806121628339810160405280805190
 var types = util.toSchema(typeMapping)(json_meta.xabi.vars)
 
 console.log(chalk.blue("Type schema"))
-console.log(types)
-
-var end = __.map(types, (v, k) => "\x22"+ k + "\x22" + " " + v);
-
-// createdb xxxxxx
-// ./postgrest postgres://kejace:@localhost:5432/sample -a kejace --schema public
+console.log(JSON.stringify(types))
 
 console.log(chalk.blue("Table schema"))
 var toPrint = util.toSchemaString(json_meta)
@@ -40,7 +35,7 @@ var json_state = [{"address":"14eee34a903e0926813ffb048ce354e576953a5d","state":
 var copyJ2 =  util.cleanState(json_state)
 
 console.log(chalk.blue("New data"))
-console.log(copyJ2[0])
+console.log(JSON.stringify(copyJ2[0]))
 
 var s = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 var randomString = function(N){
@@ -59,14 +54,14 @@ var toUpload = _.flatten(
     
     var host = process.env.HOST || 'localhost'
     var options = { method: 'POST',
-      url: 'http://' + host + '/' + json_meta.name,
+      url: 'http://' + host + ':3000/' + json_meta.name,
       headers: 
        { 'cache-control': 'no-cache',
          'content-type': 'application/json' },
       body: tt,
       json: true };
 
-      console.log("Creating an " + n + " upload promise")
+      console.log("Creating an " + n + " upload promise for " + host)
       return rp(options).promise();
   })
 )
