@@ -27,6 +27,7 @@ services:
       - postgres
     restart: always
     ports:
+      - "3000:3000"
       - "30303:30303"
       - "30303:30303/udp"
     environment:
@@ -35,3 +36,19 @@ services:
       networkId : "${networkId}"
       peers : "${peers}"
       genesisBlock: "${genesisBlock}"
+  bloc:
+    image: auth.blockapps.net:5000/blockapps/bloc
+    restart: always
+    ports:
+      - 8000:8000
+    environment:
+      fqdn: strato
+  nginx:
+    image: nginx
+    build: ./nginx
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - strato
+      - bloc
