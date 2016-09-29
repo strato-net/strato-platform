@@ -45,10 +45,10 @@ var randomString = function(N){
 console.log(chalk.yellow("Contract name: " + json_meta.name))
 var toUpload = _.flatten(
   copyJ2.map(v=>{
-    var n = 5000; // this is about as many we can do without choking
+    var n = 1; // this is about as many we can do without choking
     var tt = [...Array(n).keys()].map(n=>{
       var t = JSON.parse(JSON.stringify(v)); // clone()
-      t.address = v.address + "_" + n + "_" + randomString(6);
+      //t.address = v.address + "_" + n + "_" + randomString(6);
       return t;
     });
     
