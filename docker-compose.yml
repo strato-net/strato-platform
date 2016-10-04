@@ -13,20 +13,21 @@ services:
       - '5433:5432'
 
   postgrest:
-    image: cirrus-postgrest
+    build: ./postgrest_docker
+    #image: cirrus-postgrest
     environment:
       POSTGRES_DB: cirrus
       POSTGRES_USER: postgres
       PG_ENV_POSTGRES_DB: cirrus
       PG_ENV_POSTGRES_USER: postgres
-      PG_PORT_5433_TCP_PORT: 5433
+      PG_PORT_5433_TCP_PORT: 5432
     links:
       - postgres:postgres
     ports:
       - '3000:3000'
   #  entrypoint: ./wait-for-it.sh postgres:5432
 
-  service:
+  cirrus:
     build: .
     command: node_modules/.bin/nodemon cirrus.js
     environment:
@@ -41,11 +42,11 @@ services:
       - postgrest:postgrest
       - postgres:postgres
 
-  nginx:
-    image: cirrus-nginx
-    ports:
-      - "3003:3003"
-    depends_on:
-      - postgres
-      - postgrest
-      - service
+#  nginx:
+#    image: cirrus-nginx
+#    ports:
+#      - "3003:3003"
+#    depends_on:
+#      - postgres
+#      - postgrest
+#      - cirrus 
