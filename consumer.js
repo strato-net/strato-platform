@@ -4,6 +4,8 @@ var rp = require("request-promise");
 var yaml = require('yaml-parser');
 var child_process = require("child_process");
 
+var chalk = require('chalk');
+
 // Load the fp build.
 var _ = require('lodash/fp');
 var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
@@ -38,28 +40,55 @@ consumer.call('on', 'message', function (m) {
     console.log(m.value);
 
     var state = JSON.parse(m.value);
-    var accounts = Object.keys(state.updatedAccounts);
-    console.log("Updated accounts: " + accounts)
+
+    var createdAccounts = Object.keys(state.createdAccounts);
+    var updatedAccounts = Object.keys(state.updatedAccounts);
+    var deletedAccounts = Object.keys(state.deletedAccounts);
+
+    if(createdAccounts) console.log(chalk.green("Created accounts: " + createdAccounts));
+    if(updatedAccounts) console.log(chalk.blue("Updated accounts: " + updatedAccounts));
+    if(deletedAccounts) console.log(chalk.red("Deleted accounts: " + deletedAccounts));
+
     //var key = m.value["updatedAccounts"];
     //var key = Object.keys(m.value.updatedAccounts)[0]
     //console.log("Address: " + key)
     // rest post here
 
     var toUpload = _.flatten(
-      accounts.map(a=>{
-        
-        var host = process.env.HOST || 'localhost'
-        var options = { method: 'PATCH',
-          url: 'http://' + host + ':3000/' + 'Sample?address=eq.' + a,
-          headers: 
-           { 'cache-control': 'no-cache',
-             'content-type': 'application/json' },
-          body: {currentVendor:"ABBA"}, // replace this with actual storage
-          json: true };
 
-          console.log("Updating account " + a)
-          return rp(options).promise();
-      })
+      [
+          createdAccounts.map(a => {
+
+        }),
+
+        updatedAccounts.map(a => {
+
+          //console.log("Updating account " + a)
+          var tKeys = Object.keys(state.updatedAccounts[a].storage)
+          //console.log("Storage to change: " + JSON.stringify(state.updatedAccounts[a].storage))
+
+          var val = state.updatedAccounts[a].storage[tKeys[0]];
+          if(val)
+            val = parseInt(val['newValue'], 16);
+          else
+            val = 0;
+
+          var host = process.env.HOST || 'localhost'
+          var options = { method: 'PATCH',
+            url: 'http://' + host + ':3000/' + 'SimpleStorage?address=eq.' + a,
+            headers: 
+             { 'cache-control': 'no-cache',
+               'content-type': 'application/json' },
+            body: {storedData: val}, // replace this with actual storage
+            json: true };
+
+            return rp(options).promise();
+        }),
+
+        deletedAccounts.map(a => {
+
+        })
+      ]
     )
 
     Promise.all(toUpload)

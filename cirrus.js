@@ -34,7 +34,7 @@ app.post('/', function (req, res, next) {
   pool
     .query(schema)
     .then(function() {
-      console.log("Hello")
+      console.log("Hello cirrus")
     })
   next()
 });
