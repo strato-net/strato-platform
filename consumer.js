@@ -37,35 +37,53 @@ var consumer = offset.then(function(offset) {
 });
 
 consumer.call('on', 'message', function (m) {
-    console.log(m.value);
+
+    console.log(chalk.yellow("Incoming state update..."));
+
+    //console.log(m.value);
 
     var state = JSON.parse(m.value);
+
+    // for now, only update accounts with changed storage
+    state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
+    //console.log("Cleaned state: " + JSON.stringify(state.updatedAccounts));
 
     var createdAccounts = Object.keys(state.createdAccounts);
     var updatedAccounts = Object.keys(state.updatedAccounts);
     var deletedAccounts = Object.keys(state.deletedAccounts);
 
-    if(createdAccounts) console.log(chalk.green("Created accounts: " + createdAccounts));
-    if(updatedAccounts) console.log(chalk.blue("Updated accounts: " + updatedAccounts));
-    if(deletedAccounts) console.log(chalk.red("Deleted accounts: " + deletedAccounts));
-
-    //var key = m.value["updatedAccounts"];
-    //var key = Object.keys(m.value.updatedAccounts)[0]
-    //console.log("Address: " + key)
-    // rest post here
+    console.log(chalk.green("Created accounts: " + createdAccounts));
+    console.log(chalk.blue("Updated accounts: " + updatedAccounts));
+    console.log(chalk.red("Deleted accounts: " + deletedAccounts));
 
     var toUpload = _.flatten(
 
       [
-          createdAccounts.map(a => {
+        createdAccounts.map(a => {
+
+          var tKeys = Object.keys(state.createdAccounts[a]);
+
+          var val = state.createdAccounts[a].storage[tKeys[0]];
+          if(val)
+            val = parseInt(val['newValue'], 16);
+          else
+            val = 0;
+
+          var host = process.env.HOST || 'localhost'
+          var options = { method: 'POST',
+            url: 'http://' + host + ':3000/' + 'SimpleStorage',
+            headers: 
+             { 'cache-control': 'no-cache',
+               'content-type': 'application/json' },
+            body: {storedData: val, address: a}, // replace this with actual storage
+            json: true };
+
+            return rp(options).promise();
 
         }),
 
         updatedAccounts.map(a => {
-
-          //console.log("Updating account " + a)
           var tKeys = Object.keys(state.updatedAccounts[a].storage)
-          //console.log("Storage to change: " + JSON.stringify(state.updatedAccounts[a].storage))
 
           var val = state.updatedAccounts[a].storage[tKeys[0]];
           if(val)
