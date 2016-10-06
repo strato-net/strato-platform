@@ -52,9 +52,9 @@ consumer.call('on', 'message', function (m) {
     var updatedAccounts = Object.keys(state.updatedAccounts);
     var deletedAccounts = Object.keys(state.deletedAccounts);
 
-    console.log(chalk.green("Created accounts: " + createdAccounts));
-    console.log(chalk.blue("Updated accounts: " + updatedAccounts));
-    console.log(chalk.red("Deleted accounts: " + deletedAccounts));
+    console.log(chalk.green("|\tCreated accounts: " + createdAccounts));
+    console.log(chalk.blue("|\tUpdated accounts: " + updatedAccounts));
+    console.log(chalk.red("|\tDeleted accounts: " + deletedAccounts));
 
     var toUpload = _.flatten(
 
@@ -117,7 +117,7 @@ consumer.call('on', 'message', function (m) {
       // if (error){
       //   throw new Error(error);
       // } 
-      console.log("Done updating accounts");
+      console.log(chalk.yellow("... done updating accounts"));
     });
 });
 
