@@ -1,0 +1,6 @@
+FROM ubuntu:16.04
+MAINTAINER Ryan Reich <ryan@blockapps.net>
+
+COPY setup-deployment.sh /
+RUN /setup-deployment.sh && rm /setup-deployment.sh
+

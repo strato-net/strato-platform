@@ -1,31 +1,61 @@
 #!/bin/bash
 
-registry="auth.blockapps.net:5000/blockapps"
+set -e
+exec 2> >(while read line; do echo -e "\e[01;31m$line\e[0m" >&2; done)
+
+export registry="auth.blockapps.net:5000/blockapps"
 
 function buildWithDocker { :; }
 
 function buildLocally
 {
-  cd $pkgdir
-  ./BUILD
+  cd $submoddir
+  $pkgdir/BUILD
 }
 
 function deployWithDocker
 {
   deploybase="$registry/$submoddir-base"
+  ln -sf buildDocker/Dockerfile $pkgdir
   docker tag $deploybase deploybase
   docker build -t $submoddir $pkgdir
+  docker rmi deploybase
+  rm -f $pkgdir/Dockerfile
 }
 
 function deployLocally
 {
-  cd $pkgdir
-  ./setup-deployment
+  cd $submoddir
+  $pkgdir/setup-deployment.sh
   sudo cp -a $builddir/* /
 }
 
-set -e
-exec 2> >(while read line; do echo -e "\e[01;31m$line\e[0m" >&2; done)
+function doInstallMod
+{
+  export builddir=$pkgdir/build
+  if [[ -x $pkgdir/BUILD ]]
+  then
+    echo "############### Building: $submoddir"
+    ($build)
+    echo "############### Deploying: $submoddir"
+    ($deploy)
+    echo
+  fi
+}
+
+function doDeployBaseMod
+{
+  if [[ -x $pkgdir/setup-deployment.sh ]]
+  then
+    echo "############### Building deploybase: $submoddir"
+    ln -sf buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
+    docker build -t $registry/$submoddir-base $pkgdir
+    rm -f $pkgdir/Dockerfile
+  else
+    echo >&2 "Error: $submoddir must have an executable $pkgdir/setup-deployment.sh"
+    exit 1
+  fi
+}
 
 if [[ $# -eq 0 ]]
 then
@@ -33,23 +63,32 @@ then
   exit 1
 fi
 
-build="buildWithDocker"
-deploy="deployWithDocker"
 case $1 in
+  "docker"|"docker-to-local")
+    echo >&2 "'docker' build mode not supported currently"
+    exit 1
+    ;;
+  "docker"|"docker-to-local")
+    build="buildWithDocker"
+    ;;&
   "local"|"local-to-docker")
     build="buildLocally"
+    ;;&
+  "docker"|"local-to-docker")
+    deploy="deployWithDocker"
     ;;&
   "local"|"docker-to-local")
     deploy="deployLocally"
     ;;&
-  "docker"|"docker-to-local")
-    echo >&2 "'docker' build mode not supported currently"
-    exit 1
-    ;;&
   "local"|"docker"|"local-to-docker"|"docker-to-local")
+    doit=doInstallMod
+    ;;
+  "deploybases")
+    doit=doDeployBaseMod
     ;;
   *)
-    echo >&2 "Mode must be: local, docker, local-to-docker, docker-to-local"
+    echo >&2 "To install, mode may be: local, docker, local-to-docker, docker-to-local"
+    echo >&2 "To build the deploybases, mode may be: deploybases"
     exit 1
     ;;
 esac
@@ -58,14 +97,6 @@ for i in $(<mgitmods)
 do
   export submoddir=`basename $i`
   export pkgdir=$submoddir/pkg
-  export builddir=$pkgdir/build
-  if [[ -x $submoddir/BUILD ]]
-  then
-    echo "############### Building: $submoddir"
-    ($build)
-    echo "############### Deploying: $submoddir"
-    ($deploy)
-    echo
-  fi
+  $doit
 done
 
