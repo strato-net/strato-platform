@@ -45,12 +45,25 @@ function doInstallMod
 
 function doDeployBaseMod
 {
+  function doDocker
+  {
+      echo "############### Building deploybase: $submoddir"
+      ln -sf buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
+      docker build -t $registry/$submoddir-base $pkgdir
+      rm -f $pkgdir/Dockerfile
+  }
+
+  function doLocal
+  {
+      echo "############### Installing deploybase: $submoddir"
+      $pkgdir/setup-deploybase.sh
+  }
+
+  doit="do$1"
+
   if [[ -x $pkgdir/setup-deployment.sh ]]
   then
-    echo "############### Building deploybase: $submoddir"
-    ln -sf buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
-    docker build -t $registry/$submoddir-base $pkgdir
-    rm -f $pkgdir/Dockerfile
+    $doit
   else
     echo >&2 "Error: $submoddir must have an executable $pkgdir/setup-deployment.sh"
     exit 1
@@ -84,7 +97,18 @@ case $1 in
     doit=doInstallMod
     ;;
   "deploybases")
-    doit=doDeployBaseMod
+    case $2 in
+      "docker")
+        doit="doDeployBaseMod docker"
+        ;;
+      "local")
+        doit="doDeployBaseMod local"
+        ;;
+      *)
+        echo >&2 "Mode 'deploybases' takes a second argument: docker, local"
+        exit 1
+        ;;
+    esac
     ;;
   *)
     echo >&2 "To install, mode may be: local, docker, local-to-docker, docker-to-local"
