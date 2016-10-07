@@ -16,6 +16,13 @@ function buildLocally
 function deployWithDocker
 {
   deploybase="$registry/$submoddir-base"
+  if [[ -z $(docker images | awk '{print $1;}' | grep $deploybase) ]]
+  then
+    echo >&2 "Error: missing deployment base image for $submoddir."
+    echo >&2 "       Have you run `$0 deploybase docker`?"
+    exit 1
+  fi
+
   ln -sf buildDocker/Dockerfile $pkgdir
   docker tag $deploybase deploybase
   docker build -t $submoddir $pkgdir
