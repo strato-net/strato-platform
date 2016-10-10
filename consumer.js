@@ -13,13 +13,23 @@ var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {.
 var kafka = require('kafka-node');
 var client = new kafka.Client();
 
-var dockerDir = "docker"; // Configurable
-var topics = yaml.safeLoad(
-  child_process.execSync(
-    "docker exec " + dockerDir + "_strato_1 cat .ethereumH/topics.yaml"
-  )
-);
-var topic = topics.statediff;
+// var dockerDir = "docker"; // Configurable
+// var topics = yaml.safeLoad(
+//   child_process.execSync(.peerId
+//     "docker exec " + dockerDir + "_strato_1 cat .ethereumH/topics.yaml"
+//   )
+// );
+// var topic = topics.statediff;
+
+var stratoHost = 'strato:80';
+var postgrestHost = 'localhost:3001';
+var topic;
+
+var options = { method: 'GET',
+            url: 'http://' + stratoHost + '/' + '/eth/v1.2/uuid',
+            json: true };
+
+return rp(options).promise().then(r => {topic = r.peerId; console.log("Topic is: " + topic.peerId)});
 
 var offsets = Promise.promisifyAll(new kafka.Offset(client));
 var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
@@ -69,9 +79,8 @@ consumer.call('on', 'message', function (m) {
           else
             val = 0;
 
-          var host = process.env.HOST || 'localhost'
           var options = { method: 'POST',
-            url: 'http://' + host + ':3000/' + 'SimpleStorage',
+            url: 'http://' + postgrestHost + '/SimpleStorage',
             headers: 
              { 'cache-control': 'no-cache',
                'content-type': 'application/json' },
@@ -79,7 +88,6 @@ consumer.call('on', 'message', function (m) {
             json: true };
 
             return rp(options).promise();
-
         }),
 
         updatedAccounts.map(a => {
@@ -91,9 +99,8 @@ consumer.call('on', 'message', function (m) {
           else
             val = 0;
 
-          var host = process.env.HOST || 'localhost'
           var options = { method: 'PATCH',
-            url: 'http://' + host + ':3000/' + 'SimpleStorage?address=eq.' + a,
+            url: 'http://' + postgrestHost + '/SimpleStorage?address=eq.' + a,
             headers: 
              { 'cache-control': 'no-cache',
                'content-type': 'application/json' },

@@ -24,12 +24,12 @@ services:
     links:
       - postgres:postgres
     ports:
-      - '3000:3000'
+      - '3001:3001'
   #  entrypoint: ./wait-for-it.sh postgres:5432
 
   cirrus:
     build: .
-    command: node_modules/.bin/nodemon cirrus.js
+    command: node_modules/.bin/nodemon main.js
     environment:
       NODE_ENV: development
     ports:
@@ -38,9 +38,19 @@ services:
       - .:/home/app/cirrus
       - /home/app/cirrus/node_modules
       - /home/app/cirrus/lib
+      - /var/run/docker.sock:/var/run/docker.sock
     links:
       - postgrest:postgrest
       - postgres:postgres
+    networks:
+      - docker_default
+    external_links:
+      - docker_nginx_1:strato
+
+networks:
+  docker_default:
+    #driver: bridge
+    external: true
 
 #  nginx:
 #    image: cirrus-nginx
