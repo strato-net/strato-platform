@@ -36,4 +36,4 @@ ENV CONNECTIONSTRING postgres:${PG_ENV_POSTGRES_PASSWORD}@postgres:${PG_PORT_543
 COPY wait-for-it.sh wait-for-it.sh
 COPY wait-for-postgres.sh wait-for-postgres.sh
 
-EXPOSE 3000
+EXPOSE 3001
