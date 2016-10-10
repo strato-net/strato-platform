@@ -20,9 +20,6 @@ RUN apt-get update && apt-get install -y wget
 RUN wget https://github.com/jwilder/dockerize/releases/download/v0.1.0/dockerize-linux-amd64-v0.1.0.tar.gz
 RUN tar -C /usr/local/bin -xzvf dockerize-linux-amd64-v0.1.0.tar.gz
 
-ENV PG_PORT_5433_TCP_PORT 5432
-ENV PG_ENV_POSTGRES_DB cirrus
-
 CMD exec postgrest postgres://postgres:${PG_ENV_POSTGRES_PASSWORD}@postgres:${PG_PORT_5433_TCP_PORT}/${PG_ENV_POSTGRES_DB} \
               --port 3001 \
               --schema ${POSTGREST_SCHEMA} \
