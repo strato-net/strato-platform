@@ -11,6 +11,8 @@ services:
       PG_ENV_POSTGRES_USER: postgres    
     ports:
       - '5433:5432'
+    networks:
+      - docker_default
 
   postgrest:
     build: ./postgrest_docker
@@ -27,10 +29,6 @@ services:
       - '3001:3001'
     networks:
       - docker_default
-    external_links:
-      - docker_nginx_1:strato
-      - docker_zookeeper_1:zookeeper
-      - docker_kafka_1:kafka
   #  entrypoint: ./wait-for-it.sh postgres:5432
 
   cirrus:

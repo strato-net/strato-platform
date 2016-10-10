@@ -22,6 +22,26 @@ app.use(bodyParser.json())
 
 ////////////////
 
+
+// by default the pool will use the same environment variables
+// as psql, pg_dump, pg_restore etc:
+// https://www.postgresql.org/docs/9.5/static/libpq-envars.html
+
+// you can optionally supply other values
+var config = {
+  host: (process.env.POSTGRES || 'postgres'),
+  user: 'postgres',
+  //password: 'bar',
+  database: 'cirrus',
+  port: 5432
+};
+
+// create the pool somewhere globally so its lifetime
+// lasts for as long as your app is running
+var pool = new Pool(config)
+
+////////////////////
+
 app.post('/', function (req, res, next) {
   var schema;
   try {
@@ -41,50 +61,17 @@ app.post('/', function (req, res, next) {
 
 app.get('/', function (req, res, next) {
   res.send('Hello World!');
-  console.log(req.body) // populated!
+  pool
+    .query("SELECT * from postgres;")
+    .then(function() {
+      console.log("Hello cirrus")
+    })
   next()
 });
 
 app.listen(3333, cors(), function (req, res) {
   console.log('Example app listening on port 3333!');
 });
-// by default the pool will use the same environment variables
-// as psql, pg_dump, pg_restore etc:
-// https://www.postgresql.org/docs/9.5/static/libpq-envars.html
-
-// you can optionally supply other values
-var config = {
-  host: 'postgres',
-  user: 'postgres',
-  //password: 'bar',
-  database: 'cirrus',
-  port: 5432
-};
-
-// create the pool somewhere globally so its lifetime
-// lasts for as long as your app is running
-var pool = new Pool(config)
-
-// var server = http.createServer(function(req, res) {
-
-//   var onError = function(err) {
-//     console.log(err.message, err.stack)
-//     res.writeHead(500, {'content-type': 'text/plain'});
-//     res.end('An error occurred');
-//   };
-
-//   pool.query('INSERT INTO "Sample" (address) VALUES ($1)', ["deadbeef"], function(err) {
-//     if (err) return onError(err);
-
-//     // get the total number of visits today (including the current visit)
-//     pool.query('SELECT COUNT(*) AS count FROM "Sample"', function(err, result) {
-//       // handle an error from the query
-//       if(err) return onError(err);
-//       res.writeHead(200, {'content-type': 'text/plain'});
-//       res.end('There are ' + result.rows[0].count + ' Sample contracts');
-//     });
-//   });
-// });
 
 module.exports = app;
 
