@@ -20,9 +20,9 @@ var kafka = require('kafka-node');
 // );
 // var topic = topics.statediff;
 
-var stratoHost = 'strato:80';
-var postgrestHost = 'localhost:3001';
-var kafkaHost = 'zookeeper:2181';
+var stratoHost = (process.env.STRATO || 'strato') + ':80';
+var postgrestHost = (process.env.POSTGREST || 'postgrest' ) + ':3001';
+var zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper') + ':2181';
 var topic;
 
 var options = { method: 'GET',
@@ -34,7 +34,7 @@ return rp(options).promise().then(r => {topic = r.peerId;
   var kafkaTopic = 'statediff_' + topic;
   console.log("Topic is: " + kafkaTopic)
 
-  var client = new kafka.Client(kafkaHost);
+  var client = new kafka.Client(zookeeperHost);
 
   var offsets = Promise.promisifyAll(new kafka.Offset(client));
   var offset = offsets.fetchLatestOffsetsAsync([kafkaTopic]).get(kafkaTopic).get(0);
