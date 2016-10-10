@@ -46,6 +46,8 @@ services:
       - docker_default
     external_links:
       - docker_nginx_1:strato
+      - docker_zookeeper_1:zookeeper
+      - docker_kafka_1:kafka
 
 networks:
   docker_default:
