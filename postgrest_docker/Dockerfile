@@ -24,7 +24,7 @@ ENV PG_PORT_5433_TCP_PORT 5432
 ENV PG_ENV_POSTGRES_DB cirrus
 
 CMD exec postgrest postgres://postgres:${PG_ENV_POSTGRES_PASSWORD}@postgres:${PG_PORT_5433_TCP_PORT}/${PG_ENV_POSTGRES_DB} \
-              --port 3000 \
+              --port 3001 \
               --schema ${POSTGREST_SCHEMA} \
               --anonymous ${POSTGREST_ANONYMOUS} \
               --pool ${POSTGREST_POOL} \
