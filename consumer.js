@@ -22,7 +22,7 @@ var kafka = require('kafka-node');
 
 var stratoHost = 'strato:80';
 var postgrestHost = 'localhost:3001';
-var kafkaHost = 'zookeeper:2181';
+var kafkaHost = 'zookeeper:2181/';
 var topic;
 
 var options = { method: 'GET',

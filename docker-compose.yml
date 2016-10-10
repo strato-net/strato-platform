@@ -23,6 +23,8 @@ services:
       PG_PORT_5433_TCP_PORT: 5432
     links:
       - postgres:postgres
+      - docker_zookeeper_1:zookeeper
+      - docker_kafka_1:kafka
     ports:
       - '3001:3001'
   #  entrypoint: ./wait-for-it.sh postgres:5432
