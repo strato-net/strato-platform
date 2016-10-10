@@ -11,7 +11,6 @@ var _ = require('lodash/fp');
 var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
 
 var kafka = require('kafka-node');
-var client = new kafka.Client();
 
 // var dockerDir = "docker"; // Configurable
 // var topics = yaml.safeLoad(
@@ -23,6 +22,7 @@ var client = new kafka.Client();
 
 var stratoHost = 'strato:80';
 var postgrestHost = 'localhost:3001';
+var kafkaHost = 'kafka:2181';
 var topic;
 
 var options = { method: 'GET',
@@ -32,6 +32,8 @@ var options = { method: 'GET',
 return rp(options).promise().then(r => {topic = r.peerId; 
 
   console.log("Topic is: " + topic)
+
+  var client = new kafka.Client(kafkaHost);
 
   var offsets = Promise.promisifyAll(new kafka.Offset(client));
   var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
