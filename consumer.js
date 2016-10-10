@@ -23,13 +23,19 @@ var kafka = require('kafka-node');
 var stratoHost = (process.env.STRATO || 'strato') + ':80';
 var postgrestHost = (process.env.POSTGREST || 'postgrest' ) + ':3001';
 var zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper') + ':2181';
+
 var topic;
 
 var options = { method: 'GET',
             url: 'http://' + stratoHost + '/' + '/eth/v1.2/uuid',
             json: true };
 
-return rp(options).promise().then(r => {topic = r.peerId; 
+rp(options).promise().then(r => {topic = r.peerId; 
+  console.log("Topic: " + topic)
+});
+
+
+  var topic = "ebb67b41ddb398f9bf2054a5ba863cfbdf8d934c";
 
   var kafkaTopic = 'statediff_' + topic;
   console.log("Topic is: " + kafkaTopic)
@@ -137,7 +143,5 @@ return rp(options).promise().then(r => {topic = r.peerId;
     console.log("Caught error: " + err)
   })
 
-
-});
 
 
