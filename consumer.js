@@ -29,107 +29,112 @@ var options = { method: 'GET',
             url: 'http://' + stratoHost + '/' + '/eth/v1.2/uuid',
             json: true };
 
-return rp(options).promise().then(r => {topic = r.peerId; console.log("Topic is: " + topic.peerId)});
+return rp(options).promise().then(r => {topic = r.peerId; 
 
-var offsets = Promise.promisifyAll(new kafka.Offset(client));
-var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
+  console.log("Topic is: " + topic)
 
-var consumer = offset.then(function(offset) {
-  return new kafka.Consumer(
-    client,
-    [{
-      topic: topic, 
-      offset: offset,
-      partition: 0
-    }],
-    {fromOffset: true}
-  );
+  var offsets = Promise.promisifyAll(new kafka.Offset(client));
+  var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
+
+  var consumer = offset.then(function(offset) {
+    return new kafka.Consumer(
+      client,
+      [{
+        topic: topic, 
+        offset: offset,
+        partition: 0
+      }],
+      {fromOffset: true}
+    );
+  });
+
+  consumer.call('on', 'message', function (m) {
+
+      console.log(chalk.yellow("Incoming state update..."));
+
+      //console.log(m.value);
+
+      var state = JSON.parse(m.value);
+
+      // for now, only update accounts with changed storage
+      state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
+      //console.log("Cleaned state: " + JSON.stringify(state.updatedAccounts));
+
+      var createdAccounts = Object.keys(state.createdAccounts);
+      var updatedAccounts = Object.keys(state.updatedAccounts);
+      var deletedAccounts = Object.keys(state.deletedAccounts);
+
+      console.log(chalk.green("|\tCreated accounts: " + createdAccounts));
+      console.log(chalk.blue("|\tUpdated accounts: " + updatedAccounts));
+      console.log(chalk.red("|\tDeleted accounts: " + deletedAccounts));
+
+      var toUpload = _.flatten(
+
+        [
+          createdAccounts.map(a => {
+
+            var tKeys = Object.keys(state.createdAccounts[a]);
+
+            var val = state.createdAccounts[a].storage[tKeys[0]];
+            if(val)
+              val = parseInt(val['newValue'], 16);
+            else
+              val = 0;
+
+            var options = { method: 'POST',
+              url: 'http://' + postgrestHost + '/SimpleStorage',
+              headers: 
+               { 'cache-control': 'no-cache',
+                 'content-type': 'application/json' },
+              body: {storedData: val, address: a}, // replace this with actual storage
+              json: true };
+
+              return rp(options).promise();
+          }),
+
+          updatedAccounts.map(a => {
+            var tKeys = Object.keys(state.updatedAccounts[a].storage)
+
+            var val = state.updatedAccounts[a].storage[tKeys[0]];
+            if(val)
+              val = parseInt(val['newValue'], 16);
+            else
+              val = 0;
+
+            var options = { method: 'PATCH',
+              url: 'http://' + postgrestHost + '/SimpleStorage?address=eq.' + a,
+              headers: 
+               { 'cache-control': 'no-cache',
+                 'content-type': 'application/json' },
+              body: {storedData: val}, // replace this with actual storage
+              json: true };
+
+              return rp(options).promise();
+          }),
+
+          deletedAccounts.map(a => {
+
+          })
+        ]
+      )
+
+      Promise.all(toUpload)
+      .catch(function (error){
+        console.log("Caught an error: " + error);
+      })
+      .then(function (error, response, body) {
+        // if (error){
+        //   throw new Error(error);
+        // } 
+        console.log(chalk.yellow("... done updating accounts"));
+      });
+  });
+
+  consumer.call('on', 'error', function (err) {
+    console.log("Caught error: " + err)
+  })
+
+
 });
-
-consumer.call('on', 'message', function (m) {
-
-    console.log(chalk.yellow("Incoming state update..."));
-
-    //console.log(m.value);
-
-    var state = JSON.parse(m.value);
-
-    // for now, only update accounts with changed storage
-    state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
-    //console.log("Cleaned state: " + JSON.stringify(state.updatedAccounts));
-
-    var createdAccounts = Object.keys(state.createdAccounts);
-    var updatedAccounts = Object.keys(state.updatedAccounts);
-    var deletedAccounts = Object.keys(state.deletedAccounts);
-
-    console.log(chalk.green("|\tCreated accounts: " + createdAccounts));
-    console.log(chalk.blue("|\tUpdated accounts: " + updatedAccounts));
-    console.log(chalk.red("|\tDeleted accounts: " + deletedAccounts));
-
-    var toUpload = _.flatten(
-
-      [
-        createdAccounts.map(a => {
-
-          var tKeys = Object.keys(state.createdAccounts[a]);
-
-          var val = state.createdAccounts[a].storage[tKeys[0]];
-          if(val)
-            val = parseInt(val['newValue'], 16);
-          else
-            val = 0;
-
-          var options = { method: 'POST',
-            url: 'http://' + postgrestHost + '/SimpleStorage',
-            headers: 
-             { 'cache-control': 'no-cache',
-               'content-type': 'application/json' },
-            body: {storedData: val, address: a}, // replace this with actual storage
-            json: true };
-
-            return rp(options).promise();
-        }),
-
-        updatedAccounts.map(a => {
-          var tKeys = Object.keys(state.updatedAccounts[a].storage)
-
-          var val = state.updatedAccounts[a].storage[tKeys[0]];
-          if(val)
-            val = parseInt(val['newValue'], 16);
-          else
-            val = 0;
-
-          var options = { method: 'PATCH',
-            url: 'http://' + postgrestHost + '/SimpleStorage?address=eq.' + a,
-            headers: 
-             { 'cache-control': 'no-cache',
-               'content-type': 'application/json' },
-            body: {storedData: val}, // replace this with actual storage
-            json: true };
-
-            return rp(options).promise();
-        }),
-
-        deletedAccounts.map(a => {
-
-        })
-      ]
-    )
-
-    Promise.all(toUpload)
-    .catch(function (error){
-      console.log("Caught an error: " + error);
-    })
-    .then(function (error, response, body) {
-      // if (error){
-      //   throw new Error(error);
-      // } 
-      console.log(chalk.yellow("... done updating accounts"));
-    });
-});
-
-consumer.call('on', 'error', function (err) {
-  console.log("Caught error: " + err)
-})
 
 
