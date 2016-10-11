@@ -9,30 +9,30 @@ function buildWithDocker { :; }
 
 function buildLocally
 {
-  cd $submoddir
+  cd $submod
   $pkgdir/BUILD
 }
 
 function deployWithDocker
 {
-  deploybase="$registry/$submoddir-base"
+  deploybase="$registry/$submod-base"
   if [[ -z $(docker images | awk '{print $1;}' | grep $deploybase) ]]
   then
-    echo >&2 "Error: missing deployment base image for $submoddir."
+    echo >&2 "Error: missing deployment base image for $submod."
     echo >&2 "       Have you run `$0 deploybase docker`?"
     exit 1
   fi
 
   ln -sf buildDocker/Dockerfile $pkgdir
   docker tag $deploybase deploybase
-  docker build -t $submoddir $pkgdir
+  docker build -t $submod $pkgdir
   docker rmi deploybase
   rm -f $pkgdir/Dockerfile
 }
 
 function deployLocally
 {
-  cd $submoddir
+  cd $submod
   $pkgdir/setup-deployment.sh
   sudo cp -a $builddir/* /
 }
@@ -42,9 +42,9 @@ function doInstallMod
   export builddir=$pkgdir/build
   if [[ -x $pkgdir/BUILD ]]
   then
-    echo "############### Building: $submoddir"
+    echo "############### Building: $submod"
     ($build)
-    echo "############### Deploying: $submoddir"
+    echo "############### Deploying: $submod"
     ($deploy)
     echo
   fi
@@ -52,18 +52,18 @@ function doInstallMod
 
 function doDeployBaseMod
 {
-  function doDocker
+  function dodocker
   {
-      echo "############### Building deploybase: $submoddir"
+      echo "############### Building deploybase: $submod"
       ln -sf buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
-      docker build -t $registry/$submoddir-base $pkgdir
+      docker build -t $registry/$submod-base $pkgdir
       rm -f $pkgdir/Dockerfile
   }
 
-  function doLocal
+  function dolocal
   {
-      echo "############### Installing deploybase: $submoddir"
-      $pkgdir/setup-deploybase.sh
+      echo "############### Installing deploybase: $submod"
+      $pkgdir/setup-deployment.sh
   }
 
   doit="do$1"
@@ -72,7 +72,7 @@ function doDeployBaseMod
   then
     $doit
   else
-    echo >&2 "Error: $submoddir must have an executable $pkgdir/setup-deployment.sh"
+    echo >&2 "Error: $submod must have an executable $pkgdir/setup-deployment.sh"
     exit 1
   fi
 }
@@ -126,8 +126,10 @@ esac
 
 for i in $(<mgitmods)
 do
-  export submoddir=`basename $i`
-  export pkgdir=$submoddir/pkg
+  export submod=`basename $i`
+  export pkgdir=$PWD/$submod/pkg
+  export builddir=$pkgdir/build
+  mkdir -p $builddir
   $doit
 done
 
