@@ -19,11 +19,11 @@ function deployWithDocker
   if [[ -z $(docker images | awk '{print $1;}' | grep $deploybase) ]]
   then
     echo >&2 "Error: missing deployment base image for $submod."
-    echo >&2 "       Have you run `$0 deploybase docker`?"
+    echo >&2 "       Have you run \`$0 deploybase docker\`?"
     exit 1
   fi
 
-  ln -sf buildDocker/Dockerfile $pkgdir
+  cp -f buildDocker/Dockerfile $pkgdir
   docker tag $deploybase deploybase
   docker build -t $submod $pkgdir
   docker rmi deploybase
@@ -55,7 +55,7 @@ function doDeployBaseMod
   function dodocker
   {
       echo "############### Building deploybase: $submod"
-      ln -sf buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
+      cp -f $PWD/buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
       docker build -t $registry/$submod-base $pkgdir
       rm -f $pkgdir/Dockerfile
   }
@@ -102,6 +102,7 @@ case $1 in
     ;;&
   "local"|"docker"|"local-to-docker"|"docker-to-local")
     doit=doInstallMod
+    shift
     ;;
   "deploybases")
     case $2 in
@@ -116,6 +117,7 @@ case $1 in
         exit 1
         ;;
     esac
+    shift 2
     ;;
   *)
     echo >&2 "To install, mode may be: local, docker, local-to-docker, docker-to-local"
@@ -124,7 +126,8 @@ case $1 in
     ;;
 esac
 
-for i in $(<mgitmods)
+modsToBuild=${1:-$(<mgitmods)}
+for i in $modsToBuild
 do
   export submod=`basename $i`
   export pkgdir=$PWD/$submod/pkg

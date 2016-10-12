@@ -43,17 +43,9 @@ services:
       - 8000:8000
     environment:
       fqdn: "${fqdn}"
-  explorer:
-    image: strato-explorer
-    ports:
-      - 9000:9000
-    depends_on:
-      - bloc
-    restart: always
-    environment:
-      peers: "${peers}"
   nginx:
     image: nginx
+    build: ./nginx
     restart: always
     ports:
       - "80:80"
