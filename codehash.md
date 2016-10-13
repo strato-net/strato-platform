@@ -26,7 +26,7 @@ contract Ac {
 }
 ```
 
-Even this contract is indistinguishable, since only the constructor is different and that is only encoded in the `bin-runtime`:
+Even this contract is indistinguishable, since only the constructor is different and that is only encoded in the `bin`:
 
 + codeHash: `d1d29ee74a6d03244189ddb39239adc2a5f77ba91a8df459f17a172dbd96213d`
 + bin-runtime: `60606040526008565b00`
@@ -41,7 +41,7 @@ contract Ad {
 }
 ```
 
-Note that we cannot rely on `bin-runtime` as a unique identifier - look for example at this contract:
+Note that we cannot rely on `bin` as a unique identifier - look for example at this contract:
 
 + codeHash: `d1d29ee74a6d03244189ddb39239adc2a5f77ba91a8df459f17a172dbd96213d`
 + bin-runtime: `60606040526008565b00`
