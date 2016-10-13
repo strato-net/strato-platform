@@ -36,10 +36,16 @@ var config = {
   port: 5432
 };
 
+var nameSchema = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" ("codeHash" text PRIMARY KEY, "name" text); COMMIT;'
+
 // create the pool somewhere globally so its lifetime
 // lasts for as long as your app is running
 var pool = new Pool(config)
 
+
+pool
+  .query(nameSchema)
+  .then(r => console.log("Created contract table"))
 ////////////////////
 
 app.post('/', function (req, res, next) {
@@ -53,24 +59,20 @@ app.post('/', function (req, res, next) {
   res.send(schema);
   pool
     .query(schema)
-    .then(function() {
-      console.log("Hello cirrus")
-    })
+    .then(_ => console.log("done creating new schema for contract"))
   next()
 });
 
 app.get('/', function (req, res, next) {
-  res.send('Hello World!');
+  res.send('Hello cirrus!');
   pool
-    .query("SELECT * from postgres;")
-    .then(function() {
-      console.log("Hello cirrus")
-    })
+    .query("select count(*) from information_schema.tables;")
+    .then(r => console.log(JSON.stringify(r)))
   next()
 });
 
 app.listen(3333, cors(), function (req, res) {
-  console.log('Example app listening on port 3333!');
+  console.log('cirrus is listening on port 3333!');
 });
 
 module.exports = app;

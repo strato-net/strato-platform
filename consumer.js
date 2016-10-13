@@ -50,9 +50,11 @@ rp(options).promise().then(r => {
 
         var state = JSON.parse(m.value);
 
+        // for now, remove accounts that have no code
+        state.createdAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
         // for now, only update accounts with changed storage
         state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
-        //console.log("Cleaned state: " + JSON.stringify(state.updatedAccounts));
+        
 
         var createdAccounts = Object.keys(state.createdAccounts);
         var updatedAccounts = Object.keys(state.updatedAccounts);
@@ -66,6 +68,8 @@ rp(options).promise().then(r => {
 
           [
             createdAccounts.map(a => {
+
+              // console.log("Account just created: " + JSON.stringify(state.createdAccounts[a]))
 
               var tKeys = Object.keys(state.createdAccounts[a]);
 
@@ -84,6 +88,7 @@ rp(options).promise().then(r => {
                 json: true };
 
                 return rp(options).promise();
+
             }),
 
             updatedAccounts.map(a => {
