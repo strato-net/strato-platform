@@ -127,7 +127,7 @@ case $1 in
     ;;
 esac
 
-modsToBuild=${1:-$(<mgitmods)}
+modsToBuild=${@:-$(<mgitmods)}
 for i in $modsToBuild
 do
   export submod=`basename $i`
