@@ -93,7 +93,7 @@ contract Bb {
 
 ## Caveats
 
-If we mix non-unique and unique features, we will only be able to distinguish variables that are shared amongst them, even if they are distinct:
+If we mix non-unique and unique features, we will only be able to distinguish variables that are shared amongst them, even if the contracts themselves are distinct:
 
 ### Contract Ca, Cb
 
