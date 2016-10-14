@@ -37,18 +37,20 @@ services:
       peers : "${peers}"
       genesisBlock: "${genesisBlock}"
   bloc:
-    image: auth.blockapps.net:5000/blockapps/bloc
+    image: bloc
     restart: always
     ports:
       - 8000:8000
     environment:
-      fqdn: "${fqdn}"
+      fqdn: "${fqdn}/strato-api"
   nginx:
-    image: nginx
-    build: ./nginx
+    image: nginx-packager
     restart: always
+    volumes: 
+      - /etc/ssl/private:/etc/ssl/private
+      - /etc/ssl/certs:/etc/ssl/certs
     ports:
-      - "80:80"
+      - "443:443"
     depends_on:
       - strato
       - bloc

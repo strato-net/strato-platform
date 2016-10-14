@@ -56,7 +56,7 @@ function doDeployBaseMod
   {
       echo "############### Building deploybase: $submod"
       cp -f $PWD/buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
-      docker rmi -f $registry/$submod-base
+      docker rmi $registry/$submod-base >&/dev/null || true
       docker build -t $registry/$submod-base $pkgdir
       rm -f $pkgdir/Dockerfile
   }
