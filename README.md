@@ -74,6 +74,8 @@ This is controlled by the `<submod>/pkg/setup-deployment.sh` script, which for
 source or depends on it; e.g. Ubuntu packages, npm packages, and so on.  Nothing
 that ever changes in our own repos should affect this script.
 
+The Dockerfile for this is `buildDocker/Dockerfile-deploybase`.
+
 ### Deployment
 
 This is an entirely automatic process that simply copies, on top of the runtime
@@ -83,3 +85,4 @@ construction.  The startup script for the submodule is `<submod>/pkg/doit.sh`,
 which is set as the `ENTRYPOINT` of the docker image if `local-to-docker` is
 used.
 
+The Dockerfile for this is `buildDocker/Dockerfile`.
