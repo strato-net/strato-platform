@@ -3,6 +3,10 @@ var Promise = require("bluebird");
 var rp = require("request-promise");
 var yaml = require('yaml-parser');
 var child_process = require("child_process");
+var bajs = require('blockapps-js');
+bajs.setProfile('strato-dev', 'http://strato')
+
+var util = require('./lib/util');
 
 var chalk = require('chalk');
 
@@ -22,10 +26,23 @@ var options = { method: 'GET',
             url: 'http://' + stratoHost + '/' + '/eth/v1.2/uuid',
             json: true };
 
+
+// cleanState :: Object -> [{key: value}]
+var cleanState = s => _.map(o => 
+                    _.flow(
+                      _.pickBy(v => (typeof v !== `string`) ? true : v.indexOf('function (') === -1)
+                     ,_.pickBy(v => (typeof v !== `string`) ? true : v.indexOf('mapping (')  === -1)
+                     ,_.mapValues(v => (typeof v !== 'object' || v === 'null') ? v : (v.key === undefined ? v : v.key))
+                     //,_.merge({address: o.address}) // PRIMARY KEY
+                    )(s)
+                )
+
+
+global.contractMap = {}
+
 rp(options).promise().then(r => {
 
   var topic = 'statediff_' + r.peerId; 
-
 
   var offsets = Promise.promisifyAll(new kafka.Offset(client));
   var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
@@ -54,7 +71,6 @@ rp(options).promise().then(r => {
         state.createdAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
         // for now, only update accounts with changed storage
         state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
-        
 
         var createdAccounts = Object.keys(state.createdAccounts);
         var updatedAccounts = Object.keys(state.updatedAccounts);
@@ -69,18 +85,40 @@ rp(options).promise().then(r => {
           [
             createdAccounts.map(a => {
 
-              // console.log("Account just created: " + JSON.stringify(state.createdAccounts[a]))
+              //console.log("Account just created: " + JSON.stringify(state.createdAccounts[a]))
 
               var tKeys = Object.keys(state.createdAccounts[a]);
 
+              console.log("Contract name for codeHash is: " + global.contractMap[state.createdAccounts[a].codeHash].name);
+              
+              var o = bajs.Solidity.attach(global.contractMap[state.createdAccounts[a].codeHash]);
+              console.log("preState: " + JSON.stringify(o.state))
+
+              var p = Promise.props(o.state).then(function(sVars) {
+                var parsed = traverse(sVars).forEach(function (x) {
+                  if (Buffer.isBuffer(x)) {
+                    this.update(x.toString());
+                  }
+                });
+
+               return sVars;
+              });
+
+              console.log("postState: " + JSON.stringify(p))
+
+              //o.state.props().then(JSON.stringify).then(console.log);
+              //console.log("Contract xabi for codeHash is: " + global.contractMap[state.createdAccounts[a].codeHash].xabi);              
+              
               var val = state.createdAccounts[a].storage[tKeys[0]];
               if(val)
                 val = parseInt(val['newValue'], 16);
               else
                 val = 0;
+  
+              // do `codeHash` -> name lookup here
 
               var options = { method: 'POST',
-                url: 'http://' + postgrestHost + '/SimpleStorage',
+                url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
                 headers: 
                  { 'cache-control': 'no-cache',
                    'content-type': 'application/json' },
@@ -98,10 +136,10 @@ rp(options).promise().then(r => {
               if(val)
                 val = parseInt(val['newValue'], 16);
               else
-                val = 0;
+                val = 0; 
 
               var options = { method: 'PATCH',
-                url: 'http://' + postgrestHost + '/SimpleStorage?address=eq.' + a,
+                url: 'http://' + postgrestHost + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
                 headers: 
                  { 'cache-control': 'no-cache',
                    'content-type': 'application/json' },
@@ -133,5 +171,3 @@ rp(options).promise().then(r => {
     console.log("Caught error: " + err)
   })
 })
-
-

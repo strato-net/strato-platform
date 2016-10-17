@@ -10,6 +10,11 @@ With `cirrus`, you can search your `strato` blockchain! It leverages [postgrest]
 docker-compose up
 ```
 
+## tutorial
+
+1. `POST` the output of `bloc`'s `/state` route to `cirrus:3333/`
+2. run `e2e/contract.test.js`
+
 ## routes
 
 | Type   |      Route      |  Content-type | Info | Result |

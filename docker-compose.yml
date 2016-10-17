@@ -29,7 +29,7 @@ services:
       - '3001:3001'
     networks:
       - docker_default
-  #  entrypoint: ./wait-for-it.sh postgres:5432
+   # entrypoint: ./wait-for-it.sh postgres:5432
 
   cirrus:
     build: .
