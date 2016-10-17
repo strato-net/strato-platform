@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -e
+
+if [[ $# -eq 0 ]]
+then
+  echo >&2 "Must pass a branch name that exists in strato already."
+  exit 1;
+fi
+branch=$1
+
+nonStratoDirs=( 
+  . 
+  bloc strato-explorer 
+  postgres-packager zookeeper-packager
+  kafka-packager nginx-packager
+)
+
+git config credential.helper cache
+for dir in ${nonStratoDirs[@]}
+do
+  git -C $dir checkout -b $branch
+  git -C $dir push --set-upstream origin $branch
+done
+git credential-cache exit
+
