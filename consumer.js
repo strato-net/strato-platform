@@ -8,6 +8,8 @@ bajs.setProfile('strato-dev', 'http://strato')
 
 var util = require('./lib/util');
 
+var traverse = require('traverse');
+
 var chalk = require('chalk');
 
 // Load the fp build.
@@ -28,18 +30,44 @@ var options = { method: 'GET',
 
 
 // cleanState :: Object -> [{key: value}]
-var cleanState = s => _.map(o => 
-                    _.flow(
-                      _.pickBy(v => (typeof v !== `string`) ? true : v.indexOf('function (') === -1)
-                     ,_.pickBy(v => (typeof v !== `string`) ? true : v.indexOf('mapping (')  === -1)
-                     ,_.mapValues(v => (typeof v !== 'object' || v === 'null') ? v : (v.key === undefined ? v : v.key))
-                     //,_.merge({address: o.address}) // PRIMARY KEY
-                    )(s)
-                )
+// TODO add filtering on `public` here?
+var cleanState = function(o) {
+                    return _.flow(
+                      _.pickBy(v => (typeof v !== `string`) ? true : v.indexOf('function (') === -1) // remove functions
+                     ,_.pickBy(v => (typeof v !== `string`) ? true : v.indexOf('mapping (')  === -1) // remove mappings
+                     ,_.mapValues(v => (typeof v !== 'object' || v === 'null') ? v : (v.key === undefined ? v : v.key)) // reduce enums
+                    )(o)
+                  };
 
+
+var stateToBody = function(state, address) {
+
+  var xabi = global.contractMap[state[address].codeHash];
+  console.log("Attaching: " + xabi.name);
+ 
+  xabi.address = address;
+
+  //console.log(JSON.stringify(xabi));
+
+  try {
+    var o = bajs.Solidity.attach(xabi);
+    var p = Promise.props(o.state).then(function(sVars) {
+      var parsed = traverse(sVars).forEach(function (x) {
+        if (Buffer.isBuffer(x)) {
+          this.update(x.toString());
+        }
+      });
+     return sVars;
+    });
+    return p;
+  } catch (error) {
+    console.log(chalk.red("Failed to attach solidity object: " + error));
+    return Promise.props({});
+  }
+}
 
 global.contractMap = {}
-
+ 
 rp(options).promise().then(r => {
 
   var topic = 'statediff_' + r.peerId; 
@@ -63,8 +91,6 @@ rp(options).promise().then(r => {
 
         console.log(chalk.yellow("Incoming state update..."));
 
-        //console.log(m.value);
-
         var state = JSON.parse(m.value);
 
         // for now, remove accounts that have no code
@@ -85,73 +111,53 @@ rp(options).promise().then(r => {
           [
             createdAccounts.map(a => {
 
-              //console.log("Account just created: " + JSON.stringify(state.createdAccounts[a]))
+              stateToBody(state.createdAccounts, a)
+                .then(JSON.stringify)
+                .then(JSON.parse)
+                .then(cleanState)
+                .then(x => {
+                  x.address = a;
+                  var options = { method: 'POST',
+                    url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
+                    headers: 
+                     { 'cache-control': 'no-cache',
+                       'content-type': 'application/json' },
+                    body: x,
+                    json: true };
 
-              var tKeys = Object.keys(state.createdAccounts[a]);
-
-              console.log("Contract name for codeHash is: " + global.contractMap[state.createdAccounts[a].codeHash].name);
-              
-              var o = bajs.Solidity.attach(global.contractMap[state.createdAccounts[a].codeHash]);
-              console.log("preState: " + JSON.stringify(o.state))
-
-              var p = Promise.props(o.state).then(function(sVars) {
-                var parsed = traverse(sVars).forEach(function (x) {
-                  if (Buffer.isBuffer(x)) {
-                    this.update(x.toString());
-                  }
-                });
-
-               return sVars;
-              });
-
-              console.log("postState: " + JSON.stringify(p))
-
-              //o.state.props().then(JSON.stringify).then(console.log);
-              //console.log("Contract xabi for codeHash is: " + global.contractMap[state.createdAccounts[a].codeHash].xabi);              
-              
-              var val = state.createdAccounts[a].storage[tKeys[0]];
-              if(val)
-                val = parseInt(val['newValue'], 16);
-              else
-                val = 0;
-  
-              // do `codeHash` -> name lookup here
-
-              var options = { method: 'POST',
-                url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
-                headers: 
-                 { 'cache-control': 'no-cache',
-                   'content-type': 'application/json' },
-                body: {storedData: val, address: a}, // replace this with actual storage
-                json: true };
-
-                return rp(options).promise();
-
+                    return rp(options).promise();
+                  });
             }),
 
             updatedAccounts.map(a => {
-              var tKeys = Object.keys(state.updatedAccounts[a].storage)
 
-              var val = state.updatedAccounts[a].storage[tKeys[0]];
-              if(val)
-                val = parseInt(val['newValue'], 16);
-              else
-                val = 0; 
+              // this was useful when not using blockapps-js
+              // var tKeys = Object.keys(state.updatedAccounts[a].storage)
+              // var val = state.updatedAccounts[a].storage[tKeys[0]];
+              // if(val)
+              //   val = parseInt(val['newValue'], 16);
+              // else
+              //   val = 0; 
 
-              var options = { method: 'PATCH',
-                url: 'http://' + postgrestHost + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
-                headers: 
-                 { 'cache-control': 'no-cache',
-                   'content-type': 'application/json' },
-                body: {storedData: val}, // replace this with actual storage
-                json: true };
+              stateToBody(state.updatedAccounts, a)
+                .then(JSON.stringify)
+                .then(JSON.parse)
+                .then(cleanState)
+                .then(x => {
+                  x.address = a;
+                  var options = { method: 'PATCH',
+                    url: 'http://' + postgrestHost + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
+                    headers: 
+                     { 'cache-control': 'no-cache',
+                       'content-type': 'application/json' },
+                    body: x,
+                    json: true };
 
-                return rp(options).promise();
+                    return rp(options).promise();
+                });
             }),
 
-            deletedAccounts.map(a => {
-
-            })
+            deletedAccounts.map(a => {})
           ]
         )
 

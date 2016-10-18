@@ -36,11 +36,11 @@ var toSchema = typeMapping => _.flow(
                                 ,_.mapValues(v => typeMapping[v])
                                 ,_.merge({address: "text PRIMARY KEY"})
                               )
-
+ 
 // this should arguably be replaced by `sequelize`
 var toSchemaString = function(json){ 
 
-  var typeMapping = {'String':'text DEFAULT "\x22""\x22"', 'Int':'integer DEFAULT 0', 'Address':'text', 'json' : 'json DEFAULT {}'}
+  var typeMapping = {'String':'text', 'Int':'integer DEFAULT 0', 'Address':'text', 'json' : 'json DEFAULT {}'}
 
   var types = toSchema(typeMapping)(json.xabi.vars)
   var end = __.map(types, (v, k) => "\x22"+ k + "\x22" + " " + v);
