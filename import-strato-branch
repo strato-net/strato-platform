@@ -16,10 +16,10 @@ nonStratoDirs=(
   kafka-packager nginx-packager
 )
 
-git config credential.helper cache
+git config --global credential.helper cache
 for dir in ${nonStratoDirs[@]}
 do
-  git -C $dir checkout -b $branch
+  git -C $dir checkout -B $branch
   git -C $dir push --set-upstream origin $branch
 done
 git credential-cache exit
