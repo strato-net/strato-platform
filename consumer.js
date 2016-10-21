@@ -41,16 +41,20 @@ var cleanState = function(o) {
 
 
 var stateToBody = function(state, address) {
-
   var xabi = global.contractMap[state[address].codeHash];
+  var tmpStr = JSON.stringify(global.contractMap[state[address].codeHash]);
+  var parsed = JSON.parse(tmpStr);
+ 
   console.log("Attaching: " + xabi.name);
  
   xabi.address = address;
+  parsed.address = address;
 
   //console.log(JSON.stringify(xabi));
 
   try {
-    var o = bajs.Solidity.attach(xabi);
+    //var o = bajs.Solidity.attach(xabi);
+    var o = bajs.Solidity.attach(parsed);
     var p = Promise.props(o.state).then(function(sVars) {
       var parsed = traverse(sVars).forEach(function (x) {
         if (Buffer.isBuffer(x)) {
@@ -117,6 +121,7 @@ rp(options).promise().then(r => {
                 .then(cleanState)
                 .then(x => {
                   x.address = a;
+		  console.log(x);
                   var options = { method: 'POST',
                     url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
                     headers: 
