@@ -134,6 +134,6 @@ do
   export pkgdir=$PWD/$submod/pkg
   export builddir=$pkgdir/build
   mkdir -p $builddir
-  $doit
+  [[ -x $pkgdir/BUILD ]] && $doit
 done
 
