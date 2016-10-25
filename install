@@ -23,11 +23,12 @@ function deployWithDocker
     exit 1
   fi
 
-  cp -f buildDocker/Dockerfile $pkgdir
+  cp $pkgdir/doit.sh $workdir
+  cp -f buildDocker/Dockerfile $workdir
   docker tag $deploybase deploybase
-  docker build -t $submod $pkgdir
+  docker build -t $submod $workdir
   docker rmi deploybase
-  rm -f $pkgdir/Dockerfile
+  rm -f $workdir/Dockerfile
 }
 
 function deployLocally
@@ -39,7 +40,6 @@ function deployLocally
 
 function doInstallMod
 {
-  export builddir=$pkgdir/build
   if [[ -x $pkgdir/BUILD ]]
   then
     echo "############### Building: $submod"
@@ -132,7 +132,8 @@ for i in $modsToBuild
 do
   export submod=`basename $i`
   export pkgdir=$PWD/$submod/pkg
-  export builddir=$pkgdir/build
+  export workdir=$PWD/.silo-work/$submod
+  export builddir=$workdir/build
   mkdir -p $builddir
   [[ -x $pkgdir/BUILD ]] && $doit
 done
