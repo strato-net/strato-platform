@@ -30,7 +30,6 @@ services:
       - "30303:30303"
       - "30303:30303/udp"
     environment:
-      fqdn : "${fqdn}"
       networkId : "${networkId}"
       genesis: "${genesis}"
       genesisBlock: "${genesisBlock}"
