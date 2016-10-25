@@ -27,20 +27,18 @@ services:
       - postgres
     restart: always
     ports:
-      - "3000:3000"
       - "30303:30303"
       - "30303:30303/udp"
     environment:
       fqdn : "${fqdn}"
-      mode : "${mode}"
       networkId : "${networkId}"
-      peers : "${peers}"
+      genesis: "${genesis}"
       genesisBlock: "${genesisBlock}"
+      bootnode: "${bootnode}"
+      addBootnodes: "${addBootnodes}"
   bloc:
     image: bloc
     restart: always
-    ports:
-      - 8000:8000
     environment:
       fqdn: "${fqdn}/strato-api"
   nginx:
