@@ -35,6 +35,9 @@ services:
       genesisBlock: "${genesisBlock}"
       bootnode: "${bootnode}"
       addBootnodes: "${addBootnodes}"
+      instantMining: "${instantMining}"
+      lazyBlocks: "${lazyBlocks}"
+      miningAlgorithm: "${miningAlgorithm}"
   bloc:
     image: bloc
     restart: always
