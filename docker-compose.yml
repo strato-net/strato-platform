@@ -39,8 +39,6 @@ services:
   bloc:
     image: bloc
     restart: always
-    environment:
-      fqdn: "${fqdn}/strato-api"
   nginx:
     image: nginx-packager
     restart: always
