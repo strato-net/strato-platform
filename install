@@ -23,11 +23,12 @@ function deployWithDocker
     exit 1
   fi
 
-  cp -f buildDocker/Dockerfile $pkgdir
+  cp $pkgdir/doit.sh $workdir
+  cp -f buildDocker/Dockerfile $workdir
   docker tag $deploybase deploybase
-  docker build -t $submod $pkgdir
+  docker build -t $submod $workdir
   docker rmi deploybase
-  rm -f $pkgdir/Dockerfile
+  rm -f $workdir/Dockerfile
 }
 
 function deployLocally
@@ -39,7 +40,6 @@ function deployLocally
 
 function doInstallMod
 {
-  export builddir=$pkgdir/build
   if [[ -x $pkgdir/BUILD ]]
   then
     echo "############### Building: $submod"
@@ -50,11 +50,34 @@ function doInstallMod
   fi
 }
 
+function doBuildEnvMod
+{
+  function dodocker
+  {
+      echo "############### Building build environment: $submod"
+      cp -f $PWD/buildDocker/Dockerfile-buildenv $pkgdir/Dockerfile
+      docker rmi $registry/$submod-build >&/dev/null || true
+      docker build -t $registry/$submod-build $pkgdir
+      rm -f $pkgdir/Dockerfile
+  }
+
+  function dolocal
+  {
+      echo "############### Installing build environment: $submod"
+      sudo=sudo $pkgdir/setup-build.sh
+  }
+
+  if [[ -x $pkgdir/setup-build.sh ]]
+  then 
+    do$1
+  fi
+}
+
 function doDeployBaseMod
 {
   function dodocker
   {
-      echo "############### Building deploybase: $submod"
+      echo "############### Building deployment environment: $submod"
       cp -f $PWD/buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
       docker rmi $registry/$submod-base >&/dev/null || true
       docker build -t $registry/$submod-base $pkgdir
@@ -63,15 +86,13 @@ function doDeployBaseMod
 
   function dolocal
   {
-      echo "############### Installing deploybase: $submod"
-      $pkgdir/setup-deployment.sh
+      echo "############### Installing deployment environment: $submod"
+      sudo=sudo $pkgdir/setup-deployment.sh
   }
-
-  doit="do$1"
 
   if [[ -x $pkgdir/setup-deployment.sh ]]
   then
-    $doit
+    do$1
   else
     echo >&2 "Error: $submod must have an executable $pkgdir/setup-deployment.sh"
     exit 1
@@ -105,7 +126,22 @@ case $1 in
     doit=doInstallMod
     shift
     ;;
-  "deploybases")
+  "build-env")
+    case $2 in
+      "docker")
+        doit="doBuildEnvMod docker"
+        ;;
+      "local")
+        doit="doBuildEnvMod local"
+        ;;
+      *)
+        echo >&2 "Mode '$1' takes a second argument: docker, local"
+        exit 1;
+        ;;
+    esac
+    shift 2
+    ;;
+  "deploy-env")
     case $2 in
       "docker")
         doit="doDeployBaseMod docker"
@@ -114,7 +150,7 @@ case $1 in
         doit="doDeployBaseMod local"
         ;;
       *)
-        echo >&2 "Mode 'deploybases' takes a second argument: docker, local"
+        echo >&2 "Mode '$1' takes a second argument: docker, local"
         exit 1
         ;;
     esac
@@ -122,7 +158,8 @@ case $1 in
     ;;
   *)
     echo >&2 "To install, mode may be: local, docker, local-to-docker, docker-to-local"
-    echo >&2 "To build the deploybases, mode may be: deploybases"
+    echo >&2 "To create the build environment, mode may be: build-env"
+    echo >&2 "To create the deployment environment, mode may be: deploy-env"
     exit 1
     ;;
 esac
@@ -132,7 +169,8 @@ for i in $modsToBuild
 do
   export submod=`basename $i`
   export pkgdir=$PWD/$submod/pkg
-  export builddir=$pkgdir/build
+  export workdir=$PWD/.silo-work/$submod
+  export builddir=$workdir/build
   mkdir -p $builddir
   [[ -x $pkgdir/BUILD ]] && $doit
 done
