@@ -13,11 +13,14 @@ incremental build piece.
 
 Run
 ```
-./install deploybases (local|docker) [module-name ..]
+./install build-env local [module-name ..]
+./install deploy-env (local|docker) [module-name ..]
 ```
-to build the runtime dependencies for the modules.  If `local`, these
-dependencies are installed directly on your machine; if `docker`, a set of
-docker images is built.
+to install the build dependencies and to build the runtime dependencies for the
+modules.  If `local`, these dependencies are installed directly on your machine;
+if `docker`, a set of docker images is built.  Currently we don't support
+dockerized build environments.  In fact, the only OS we support is Ubuntu 16.04,
+because of library versioning in the dependencies of `solc`.
 
 This command only needs to be run again if one of the scripts
 `<submod>/pkg/setup-deployment.sh` changes, which should be almost never.
@@ -51,17 +54,23 @@ directories.
 
 ### Build-time dependencies
 
-This has no support currently; we simply assume that all the necessary tools are
-present on your machine.  If not, you'll get an error, which may not be
-especially obvious.
+This is controlled by the `<submod>/pkg/setup-build.sh` script, which for
+`./install build-env docker` is run inside a Dockerfile building on Ubuntu
+16.04.  The purpose of this script is to install any programs or libraries
+required during the build process; none of these should be part of our own
+repos, and none of it should be copied directly to `$builddir`; use
+`setup-deployment` for that.
+
+The Dockerfile for this is `buildDocker/Dockerfile-buildenv`
 
 ### Building
 
 This is controlled by the `<submod>/pkg/BUILD` script, which is provided with
 some environment variables:
 - `submod`: the name of the submodule
+- `workdir`: the directory where work is done (`.silo-work/<submod>`)
 - `builddir`: the directory where all build products must be placed (this is
-  always `<submod>/pkg/build`)
+  always `.silo-work/<submod>/build`)
 - `pkgdir`: the package directory, i.e. `<submod>/pkg`
 It is not a good idea to rely on the actual values of these variables, though;
 use them exclusively symbolically in the `BUILD` scripts.
@@ -69,7 +78,7 @@ use them exclusively symbolically in the `BUILD` scripts.
 ### Runtime dependencies
 
 This is controlled by the `<submod>/pkg/setup-deployment.sh` script, which for
-`./install deploybases docker` is run inside a Dockerfile building on Ubuntu
+`./install deploy-env docker` is run inside a Dockerfile building on Ubuntu
 16.04.  The purpose of this script is to install anything that is _not_ local
 source or depends on it; e.g. Ubuntu packages, npm packages, and so on.  Nothing
 that ever changes in our own repos should affect this script.
