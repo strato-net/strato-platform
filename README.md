@@ -45,10 +45,12 @@ is true whether or not docker is used.
 ## Architecture
 
 The build system has the following pieces:
+
 1. The build-time dependency environment (currently unimplemented)
 2. Building local sources
 3. The runtime dependency environment
 4. Creating the deployment from the build products.
+
 These stages are controlled by scripts located in the `<submod>/pkg`
 directories.
 
