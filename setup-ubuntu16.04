@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -e
+
+docker=${docker:-false}
+if [[ !$docker ]]; then
+  echo "Installing docker..."
+  sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys
+  58118E89F3A912897C070ADBF76221572C52609D
+  echo "deb https://apt.dockerproject.org/repo ubuntu-xenial main" \
+    | sudo tee /etc/apt/sources.list.d/docker.list
+  sudo apt-get update
+  sudo apt-get -y install docker-engine
+  sudo usermod -aG docker blockapps
+  docker=true exec $0
+fi
+docker login -u blockapps -p blockAPPS123 auth.blockapps.net
+
+echo "Installing docker-compose..."
+sudo curl -L \
+  "https://github.com/docker/compose/releases/download/1.8.1/docker-compose-$(uname -s)-$(uname -m)" \ 
+  -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+echo "Copying certs..."
+if [[ -f server.pem ]]; then
+  sudo mv server.pem /etc/ssl/certs
+else
+  echo >&2 "You must place server.pem into this directory"
+fi
+
+if [[ -f server.key ]]; then
+  sudo mv server.key /etc/ssl/private
+else
+  echo >&2 "You must place server.key into this directory"
+fi
+
+echo
+echo "Now get the 'Raw' URL for blockapps/silo/docker-compose.yml on your"
+echo "favorite branch from github and wget it into ./docker-compose.yml."
+echo
+echo "Run the following sed command:"
+echo "    sed 'i s@image: \(.*\)@image: auth.blockapps.net:5000/blockapps\1:<tag>@' docker-compose.yml
+echo "and set and export any environment variables you want that are mentioned."
+echo "Finally, run"
+echo "    docker-compose up -d"
+echo
