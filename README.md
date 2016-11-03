@@ -97,3 +97,95 @@ which is set as the `ENTRYPOINT` of the docker image if `local-to-docker` is
 used.
 
 The Dockerfile for this is `buildDocker/Dockerfile`.
+
+# Running
+
+Once the build and deploy steps are completed, you'll have either docker images
+or a local install of strato.  
+
+## Running a local install
+
+TBD
+
+## Running the docker images
+
+You will need Docker Compose at least version 1.7.  The basic launch command is
+simply
+```
+docker-compose up -d
+```
+in the directory with the `docker-compose.yml` file.  This starts strato, the
+supporting services (postgres, kafka, zookeeper, nginx) and a bloc server
+container.  The blockchain will be in "dev mode", with blocks mined instantly
+and the genesis block populated with a "faucet" account that you can get free
+ether from.  To change these settings, you need to set environment variables
+from those under the `strato` entry of the `docker-compose.yml`.  For instance,
+this starts a mining node:
+```
+genesis=mixed10k instantMining=false lazyBlocks=false miningAlgorithm=SHA
+docker-compose up -d
+```
+The genesis block is pre-set to 10k difficulty, which gives initially quick
+block times.  The mining algorithm of SHA is the only one we currently
+implement.
+
+It is possible to network several strato nodes.  To do that, each one must be
+able to listen on port 30303 tcp/udp on its respective machine.  One of them
+will be the "bootnode", and is launched as above.  The others are launched using
+the `bootnode` environment variable:
+```
+bootnode=1.2.3.4 docker-compose up -d
+```
+This will connect them to the boot node and they will then exchange blocks and
+transactions.
+
+To use strato-api, you must be able to connect to nginx on port 443 using HTTPS.
+Therefore, the strato machine must have the SSL certs available at
+`/etc/ssl/certs/server.pem` and `/etc/ssl/private/server.key`.  Even for the
+docker deployment, these files should be on the local filesystem and not inside
+a docker container.  The certs ought to match your domain (e.g. blockapps.net).
+
+### Logs
+
+Logs for the docker containers are available in several ways.  All of them
+provide the output of their main process via
+```
+docker-compose logs -f <service> # i.e. strato, bloc, nginx
+```
+The strato container violates the Docker philosophy and runs many processes, so
+they keep their logs inside the container at `/var/lib/strato/logs` under the
+name of each process.  The important ones are `ethereum-vm` (which should show
+transactions being executed and blocks being added), `strato-p2p-client` (which
+should show blocks being received from peers), and `strato-index` (which should
+show blocks being put in the SQL database.  If this stops, the system is
+non-functional).
+
+## Resource concerns
+
+Strato makes demands of the processor, the network, and the filesystem.
+
+### Processor
+
+The three most computationally intensive processes are ethereum-vm, strato-api,
+and strato-adit.  The latter, in particular, should be given an entire core to
+itself, so that the mining speed is not affected by the load on the rest of the
+machine.  strato-api uses enormous processing resources under high load, easily
+most of the available power because it is multithreaded and therefore can
+operate on many cores simultaneously.  ethereum-vm uses a more modest amount
+because it is largely single-threaded, but still potentially more than one core.
+At least four cores are therefore advised.
+
+### Network
+
+The network demands are comparatively light, and network speed has not yet come
+to be a significant factor in overall performance.  The network is used both by
+strato-api (as a server) and both strato-p2p-client and strato-p2p-server, all
+of which do have to receive large amounts of data in the form of transactions
+and blocks.
+
+### Filesystem
+
+The filesystem is controlled by the SQL database for the most part.  Its
+performance is a significant factor in overall performance, and therefore needs
+to be optimized.  Simply using an SSD for storage contributes greatly and is
+virtually required.
