@@ -40,8 +40,8 @@ echo
 echo "Now get the 'Raw' URL for blockapps/silo/docker-compose.yml on your"
 echo "favorite branch from github and wget it into ./docker-compose.yml."
 echo
-echo "Run the following sed command:"
-echo "    sed 'i s@image: \(.*\)@image: auth.blockapps.net:5000/blockapps\1:<tag>@' docker-compose.yml"
+echo "Run the following sed command, replacing <tag> with your tag:"
+echo "    sed -i 's@image: \(.*\)@image: auth.blockapps.net:5000/blockapps/\1:<tag>@' docker-compose.yml"
 echo "and set and export any environment variables you want that are mentioned."
 echo "Finally, run"
 echo "    docker login -u blockapps -p blockAPPS123 auth.blockapps.net:5000"
