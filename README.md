@@ -4,6 +4,20 @@ This meta-meta repo provides the deployment framework for the `strato` product.
 Its `mgitmods` tracks the various modules, some of which (i.e. `strato`) are
 themselves meta-repos managed by `mgit`.
 
+## Pre-build
+
+To prepare a completely new (Ubuntu 16.04) machine to use this repo, you must run the
+`bootstrap` script provided (to get it without cloning the repo, `wget` the
+"Raw" file from github) with the desired branch of `silo`.  That is,
+```
+# wget https://raw.githubusercontent.com/blockapps/silo/132922485_transaction-batching/bootstrap?token=<something> -O bootstrap  
+chmod +x bootstrap
+./bootstrap <branch>
+```
+After this is complete, you will have the Haskell Stack installed, our repo
+management tool `mgit` built and installed, and `silo` cloned into the desired
+branch.  Now you may proceed with the next step.
+
 ## Building
 
 The build process as-of-yet has two stages: a one-time setup piece and an
@@ -98,16 +112,16 @@ used.
 
 The Dockerfile for this is `buildDocker/Dockerfile`.
 
-# Running
+## Running
 
 Once the build and deploy steps are completed, you'll have either docker images
 or a local install of strato.  
 
-## Running a local install
+### Running a local install
 
 TBD
 
-## Running the docker images
+### Running the docker images
 
 You will need Docker Compose at least version 1.7.  The basic launch command is
 simply
@@ -145,7 +159,7 @@ Therefore, the strato machine must have the SSL certs available at
 docker deployment, these files should be on the local filesystem and not inside
 a docker container.  The certs ought to match your domain (e.g. blockapps.net).
 
-### Logs
+#### Logs
 
 Logs for the docker containers are available in several ways.  All of them
 provide the output of their main process via
@@ -160,11 +174,11 @@ should show blocks being received from peers), and `strato-index` (which should
 show blocks being put in the SQL database.  If this stops, the system is
 non-functional).
 
-## Resource concerns
+### Resource concerns
 
 Strato makes demands of the processor, the network, and the filesystem.
 
-### Processor
+#### Processor
 
 The three most computationally intensive processes are ethereum-vm, strato-api,
 and strato-adit.  The latter, in particular, should be given an entire core to
@@ -175,7 +189,7 @@ operate on many cores simultaneously.  ethereum-vm uses a more modest amount
 because it is largely single-threaded, but still potentially more than one core.
 At least four cores are therefore advised.
 
-### Network
+#### Network
 
 The network demands are comparatively light, and network speed has not yet come
 to be a significant factor in overall performance.  The network is used both by
@@ -183,7 +197,7 @@ strato-api (as a server) and both strato-p2p-client and strato-p2p-server, all
 of which do have to receive large amounts of data in the form of transactions
 and blocks.
 
-### Filesystem
+#### Filesystem
 
 The filesystem is controlled by the SQL database for the most part.  Its
 performance is a significant factor in overall performance, and therefore needs
