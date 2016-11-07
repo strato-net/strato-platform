@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [[ $USER == "root" ]]
+then sudo=""
+else sudo=sudo
+fi
+
+echo "Installing Haskell Stack..."
+echo "deb http://download.fpcomplete.com/ubuntu $(lsb_release -s -c) main" | \
+  sudo tee /etc/apt/sources.list.d/fpco.list
+$sudo apt-get update
+$sudo apt-get -y install stack git
+
+echo "Compiling and installing mgit..."
+git clone https://github.com/blockapps/mgit
+(
+  cd mgit
+  stack setup
+  stack install
+)
+
+mgit clone https://github.com/blockapps/silo
+
+echo "silo has been cloned.  Make sure to `mgit checkout` the desired branch!"
+
