@@ -18,6 +18,15 @@ After this is complete, you will have the Haskell Stack installed, our repo
 management tool `mgit` built and installed, and `silo` cloned into the desired
 branch.  Now you may proceed with the next step.
 
+### Credentials
+
+The only credntials you will need are for our github repos.  To automate the
+cloning of `silo`, place the following in `~/.git-credentials`:
+```
+https://<user>:<password>@github.com
+```
+with your own github username and password.
+
 ## Building
 
 The build process as-of-yet has two stages: a one-time setup piece and an
