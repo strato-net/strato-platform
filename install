@@ -50,6 +50,13 @@ function doInstallMod
   fi
 }
 
+function doTagAndPush
+{
+  imageName="$registry/blockapps/$submod:$tag"
+  docker tag $submod $imageName
+  docker push $imageName
+}
+
 function doBuildEnvMod
 {
   function dodocker
@@ -126,6 +133,17 @@ case $1 in
     doit=doInstallMod
     shift
     ;;
+  "tag-and-push")
+    if [[ -n $2 ]]
+    then 
+      tag=$2
+      shift 2
+    else
+      echo >&2 "Mode '$1' takes a tag name as an argument"
+      exit 1;
+    fi
+    doit=doTagAndPush
+    ;;
   "build-env")
     case $2 in
       "docker")
@@ -160,6 +178,7 @@ case $1 in
     echo >&2 "To install, mode may be: local, docker, local-to-docker, docker-to-local"
     echo >&2 "To create the build environment, mode may be: build-env"
     echo >&2 "To create the deployment environment, mode may be: deploy-env"
+    echo >&2 "To tag and push images to the registry, mode may be: tag-and-push"
     exit 1
     ;;
 esac

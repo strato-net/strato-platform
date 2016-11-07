@@ -121,6 +121,19 @@ used.
 
 The Dockerfile for this is `buildDocker/Dockerfile`.
 
+## Tagging docker images
+
+If you did a `docker` deployment, the images will be called `strato`, `bloc`,
+and so on.  To tag and push them to our registry, run
+```
+./install tag-and-push <tag name>
+```
+which will name them `auth.blockapps.net:5000/blockapps/strato:<tag name>` and
+so on.  Note that the `docker-compose.yml` file, used in the commands described
+below, will still refer to the original names.  If you pull the images onto
+another machine to run them, you will either have to tag them back or edit this
+file.
+
 ## Running
 
 Once the build and deploy steps are completed, you'll have either docker images
