@@ -19,7 +19,7 @@ function deployWithDocker
   if [[ -z $(docker images | awk '{print $1;}' | grep $deploybase) ]]
   then
     echo >&2 "Error: missing deployment base image for $submod."
-    echo >&2 "       Have you run \`$0 deploybase docker\`?"
+    echo >&2 "       Have you run \`$0 deploy-env docker\`?"
     exit 1
   fi
 
