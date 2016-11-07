@@ -1,25 +1,40 @@
 #!/bin/bash
 
+set -e
+
 if [[ $USER == "root" ]]
 then sudo=""
 else sudo=sudo
 fi
 
 echo "Installing Haskell Stack..."
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442
 echo "deb http://download.fpcomplete.com/ubuntu $(lsb_release -s -c) main" | \
   sudo tee /etc/apt/sources.list.d/fpco.list
 $sudo apt-get update
-$sudo apt-get -y install stack git
+$sudo apt-get -y --allow-unauthenticated install stack git
 
 echo "Compiling and installing mgit..."
-git clone https://github.com/blockapps/mgit
+git clone https://github.com/blockapps/mgit -b 131758053_credential-helpers
 (
   cd mgit
   stack setup
   stack install
 )
 
-mgit clone https://github.com/blockapps/silo
+if [[ -n $1 ]]
+then 
+  echo >&2 "Using branch $1"
+  branch="-b $1"
+else
+  echo >&2 "No branch specified"
+  echo >&2 "To specify a branch, run $0 <branch>"
+fi
 
-echo "silo has been cloned.  Make sure to `mgit checkout` the desired branch!"
+if ! [[ -r ~/.git-credentials ]]
+then
+  echo >&2 "To automate this script, you must place credentials in ~/.git-credentials"
+  echo >&2 "in the format 'https://<user>:<password>@github.com'"
+fi
 
+mgit --stored-credentials clone https://github.com/blockapps/silo $branch
