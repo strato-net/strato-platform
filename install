@@ -172,6 +172,8 @@ do
   export workdir=$PWD/.silo-work/$submod
   export builddir=$workdir/build
   mkdir -p $builddir
-  [[ -x $pkgdir/BUILD ]] && $doit
+  if [[ -x $pkgdir/BUILD ]]
+  then $doit
+  fi
 done
 
