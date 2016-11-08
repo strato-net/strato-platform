@@ -1,3 +1,5 @@
 *~
 packages
 .silo-work
+server.key
+server.pem
