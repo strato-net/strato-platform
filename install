@@ -9,12 +9,14 @@ function buildWithDocker { :; }
 
 function buildLocally
 {
+  ensureBuildEnv local
   cd $submod
   $pkgdir/BUILD
 }
 
 function deployWithDocker
 {
+  ensureDeployEnv docker
   deploybase="$registry/$submod-base"
   if [[ -z $(docker images | awk '{print $1;}' | grep $deploybase) ]]
   then
@@ -33,6 +35,7 @@ function deployWithDocker
 
 function deployLocally
 {
+  ensureDeployEnv local
   cd $submod
   $pkgdir/setup-deployment.sh
   sudo cp -a $builddir/* /
@@ -57,11 +60,31 @@ function doTagAndPush
   docker push $imageName
 }
 
+function ensureBuildEnv
+{
+  buildEnvFile=$workdir/build-env
+  if [[ $buildEnvFile -ot $pkgdir/setup-build.sh ]] 
+  then
+    doBuildEnvMod $1
+    touch $buildEnvFile
+  fi
+}
+
+function ensureDeployEnv
+{
+  deployEnvFile=$workdir/deploy-env
+  if [[ $deployEnvFile -ot $pkgdir/setup-deployment.sh ]]
+  then
+    doDeployBaseMod $1
+    touch $deployEnvFile
+  fi
+}
+
 function doBuildEnvMod
 {
   function dodocker
   {
-      echo "############### Building build environment: $submod"
+      echo ">>>>>>>>>>>>>>> Building build environment: $submod"
       cp -f $PWD/buildDocker/Dockerfile-buildenv $pkgdir/Dockerfile
       docker rmi $registry/$submod-build >&/dev/null || true
       docker build -t $registry/$submod-build $pkgdir
@@ -70,7 +93,7 @@ function doBuildEnvMod
 
   function dolocal
   {
-      echo "############### Installing build environment: $submod"
+      echo ">>>>>>>>>>>>>>> Installing build environment: $submod"
       sudo=sudo $pkgdir/setup-build.sh
   }
 
@@ -84,7 +107,7 @@ function doDeployBaseMod
 {
   function dodocker
   {
-      echo "############### Building deployment environment: $submod"
+      echo ">>>>>>>>>>>>>>> Building deployment environment: $submod"
       cp -f $PWD/buildDocker/Dockerfile-deploybase $pkgdir/Dockerfile
       docker rmi $registry/$submod-base >&/dev/null || true
       docker build -t $registry/$submod-base $pkgdir
@@ -93,7 +116,7 @@ function doDeployBaseMod
 
   function dolocal
   {
-      echo "############### Installing deployment environment: $submod"
+      echo ">>>>>>>>>>>>>>> Installing deployment environment: $submod"
       sudo=sudo $pkgdir/setup-deployment.sh
   }
 
