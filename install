@@ -36,9 +36,9 @@ function deployWithDocker
 function deployLocally
 {
   ensureDeployEnv local
-  cd $submod
-  $pkgdir/setup-deployment.sh
-  sudo cp -a $builddir/* /
+  sudo find $builddir -maxdepth 1 -mindepth 1 \
+    \( -type f -execdir cp -t / '{}' + \) -o \
+    \( -type d -execdir cp -a '{}' / ';' \)
 }
 
 function doInstallMod
