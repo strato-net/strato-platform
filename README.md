@@ -29,13 +29,16 @@ incremental build piece.
 
 ### One-time setup
 
-Run
+Ideally, the build-time and deploy-time dependencies will be automatically
+installed if they are not determined to be up-to-date (based on a timestamp
+comparison between the installation script and a sentinel file).  If either of
+these steps needs to be forced for some reason, the following commands are
+available:
 ```
 ./install build-env local [module-name ..]
 ./install deploy-env (local|docker) [module-name ..]
 ```
-to install the build dependencies and to build the runtime dependencies for the
-modules.  If `local`, these dependencies are installed directly on your machine;
+If `local`, these dependencies are installed directly on your machine;
 if `docker`, a set of docker images is built.  Currently we don't support
 dockerized build environments.  In fact, the only OS we support is Ubuntu 16.04,
 because of library versioning in the dependencies of `solc`.
