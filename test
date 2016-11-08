@@ -1,0 +1,12 @@
+echo "Installing test dependencies..."
+cd strato/deployments/test
+npm install
+
+echo "Running tests..."
+node_modules/mocha/bin/mocha e2e
+
+if [[ $1 == "docker-down" ]]
+then
+  echo "Killing docker processes..."
+  docker-compose kill && docker-compose down -v
+fi
