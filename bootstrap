@@ -23,23 +23,6 @@ git clone https://github.com/blockapps/mgit -b 131758053_credential-helpers
   stack install
 )
 
-if [[ -n $1 ]]
-then 
-  echo >&2 "Using branch $1"
-  branch="-b $1"
-else
-  echo >&2 "No branch specified"
-  echo >&2 "To specify a branch, run $0 <branch>"
-fi
-
-if ! [[ -r ~/.git-credentials ]]
-then
-  echo >&2 "To automate this script, you must place credentials in ~/.git-credentials"
-  echo >&2 "in the format 'https://<user>:<password>@github.com'"
-fi
-
-mgit --stored-credentials clone https://github.com/blockapps/silo $branch
-
 echo "Installing docker..."
 $sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 \
   --recv-keys 58118E89F3A912897C070ADBF76221572C52609D &>/dev/null
