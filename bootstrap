@@ -35,6 +35,3 @@ echo "Adding $USER to the docker group..."
 $sudo usermod -aG docker $USER >&/dev/null
 $sudo su - $USER
 
-echo >&3 "Installing node..."
-curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
-sudo apt-get install -y nodejs
