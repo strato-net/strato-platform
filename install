@@ -23,7 +23,7 @@ function deployWithDocker
     xargs -n1 --delim '\n' -I DATE date -d DATE '+%F %T %z %Z' | \
     sort | tail -n1)
 
-  if [[ $imageTime < $buildTime ]]
+  if [[ -z $imageTime || $imageTime < $buildTime ]]
   then
     deploybase="$registry/$submod-base"
     cp $pkgdir/doit.sh $workdir
