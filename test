@@ -1,11 +1,20 @@
 #!/bin/bash
 set -e
 
-echo "Installing deployment dependencies"
-sudo ./setup-ubuntu16.04
 
-echo "Starting docker containers"
-docker-compose up -d
+if [[ ($1 == "install-docker-compose") || ($2 == "install-docker-compose") || ($3 == "install-docker-compose") ]]
+then
+  echo "Installing deployment dependencies"
+  sudo ./setup-ubuntu16.04
+fi
+
+
+if [[ ($1 == "start-docker") || ($2 == "start-docker") || ($3 == "start-docker") ]]
+then
+  echo "Starting docker containers"
+  ssl=false docker-compose up -d
+fi
+
 
 echo "Installing test dependencies..."
 cd strato/deployments/test
@@ -14,7 +23,7 @@ npm install
 echo "Running tests..."
 node_modules/mocha/bin/mocha --config ./../../../test.config.yaml e2e
 
-if [[ $1 == "docker-down" ]]
+if [[ ($1 == "kill-docker") || ($2 == "kill-docker") || ($3 == "kill-docker") ]]
 then
   echo "Killing docker processes..."
   docker-compose kill && docker-compose down -v
