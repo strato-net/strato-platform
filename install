@@ -17,20 +17,26 @@ function buildLocally
 function deployWithDocker
 {
   ensureDeployEnv docker
-  deploybase="$registry/$submod-base"
-  if [[ -z $(docker images | awk '{print $1;}' | grep $deploybase) ]]
-  then
-    echo >&2 "Error: missing deployment base image for $submod."
-    echo >&2 "       Have you run \`$0 deploy-env docker\`?"
-    exit 1
-  fi
+        
+  imageTime=$(docker images $submod --format "{{.CreatedAt}}")
+  buildTime=$(find $builddir -maxdepth 1 -printf '%Tc\n' | \
+    xargs -n1 --delim '\n' -I DATE date -d DATE '+%F %T %z %Z' | \
+    sort | tail -n1)
 
-  cp $pkgdir/doit.sh $workdir
-  cp -f buildDocker/Dockerfile $workdir
-  docker tag $deploybase deploybase
-  docker build -t $submod $workdir
-  docker rmi deploybase
-  rm -f $workdir/Dockerfile
+  if [[ $imageTime < $buildTime ]]
+  then
+    deploybase="$registry/$submod-base"
+    cp $pkgdir/doit.sh $workdir
+    cp -f buildDocker/Dockerfile $workdir
+    docker tag $deploybase deploybase
+    docker build -t $submod $workdir
+    docker rmi deploybase
+    rm -f $workdir/Dockerfile
+  else
+    echo "Build time: $buildTime"
+    echo "Image time: $imageTime"
+    echo "Skipping docker image build; up to date"
+  fi
 }
 
 function deployLocally
