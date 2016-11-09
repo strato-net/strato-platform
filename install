@@ -55,7 +55,7 @@ function doInstallMod
 
 function doTagAndPush
 {
-  imageName="$registry/blockapps/$submod:$tag"
+  imageName="$registry/$submod:$tag"
   docker tag $submod $imageName
   docker push $imageName
 }
