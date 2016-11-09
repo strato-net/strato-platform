@@ -41,6 +41,8 @@ services:
   bloc:
     image: bloc
     restart: always
+    environment:
+      ssl: "${ssl}"
   nginx:
     image: nginx-packager
     restart: always
@@ -52,3 +54,5 @@ services:
     depends_on:
       - strato
       - bloc
+    environment:
+      ssl: "${ssl}"
