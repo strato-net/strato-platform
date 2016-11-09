@@ -51,6 +51,7 @@ services:
       - /etc/ssl/certs:/etc/ssl/certs
     ports:
       - "443:443"
+      - "80:80"
     depends_on:
       - strato
       - bloc
