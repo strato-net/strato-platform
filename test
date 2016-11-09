@@ -3,7 +3,7 @@ cd strato/deployments/test
 npm install
 
 echo "Running tests..."
-node_modules/mocha/bin/mocha --config ./../../../config.test.yaml e2e
+node_modules/mocha/bin/mocha --config ./../../../test.config.yaml e2e
 
 if [[ $1 == "docker-down" ]]
 then
