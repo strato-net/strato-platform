@@ -33,5 +33,5 @@ $sudo apt-get update >&/dev/null
 $sudo apt-get -y install docker-engine &>/dev/null
 echo "Adding $USER to the docker group..."
 $sudo usermod -aG docker $USER >&/dev/null
-$sudo su - $USER
+exec $sudo su - $USER
 
