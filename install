@@ -212,7 +212,7 @@ case $1 in
     ;;
 esac
 
-modsToBuild=${@:-$(<mgitmods)}
+modsToBuild=${@:-$(sed -n 's/.*image: //p' docker-compose.yml)}
 for i in $modsToBuild
 do
   export submod=`basename $i`
