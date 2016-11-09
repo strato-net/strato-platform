@@ -3,4 +3,4 @@
 nginxhome=$builddir/etc/nginx
 
 mkdir -p $nginxhome
-cp nginx.conf $nginxhome
+cp nginx-{,no}ssl.conf $nginxhome
