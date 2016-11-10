@@ -1,6 +1,6 @@
 apiDebug: false
 password: '1234'
-timeout: 900000
+timeout: 9000
 blocUserFolder: '/Users/kejace/devel/blockapps/minsheng/bloc_minsheng/app/users'
 
 # WARNING - extra strict syntax
