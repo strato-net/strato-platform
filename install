@@ -46,7 +46,7 @@ function deployWithDocker
     deploybase="$registry/$submod-base"
     cp $pkgdir/doit.sh $workdir
     cp -f buildDocker/Dockerfile $workdir
-    touch $workdir/deployed
+    echo date > $workdir/deployed
     docker tag $deploybase deploybase
     docker build -t $submod $workdir
     docker rmi deploybase
