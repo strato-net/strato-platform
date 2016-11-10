@@ -31,12 +31,13 @@ mgit clone https://github.com/blockapps/silo -b <branch name>
 cd silo; ./install local-to-docker
 ```
 
-###Run the testing script (all arguments are optional)
+###Run the testing script
 ```
-./test
 ./test install-docker-compose start-docker kill-docker
 ```
-Explanation of arguments for test script. You can run the test script without any of these arguments if you are deploying outside of this process.
+Explanation of arguments for test script. 
 - **install-docker-compose**: This will install the dependencies required for deployment
 - **start-docker**: This will bring up the docker containers to test against.
 - **kill-docker**: This will stop the containers and clear all storage used by processes after testing is finished.
+
+If you deploying outside the testing process, use `./test` without any arguments to only run the tests without affecting the docker containers.
