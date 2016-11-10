@@ -5,13 +5,33 @@ exec 2> >(while read line; do echo -e "\e[01;31m$line\e[0m" >&2; done)
 
 export registry="auth.blockapps.net:5000/blockapps"
 
+function latestDirModification
+{
+  find $1 \
+    \( -not -wholename $1 \) \
+    \( \( -name .stack-work -not -name .git -not -name node_modules \) \
+       -prune -o -printf '@%T@\n' \) | \
+    sort --numeric-sort --reverse | head -n 1 | \
+    xargs -I DATE date -d DATE '+%F %T %z %Z'
+}
+
 function buildWithDocker { :; }
 
 function buildLocally
 {
+  buildTime=$(latestDirModification $builddir)
+  srcTime=$(latestDirModification $submoddir)
+
   ensureBuildEnv local
-  cd $submod
-  $pkgdir/BUILD
+  if [[ -z $buildTime || $buildTime < $srcTime ]]
+  then
+    cd $submod
+    $pkgdir/BUILD
+  else
+    echo "Source time: $srcTime"
+    echo "Build  time: $buildTime"
+    echo "Skipping build phase; up to date"
+  fi
 }
 
 function deployWithDocker
@@ -19,15 +39,14 @@ function deployWithDocker
   ensureDeployEnv docker
         
   imageTime=$(docker images $submod --format "{{.CreatedAt}}")
-  buildTime=$(find $builddir -maxdepth 1 -printf '%Tc\n' | \
-    xargs -n1 --delim '\n' -I DATE date -d DATE '+%F %T %z %Z' | \
-    sort | tail -n1)
+  buildTime=$(latestDirModification $builddir)
 
   if [[ -z $imageTime || $imageTime < $buildTime ]]
   then
     deploybase="$registry/$submod-base"
     cp $pkgdir/doit.sh $workdir
     cp -f buildDocker/Dockerfile $workdir
+    touch $workdir/deployed
     docker tag $deploybase deploybase
     docker build -t $submod $workdir
     docker rmi deploybase
@@ -35,7 +54,7 @@ function deployWithDocker
   else
     echo "Build time: $buildTime"
     echo "Image time: $imageTime"
-    echo "Skipping docker image build; up to date"
+    echo "Skipping docker image creation; up to date"
   fi
 }
 
@@ -216,7 +235,8 @@ modsToBuild=${@:-$(sed -n 's/.*image: //p' docker-compose.yml)}
 for i in $modsToBuild
 do
   export submod=$i
-  export pkgdir=$PWD/$submod/pkg
+  export submoddir=$PWD/$submod
+  export pkgdir=$submoddir/pkg
   export workdir=$PWD/.silo-work/$submod
   export builddir=$workdir/build
   mkdir -p $builddir
