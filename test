@@ -21,7 +21,7 @@ cd strato/deployments/test
 npm install
 
 echo "Running tests..."
-node_modules/mocha/bin/mocha --config ./../../../test.config.yaml e2e
+node_modules/mocha/bin/mocha --max_old_space_size=4096 --config ./../../../test.config.yaml e2e
 
 if [[ ($1 == "kill-docker") || ($2 == "kill-docker") || ($3 == "kill-docker") ]]
 then
