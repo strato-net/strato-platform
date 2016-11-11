@@ -43,6 +43,7 @@ services:
     restart: always
     environment:
       ssl: "${ssl}"
+      stratoHost: "${stratoHost}"
   nginx:
     image: nginx-packager
     restart: always
