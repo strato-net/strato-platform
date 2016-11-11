@@ -39,7 +39,7 @@ Even this contract is indistinguishable, since only the constructor is different
 ```js
 contract Ad {
 	bool a;
-	function Ac() {
+	function Ad() {
 		bool b = true;
 	}
 }
@@ -56,7 +56,7 @@ Note that we cannot rely on `bin` as a unique identifier - look for example at t
 ```js
 contract Ae {
 	string a;
-	function Ac() {
+	function Ae() {
 		bool b = true;
 	}
 }
