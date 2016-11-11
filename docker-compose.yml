@@ -1,0 +1,68 @@
+version: '2'
+
+services:
+
+  postgres:
+    image: postgres:9.6
+    environment:
+      POSTGRES_DB: cirrus
+      POSTGRES_USER: postgres
+      PG_ENV_POSTGRES_DB: cirrus
+      PG_ENV_POSTGRES_USER: postgres    
+    ports:
+      - '5433:5432'
+    networks:
+      - docker_default
+
+  postgrest:
+    build: ./postgrest_docker
+    #image: cirrus-postgrest
+    environment:
+      POSTGRES_DB: cirrus
+      POSTGRES_USER: postgres
+      PG_ENV_POSTGRES_DB: cirrus
+      PG_ENV_POSTGRES_USER: postgres
+      PG_PORT_5433_TCP_PORT: 5432
+    links:
+      - postgres:postgres
+    ports:
+      - '3001:3001'
+    networks:
+      - docker_default
+   # entrypoint: ./wait-for-it.sh postgres:5432
+
+  cirrus:
+    build: .
+    command: node_modules/.bin/nodemon main.js
+    environment:
+      NODE_ENV: development
+    ports:
+      - '3333:3333'
+    volumes:
+      - .:/home/app/cirrus
+      - /home/app/cirrus/node_modules
+      - /home/app/cirrus/lib
+      - /var/run/docker.sock:/var/run/docker.sock
+    links:
+      - postgrest:postgrest
+      - postgres:postgres
+    networks:
+      - docker_default
+    external_links:
+      - docker_nginx_1:strato
+      - docker_zookeeper_1:zookeeper
+      - docker_kafka_1:kafka
+
+networks:
+  docker_default:
+    #driver: bridge
+    external: true
+
+#  nginx:
+#    image: cirrus-nginx
+#    ports:
+#      - "3003:3003"
+#    depends_on:
+#      - postgres
+#      - postgrest
+#      - cirrus 
