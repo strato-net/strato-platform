@@ -82,9 +82,11 @@ This is controlled by the `<submod>/pkg/setup-build.sh` script, which for
 16.04.  The purpose of this script is to install any programs or libraries
 required during the build process; none of these should be part of our own
 repos, and none of it should be copied directly to `$builddir`; use
-`setup-deployment` for that.
+`setup-deployment` for that.  You can and should use the `$sudo` variable to
+indicate either `sudo` itself or the empty string, which is selected depending
+on the build mode.
 
-The Dockerfile for this is `buildDocker/Dockerfile-buildenv`
+The Dockerfile for this is `buildDocker/Dockerfile-buildenv`.
 
 ### Building
 
@@ -115,7 +117,9 @@ dependencies, the entire contents of `<submod>/pkg/build` (i.e. `$builddir`)
 into the root filesystem, either of the local machine or a docker image under
 construction.  The startup script for the submodule is `<submod>/pkg/doit.sh`,
 which is set as the `ENTRYPOINT` of the docker image if `local-to-docker` is
-used.
+used.  You can and should use the `$sudo` variable to represent either `sudo`
+itself or the empty string, which is automatically selected based on the deploy
+mode.
 
 The Dockerfile for this is `buildDocker/Dockerfile`.
 
