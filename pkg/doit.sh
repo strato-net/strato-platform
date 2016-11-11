@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Hello cirrus:doit.sh"
+
 stratoHost=${stratoHost:-$(curl ident.me)}
 
 cd /var/run/strato/bloc-server

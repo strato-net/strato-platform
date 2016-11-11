@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Hello cirrus: setup-build.sh"
+
 set -e
 
 $sudo apt-get -y install curl
