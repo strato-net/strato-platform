@@ -1,5 +1,10 @@
 #Setup and Test Strato Server Starting from Scratch
 
+###Requirements
+- Ubuntu 16.04
+- Needs atleast 16GB of storage.
+- 2 cores minimum. 4 recommended.
+
 ###Get git
 ```
 apt-get install git
