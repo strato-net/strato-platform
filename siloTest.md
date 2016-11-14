@@ -43,7 +43,7 @@ cd silo; ./install local-to-docker
 Explanation of arguments for test script.
 - **install-docker-compose**: This will install the dependencies required for deployment
 - **start-docker**: This will bring up the docker containers to test against.
-- **enable-ssl**: use https instead of http for deployment and testing.
+- **enable-ssl**: use https instead of http for deployment and testing (disabled by default).
 - **kill-docker**: This will stop the containers and clear all storage used by processes after testing is finished.
 
 If you deploying outside the testing process, use `./test` without any arguments to only run the tests without affecting the docker containers.
