@@ -51,7 +51,12 @@ cd $rootDir
 
 # Run the tests
 echo "Running tests..."
-$testDir/node_modules/mocha/bin/mocha --config test.config.yaml $testDir/e2e
+if [[ "$enableSsl" == true ]]
+then
+  $testDir/node_modules/mocha/bin/mocha --config test-https.config.yaml $testDir/e2e
+else
+  $testDir/node_modules/mocha/bin/mocha --config test.config.yaml $testDir/e2e
+fi
 
 # Stop docker if requested
 if [[ "$killDocker" == true ]]
