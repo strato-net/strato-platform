@@ -1,29 +1,60 @@
 #!/bin/bash
 set -e
 
+# Variable Declarations
+installDockerCompose=false
+startDocker=false
+killDocker=false
+enableSsl=false
+testDir="strato/deployments/test"
+rootDir=$PWD
 
-if [[ ($1 == "install-docker-compose") || ($2 == "install-docker-compose") || ($3 == "install-docker-compose") ]]
+# Parse command line arguments
+for arg in "$@"
+do
+  echo $arg
+  case "$arg" in
+    "install-docker-compose")
+      installDockerCompose=true
+      ;;
+    "start-docker")
+      startDocker=true
+      ;;
+    "kill-docker")
+      killDocker=true
+      ;;
+    "enable-ssl")
+      enableSsl=true
+      ;;
+    esac
+done
+
+# Check if we need to install docker compose
+if [[ "$installDockerCompose" == true ]]
 then
   echo "Installing deployment dependencies"
   sudo ./setup-ubuntu16.04
 fi
 
-
-if [[ ($1 == "start-docker") || ($2 == "start-docker") || ($3 == "start-docker") ]]
+# Start docker based on the ssl flag
+if [[ "$startDocker" == true ]]
 then
-  echo "Starting docker containers"
-  ssl=false docker-compose up -d
+  echo "Starting docker containers with ssl=$enableSsl"
+  ssl=$enableSsl docker-compose up -d
 fi
 
-
+# Install npm packages for testing
 echo "Installing test dependencies..."
-cd strato/deployments/test
+cd $testDir
 npm install
+cd $rootDir
 
+# Run the tests
 echo "Running tests..."
-node_modules/mocha/bin/mocha --config ./../../../test.config.yaml e2e
+$testDir/node_modules/mocha/bin/mocha --config test.config.yaml $testDir/e2e
 
-if [[ ($1 == "kill-docker") || ($2 == "kill-docker") || ($3 == "kill-docker") ]]
+# Stop docker if requested
+if [[ "$killDocker" == true ]]
 then
   echo "Killing docker processes..."
   docker-compose kill && docker-compose down -v
