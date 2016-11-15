@@ -17,7 +17,7 @@
     "babel-preset-node5": "^10.5.0",
     "babel-register": "^6.4.3",
     "babel-relay-plugin": "^0.6.3",
-    "blockapps-js": "blockapps/blockapps-js#127632337_vm_publish",
+    "blockapps-js": "blockapps/blockapps-js#132922485_transaction-batching",
     "bluebird": "^3.4.6",
     "body-parser": "~1.15.1",
     "chalk": "^1.1.3",
