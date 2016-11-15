@@ -75,6 +75,11 @@ The build system has the following pieces:
 These stages are controlled by scripts located in the `<submod>/pkg`
 directories.
 
+Please note that any commands with `sudo` capacity will need to be added to the [blockapps-ci](https://github.com/blockapps/blockapps-ci/) `/etc/sudoers.d/go` as described the the [readme](https://github.com/blockapps/blockapps-ci/blob/master/README.md#go-agent). Currently these are 
+```
+/usr/bin/apt-get, /usr/bin/apt-key, /usr/sbin/usermod, /bin/su, /usr/bin/tee, /bin/bash, /usr/bin/docker
+```
+
 ### Build-time dependencies
 
 This is controlled by the `<submod>/pkg/setup-build.sh` script, which for
