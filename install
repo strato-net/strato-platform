@@ -7,9 +7,8 @@ export registry="auth.blockapps.net:5000/blockapps"
 
 function latestDirModification
 {
-  find $1 \
-    \( -not -wholename $1 \) \
-    \( \( -name .stack-work -not -name .git -not -name node_modules \) \
+  find $@ \
+    \( \( -name .stack-work -o -name .git -o -name node_modules \) \
        -prune -o -printf '@%T@\n' \) | \
     sort --numeric-sort --reverse | head -n 1 | \
     xargs -I DATE date -d DATE '+%F %T %z %Z'
@@ -23,7 +22,7 @@ function buildLocally
   srcTime=$(latestDirModification $submoddir)
 
   ensureBuildEnv local
-  if [[ 1 ]] # [[ -z $buildTime || $buildTime < $srcTime ]]
+  if [[ -z $buildTime || $buildTime < $srcTime ]]
   then
     cd $submod
     $pkgdir/BUILD
@@ -39,9 +38,9 @@ function deployWithDocker
   ensureDeployEnv docker
         
   imageTime=$(docker images $submod --format "{{.CreatedAt}}")
-  buildTime=$(latestDirModification $builddir)
+  buildTime=$(latestDirModification $builddir $pkgdir/doit.sh)
 
-  if [[ 1 ]] # [[ -z $imageTime || $imageTime < $buildTime ]]
+  if [[ -z $imageTime || $imageTime < $buildTime ]]
   then
     deploybase="$registry/$submod-base"
     cp $pkgdir/doit.sh $workdir
