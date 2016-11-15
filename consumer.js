@@ -18,7 +18,7 @@ var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {.
 
 var kafka = require('kafka-node');
 
-var stratoHost    = (process.env.STRATO    || 'strato:80') ;
+var stratoHost    = (process.env.STRATO    || 'strato:3000') ;
 var postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
 var zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
 

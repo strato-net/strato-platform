@@ -63,7 +63,7 @@ var toSchemaString = function(json){
 var config = {
   host: (process.env.POSTGRES || 'postgres'),
   user: 'postgres',
-  //password: 'bar',
+  //password: 'api',
   database: 'cirrus',
   port: 5432
 };
@@ -72,12 +72,21 @@ var nameSchema = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "code
 
 // create the pool somewhere globally so its lifetime
 // lasts for as long as your app is running
-var pool = new Pool(config)
+var pool;
 
+try {
+  pool = new Pool(config);
+} catch (err) {
+  console.log("Couldn't connect to postgres: " + err);
+}
 
-pool
-  .query(nameSchema)
-  .then(r => console.log("Created contract table"))
+try {
+  pool
+    .query(nameSchema)
+    .then(r => console.log("Created contract table"))
+} catch (err) {
+  console.log("Couldn't create contract table: " + err);
+}
 ////////////////////
 
 
