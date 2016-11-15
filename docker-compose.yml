@@ -44,6 +44,34 @@ services:
     environment:
       ssl: "${ssl}"
       stratoHost: "${stratoHost}"
+  postgres-cirrus:
+    image: postgres:9.6
+    environment:
+      POSTGRES_DB: cirrus
+      POSTGRES_USER: postgres
+      PG_ENV_POSTGRES_DB: cirrus
+      PG_ENV_POSTGRES_USER: postgres
+    ports:
+      - '5434:5432'
+  postgrest:
+    image:  postgrest-packager
+    restart: always
+    environment:
+      POSTGRES_DB: cirrus
+      POSTGRES_USER: postgres
+      PG_ENV_POSTGRES_DB: cirrus
+      PG_ENV_POSTGRES_USER: postgres
+      PG_PORT_5433_TCP_PORT: 5432
+    links:
+      - postgres-cirrus:postgres
+    ports:
+      - '3001:3001'
+  cirrus:
+    image: cirrus
+    environment:
+      STRATO: "strato:3000"
+    links:
+      - strato:strato
   nginx:
     image: nginx-packager
     restart: always
