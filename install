@@ -23,7 +23,7 @@ function buildLocally
   srcTime=$(latestDirModification $submoddir)
 
   ensureBuildEnv local
-  if [[ -z $buildTime || $buildTime < $srcTime ]]
+  if [[ 1 ]] # [[ -z $buildTime || $buildTime < $srcTime ]]
   then
     cd $submod
     $pkgdir/BUILD
@@ -41,7 +41,7 @@ function deployWithDocker
   imageTime=$(docker images $submod --format "{{.CreatedAt}}")
   buildTime=$(latestDirModification $builddir)
 
-  if [[ -z $imageTime || $imageTime < $buildTime ]]
+  if [[ 1 ]] # [[ -z $imageTime || $imageTime < $buildTime ]]
   then
     deploybase="$registry/$submod-base"
     cp $pkgdir/doit.sh $workdir
