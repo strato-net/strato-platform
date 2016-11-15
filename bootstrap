@@ -33,6 +33,5 @@ echo "deb https://apt.dockerproject.org/repo ubuntu-xenial main" \
 $sudo apt-get update >&/dev/null
 $sudo apt-get -y install docker-engine &>/dev/null
 echo "Adding $USER to the docker group..."
-$sudo usermod -aG docker $USER >&/dev/null
-exec $sudo su - $USER 1>&3
-
+$sudo usermod -aG docker $USER
+$sudo chown :$USER /var/run/docker.sock
