@@ -21,7 +21,8 @@ git clone https://github.com/blockapps/mgit -b 131758053_credential-helpers
 (
   cd mgit
   stack setup
-  stack install
+  stack build
+  $sudo stack install --local-bin-path /usr/bin --allow-different-user
 )
 
 echo >&3 "Installing docker..."
