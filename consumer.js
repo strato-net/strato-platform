@@ -74,6 +74,8 @@ global.contractMap = {}
  
 rp(options).promise().then(r => {
 
+  console.log("Connecting to blockchain: " + r.peerId);
+
   var topic = 'statediff_' + r.peerId; 
 
   var offsets = Promise.promisifyAll(new kafka.Offset(client));
