@@ -83,5 +83,7 @@ services:
     depends_on:
       - strato
       - bloc
+      - cirrus
+      - postgrest
     environment:
       ssl: "${ssl}"
