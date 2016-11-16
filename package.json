@@ -49,6 +49,7 @@
     "flow-bin": "^0.29.0",
     "nodemon": "^1.9.2",
     "pg": "^4.5.6",
+    "promise-queue": "^2.2.3",
     "request-promise": "^4.1.1"
   },
   "pre-commit": [
