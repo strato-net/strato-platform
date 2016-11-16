@@ -188,6 +188,14 @@ Therefore, the strato machine must have the SSL certs available at
 docker deployment, these files should be on the local filesystem and not inside
 a docker container.  The certs ought to match your domain (e.g. blockapps.net).
 
+#### Connecting to Kafka
+
+The kafka and zookeeper containers expose their ports on the local machine.
+In order to connect to kafka using these ports, you must alias the machine
+on which it's running as 'kafka', and likewise for zookeeper.  For instance, to
+do this for your local machine, add 'kafka' and 'zookeeper' to the end of the
+line in /etc/hosts starting with '127.0.0.1 localhost'.
+
 #### Logs
 
 Logs for the docker containers are available in several ways.  All of them
