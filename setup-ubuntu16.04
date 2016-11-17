@@ -3,32 +3,47 @@
 set -e
 
 if [[ $EUID -ne 0 ]]; then
-  echo >&2 "Must be run as root"
-  exit 1
+  sudo=sudo
 fi
 
-echo "Installing docker..."
-apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 \
-  --recv-keys 58118E89F3A912897C070ADBF76221572C52609D &>/dev/null
-echo "deb https://apt.dockerproject.org/repo ubuntu-xenial main" \
-  | tee /etc/apt/sources.list.d/docker.list >/dev/null
-apt-get update >&/dev/null
-apt-get -y install docker-engine &>/dev/null
-echo "Adding $USER to the docker group..."
-usermod -aG docker $USER >&/dev/null
-echo "You will need to log out and back in to activate your group membership"
+# Controls whether to copy certs.  Must be true or false, defaults to false
+ssl=${ssl:-false}
+
+# Try to catch docker installation so that we don't use an unnecessary sudo.
+echo -n "Installing docker..."
+if dpkg-query -l docker-engine >&/dev/null
+then echo "already installed."
+else 
+  echo
+  (
+  $sudo apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 \
+    --recv-keys 58118E89F3A912897C070ADBF76221572C52609D
+  echo "deb https://apt.dockerproject.org/repo ubuntu-xenial main" \
+    | $sudo tee /etc/apt/sources.list.d/docker.list
+  $sudo apt-get update
+  $sudo apt-get -y install docker-engine
+  $sudo usermod -aG docker $USER
+  $sudo chown :$USER /var/run/docker.sock
+  ) >&/dev/null
+fi 
 
 echo "Installing docker-compose..."
-curl -L "https://github.com/docker/compose/releases/download/1.8.1/docker-compose-$(uname -s)-$(uname -m)"  -o /usr/local/bin/docker-compose >& /dev/null
-chmod +x /usr/local/bin/docker-compose
+# Install to /tmp first to avoid having to use sudo curl
+curl -L "https://github.com/docker/compose/releases/download/1.8.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose >& /dev/null
+chmod +x /tmp/docker-compose
+# cp is already in sudoers
+$sudo cp -f /tmp/docker-compose /usr/local/bin
 
-echo "Copying certs if present..."
-if [[ -f server.pem ]]; then
-  mv server.pem /etc/ssl/certs
-fi
-
-if [[ -f server.key ]]; then
-  mv server.key /etc/ssl/private
+if $ssl; then
+  echo "Copying server.pem..."
+  $sudo mv server.pem /etc/ssl/certs >&/dev/null || \
+    { echo "Found 'ssl=true', but couldn't find server.pem in this directory."; exit 1; }
+  echo "Copying server.key..."
+  $sudo mv server.key /etc/ssl/private >&/dev/null || \
+    { echo "Found 'ssl=true', but couldn't find server.key in this directory."; exit 1; }
+else
+  echo "The environment variable 'ssl' is unset or false.  If you wish to use
+  SSL with strato, re-run the script with ssl=true."
 fi
 
 if ! [[ -r docker-compose.yml ]]

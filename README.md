@@ -152,8 +152,12 @@ TBD
 
 ### Running the docker images
 
-You will need Docker Compose at least version 1.7.  The basic launch command is
-simply
+You need to run the script `setup-ubuntu16.04` in silo to install the runtime
+components, which are Docker, Docker Compose, and (optionally) the SSL certs.
+To enable the latter, set the environment variable `ssl=true` and put the certs
+in the same directory you run the script in.
+
+The basic launch command is simply
 ```
 docker-compose up -d
 ```
