@@ -4,8 +4,6 @@ var rp = require("request-promise");
 var yaml = require('yaml-parser');
 var child_process = require("child_process");
 var bajs = require('blockapps-js');
-bajs.setProfile('strato-dev', 'http://strato')
-
 var util = require('./lib/util');
 
 var traverse = require('traverse');
@@ -21,6 +19,10 @@ var kafka = require('kafka-node');
 var stratoHost    = (process.env.STRATO    || 'strato:3000') ;
 var postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
 var zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
+
+bajs.setProfile('strato-dev', 'http://' + stratoHost)
+
+console.log("Connections are:\n strato: " + stratoHost + "\npostgrest: " + postgrestHost + "\nzookeeper: " + zookeeperHost);
 
 var client = new kafka.Client(zookeeperHost);
 
@@ -41,32 +43,42 @@ var cleanState = function(o) {
 
 
 var stateToBody = function(state, address) {
+
   var xabi = global.contractMap[state[address].codeHash];
-  var tmpStr = JSON.stringify(global.contractMap[state[address].codeHash]);
-  var parsed = JSON.parse(tmpStr);
- 
-  console.log("Attaching: " + xabi.name);
- 
-  xabi.address = address;
-  parsed.address = address;
+  if((typeof xabi) !== 'undefined'){
 
-  //console.log(JSON.stringify(xabi));
+    var tmpStr = JSON.stringify(global.contractMap[state[address].codeHash]);
+  
+    var parsed = JSON.parse(tmpStr);
+ 
+    //console.log("Attaching: " + xabi.name);
+ 
+    xabi.address = address;
+    parsed.address = address;
 
-  try {
-    //var o = bajs.Solidity.attach(xabi);
-    var o = bajs.Solidity.attach(parsed);
-    var p = Promise.props(o.state).then(function(sVars) {
-      var parsed = traverse(sVars).forEach(function (x) {
-        if (Buffer.isBuffer(x)) {
-          this.update(x.toString());
-        }
+
+    try {
+      //var o = bajs.Solidity.attach(xabi);
+      //console.log("Calling attach()");
+      var o = bajs.Solidity.attach(parsed);
+      //console.log("Done calling attach()")
+      var p = Promise.props(o.state).then(function(sVars) {
+        var parsed = traverse(sVars).forEach(function (x) {
+          if (Buffer.isBuffer(x)) {
+            this.update(x.toString());
+          }
+        });
+      return sVars;
       });
-     return sVars;
-    });
-    return p;
-  } catch (error) {
-    console.log(chalk.red("Failed to attach solidity object: " + error));
-    return Promise.props({});
+      return p;
+    } catch (error) {
+      console.log(chalk.red("Failed to attach solidity object: " + error));
+      //return Promise.props({});
+      return Promise.reject("Failed to attach solidity object: " + error);
+    }
+  } else {
+    return Promise.reject("No table found");
+    //throw new Error("No table found for contract");
   }
 }
 
@@ -131,9 +143,10 @@ rp(options).promise().then(r => {
                        'content-type': 'application/json' },
                     body: x,
                     json: true };
-
+                    //console.log("create options: " + JSON.stringify(options));
                     return rp(options).promise();
-                  });
+                  })
+                .catch(err => console.log("Warn: " + err))
             }),
 
             updatedAccounts.map(a => {
@@ -159,14 +172,17 @@ rp(options).promise().then(r => {
                        'content-type': 'application/json' },
                     body: x,
                     json: true };
-
+                    //console.log("update options: " + JSON.stringify(options));
                     return rp(options).promise();
-                });
+                })
+              .catch(err => console.log("Warn: " + err))
             }),
 
             deletedAccounts.map(a => {})
           ]
         )
+
+        console.log("toUpload: " + JSON.stringify(toUpload));
 
         Promise.all(toUpload)
         .catch(function (error){

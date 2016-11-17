@@ -73,7 +73,7 @@ var nameSchema = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "code
 // create the pool somewhere globally so its lifetime
 // lasts for as long as your app is running
 var pool;
-var queue = Queue(1, Infinity); // 1 concurrent job, infinite size queue
+var queue = new Queue(1, Infinity); // 1 concurrent job, infinite size queue
 
 try {
   pool = new Pool(config);
@@ -94,16 +94,19 @@ try {
 app.post('/', function (req, res, next) {
   var schema = toSchemaString(req.body);
   global.contractMap[req.body.codeHash] = req.body;
-    
-  queue.add(
+  
+  console.log("global.contractMap: " + JSON.stringify(global.contractMap));
+
+//  queue.add(
      pool
       .query(schema)
-  )
+//  )
   .then(_ => console.log("done creating new schema for contract"))
-  .then(res.send(schema))
-  .then(next());
 
-  console.log(schema)
+  console.log("Schema: " + schema)  
+  res.send(schema)
+  next();
+
 });
 
 app.get('/', function (req, res, next) {
