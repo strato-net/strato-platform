@@ -2,34 +2,34 @@ version: '2'
 
 services:
 
-  postgres:
-    image: postgres:9.6
-    environment:
-      POSTGRES_DB: cirrus
-      POSTGRES_USER: postgres
-      PG_ENV_POSTGRES_DB: cirrus
-      PG_ENV_POSTGRES_USER: postgres    
-    ports:
-      - '5433:5432'
-    networks:
-      - docker_default
+#  postgres:
+#    image: postgres:9.6
+#    environment:
+#      POSTGRES_DB: cirrus
+#      POSTGRES_USER: postgres
+#      PG_ENV_POSTGRES_DB: cirrus
+#      PG_ENV_POSTGRES_USER: postgres    
+#    ports:
+#      - '5433:5432'
+#    networks:
+#      - docker_default
 
-  postgrest:
-    build: ./postgrest_docker
-    #image: cirrus-postgrest
-    environment:
-      POSTGRES_DB: cirrus
-      POSTGRES_USER: postgres
-      PG_ENV_POSTGRES_DB: cirrus
-      PG_ENV_POSTGRES_USER: postgres
-      PG_PORT_5433_TCP_PORT: 5432
-    links:
-      - postgres:postgres
-    ports:
-      - '3001:3001'
-    networks:
-      - docker_default
-   # entrypoint: ./wait-for-it.sh postgres:5432
+#  postgrest:
+#    build: ./postgrest_docker
+#    #image: cirrus-postgrest
+#    environment:
+#      POSTGRES_DB: cirrus
+#      POSTGRES_USER: postgres
+#      PG_ENV_POSTGRES_DB: cirrus
+#      PG_ENV_POSTGRES_USER: postgres
+#      PG_PORT_5433_TCP_PORT: 5432
+#    links:
+#      - postgres:postgres
+#    ports:
+#      - '3001:3001'
+#    networks:
+#      - docker_default
+#   # entrypoint: ./wait-for-it.sh postgres:5432
 
   cirrus:
     build: .
@@ -43,18 +43,19 @@ services:
       - /home/app/cirrus/node_modules
       - /home/app/cirrus/lib
       - /var/run/docker.sock:/var/run/docker.sock
-    links:
-      - postgrest:postgrest
-      - postgres:postgres
+ #   links:
+ #     - postgrest:postgrest
+ #     - postgres:postgres
     networks:
-      - docker_default
+      - silo_default
     external_links:
-      - docker_nginx_1:strato
-      - docker_zookeeper_1:zookeeper
-      - docker_kafka_1:kafka
-
+      - silo_strato_1:strato
+      - silo_zookeeper_1:zookeeper
+      - silo_kafka_1:kafka
+      - silo_postgrest_1:postgrest
+      - silo_postgres-cirrus_1:postgres
 networks:
-  docker_default:
+  silo_default:
     #driver: bridge
     external: true
 

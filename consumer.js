@@ -20,9 +20,11 @@ var stratoHost    = (process.env.STRATO    || 'strato:3000') ;
 var postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
 var zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
 
+var allHosts = [stratoHost, postgrestHost];
+
 bajs.setProfile('strato-dev', 'http://' + stratoHost)
 
-console.log("Connections are:\n strato: " + stratoHost + "\npostgrest: " + postgrestHost + "\nzookeeper: " + zookeeperHost);
+console.log("Connections are:\n\tstrato: " + stratoHost + "\n\tpostgrest: " + postgrestHost + "\n\tzookeeper: " + zookeeperHost);
 
 var client = new kafka.Client(zookeeperHost);
 
@@ -30,6 +32,26 @@ var options = { method: 'GET',
             url: 'http://' + stratoHost + '/' + '/eth/v1.2/uuid',
             json: true };
 
+var allPromises = allHosts.map(h =>{
+  rp({ method: 'GET'
+     , url: 'http://' + h 
+     , resolveWithFullResponse: true
+     })
+    .promise()
+    .then(r => {
+      console.log("Response from " + h + ": " + r.statusCode);
+      if(r.statusCode != 200){
+        console.log("Restarting, awaiting " + h);
+        process.exit(1); 
+      }
+    })
+    .catch(err => {
+      console.log("Restarting, awaiting " + h);
+      process.exit(1);
+    })
+})
+
+Promise.all(allPromises);
 
 // cleanState :: Object -> [{key: value}]
 // TODO add filtering on `public` here?
