@@ -79,6 +79,7 @@ try {
   pool = new Pool(config);
 } catch (err) {
   console.log("Couldn't connect to postgres: " + err);
+  process.exit(1);
 }
 
 try {
