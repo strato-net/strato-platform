@@ -173,7 +173,12 @@ genesis=mixed10k lazyBlocks=false miningAlgorithm=SHA docker-compose up -d
 ```
 The genesis block is pre-set to 10k difficulty, which gives initially quick
 block times.  The mining algorithm of SHA is the only one we currently
-implement.
+implement.  You can also supply your own genesis block:
+```
+genesisBlock=<JSON-formatted genesis block> genesis=<some name> docker-compose up -d
+```
+The JSON string can be provided from a file using the bash construct $(<
+genesisFile.json).
 
 It is possible to network several strato nodes.  To do that, each one must be
 able to listen on port 30303 tcp/udp on its respective machine.  One of them
