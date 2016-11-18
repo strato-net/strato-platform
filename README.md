@@ -169,8 +169,7 @@ ether from.  To change these settings, you need to set environment variables
 from those under the `strato` entry of the `docker-compose.yml`.  For instance,
 this starts a mining node:
 ```
-genesis=mixed10k instantMining=false lazyBlocks=false miningAlgorithm=SHA
-docker-compose up -d
+genesis=mixed10k lazyBlocks=false miningAlgorithm=SHA docker-compose up -d
 ```
 The genesis block is pre-set to 10k difficulty, which gives initially quick
 block times.  The mining algorithm of SHA is the only one we currently
