@@ -47,15 +47,14 @@ fi
 echo "Installing test dependencies..."
 cd $testDir
 npm install
-cd $rootDir
 
 # Run the tests
 echo "Running tests..."
 if [[ "$enableSsl" == true ]]
 then
-  $testDir/node_modules/mocha/bin/mocha --config test-https.config.yaml $testDir/e2e
+  node_modules/mocha/bin/mocha --config $rootDir/test-https.config.yaml e2e
 else
-  $testDir/node_modules/mocha/bin/mocha --config test.config.yaml $testDir/e2e
+  node_modules/mocha/bin/mocha --config $rootDir/test.config.yaml e2e
 fi
 
 # Stop docker if requested
