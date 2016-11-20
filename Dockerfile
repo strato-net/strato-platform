@@ -17,4 +17,4 @@ COPY lib $HOME/cirrus/lib
 RUN chown -R app:app $HOME/*
 USER app
 
-CMD ["node", "main.js"]
+#CMD ["node", "main.js"]

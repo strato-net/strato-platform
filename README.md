@@ -4,24 +4,20 @@ With `cirrus`, you can search your `strato` blockchain! It leverages [postgrest]
 
 ## pre-requirements and installation
 
-`cirrus` assumes a running docker instance of `strato` on the same machine and connects to it on the default `docker_default` network. Once this is running, you can start `cirrus` by executing:
-
-```sh
-docker-compose up
-```
+`cirrus` is now part of `silo` and hence is automatically deployed. For debugging purposes you can connect your `cirrus` container to an existing `silo` network and use `nodemon` for automatic restart.
 
 ## tutorial
 
-1. `POST` the output of `bloc`'s `/state` route to `cirrus:3333/`
+1. `POST` the output of `bloc`'s `/state` route to `cirrus/contract/`, alternatively enable the option to `bloc` to post this on compilation. 
 2. run `e2e/contract.test.js`
 
 ## routes
 
 | Type   |      Route      |  Content-type | Info | Result |
 |--------|-----------------|---------------|------|--------|
-| `POST` |  `cirrus:3333/` | `application/json`| Post schema | |
-| `GET`  |  `cirrus:3001/` | |  Returns contract types | |
-| `GET`  | `cirrus:3001/<ContractName>` | | Query a specific contract, see the [API reference](http://postgrest.com/api/reading/) | |
+| `POST` |  `cirrus/contract` | `application/json`| Post schema | |
+| `GET`  |  `cirrus/search/` | |  Returns contract types | |
+| `GET`  | `cirrus/search/<ContractName>` | | Query a specific contract, see the [API reference](http://postgrest.com/api/reading/) | |
 
 ## roadmap
 
