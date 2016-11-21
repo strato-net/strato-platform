@@ -44,6 +44,7 @@
   "devDependencies": {
     "babel-cli": "^6.10.1",
     "babel-eslint": "^6.1.2",
+    "crypto": "0.0.3",
     "eslint": "^3.5.0",
     "eslint-plugin-lodash-fp": "^2.0.1",
     "flow-bin": "^0.29.0",

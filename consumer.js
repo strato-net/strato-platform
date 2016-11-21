@@ -130,7 +130,6 @@ rp(options).promise().then(r => {
   consumer.call('on', 'message', function (m) {
 
         console.log(chalk.yellow("Incoming state update..."));
-
         var state = JSON.parse(m.value);
 
         // for now, remove accounts that have no code
@@ -203,8 +202,6 @@ rp(options).promise().then(r => {
             deletedAccounts.map(a => {})
           ]
         )
-
-        console.log("toUpload: " + JSON.stringify(toUpload));
 
         Promise.all(toUpload)
         .catch(function (error){

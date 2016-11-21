@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Hello cirrus:doit-prod.sh"
+echo "Hello cirrus:doit.sh"
 
 stratoHost=${stratoHost:-$(curl -s ident.me)}
 
