@@ -12,11 +12,20 @@ var client = new kafka.Client(zookeeperHost);
 var producer = new kafka.HighLevelProducer(client, {partitionerType: 0}); 
 var offsetter = new kafka.Offset(client); 
 
+function callNTimes(n, time, fn) {
+  var i = n;
+  function callFn() {
+    if (--n < 0) return;
+      fn(-(n-i));
+      setTimeout(callFn, time);
+    }
+  setTimeout(callFn, time);
+}
+
 switch (argv.role) {
 
   case 'vm':
     km = new kafka.KeyedMessage('key', 'message'),
-    payloads = [{ topic: 'stateDiff', messages: 'hi3', partition: 0 }];
     
     producer.on('ready', function () {
       producer.createTopics(['stateDiff'], console.log);
@@ -24,17 +33,41 @@ switch (argv.role) {
       // for when partitionerType = 3
       //client.refreshMetadata(); // see https://github.com/SOHU-Co/kafka-node/issues/354
       
-      producer.send(payloads, console.log);
+      callNTimes(9999999999, 1000, n => {
+        producer.send([{ topic: 'stateDiff', messages: 'stateDiff_'+n, partition: 0 }], console.log)
+      });
     });
     
-    producer.on('error', function (err) {})
+    producer.on('error', console.log)
  
     break;
   
   case 'bloc':
     break;
   case 'cirrus':
-    break;
+    offsetter
+      .fetchLatestOffsetsAsync(['fullState'])
+      .get('fullState')
+      .get(0)
+      .then(offset => {
+        console.log("offset is: " + offset);
+        return new kafka.Consumer(
+          client,
+          [{
+            topic: 'fullState',
+            offset: 0, // offset
+            partition: 0
+          }],
+          {fromOffset: true}
+        );
+      })
+    .call('on', 'message', m => {
+      console.log("m:" + JSON.stringify(m));
+    })
+    .call('on', 'error', console.log);
+
+   break;
+
   case 'birrus':
     offsetter
       .fetchLatestOffsetsAsync(['stateDiff'])
@@ -52,7 +85,13 @@ switch (argv.role) {
           {fromOffset: true}
         );
       })
-    .call('on', 'message', console.log)
+    .call('on', 'message', m => {
+      console.log("m:" + JSON.stringify(m));
+      //producer.on('ready', function () {
+        producer.createTopics(['fullState'], console.log);
+        producer.send([{ topic: 'fullState', messages: 'fullState_', partition: 0 }], console.log)
+      //})
+    })
     .call('on', 'error', console.log); 
 
     break;

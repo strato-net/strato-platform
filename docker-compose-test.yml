@@ -42,6 +42,19 @@ services:
       - silo_zookepper_1:zookepper
       - silo_kafka_1:kafka
 
+  cirrus_cirrus:
+    build: .
+    command: node_modules/.bin/nodemon cirrus-test.js --role cirrus
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/home/app/cirrus
+    networks:
+      - silo_default
+    external_links:
+      - silo_zookepper_1:zookepper
+      - silo_kafka_1:kafka
+ 
   cirrus:
     build: .
     command: node_modules/.bin/nodemon main.js
