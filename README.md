@@ -19,6 +19,51 @@ With `cirrus`, you can search your `strato` blockchain! It leverages [postgrest]
 | `GET`  |  `cirrus/search/` | |  Returns contract types | |
 | `GET`  | `cirrus/search/<ContractName>` | | Query a specific contract, see the [API reference](http://postgrest.com/api/reading/) | |
 
+## architecture
+
+![             ┌──────────────────────────────────────────┐
+             │                           stateDiffStream│                             ┌─────────────────────────────────────────────────────────┐
+             │ :: [{key :: Word160, state :: StateDiff}]│                             │                                          fullStateStream│
+             ├──────────────────────────────┬───────────┘                             │:: [ { partition :: SHA, stateDiffs :: stateDiffStream} ]│
+             │deadbeef0  , storageDiff_i_0  │                                         ├─────────────────────────────────────────────────────────┴────────────────────────────────┐
+             │deadbeef1  , storageDiff_i_1  │                                         │         ┌───────────────┐             ┌───────────────┐                ┌───────────────┐ │
+             │deadbeef2  , storageDiff_i_2  │                                         │         │     abba0     │             │     abba1     │                │     abba2     │ │
+             │deadbeef1  , storageDiff_i_3  │                                         │┌────────┴───────────────┤  ┌──────────┴───────────────┤     ┌──────────┴───────────────┤ │
+╔════╗       │deadbeef1  , storageDiff_i_4  │                          ╔═════════╗    ││deadbeef0  , state_i_0  │  │deadbeef2  , state_i_2    │     │deadbeef3  , state_i_5    │ │
+║ VM ║──────▶│deadbeef3  , storageDiff_i_5  │──────┬──────────────────▶║ birrus  ║───▶││deadbeef1  , state_i_1  │  │deadbeef2  , state_i_9    │     │deadbeef5  , state_i_7    │ │─────────┐
+╚════╝       │deadbeef4  , storageDiff_i_6  │      │                   ╚═════════╝    ││deadbeef1  , state_i_3  │  │                          │─ ─ ─│deadbeef6  , state_i_8    │ │         │
+             │deadbeef5  , storageDiff_i_7  │      │                                  ││deadbeef1  , state_i_4  │  │                          │     │deadbeef3  , state_i_10   │ │         │
+             │deadbeef6  , storageDiff_i_8  │      │                                  ││deadbeef4  , state_i+6  │  │                          │     │                          │ │         ▼
+             │deadbeef2  , storageDiff_i_9  │      │                                  │└────────────────────────┘  └──────────────────────────┘     └──────────────────────────┘ │    ┌─────────┐
+             │deadbeef3  , storageDiff_i_10 │      │                                  └──────────────────────────────────────────────────────────────────────────────────────────┘    │ compact │
+             └──────────────────────────────┘      │                                  ┌──────────────────────────────────────────────────────────────────────────────────────────┐    └─────────┘
+                 ┌──────────────────────┐          │                                  │         ┌───────────────┐             ┌───────────────┐                ┌───────────────┐ │         │
+             ■───┤ one key per address  ├───■      │                                  │         │     abba0     │             │     abba1     │                │     abba2     │ │         │
+                 └──────────────────────┘          │                                  │┌────────┴───────────────┤  ┌──────────┴───────────────┤     ┌──────────┴───────────────┤ │         │
+                                                   │                                  ││deadbeef0  , state_i_0  │  │deadbeef2  , state_i_9    │     │deadbeef5  , state_i_7    │ │         │
+                                                   │                               ┌──││deadbeef1  , state_i_4  │  │                          │     │deadbeef6  , state_i_8    │ │◀────────┘
+                                                   │                               │  ││deadbeef4  , state_i_6  │  │                          │─ ─ ─│deadbeef3  , state_i_10   │ │
+                                                   │                               │  ││                        │  │                          │     │                          │ │
+                                                   │                               │  ││                        │  │                          │     │                          │ │
+                                                   │                               │  │└────────────────────────┘  └──────────────────────────┘     └──────────────────────────┘ │
+                                                   │                               │  └──────────────────────────────────────────────────────────────────────────────────────────┘
+                                                   │                               │                               ┌────────────────────────────────┐
+                                                   │                               │  ■────────────────────────────┤ one partition for per codeHash ├────────────────────────────■
+                                                   │                               │                               └────────────────────────────────┘
+                                                   │                               │
+                                                   │                               │
+                                                   │                               │
+             ┌────────────────────────────────┐    │                               │
+             │                  contractStream│    │                               │
+             │:: [{key :: SHA, value :: xAbi}]│    │                               │
+             ├──────────────────┬─────────────┘    │                               │
+             │abba0  , xabi_j_0 │                  │                               │
+╔════╗       │abba1  , xabi_j_1 │                  │                               │                                                                                                  ╔═════════╗
+║bloc║──────▶│abba2  , xabi_j_2 │──────────────────┴───────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────▶║ cirrus  ║
+╚════╝       │abba1  , xabi_j_1 │                                                                                                                                                     ╚═════════╝
+             │abba0  , xabi_j_0 │
+             └──────────────────┘](cirrus_architecture.png)
+
 ## roadmap
 
 + build our own `postgrest` instead of official docker image to enable:
