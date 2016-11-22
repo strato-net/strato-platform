@@ -29,6 +29,8 @@ app.use(bodyParser.urlencoded({limit: '500mb', extended: true }));
 var _ = require('lodash/fp');
 var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
 
+const typeMapping = {'Bool':'boolean', 'String':'text', 'Int':'integer DEFAULT 0', 'Address':'text', 'json':'json DEFAULT \'{}\''}
+
 // toSchema :: [(key: value)] -> Object -> Schema
 // we might want to filter on `public` here in the future
 var toSchema = typeMapping => _.flow(
@@ -41,8 +43,6 @@ var toSchema = typeMapping => _.flow(
  
 // this should arguably be replaced by `sequelize`
 var toSchemaString = function(json){ 
-
-  var typeMapping = {'Bool':'boolean', 'String':'text', 'Int':'integer DEFAULT 0', 'Address':'text', 'json':'json DEFAULT \'{}\''}
 
   var types = toSchema(typeMapping)(json.xabi.vars)
   var end = __.map(types, (v, k) => "\x22"+ k + "\x22" + " " + v);

@@ -203,6 +203,7 @@ var streamTopic = function(topic, offset){
 
 switch (argv.role) {
 
+  // vm :: IO [StateDiff]
   case 'vm':
     producer.on('ready', function () {
       producer.createTopics([stateDiff_chain], console.log);
@@ -211,18 +212,19 @@ switch (argv.role) {
       // see https://github.com/SOHU-Co/kafka-node/issues/354
       // client.refreshMetadata();
       
-      callNTimes(9999999999, 1000, n => {
-        producer.send([{ topic: stateDiff_chain, messages: randomStateDiff(), partition: 0 }], console.log)
+      callNTimes(9999999999, 4000, n => {
+        producer.send([{ topic: stateDiff_chain, messages: JSON.stringify(randomStateDiff()), partition: 0 }], console.log)
       });
     });
     producer.on('error', console.log)
  
     break;
   
+  // bloc :: IO [ContractNew]
   case 'bloc':
     producer.on('ready', function () {
       producer.createTopics([contractNew_chain], console.log);
-      callNTimes(9999999999, 5000, n => {
+      callNTimes(9999999999, 8000, n => {
         producer.send([{ topic: contractNew_chain, messages: randomContractNew(), partition: 0 }], console.log)
       });
     });
@@ -230,6 +232,7 @@ switch (argv.role) {
 
     break;
   
+  // cirrus :: [FullState] -> [ContractNew] -> IO ()
   case 'cirrus':
     streamTopic('fullState', false)
     .call('on', 'message', m => {
@@ -239,14 +242,24 @@ switch (argv.role) {
 
    break;
 
+  // birrus :: [StateDiff] -> [ContractNew] -> [FullState]
   case 'birrus':
     streamTopic(stateDiff_chain, false)
     .call('on', 'message', m => {
       console.log("m:" + JSON.stringify(m));
+      var fsTopic = 'fullState_' + m.topic.split('_')[1];
+      var state = "Failed to parse incoming message!";
+      try {
+        state = JSON.parse(m.value);
+      } catch (err) {
+        console.log("Failed to parse: " + err);
+      }
+      if(state.updatedAccounts.length > 0){
       //producer.on('ready', function () {
-        producer.createTopics(['fullState'], console.log);
-        producer.send([{ topic: 'fullState', messages: 'fullState_', partition: 0 }], console.log)
+        producer.createTopics([fsTopic], console.log);
+        producer.send([{ topic: 'fsTopic', messages: fsTopic + '_' + state, partition: 0 }], console.log)
       //})
+      }
     })
     .call('on', 'error', console.log); 
 
