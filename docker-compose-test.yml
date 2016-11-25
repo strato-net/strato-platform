@@ -1,62 +1,10 @@
 version: '2'
 
 services:
-
-  cirrus_vm:
-    build: .
-    command: node_modules/.bin/nodemon cirrus-test.js --role vm
-    environment:
-      NODE_ENV: development
-    volumes:
-      - .:/home/app/cirrus 
-    networks:
-      - silo_default
-    external_links:
-      - silo_zookepper_1:zookepper
-      - silo_kafka_1:kafka
-
-
-  cirrus_bloc:
-    build: .
-    command: node_modules/.bin/nodemon cirrus-test.js --role bloc
-    environment:
-      NODE_ENV: development
-    volumes:
-      - .:/home/app/cirrus
-    networks:
-      - silo_default
-    external_links:
-      - silo_zookepper_1:zookepper
-      - silo_kafka_1:kafka
-
-  cirrus_birrus:
-    build: .
-    command: node_modules/.bin/nodemon cirrus-test.js --role birrus
-    environment:
-      NODE_ENV: development
-    volumes:
-      - .:/home/app/cirrus
-    networks:
-      - silo_default
-    external_links:
-      - silo_zookepper_1:zookepper
-      - silo_kafka_1:kafka
-
-  cirrus_cirrus:
-    build: .
-    command: node_modules/.bin/nodemon cirrus-test.js --role cirrus
-    environment:
-      NODE_ENV: development
-    volumes:
-      - .:/home/app/cirrus
-    networks:
-      - silo_default
-    external_links:
-      - silo_zookepper_1:zookepper
-      - silo_kafka_1:kafka
  
   cirrus:
     build: .
+    image: cirrus/local
     command: node_modules/.bin/nodemon main.js
     environment:
       NODE_ENV: development
@@ -75,6 +23,59 @@ services:
       - silo_kafka_1:kafka
       - silo_postgrest_1:postgrest
       - silo_postgres-cirrus_1:postgres
+
+  cirrus_vm:
+    image: cirrus/local 
+    command: node_modules/.bin/nodemon cirrus-test.js --role vm
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/home/app/cirrus 
+    networks:
+      - silo_default
+    external_links:
+      - silo_zookepper_1:zookepper
+      - silo_kafka_1:kafka
+
+
+  cirrus_bloc:
+    image: cirrus/local
+    command: node_modules/.bin/nodemon cirrus-test.js --role bloc
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/home/app/cirrus
+    networks:
+      - silo_default
+    external_links:
+      - silo_zookepper_1:zookepper
+      - silo_kafka_1:kafka
+
+  cirrus_birrus:
+    image: cirrus/local
+    command: node_modules/.bin/nodemon cirrus-test.js --role birrus
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/home/app/cirrus
+    networks:
+      - silo_default
+    external_links:
+      - silo_zookepper_1:zookepper
+      - silo_kafka_1:kafka
+
+  cirrus_cirrus:
+    image: cirrus/local
+    command: node_modules/.bin/nodemon cirrus-test.js --role cirrus
+    environment:
+      NODE_ENV: development
+    volumes:
+      - .:/home/app/cirrus
+    networks:
+      - silo_default
+    external_links:
+      - silo_zookepper_1:zookepper
+      - silo_kafka_1:kafka
 
 networks:
   silo_default:

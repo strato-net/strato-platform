@@ -32,6 +32,10 @@ function randHex(n) {
   return crypto.randomBytes(n).toString('hex');
 }
 
+function randomCodeHash() {
+  return "abba" + (Math.random()*11|0);
+}
+
 function callNTimes(n, time, fn) {
   var i = n;
   function callFn() {
@@ -62,9 +66,9 @@ var randomStateDiff = function () {
 var randomSimpleStorageDiff = function(){
   var address = randHex(46);
   var amount = leftpad(randHex(6), 64, 0);
-
-  return acc = {
-    address : {
+  var acc = {};
+  acc[address] = 
+     {
       contractRoot:{
         oldValue:"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
         newValue:"3d060ab22dfb38810db7dd1bd799f455752baea6f1417b9468cd6eb1aec9cb1f"
@@ -78,8 +82,8 @@ var randomSimpleStorageDiff = function(){
       codeHash:"989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8",
       code:null,
       nonce:null
-    }
-  }
+    };
+  return acc;
 }
 
 var sampleXabi = {
@@ -246,20 +250,21 @@ switch (argv.role) {
   case 'birrus':
     streamTopic(stateDiff_chain, false)
     .call('on', 'message', m => {
-      console.log("m:" + JSON.stringify(m));
-      var fsTopic = 'fullState_' + m.topic.split('_')[1];
-      var state = "Failed to parse incoming message!";
-      try {
-        state = JSON.parse(m.value);
-      } catch (err) {
-        console.log("Failed to parse: " + err);
-      }
-      if(state.updatedAccounts.length > 0){
+      //console.log("m:" + JSON.stringify(m));
+      //var state = "Failed to parse incoming message!";
+      //try {
+      //  state = JSON.parse(m.value);
+      //} catch (err) {
+      //  console.log("Failed to parse: " + err);
+      //}
+      var fsTopic = "fullState_" + randomCodeHash();
+      //console.log(JSON.stringify(state));
+      //if(Object.keys(state.updatedAccounts).length > 0){
       //producer.on('ready', function () {
         producer.createTopics([fsTopic], console.log);
-        producer.send([{ topic: 'fsTopic', messages: fsTopic + '_' + state, partition: 0 }], console.log)
+        producer.send([{ topic: fsTopic, messages: "A STATE", partition: 0 }], console.log)
       //})
-      }
+      //}
     })
     .call('on', 'error', console.log); 
 
