@@ -157,7 +157,7 @@ takes options as described by `strato-admin.sh --help`.  Typical usage is:
 
  - On a bare machine, obtain the script somehow (e.g. wget the "Raw" file from
    github) as well as the file `docker-compose.yml.template`, and run 
-   ```./strato-admin.sh --run-tag <tag> --bare```.
+   ```./strato-admin.sh --run-tag <tag> --bare```
    All the runtime dependencies will be installed for you, the
    docker-compose.yml will be generated with reference to the given tag, and the
    containers will be downloaded and installed.  It will also (optionally) the
@@ -170,7 +170,7 @@ takes options as described by `strato-admin.sh --help`.  Typical usage is:
 
  - To completely remove all the containers and their associated volumes, run
    ```./strato-admin.sh --wipe```
-   **This is highly dangerous: it removes all blockchain data.***
+   **This is highly dangerous: it removes all blockchain data.**
 
  - For convenience, you can wipe and restart with
    ```./strato-admin.sh --run-tag <tag> --reset```
