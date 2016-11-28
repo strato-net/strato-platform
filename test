@@ -57,6 +57,8 @@ else
   node_modules/mocha/bin/mocha --config $rootDir/test.config.yaml e2e
 fi
 
+cd $rootDir
+
 # Stop docker if requested
 if [[ "$killDocker" == true ]]
 then
