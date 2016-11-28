@@ -44,6 +44,7 @@ services:
     environment:
       ssl: "${ssl}"
       stratoHost: "${stratoHost}"
+      apiUrlOverride: "${apiUrlOverride}"
   nginx:
     image: nginx-packager
     restart: always
