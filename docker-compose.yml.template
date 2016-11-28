@@ -24,7 +24,7 @@ services:
     image: %REPO%postgres-packager
     restart: always
   strato:
-    image: strato
+    image: %REPO%strato
     links:
       - zookeeper
       - kafka
