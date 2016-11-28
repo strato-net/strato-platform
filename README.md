@@ -152,30 +152,44 @@ TBD
 
 ### Running the docker images
 
-You need to run the script `setup-ubuntu16.04` in silo to install the runtime
-components, which are Docker, Docker Compose, and (optionally) the SSL certs.
-To enable the latter, set the environment variable `ssl=true` and put the certs
-in the same directory you run the script in.
+Running the strato containers is handled by the script `strato-admin.sh`.  It
+takes options as described by `strato-admin.sh --help`.  Typical usage is:
 
-The basic launch command is simply
+ - On a bare machine, obtain the script somehow (e.g. wget the "Raw" file from
+   github) as well as the file `docker-compose.yml.template`, and run 
+   ```./strato-admin.sh --run-tag <tag> --bare```.
+   All the runtime dependencies will be installed for you, the
+   docker-compose.yml will be generated with reference to the given tag, and the
+   containers will be downloaded and installed.  It will also (optionally) the
+   SSL certs if you set the environment variable `ssl=true` and put the certs in
+   the same directory you run the script in.
+
+ - Once the macine is set up, the same command without `--bare` will start the
+   containers.  If they are already run, they will be stopped (as in `docker
+   stop`) and then restarted with the new tag. 
+
+ - To completely remove all the containers and their associated volumes, run
+   ```./strato-admin.sh --wipe```
+   **This is highly dangerous: it removes all blockchain data.***
+
+ - For convenience, you can wipe and restart with
+   ```./strato-admin.sh --run-tag <tag> --reset```
+
+Calling the script with `--run-tag <tag>` starts strato, the supporting services
+(postgres, kafka, zookeeper, nginx) and a bloc server container.  The blockchain
+will be in "dev mode", with blocks mined instantly and the genesis block
+populated with a "faucet" account that you can get free ether from.  To change
+these settings, you need to set environment variables from those printed by
+`strato-admin.sh` when it runs.  For instance, this starts a mining
+node:
 ```
-docker-compose up -d
-```
-in the directory with the `docker-compose.yml` file.  This starts strato, the
-supporting services (postgres, kafka, zookeeper, nginx) and a bloc server
-container.  The blockchain will be in "dev mode", with blocks mined instantly
-and the genesis block populated with a "faucet" account that you can get free
-ether from.  To change these settings, you need to set environment variables
-from those under the `strato` entry of the `docker-compose.yml`.  For instance,
-this starts a mining node:
-```
-genesis=mixed10k lazyBlocks=false miningAlgorithm=SHA docker-compose up -d
+genesis=mixed10k lazyBlocks=false miningAlgorithm=SHA ./strato-admin.sh --run-tag <tag>
 ```
 The genesis block is pre-set to 10k difficulty, which gives initially quick
 block times.  The mining algorithm of SHA is the only one we currently
 implement.  You can also supply your own genesis block:
 ```
-genesisBlock=<JSON-formatted genesis block> genesis=<some name> docker-compose up -d
+genesisBlock=<JSON-formatted genesis block> genesis=<some name> ./strato-admin.sh --run-tag <tag>
 ```
 The JSON string can be provided from a file using the bash construct $(<
 genesisFile.json).
@@ -185,7 +199,7 @@ able to listen on port 30303 tcp/udp on its respective machine.  One of them
 will be the "bootnode", and is launched as above.  The others are launched using
 the `bootnode` environment variable:
 ```
-bootnode=1.2.3.4 docker-compose up -d
+bootnode=1.2.3.4 ./strato-admin.sh --run-tag <tag>
 ```
 This will connect them to the boot node and they will then exchange blocks and
 transactions.

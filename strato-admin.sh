@@ -18,6 +18,32 @@ usage='
                                       DANGEROUS last resort.
 '
 
+function setEnv {
+  export $1
+  [[ -n ${!1} ]] || eval $1=$2
+  echo "$1 = ${!1}"
+}
+
+function setEnvVars {
+  setEnv ssl false
+
+  setEnv genesis stablenet
+  setEnv miningAlgorithm Instant
+
+  setEnv stratoHost ""
+  setEnv networkID 6
+  setEnv genesisBlock ""
+  setEnv bootnode ""
+
+  setEnv mineBlocks true
+  setEnv verifyBlocks false
+  setEnv lazyBlocks true 
+  setEnv serveBlocks true
+  setEnv receiveBlocks true
+  setEnv addBootnodes false
+  setEnv noMinPeers false
+}
+
 if [[ $# -eq 0 ]]
 then
   echo >&2 "Must pass an argument.  Possible arguments are:"
@@ -61,6 +87,7 @@ case $1 in
     doFirst=""
     ;;
   "--help")
+    setEnvVars # To show the values
     echo "$0 usage:"
     echo "$usage"
     exit 0
@@ -71,30 +98,6 @@ case $1 in
     exit 1
     ;;
 esac
-
-function setEnv {
-  export $1
-  [[ -n ${!1} ]] || eval $1=$2
-  echo "$1 = ${!1}"
-}
-
-setEnv ssl false
-
-setEnv genesis stablenet
-setEnv miningAlgorithm Instant
-
-setEnv stratoHost ""
-setEnv networkID 6
-setEnv genesisBlock ""
-setEnv bootnode ""
-
-setEnv mineBlocks true
-setEnv verifyBlocks false
-setEnv lazyBlocks true 
-setEnv serveBlocks true
-setEnv receiveBlocks true
-setEnv addBootnodes false
-setEnv noMinPeers false
 
 function runTag
 {
@@ -172,6 +175,7 @@ function bare
   )
 }
 
+setEnvVars
 $doFirst
 $doit
 
