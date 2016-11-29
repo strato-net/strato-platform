@@ -34,7 +34,7 @@ var options = { method: 'GET',
 
 var allPromises = allHosts.map(h =>{
   rp({ method: 'GET'
-     , url: 'http://' + h 
+     , url: 'http://' + h
      , resolveWithFullResponse: true
      })
     .promise()
@@ -42,7 +42,7 @@ var allPromises = allHosts.map(h =>{
       console.log("Response from " + h + ": " + r.statusCode);
       if(r.statusCode != 200){
         console.log("Restarting, awaiting " + h);
-        process.exit(1); 
+        process.exit(1);
       }
     })
     .catch(err => {
@@ -70,11 +70,11 @@ var stateToBody = function(state, address) {
   if((typeof xabi) !== 'undefined'){
 
     var tmpStr = JSON.stringify(global.contractMap[state[address].codeHash]);
-  
+
     var parsed = JSON.parse(tmpStr);
- 
+
     //console.log("Attaching: " + xabi.name);
- 
+
     xabi.address = address;
     parsed.address = address;
 
@@ -105,12 +105,12 @@ var stateToBody = function(state, address) {
 }
 
 global.contractMap = {}
- 
+
 rp(options).promise().then(r => {
 
   console.log("Connecting to blockchain: " + r.peerId);
 
-  var topic = 'statediff_' + r.peerId; 
+  var topic = 'statediff_' + r.peerId;
 
   var offsets = Promise.promisifyAll(new kafka.Offset(client));
   var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
@@ -119,11 +119,14 @@ rp(options).promise().then(r => {
     return new kafka.Consumer(
       client,
       [{
-        topic: topic, 
+        topic: topic,
         offset: offset,
         partition: 0
       }],
-      {fromOffset: true}
+      {
+        fromOffset: true,
+        fetchMaxBytes: 1024*1024*15
+      }
     );
   });
 
@@ -159,7 +162,7 @@ rp(options).promise().then(r => {
 		  console.log(x);
                   var options = { method: 'POST',
                     url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
-                    headers: 
+                    headers:
                      { 'cache-control': 'no-cache',
                        'content-type': 'application/json' },
                     body: x,
@@ -178,7 +181,7 @@ rp(options).promise().then(r => {
               // if(val)
               //   val = parseInt(val['newValue'], 16);
               // else
-              //   val = 0; 
+              //   val = 0;
 
               stateToBody(state.updatedAccounts, a)
                 .then(JSON.stringify)
@@ -188,7 +191,7 @@ rp(options).promise().then(r => {
                   x.address = a;
                   var options = { method: 'PATCH',
                     url: 'http://' + postgrestHost + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
-                    headers: 
+                    headers:
                      { 'cache-control': 'no-cache',
                        'content-type': 'application/json' },
                     body: x,
@@ -210,7 +213,7 @@ rp(options).promise().then(r => {
         .then(function (error, response, body) {
           // if (error){
           //   throw new Error(error);
-          // } 
+          // }
           console.log(chalk.yellow("... done updating accounts"));
         });
     });
