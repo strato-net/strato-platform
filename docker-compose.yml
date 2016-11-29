@@ -18,7 +18,7 @@ services:
       KAFKA_DELETE_TOPIC_ENABLE: "true"
       KAFKA_LOG_CLEANER_ENABLE: "false"
       KAFKA_LOG_RETENTION_HOURS: 2147483647
-      KAFKA_MESSAGE_SIZE: 16777214
+      kafkaMessageSize: "${kafkaMessageSize}"
     ports:
       - "9092:9092"
   postgres:
