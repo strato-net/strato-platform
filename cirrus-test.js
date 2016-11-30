@@ -205,6 +205,16 @@ var streamTopic = function(topic, offset){
     })
 }
 
+global.hashMap = {};
+var once = function(hash, f){
+  if(hash in global.hashMap == false){
+    console.log("First call: " + hash);
+    var toRet = f();
+    global.hashMap[hash] = toRet;
+    return toRet;
+  }
+}
+
 switch (argv.role) {
 
   // vm :: IO [StateDiff]
@@ -261,7 +271,7 @@ switch (argv.role) {
       //console.log(JSON.stringify(state));
       //if(Object.keys(state.updatedAccounts).length > 0){
       //producer.on('ready', function () {
-        producer.createTopics([fsTopic], console.log);
+        once(fsTopic, _ => { producer.createTopics([fsTopic], console.log)}) 
         producer.send([{ topic: fsTopic, messages: "A STATE", partition: 0 }], console.log)
       //})
       //}
