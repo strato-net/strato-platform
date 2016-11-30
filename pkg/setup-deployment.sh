@@ -12,7 +12,7 @@ POSTGREST_MAX_ROWS=1000000
 POSTGREST_POOL=200
 
 $sudo apt-get update && \
-    $sudo apt-get install -y tar xz-utils wget libpq-dev && \
+    $sudo apt-get install -y tar xz-utils wget libpq-dev netcat-openbsd netbase && \
     $sudo apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 wget http://github.com/begriffs/postgrest/releases/download/v${POSTGREST_VERSION}/postgrest-${POSTGREST_VERSION}-ubuntu.tar.xz && \
@@ -20,7 +20,6 @@ wget http://github.com/begriffs/postgrest/releases/download/v${POSTGREST_VERSION
     $sudo mv postgrest /usr/local/bin/postgrest && \
     rm postgrest-${POSTGREST_VERSION}-ubuntu.tar.xz
 
-$sud apt-get update && apt-get install -y wget
 wget https://github.com/jwilder/dockerize/releases/download/v0.1.0/dockerize-linux-amd64-v0.1.0.tar.gz
 $sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-v0.1.0.tar.gz
 
