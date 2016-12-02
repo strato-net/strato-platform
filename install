@@ -36,7 +36,7 @@ function buildLocally
 function deployWithDocker
 {
   ensureDeployEnv docker
-        
+
   imageTime=$(docker images $submod --format "{{.CreatedAt}}")
   buildTime=$(latestDirModification $builddir $pkgdir/doit.sh)
 
