@@ -74,6 +74,17 @@ services:
     links:
       - strato:strato
       - postgres-cirrus:postgres
+  explorer:
+    image: strato-explorer
+    ports:
+      - 9000:9000
+    restart: always
+    environment:
+      peers: "${peers}"
+    links:
+      - strato:strato
+      - bloc:bloc
+  
   nginx:
     image: nginx-packager
     restart: always
@@ -88,5 +99,6 @@ services:
       - bloc
       - cirrus
       - postgrest
+      - explorer
     environment:
       ssl: "${ssl}"
