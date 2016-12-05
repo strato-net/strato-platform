@@ -47,6 +47,8 @@ services:
     environment:
       ssl: "${ssl}"
       stratoHost: "${stratoHost}"
+      apiUrlOverride: "${apiUrlOverride}"
+
   postgres-cirrus:
     image: postgres:9.6
     environment:
