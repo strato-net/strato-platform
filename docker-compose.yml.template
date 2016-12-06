@@ -50,7 +50,7 @@ services:
       apiUrlOverride: "${apiUrlOverride}"
 
   postgres-cirrus:
-    image: %REPO%postgres:9.6
+    image: postgres:9.6
     environment:
       POSTGRES_DB: cirrus
       POSTGRES_USER: postgres
