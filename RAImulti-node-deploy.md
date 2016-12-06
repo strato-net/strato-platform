@@ -30,7 +30,22 @@ Create the genesis block JSON file in the `silo/` folder:
 
 ## boot node
 Using the new and shiny deployment script `strato-admin.sh` we deploy strato:
+
+If the machine is new and doesn't have docker, use the `--bare` flag when deploying
+
+`genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129 --bare`
+
+Else, you can exlcude the `--bare` flag
+
 `genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129`
 
 ## All nodes started after boot node
+
+If the machine is new and doesn't have docker, use the `--bare` flag when deploying
+
+
+`genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA bootnode=<IP.Of.Boot.Node> ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129 --bare`
+
+Else, you can exlcude the `--bare` flag
+
 `genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA bootnode=<IP.Of.Boot.Node> ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129`
