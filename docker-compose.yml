@@ -41,6 +41,7 @@ services:
       addBootnodes: "${addBootnodes}"
       lazyBlocks: "${lazyBlocks}"
       miningAlgorithm: "${miningAlgorithm}"
+      miningThreads: "$miningThreads"
   bloc:
     image: bloc
     restart: always
