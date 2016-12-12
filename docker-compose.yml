@@ -76,6 +76,7 @@ services:
     links:
       - strato:strato
       - postgres-cirrus:postgres
+    restart: always
   explorer:
     image: strato-explorer
     ports:
