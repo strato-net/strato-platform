@@ -42,6 +42,8 @@ services:
       lazyBlocks: "${lazyBlocks}"
       miningAlgorithm: "${miningAlgorithm}"
       miningThreads: "$miningThreads"
+      blockTime: "$blockTime"
+      minBlockDifficulty: "$minBlockDifficulty"
   bloc:
     image: bloc
     restart: always
