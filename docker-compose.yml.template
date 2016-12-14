@@ -103,7 +103,7 @@ services:
     depends_on:
       - strato
       - bloc
-      - cirrus
+#      - cirrus
 #     - postgrest
 #      - explorer
     environment:
