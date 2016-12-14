@@ -41,6 +41,9 @@ services:
       addBootnodes: "${addBootnodes}"
       lazyBlocks: "${lazyBlocks}"
       miningAlgorithm: "${miningAlgorithm}"
+      miningThreads: "${miningThreads}"
+      blockTime: "${blockTime}"
+      minBlockDifficulty: "${minBlockDifficulty}"
   bloc:
     image: bloc
     restart: always
@@ -48,6 +51,7 @@ services:
       ssl: "${ssl}"
       stratoHost: "${stratoHost}"
       apiUrlOverride: "${apiUrlOverride}"
+  
   postgres-cirrus:
     image: postgres:9.6
     environment:
@@ -75,6 +79,18 @@ services:
     links:
       - strato:strato
       - postgres-cirrus:postgres
+    restart: always
+  explorer:
+    image: strato-explorer
+    ports:
+      - 9000:9000
+    restart: always
+    environment:
+      peers: "${peers}"
+    links:
+      - strato:strato
+      - bloc:bloc
+  
   nginx:
     image: nginx-packager
     restart: always
@@ -89,5 +105,6 @@ services:
       - bloc
       - cirrus
       - postgrest
+      - explorer
     environment:
       ssl: "${ssl}"
