@@ -52,44 +52,44 @@ services:
       stratoHost: "${stratoHost}"
       apiUrlOverride: "${apiUrlOverride}"
 
-  postgres-cirrus:
-    image: postgres:9.6
-    environment:
-      POSTGRES_DB: cirrus
-      POSTGRES_USER: postgres
-      PG_ENV_POSTGRES_DB: cirrus
-      PG_ENV_POSTGRES_USER: postgres
-    ports:
-      - '5434:5432'
-  postgrest:
-    image:  %REPO%postgrest-packager
-    restart: always
-    environment:
-      POSTGRES_DB: cirrus
-      POSTGRES_USER: postgres
-      PG_ENV_POSTGRES_DB: cirrus
-      PG_ENV_POSTGRES_USER: postgres
-      PG_PORT_5433_TCP_PORT: 5432
-    links:
-      - postgres-cirrus:postgres
-    ports:
-      - '3001:3001'
-  cirrus:
-    image: %REPO%cirrus
-    links:
-      - strato:strato
-      - postgres-cirrus:postgres
-    restart: always
-  explorer:
-    image: %REPO%strato-explorer
-    ports:
-      - 9000:9000
-    restart: always
-    environment:
-      peers: "${peers}"
-    links:
-      - strato:strato
-      - bloc:bloc
+#  postgres-cirrus:
+#    image: postgres:9.6
+#    environment:
+#      POSTGRES_DB: cirrus
+#      POSTGRES_USER: postgres
+#      PG_ENV_POSTGRES_DB: cirrus
+#      PG_ENV_POSTGRES_USER: postgres
+#    ports:
+#      - '5434:5432'
+#  postgrest:
+#    image:  %REPO%postgrest-packager
+#    restart: always
+#    environment:
+#      POSTGRES_DB: cirrus
+#      POSTGRES_USER: postgres
+#      PG_ENV_POSTGRES_DB: cirrus
+#      PG_ENV_POSTGRES_USER: postgres
+#      PG_PORT_5433_TCP_PORT: 5432
+#    links:
+#      - postgres-cirrus:postgres
+#    ports:
+#      - '3001:3001'
+#  cirrus:
+#    image: %REPO%cirrus
+#    links:
+#      - strato:strato
+#      - postgres-cirrus:postgres
+#    restart: always
+#  explorer:
+#    image: %REPO%strato-explorer
+#    ports:
+#      - 9000:9000
+#    restart: always
+#    environment:
+#      peers: "${peers}"
+#    links:
+#      - strato:strato
+#      - bloc:bloc
   
   nginx:
     image: %REPO%nginx-packager
@@ -104,7 +104,7 @@ services:
       - strato
       - bloc
       - cirrus
-      - postgrest
-      - explorer
+#     - postgrest
+#      - explorer
     environment:
       ssl: "${ssl}"
