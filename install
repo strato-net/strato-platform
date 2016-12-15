@@ -230,7 +230,7 @@ case $1 in
     ;;
 esac
 
-modsToBuild=${@:-$(sed -n 's/.*image: //p' docker-compose.yml)}
+modsToBuild=${@:-$(sed -n 's/.*image: %REPO%//p' docker-compose.yml.template)}
 for i in $modsToBuild
 do
   export submod=$i
