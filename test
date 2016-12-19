@@ -49,7 +49,9 @@ cd $testDir
 npm install
 
 # Run the tests
-echo "Running tests..."
+echo "Running vm tests..."
+stack test ethereum-test
+echo "Running e2e tests..."
 if [[ "$enableSsl" == true ]]
 then
   node_modules/mocha/bin/mocha --config $rootDir/test-https.config.yaml e2e
