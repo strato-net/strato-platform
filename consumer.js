@@ -34,7 +34,9 @@ var options = { method: 'GET',
 
 var allPromises = allHosts.map(h =>{
   rp({ method: 'GET'
-     , url: 'http://' + h
+      // TODO: the part with the ternary operator should be removed once bug with strato-api is fixed
+      // see https://www.pivotaltracker.com/story/show/136456021
+     , url: 'http://' + h + (h == stratoHost ? '/eth/v1.2/uuid' :  '') 
      , resolveWithFullResponse: true
      })
     .promise()
