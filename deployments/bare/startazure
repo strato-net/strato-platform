@@ -1,0 +1,19 @@
+#!/bin/bash
+
+nohup strato-p2p-server --runUDPServer=false --networkID=1001001 -a 10.5.0.4 -p 30303 > logs/strato-p2p-server &
+nohup ethereum-discover 40.76.57.208 30303 > logs/ethereum-discover &
+cd strato-api
+nohup strato-api > /dev/null &
+cd ..
+nohup ethereum-vm --miningVerification=false > logs/ethereum-vm &
+nohup strato-p2p-client 2 --networkID=1001001 > logs/strato-p2p-client &
+
+cd ~/keyserver/keyserver
+
+export PORT=9000
+export HOST=10.0.0.4
+nohup node app.js > /dev/null &
+
+export PORT=8000
+cd ~/explorer/strato-explorer
+nohup grunt serve > ~/strato/logs/explorer &

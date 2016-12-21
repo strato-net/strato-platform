@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>BlockApps: Build Apps for Ethereum</title>
+    <!-- favicons -->
+    <link rel="apple-touch-icon" sizes="57x57" href="img/favicons/favicons/apple-touch-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="img/favicons/apple-touch-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="img/favicons/apple-touch-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="img/favicons/apple-touch-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="img/favicons/apple-touch-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="img/favicons/apple-touch-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="img/favicons/apple-touch-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="img/favicons/apple-touch-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="img/favicons/apple-touch-icon-180x180.png">
+    <link rel="icon" type="image/png" href="img/favicons/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="img/favicons/android-chrome-192x192.png" sizes="192x192">
+    <link rel="icon" type="image/png" href="img/favicons/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/png" href="img/favicons/favicon-16x16.png" sizes="16x16">
+    <link rel="manifest" href="img/favicons/manifest.json">
+    <link rel="shortcut icon" href="img/favicons/favicon.ico">
+     <!-- // end favicons -->
+    <!-- Bootstrap core CSS -->
+    <link href="http://blockapps.net/css/style.css" rel="stylesheet">
+
+  <body>
+
+    <script src="http://stablenet.blockapps.net/ethlightjs.min.js"></script>
+    <script src="http://stablenet.blockapps.net/includetransaction/pushtx.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+
+    <nav class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+
+        <div id="navbar" class="collapse navbar-collapse">
+          <ul class="nav navbar-nav navbar-right">
+            <li class="active"><a href="/">Tutorial</a></li>
+            <li><a href="#faucet">Faucet</a></li>
+            <li><a href="#ss">SimpleStorage</a></li>
+            <li><a href="#sm">SimpleMemory</a></li>
+            <li><a href="#fcfs">FirstComeFirstServe</a></li>     
+            <li><a href="#pc">PassCrack</a></li>     
+            <li><a href="#sms">SimpleMultiSig</a></li>            
+
+    <div class="container section logo-section">
+      <div class="row">
+        <div class="col-md-12">
+          <div class="logo">
+      <div class="row">
+        <div class="col-md-12">
+          <div class="col-md-6 col-md-offset-3 col-sm-8 col-sm-offset-2 col-xs-12">
+            <h2>The Interactive Solidity Tutorial</h2>
+
+    <div class="container-fluid section red-section">
+      <div class="row">
+        <div class="row">
+          <h2>The facuet</h2>
+
+      <div class="row">
+        <div class="col-md-8">
+          <table class="table" style="border: 0px; width: 400px;">
+            <tbody>
+              <tr>
+                <td style="text-align: right;"><label for="seed">Seed:</label></td>
+                <td align="right">
+                  <input id="seed" style="width: 500px;" value=""/>
+                  <button onclick="randomSeed()">Random Seed</button>
+                  <button onclick="setSeed()">Set Seed</button>
+
+              <tr>
+                <td style="text-align: right;" align="right"><label for="password">Password:</label></td>
+                <td align="right"><input id="password" style="width: 300px;" type="password" value='mypassword'/></td>
+
+              <tr>
+                <td style="text-align: right;"><label for="prvkey">Private Key:</label></td>
+                <td align="right"><input id="prvkey" style="width: 500px;"/><div id="invalidPrvKeyWarning" class="error">Invalid Private Key</div></td>
+
+              <tr>
+                <td style="text-align: right;"><label for="address">Address:</label></td>
+                <td align="right"><select id="address" onchange="console.log('address: ' + address.value);">
+                  <option value=undefined>no address found</option>
+              <tr>
+                <td style="text-align: right;"></td>
+                <td style="text-align: right;" align="right"><button id="submitButton" onclick="claimEther()">Press here to grab some ether from the faucet!</button></td>
+
+              <h5 class="text-center">Excellent! You should see that the balance is non-zero - you've been gifted 1000 StableNet Ether courtesy of BlockApps.</h5>
+
+            <div class="md-4">
+            <h4> Solidity is a high level language that compiles to EVM bytecode - the virtualized execution instructions native to the Ethereum Virtual Machine. It is emerging as the standard high level language for developing smart contracts on Ethereum. Before we get into the guts of Solidity, let's generate a few private keys. Click <em> random seed</em>, followed by <em> set seed</em>, and don't forget to grab some ether. Don't worry about the details of the seed for now - just think of it as a convenient way to generate a few private keys - we'll need them.
+
+
+      <div class="row">
+        <div class="col-md-4">
+      <div class="row">
+        <div class="col-md-12">
+          <div id="message">
+            <div style="padding: 5px;">
+              <div id="inner-message" class="alert alert-error">
+                <table class="table gray-section" style="border: solid; width: 250px;">
+                  <tbody>
+                    <tr>
+                      <td style="text-align: right;"><label for="balance">Balance:</label></td>
+                      <td><input id="balance" value="" style="width: 200px;" readonly /></td>
+                    <tr>
+                      <td style="text-align: right;"><label for="nonce">Nonce:</label></td>
+                      <td><input id="nonce" value="0" style="width: 200px" readonly /></td>
+
+    <div class="container-fluid section gray-section">
+      <div class="row">
+        <h2>Simple storage</h2>
+
+      <div class="row">
+        <div class="col-md-4">
+        <h3>Solidity contracts are declared with the word contract and written in C-style syntax. What you see here is one of the simplest possible solidity contracts - all it does is store an unsigned integer. If you delete a brace somewhere, you should see errors appear in the right text area. This is because the contract is being compiled live and is ready to be committed to the the blockchain.
+        <div class="col-md-8">
+          <textarea rows="10" style="border: 0px; width: 400px;" id="storageInput" onchange="compile(storageInput,storageOutput,storageSelect,storageTable,storageButton)" onkeyup="compile(storageInput,storageOutput,storageSelect,storageTable,storageButton)">
+          contract SimpleStorage {
+              uint storedData;
+              function set(uint x) {
+                  storedData = x;
+              }
+              function get() returns (uint retVal) {
+                  return storedData;
+              }
+          }
+          <textarea id="storageOutput" style="border: 0px; width: 400px;" rows="10" style="border: 0px;" readonly="true">
+        <div style="width: 100%">
+          <select id="storageSelect" onchange="typeListToTable(getFunctionNameTypes(storageSelect[storageSelect.selectedIndex].innerHTML, $(storageOutput).data('solabi')),storageTable);storageData.value=''">
+
+          <table id="storageTable" style="width: 400px; " onchange="storageData.value=dataPayload(storageOutput,storageSelect,storageTable)" onkeyup="storageData.value=dataPayload(storageOutput,storageSelect,storageTable)">
+          <tr>
+            <tr>
+            <td><button type="submit" onclick="pushSolOrCallFunc(storageInput,storageData.value,storageButton,storageStorage)" id="storageButton">Push Solidity Code</button>
+          <textarea id="storageData" style="width: 600px; height: 20px" readonly="true">
+          <br>
+          <textarea id="storageStorage" style="width: 600px; height: 40px" readonly="true">    
+
+        <h4>Go ahead and press the button to submit the contract. </h4>
+        <div id="warn1" style="text-align"> 
+          <big> &#x2621; </big> 
+
+          Call the function <em> set </em> with an unsigned integer as the argument. Notice that the storage updates, with the variable name clear in JSON. Why, then, did we write the <em>get</em> method? After all the <em>get</em> requires the virtual machine to run, and this will make the front end less responsive (and might cost you).
+
+          The answer is that we might need to pass the result to another contract. For making data available to the front end - directly looking up storage is preferred. For error messages or passing the value to other contracts, use <em>return</em>. 
+
+    <div class="container-fluid section blue-section">
+      <div class="row">
+        <h2>Simple memory</h2>
+      <div class="row">
+
+        <div class="col-md-8">
+          <textarea rows="12" id="memoryInput"  style="width: 400px; " onchange="compile(memoryInput,memoryOutput,memorySelect,memoryTable,memoryButton)" onkeyup="compile(memoryInput,memoryOutput,memorySelect,memoryTable,memoryButton)">
+          contract SimpleMemory {
+              uint storedGlobal;
+              function set(uint x) {
+                  uint memoryLocal;
+                  memoryLocal = x;
+              }
+              function get() returns (uint retVal) {
+                  return memoryLocal;
+              }
+          }
+        <textarea id="memoryOutput" rows="12" style="border: 0px; width: 400px;" readonly="true"></textarea>
+
+        <select id="memorySelect" onchange="typeListToTable(getFunctionNameTypes(memorySelect[memorySelect.selectedIndex].innerHTML, $(memoryOutput).data('solabi')),memoryTable)">
+
+        <table id="memoryTable" style="width: 400px; " onchange="memoryData.value=dataPayload(memoryOutput,memorySelect,memoryTable)" onkeyup="memoryData.value=dataPayload(memoryOutput,memorySelect,memoryTable)">
+        <tr>
+          <tr>
+            <td><button type="submit" id="memoryButton" onclick="pushSolOrCallFunc(memoryInput,memoryData.value,memoryButton,memoryStorage)" >Push Solidity Code</button>
+        <textarea id="memoryData" style="width: 600px; height: 20px" readonly="true"></textarea><br>      
+        <textarea id="memoryStorage" style="width: 600px; height: 40px" readonly="true"></textarea>      
+      <div class="col-md-4">
+        <h3> What kind of tutorial is this? This contract doesn't compile. The example illustrates two Solidity design decisions: the nature of its scoping rules and also the difference between storage and memory. Globally scoped variables are located in storage, and locally scoped variables are written to memory, by default. Storage persists between runs of the VM; memory, naturally, does not. Confirm by excising <em>get</em> and then run <em>set</em>.
+
+      <div id="warn1" style="text-align"> 
+        <h3> Aside: <em> Gas </em>
+            If you look above, you may have noticed your balance falling. On Ethereum, everything is a transaction, even if there is no value exchanged. Why does it cost you to create or run a contract? Each transaction requires <em> gas </em> to run. Gas acts as a market price indepenent tally of the amount of computational work that a contract requires. We've hidden it from you, but each transaction requires a <em> gas limit </em> - the maximal amount of gas that a transaction can consume, and a <em> gas price </em>- the amount of Ether the creator of the transaction is willing to pay for it to run. Fees are payed to the miner of the <em>block</em> that a transaction is in. Check out <a href="http://stablenet.blockapps.net/query/account?address=5b42bd01ff7b368cd80a477cb1cf0d407e2b1cbe">the coinbase address</a> and you should see a reference to the most recent block, and that the balance will change when new transactions are pushed to the network. 
+
+    <div class="container-fluid section yellow-second-section">
+      <div class="row">
+        <h2>First come first serve
+      <div class="row">
+        <div class="col-md-4">
+        <h3>Solidity contracts are declared with the word contract and written in C-style syntax. What you see here is one of the simplest possible solidity contracts - all it does is store an unsigned integer. If you delete a brace somewhere, you should see errors appear in the right text area. This is because the contract is being compiled live and is ready to be committed to the the blockchain.
+
+      <div class="col-md-8">
+        <textarea id="firstInput" rows="10" style="width: 400px;" onchange="compile(firstInput,firstOutput,firstSelect,firstTable,firstButton)" onkeyup="compile(firstInput,firstOutput,firstSelect,firstTable,firstButton)">
+        contract FirstComeFirstServe {
+         function takeIt() {
+           msg.sender.send(this.balance);
+         }
+        }
+        <textarea id="firstOutput" rows="10" style="width: 400px; border=0px;" readonly="true"></textarea>
+
+        <select id="firstSelect" style="width: 400px; " onchange="typeListToTable(getFunctionNameTypes(firstSelect[firstSelect.selectedIndex].innerHTML, $(firstOutput).data('solabi')),firstTable)">
+
+        <table id="firstTable" onchange="firstData.value=dataPayload(firstOutput,firstSelect,firstTable)" onkeyup="firstData.value=dataPayload(firstOutput,firstSelect,firstTable)">
+          <tr>
+            <tr>
+              <td><button type="submit" id="firstButton" onclick="pushSolOrCallFunc(firstInput,firstData.value,firstButton,firstStorage)" >Push Solidity Code</button></td>
+
+        <textarea id="firstData" style="width: 600px; height: 20px" readonly="true"></textarea><br>      
+        <textarea id="firstStorage" style="width: 600px; height: 40px" readonly="true"></textarea>      
+
+  
+      <div id="warn1" style="text-align">
+        <big> &#x2621; </big> 
+        You might send a transaction to FirstComeFirstServe thinking that you will claim its balance, but someone can slide in and claim it before you. And it will still cost you gas! Try it!
+        The FirstComeFirstServe contract surrenders its balance to the first taker. What purpose could it have? It is meant to illustrate the possibility of race conditions, within Ethereum. The EVM is synchronous and executes transactions exactly in the order they appear in a <em>block</em>. For now, think of a block as a bundle of transactions, each originating from an address. <em>msg.sender</em> is the address of the person (or contract) that called the contract. When we called methods before, we were sending a transaction into the Ethereum network (remember, everything is a transaction). So the contract immediately sends its balance (<em>this.balance</em>) to the first person to call it.
+
+    <div class="clear"></div>
+
+    <div class="container-fluid section blue-section">
+      <div class="row">
+        <h2>Password crack</h2>
+
+      <div class="col-md-8">
+        <div class="row">
+          <textarea rows="20" style="width: 400px" id="passInput" onchange="compile(passInput,passOutput,passSelect,passTable,passButton)" onkeyup="compile(passInput,passOutput,passSelect,passTable,passButton)">
+          contract PassCrack {
+            struct passData {
+              bytes32 hash;
+              uint bounty;
+            }  
+
+            mapping (bytes32 => passData) loginHashes;
+            function createBounty(bytes32 login, bytes32 passHash) {
+              loginHashes[login].hash = passHash;
+              loginHashes[login].bounty = msg.value;
+            }
+
+            function claimBounty(bytes32 login, string pass) {
+              if (loginHashes[login].hash == sha3(pass)) {
+                msg.sender.send(loginHashes[login].bounty);
+                loginHashes[login].hash = 0;
+                loginHashes[login].bounty = 0;
+              }
+            }
+          }
+          <textarea id="passOutput" rows="20" style="width: 300px; border: 0px;" readonly="true"></textarea>
+        <br>
+        <div class="row">
+          <input id="pass" value="password" onchange="hash()" onkeyup="hash()">
+          <input id="hashPass" value="">
+
+        <div class="row">
+          <select id="passSelect" onchange="typeListToTable(getFunctionNameTypes(passSelect[passSelect.selectedIndex].innerHTML, $(passOutput).data('solabi')),passTable)" >
+
+
+          <table id="passTable" style="width: 400px; " onchange="passData.value=dataPayload(passOutput,passSelect,passTable)" onkeyup="passData.value=dataPayload(passOutput,passSelect,passTable)">
+            <tr>
+              <tr>
+                <td><button type="submit" id="passButton" onclick="pushSolOrCallFunc(passInput,passData.value,passButton,passStorage)" >Push Solidity Code</button></td>
+
+        <textarea id="passData" style="width: 600px; height: 20px" readonly="true"></textarea><br>      
+        <textarea id="passStorage" style="width: 600px; height: 40px" readonly="true"></textarea>   
+
+      <div class="col-md-4">
+        <h3> PassCrack is an incentivized password cracking contract. PassCrack allows an unscrupulous user to post a login name and a hashed password, and it pays out a bounty if that password is found. 
+
+      <div id="warn1" style="text-align"> 
+        As a general pattern, it illustrates the use of structs, and how secrets can be used on the blockchain. The password is assumed hashed before commited to the chain. One creates a bounty with the createBounty function, and claims a bounty with the claimBounty function. The claimBounty function takes the plaintext password, checks that it is equal to the hashed value, and if so, pays out. We will see this 'commit-and-reveal' pattern again. 
+
+    <div class="container-fluid section red-section">
+
+      <div class="row">
+        <h2>Simple multi-sig
+      <div class="row">
+        <div class="col-md-4">
+        <h3>This is an example of a simple MultiSig contract. Alice holds two keys, and Bob, the service provider, holds one. Two out of three signatures required to withdraw one transaction at a time, only. 
+        Bob cannot carry out the withdrawal but is responsible for creating the contract and register Alice, the customer. This registration can only happen once. This more complicated contract indicates several principles: the coordination of different actors, irreversible actions, and error handling. 
+        The contract needs to remember the addresses of Alice and Bob respectfully, so Bob registers them at 'register.' Without setting the variable registeredYet, Bob could re-register new Alice's in the future and walk away with her hard earned cash.
+        The contract can fail many ways, and so error messages are included in global storage. Try clicking withdraw without having the right number of signatures! 
+        In general, error handling on Ethereum is an open question. For a contract called by others, it might be best to return a value indicating an error. But to make the error obvious to the front end, set it in storage.
+
+      <div class="col-md-8">
+        <textarea rows="52" style="width: 400px" id="multiInput" onchange="compile(multiInput,multiOutput,multiSelect,multiTable,multiButton)" onkeyup="compile(multiInput,multiOutput,multiSelect,multiTable,multiButton)">
+        contract SimpleMultiSig {
+           address alice1;
+           address alice2;
+           address bob;
+           uint numSigned = 0;
+           bytes32 error; 
+           bool registeredYet;   
+           mapping (address => bool) signedYet;
+
+           function SimpleMultiSig() {
+             bob = msg.sender;
+             registeredYet = false;
+           }
+
+           function register(address registerAlice1, address registerAlice2) {
+             if (msg.sender == bob && registeredYet == false) {
+               alice1 = registerAlice1;
+               alice2 = registerAlice2;
+               registeredYet = true;
+             } else if (msg.sender == bob) { 
+               error = "registered already";
+             } else { 
+               error = "you aren't bob!";
+             }
+           }
+
+           function withdraw(address to) {
+             if ((msg.sender == alice1 || msg.sender == alice2) && numSigned >= 2) {
+                to.send(this.balance);
+                numSigned = 0;
+                signedYet[alice1] = signedYet[alice2] = signedYet[bob] = false;
+             } else { 
+                error = "can't withdraw yet!";
+             }
+           }
+
+           function addSignature() {
+             if (msg.sender == alice1 && signedYet[alice1]==false) {
+               signedYet[alice1] = true;
+               numSigned++;
+             } else if (msg.sender == alice2 && signedYet[alice2]==false) {
+               signedYet[alice2] = true;
+               numSigned++;
+             } else if (msg.sender == bob && signedYet[bob]==false) {
+               signedYet[bob] = true;
+               numSigned++;
+             } else { 
+               error = "unknown address";
+             } 
+           }
+        }
+      <textarea rows="52" id="multiOutput" style="width: 400px; border: 0px;" readonly="true">
+
+      <select id="multiSelect" onchange="typeListToTable(getFunctionNameTypes(multiSelect[multiSelect.selectedIndex].innerHTML, $(multiOutput).data('solabi')),multiTable);multiData.value=dataPayload(multiOutput,multiSelect,multiTable);" >
+
+
+      <table id="multiTable" style="width: 400px; " onchange="multiData.value=dataPayload(multiOutput,multiSelect,multiTable)" onkeyup="multiData.value=dataPayload(multiOutput,multiSelect,multiTable)">
+          <tr>
+            <tr>
+            <td><button type="submit" id="multiButton" onclick="pushSolOrCallFunc(multiInput,multiData.value,multiButton,multiStorage)" >Push Solidity Code</button>
+
+      <textarea id="multiData" style="width: 600px; height: 20px" readonly="true"></textarea><br>      
+      <textarea id="multiStorage" style="width: 600px; height: 40px" readonly="true"></textarea>      
+
+    <div class="container-fluid section yellow-section">
+     <div class="col-xs-12">
+        <div class="what-is-ethereum">
+          <h1>Thank you!
+
+    <footer class="container-fluid section footer-section">
+      <div class="footer-top container">
+        <div class="row">
+          <div class="widget col-xs-12 col-sm-4">
+            <h4 class="widget-title">Site Map</h4>
+            <ul class="entries links links-2-cols">
+              <li><a href="/apidocs">API Docs</a></li>
+              <li><a href="/demo">Demo</a></li>
+              <li><a href="/apidocs#tutorial">Tutorial</a></li>
+
+          <div class="clearfix visible-xs"></div>
+          <div class="widget col-xs-6 col-sm-2">
+            <h4 class="widget-title">Info</h4>
+            <ul class="entries links links">
+              <li><a href="#">About</a></li>
+              <li><a href="https://angel.co/consensys/jobs">Careers</a></li>
+              <li><a href="#">Terms &amp; Conditions</a></li>
+              <li><a href="#">Privacy</a></li>
+
+          <div class="widget col-xs-6 col-sm-2">
+            <h4 class="widget-title">Follow Us</h4>
+            <ul class="entries links">
+              <li><a href="https://twitter.com/blockapps"><i class="fa fa-twitter-square fa-2x"></i> Twitter</a></li>
+              <li><a href="https://www.facebook.com/consensussystems"><i class="fa fa-facebook-square fa-2x"></i> Facebook</a></li>
+
+          <div class="clearfix visible-xs"></div>
+          <div class="widget col-xs-12 col-sm-4">
+            <h4 class="widget-title">Contact</h4>
+            <p>We'd love to hear from you!</p>
+            <p><div id="blockapps-email"></div></p>
+            <p><a href="https://twitter.com/blockapps">@blockapps</a></p>
+
+      <div class="row">
+        <div class="col-md-12 copyright">
+          <p>Copyright &copy; 2015 by <a href="http://consensys.net">ConsenSys, LLC</a>. All Rights Reserved.</p>
+          <p>Design by Bogdan Burcea.</p>
+
+  <script>
+    compile(storageInput,storageOutput,storageSelect,storageTable,storageButton);
+    compile(memoryInput,memoryOutput,memorySelect,memoryTable,memoryButton);
+    compile(firstInput,firstOutput,firstSelect,firstTable,firstButton);
+    compile(passInput,passOutput,passSelect,passTable,passButton);
+    compile(multiInput,multiOutput,multiSelect,multiTable,multiButton);
+    setInterval(loadAccountInfo,1000);
+    hash();
+    console.log("hello")
+
+    <script src="js/app.min.js"></script>
+
+
+    <!-- MC -->
+    <script type='text/javascript' src='http://s3.amazonaws.com/downloads.mailchimp.com/js/mc-validate.js'></script>
+    <script type='text/javascript'>(function($) {window.fnames = new Array(); window.ftypes = new Array();fnames[0]='EMAIL';ftypes[0]='email';}(jQuery));var $mcj = jQuery.noConflict(true);</script>
+
+    <!-- GA -->
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','http://www.google-analytics.com/analytics.js','ga');
+      ga('create', 'UA-64394910-1', 'auto');
+      ga('send', 'pageview');
+
+
+    <!-- Kiss -->
+    <script type="text/javascript">var _kmq = _kmq || [];
+        var _kmk = _kmk || '7fa2442d28adb9ee7275c4818c73025957463d94';
+        function _kms(u){
+                setTimeout(function(){
+                var d = document, f = d.getElementsByTagName('script')[0],
+                s = d.createElement('script');
+                s.type = 'text/javascript'; s.async = true; s.src = u;
+                f.parentNode.insertBefore(s, f);
+                }, 1);
+        }
+        _kms('http://i.kissmetrics.com/i.js');
+        _kms('http://scripts.kissmetrics.com/' + _kmk + '.2.js');
+
+    <!-- Seg -->
+    <script>
+     !function(){var analytics=window.analytics=window.analytics||[];if(!analytics.initialize)if(analytics.invoked)window.console&&console.error&&console.error("Segment snippet included twice.");else{analytics.invoked=!0;analytics.methods=["trackSubmit","trackClick","trackLink","trackForm","pageview","identify","group","track","ready","alias","page","once","off","on"];analytics.factory=function(t){return function(){var e=Array.prototype.slice.call(arguments);e.unshift(t);analytics.push(e);return analytics}};for(var t=0;t<analytics.methods.length;t++){var e=analytics.methods[t];analytics[e]=analytics.factory(e)}analytics.load=function(t){var e=document.createElement("script");e.type="text/javascript";e.async=!0;e.src=("https:"===document.location.protocol?"https://":"http://")+"cdn.segment.com/analytics.js/v1/"+t+"/analytics.min.js";var n=document.getElementsByTagName("script")[0];n.parentNode.insertBefore(e,n)};analytics.SNIPPET_VERSION="3.0.1";
+       analytics.load("JvUe2mhRcB63uvL0KslGanyFwNBZRVPS");
+       analytics.page("Home");
+       }}();

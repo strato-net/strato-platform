@@ -1,0 +1,124 @@
+name: blockapps-data
+version: 0.0.1
+cabal-version: >=1.10
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:  
+    The client described in the Ethereum Yellowpaper
+    
+source-repository this
+  type:     git
+  location: https://github.com/jamshidh/ethereum-client-haskell
+  branch:   master
+  tag:      v0.0.1
+
+library
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , aeson
+                 , base-unicode-symbols
+                 , base16-bytestring
+                 , binary
+                 , blockapps-util
+                 , bytestring
+                 , clock
+                 , containers
+                 , crypto-pubkey-types
+                 , cryptohash
+                 , data-default
+                 , deepseq
+                 , directory
+                 , esqueleto
+                 , ethereum-encryption
+                 , ethereum-rlp
+                 , fast-ecrecover
+                 , filepath
+                 , haskoin
+                 , lens
+                 , leveldb-haskell
+                 , lifted-base
+                 , merkle-patricia-db
+                 , milena
+                 , monad-logger
+                 , mtl
+                 , nibblestring
+                 , path-pieces
+                 , persistent
+                 , persistent-postgresql
+                 , persistent-template
+                 , resourcet
+                 , strato-conf
+                 , text
+                 , time
+                 , transformers
+                 , ansi-wl-pprint
+                 , entropy
+                 , yaml
+                 , entropy
+                 , process
+                 , hflags
+                 , monad-control
+
+    exposed-modules: 
+                   Blockchain.Constants
+                   Blockchain.Data.Address
+                   Blockchain.Data.AddressStateDB
+                   Blockchain.Data.BlockDB
+                   Blockchain.Data.BlockHeader
+                   Blockchain.Data.BlockOffset
+                   Blockchain.Data.BlockSummary
+                   Blockchain.Data.Code
+                   Blockchain.Data.DataDefs
+                   Blockchain.Data.DiffDB
+                   Blockchain.Data.Extra
+                   Blockchain.Data.Json
+                   Blockchain.Data.Log
+                   Blockchain.Data.LogDB
+                   Blockchain.Data.NewBlk
+                   Blockchain.Data.PersistTypes
+                   Blockchain.Data.RawTransaction
+                   Blockchain.Data.StateDiff
+                   Blockchain.Data.Transaction
+                   Blockchain.Data.TransactionDef
+                   Blockchain.Data.TransactionReceipt
+                   Blockchain.Data.TransactionResult
+                   Blockchain.Data.TXOrigin
+                   Blockchain.DBM
+                   Blockchain.DB.AddressStateDB
+                   Blockchain.DB.BlockDB
+                   Blockchain.DB.BlockSummaryDB
+                   Blockchain.DB.CodeDB
+                   Blockchain.DB.DetailsDB
+                   Blockchain.DB.HashDB
+                   Blockchain.DB.MemAddressStateDB
+                   Blockchain.DB.SQLDB   
+                   Blockchain.DB.StateDB
+                   Blockchain.DB.StorageDB
+                   Blockchain.Verification
+                   Blockchain.Stream.Raw
+                   Blockchain.Stream.VMEvent
+                   Blockchain.Stream.UnminedBlock
+                   Blockchain.Data.Blockchain
+    other-modules: Paths_blockapps_data  
+    ghc-options: -Wall -O2
+    extensions: TemplateHaskell
+    buildable: True
+    hs-source-dirs: src
+
+executable global-db
+    default-language: Haskell98
+    ghc-options: -Wall -O2
+    build-depends: 
+                   base >= 4 && < 5
+                 , blockapps-data
+                 , strato-conf
+                 , hflags
+    buildable: True
+    main-is: GlobalDB.hs
+    hs-source-dirs: exec_src

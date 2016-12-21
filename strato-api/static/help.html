@@ -1,0 +1,59 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <meta name="generator" content="pandoc" />
+  <title></title>
+  <style type="text/css">code{white-space: pre;}</style>
+  <link rel="stylesheet" href="../static/css/bootstrap.css" type="text/css" />
+</head>
+<body>
+<h2 id="endpoints">Endpoints</h2>
+<p>There are three REST endpoints, corrensponding to the query of a block, address and a transaction, respectively.</p>
+<p>All of these queries can be appended with <code>page=n</code> for pageing. Pageing starts at 0 so <code>/query?block=xxxx</code> is equivalent to <code>/query?block=xxxx&amp;page=0</code>. For blocks we support indexing. If you want to query a large range, supply <code>index=n</code> where <code>n-1</code> is the last block that you queried. This will supersede paging eventually for all queries.</p>
+<h3 id="queryblock"><code>/query/block?</code></h3>
+<ul>
+<li><code>number</code>, <code>maxnumber</code>, <code>minnumber</code></li>
+<li><code>nonce</code>, <code>maxnonce</code>, <code>minnonce</code></li>
+<li><code>gas</code>, <code>maxgas</code>, <code>mingas</code><br /></li>
+<li><code>gaslim</code>, <code>maxgaslim</code>, <code>mingaslim</code></li>
+<li><code>gasused</code>, <code>maxgasused</code>, <code>mingasused</code></li>
+<li><code>diff</code>, <code>maxdiff</code>, <code>mindiff</code></li>
+<li><code>txaddress</code></li>
+<li><code>coinbase</code></li>
+<li><code>blockid</code></li>
+</ul>
+<h3 id="queryaccount"><code>/query/account?</code></h3>
+<ul>
+<li><code>balance</code>, <code>minbalance</code>, <code>maxbalance</code><br /></li>
+<li><code>nonce</code>, <code>minnonce</code>, <code>maxnonce</code></li>
+<li><code>address</code></li>
+</ul>
+<h3 id="querytransaction"><code>/query/transaction?</code></h3>
+<ul>
+<li><code>from</code>, <code>to</code>, <code>address</code></li>
+<li><code>blockid</code></li>
+<li><code>value</code>, <code>maxvalue</code>, <code>minvalue</code></li>
+<li><code>gasprice</code>, <code>maxgasprice</code>, <code>mingasprice</code></li>
+<li><code>gaslimit</code>, <code>maxgaslimit</code>, <code>mingaslimit</code></li>
+</ul>
+<h2 id="there-are-also-fixed-endpoints-to-be-deprecated">There are also fixed endpoints (to be deprecated)</h2>
+<p>Pages (where supported) start from 0 and are appended to the string in the end, like <code>/query/block?address=xxx/2</code>. This will eventually move into the general query string. They are optional.</p>
+<ul>
+<li><code>/query/block/txaddress/xxxxxxxx</code> or <code>/query/block/txaddress/xxxxxxxx/2</code></li>
+<li><code>/query/block/coinbase/xxxxxxxx</code> or <code>/query/block/coinbase/xxxxxxxx/5</code></li>
+<li><code>/query/account/address/xxxxxxx</code> or <code>/query/account/address/xxxxxxx/12</code></li>
+<li><p><code>/query/transaction/address/xxxxxxx</code> or <code>/query/transaction/address/xxxxxxx/0</code></p></li>
+<li><code>/query/block/blockrange/lower/n1/upper/n2/</code> or <code>/query/block/blockrange/lower/n1/upper/n2/12</code></li>
+<li><p><code>/query/block/numberrange/lower/n1/upper/n2/</code> or <code>/query/block/numberrange/lower/n1/upper/n2/12</code></p></li>
+</ul>
+<h2 id="types-of-transactions">Types of transactions</h2>
+<h3 id="functioncall">FunctionCall</h3>
+<p>If <code>toAddress == Null</code> and <code>len(code) &gt; 0</code> we have a <code>FunctionCall</code>.</p>
+<h3 id="contract">Contract</h3>
+<p>If <code>toAddress != Null</code> and <code>len(code) &gt;= 0</code> we have a <code>Contract</code>.</p>
+<h3 id="transaction">Transaction</h3>
+<p>If <code>toAddress != Null</code> and <code>len(code) == 0</code> we have a <code>Transaction</code>.</p>
+</body>
+</html>

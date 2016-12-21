@@ -1,0 +1,64 @@
+
+var abi = #{rawJS abi}
+var contractAddress = "#{rawJS contractAddress}"
+
+document.getElementById('abi').innerHTML = JSON.stringify(abi);
+
+function submitPost(url, params) {
+    var i;
+    var form = document.createElement("form");
+    form.method = 'post';
+    form.action = url;
+    form.setAttribute("target", "_blank");
+    Object.keys(params).forEach(function (key) {
+  var input = document.createElement('input');
+  input.type = "text";
+  input.name = key;
+  if (typeof params[key] == "string") input.value = params[key];
+  else input.value = JSON.stringify(params[key]);
+  form.appendChild(input);
+    });
+    form.submit();
+}
+
+function launchDemo(abi) {
+    submitPost("/transactionDemo.html", {"abi": abi, "contractAddress": contractAddress});
+}
+
+<<<<<<< HEAD
+var oReq = new XMLHttpRequest();
+oReq.open("GET", "http://stablenet.blockapps.net/transactionResult/#{rawJS transactionHash}", true);
+
+oReq.onload = function () {
+  if(oReq.readyState == 4 && oReq.status == 200) {
+    var i, responseText = "";
+    var response = JSON.parse(this.responseText);
+    console.log(response);
+    for(i = 0; i < response.length; i++) {
+      document.getElementById('message').value = document.getElementById('message').value + response[i].details + "\n";
+      document.getElementById('result').innerHTML = document.getElementById('result').innerHTML + response[i].message + "\n";
+=======
+
+function getTransactionResults() {
+  var oReq = new XMLHttpRequest();
+  oReq.open("GET", "/transactionResult/#{rawJS transactionHash}", true);
+
+  oReq.onload = function () { 
+    if(oReq.readyState == 4 && oReq.status == 200) {
+      var i, responseText = "";
+      var response = JSON.parse(this.responseText); 
+      for(i = 0; i < response.length; i++) {
+        result.value = result.value + response[i].message + "\n";
+        details.value = details.value + response[i].trace + "\n";
+      }
+    }
+    else {
+      alert("ERROR!\n" + this.responseText); 
+>>>>>>> 4e72dc5ba8a51a92566f846a6c23652274f28f8b
+    }
+  }
+  else {
+    alert("ERROR!\n" + this.responseText);
+  }
+}
+oReq.send();

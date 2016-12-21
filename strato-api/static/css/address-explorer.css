@@ -1,0 +1,178 @@
+html,
+:root {
+  font-family: Lato, sans-serif; 
+  -moz-text-size-adjust: none;
+  -ms-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -webkit-font-feature-settings: "kern";
+  -moz-font-feature-settings: "kern";
+  -moz-font-feature-settings: "kern=1";
+  font-feature-settings: "kern" 1;
+  font-kerning: normal;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  
+}
+
+body {
+  font-family: Lato, sans-serif;
+  
+  height: 100%;
+  width: 100%;
+  color: rgba(255,255,255,0.65);
+  margin: 0;
+  padding: 0;
+}
+
+.background {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+  z-index: -1;
+  background: linear-gradient(-45deg, gray, black);
+  background-repeat: no-repeat, repeat;
+  background-position: right bottom, 0 0;
+  background-size: cover;
+}
+
+.view {
+  width: 100%;
+  
+}
+
+.view.visible {
+  display: block; 
+}
+
+.view.center {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-items: center;
+  justify-items: center;
+}
+
+#address_view {
+  height: 100%;
+}
+
+#address_view > div {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#account_view {
+  margin-bottom: 10rem;
+}
+
+.view.hidden {
+  display: none;
+}
+
+button, button:focus {
+  color: rgba(255,255,255,0.65);
+}
+
+button:hover {
+  color: white;
+  border-color: white;
+}
+
+input {
+  font-weight: bold;
+  width: 50rem;
+  font-family: Lato, sans-serif;
+  font-size: 2rem;
+}
+
+#address_entered {
+  font-size: 2rem;
+}
+
+h1, #refresh {
+  margin-top: 10rem;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-bottom: 0px;
+}
+
+h4 {
+  margin-top: 4rem;
+}
+
+span {
+  display: inline-block;
+}
+
+.icon {
+  display: inline-block;
+  font-size: 5rem;
+  margin-right: 0.5rem;
+}
+
+.label {
+  text-transform: uppercase;
+}
+
+.transaction {
+  margin-bottom: 0.5rem;
+}
+
+.transaction > span {
+  vertical-align: middle;
+  display: inline-block;
+  line-height: 3rem;
+  height: 3rem;
+  margin-right: 1rem;
+}
+
+.transaction .icon {
+  width: 2rem;
+}
+
+.transaction .type {
+  width: 8rem;
+}
+
+.transaction .gas {
+  width: 15rem;
+  text-align: right;
+}
+
+.transaction .timestamp {
+  float: right;
+  text-align: right;
+  width: 15rem;
+}
+
+.icon.small {
+  font-size: 2.5rem;
+  font-family: monospace;
+}
+
+.red {
+  color: red;
+}
+
+.green {
+  color: green;
+}
+
+a.address {
+  cursor: pointer;
+  color: white;
+  text-decoration: none;
+}
+
+a.address:hover {
+  text-decoration: underline;
+}

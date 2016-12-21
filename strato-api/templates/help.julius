@@ -1,0 +1,85 @@
+var txCount = 0;
+var blCount = 0;
+var blAdCount = 0;
+var blN = 0;
+var accN = 0;
+
+function mkWalk(f, sel, fin){
+    function walker(txrefs, textStatus, jqXHR){
+        if(txrefs.length > 0)
+        {
+            sel(txrefs);
+            f();
+            if(txrefs[0].next != undefined)
+            {
+                $.getJSON(txrefs[0].next, mkWalk(f,sel, fin))
+            }
+        } else {
+            f();
+        //    fin();
+        }
+    }
+    return walker;
+}
+
+$(document).on("ready", function update() {
+  
+      $.getJSON
+      (
+         "/eth/v1.0/transaction?blocknumber=30255"
+        ,mkWalk
+        (
+            function(x){ $("#blTx").html(blCount);}
+          , function(x){blCount += x.length;}
+          , function(){blCount = 0;}
+        )
+      );
+
+      $.getJSON
+      (
+        "/eth/v1.0/transaction?from=1c11aa45c792e202e9ffdc2f12f99d0d209bef70&mingaslimit=3000000" 
+        , mkWalk
+        ( 
+              function(x){ $("#txNums").html(txCount);}
+            , function(x){txCount += x.length;}
+            , function(){txCount = 0;} 
+        )
+      );
+
+      $.getJSON
+      (
+         "/eth/v1.0/block?address=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"
+        ,mkWalk
+        (
+            function(x){ $("#blAd").html(blAdCount);}
+          , function(x){blAdCount += x.length;}
+          , function(){blAdCount = 0;}
+          , "/query/block?address=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"
+        )
+      );
+ 
+      $.getJSON
+      (
+         "/eth/v1.0/block?minnumber=500&maxnumber=5000&mingaslim=100000&maxgaslim=200000000"
+        ,mkWalk
+        (
+            function(x){ $("#blN").html(blN);}
+          , function(x){blN += x.length;}
+          , function(){blN = 0;}
+        )
+      );     
+
+      $.getJSON
+      (
+         "/eth/v1.0/account?minbalance=1&maxbalance=1000000"
+        ,mkWalk
+        (
+            function(x){ $("#accN").html(accN);}
+          , function(x){accN += x.length;}
+          , function(){accN = 0;}
+        )
+      );     
+
+      setTimeout( update, 6000000 );
+
+});

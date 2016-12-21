@@ -1,0 +1,218 @@
+name:              strato-api
+version:           0.0.0
+cabal-version:     >= 1.8
+build-type:        Custom
+
+Flag dev
+    Description:   Turn on development settings, like auto-reload templates.
+    Default:       True 
+
+Flag library-only
+    Description:   Build for use with "yesod devel"
+    Default:       False
+
+library
+    hs-source-dirs: ., app
+    exposed-modules: Application
+                     Foundation
+                     Import
+                     Import.NoFoundation
+                     Model
+                     Settings
+                     Settings.StaticFiles
+                     Handler.Common
+                     Handler.Home
+                     Handler.TransactionInfo
+                     Handler.AccountInfo
+                     Handler.BlockInfo
+                     Handler.BlkLast
+                     Handler.Demo
+                     Handler.Filters
+                     Handler.Help
+                     Handler.TxLast
+                     Handler.Test
+                     Handler.QueuedTransactions
+                     Handler.PushTransaction
+                     Handler.Solc
+                     Handler.AfterSubmission
+                     Handler.TransactionDemo
+                     Handler.StorageInfo
+                     Handler.TransactionResult
+                     Handler.Faucet
+                     Handler.ExtABI
+                     Handler.Login
+                     Handler.Wallet
+                     Handler.RegisterApp
+                     Handler.Developer
+                     Handler.Stats
+                     Handler.Tutorial
+                     Handler.ApiDocs
+                     Handler.Raml
+                     Handler.AppCreate
+                     Handler.Version
+                     Handler.Coinbase
+                     Handler.LogInfo
+                     Handler.SolidityCommon
+                     Handler.UUIDInfo
+                     Handler.Peers
+                     Versioning
+
+    if flag(dev) || flag(library-only)
+        cpp-options:   -DDEVELOPMENT
+        ghc-options:   -Wall -fwarn-tabs -O0
+    else
+        ghc-options:   -Wall -fwarn-tabs -O2
+    extra-libraries: pthread
+    extensions: TemplateHaskell
+                QuasiQuotes
+                OverloadedStrings
+                NoImplicitPrelude
+                CPP
+                MultiParamTypeClasses
+                TypeFamilies
+                GADTs
+                GeneralizedNewtypeDeriving
+                FlexibleContexts
+                EmptyDataDecls
+                NoMonomorphismRestriction
+                DeriveDataTypeable
+                ViewPatterns
+                TupleSections
+                RecordWildCards
+
+    build-depends: base                          >= 4
+                 , binary
+                 , conduit-combinators
+                 , conduit-extra
+                 , yesod                         >= 1.4.1      
+                 , yesod-core                    >= 1.4.6      
+                 , yesod-static                  >= 1.4.0.3    
+                 , yesod-form                    >= 1.4.0  
+                 , yesod-raml    
+                 --, yesod-table                   >= 2.0.0
+                 , classy-prelude                >= 0.10.2
+                 , classy-prelude-conduit        >= 0.10.2
+                 , classy-prelude-yesod          >= 0.10.2
+                 , clock
+                 , deepseq
+                 , either
+                 , bytestring                    >= 0.9        
+                 , text                          >= 0.11       
+                 , persistent                    >= 2.0        
+                 , persistent-postgresql         >= 2.1.1      
+                 , persistent-template           >= 2.0        
+                 , template-haskell
+                 , shakespeare                   >= 2.0        
+                 , hjsmin                        >= 0.1        
+                 , monad-control                 >= 0.3        
+                 , wai-extra                     >= 3.0        
+                 , yaml                          >= 0.8        
+                 , http-conduit                  >= 2.1        
+                 , directory                     >= 1.2        
+                 , warp                          >= 3.0        
+                 , data-default
+                 , aeson                         >= 0.6        
+                 , conduit                       >= 1.0        
+                 , monad-logger                  >= 0.3        
+                 , fast-logger                   >= 2.2        
+                 , wai-logger                    >= 2.2        
+                 , file-embed
+                 , safe
+                 , unordered-containers
+                 , containers
+                 , vector
+                 , time
+                 , blockapps-data
+                 , merkle-patricia-db
+                 , esqueleto                
+                 , ethereum-rlp
+                 , base16-bytestring
+                 , old-locale
+                 , blockapps-util
+                 , transformers
+                 , postgresql-simple
+                 , postgresql-libpq
+                 , process
+                 , parsec
+                 , haskoin
+                 , solidity-abi
+                 , aeson-pretty
+                 , bcrypt
+                 , entropy
+                 , wai
+                 , mime-mail
+                 , blaze-html
+                 , blaze-markup
+                 , filepath
+                 --, stack
+                 , warp-tls
+                 , temporary
+                 , strato-conf
+                 , strato-sequencer
+
+executable         strato-api
+    if flag(library-only)
+        Buildable: False
+
+    main-is:           main.hs
+    hs-source-dirs:    app
+    build-depends:     base, strato-api
+    extra-libraries: pthread
+    ghc-options:       -threaded -O2 -rtsopts -with-rtsopts=-N
+
+test-suite test
+    type:              exitcode-stdio-1.0
+    main-is:           Main.hs
+    hs-source-dirs:    test
+    ghc-options:       -Wall
+    extra-libraries: pthread
+
+    extensions: TemplateHaskell
+                QuasiQuotes
+                OverloadedStrings
+                NoImplicitPrelude
+                CPP
+                MultiParamTypeClasses
+                TypeFamilies
+                GADTs
+                GeneralizedNewtypeDeriving
+                FlexibleContexts
+                EmptyDataDecls
+                NoMonomorphismRestriction
+                DeriveDataTypeable
+                ViewPatterns
+                TupleSections
+
+    build-depends: base
+                 , strato-api
+                 , yesod-test >= 1.4.3 && < 1.5
+                 , yesod-core
+                 , yesod
+                 , persistent
+                 , persistent-postgresql
+                 , resourcet
+                 , monad-logger
+                 , transformers
+                 , hspec >= 2.0.0
+                 , classy-prelude
+                 , classy-prelude-yesod
+                 , hspec-wai
+                 , hspec-wai-json
+                 , warp
+                 , wai
+                 , wai-extra
+                 , HUnit
+                 , bytestring
+                 , text
+                 , blockapps-data
+                 , aeson
+                 , blaze-html
+                 , blaze-markup
+                 , solidity-abi                 
+                 , aeson-pretty
+                 , bcrypt
+                 , entropy
+                 , wai
+                 , mime-mail
+                 , timeit
+                 , warp-tls

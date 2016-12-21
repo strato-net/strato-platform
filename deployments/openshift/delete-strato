@@ -1,0 +1,2 @@
+#!/bin/bash
+oc delete svc/strato-service rc/strato route/api-http

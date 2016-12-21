@@ -1,0 +1,48 @@
+
+set -e
+
+mkdir -p work
+
+cd work
+
+if [ ! -e cpp-ethereum ]
+then
+	git clone https://github.com/ethereum/cpp-ethereum.git
+fi
+
+cp -a ../GenesisInfo.cpp cpp-ethereum/libethereum
+
+cd cpp-ethereum
+
+mkdir -p build
+
+cd build
+
+cmake .. -DGUI=0 # -DJSONRPC=0 -DMINER=0 -DETHKEY=0 -DSERPENT=0 -DTOOLS=0 -DTESTS=0
+
+make -j 4
+
+mkdir -p ../../../work/upload/bin
+mkdir -p ../../../work/upload/lib
+
+cp eth/eth ../../../work/upload/bin/
+
+cp libdevcore/libdevcore.so ../../../work/upload/lib/
+#cp libscrypt/libscrypt.so ../../../work/upload/lib/
+cp libdevcrypto/libdevcrypto.so ../../../work/upload/lib/
+#cp libserpent/libserpent.so ../../../work/upload/lib/
+#cp libethash/libethash.so ../../../work/upload/lib/
+#cp libsolidity/libsolidity.so ../../../work/upload/lib/
+cp libethcore/libethcore.so ../../../work/upload/lib/
+#cp libtestutils/libtestutils.so ../../../work/upload/lib/
+cp libethereum/libethereum.so ../../../work/upload/lib/
+#cp libweb3jsonrpc/libweb3jsonrpc.so ../../../work/upload/lib/
+#cp libevmasm/libevmasm.so ../../../work/upload/lib/
+cp libwebthree/libwebthree.so ../../../work/upload/lib/
+cp libevmcore/libevmcore.so ../../../work/upload/lib/
+#cp libwhisper/libwhisper.so ../../../work/upload/lib/
+cp libevm/libevm.so ../../../work/upload/lib/
+#cp secp256k1/libsecp256k1.so ../../../work/upload/lib/
+#cp liblll/liblll.so ../../../work/upload/lib/
+#cp solc/libsoljson.so ../../../work/upload/lib/
+cp libp2p/libp2p.so ../../../work/upload/lib/

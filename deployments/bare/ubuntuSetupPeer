@@ -1,0 +1,10 @@
+sudo apt-get install postgresql libleveldb-dev 
+
+sudo -u postgres createdb eth
+
+sudo -u postgres psql eth << EOF
+#CREATE USER postgres WITH PASSWORD 'api';
+#GRANT ALL PRIVILEGES ON DATABASE "eth" to postgres;
+ALTER USER postgres WITH PASSWORD 'api';
+EOF
+

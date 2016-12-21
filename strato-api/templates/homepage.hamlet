@@ -1,0 +1,44 @@
+<script src=static/js/jquery-2.1.4.min.js>
+<div role="navigation" class="navbar navbar-inverse navbar-fixed-top">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <ul class="nav navbar-nav">
+        <li> <a href="http://blockapps.net" class="nav__logo--link"><img src="static/images/logo.png" class="nav__logo"/></a></li>
+
+
+<div class="row banner__wrapper container">
+  <div class="col-md-6">
+    <h1>Welcome to your BlockApps STRATO blockchain
+    <h3>BlockApps STRATO blockchains are the most convenient and reliable way to build Blockchain based applications.
+    
+  <div class="col-md-4 col-md-offset-2">
+    <img class="banner__logo" src="static/images/logo_strato.png" style="width: 200px;">
+
+<div class="row container">
+  <hr>
+  <div class="col-md-4 row">
+    <span class="bucket__icon col-md-3 glyphicon glyphicon-list-alt" aria-hidden="true"></span>
+    <p class="col-md-9"> Check out our <a href="http://portal.blockapps.net/markdown">docs</a> to learn more about how the BlockApps API works.
+  <div class="col-md-4 row">
+    <span class="bucket__icon col-md-3 glyphicon glyphicon-dashboard" aria-hidden="true"></span>
+    <p class="col-md-9"> Go visit our <a href=@{HelpR}>query engine</a>! See the descriptions within, including examples.
+  <div class="col-md-4 row">
+    <span class="bucket__icon col-md-3 glyphicon glyphicon-info-sign" aria-hidden="true"></span>
+    <p class="col-md-9"><a href="http://blockapps.net/images/pdf/blockapps_strato_en.pdf">Learn More</a> about what your BlockApps STRATO blockchain can do.
+
+
+<div class="row container getting-started">
+  <hr>
+  <h3>Getting Started with your STRATO blockchain
+  <ol>
+    <li>Head over to our <a href="https://github.com/blockapps/bloc" target="_blank">GitHub</a> and install our blockchain development tool <code>bloc</code>
+    <li>Follow the instructions in the README and set up your first STRATO blockchain application.
+    <li>Dig in to our <a href="http://blockapps.net/strato-api/1.2/docs" target="_blank">Docs</a> and reach out on our <a href="http://forums.blockapps.net">developer forum</a> to get involved with the BlockApps community!
+
+<div class="row container">
+  <hr>
+  <p>
+    All blockchain based applications will need to pull information from the blockchain. We've made that
+    process simple. We've created an intuitive RESTful API for querying the Ethereum Blockchain. Our Haskell based
+    Ethereum network peer (client) is in sync with the livenet and making data available to you.
+  

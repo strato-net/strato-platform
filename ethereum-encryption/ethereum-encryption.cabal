@@ -1,0 +1,72 @@
+
+name:                ethereum-encryption
+version:             0.1.0.0
+author:              jamshid
+maintainer:          jim
+build-type:          Simple
+cabal-version:       >=1.10
+license:             Apache-2.0
+
+library
+  other-extensions:    OverloadedStrings
+  build-depends:       base
+                     , base16-bytestring
+                     , binary
+                     , blockapps-util
+                     , bytestring
+                     , cipher-aes
+                     , conduit
+                     , conduit-extra
+                     , Crypto
+                     , cryptohash
+                     , crypto-pubkey
+                     , crypto-pubkey-types
+                     , crypto-random
+                     , entropy
+                     , ethereum-rlp
+                     , haskoin
+                     , lifted-base
+                     , mtl
+                     , network
+                     , resourcet
+                     , spoon
+                     , time
+                     , transformers
+                     , ansi-wl-pprint
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  ghc-options:         -Wall -O2
+  exposed-modules:     Blockchain.AESCTR
+                     , Blockchain.Data.PubKey
+                     , Blockchain.ExtendedECDSA
+                     , Blockchain.ECIES
+                     , Blockchain.Frame
+                     , Blockchain.Handshake
+                     , Blockchain.RLPx
+                     , Blockchain.EthEncryptionException
+--  extra-libraries:
+
+--executable ethereum-encryption
+--  main-is:             Main.hs
+--  other-extensions:    OverloadedStrings
+--  build-depends:       base >=4.7 && <4.8
+--                     , binary
+--                     , cipher-aes
+--                     , Crypto
+--                     , cryptohash
+--                     , crypto-random
+--                     , crypto-pubkey
+--                     , crypto-pubkey-types
+--                     , bytestring >=0.10 && <0.11
+--                     , base16-bytestring
+--                     , ethereum-data-leveldb
+--                     , ethereum-rlp
+--                     , monads-tf
+--                     , network >=2.6 && <2.7
+--                     , haskoin >=0.1 && <0.2
+--                     , entropy >=0.3 && <0.4
+--                     , transformers
+--                     , ansi-wl-pprint
+--  hs-source-dirs:      src
+--  default-language:    Haskell2010
+--  ghc-options:         -Wall -O2

@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+var private = require("blockapps-js").ethbase.Crypto.PrivateKey.random();
+var address = private.toAddress();
+
+var fs = require("fs");
+var yaml = require("yaml-parser");
+
+var ethconfpath = "/var/lib/strato/.ethereumH/ethconf.yaml";
+var ethconf = yaml.safeLoad(fs.readFileSync(ethconfpath));
+ethconf.quarryConfig.coinbaseAddress = address.toString();
+fs.writeFileSync(ethconfpath, yaml.safeDump(ethconf));
+
+var privpath = "/var/lib/strato/coinbase";
+fs.writeFileSync(privpath, new Buffer(private.toString(), "hex"));
+

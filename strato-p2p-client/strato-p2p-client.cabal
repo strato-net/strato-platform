@@ -1,0 +1,95 @@
+name: strato-p2p-client
+version: 0.0.4
+cabal-version: >=1.10
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:  
+    The client described in the Ethereum Yellowpaper
+
+source-repository this
+  type:     git
+  location: https://github.com/jamshidh/ethereum-client-haskell
+  branch:   master
+  tag:      v0.0.4
+
+executable strato-p2p-client
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , blockapps-util
+                 , hflags
+                 , monad-logger
+                 , strato-p2p-client
+    main-is: Main.hs
+    ghc-options: -Wall -O2
+    buildable: True
+    hs-source-dirs: exec_src
+
+library
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , base16-bytestring
+                 , blockapps-data
+                 , blockapps-util
+                 , bytestring
+                 , conduit
+                 , conduit-combinators
+                 , conduit-extra
+                 , containers
+                 , crypto-pubkey
+                 , crypto-pubkey-types
+                 , crypto-random
+                 , esqueleto
+                 , ethereum-discovery
+                 , ethereum-encryption
+                 , ethereum-rlp
+                 , haskoin
+                 , hflags
+                 , json-rpc-server
+                 , lifted-base
+                 , merkle-patricia-db
+                 , monad-control
+                 , monad-logger
+                 , monadIO
+                 , milena
+                 , mtl
+                 , network
+                 , persistent
+                 , persistent-postgresql
+                 , postgresql-simple
+                 , random
+                 , resourcet
+                 , stm
+                 , stm-conduit
+                 , strato-conf
+                 , text
+                 , time
+                 , transformers
+                 , ansi-wl-pprint
+                 , strato-conf
+                 , strato-sequencer
+
+    exposed-modules: 
+                   Blockchain.BlockNotify  
+                   Blockchain.Context
+                   Blockchain.Data.Wire
+                   Blockchain.Display
+                   Blockchain.Event
+                   Blockchain.EventException
+                   Blockchain.ExtMergeSources
+                   Blockchain.Options
+                   Blockchain.RawTXNotify  
+                   Blockchain.TCPClientWithTimeout
+                   Executable.StratoP2PClient
+    other-modules:
+                   Blockchain.TimerSource
+                   Executable.StratoP2PClientComm
+    ghc-options: -Wall -O2
+    buildable: True
+    hs-source-dirs: src

@@ -1,0 +1,6 @@
+$doctype 5
+<html>
+  <head>
+    <title>Successfully Created Application! 
+  <body>
+    <p>Application #{show app} created successfull! Check your email to confirm.

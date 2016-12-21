@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get -y install git lsb-release sudo software-properties-common 
+
+cd /usr/src
+git clone --recursive --branch v0.3.6 https://github.com/ethereum/solidity.git
+cd solidity
+sed -i 's/dpkg-reconfigure/dpkg-reconfigure --frontend noninteractive/' scripts/install_deps.sh
+scripts/install_deps.sh
+mkdir -p build
+cd build
+
+cmake ..
+make -j4 
+make install
+ldconfig
+
+rm -rf /usr/src/solidity
+

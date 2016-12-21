@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+
+if [ $# == 0 ]
+then
+  base="$HOME"
+else
+  base=$1
+  shift
+fi
+
+#useradd kafka -m
+
+#passwd kafka
+#adduser kafka sudo
+#su - kafka
+
+#sudo apt-get -y update
+#sudo apt-get -y install default-jre zookeeperd
+
+#telnet localhost 2181
+wget "http://mirror.cc.columbia.edu/pub/software/apache/kafka/0.9.0.1/kafka_2.11-0.9.0.1.tgz" -O $base/kafka.tgz
+mkdir -p $base/kafka && cd $base/kafka
+tar -xvzf $base/kafka.tgz --strip 1
+rm $base/kafka.tgz
+
+sed -i 's@/tmp/kafka-logs@/var/lib/kafka@' $base/kafka/config/server.properties
+
+cat >$base/kafka/doit <<EOF
+#!/bin/bash
+export KAFKA_HEAP_OPTS="-Xmx256M -Xms128M"
+nohup $base/kafka/bin/kafka-server-start.sh $base/kafka/config/server.properties > $base/kafka/kafka.log 2>&1 &
+EOF
+chmod 755 $base/kafka/doit

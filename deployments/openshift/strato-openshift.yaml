@@ -1,0 +1,87 @@
+kind : Template
+apiVersion: v1
+metadata :
+  name : strato-openshift
+  namespace : strato
+  annotations :
+    description : The Blockapps STRATO environment for developing, deploying, and testing in Ethereum.
+    tags : ethereum,strato,haskell,sql
+labels :
+  template : strato-openshift
+parameters :
+  - name : deploymentName
+    description : Name for this deployment of STRATO
+    required : true
+  - name : blockchain
+    description : Which blockchain to use for the genesis block
+    value : strato-dev
+    required : false
+  - name : email
+    description : A contact email at which Blockapps can reach you
+    required : true
+objects :
+  - kind : ReplicationController
+    apiVersion: v1
+    metadata :
+      name : strato
+      namespace : strato
+    spec :
+      replicas : 1
+      selector :
+        strato : default
+      template :
+        metadata :
+          labels :
+            strato : default
+        spec :
+          restartPolicy : Always
+          imagePullSecrets :
+            - name : blockappsuser
+          containers :
+            - name : strato
+              image : blockapps/strato:rhel7
+              args : 
+                - ${blockchain}
+                - ${deploymentName}
+                - ${email}
+                - "1"
+              imagePullPolicy : Always
+              ports :
+                - containerPort : 80
+                  protocol : TCP
+                  name : api-port
+                - containerPort : 30303
+                  protocol : TCP
+                  name : p2p-port-tcp
+                - containerPort : 30303
+                  protocol : UDP
+                  name : p2p-port-udp
+  - kind : Service
+    apiVersion : v1
+    metadata :
+      name : strato-service
+      namespace : strato
+    spec :
+      selector :
+        strato : default
+      ports :
+        - protocol : TCP
+          port : 80
+          targetPort : api-port
+          name : http
+        - protocol : TCP
+          port : 443
+          targetPort : api-port
+          name : https
+  - kind : Route
+    apiVersion : v1
+    metadata :
+      name : api-http
+      namespace : strato
+    spec :
+      host : openshift.westus.cloudapp.azure.com
+      port : 
+        targetPort : http
+      to :
+        kind : Service
+        name : strato-service

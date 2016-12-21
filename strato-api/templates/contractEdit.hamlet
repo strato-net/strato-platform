@@ -1,0 +1,4 @@
+<div class="col-md-8">
+  <textarea id=#{contractName ++ "Area"}> #{contractText}
+  <textarea id=#{contractName ++ "Compiled"} readonly="true">Compiler Data Here
+  

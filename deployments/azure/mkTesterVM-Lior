@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+
+# Make a blockapps-tester VM
+resourceGroup='blockapps'
+storageAccount='blockapps'
+imageURI='https://blockapps.blob.core.windows.net/system/Microsoft.Compute/Images/vhds/blockapps-osDisk.2a191976-c2e4-46dc-8d60-13ef69661690.vhd'
+region='centralus'
+netName='strato-dev3'
+
+# force first argument
+if [ -z "$1" ]; then
+  echo ERROR: VM name must be specified
+  exit 1
+fi
+
+# login to our account
+echo "Logging into Azure - follow the prompt, enter the code, and click on 'Ryan Reich'"
+azure login
+# set ARM mode
+azure config mode arm
+
+name=$1
+azure vm create -g $resourceGroup -n $name -f ${name}nic -l $region -y Linux -z Standard_DS1_v2 -i ${name}ip -w ${name} -F $netName -j default -Q $imageURI -o $storageAccount \
+  --admin-username blockapps --admin-password 'blockAPPS123!' --disable-boot-diagnostics

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+./scripts/buildCpp
+
+mkdir -p work/upload/lib
+
+cp work/cpp-ethereum/build/libsolidity/libsolidity.so work/upload/lib
+cp work/cpp-ethereum/build/libevmasm/libevmasm.so work/upload/lib
+cp work/cpp-ethereum/build/libevmcore/libevmcore.so work/upload/lib
+cp work/cpp-ethereum/build/libdevcore/libdevcore.so work/upload/lib
+cp work/cpp-ethereum/build/libjsoncpp/libjsoncpp.so work/upload/lib
+
+rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress work/upload/* root@stablenet.blockapps.net:~/

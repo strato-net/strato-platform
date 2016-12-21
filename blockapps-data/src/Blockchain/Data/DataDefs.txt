@@ -1,0 +1,173 @@
+BlockData
+    parentHash SHA
+    unclesHash SHA
+    coinbase Address
+    stateRoot StateRoot
+    transactionsRoot StateRoot
+    receiptsRoot StateRoot
+    logBloom BS.ByteString
+    difficulty Integer sqltype=numeric(1000,0)
+    number Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    gasUsed Integer sqltype=numeric(1000,0)
+    timestamp UTCTime
+    extraData Integer 
+    nonce Word64
+    mixHash SHA
+    deriving Show Read Eq
+
+BlockDataRef
+    parentHash SHA
+    unclesHash SHA
+    coinbase Address
+    stateRoot StateRoot
+    transactionsRoot StateRoot
+    receiptsRoot StateRoot
+    logBloom BS.ByteString
+    difficulty Integer sqltype=numeric(1000,0)
+    number Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    gasUsed Integer sqltype=numeric(1000,0)
+    timestamp UTCTime
+    extraData Integer
+    nonce Word64
+    mixHash SHA
+    blockId BlockId
+    hash SHA
+    powVerified Bool
+    isConfirmed Bool
+    totalDifficulty Integer sqltype=numeric(1000,0)
+    deriving Show Read Eq
+
+Block 
+    blockData BlockData
+    receiptTransactions [Transaction]
+    blockUncles [BlockData]
+    deriving Show Read Eq
+
+NewBlk
+    hash SHA
+    blockData BlockData
+    receiptTransactions [Transaction]
+    blockUncles [BlockData]
+    Primary hash
+    TheHash hash
+    deriving Show Read Eq
+
+BlockTransaction
+    blockId BlockId
+    transaction RawTransactionId
+
+AddressState 
+    nonce Integer sqltype=numeric(1000,0)
+    balance Integer sqltype=numeric(1000,0)
+    contractRoot StateRoot 
+    codeHash SHA 
+    deriving Show Read Eq Generic
+
+AddressStateRef
+    address Address
+    nonce Integer sqltype=numeric(1000,0)
+    balance Integer sqltype=numeric(1000,0)
+    contractRoot StateRoot
+    code BS.ByteString
+    codeHash SHA
+    latestBlockDataRefNumber Integer
+    deriving Show Read Eq
+
+RawTransaction
+    timestamp UTCTime
+    fromAddress Address
+    nonce Integer sqltype=numeric(1000,0)
+    gasPrice Integer sqltype=numeric(1000,0)
+    gasLimit Integer sqltype=numeric(1000,0)
+    toAddress Address Maybe 
+    value Integer sqltype=numeric(1000,0)
+    codeOrData BS.ByteString
+    r Integer
+    s Integer
+    v Word8
+    blockNumber Int
+    txHash SHA
+    origin TXOrigin
+    UniqueTXHash txHash
+    deriving Show Read Eq Generic
+
+Storage json
+    addressStateRefId AddressStateRefId
+    key Word256
+    value Word256
+    deriving Show Read Eq
+
+TransactionResult json
+    blockHash SHA
+    transactionHash SHA
+    message String
+    response String
+    trace String
+    gasUsed Word256
+    etherUsed Word256
+    contractsCreated String
+    contractsDeleted String
+    stateDiff String
+    time Double
+    newStorage String
+    deletedStorage String
+    deriving Show
+
+UserN json
+    email String
+    loginPassHash BS.ByteString
+    lastLogin UTCTime
+    numLogins Int
+    verified Bool
+    verkey BS.ByteString
+    deriving Show Read Eq   
+
+UserData json
+    encryptedWallet String
+    address Address
+    userId UserNId
+    deriving Show Read Eq
+    
+BlockApp json
+    name String
+    developerName String
+    developerEmail String
+    appUrl String
+    repoUrl String Maybe
+    loginPassHash BS.ByteString
+    verified Bool
+    verkey BS.ByteString
+    deriving Show Read Eq
+
+BlockAppLogin json
+    userId UserNId
+    blockAppId BlockAppId
+    timestamp UTCTime
+    ip String
+    deriving Show Read Eq
+
+Extra
+    theKey String
+    value String
+    Primary theKey
+    TheKey theKey
+
+LogDB
+    transactionHash SHA
+    address Address
+    topic1 Word256 Maybe
+    topic2 Word256 Maybe
+    topic3 Word256 Maybe
+    topic4 Word256 Maybe
+    theData BS.ByteString
+    bloom Word512
+    deriving Show Read Eq
+
+BlockOffset
+    offset Integer
+    number Integer
+    hash SHA
+    Primary hash
+    UniqueH hash

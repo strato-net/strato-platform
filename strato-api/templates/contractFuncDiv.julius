@@ -1,0 +1,25 @@
+function solToFuncArgs(solObj) {
+    var contractName = solObj.name;
+    var symtab = solObj.symTab;
+    var funcs = Object.keys(symtab).filter(function(name) {
+        return symtab[name]["jsType"] === "Function";
+    });
+   
+    // fold over functions, making a button and a number of text inputs for each 
+    
+     console.log("funcs: " + JSON.stringify(funcs));
+     var funcArgs = funcs.map(function (funcName){
+         var obj = {"contractName": contractName};
+         obj[funcName] = symtab[funcName].functionArgs.map(function(arg){
+                    return {argName: arg};
+         });
+       
+        return obj;
+     });
+
+   return funcArgs;
+}
+
+function makeFuncDivs(funcArgs) {
+   console.log(JSON.stringify(funcArgs));    
+}

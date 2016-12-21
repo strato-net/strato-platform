@@ -1,0 +1,81 @@
+# This config lists all the possible config options.
+#
+# To configure Docker Registry to talk to this server, put the following in the registry config file:
+#
+#  auth:
+#    token:
+#      realm: "https://127.0.0.1:5001/auth"
+#      service: "Docker registry"
+#      issuer: "Acme auth server"
+#      rootcertbundle: "/path/to/server.pem"
+
+server:  # Server settings.
+  # Address to listen on.
+  addr: "0.0.0.0:5001"
+  # TLS certificate and key.
+  certificate: "/ssl/server.pem"
+  key: "/ssl/server.key"
+  # Take client's address from the specified HTTP header instead of connection.
+  # May be useful if the server is behind a proxy or load balancer.
+  # If configured, this header must be present, requests without it will be rejected.
+  # real_ip_header: "X-Forwarded-For"
+
+token:  # Settings for the tokens.
+  issuer: "Blockapps auth server"  # Must match issuer in the Registry config.
+  expiration: 900
+  # It is possible configure a different certificate for tokens.
+  # If not specified, server certificate is used.
+  #certificate: "/ssl/server.pem"
+  #key: "/ssl/server.key"
+
+# Authentication methods. All are tried, any one returning success is sufficient.
+# At least one must be configured. If you want an unauthenticated public setup,
+# configure static user map with anonymous access.
+
+# Google authentication.
+# ==! NB: DO NOT ENTER YOUR GOOGLE PASSWORD AT "docker login". IT WILL NOT WORK.
+# Instead, Auth server maintains a database of Google authentication tokens.
+# Go to the server's port with you browser and follow the "Login with Google account" link.
+# Once signed in, you will get a throw-away password which you can use for Docker login.
+google_auth:
+  #domain: "example.com"  # Optional. If set, only logins fromt his domain are accepted.
+  # client_id and client_secret for API access. Required.
+  # Follow instructions here: https://developers.google.com/identity/sign-in/web/devconsole-project
+  # NB: Make sure JavaScript origins are configured correcly.
+  client_id: "959481578308-5q3lfid9beksk9mhfm5hlntvahtnc7lf.apps.googleusercontent.com"
+  # Either client_secret or client_secret_file is required. Use client_secret_file if you don't
+  # want to have sensitive information checked in.
+  client_secret: "wNisXrQ43fXatbsiV6vUP8NX"
+  #client_secret_file: "/path/to/client_secret.txt"
+  # Where to store server tokens. Required.
+  token_db: "/tokens/google_tokens.ldb"
+  # How long to wait when talking to Google servers. Optional.
+  http_timeout: 10
+
+# Static user map.
+users:
+  # Password is specified as a BCrypt hash. Use htpasswd -B to generate.
+  "blockapps":
+    password: "$2y$05$IbBeF1bGU/p/ckhYnaYmLuLL/MYsZXp0q2jmxQ9vEVToRWlHxWALy" 
+  #"": {}  # Allow anonymous (no "docker login") access.
+
+acl:
+  - match: {account: "blockapps"}
+    actions: ["*"]
+  - match: {account: "?*@blockapps.net"}
+    actions: ["*"]
+  - match: {account: "blockapps"}
+    actions: ["*"]
+    comment: "User \"blockapps\" can do everything."
+  - match: {account: "/.+/", type: "registry", name: "catalog"}
+    actions: ["*"]
+    comment: "Logged in users can query the catalog."
+  - match: {account: "/.+/"}
+    actions: ["pull"]
+    comment: "Logged in users can pull all images."
+  - match: {account: "*@blockapps.net"}
+    actions: ["*"]
+    comment: "Anyone with @blockapps.net can do anything"
+  - match: {account: "admin"}
+    actions: ["*"]
+ 

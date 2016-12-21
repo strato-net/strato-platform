@@ -1,0 +1,89 @@
+<script src=static/js/jquery-2.1.4.min.js>
+
+<h1>Querystring help
+
+<h3> Example queries
+
+The following are some natural queries in human language and their REST equivalent:
+
+<div class="container">
+  <table class="table">
+    <thead>
+      <tr>
+        <th class="col-sm-6">How many transactions came from account <code>1c11aa45c792e202e9ffdc2f12f99d0d209bef70</code> with a minimum gasprice of <code>3000000</code>
+        <th id="txNums" class="col-sm-3">
+        <th class="col-sm-3"><a href="@{TransactionR}?from=1c11aa45c792e202e9ffdc2f12f99d0d209bef70&mingasprice=3000000">see query</a>
+      <tr>
+        <th class="col-sm-6">What's the number of transactions in block <code>30255</code>:
+        <th id="blTx" class="col-sm-3">
+        <th class="col-sm-3"><a href="@{TransactionR}?blocknumber=30255">see query</a>
+      <tr>
+        <th class="col-sm-6">Let's get the all blocks that have the address <code>1c11aa45c792e202e9ffdc2f12f99d0d209bef70</code> in it:
+        <th id="blAd" class="col-sm-3">
+        <th class="col-sm-3"><a href="@{BlockInfoR}?address=1c11aa45c792e202e9ffdc2f12f99d0d209bef70">see query</a>
+      <tr>
+        <th class="col-sm-6">Let's get the all blocks between <code>500</code> and <code>5000</code> with gasprice between <code>100000</code> and <code>2000000</code>:
+        <th id="blN" class="col-sm-3">
+        <th class="col-sm-3"><a href="@{BlockInfoR}?minnumber=500&maxnumber=5000&mingaslim=100000&maxgaslim=200000000">see query</a>
+      <tr>
+        <th class="col-sm-6">What's the number of accounts with balance between <code>1</code> and <code>1000000</code>:
+        <th id="accN" class="col-sm-3">
+        <th class="col-sm-3"><a href="@{AccountInfoR}?minbalance=1&maxbalance=1000000">see query</a>
+
+
+
+<h2> Endpoints
+
+<p>There are three REST endpoints, corrensponding to the query of a block, address and a transaction, respectively                                                                                                                                                                                                                                        If you want to query a large range, supply <code>index=n</code> where <code>n-1</code> is the last block that you queried. 
+
+<h3<code>@{BlockInfoR}?</h3>
+
+Note that <code>blocks</code> come with a <code>next</code> field that contains the index for the next 100 results.
+
+<ul>
+<li><a href="@{BlockInfoR}?number=0"><code>number</code></a>, <a href="/eth/v1.0/block?maxnumber=20"><code>maxnumber</code></a>, <a href="/eth/v1.0/block?minnumber=200"><code>minnumber</code></a>
+<li><a href="@{BlockInfoR}?gaslim=3141592"><code>gas</code></a>, <a href="/eth/v1.0/block?maxgaslim=21352342343"><code>maxgaslim</code></a>, <a href="/eth/v1.0/block?mingaslim=21353"><code>mingaslim</code><br /></a>
+<li><a href="@{BlockInfoR}?gasused=1463234"><code>gasused</code></a>, <a href="/eth/v1.0/block?maxgasused=123213"><code>maxgasused</code></a>, <a href="/eth/v1.0/block?mingasused=20"><code>mingasused</code></a>
+<li><a href="@{BlockInfoR}?diff=131072"><code>diff</code></a>, <a href="/eth/v1.0/block?maxdiff=21123123"><code>maxdiff</code></a>, <a href="/eth/v1.0/block?mindiff=213"><code>mindiff</code></a>
+<li><a href="@{BlockInfoR}?txaddress=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"><code>txaddress</code></a>
+<li><a href="@{BlockInfoR}?coinbase=8c67b32520cd507bab6465a08b97541607db50a1"><code>coinbase</code></a>
+<li><a href="@{BlockInfoR}?address=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"><code>address</code></a>
+<li><a href="@{BlockInfoR}?hash=58b3ed866c3498b778b62f070cd6894f1976375c09c9581fe842a25d22d14d8e"><code>hash</code></a>
+
+<h3>@{AccountInfoR}?</h3>
+
+<li><a href="@{AccountInfoR}?balance=213"><code>balance</code></a>, <a href="/eth/v1.0/account?maxbalance=213"><code>maxbalance</code></a>, <a href="/eth/v1.0/account?minbalance=213"><code>minbalance</code></a>
+<li><a href="@{AccountInfoR}?nonce=213"><code>nonce</code></a>, <a href="/eth/v1.0/account?maxnonce=213"><code>maxnonce</code></a>, <a href="/eth/v1.0/account?minnonce=213"><code>minnonce</code></a>
+<li><a href="@{AccountInfoR}?address=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"><code>address</code></a>
+    
+<h3 id="transaction">@{TransactionR}?</h3>
+
+Note that <code>blocks</code> come with a <code>next</code> field that contains the index for the next 100 results.
+
+<li><a href="@{TransactionR}?from=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"><code>from</code></a>, <a href="/eth/v1.0/transaction?to=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"><code>to</code></a>, <a href="/eth/v1.0/transaction?address=1c11aa45c792e202e9ffdc2f12f99d0d209bef70"><code>address</code></a>
+
+<li><a href="@{TransactionR}?value=0"><code>value</code></a>, <a href="/eth/v1.0/transaction?maxvalue=213"><code>maxvalue</code></a>, <a href="/eth/v1.0/transaction?minvalue=213"><code>minvalue</code></a>
+
+<li><a href="@{TransactionR}?gasprice=10000000000000"><code>gasprice</code></a>, <a href="/eth/v1.0/transaction?maxgasprice=213"><code>maxgasprice</code></a>, <a href="/eth/v1.0/transaction?mingasprice=213"><code>mingasprice</code></a>
+
+<li><a href="@{TransactionR}?gaslimit=3000000"><code>gaslimit</code></a>, <a href="/eth/v1.0/transaction?maxgaslimit=30000000"><code>maxgaslimit</code></a>, <a href="/eth/v1.0/transaction?mingaslimit=213"><code>mingaslimit</code></a>
+
+<li><a href="@{TransactionR}?blocknumber=22973"><code>blocknumber</code></a>
+
+<h2> Extra parameters
+<li> <code>raw=1</code> passes the pre-processor and gives you the raw result (default: <code>raw=0</code>)
+<li> <code>index=</code> acts as a cursor for querying the next 100 items correctly. See also the <code>next</code> field.
+
+<h2> Types of transactions
+
+<h3> FunctionCall
+
+If <code>toAddress == Null</code> and <code>len(code) > 0</code> we have a <code>FunctionCall</code>.
+
+<h3> Contract
+
+If <code>toAddress != Null</code> and <code>len(code) >= 0</code> we have a <code>Contract</code>.
+
+<h3> Transaction
+
+If <code>toAddress != Null</code> and <code>len(code) == 0</code> we have a <code>Transaction</code>.

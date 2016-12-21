@@ -1,0 +1,46 @@
+{
+    $schema: 'http://schema.management.azure.com/schemas/2014-04-01-preview/VM_IP.json',
+    contentVersion: '1.0.0.0',
+    parameters: {
+        vmName: { type: 'string' },
+        vmSize: { type: 'string', defaultValue: 'Standard_DS1_v2' },
+        adminUserName: { type: 'string' },
+        adminPassword: { type: 'securestring' },
+        networkInterfaceId: { type: 'string' }
+    },
+    resources: [
+        {
+            apiVersion: '2016-03-30',
+            properties: {
+                hardwareProfile: { vmSize: "[parameters('vmSize')]" },
+                storageProfile: {
+                    osDisk: {
+                        osType: 'Linux',
+                        name: 'blockapps5209-osDisk.008fce60-6235-45fc-8f79-6f8798b64eb2.vhd',
+                        createOption: 'FromImage',
+                        image: { uri: 'https://blockapps.blob.core.windows.net/system/Microsoft.Compute/Images/vhds/blockapps5209-osDisk.008fce60-6235-45fc-8f79-6f8798b64eb2.vhd' },
+                        vhd: { uri: 'https://blockapps.blob.core.windows.net/vmcontainer7ad137a2-3715-4b7e-92fd-931da73e1bfb/osDisk.7ad137a2-3715-4b7e-92fd-931da73e1bfb.vhd' },
+                        caching: 'ReadWrite'
+                    }
+                },
+                osProfile: {
+                    computerName: "[parameters('vmName')]",
+                    adminUsername: "[parameters('adminUsername')]",
+                    adminPassword: "[parameters('adminPassword')]"
+                },
+                networkProfile: {
+                    networkInterfaces: [
+                        { id: "[parameters('networkInterfaceId')]" }
+                    ]
+                },
+                diagnosticsProfile: {
+                    bootDiagnostics: { enabled: true, storageUri: 'https://blockapps5209.blob.core.windows.net/' }
+                },
+                provisioningState: 0
+            },
+            name: "[parameters('vmName')]",
+            type: 'Microsoft.Compute/virtualMachines',
+            location: 'centralus'
+        }
+    ]
+}

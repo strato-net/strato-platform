@@ -1,0 +1,130 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "name" : {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "apiVersion" : "2015-06-15",
+    "vmSize": "Standard_DS3_v2",
+    "username": "strato",
+    "location": "eastus",
+    "password": "G4v1nw00dw00dd0th4t",
+
+    "name" : "[concat(parameters('name'), '-build')]",
+    "storageAccount": "blockapps8018",
+    "imageURI": "https://blockapps8018.blob.core.windows.net/vhds/bacd.vhd",
+    "vhdURI": "[concat('https:\/\/', variables('storageAccount'), '.blob.core.windows.net\/vhds\/', variables('name'), '.vhd')]",
+
+    "networkInterfaceName": "[concat(variables('name'), 'nic')]",
+    "networkInterfacePath": "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]",
+    "networkInterfaceId": "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName'))]",
+
+    "ipConfigurationName": "[concat(variables('name'), 'ipconfig')]",
+    "publicIPAddressName": "[concat(variables('name'), 'publicip')]",
+    "publicIPAddressPath": "[concat('Microsoft.Network/publicIPAddresses/', variables('publicIPAddressName'))]",
+    "publicIPAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))]",
+    "publicIPAddressType": "Dynamic",
+
+    "networkSecurityGroupId": "[resourceId('Microsoft.Network/networkSecurityGroups', 'blockapps-cd')]",
+    "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', 'blockapps3056')]",
+    "subnetId": "[concat(variables('vnetID'), '/subnets/default')]"
+  },
+  "outputs": {
+    "username": {
+      "value": "[variables('username')]",
+      "type": "string"
+    },
+    "password": {
+      "value": "[variables('password')]",
+      "type": "string"
+    }
+  },
+  "resources": [
+  {
+    "apiVersion": "[variables('apiVersion')]",
+    "type": "Microsoft.Network/publicIPAddresses",
+    "name": "[variables('publicIPAddressName')]",
+    "location": "[variables('location')]",
+    "properties": {
+      "publicIPAllocationMethod": "[variables('publicIPAddressType')]"
+    }
+  },
+  {
+    "apiVersion": "[variables('apiVersion')]",
+    "type": "Microsoft.Network/networkInterfaces",
+    "name": "[variables('networkInterfaceName')]",
+    "location": "[variables('location')]",
+    "dependsOn": [
+      "[variables('publicIPAddressPath')]"
+      ],
+    "properties": {
+      "networkSecurityGroup" : {
+        "id" : "[variables('networkSecurityGroupId')]"
+      },
+      "ipConfigurations": [
+      {
+        "name": "[variables('ipConfigurationName')]",
+        "properties": {
+          "privateIPAllocationMethod": "Dynamic",
+          "publicIPAddress" : {
+            "id": "[variables('publicIPAddressId')]"
+          },
+          "subnet": {
+            "id": "[variables('subnetId')]"
+          }
+        }
+      }
+      ]
+    }
+  },
+  {
+    "location": "[variables('location')]",
+    "type": "Microsoft.Compute/virtualMachines",
+    "name": "[variables('name')]",
+    "dependsOn": [
+      "[variables('networkInterfacePath')]"
+    ],
+    "properties": {
+      "diagnosticsProfile": {
+        "bootDiagnostics": {
+          "enabled": false
+        }
+      },
+      "networkProfile": {
+        "networkInterfaces": [{
+          "id": "[variables('networkInterfaceId')]"
+        }]
+      },
+      "osProfile": {
+        "computerName": "[variables('name')]",
+        "adminUsername": "[variables('username')]",
+        "adminPassword": "[variables('password')]",
+        "linuxConfiguration": {
+          "disablePasswordAuthentication": "false"
+        }
+      },
+      "storageProfile": {
+        "osDisk": {
+          "caching": "ReadWrite",
+          "osType": "linux",
+          "image": {
+            "uri": "[variables('imageURI')]"
+          },
+          "vhd": {
+            "uri": "[variables('vhdURI')]"
+          },
+          "createOption": "FromImage",
+          "name" : "[concat(variables('name'), 'osDisk')]"
+        }
+      },
+      "hardwareProfile": {
+        "vmSize": "[variables('vmSize')]"
+      }
+    },
+    "apiVersion": "[variables('apiVersion')]"
+  }
+  ]
+}

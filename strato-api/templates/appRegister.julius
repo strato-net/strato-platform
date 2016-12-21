@@ -1,0 +1,5 @@
+var url = "#{rawJS url}"
+function redir() {
+   window.location.assign(url);                                                                       
+}
+console.log(url);

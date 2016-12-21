@@ -1,0 +1,15 @@
+
+set -e
+
+mkdir -p work
+
+cd work
+
+if [ ! -e go-ethereum ]
+then
+	git clone https://github.com/ethereum/go-ethereum.git
+fi
+
+cd go-ethereum
+
+make

@@ -1,0 +1,103 @@
+#!/usr/bin/env node
+
+var request = require("request");
+var Promise = require("bluebird");
+
+var STREAK_PIPELINE='agxzfm1haWxmb29nYWVyPwsSDE9yZ2FuaXphdGlvbiIYYmxvY2thcHBzLnVzZXJAZ21haWwuY29tDAsSCFdvcmtmbG93GICAgICA8ogKDA'
+var STREAK_API_KEY=process.argv[4];
+var STREAK_API_URL='https://www.streak.com/api/v1'
+var STREAK_CREATED_STAGE='5002'
+var STREAK_CONTACT_FIELD='1003'
+
+if (process.argv.length < 5) {
+    throw Error("Usage: streak <name> <email> <api key>")
+}
+
+var deployment = process.argv[2];
+var email = process.argv[3];
+
+streakRequest0 = Promise.promisify(
+    request.defaults({
+	baseUrl : STREAK_API_URL,
+	auth : {
+	    username : STREAK_API_KEY,
+	    password : "",
+	    sendImmediately : true
+	},
+	json : true
+    }),
+    {multiArgs:true}
+);
+
+function streakRequest(x) {
+    return streakRequest0(x).get(1);
+}
+
+streakRequest('/pipelines/' + STREAK_PIPELINE + '/boxes')
+.call("find", function(box) {
+    return box.name == deployment;
+})
+.then(function(box) {
+    if (!box) {
+	return {
+	    url : '/pipelines/' + STREAK_PIPELINE + '/boxes/',
+	    method : "PUT",
+	    form : {
+		name : deployment,
+		stageKey : STREAK_CREATED_STAGE
+	    }
+	};
+    }
+    else if (box.stageKey != STREAK_CREATED_STAGE) {
+	return {
+	    url : '/boxes/' + box.boxKey,
+	    method : "POST",
+	    body : {
+		stageKey : STREAK_CREATED_STAGE,
+	    }
+	};
+    }
+    else {
+	throw {
+	    doNotRunStreak : true,
+	    boxKey : box.boxKey
+	};
+    }
+})
+.then(streakRequest)
+.catch({doNotRunStreak:true}, Promise.resolve)
+.catch({success:false}, function(obj) {throw obj.error})
+.get("boxKey")
+.then(function(boxKey) {
+    return [
+	{
+	    url : '/boxes/' + boxKey + '/fields/' + STREAK_CONTACT_FIELD,
+	    method : "POST",
+	    body : {
+	    	value : email
+	    }
+	},
+	{
+	    url : '/boxes/' + boxKey + '/comments/',
+	    method: "PUT",
+	    form : {
+		message : "Created new instance"
+	    }
+	}
+    ]
+})
+.map(streakRequest)
+.catch(function(a) {
+    return a.some(function(x) {
+	x.success === false
+    });
+}, function(a) {
+    throw a.map(function(x) {
+	if ("error" in x) {
+	    return x.error;
+	}
+	else {
+	    return x;
+	}
+    });
+});

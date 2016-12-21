@@ -1,0 +1,115 @@
+module Blockchain.Sequencer.SequencerSpec where
+
+import Numeric (showHex)
+import Data.Time.Clock.POSIX
+
+import Control.Monad.Logger
+import Control.Exception (finally)
+
+import Blockchain.Sequencer
+import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Monad
+import Blockchain.Sequencer.ChainHelpers
+import Blockchain.Sequencer.OrderValidator
+import Blockchain.Format
+import Blockchain.Output
+
+import qualified Data.ByteString.Char8  as C8
+import qualified Network.Kafka.Protocol as KP
+
+import Test.Hspec
+import Test.Hspec.Contrib.HUnit()
+import Test.HUnit
+import Test.QuickCheck
+
+import System.Directory (createDirectoryIfMissing, removeDirectoryRecursive, getCurrentDirectory, setCurrentDirectory)
+
+stripTransactionsAndUncles :: IngestBlock -> IngestBlock
+stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [] }
+
+dedupWindow :: Int
+dedupWindow = 100
+
+withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
+withTemporaryDepBlockDB genesisBlock m = do
+    cwd          <- getCurrentDirectory
+    randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
+    timestamp    <- (show . round) <$> getPOSIXTime
+    fullPath     <- return $ "./.ethereumH/dep_block_" ++ timestamp ++ "_" ++ (showHex randomSuffix "") ++ "/"
+    tempKCID     <- return $ "sequencer_" ++ timestamp ++ "_" ++ (showHex randomSuffix "")
+    setCurrentDirectory "../" -- for ethconf to be happy
+    createDirectoryIfMissing True fullPath
+    cfg          <- return $ SequencerConfig
+                               { depBlockDBCacheSize   = 0
+                               , depBlockDBPath        = fullPath
+                               , kafkaClientId         = KP.KString . C8.pack $ tempKCID
+                               , seenTransactionDBSize = dedupWindow
+                               , syncWrites            = False
+                               , bootstrapDoEmit       = True
+                               }
+
+    (flip runLoggingT printLogMsg $ runSequencerM cfg ((bootstrap $ ingestBlockToBlock genesisBlock) >> m))
+        `finally`
+        ((removeDirectoryRecursive fullPath) >> (setCurrentDirectory cwd))-- always clean up
+
+feedBackOutputsToInput :: [OutputEvent] -> [IngestEvent]
+feedBackOutputsToInput = map rebox
+    where rebox (OETx t) = IETx . unboxTx $ t
+          rebox (OEBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
+          unboxTx (OutputTx origin _ _ base) = IngestTx origin base
+          unboxBlockTx (OutputTx _ _ _ base) = base
+
+spec :: Spec
+spec = do
+    describe "Testing Support" $ do
+        it "makeGenesisBlock >>= buildIngestChain >>= validate should always be valid" $ do
+            gb    <- makeGenesisBlock
+            chain <- buildIngestChain gb 4 2
+            ret   <- validateOrder gb chain
+            assertBool (format ret) $ isValid ret
+
+        it "makeGenesisBlock >>= (reverse <$> buildIngestChain) >>= validate should always be invalid" $ do
+            gb    <- makeGenesisBlock
+            chain <- reverse <$> buildIngestChain gb 4 2
+            ret   <- validateOrder gb chain
+            assertBool (format ret) $ (not.isValid) ret
+
+    describe "Sequencer" $ do
+        it "transformEvents should output blocks in partial order based on parent hash when input is in order" $ do
+            gb <- makeGenesisBlock
+            inChain <- buildIngestChain gb 8 2
+            outChain <- withTemporaryDepBlockDB gb $ transformEvents (IEBlock <$> inChain)
+            ret <- validateOrder gb $ extractBlocksFromOutputEvents . snd $ outChain
+            assertBool (format ret) $ isValid ret
+
+        it "transformEvents should output blocks in partial order based on parent hash when input is out of order" $ do
+            gb <- makeGenesisBlock
+            inChain <- buildIngestChain gb 8 2
+            shuffled <- generate $ shuffle inChain
+            outChain <- withTemporaryDepBlockDB gb $ transformEvents (IEBlock <$> shuffled)
+            ret <- validateOrder gb $ extractBlocksFromOutputEvents . snd $ outChain
+            assertBool (format ret) $ isValid ret
+
+        it "should not deduplicate incoming transactions that are unique" $ do
+            gb <- makeGenesisBlock
+            inTxSize <- generate $ choose (10, (dedupWindow - 1))
+            inTxs  <- generate $ vectorOf inTxSize $ arbitrary
+            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx <$> inTxs)
+            -- ^^ in case any arbitrary Txs weren't unique
+            dedupedIn <- return $ feedBackOutputsToInput (snd outTxs)
+            dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents dedupedIn
+            assertBool ((show . length $ dedupedIn) ++ " /= " ++ (show . length . snd $ dedupedOut)) $
+                (length dedupedIn) == (length . snd $ dedupedOut)
+
+        it ("should allow duplicate incoming transactions that come in after a specified window (" ++ (show dedupWindow) ++ " txs)") $ do
+            gb <- makeGenesisBlock
+            inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
+            inTxs  <- generate $ vectorOf inTxSize $ arbitrary
+            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx <$> inTxs)
+            -- ^^ in case any arbitrary Txs weren't unique
+            dedupedIn <- return $ feedBackOutputsToInput (snd outTxs)
+            replicationsNeeded <- return $ (dedupWindow `quot` (length dedupedIn)) + 1
+            replicatedIn <- return . concat $ replicate replicationsNeeded (dedupedIn)
+            dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents replicatedIn
+            assertBool ((show . length $ replicatedIn) ++ " /= " ++ (show . length . snd $ dedupedOut)) $
+                (length replicatedIn) == (length . snd $ dedupedOut)

@@ -1,0 +1,11 @@
+*~
+*#
+docker/strato/bin
+docker/explorer/explorer
+docker/bloc/bloc
+docker/authregistry/auth_server/ssl/
+docker/authregistry/auth_server/tokens/
+build-scripts/strato-files.tar.gz
+
+node_modules/
+.DS_Store

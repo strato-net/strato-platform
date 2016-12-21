@@ -1,0 +1,4 @@
+#!/bin/sh
+if [ "$1" = "remove" ]; then
+update-rc.d -f kafka remove
+fi

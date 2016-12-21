@@ -1,0 +1,9 @@
+#!/bin/bash
+if [[ $# -ne 2 ]]
+then echo "Usage: $0 <deployment name> <email>"; exit 1
+fi
+
+deployName=$1
+email=$2
+
+oc new-app --template strato-openshift --param "deploymentName=$deployName,email=$email"

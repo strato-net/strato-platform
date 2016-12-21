@@ -1,0 +1,11 @@
+#!/bin/bash
+
+rm -rf ~/.ethereumH/
+
+sudo -u postgres dropdb eth
+sudo -u postgres createdb eth
+
+strato-setup
+
+cp strato-conf/ethconf.yaml ~/.ethereumH/
+cp strato-conf/peers.yaml ~/.ethereumH/

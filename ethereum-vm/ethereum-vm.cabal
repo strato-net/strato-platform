@@ -1,0 +1,119 @@
+name: ethereum-vm
+version: 0.0.4
+cabal-version: >=1.10
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:  
+    The client described in the Ethereum Yellowpaper
+
+source-repository this
+  type:     git
+  location: https://github.com/jamshidh/ethereum-vm
+  branch:   master
+  tag:      v0.0.4
+
+library
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , aeson
+                 , base16-bytestring
+                 , binary
+                 , blockapps-data
+                 , blockapps-util
+                 , bytestring
+                 , containers
+                 , cryptohash
+                 , directory
+                 , either
+                 , esqueleto
+                 , ethereum-encryption
+                 , ethereum-rlp
+                 , filepath
+                 , haskoin
+                 , hflags
+                 , leveldb-haskell
+                 , lens
+                 , merkle-patricia-db
+                 , milena
+                 , mtl
+                 , monad-control
+                 , monad-logger
+                 , persistent-postgresql
+                 , postgresql-simple
+                 , resourcet
+                 , strato-adit
+                 , strato-conf
+                 , strato-quarry
+                 , strato-sequencer
+                 , text
+                 , time
+                 , transformers
+                 , transformers-base
+                 , vector
+                 , ansi-wl-pprint
+                 , nibblestring
+    exposed-modules: 
+                     Blockchain.BlockChain
+                     Blockchain.Data.ExecResults
+                     Blockchain.TheDAOFork
+                     Blockchain.VMContext
+                     Blockchain.VMOptions
+                     Blockchain.Trigger
+                     Blockchain.Verifier
+                     Blockchain.VM
+                     Blockchain.VM.Code
+                     Blockchain.VM.Environment
+                     Blockchain.VM.Opcodes
+                     Blockchain.VM.VMState
+                     Executable.EthereumVM  
+    other-modules:
+                  Blockchain.DB.ModifyStateDB
+                  Blockchain.JsonRpcCommand
+                  Blockchain.VM.Memory
+                  Blockchain.VM.OpcodePrices
+                  Blockchain.VM.PrecompiledContracts
+                  Blockchain.VM.VMM
+    ghc-options: -Wall -O2
+    buildable: True
+    hs-source-dirs: src
+
+
+executable ethereum-vm
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , bytestring
+                 , containers
+                 , directory
+                 , esqueleto
+                 , blockapps-data
+                 , blockapps-util
+                 , ethereum-rlp
+                 , ethereum-vm
+                 , filepath
+                 , haskoin
+                 , hflags
+                 , lens
+                 , leveldb-haskell
+                 , merkle-patricia-db
+                 , milena
+                 , monad-logger
+                 , mtl
+                 , persistent-postgresql
+                 , postgresql-simple
+                 , resourcet
+                 , strato-quarry
+                 , text
+                 , time
+                 , transformers
+                 , strato-conf
+    main-is: Main.hs
+    ghc-options: -Wall -O2 -threaded
+    buildable: True
+    hs-source-dirs: exec_src

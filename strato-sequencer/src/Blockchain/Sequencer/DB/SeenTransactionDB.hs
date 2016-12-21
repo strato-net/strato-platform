@@ -1,0 +1,58 @@
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+module Blockchain.Sequencer.DB.SeenTransactionDB where
+
+import Control.Monad.Trans.Resource
+import Blockchain.SHA
+
+import qualified Data.Set      as S
+import qualified Data.Sequence as Q
+
+data SeenTransactionDB =
+     SeenTransactionDB { size :: Int
+                       , operations :: Int -- track number of pushes to start popping after `size`
+                       , clearQueue :: Q.Seq SHA
+                       , seen       :: S.Set SHA
+                       }
+
+mkSeenTxDB :: Int -> SeenTransactionDB
+mkSeenTxDB dbSize = SeenTransactionDB { size       = dbSize
+                                      , operations = 0
+                                      , clearQueue = Q.empty
+                                      , seen       = S.empty
+                                      }
+
+class Witnessable t where
+    witnessableHash :: t -> SHA
+
+class (MonadResource m) => HasSeenTransactionDB m where
+    getSeenTransactionDB :: m SeenTransactionDB
+    putSeenTransactionDB :: SeenTransactionDB -> m ()
+    {-# MINIMAL getSeenTransactionDB, putSeenTransactionDB #-}
+
+    wasTransactionHashWitnessed :: HasSeenTransactionDB m => SHA -> m Bool
+    wasTransactionHashWitnessed sha = do
+        stxdb <- getSeenTransactionDB
+        return $ sha `S.member` (seen stxdb)
+
+    witnessTransactionHash :: HasSeenTransactionDB m => SHA -> m ()
+    witnessTransactionHash sha = do
+        stxdb     <- getSeenTransactionDB
+        withClear <- return $ stxdb { operations = (operations stxdb) + 1
+                                    , clearQueue = (clearQueue stxdb) Q.|> sha
+                                    , seen       = sha `S.insert` (seen stxdb)
+                                    }
+        withIntBoundFix <- return $ if (operations withClear) >= 0
+            then withClear
+            else withClear { operations = ((size withClear) + 1) } -- prevent Int rollover since were comparing to size which is int
+        withPop <- return $ if (operations withIntBoundFix) < (size withIntBoundFix) then withIntBoundFix
+                   else
+                       case Q.viewl (clearQueue withIntBoundFix) of
+                        Q.EmptyL    -> withIntBoundFix
+                        (q Q.:< qs) -> withIntBoundFix { clearQueue = qs, seen = q `S.delete` (seen withIntBoundFix) }
+        putSeenTransactionDB withPop
+
+    wasTransactionWitnessed :: (HasSeenTransactionDB m, Witnessable t) => t -> m Bool
+    wasTransactionWitnessed  = wasTransactionHashWitnessed . witnessableHash
+
+    witnessTransaction      :: (HasSeenTransactionDB m, Witnessable t) => t -> m ()
+    witnessTransaction       = witnessTransactionHash . witnessableHash

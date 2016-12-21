@@ -1,0 +1,120 @@
+name: strato-init
+version: 0.0.1
+cabal-version: >=1.10
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A tool to setup the DBs for a Strato instance
+category:      Data Structures
+license: Apache-2.0
+description: A tool to setup the DBs for a Strato instance
+
+source-repository this
+  type:     git
+  location: https://github.com/blockapps/strato-setup
+  branch:   master
+  tag:      v0.0.1
+
+
+executable strato-setup
+    default-language: Haskell98
+    ghc-options: -Wall -O2
+    build-depends: 
+                   base >= 4 && < 5
+                 , aeson
+                 , base16-bytestring
+                 , blockapps-data
+                 , blockapps-util
+                 , strato-sequencer
+                 , bytestring
+                 , containers
+                 , cryptohash
+                 , directory
+                 , entropy
+                 , ethereum-discovery
+                 , ethereum-rlp
+                 , file-embed
+                 , filepath
+                 , hflags
+                 , leveldb-haskell
+                 , merkle-patricia-db
+                 , milena
+                 , monad-logger
+                 , persistent-postgresql
+                 , process
+                 , resourcet
+                 , strato-conf
+                 , text
+                 , time
+                 , transformers
+                 , yaml
+    other-modules: Blockchain.BackupBlocks
+                   Blockchain.BackupMP
+                   Blockchain.Data.GenesisBlock
+                   Blockchain.Data.GenesisInfo
+                   Blockchain.Setup
+                   Paths_strato_init
+    buildable: True
+    main-is: Main.hs
+    hs-source-dirs: src
+
+executable strato-backup
+    default-language: Haskell98
+    ghc-options: -Wall -O2
+    build-depends: base >= 4 && < 5
+                 , base16-bytestring
+                 , binary
+                 , blockapps-data
+                 , blockapps-util
+                 , bytestring
+                 , ethereum-rlp
+                 , leveldb-haskell
+                 , merkle-patricia-db
+                 , monad-control
+                 , monad-logger
+                 , nibblestring
+                 , persistent-postgresql
+                 , strato-conf
+                 , transformers
+    buildable: True
+    main-is: Backup.hs
+    hs-source-dirs: src
+
+executable strato-block-backup
+    default-language: Haskell98
+    ghc-options: -Wall -O2
+    build-depends: base >= 4 && < 5
+                 , base16-bytestring
+                 , blockapps-data
+                 , bytestring
+                 , milena
+                 , strato-conf
+                 , transformers
+    buildable: True
+    main-is: BlockBackup.hs
+    hs-source-dirs: src
+
+
+executable genesis-setup
+    default-language: Haskell98
+    ghc-options: -Wall -O2
+    build-depends: 
+                   base >= 4 && < 5
+                 , aeson
+                 , base16-bytestring
+                 , binary
+                 , blockapps-data
+                 , blockapps-util
+                 , bytestring
+                 , directory
+                 , entropy
+                 , haskoin
+                 , hflags
+                 , merkle-patricia-db
+                 , time
+    other-modules: Blockchain.Data.GenesisInfo
+                   Blockchain.GenesisBlockSetup
+    buildable: True
+    main-is: GenesisSetup.hs
+    hs-source-dirs: src

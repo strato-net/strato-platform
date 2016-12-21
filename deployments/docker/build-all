@@ -1,0 +1,73 @@
+#!/bin/bash
+
+function cleanup {
+  docker ps -aq | xargs -r -n1 -P0 docker rm -fv 2>/dev/null
+  docker images | grep '^<none>' | awk '{print $3;}' | xargs -r -n1 -P0 docker rmi 2>/dev/null
+  rm -rf bloc/bloc explorer/explorer strato/{install,bin} globaldb/bin raistones/project-rai-stones
+}
+
+trap cleanup EXIT
+
+if [[ $1 == "--push" ]]
+then push=true
+     shift
+else push=false
+fi
+
+. set-params.sh
+
+find . -name '*~' -o -name '#*#' | xargs -r -n1 -P0 rm -f
+
+set -e 
+
+toBuild=${@:-${ourImages[@]}}
+
+for name in $toBuild
+do
+  echo "Building $name"
+
+  case $name in
+    explorer)
+      git -C $name clone --local $PWD/../../strato-$name $name
+      ;;
+    bloc)
+      git -C $name clone --local $PWD/../../$name $name
+      ;;
+    strato)
+      mkdir $name/bin
+      (
+        cd ../..
+        stack install --local-bin-path deployments/docker/strato/bin 
+      )
+      ;;
+    globaldb)
+      mkdir $name/bin
+      (
+        cd ../..
+        stack install --local-bin-path deployments/docker/globaldb/bin blockapps-data:global-db
+      )
+      ;;
+    raistones)
+      git -C raistones clone http://github.com/consensys/project-rai-stones -b 126685569_Auth
+      ;;
+  esac
+  imageName=${name}Image
+  image=${!imageName}
+
+  docker build --rm -t $image $name
+  docker tag $image ${image%:*}
+  echo
+done
+docker tag $solcImage solc
+
+if $push
+then
+  for name in $toBuild
+  do 
+    echo "Pushing $name"
+    imageName=${name}Image
+    image=${!imageName}
+    docker push $image
+    echo
+  done
+fi

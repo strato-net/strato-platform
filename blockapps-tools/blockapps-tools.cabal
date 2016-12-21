@@ -1,0 +1,95 @@
+name: blockapps-tools
+version: 0.0.1
+cabal-version: >=1.10
+build-type: Simple
+author: Jamshid
+license-file:  LICENSE
+maintainer:    jamshidnh@gmail.com
+synopsis: A Haskell version of an Ethereum client
+category:      Data Structures
+license: Apache-2.0
+description:  
+	      Tool to query the ethereum databases
+
+source-repository this
+  type:     git
+  location: https://github.com/jamshidh/ethereum-client-haskell
+  branch:   master
+  tag:      v0.0.4
+
+executable queryStrato
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , ansi-wl-pprint
+                 , array
+                 , base16-bytestring
+                 , binary
+                 , blockapps-data
+                 , blockapps-util
+                 , bytestring
+                 , cmdargs
+                 , containers
+                 , cryptohash
+                 , data-default
+                 , directory
+                 , ethereum-rlp
+                 , ethereum-vm
+                 , filepath
+                 , haskoin
+                 , leveldb-haskell
+                 , lens
+                 , merkle-patricia-db
+                 , milena
+                 , monad-logger
+                 , monad-loops
+                 , mtl
+                 , network
+                 , nibblestring
+                 , persistent-postgresql
+                 , process
+                 , resourcet
+                 , strato-p2p-client
+                 , time
+                 , transformers
+                 , strato-conf
+                 , aeson
+                 , text
+                 , strato-sequencer
+                 
+    main-is: Main.hs
+    other-modules:
+                   Block
+                   BlockGO
+                   Code
+                   DumpKafkaBlocks
+                   DumpKafkaUnminedBlocks
+                   DumpKafkaSequencer
+                   DumpKafkaUnSequencer
+                   DumpKafkaStateDiff
+                   DumpKafkaRaw
+                   DumpLevelDB
+                   FRawMP
+                   Hash
+                   Init
+                   Raw
+                   RawMP
+                   RLP
+                   State
+                   Util
+                   Psql
+                   InsertTX
+    buildable: True
+    hs-source-dirs: src
+
+executable restoreStrato
+    default-language: Haskell98
+    build-depends: 
+                   base >= 4 && < 5
+                 , base16-bytestring
+                 , bytestring
+                 , milena
+    main-is: Restore.hs
+    buildable: True
+    hs-source-dirs: src
+

@@ -1,0 +1,42 @@
+
+set -e
+
+if [ "$1" == "" ]
+then
+	echo "usage: upload <server>"
+	exit 1
+fi
+
+user=${2:-root}
+
+mkdir -p work/upload/.local/bin
+mkdir -p work/upload/.ethereumH
+
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/strato-p2p-client work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/strato-api work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/strato-p2p-server work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/ethereum-vm work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/strato-setup work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/ethereum-discover work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/queryStrato work/upload/.local/bin/
+cp .stack-work/install/x86_64-linux/lts-3.4/7.10.2/bin/strato-index work/upload/.local/bin/
+
+if [ -e work/go-ethereum/build/bin/geth ]
+then
+	cp work/go-ethereum/build/bin/geth work/upload/.local/bin/
+fi
+
+cp -a strato-api/static work/upload/
+cp -a strato-api/config work/upload/
+cp strato-scripts/bashrc2 work/upload/bashrc2
+cp strato-scripts/ethReset work/upload/.local/bin/
+cp strato-scripts/ubuntuSetupPeer work/upload/.local/bin/
+cp strato-scripts/setupKafka work/upload/.local/bin/
+
+cp strato-conf/ethconf.yaml work/upload/.ethereumH/
+cp strato-conf/peers.yaml work/upload/.ethereumH/
+
+mkdir work/upload/.ethereumH/conf
+cp blockapps-data/*Genesis.json work/upload/.ethereumH/conf/
+
+rsync -avz -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" --progress work/upload/ $user@$1:~/../$user

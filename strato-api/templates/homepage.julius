@@ -1,0 +1,13 @@
+$(document).on("ready", function update() {
+  
+  $.getJSON("/eth/v1.1/block/last/1", function(blockrefs, textStatus, jqXHR) {
+    $("#blockNumber").html("Last block: " + blockrefs[0].blockData.number);
+    $("#blockTime").html("Mined on: " + blockrefs[0].blockData.timestamp);
+    //console.log("Latest block: " + blockrefs[0].blockData.number);
+    //console.log("Latest blocktime: " + blockrefs[0].blockData.timestamp);
+  });
+
+
+  setTimeout( update, 5000 );
+
+});

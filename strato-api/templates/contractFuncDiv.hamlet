@@ -1,0 +1,6 @@
+  <div id="#{contractName}#{name}Div">
+    <button class="btn col-sm-12" onclick="callFunc(#{name})">
+    <input class="form-control col-sm-12" type="text" name="#{name}" placeholder="#{argName}" id="#{name}#{argName}"/>
+    <input class="form-control col-sm-12" type="value" name="#{name}ValueField" placeholder="send value in Ether" id="#{name}ValueField" />
+    <textarea class="form-control" id="afterTXarea" readonly="true" rows="14">
+     

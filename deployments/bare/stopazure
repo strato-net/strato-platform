@@ -1,0 +1,10 @@
+#!/bin/bash
+
+killall strato-p2p-server
+killall ethereum-discover
+killall strato-api
+killall ethereum-vm
+killall strato-p2p-client
+killall node
+killall gulp
+killall grunt

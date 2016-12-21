@@ -1,0 +1,7 @@
+version: '2'
+
+services:
+  streak:
+    image: $streakImage
+    command: $streakName $streakEmail $streakAPIToken
+

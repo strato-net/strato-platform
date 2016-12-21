@@ -1,0 +1,299 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "nodeName" : {
+      "type" : "string"
+    },
+    "adminUsername" : {
+      "type" : "string",
+      "defaultValue": "blockapps"
+    },
+    "adminPassword" : {
+      "type" : "secureString",
+      "defaultValue": "BlockappsPassword123!"
+    },
+    "vmSize" : {
+      "type" : "string",
+      "defaultValue": "Standard_DS3"
+    },
+    "storageAccount" : {
+      "type" : "string"
+    },
+    "mode": {
+      "type": "string"
+    }
+  },
+  "variables": {
+    "apiVersion" : "2015-06-15",
+    "name" : "[parameters('nodeName')]",
+    "vmSize": "[parameters('vmSize')]",
+    "username": "[parameters('adminUsername')]",
+    "location": "[resourceGroup().location]",
+    "password": "[parameters('adminPassword')]",
+
+    "storageAccount": "[parameters('storageAccount')]",
+    "imageURI" : "[concat('https://', variables('storageAccount'), '.blob.core.windows.net/vhds/wan2.vhd')]",
+    "vhdURI": "[concat('https://', variables('storageAccount'), '.blob.core.windows.net/vhds/', variables('name'), '.vhd')]",
+    "storageAccountPath": "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccount'))]",
+    "storageAccountType": "Standard_LRS",
+
+    "networkInterfaceName": "[concat(variables('name'), 'nic')]",
+    "networkInterfacePath": "[concat('Microsoft.Network/networkInterfaces/', variables('networkInterfaceName'))]",
+    "networkInterfaceId": "[resourceId('Microsoft.Network/networkInterfaces',variables('networkInterfaceName'))]",
+
+    "networkSecurityGroupName": "[concat(variables('name'), 'nsg')]",
+    "networkSecurityGroupPath": "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]",
+    "networkSecurityGroupId": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]",
+
+    "ipConfigurationName": "[concat(variables('name'), 'ipconfig')]",
+    "publicIPAddressName": "[concat(variables('name'), 'publicip')]",
+    "publicIPAddressPath": "[concat('Microsoft.Network/publicIPAddresses/', variables('publicIPAddressName'))]",
+    "publicIPAddressId" : "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))]",
+    "publicIPAddressType": "Dynamic",
+
+    "virtualNetworkName": "[concat(variables('name'), 'vnet')]",
+    "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+    "vnetAddressBase": "11.24.",
+    "vnetAddressPrefix": "[concat(variables('vnetAddressBase'), '0.0/16')]",
+    "subnetName": "[concat(variables('name'), 'subnet')]",
+    "subnetId": "[concat(variables('vnetID'),'/subnets/',variables('subnetName'))]",
+    "virtualSubnetAddressBase": "[concat(variables('vnetAddressBase'), '82.')]",
+    "virtualSubnetAddressPrefix": "[concat(variables('virtualSubnetAddressBase'), '0/24')]",
+
+    "vmID" : "[concat('Microsoft.Compute/virtualMachines/', variables('name'))]",
+    "vmExtName" : "[concat(variables('name'), '/ext')]",
+    "mode": "[parameters('mode')]"
+  },
+  "resources": [
+  {
+    "type": "Microsoft.Storage/storageAccounts",
+    "name": "[variables('storageAccount')]",
+    "apiVersion": "[variables('apiVersion')]",
+    "location": "[variables('location')]",
+    "properties": {
+      "accountType": "[variables('storageAccountType')]"
+    }
+  },
+  {
+    "apiVersion": "[variables('apiVersion')]",
+    "type": "Microsoft.Network/networkSecurityGroups",
+    "name": "[variables('networkSecurityGroupName')]",
+    "location": "[variables('location')]",
+    "properties": {
+      "securityRules": [
+      {
+        "name": "AllowSSHIn",
+        "properties": {
+          "description": "Allow inbound SSH connections",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "22",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "direction": "Inbound",
+          "priority": 100
+        }
+      },
+      {
+        "name": "AllowHTTPIn",
+        "properties": {
+          "description": "Allow api requests",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "80",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "direction": "Inbound",
+          "priority": 101
+        }
+      },
+      {
+        "name": "AllowBlocIn",
+        "properties": {
+          "description": "Allow api requests",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "8000",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*",
+          "access": "Allow",
+          "direction": "Inbound",
+          "priority": 102
+        }
+      },
+      {
+        "name": "AllowExplorerIn",
+        "properties": {
+          "description": "Allow api requests",
+          "protocol": "Tcp",
+          "sourcePortRange": "*",
+          "destinationPortRange": "9000",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*", 
+          "access": "Allow",
+          "direction": "Inbound",
+          "priority": 103
+        }
+      },
+      {
+        "name": "AllowP2PIn",
+        "properties": {
+          "description": "Allow api requests",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "30303",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*", 
+          "access": "Allow",
+          "direction": "Inbound",
+          "priority": 104
+        }
+      },
+      {
+        "name": "AllowP2POut",
+        "properties": {
+          "description": "Allow api requests",
+          "protocol": "*",
+          "sourcePortRange": "*",
+          "destinationPortRange": "30303",
+          "sourceAddressPrefix": "*",
+          "destinationAddressPrefix": "*", 
+          "access": "Allow",
+          "direction": "Outbound",
+          "priority": 104
+        }
+      }
+      ]
+    }
+  },
+  {
+    "apiVersion": "[variables('apiVersion')]",
+    "type": "Microsoft.Network/virtualNetworks",
+    "name": "[variables('virtualNetworkName')]",
+    "location": "[variables('location')]",
+    "properties": {
+      "addressSpace": {
+        "addressPrefixes": [
+          "[variables('vnetAddressPrefix')]"
+          ]
+      },
+      "subnets": [
+      {
+        "name": "[variables('subnetName')]",
+        "properties": {
+          "addressPrefix": "[variables('virtualSubnetAddressPrefix')]"
+        }
+      }
+      ]
+    }
+  },
+  {
+    "apiVersion": "[variables('apiVersion')]",
+    "type": "Microsoft.Network/publicIPAddresses",
+    "name": "[variables('publicIPAddressName')]",
+    "location": "[variables('location')]",
+    "properties": {
+      "publicIPAllocationMethod": "[variables('publicIPAddressType')]"
+    }
+  },
+  {
+    "apiVersion": "[variables('apiVersion')]",
+    "type": "Microsoft.Network/networkInterfaces",
+    "name": "[variables('networkInterfaceName')]",
+    "location": "[variables('location')]",
+    "dependsOn": [
+      "[variables('vnetID')]",
+      "[variables('publicIPAddressPath')]",
+      "[variables('networkSecurityGroupPath')]"
+      ],
+    "properties": {
+      "networkSecurityGroup" : {
+        "id" : "[variables('networkSecurityGroupId')]"
+      },
+      "ipConfigurations": [
+      {
+        "name": "[variables('ipConfigurationName')]",
+        "properties": {
+          "privateIPAllocationMethod": "Static",
+          "publicIPAddress" : {
+            "id": "[variables('publicIPAddressId')]"
+          },
+          "privateIPAddress": "[concat(variables('virtualSubnetAddressBase'), '4')]",
+          "subnet": {
+            "id": "[variables('subnetId')]"
+          }
+        }
+      }
+      ]
+    }
+  },
+  {
+    "location": "[variables('location')]",
+    "type": "Microsoft.Compute/virtualMachines",
+    "name": "[variables('name')]",
+    "dependsOn": [
+      "[variables('storageAccountPath')]",
+      "[variables('networkInterfacePath')]"
+    ],
+    "properties": {
+      "diagnosticsProfile": {
+        "bootDiagnostics": {
+          "enabled": false
+        }
+      },
+      "networkProfile": {
+        "networkInterfaces": [{
+          "id": "[variables('networkInterfaceId')]"
+        }]
+      },
+      "osProfile": {
+        "computerName": "[variables('name')]",
+        "adminUsername": "[variables('username')]",
+        "adminPassword": "[variables('password')]",
+        "linuxConfiguration": {
+          "disablePasswordAuthentication": "false"
+        }
+      },
+      "storageProfile": {
+        "osDisk": {
+          "caching": "ReadWrite",
+          "osType": "linux",
+          "createOption": "FromImage",
+          "vhd": {
+            "uri": "[variables('vhdURI')]"
+          },
+          "image": {
+            "uri": "[variables('imageURI')]"
+          },
+          "name" : "[concat(variables('name'), 'osDisk')]"
+        }
+      },
+      "hardwareProfile": {
+        "vmSize": "[variables('vmSize')]"
+      }
+    },
+    "apiVersion": "[variables('apiVersion')]"
+  },
+  {
+    "type": "Microsoft.Compute/virtualMachines/extensions",
+    "name": "[variables('vmExtName')]",
+    "apiVersion": "[variables('apiVersion')]",
+    "location": "[variables('location')]",
+    "dependsOn": [
+      "[variables('vmID')]"
+      ],
+    "properties": {
+      "publisher": "Microsoft.OSTCExtensions",
+      "type": "CustomScriptForLinux",
+      "typeHandlerVersion": "1.5",
+      "autoUpgradeMinorVersion": true,
+      "settings": {
+        "commandToExecute" : "[concat('sudo -u strato -i -- /bin/bash -c \". set-params.sh && docker-compose kill && docker-compose rm -v -f && ./init-strato.sh ', variables('mode'), '\"')]"
+      }
+    }
+  }
+  ]
+}

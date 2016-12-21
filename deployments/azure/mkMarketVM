@@ -1,0 +1,12 @@
+#!/bin/bash
+# These must already exist
+resourceGroup='strato-dev3'
+storageAccount='stratodev31481'
+imageURI='https://stratodev31481.blob.core.windows.net/system/Microsoft.Compute/Images/hackathon/marketvm-osDisk.96a2c984-9005-451c-b321-ed5be0310ac9.vhd'
+region=centralus
+netName='strato-dev3'
+
+name=marketvm
+azure vm create -g $resourceGroup -n $name -f ${name}nic -l $region -y Linux -z Standard_DS1 -i ${name}ip -w ${name} -F $netName -j default -Q $imageURI -o $storageAccount \
+  --admin-username blockapps --admin-password 'BlockappsPassword123!' --disable-boot-diagnostics
+

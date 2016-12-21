@@ -1,0 +1,19 @@
+
+sqlConfig:
+  user: "postgres"
+  password: "api"
+  host: "localhost"
+  port: 5432
+  database: "eth2"
+  poolsize: 10
+
+levelDBConfig:
+  table: ""
+  path: ""
+
+quarryConfig:
+  coinbaseAddress: "57"
+  lazyBlocks: false
+
+blockConfig:
+  blockTime: 13

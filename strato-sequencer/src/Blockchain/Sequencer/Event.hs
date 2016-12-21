@@ -1,0 +1,290 @@
+{-# LANGUAGE DeriveGeneric, DefaultSignatures #-}
+module Blockchain.Sequencer.Event where
+
+import Data.Binary
+import Data.List (intercalate)
+import Data.Maybe (fromJust)
+
+import qualified Blockchain.Data.Address     as A
+import qualified Blockchain.Data.DataDefs    as DD
+import qualified Blockchain.Data.BlockDB     as BDB
+import qualified Blockchain.Data.Transaction as TX
+import qualified Blockchain.Data.TXOrigin    as TO
+
+import qualified GHC.Generics as GHCG
+
+import qualified Blockchain.Colors as CL
+import Blockchain.Format
+
+import Blockchain.SHA (SHA(..))
+import Blockchain.Util
+
+import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString      as BS
+import Blockchain.Sequencer.DB.SeenTransactionDB
+
+import Blockchain.Sequencer.BinaryInstances()
+
+data IngestEvent = IETx IngestTx | IEBlock IngestBlock deriving (Eq, Read, Show, GHCG.Generic)
+
+data IngestTx = IngestTx { itOrigin      :: TO.TXOrigin
+                         , itTransaction :: TX.Transaction
+                         } deriving (Eq, Read, Show, GHCG.Generic)
+
+data IngestBlock = IngestBlock { ibOrigin              :: TO.TXOrigin
+                               , ibBlockData           :: DD.BlockData
+                               , ibReceiptTransactions :: [TX.Transaction]
+                               , ibBlockUncles         :: [DD.BlockData]
+                               } deriving (Eq, Read, Show, GHCG.Generic)
+
+
+data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
+                                     , sbHash                :: SHA
+                                     , sbBlockData           :: DD.BlockData
+                                     , sbReceiptTransactions :: [OutputTx]
+                                     , sbBlockUncles         :: [DD.BlockData]
+                                     } deriving (Read, Show, GHCG.Generic)
+
+data JsonRpcCommand =
+  JRCGetBalance {
+    jrcAddress::A.Address,
+    jrcId::String,
+    jrcBlockString::String
+    } |
+  JRCGetCode {
+    jrcAddress::A.Address,
+    jrcId::String,
+    jrcBlockString::String
+    } |
+  JRCGetTransactionCount {
+    jrcAddress::A.Address,
+    jrcId::String,
+    jrcBlockString::String
+    } |
+  JRCGetStorageAt {
+    jrcAddress::A.Address,
+    jrcKey::BS.ByteString,
+    jrcId::String,
+    jrcBlockString::String
+    } |
+  JRCCall {
+    jrcCode::BS.ByteString,
+    jrcId::String,
+    jrcBlockString::String
+    } deriving (Eq, Read, Show, GHCG.Generic)
+
+
+data OutputEvent = OETx OutputTx | OEBlock OutputBlock | OEJsonRpcCommand JsonRpcCommand deriving (Eq, Read, Show, GHCG.Generic)
+
+data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
+                         , otHash   :: SHA
+                         , otSigner :: A.Address
+                         , otBaseTx :: TX.Transaction
+                         } deriving (Eq, Read, Show, GHCG.Generic)
+
+data OutputBlock = OutputBlock { obOrigin              :: TO.TXOrigin
+                               , obTotalDifficulty     :: Integer
+                               , obBlockData           :: DD.BlockData
+                               , obReceiptTransactions :: [OutputTx]
+                               , obBlockUncles         :: [DD.BlockData]
+                               } deriving (Eq, Read, Show, GHCG.Generic)
+
+blockToIngestBlock :: TO.TXOrigin -> DD.Block -> IngestBlock
+blockToIngestBlock origin BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
+    IngestBlock{ibOrigin = origin, ibBlockData = bd, ibReceiptTransactions = txs, ibBlockUncles = us}
+
+ingestBlockToBlock :: IngestBlock -> BDB.Block
+ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBlockUncles = us} =
+    BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us}
+
+ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
+ingestBlockToSequencedBlock ib =
+    let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
+        in case sequence $ (wrapIngestBlockTransaction theHash) <$> (ibReceiptTransactions ib) of
+            Nothing -> Nothing
+            Just outputTxs -> Just $ SequencedBlock { sbOrigin              = (ibOrigin ib)
+                                                    , sbHash                = theHash
+                                                    , sbBlockData           = (ibBlockData ib)
+                                                    , sbReceiptTransactions = outputTxs
+                                                    , sbBlockUncles         = (ibBlockUncles ib)
+                                                    }
+
+sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
+sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin              = (sbOrigin sb)
+                                                             , obTotalDifficulty     = totalDifficulty
+                                                             , obBlockData           = (sbBlockData sb)
+                                                             , obReceiptTransactions = (sbReceiptTransactions sb)
+                                                             , obBlockUncles         = (sbBlockUncles sb)
+                                                             }
+
+sequencedBlockShortName :: SequencedBlock -> String
+sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
+    "Block #" ++ CL.yellow(show . DD.blockDataNumber $ d) ++ "/" ++ CL.blue(format theHash)
+
+wrapTransaction :: IngestTx -> Maybe OutputTx
+wrapTransaction tx@IngestTx{} =
+    let baseTx = itTransaction tx in case (TX.whoSignedThisTransaction baseTx) of
+            Nothing -> Nothing
+            Just signer -> Just $ OutputTx { otOrigin = itOrigin tx
+                                           , otHash   = TX.transactionHash baseTx
+                                           , otSigner = signer
+                                           , otBaseTx = baseTx
+                                           }
+
+wrapIngestBlockTransaction :: SHA -> TX.Transaction -> Maybe OutputTx
+wrapIngestBlockTransaction hash tx =
+    case TX.whoSignedThisTransaction $ tx of
+        Nothing -> Nothing
+        Just signer -> Just $ OutputTx { otOrigin = TO.BlockHash hash
+                                       , otSigner = signer
+                                       , otBaseTx = tx
+                                       , otHash   = TX.transactionHash tx
+                                       }
+
+parentHashBS :: SequencedBlock -> BS.ByteString
+parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
+
+ingestBlockHash :: IngestBlock -> SHA
+ingestBlockHash = BDB.blockHeaderHash . ibBlockData
+
+ingestBlockHashBS :: IngestBlock -> BS.ByteString
+ingestBlockHashBS = B.toStrict . encode . ingestBlockHash
+
+ingestBlockDifficulty :: IngestBlock -> Integer
+ingestBlockDifficulty = DD.blockDataDifficulty . ibBlockData
+
+blockHashBS :: SequencedBlock -> BS.ByteString
+blockHashBS = B.toStrict . encode . sbHash
+
+sequencedBlockDifficulty :: SequencedBlock -> Integer
+sequencedBlockDifficulty = DD.blockDataDifficulty . sbBlockData
+
+outputBlockHash :: OutputBlock -> SHA
+outputBlockHash = BDB.blockHeaderHash . obBlockData
+
+outputBlockToBlock :: OutputBlock -> DD.Block
+outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
+    BDB.Block{BDB.blockBlockData = bd,BDB.blockReceiptTransactions=(otBaseTx <$> txs),BDB.blockBlockUncles=us}
+
+quarryBlockToOutputBlock :: BDB.Block -> OutputBlock
+quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
+    OutputBlock { obOrigin              = TO.Quarry
+                , obBlockData           = bd
+                , obBlockUncles         = us
+                , obReceiptTransactions = (wrapQuarryReceipt <$> txs)
+                , obTotalDifficulty     = 0
+                }
+
+    where wrapQuarryReceipt t = OutputTx { otOrigin = TO.Quarry
+                                         , otBaseTx = t
+                                         , otSigner = fromJust . TX.whoSignedThisTransaction $ t
+                                         , otHash   = TX.transactionHash t
+                                         }
+
+instance Witnessable IngestTx where
+    witnessableHash = TX.partialTransactionHash . itTransaction
+
+instance Witnessable OutputTx where
+    witnessableHash = otHash
+
+instance Eq SequencedBlock where
+    a == b = (sbHash a) == (sbHash b)
+
+instance Ord OutputTx where
+    compare OutputTx{otHash = hA} OutputTx{otHash = hB} = compare hA hB
+
+instance Binary IngestTx where
+instance Binary IngestBlock where
+instance Binary SequencedBlock where
+instance Binary OutputTx where
+instance Binary OutputBlock where
+
+instance Binary IngestEvent where
+    put (IETx t)    = putWord8 0 >> put t
+    put (IEBlock b) = putWord8 1 >> put b
+    get = do
+        tag <- getWord8
+        case tag of
+            0 -> IETx    <$> get
+            1 -> IEBlock <$> get
+            x -> error $ "unknown InputEvent tag " ++ show x
+
+instance Binary JsonRpcCommand where
+  put JRCGetBalance{jrcAddress=a, jrcId=i, jrcBlockString=b} =
+    putWord8 0 >> put a >> put i >> put b
+  put JRCGetCode{jrcAddress=a, jrcId=i, jrcBlockString=b} =
+    putWord8 1 >> put a >> put i >> put b
+  put JRCGetTransactionCount {jrcAddress=a, jrcId=i, jrcBlockString=b} =
+    putWord8 2 >> put a >> put i >> put b
+  put JRCGetStorageAt {jrcAddress=a, jrcKey=k, jrcId=i, jrcBlockString=b} =
+    putWord8 3 >> put a >> put k >> put i >> put b
+  put JRCCall{jrcCode=c,jrcId=i,jrcBlockString=b} =
+    putWord8 4 >> put c >> put i >> put b
+  get = do
+        tag <- getWord8
+        case tag of
+            0 -> JRCGetBalance <$> get <*> get <*> get
+            1 -> JRCGetCode <$> get <*> get <*> get
+            2 -> JRCGetTransactionCount <$> get <*> get <*> get
+            3 -> JRCGetStorageAt <$> get <*> get <*> get <*> get
+            4 -> JRCCall <$> get <*> get <*> get
+            x -> error $ "unknown JsonRpcCommand tag " ++ show x
+
+instance Binary OutputEvent where
+    put (OETx t)    = putWord8 0 >> put t
+    put (OEBlock b) = putWord8 1 >> put b
+    put (OEJsonRpcCommand c) = putWord8 2 >> put c
+    get = do
+        tag <- getWord8
+        case tag of
+            0 -> OETx    <$> get
+            1 -> OEBlock <$> get
+            2 -> OEJsonRpcCommand <$> get
+            x -> error $ "unknown OutputEvent tag " ++ show x
+
+instance Format IngestBlock where
+    format b@IngestBlock { ibOrigin              = origin
+                         , ibBlockData           = bd
+                         , ibReceiptTransactions = receipts
+                         , ibBlockUncles         = uncles
+                         } =
+        CL.blue ("Block #" ++ show (BDB.blockDataNumber bd)) ++ " (via " ++ (format origin) ++ ") " ++
+        tab (format (ingestBlockHash b) ++ "\n" ++
+             format bd ++
+             (if null receipts
+              then "        (no transactions)\n"
+              else tab (intercalate "\n    " (format <$> receipts))) ++
+             (if null uncles
+              then "        (no uncles)"
+              else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+
+instance Format OutputBlock where
+    format b@OutputBlock { obOrigin              = origin
+                         , obTotalDifficulty     = totDiff
+                         , obBlockData           = bd
+                         , obReceiptTransactions = receipts
+                         , obBlockUncles         = uncles
+                         } =
+        CL.blue ("OutputBlock #" ++ show (BDB.blockDataNumber bd) ++ "; total diff" ++ (show totDiff)) ++ " (via " ++ (format origin) ++ ") " ++
+        tab (format (outputBlockHash b) ++ "\n" ++
+             format bd ++
+             (if null receipts
+              then "        (no transactions)\n"
+              else tab (intercalate "\n    " (format <$> receipts))) ++
+             (if null uncles
+              then "        (no uncles)"
+              else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
+
+instance Format OutputTx where
+    format OutputTx{ otOrigin = origin
+                   , otSigner = signer
+                   , otBaseTx = base
+                   } =
+           CL.red("OutputTx from address " ++ format signer)
+                ++ tab ("via " ++ (format origin) ++ "\n" ++ (format base))
+
+instance Format IngestTx where
+    format IngestTx{ itOrigin      = origin
+                   , itTransaction = base
+                   } =
+           CL.red("IngestTx via " ++ (format origin) ++ "\n" ++ tab (format base))
