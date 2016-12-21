@@ -82,6 +82,10 @@ case $1 in
       shift
     fi
     ;;
+  "--run-local")
+    doit="runLocal"
+    doFirst=""
+    ;;
   "--wipe")
     doit="wipe"
     doFirst=""
@@ -103,6 +107,15 @@ function runTag
 {
   echo "Running strato from Docker tag $1..."
   sed "s@%REPO%\(.*\)@auth.blockapps.net:5000/blockapps/\1:$1@" \
+    docker-compose.yml.template >docker-compose.yml 2>/dev/null
+  docker-compose up -d
+}
+
+
+function runLocal
+{
+  echo "Running strato from local, untagged images"
+  sed "s/%REPO%//" \
     docker-compose.yml.template >docker-compose.yml 2>/dev/null
   docker-compose up -d
 }

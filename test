@@ -6,7 +6,7 @@ installDockerCompose=false
 startDocker=false
 killDocker=false
 enableSsl=false
-testDir="strato/deployments/test"
+testDir="monstrato/deployments/test"
 rootDir=$PWD
 
 # Parse command line arguments
@@ -50,7 +50,7 @@ npm install
 
 # Run the tests
 echo "Running vm tests..."
-stack test ethereum-test
+#stack test ethereum-test
 echo "Running e2e tests..."
 if [[ "$enableSsl" == true ]]
 then
