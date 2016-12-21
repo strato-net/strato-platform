@@ -23,11 +23,14 @@ import Blockchain.DB.AddressStateDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.DetailsDB
 import Blockchain.DB.HashDB
+import Blockchain.DB.MemAddressStateDB hiding (getAddressState)
 import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB
+import Blockchain.DB.StorageDB
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Sequencer.Event
+import Blockchain.ExtWord
 
 produceResponse::String->B.ByteString->IO ()
 produceResponse id theData = do
@@ -40,7 +43,7 @@ produceResponse id theData = do
         Right resps -> return ()
 
 
-runJsonRpcCommand::(MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m)=>
+runJsonRpcCommand::(MonadLogger m, HasStateDB m, HasHashDB m, HasSQLDB m, HasCodeDB m, HasStorageDB m, HasMemAddressStateDB m)=>
                    JsonRpcCommand->m ()
 runJsonRpcCommand c@JRCGetBalance{jrcAddress=address, jrcBlockString=blockString, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
@@ -70,13 +73,10 @@ runJsonRpcCommand c@JRCGetTransactionCount{jrcAddress=address, jrcBlockString=bl
   liftIO $ produceResponse id $ BC.pack response
   liftIO $ putStrLn response
 
-{-
-runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcBlockString=blockString, jrcId=id} = do
+runJsonRpcCommand c@JRCGetStorageAt{jrcAddress=address, jrcKey=key, jrcBlockString=blockString, jrcId=id} = do
   liftIO $ putStrLn $ "running command: " ++ show c
   bestBlock <- getBestBlock
   setStateDBStateRoot $ blockDataStateRoot $ blockBlockData bestBlock
-  addressState <- getAddressState address
-  let response = show $ addressStateNonce addressState
-  liftIO $ produceResponse id $ BC.pack response
-  liftIO $ putStrLn response
--}
+  value <- getStorageKeyVal' address $ bytesToWord256 $ B.unpack key
+  liftIO $ produceResponse id $ B.pack $ word256ToBytes value
+  liftIO $ putStrLn $ show value
