@@ -35,7 +35,7 @@ contract SampleManager {
     data.push(new Sample(buid, wellname, sampletype, currentlocationtype, currentvendor, startdepthfeet, enddepthfeet, startdepthmeter, enddepthmeter));
   }
 
-  function addSimple(uint x) {
+  function addSimple(string x) {
     simpleData.push(new SimpleStorage(x));
   }
 

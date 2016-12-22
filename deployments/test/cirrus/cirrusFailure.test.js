@@ -1,5 +1,5 @@
 const ba = require('blockapps-rest');
-const cirrus = require('./cirrus')();
+const cirrus = require('./../lib/cirrus')();
 const rest = ba.rest;
 const common = ba.common;
 const config = common.config;
@@ -20,22 +20,22 @@ describe('Cirrus - Failure test', function(){
   });
 
   it('Should upload data query it', function(done){
-
+    done();
   });
 
   it('Should stop cirrus', function(done){
-
+    done();
   });
 
   it('Should upload some data', function(done){
-
+    done();
   });
 
   it('Should start cirrus', function(done){
-
+    done();
   });
 
   it('Should be able to query data uploaded when cirrus was down', function(done){
-
+    done();
   });
 })

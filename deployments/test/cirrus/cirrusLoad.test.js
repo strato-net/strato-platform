@@ -1,5 +1,5 @@
 const ba = require('blockapps-rest');
-const cirrus = require('cirrus');
+const cirrus = require('./../lib/cirrus')();
 const rest = ba.rest;
 const common = ba.common;
 const config = common.config;
@@ -29,7 +29,7 @@ describe('Cirrus - Load Test', function() {
   const adminName = util.uid('Admin');
   const adminPassword = config.password;
   const contractName = 'SampleManager';
-  const contractFilename = './../fixtures/search/SampleManager.sol';
+  const contractFilename = './fixtures/search/SampleManager.sol';
 
   const compileList = [{
     searchable: ['Sample'],
