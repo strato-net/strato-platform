@@ -48,7 +48,7 @@ var toSchemaString = function(json){
   var end = __.map(types, (v, k) => "\x22"+ k + "\x22" + " " + v);
   var tableCreate = "CREATE TABLE IF NOT EXISTS " + "\x22" + json.name + "\x22" + " (" + end.join(', ') + " ); ";
   var indexCreate = "CREATE INDEX IF NOT EXISTS idx ON " + "\x22" + json.name + "\x22" + " (address); ";
-  var nameAdd = "INSERT INTO contract VALUES (DEFAULT, '" + json.codeHash + "', '" + json.name + "') ON CONFLICT DO NOTHING; ";
+  var nameAdd = "INSERT INTO contract VALUES (DEFAULT, '" + json.codeHash + "', '" + json.name + "', '" + JSON.stringify(json.xabi) +  "' ) ON CONFLICT DO NOTHING; ";
 
   return "BEGIN; " + tableCreate + indexCreate + nameAdd + " COMMIT;"
 }
@@ -68,7 +68,7 @@ var config = {
   port: 5432
 };
 
-var nameSchema = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "codeHash" text PRIMARY KEY, "name" text); CREATE INDEX IF NOT EXISTS idx ON "contract" ("codeHash"); COMMIT;'
+var nameSchema = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "codeHash" text PRIMARY KEY, "name" text, "abi" text); CREATE INDEX IF NOT EXISTS idx ON "contract" ("codeHash"); COMMIT;'
 
 // create the pool somewhere globally so its lifetime
 // lasts for as long as your app is running
