@@ -276,4 +276,3 @@ location /bloc/ {
       }
 ```
 This was done to prevent nginx from timing out before bloc.
-```
