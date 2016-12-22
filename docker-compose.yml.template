@@ -62,7 +62,7 @@ services:
     ports:
       - '5434:5432'
   postgrest:
-    image:  %REPO%postgrest-packager
+    image: %REPO%postgrest-packager
     restart: always
     environment:
       POSTGRES_DB: cirrus
