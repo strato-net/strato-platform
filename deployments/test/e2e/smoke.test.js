@@ -21,9 +21,11 @@ describe('All services should be alive', function() {
   this.timeout(config.timeout);
 
   it('Strato should be alive', function(done) {
-    return api.strato.home()
-      .then(function(string) {
-        assert(string.length > 0, 'home page empty');
+    return api.strato.uuid()
+      .then(function(id) {
+        id.should.be.defined;
+        id.should.have.property('peerId');
+        id.peerId.should.be.defined;
         done();
       }).catch(done);
   });
@@ -236,8 +238,7 @@ describe('Walkthru - transaction', function() {
       }, alice.name, alice.address)
       .then(function(tx) {
         alice.fee = new BigNumber(tx.gasLimit).times(new BigNumber(tx.gasPrice));
-        console.log("tx", tx);
-        done();
+        setTimeout(function() {done();}, 2000); // wait for transaction to confirm
       })
       .catch(done);
   });

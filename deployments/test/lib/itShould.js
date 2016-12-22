@@ -19,7 +19,7 @@ function api_bloc_contract(api, config, user, contract, done) {
     .then(function(address) {
       if (util.isAddress(address)) {
         contract.address = address;
-        done();
+        setTimeout(function(){ done(); }, 2000); // wait for upload to get confirmed
       } else {
         done(new Error('contract upload should produce a valid address ' + address));
       }
@@ -300,7 +300,7 @@ module.exports = function(api, config) {
       });
     },
     // send a transaction
-    send: function(tx, node) {
+    send: function(tx, node, delay) {
       return it('should send ' + tx.toString(), function(done) {
         api.setNode(node);
         return api.bloc.send({
@@ -310,7 +310,12 @@ module.exports = function(api, config) {
           }, tx.fromUser.name, tx.fromUser.address)
           .then(function(result) {
             tx.result = result;
-            done();
+            if(delay) {
+              setTimeout(function(){ done(); }, delay);
+            }
+            else {
+              done();
+            }
           })
           .catch(function(err){done(new Error(err.data));});
       });

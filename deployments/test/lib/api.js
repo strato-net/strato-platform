@@ -64,6 +64,9 @@ module.exports = function(config) {
       home: function() {
         return ax.get(config.getStratoUrl(node), '/');
       },
+      uuid: function() {
+        return ax.get(config.getStratoUrl(node), '/eth/v1.2/uuid');
+      },
       account: function(address) {
         return ax.get(config.getStratoUrl(node), '/eth/v1.2/account?address=' + address);
       },

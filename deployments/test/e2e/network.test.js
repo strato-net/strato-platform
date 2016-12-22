@@ -42,7 +42,7 @@ describe('network', function() {
   }
 
   const tx1 = new Tx(alice, bob, 20);
-  itShould.send(tx1);
+  itShould.send(tx1, 0, 5000); //wait for a few seconds for transaction to confirm;
   it('should find the same value', function(done) {
     const sentValue = new BigNumber(tx1.valueEther).times(constants.ETHER);
     const reportedValue = new BigNumber(tx1.result.value);
@@ -54,12 +54,11 @@ describe('network', function() {
 
   for (var node = 0; node < nodes; node++) {
     itShould.getBalance(bob, node);
-    it('should have balance of ' + expectedBalance.plus(sentValue), function(done) {
-      bob.balance.should.be.bignumber.equal(expectedBalance.plus(sentValue));
+    const expectedValue = expectedBalance.plus(sentValue);
+    it('should have balance of ' + expectedValue, function(done) {
+      bob.balance.should.be.bignumber.equal(expectedValue);
       done();
     });
   }
-
-
 
 });

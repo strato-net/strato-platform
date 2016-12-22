@@ -215,10 +215,11 @@ describe('Search state', function() {
     done();
   });
 
+
   itShould.getContractsBySearch(stateContract1, {"lookup":"state1", "lookup":"state2"});
   it('should limit the search', function(done) {
-
-    console.log(JSON.stringify(stateContract1))
+    //subsequent runs of the test without resetting the deployment may cause larger result sets
+    assert.isAtleast(stateContract1.stateMap.length, 2, "Two states should be returned");
     done();
   });
 });

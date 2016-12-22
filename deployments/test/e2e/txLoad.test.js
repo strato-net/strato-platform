@@ -55,8 +55,8 @@ describe('Bloc - TX load', function() {
       .then(function(scope) {
         const aliceAddress = scope.users[aliceName].address;
         const bobAddress = scope.users[bobName].address;
-        console.log('Alice', scope.balances[aliceAddress]);
-        console.log('Bob', scope.balances[bobAddress]);
+        // console.log('Alice', scope.balances[aliceAddress]);
+        // console.log('Bob', scope.balances[bobAddress]);
         done();
       })
       .catch(done);
@@ -65,7 +65,7 @@ describe('Bloc - TX load', function() {
   it('Should upload batches', function(done) {
     // 90, 10, 1
     const batchValue = 0.001;
-    const batchSize = 500;
+    const batchSize = 50;
     const batchCount = 5;
     const batchDelay = 0.1 * 1000;
     const uid = util.uid();
@@ -74,7 +74,7 @@ describe('Bloc - TX load', function() {
     const aliceAddress = scope.users[aliceName].address;
     const bobAddress = scope.users[bobName].address;
 
-      const startTime = new Date();
+    const startTime = new Date();
     // .then(function(scope) {
     //   var endTime = new Date();
     //   var elapsedTime = (endTime.getTime() - startTime.getTime()) / 1000;
@@ -85,13 +85,13 @@ describe('Bloc - TX load', function() {
 
     const batches = [...Array(batchCount).keys()];
     Promise.each(batches, function(batch) {
-        console.log('-------------------- batch', batch, batchCount);
+        // console.log('-------------------- batch', batch, batchCount);
         const endTime = new Date();
         const elapsedTime = (endTime.getTime() - startTime.getTime());
         const txCount = batchSize*batch;
 
         const tps = (txCount / elapsedTime) * 1000;
-        console.log( 'count', txCount,'elapsed', elapsedTime, 'delay', batchDelay, 'tps', tps);
+        // console.log( 'count', txCount,'elapsed', elapsedTime, 'delay', batchDelay, 'tps', tps);
         return processBatch(aliceName, bobName, batch, batchSize, batchValue, uid)(scope)
           .then(DelayPromise(batchDelay)) // wait for cirrus to catch up
           .then(rest.getBalance(aliceAddress))
@@ -103,17 +103,17 @@ describe('Bloc - TX load', function() {
         const bobEnd = new BigNumber(scope.balances[bobAddress].slice(-1)[0]);
         const bobDelta = bobEnd.minus(bobStart);
 
-        console.log('Alice', scope.balances[aliceAddress]);
-        console.log('Bob', scope.balances[bobAddress]);
-        console.log('expected', batchSize, batchCount, batchSize*batchCount);
-        console.log('bobDelta', bobDelta.dividedBy(common.constants.ETHER).toString());
+        // console.log('Alice', scope.balances[aliceAddress]);
+        // console.log('Bob', scope.balances[bobAddress]);
+        // console.log('expected', batchSize, batchCount, batchSize*batchCount);
+        // console.log('bobDelta', bobDelta.dividedBy(common.constants.ETHER).toString());
 
         const endTime = new Date();
         const elapsedTime = (endTime.getTime() - startTime.getTime());
         const txCount = batchSize*batchCount;
 
         const tps = (txCount / elapsedTime) * 1000;
-        console.log( 'count', txCount,'elapsed', elapsedTime, 'delay', batchDelay, 'tps', tps);
+        // console.log( 'count', txCount,'elapsed', elapsedTime, 'delay', batchDelay, 'tps', tps);
 
         const expectedDelta = new BigNumber(batchSize * batchCount).times(common.constants.ETHER).times(batchValue);
         bobDelta.should.be.bignumber.equal(expectedDelta);

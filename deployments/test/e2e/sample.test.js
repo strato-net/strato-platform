@@ -52,7 +52,7 @@ describe('Sample operations ', function() {
   const stateCall = new Call('state', {}, 1);
   itShould.callMethod(alice, sample, stateCall);
   it('should return something', function(done) {
-    console.log(stateCall);
+    assert.equal(stateCall.result, stateCall.expected);
     done();
   });
 
