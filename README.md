@@ -262,3 +262,18 @@ The filesystem is controlled by the SQL database for the most part.  Its
 performance is a significant factor in overall performance, and therefore needs
 to be optimized.  Simply using an SSD for storage contributes greatly and is
 virtually required.
+
+###Nginx Timeout
+In some cases it might be useful to change nginx's read timeouts for the various proxy. You can do this by using the `process_read_timeout` setting. The current nginx configuration for `bloc` is as follows.
+
+```
+location /bloc/ {
+        #proxy_redirect http://localhost:8000 /bloc;
+        proxy_read_timeout 300;
+        proxy_set_header Accept-Encoding "";
+#        proxy_pass http://localhost:8080
+        proxy_pass http://bloc:8000/;
+      }
+```
+This was done to prevent nginx from timing out before bloc.
+```
