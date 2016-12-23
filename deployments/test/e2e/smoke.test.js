@@ -303,22 +303,18 @@ describe('Walkthru - upload a contract', function() {
   });
 });
 
-describe.skip('Faucet', function() {
+describe('Faucet', function() {
+  this.timeout(config.timeout);
 
   const alice = new User(util.uid('Alice'));
-  const expectedBalance = new BigNumber(1000).times(constants.ETHER);
+  const expectedBalance = new BigNumber(2000).times(constants.ETHER);
 
   itShould.createUser(alice);
   itShould.getBalance(alice);
+  itShould.faucet(alice);
   it('should have balance of ' + expectedBalance, function(done) {
     alice.balance.should.be.bignumber.equal(expectedBalance);
     done();
   });
-
- itShould.faucet(alice);
-  // it('should have balance of ' + expectedBalance, function(done) {
-  //   alice.balance.should.be.bignumber.equal(expectedBalance);
-  //   done();
-  // });
 
 });
