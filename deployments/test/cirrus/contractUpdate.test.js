@@ -1,5 +1,4 @@
 const ba = require('blockapps-rest');
-const cirrus = require('./../lib/cirrus')();
 const rest = ba.rest;
 const common = ba.common;
 const config = common.config;
@@ -10,7 +9,7 @@ const assert = common.assert;
 const expect = common.expect;
 const BigNumber = require('bignumber.js');
 const Promise = common.Promise;
-
+const txFactory = require('./transaction.factory.js');
 
 describe('Cirrus - Contract Update Test', function(){
   this.timeout(120*1000);
@@ -43,10 +42,18 @@ describe('Cirrus - Contract Update Test', function(){
       .then(rest.uploadContract(adminName, config.password, contractName, {}))
       .then(rest.compile(compileList))
       .then(function(scope){
-        const txs = cirrus.getBatchTx(contractName, scope.contracts[contractName].address, 0, batchSize, locationV1, 1);
+        const txs = txFactory.getTxs(
+          contractName,
+          scope.contracts[contractName].address,
+          'add', //methodname
+          0, //value
+          0, //batchIndex
+          batchSize,
+          locationV1,
+          txFactory.getSampleVersion1);
         return rest.callMethodList(adminName, txs, true)(scope);
       })
-      .then(cirrus.delayPromise(delay))
+      .then(util.delayPromise(delay))
       .then(rest.query('Sample?currentLocationType=eq.' + locationV1))
       .then(function(scope){
         var result = scope.query.slice(-1)[0];
@@ -62,10 +69,18 @@ describe('Cirrus - Contract Update Test', function(){
       .then(rest.uploadContract(adminName, config.password, contractName, {}))
       .then(rest.compile(compileList))
       .then(function(scope){
-        const txs = cirrus.getBatchTx(contractName, scope.contracts[contractName].address, 0, batchSize, locationV2, 2);
+        const txs = txFactory.getTxs(
+          contractName,
+          scope.contracts[contractName].address,
+          'add', //methodname
+          0, //value
+          0, //batchIndex
+          batchSize,
+          locationV2,
+          txFactory.getSampleVersion2);
         return rest.callMethodList(adminName, txs, true)(scope);
       })
-      .then(cirrus.delayPromise(delay))
+      .then(util.delayPromise(delay))
       .then(rest.query('Sample?currentLocationType=eq.' + locationV2))
       .then(function(scope){
         var result = scope.query.slice(-1)[0];

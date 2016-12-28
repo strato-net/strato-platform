@@ -5,7 +5,6 @@
   "author": "lior@blockapps.net",
   "license": "ISC",
   "dependencies": {
-    "blockapps-rest": "blockapps/blockapps-rest",
     "babel-polyfill": "^6.7.4",
     "blockapps-rest": "blockapps/blockapps-rest",
     "chalk": "^1.1.3",

@@ -1,5 +1,4 @@
 const ba = require('blockapps-rest');
-const cirrus = require('./../lib/cirrus')();
 const rest = ba.rest;
 const common = ba.common;
 const config = common.config;

@@ -1,7 +1,7 @@
 const ba = require('blockapps-rest');
-const cirrus = require('./../lib/cirrus')();
 const rest = ba.rest;
 const common = ba.common;
+const api = common.api;
 const config = common.config;
 const util = common.util;
 const fsutil = common.fsutil;
@@ -10,17 +10,7 @@ const assert = common.assert;
 const expect = common.expect;
 const BigNumber = require('bignumber.js');
 const Promise = common.Promise;
-
-// create a delay, before a promise. pass in args payload
-function DelayPromise(delay) {
-  return function(scope) {
-    return new Promise(function(resolve, reject) {
-      setTimeout(function() {
-        resolve(scope);
-      }, delay);
-    });
-  }
-}
+const txFactory = require('./transaction.factory.js');
 
 describe('Cirrus - Load Test', function() {
   this.timeout(120 * 1000);
@@ -39,7 +29,7 @@ describe('Cirrus - Load Test', function() {
   const contractList = [{
     contractName: contractName,
     args: {},
-    txParams: cirrus.api_getTxParams(),
+    txParams: api.getTxParams(),
   }];
 
   // do once
@@ -64,9 +54,9 @@ describe('Cirrus - Load Test', function() {
     const batches = [...Array(batchCount).keys()];
     Promise.each(batches, function(batch) {
       return processBatch(batch, batchSize, uid)(scope)
-        .then(DelayPromise(batchDelay))// wait for cirrus to catch up
+        .then(util.delayPromise(batchDelay))// wait for cirrus to catch up
         .then(processBatchResult(batch, batchSize, uid)) // process each batch results
-        .then(DelayPromise(3000));// wait for query to finish
+        .then(util.delayPromise(3000));// wait for query to finish
       })
       .then(function() {
         // process all results
@@ -91,7 +81,15 @@ describe('Cirrus - Load Test', function() {
 
   function processBatch(batch, batchSize, uid) {
     return function(scope) {
-      const txs = cirrus.getBatchTx(contractName, scope.contracts[contractName].address, batch, batchSize, uid, 1);
+      const txs = txFactory.getTxs(
+        contractName,
+        scope.contracts[contractName].address,
+        'add', //methodname
+        0, //value
+        batch,
+        batchSize,
+        uid,
+        txFactory.getSampleVersion1);
       const resolve = true;
       return rest.callMethodList(adminName, txs, resolve)(scope);
      }
