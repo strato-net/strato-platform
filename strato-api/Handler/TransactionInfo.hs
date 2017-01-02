@@ -93,7 +93,7 @@ postTransactionListR = do
           ecRecoverTime <- do
             a <- insertTXIfNew API Nothing (fmap snd txr)
             return a
-          $logDebug $ "Kafkaing txs: " Import.++ (T.pack $ show $ toJSON $ (transactionHash . snd) <$> txr)
+          $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr)) 
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
           let times = (P.map timeSpecAsNanoSecs $
