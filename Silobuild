@@ -1,0 +1,8 @@
+ifeq ($(SILO_DOCKER_TAG),)
+  $(error SILO_DOCKER_TAG is not set)
+endif
+
+all: build
+
+build:
+	docker build -t $(SILO_DOCKER_TAG) .
