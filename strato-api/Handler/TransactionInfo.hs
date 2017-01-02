@@ -83,6 +83,8 @@ postTransactionListR = do
           let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
               hs = fmap (toJSON . transactionHash) txs
               txr = P.filter success $ P.zip hs txs
+          $logDebug $ "Incoming txs: " Import.++ (T.pack $ show $ fmap toJSON txs)
+          $logDebug $ "Nr. unsuccessful txs: " Import.++ (T.pack $ show $ P.length $ P.filter (not . success) $ P.zip hs txs)  
           insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
           ecRecoverTime <- do
             a <- insertTXIfNew API Nothing (fmap snd txr)
