@@ -19,6 +19,7 @@ import Blockchain.Data.Code
 import Blockchain.Data.RLP
 import Blockchain.Format
 import Blockchain.Util
+import Blockchain.SHA
 
 derivePersistField "Transaction"
 
@@ -48,7 +49,7 @@ data Transaction =
 
 
 instance Format Transaction where
-  format MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
+  format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
     CL.blue "Message Transaction" ++
     tab (
       "\n" ++
@@ -57,8 +58,9 @@ instance Format Transaction where
       "tGasLimit: " ++ show gl ++ "\n" ++
       "to: " ++ show (pretty to') ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
-      "tData: " ++ tab ("\n" ++ format d) ++ "\n")
-  format ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=theCode} =
+      "tData: " ++ tab ("\n" ++ format d) ++ 
+      "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
+  format t@ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=theCode} =
     CL.blue "Contract Creation Transaction" ++
     tab (
       "\n" ++
@@ -66,7 +68,8 @@ instance Format Transaction where
       "gasPrice: " ++ show gp ++ "\n" ++
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
-      "tInit: " ++ tab (codeToString theCode) ++ "\n")
+      "tInit: " ++ tab (codeToString theCode) ++ 
+      "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init') = format init'
       codeToString (PrecompiledCode _) = "<precompiledCode>"

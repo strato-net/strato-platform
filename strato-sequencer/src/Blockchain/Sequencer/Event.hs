@@ -27,6 +27,10 @@ import Blockchain.Sequencer.BinaryInstances()
 
 data IngestEvent = IETx IngestTx | IEBlock IngestBlock deriving (Eq, Read, Show, GHCG.Generic)
 
+instance Format IngestEvent where
+  format (IETx o) = format o
+  format (IEBlock o) = format o
+
 data IngestTx = IngestTx { itOrigin      :: TO.TXOrigin
                          , itTransaction :: TX.Transaction
                          } deriving (Eq, Read, Show, GHCG.Generic)
@@ -75,6 +79,11 @@ data JsonRpcCommand =
 
 
 data OutputEvent = OETx OutputTx | OEBlock OutputBlock | OEJsonRpcCommand JsonRpcCommand deriving (Eq, Read, Show, GHCG.Generic)
+
+instance Format OutputEvent where
+  format (OETx o) = format o
+  format (OEBlock o) = format o
+  format x = show x  
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
@@ -281,7 +290,7 @@ instance Format OutputTx where
                    , otBaseTx = base
                    } =
            CL.red("OutputTx from address " ++ format signer)
-                ++ tab ("via " ++ (format origin) ++ "\n" ++ (format base))
+                ++ tab (" via " ++ (format origin) ++ "\n" ++ (format base))
 
 instance Format IngestTx where
     format IngestTx{ itOrigin      = origin

@@ -38,6 +38,6 @@ dumpKafkaUnSequencer startingBlock = do
       stateWaitTime .= 100000
       unseqEvents <- readUnseqEvents offset
                                      
-      liftIO $ putStrLn $ unlines $ map show unseqEvents
+      liftIO $ putStrLn $ unlines $ map format unseqEvents
 
       doConsume' (offset + fromIntegral (length unseqEvents))
