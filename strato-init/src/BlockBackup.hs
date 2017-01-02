@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
@@ -7,17 +8,32 @@ import Network.Kafka.Protocol
 
 import Blockchain.Stream.Raw
 import Blockchain.KafkaTopics
+import Network.Kafka
+import Blockchain.EthConf
+-- lastOffset <- getLastOffset LatestTime 0 (lookupTopic "unseqevents")
+
+
 
 main::IO ()
 main = backupBlocks 0
 
 backupBlocks::Offset->IO ()
 backupBlocks startingBlock = do
-  doConsume' startingBlock
+
+  lastOffsetOrError <- runKafkaConfigured "strato-block-backup" $ getLastOffset LatestTime 0 (lookupTopic "unseqevents")
+  case lastOffsetOrError of 
+    Left e -> error (show e)
+    Right lastOffset -> doConsume' startingBlock lastOffset
+  
   where
-    doConsume' offset = do
-      result <- fmap (fromMaybe (error "offset out of range")) $ fetchBytesIO (lookupTopic "block") offset
+    doConsume' offset lastOffset
+      | offset >= lastOffset = return ()
+      | otherwise = do
+      
+      result <- fmap (fromMaybe (error "offset out of range")) $ fetchBytesIO (lookupTopic "unseqevents") offset
 
       liftIO $ putStr $ unlines $ map (BC.unpack . B16.encode) result
 
-      doConsume' (offset + fromIntegral (length result))
+      doConsume' (offset + fromIntegral (length result)) lastOffset
+
+     
