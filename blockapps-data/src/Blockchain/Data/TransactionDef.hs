@@ -58,7 +58,7 @@ instance Format Transaction where
       "tGasLimit: " ++ show gl ++ "\n" ++
       "to: " ++ show (pretty to') ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
-      "tData: " ++ tab ("\n" ++ format d) ++ 
+      "tData: " ++ ("\n" ++ format d) ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
   format t@ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionValue=v, transactionInit=theCode} =
     CL.blue "Contract Creation Transaction" ++
@@ -68,7 +68,7 @@ instance Format Transaction where
       "gasPrice: " ++ show gp ++ "\n" ++
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
-      "tInit: " ++ tab (codeToString theCode) ++ 
+      "tInit: " ++ (codeToString theCode) ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init') = format init'

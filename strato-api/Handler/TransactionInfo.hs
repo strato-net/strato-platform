@@ -33,6 +33,7 @@ import Control.Monad.Logger
 
 import Blockchain.Data.Address
 import Blockchain.SHA
+import Blockchain.Format
 import Blockchain.Data.Code
 import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
@@ -83,14 +84,16 @@ postTransactionListR = do
           let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
               hs = fmap (toJSON . transactionHash) txs
               txr = P.filter success $ P.zip hs txs
-          $logDebug $ "Incoming txs: " Import.++ (T.pack $ show $ fmap toJSON txs)
-          $logDebug $ "Nr. unsuccessful txs: " Import.++ (T.pack $ show $ P.length $ P.filter (not . success) $ P.zip hs txs)  
+          let num = Import.length txs
+          $logDebug $ (T.pack $ show $ num) Import.++ " incoming transactions..."
+          let num' = P.length $ P.filter (not . success) $ P.zip hs txs
+          $logDebug $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
           insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
           ecRecoverTime <- do
             a <- insertTXIfNew API Nothing (fmap snd txr)
             return a
+          $logDebug $ "Kafkaing txs: " Import.++ (T.pack $ show $ toJSON $ (transactionHash . snd) <$> txr)
           emitKafkaTransactions $ snd <$> txr
-          --liftIO $ provideJson hs
           sendResponseStart <- liftIO $ getTime Realtime
           let times = (P.map timeSpecAsNanoSecs $
                 [parserStart - handlerStart, 
@@ -100,7 +103,6 @@ postTransactionListR = do
                 ]) P.++ [ecRecoverTime]
           $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
           sendResponseStatus status200 $ toJSON hs --times -- This is for debugging
-          --sendResponseStatus status200 ("Batch inserted transactions" :: Text)
        _ -> invalidArgs ["couldn't decode transactions"]
     where
       success (a, _) =
