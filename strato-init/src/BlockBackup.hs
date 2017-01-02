@@ -10,8 +10,6 @@ import Blockchain.Stream.Raw
 import Blockchain.KafkaTopics
 import Network.Kafka
 import Blockchain.EthConf
--- lastOffset <- getLastOffset LatestTime 0 (lookupTopic "unseqevents")
-
 
 
 main::IO ()
