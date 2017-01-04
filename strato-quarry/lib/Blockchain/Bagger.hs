@@ -140,6 +140,10 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
+logDiscard prefix address expectation OutputTx{otHash=h, otBaseTx=t} = do
+    liftIO $ traceIO $ ("\n===" ++ prefix ++ " expected " ++ (show expectation) ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "n=" ++ (show $ TD.transactionNonce t) ++ "\n===")
+
+
 addToQueued :: MonadBagger m => OutputTx -> m ()
 addToQueued t@OutputTx{otSigner = signer} =
     unlessM (wasSeen t) $ do
@@ -150,6 +154,7 @@ addToQueued t@OutputTx{otSigner = signer} =
                 !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
                 putBaggerState newState
                 forM_ toDiscard removeFromSeen
+                forM_ toDiscard $ logDiscard "aTQ" signer 0
                 addToSeen t
 
 promoteExecutables :: MonadBagger m => m ()
@@ -162,13 +167,16 @@ promoteExecutables = do
         let !(discardedByNonce, state') = B.trimBelowNonceFromQueued address addressNonce state
         putBaggerState state'
         forM_ discardedByNonce removeFromSeen
+        forM_ discardedByNonce $ logDiscard "pE,Q,N" address addressNonce
 
         let !(discardedByCost, state'') = B.trimAboveCostFromQueued address addressBalance state'
         putBaggerState state''
         forM_ discardedByCost removeFromSeen
+        forM_ discardedByCost $ logDiscard "pE,Q,B" address addressBalance
 
         let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce state''
         putBaggerState state'''
+        forM_ readyToMine $ logDiscard "pE,rtm" address 0
 
         -- todo callback per promotion call instead of per-address?
         let nonceDrops = (NonceTooLow Queued addressNonce)     <$> discardedByNonce
@@ -177,11 +185,12 @@ promoteExecutables = do
         forM_ readyToMine promoteTx
 
 promoteTx :: MonadBagger m => OutputTx -> m ()
-promoteTx tx = do
+promoteTx tx@OutputTx{otSigner=signer} = do
     state <- getBaggerState
     let !(evicted, state') = B.addToPending tx state
     putBaggerState state'
     forM_ evicted removeFromSeen
+    forM_ evicted $ logDiscard "pT,S" signer 0
     addToPromotionCache tx
 
 demoteUnexecutables :: MonadBagger m => m ()
@@ -194,10 +203,12 @@ demoteUnexecutables = do
         let !(discardedByNonce, state') = B.trimBelowNonceFromPending address addressNonce state
         putBaggerState state'
         forM_ discardedByNonce removeFromSeen
+        forM_ discardedByNonce $ logDiscard "dU,P,N" address addressNonce
 
         let !(discardedByCost, state'') = B.trimAboveCostFromPending address addressBalance state'
         putBaggerState state''
         forM_ discardedByCost removeFromSeen
+        forM_ discardedByCost $ logDiscard "dU,P,B" address addressBalance
 
         -- todo callback per demotion call instead of per-address?
         let nonceDrops = (NonceTooLow Queued addressNonce)     <$> discardedByNonce
