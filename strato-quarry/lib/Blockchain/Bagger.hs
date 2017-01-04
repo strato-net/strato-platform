@@ -54,7 +54,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
     getBaggerState     :: m B.BaggerState
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, Integer))
-    rewardCoinbases    :: StateRoot -> Address -> [Address] -> m StateRoot -- miner coinbase -> uncle coinbases -> stateRoot
+    rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [BaggerTxRejection] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
@@ -264,7 +264,7 @@ buildFromMiningCache = do
     let nextDiff     = BDB.nextDifficulty False parentNum parentDiff parentTS time
     previousStateRoot <- getStateRoot
     liftIO $ traceIO $ "pre-reward :: (" ++ format stateRoot ++ ")"
-    rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase []
+    rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
     liftIO $ traceIO $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
     setStateDBStateRoot previousStateRoot
     return OutputBlock { obOrigin = TO.Quarry

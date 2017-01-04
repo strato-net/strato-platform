@@ -107,12 +107,14 @@ instance Bagger.MonadBagger ContextM where
             Left err -> error $ "mineTransactions' failed unexpectedly: " ++ show err
             Right _ -> return $ Right (newStateRoot, newGas)
 
-    rewardCoinbases sr us uncles = do
+    rewardCoinbases sr us uncles ourNumber = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        addToBalance us $ rewardBase flags_testnet
-        -- todo dont be a ~rude individual~ and actually reward uncles
-        --forM_ uncles $ \uncleCB -> addToBalance us $ rewardBase flags_testnet
+        _ <- addToBalance us $ rewardBase flags_testnet
+        forM_ uncles $ \uncle -> do
+            _ <- addToBalance us (rewardBase flags_testnet `quot` 32)
+            _ <- addToBalance (blockDataCoinbase uncle) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
+            return ()
         flushMemStorageDB
         flushMemAddressStateDB
         newStateRoot <- getStateRoot
