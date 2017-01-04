@@ -138,7 +138,7 @@ instance Bagger.MonadBagger ContextM where
                        transactionResultTransactionHash=txHash,
                        transactionResultMessage=message,
                        transactionResultResponse="",
-                       transactionResultTrace="",
+                       transactionResultTrace="<rejected>",
                        transactionResultGasUsed=0,
                        transactionResultEtherUsed=0,
                        transactionResultContractsCreated="",
