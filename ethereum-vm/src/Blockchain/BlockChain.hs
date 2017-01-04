@@ -11,6 +11,7 @@ module Blockchain.BlockChain (
 
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Extra (unlessM)
 import Control.Monad.Logger
 import Control.Monad.Trans
 import Control.Monad.Trans.Either
@@ -37,6 +38,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockSummary
+import Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.Data.Code
 import Blockchain.Data.DataDefs
 import Blockchain.Data.DiffDB
@@ -70,6 +72,9 @@ import Blockchain.VM.VMState
 
 import qualified Control.Monad.State as State
 import qualified Blockchain.Bagger as Bagger
+import qualified Blockchain.Bagger.BaggerState as BaggerState
+
+import Blockchain.SHA
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer -- txCost, accountBalance
                              | TFIntrinsicGasExceedsTxLimit Integer Integer -- intrinsicGas, txGasLimit
@@ -102,17 +107,54 @@ instance Bagger.MonadBagger ContextM where
             Left err -> error $ "mineTransactions' failed unexpectedly: " ++ show err
             Right _ -> return $ Right (newStateRoot, newGas)
 
-    rewardCoinbases sr us uncles = do
+    rewardCoinbases sr us uncles ourNumber = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        addToBalance us $ rewardBase flags_testnet
-        -- todo dont be a ~rude individual~ and actually reward uncles
-        --forM_ uncles $ \uncleCB -> addToBalance us $ rewardBase flags_testnet
+        _ <- addToBalance us $ rewardBase flags_testnet
+        forM_ uncles $ \uncle -> do
+            _ <- addToBalance us (rewardBase flags_testnet `quot` 32)
+            _ <- addToBalance (blockDataCoinbase uncle) ((rewardBase flags_testnet * (8+blockDataNumber uncle - ourNumber )) `quot` 8)
+            return ()
         flushMemStorageDB
         flushMemAddressStateDB
         newStateRoot <- getStateRoot
         setStateDBStateRoot startingStateRoot
         return newStateRoot
+
+    -- todo batch insert results
+    txsDroppedCallback rejections = forM_ rejections $ \rejection -> do
+        let (message, queue, txHash) = baggerRejectionToTransactionResultBits rejection
+        -- if a tx is dropped from Queued, it means it was likely culled during the demotion as the new best block we were just mined
+        -- came in
+        -- todo MAJOR :: there is an edge case if a DIFFERENT transaction w/ same nonce is put into BestBlock causing this one to get
+        -- todo culled. also if the best block includes stuff that somehow impoverishes the sender
+        -- todo when blockapps.js supports it, this should simply always write the failed TxResult and have ba.js pick the best
+        -- todo txresult
+        when (flags_createTransactionResults && (not $ queue == Bagger.Queued)) $ do
+            logInfoN . T.pack $ ("Transaction rejection :: " ++ format rejection)
+            _ <- putTransactionResult $
+                     TransactionResult {
+                       transactionResultBlockHash=SHA 0,
+                       transactionResultTransactionHash=txHash,
+                       transactionResultMessage=message,
+                       transactionResultResponse="",
+                       transactionResultTrace="rejected",
+                       transactionResultGasUsed=0,
+                       transactionResultEtherUsed=0,
+                       transactionResultContractsCreated="",
+                       transactionResultContractsDeleted="",
+                       transactionResultStateDiff="",
+                       transactionResultTime=0,
+                       transactionResultNewStorage="",
+                       transactionResultDeletedStorage=""
+                       }
+            return ()
+
+baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
+baggerRejectionToTransactionResultBits rejection = case rejection of
+    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", queue, hash)
+    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", queue, hash)
+    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", queue, hash)
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do

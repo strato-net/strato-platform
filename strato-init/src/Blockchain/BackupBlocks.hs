@@ -38,5 +38,5 @@ backupBlocks = do
   rawData <- liftIO $ fmap BLC.lines $ BL.getContents
   _ <- liftIO $ runKafkaConfigured "blockapps-data" $
        forM_ rawData $ \line ->
-                     produceMessages $ map (TopicAndMessage (lookupTopic "block") . makeMessage) [decodeWithCheck . BL.toStrict $ line]
+                     produceMessages $ map (TopicAndMessage (lookupTopic "unseqevents") . makeMessage) [decodeWithCheck . BL.toStrict $ line]
   return ()
