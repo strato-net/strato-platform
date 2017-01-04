@@ -120,36 +120,39 @@ instance Bagger.MonadBagger ContextM where
         return newStateRoot
 
     -- todo batch insert results
-    txsDroppedCallback rejections = do
-        bestBlockHash <- BaggerState.bestBlockSHA . BaggerState.miningCache <$> Bagger.getBaggerState
-        unlessM (BSDB.hasBSum bestBlockHash) $ do
-            forM_ rejections $ \rejection -> do
-                logInfoN . T.pack $ ("Transaction rejection :: " ++ format rejection)
-                when flags_createTransactionResults $ do
-                    let (message, txHash) = baggerRejectionToTransactionResultBits rejection
-                    _ <- putTransactionResult $
-                             TransactionResult {
-                               transactionResultBlockHash=bestBlockHash,
-                               transactionResultTransactionHash=txHash,
-                               transactionResultMessage=message,
-                               transactionResultResponse="",
-                               transactionResultTrace="",
-                               transactionResultGasUsed=0,
-                               transactionResultEtherUsed=0,
-                               transactionResultContractsCreated="",
-                               transactionResultContractsDeleted="",
-                               transactionResultStateDiff="",
-                               transactionResultTime=0,
-                               transactionResultNewStorage="",
-                               transactionResultDeletedStorage=""
-                               }
-                    return ()
+    txsDroppedCallback rejections = forM_ rejections $ \rejection -> do
+        let (message, queue, txHash) = baggerRejectionToTransactionResultBits rejection
+        -- if a tx is dropped from Queued, it means it was likely culled during the demotion as the new best block we were just mined
+        -- came in
+        -- todo MAJOR :: there is an edge case if a DIFFERENT transaction w/ same nonce is put into BestBlock causing this one to get
+        -- todo culled. also if the best block includes stuff that somehow impoverishes the sender
+        -- todo when blockapps.js supports it, this should simply always write the failed TxResult and have ba.js pick the best
+        -- todo txresult
+        when (flags_createTransactionResults && (not $ queue == Bagger.Queued)) $ do
+            logInfoN . T.pack $ ("Transaction rejection :: " ++ format rejection)
+            _ <- putTransactionResult $
+                     TransactionResult {
+                       transactionResultBlockHash=SHA 0,
+                       transactionResultTransactionHash=txHash,
+                       transactionResultMessage=message,
+                       transactionResultResponse="",
+                       transactionResultTrace="",
+                       transactionResultGasUsed=0,
+                       transactionResultEtherUsed=0,
+                       transactionResultContractsCreated="",
+                       transactionResultContractsDeleted="",
+                       transactionResultStateDiff="",
+                       transactionResultTime=0,
+                       transactionResultNewStorage="",
+                       transactionResultDeletedStorage=""
+                       }
+            return ()
 
-baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, SHA) -- pretty, bkic
+baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", hash)
-    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", hash)
-    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", hash)
+    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", queue, hash)
+    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", queue, hash)
+    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", queue, hash)
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do

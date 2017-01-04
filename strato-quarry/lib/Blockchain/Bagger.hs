@@ -38,7 +38,7 @@ data RunAttemptError = CantFindStateRoot
                      | GasLimitReached [OutputTx] [OutputTx] StateRoot Integer -- ran, unran, new stateroot, remgas
                      deriving Show
 
-data BaggerTxQueue = Validation | Pending | Queued deriving Show
+data BaggerTxQueue = Validation | Pending | Queued deriving (Eq, Show)
 
 data BaggerTxRejection = NonceTooLow    BaggerTxQueue Integer OutputTx -- integer is actual nonce
                        | BalanceTooLow  BaggerTxQueue Integer OutputTx -- integer is actual balance
