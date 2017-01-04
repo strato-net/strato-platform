@@ -3,7 +3,8 @@ module Blockchain.DB.BlockSummaryDB (
   BlockSummaryDB,
   HasBlockSummaryDB(..),
   putBSum,
-  getBSum
+  getBSum,
+  hasBSum
   ) where
 
 
@@ -35,4 +36,8 @@ putBSum blockHash bSum = do
   db <- getBlockSummaryDB
   LDB.put db LDB.defaultWriteOptions (BL.toStrict $ encode blockHash) (rlpSerialize $ rlpEncode bSum)
 
+hasBSum::(MonadResource m, HasBlockSummaryDB m)=>SHA->m Bool
+hasBSum blockHash = do
+    db <- getBlockSummaryDB
+    isJust <$> (LDB.get db LDB.defaultReadOptions $ BL.toStrict $ encode blockHash)
 

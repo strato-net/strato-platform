@@ -8,7 +8,7 @@ maintainer:    jamshidnh@gmail.com
 synopsis: A Haskell version of an Ethereum client
 category:      Data Structures
 license: Apache-2.0
-description:  
+description:
     The client described in the Ethereum Yellowpaper
 
 source-repository this
@@ -19,7 +19,7 @@ source-repository this
 
 executable strato-p2p-client
     default-language: Haskell98
-    build-depends: 
+    build-depends:
                    base >= 4 && < 5
                  , blockapps-util
                  , hflags
@@ -32,8 +32,9 @@ executable strato-p2p-client
 
 library
     default-language: Haskell98
-    build-depends: 
+    build-depends:
                    base >= 4 && < 5
+                 , aeson
                  , base16-bytestring
                  , blockapps-data
                  , blockapps-util
@@ -45,6 +46,7 @@ library
                  , crypto-pubkey
                  , crypto-pubkey-types
                  , crypto-random
+                 , either
                  , esqueleto
                  , ethereum-discovery
                  , ethereum-encryption
@@ -65,6 +67,8 @@ library
                  , postgresql-simple
                  , random
                  , resourcet
+                 , servant
+                 , servant-client
                  , stm
                  , stm-conduit
                  , strato-conf
@@ -75,8 +79,8 @@ library
                  , strato-conf
                  , strato-sequencer
 
-    exposed-modules: 
-                   Blockchain.BlockNotify  
+    exposed-modules:
+                   Blockchain.BlockNotify
                    Blockchain.Context
                    Blockchain.Data.Wire
                    Blockchain.Display
@@ -84,9 +88,10 @@ library
                    Blockchain.EventException
                    Blockchain.ExtMergeSources
                    Blockchain.Options
-                   Blockchain.RawTXNotify  
+                   Blockchain.RawTXNotify
                    Blockchain.TCPClientWithTimeout
                    Executable.StratoP2PClient
+                   Blockchain.Servant
     other-modules:
                    Blockchain.TimerSource
                    Executable.StratoP2PClientComm
