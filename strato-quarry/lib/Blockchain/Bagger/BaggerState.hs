@@ -115,4 +115,9 @@ popAllPending s@BaggerState{pending = p} = (popped, s { pending = M.empty })
 
 addToPromotionCache :: OutputTx -> BaggerState -> BaggerState
 addToPromotionCache tx s@BaggerState{ miningCache = mc@MiningCache{ promotedTransactions = pt } } =
-    let newPT = tx:pt in s { miningCache = mc { promotedTransactions = newPT } }
+    s { miningCache = mc { promotedTransactions = (upsertPT tx pt) } }
+
+upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
+upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = tx:filtered
+    where filtered = filter (not . (\t -> (otSigner t) == addr && (nonce $ otBaseTx t) == (nonce bt))) pt
+          nonce = TD.transactionNonce
