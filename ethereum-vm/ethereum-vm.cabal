@@ -58,6 +58,7 @@ library
                  , vector
                  , ansi-wl-pprint
                  , nibblestring
+                 , extra == 1.4.1
     exposed-modules: 
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults

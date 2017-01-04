@@ -38,12 +38,25 @@ data RunAttemptError = CantFindStateRoot
                      | GasLimitReached [OutputTx] [OutputTx] StateRoot Integer -- ran, unran, new stateroot, remgas
                      deriving Show
 
+data BaggerTxQueue = Validation | Pending | Queued deriving Show
+
+data BaggerTxRejection = NonceTooLow    BaggerTxQueue Integer OutputTx -- integer is actual nonce
+                       | BalanceTooLow  BaggerTxQueue Integer OutputTx -- integer is actual balance
+                       | GasLimitTooLow BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
+                       deriving Show
+
+instance Format BaggerTxRejection where
+    format (NonceTooLow    queue actual OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "; actual nonce "     ++ (show actual) ++ ", tx hash " ++ (format hash)
+    format (BalanceTooLow  queue actual OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "; actual tx limit "  ++ (show actual) ++ ", tx hash " ++ (format hash)
+    format (GasLimitTooLow queue actual OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "; actual gas limit " ++ (show actual) ++ ", tx hash " ++ (format hash)
+
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) => MonadBagger m where
-    getBaggerState   :: m B.BaggerState
-    putBaggerState   :: B.BaggerState -> m ()
-    runFromStateRoot :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, Integer))
-    rewardCoinbases  :: StateRoot -> Address -> [Address] -> m StateRoot -- miner coinbase -> uncle coinbases -> stateRoot
-    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases #-}
+    getBaggerState     :: m B.BaggerState
+    putBaggerState     :: B.BaggerState -> m ()
+    runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, Integer))
+    rewardCoinbases    :: StateRoot -> Address -> [Address] -> m StateRoot -- miner coinbase -> uncle coinbases -> stateRoot
+    txsDroppedCallback :: [BaggerTxRejection] -> m () -- called when a Tx is dropped from/rejected by the pool
+    {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
     updateBaggerState :: (B.BaggerState -> B.BaggerState) -> m ()
     updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
@@ -128,12 +141,16 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
 addToQueued :: MonadBagger m => OutputTx -> m ()
-addToQueued t@OutputTx{otSigner = signer} = unlessM (wasSeen t) $
-                    whenM (isValidForPool t) $ do
-                        !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
-                        putBaggerState newState
-                        forM_ toDiscard removeFromSeen
-                        addToSeen t
+addToQueued t@OutputTx{otSigner = signer} =
+    unlessM (wasSeen t) $ do
+        validation <- (isValidForPool t)
+        case validation of
+            Left rejection -> txsDroppedCallback [rejection]
+            Right _ -> do
+                !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
+                putBaggerState newState
+                forM_ toDiscard removeFromSeen
+                addToSeen t
 
 promoteExecutables :: MonadBagger m => m ()
 promoteExecutables = do
@@ -152,6 +169,11 @@ promoteExecutables = do
 
         let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce state''
         putBaggerState state'''
+
+        -- todo callback per promotion call instead of per-address?
+        let nonceDrops = (NonceTooLow Queued addressNonce)     <$> discardedByNonce
+        let costDrops  = (BalanceTooLow Queued addressBalance) <$> discardedByCost
+        txsDroppedCallback (nonceDrops ++ costDrops)
         forM_ readyToMine promoteTx
 
 promoteTx :: MonadBagger m => OutputTx -> m ()
@@ -177,6 +199,11 @@ demoteUnexecutables = do
         putBaggerState state''
         forM_ discardedByCost removeFromSeen
 
+        -- todo callback per demotion call instead of per-address?
+        let nonceDrops = (NonceTooLow Queued addressNonce)     <$> discardedByNonce
+        let costDrops  = (BalanceTooLow Queued addressBalance) <$> discardedByCost
+        txsDroppedCallback (nonceDrops ++ costDrops)
+
         -- drop all existing pending transactions, and try to see if they're
         -- still valid to add to the (likely new) queued pool
         let !(remainingPending, state''') = B.popAllPending state''
@@ -186,7 +213,7 @@ demoteUnexecutables = do
 wasSeen :: MonadBagger m => OutputTx -> m Bool
 wasSeen OutputTx{otHash=sha} = (M.member sha) . B.seen <$> getBaggerState
 
-isValidForPool :: MonadBagger m => OutputTx -> m Bool
+isValidForPool :: MonadBagger m => OutputTx -> m (Either BaggerTxRejection ())
 isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
     -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
     state <- getBaggerState
@@ -195,11 +222,16 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
     let txNonce      = TD.transactionNonce bt
     let txFee        = B.calculateIntrinsicTxFee state t
     if intrinsicGas > txGasLimit
-        then return False
+        then return . Left $ GasLimitTooLow Validation intrinsicGas t
         else do
             (addressNonce, addressBalance) <- getAddressNonceAndBalance address
             --liftIO $ putStrLn $ "V4P: " ++ (show tup) ++ " vs (" ++ show txNonce ++ ", " ++ show txFee ++ ")"
-            return $ (addressNonce <= txNonce) && (addressBalance >= txFee)
+            if addressNonce > txNonce then
+                return . Left $ NonceTooLow Validation addressNonce t
+            else if addressBalance < txFee then
+                return . Left $ BalanceTooLow Validation addressBalance t
+            else
+                return $ Right ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
 addToSeen t = updateBaggerState (B.addToSeen t)

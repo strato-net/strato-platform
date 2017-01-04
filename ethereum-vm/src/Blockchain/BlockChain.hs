@@ -11,6 +11,7 @@ module Blockchain.BlockChain (
 
 import Control.Monad
 import Control.Monad.IO.Class
+import Control.Monad.Extra (unlessM)
 import Control.Monad.Logger
 import Control.Monad.Trans
 import Control.Monad.Trans.Either
@@ -37,6 +38,7 @@ import Blockchain.Data.Address
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockSummary
+import Blockchain.DB.BlockSummaryDB as BSDB
 import Blockchain.Data.Code
 import Blockchain.Data.DataDefs
 import Blockchain.Data.DiffDB
@@ -70,6 +72,9 @@ import Blockchain.VM.VMState
 
 import qualified Control.Monad.State as State
 import qualified Blockchain.Bagger as Bagger
+import qualified Blockchain.Bagger.BaggerState as BaggerState
+
+import Blockchain.SHA
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer -- txCost, accountBalance
                              | TFIntrinsicGasExceedsTxLimit Integer Integer -- intrinsicGas, txGasLimit
@@ -113,6 +118,38 @@ instance Bagger.MonadBagger ContextM where
         newStateRoot <- getStateRoot
         setStateDBStateRoot startingStateRoot
         return newStateRoot
+
+    -- todo batch insert results
+    txsDroppedCallback rejections = do
+        bestBlockHash <- BaggerState.bestBlockSHA . BaggerState.miningCache <$> Bagger.getBaggerState
+        unlessM (BSDB.hasBSum bestBlockHash) $ do
+            forM_ rejections $ \rejection -> do
+                logInfoN . T.pack $ ("Transaction rejection :: " ++ format rejection)
+                when flags_createTransactionResults $ do
+                    let (message, txHash) = baggerRejectionToTransactionResultBits rejection
+                    _ <- putTransactionResult $
+                             TransactionResult {
+                               transactionResultBlockHash=bestBlockHash,
+                               transactionResultTransactionHash=txHash,
+                               transactionResultMessage=message,
+                               transactionResultResponse="",
+                               transactionResultTrace="",
+                               transactionResultGasUsed=0,
+                               transactionResultEtherUsed=0,
+                               transactionResultContractsCreated="",
+                               transactionResultContractsDeleted="",
+                               transactionResultStateDiff="",
+                               transactionResultTime=0,
+                               transactionResultNewStorage="",
+                               transactionResultDeletedStorage=""
+                               }
+                    return ()
+
+baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, SHA) -- pretty, bkic
+baggerRejectionToTransactionResultBits rejection = case rejection of
+    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", hash)
+    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", hash)
+    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", hash)
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do
