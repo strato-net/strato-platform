@@ -276,3 +276,18 @@ location /bloc/ {
       }
 ```
 This was done to prevent nginx from timing out before bloc.
+
+#### Bringing Down a Node
+
+In a live network, the process to bring down a node is the following:
+
+1. Go to the machine where the docker containers for that node is running (probably via ssh)
+2. Enter the docker container for strato using the following command:
+```
+docker exec -it strato /bin/bash
+```
+3. Identify and kill the "strato-api" process (using "ps -Af" and "kill PID").
+4. Wait a couple minutes (for any transactions submitted to the API before killing it are propagated to the network).
+5. Exit the server, and use Azure (or whatever you are deployed on) to shut down and delete the node.
+
+
