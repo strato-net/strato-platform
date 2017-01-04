@@ -494,6 +494,7 @@ printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx} (Left errMsg) 
   let tNonce = transactionNonce baseTx
   logInfoN $ T.pack $ CL.magenta "    ============================================================================="
   logInfoN $ T.pack $ CL.magenta "    | Adding transaction signed by: " ++ show (pretty tAddr) ++ CL.magenta " //  " ++ (show tNonce) ++" |"
+  logInfoN $ T.pack $ CL.magenta "    | Tx hash: " ++ (format $ transactionHash baseTx) ++ CL.magenta " |"
   logInfoN $ T.pack $ CL.magenta "    | " ++ CL.red "Transaction failure: " ++ CL.red (show errMsg) ++ CL.magenta "         |"
   logInfoN $ T.pack $ CL.magenta "    |" ++ " t = " ++ printf "%.2f" (realToFrac $ deltaT::Double) ++ "s                                                              " ++ CL.magenta "|"
   logInfoN $ T.pack $ CL.magenta "    =========================================================================="
@@ -502,6 +503,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr} (Right results) del
   let tNonce = transactionNonce t
   logInfoN $ T.pack $ CL.magenta "    =========================================================================="
   logInfoN $ T.pack $ CL.magenta "    | Adding transaction signed by: " ++ show (pretty tAddr) ++ CL.magenta " //  " ++ (show tNonce) ++" |"
+  logInfoN $ T.pack $ CL.magenta "    | Tx hash: " ++ (format $ transactionHash t) ++ CL.magenta " |"
   logInfoN $ T.pack $ CL.magenta "    |    " ++
     (
       if isMessageTX t

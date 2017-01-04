@@ -98,7 +98,9 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
         let cache       = B.miningCache state
         let lastExec    = B.lastExecutedTxs cache
         let lastExecLen = length lastExec
-        let noCachedTxsCulled = lastExecLen == length [t | t <- lastExec, otHash t `M.member` seen']
+        let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
+        let noCachedTxsCulled = lastExecLen == lastExecGuardLen
+        liftIO $ traceIO $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
         if noCachedTxsCulled then
             if (null $ B.promotedTransactions cache) then do
                     !build <- buildFromMiningCache
