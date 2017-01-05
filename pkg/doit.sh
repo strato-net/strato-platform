@@ -35,7 +35,7 @@ function newnode {
   runForever strato-index >> logs/strato-index 2>&1
 
   echo "Starting ethereum-vm"
-  runForever ethereum-vm --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks --trace=true >> logs/ethereum-vm 2>&1
+  runForever ethereum-vm --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1
 
   if $initialize
   then doRegister
