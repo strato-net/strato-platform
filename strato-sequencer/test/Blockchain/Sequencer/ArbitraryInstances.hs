@@ -43,6 +43,9 @@ derive makeArbitrary ''OutputTx
 derive makeArbitrary ''OutputBlock
 derive makeArbitrary ''TXOrigin
 
+instance Arbitrary Microtime where
+    arbitrary = (Microtime . unboxPI) <$> (arbitrary :: Gen PositiveInteger)
+
 data PositiveInteger = PositiveInteger Integer deriving (Eq, Ord, Show, Read)
 unboxPI :: PositiveInteger -> Integer
 unboxPI (PositiveInteger n) = n
