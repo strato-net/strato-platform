@@ -72,7 +72,8 @@ library
                      Blockchain.VM.Environment
                      Blockchain.VM.Opcodes
                      Blockchain.VM.VMState
-                     Executable.EthereumVM  
+                     Executable.EthereumVM
+                     Executable.EVMFlags
     other-modules:
                   Blockchain.DB.ModifyStateDB
                   Blockchain.JsonRpcCommand

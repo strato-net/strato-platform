@@ -536,12 +536,15 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd} = do
 
   let newNumber    = blockDataNumber bd
       newStateRoot = blockDataStateRoot bd
+      oldNumber    = blockDataNumber oldBestBlock
       oldStateRoot = blockDataStateRoot oldBestBlock
       bH           = outputBlockHash b
 
   logInfoN $ T.pack $ "newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
-  when (newNumber > blockDataNumber oldBestBlock || newNumber == 0) $ do
+  let shouldReplace = (newNumber > oldNumber|| newNumber == 0)
+
+  when shouldReplace $ do
     Bagger.processNewBestBlock bH bd
     diffs <- stateDiff newNumber bH oldStateRoot newStateRoot
 
@@ -554,3 +557,5 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd} = do
       --logInfoN $ T.decodeUtf8 diffBS
       produceBytes "statediff" [diffBS]
 
+  -- we're replaying SeqEvents, and need to notify the mempool
+  when ((not shouldReplace) && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $ (Bagger.processNewBestBlock bH bd)

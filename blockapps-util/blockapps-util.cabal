@@ -34,5 +34,6 @@ library
                      , stm
                      , text
                      , unix
+                     , time
   hs-source-dirs:      src
   default-language:    Haskell2010

@@ -12,6 +12,9 @@ import Numeric
 
 import Blockchain.ExtWord
 
+import Data.Ratio (numerator)
+import Data.Time.Clock.POSIX (POSIXTime, getPOSIXTime)
+
 showHex4::Word256->String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput
     where rawOutput = showHex i ""
@@ -86,3 +89,22 @@ isContiguous [] = True
 isContiguous [_] = True
 isContiguous (x:y:rest) | y == x + 1 = isContiguous $ y:rest
 isContiguous _ = False
+
+newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord)
+
+instance Num Microtime where
+    (Microtime a) + (Microtime b) = Microtime $ a+b
+    (Microtime a) * (Microtime b) = Microtime $ a*b
+    abs (Microtime a) = Microtime $ abs a
+    signum (Microtime a) = Microtime $ signum a
+    fromInteger = Microtime
+    negate (Microtime a) = Microtime $ negate a
+
+posixTimeToMicrotime :: POSIXTime -> Microtime
+posixTimeToMicrotime = Microtime . numerator . toRational . (* 1000000)
+
+secondsToMicrotime :: Integer -> Microtime
+secondsToMicrotime = Microtime . (* 1000000)
+
+getCurrentMicrotime :: IO Microtime
+getCurrentMicrotime = posixTimeToMicrotime <$> getPOSIXTime

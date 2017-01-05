@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, FlexibleContexts, FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, BangPatterns #-}
 
 module Executable.EthereumVM (
   ethereumVM
@@ -25,7 +25,11 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Stream.UnminedBlock (produceUnminedBlocks)
 
+import Executable.EVMFlags
+
 import qualified Blockchain.Bagger as Bagger
+
+import Blockchain.Util (getCurrentMicrotime, secondsToMicrotime)
 
 ethereumVM::LoggingT IO ()
 ethereumVM = do
@@ -47,24 +51,32 @@ ethereumVM = do
                Right val -> val
 
         logInfoN $ T.pack $ "lastOffset = " ++ show lastOffset
-        
+        let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
         forever $ do
             logInfoN "Getting Blocks/Txs"
             offset <- liftIO $ readIORef offsetIORef
             seqEvents <- getUnprocessedKafkaEvents offsetIORef
 
+            !currentMicrotime <- liftIO $ getCurrentMicrotime
+            logInfoN $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
+
             when (fromIntegral offset >= lastOffset) $ do
               let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
               forM_ newCommands runJsonRpcCommand
             
-            let newTXs = [t | OETx t <- seqEvents]
-            unless (null newTXs) $ logInfoN (T.pack ("adding " ++ (show $ length newTXs) ++ " txs to mempool")) >> Bagger.addTransactionsToMempool newTXs
+            let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
+            forM allNewTxs $ \(ts, t) -> do
+                logInfoN $ T.pack $ "math :: " ++ (show currentMicrotime) ++ " - " ++ (show ts) ++ " = " ++ (show $ currentMicrotime - ts) ++ "; <= " ++ (show microtimeCutoff) ++ "? " ++ (show $ (currentMicrotime - ts) <= microtimeCutoff)
+            let poolableNewTxs = [t | (ts, t) <- allNewTxs, (abs (currentMicrotime - ts) <= microtimeCutoff)]
+            logInfoN (T.pack ("adding " ++ (show $ length poolableNewTxs) ++ "/" ++ (show $ length allNewTxs) ++ " txs to mempool"))
+            unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
 
             let blocks = [b | OEBlock b <- seqEvents]
+            logInfoN $ T.pack $ "Running " ++ (show $ length blocks) ++ " blocks"
             forM_ blocks $ \b -> putBSum (outputBlockHash b) (blockHeaderToBSum $ obBlockData b)
             addBlocks False blocks
 
-            when ((not makeLazyBlocks) || (not $ null newTXs)) $ do
+            when ((not makeLazyBlocks) || (not $ null poolableNewTxs)) $ do
                 newBlock <- Bagger.makeNewBlock
                 produceUnminedBlocks [(outputBlockToBlock newBlock)]
 

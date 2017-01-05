@@ -24,6 +24,8 @@ import qualified Blockchain.Data.TXOrigin       as TO
 
 import qualified Database.LevelDB as LDB
 
+import Blockchain.Util (Microtime, getCurrentMicrotime)
+
 sequencer :: SequencerM ()
 sequencer = forever $ do
     startUnseqOffset <- getLastIngestedOffset
@@ -69,10 +71,10 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
 transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEvent])
 transformEvents input = unzip . join <$> forM input unboxAndTransform
     where unboxAndTransform e = case e of
-                                  IETx    tx -> emitTxs tx
+                                  IETx ts tx -> emitTxs ts tx
                                   IEBlock bk -> (emitBlocks bk) (ingestBlockToSequencedBlock bk)
 
-          emitTxs inTx = let wrappedTx = wrapTransaction inTx in
+          emitTxs inTs inTx = let wrappedTx = wrapTransaction inTx in
             case wrappedTx of
                 Nothing -> do
                     logWarnN $ T.pack ("Cannot ECRecover " ++ (prettyTx inTx) ++"; not emitting")
@@ -87,7 +89,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                       else do
                         logDebugN $ T.pack ("Haven't witnessed " ++ (prettyTx inTx) ++ "; emitting")
                         witnessTransactionHash witnessHash
-                        return [(Nothing, OETx tx)]
+                        return [(Nothing, OETx inTs tx)]
 
           emitBlocks bk b' = case b' of
             Nothing -> do
