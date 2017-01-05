@@ -65,7 +65,7 @@ postTransactionR = do
           emitKafkaTransactions [tx']
           case h of
             (String h') -> do
-              $logDebug $ "Successfully inserted tx: " Import.++ h'
+              $logDebug $ "Successfully inserted tx: " Import.++ (format h')
               sendResponseStatus status200 (h' :: Text)
             _ -> invalidArgs ["invalid transaction hash"]   
        _ -> invalidArgs ["couldn't decode transaction"]
