@@ -34,7 +34,6 @@ library
     default-language: Haskell98
     build-depends:
                    base >= 4 && < 5
-                 , aeson
                  , base16-bytestring
                  , blockapps-data
                  , blockapps-util
@@ -46,7 +45,6 @@ library
                  , crypto-pubkey
                  , crypto-pubkey-types
                  , crypto-random
-                 , either
                  , esqueleto
                  , ethereum-discovery
                  , ethereum-encryption
@@ -67,8 +65,6 @@ library
                  , postgresql-simple
                  , random
                  , resourcet
-                 , servant
-                 , servant-client
                  , stm
                  , stm-conduit
                  , strato-conf
@@ -91,7 +87,6 @@ library
                    Blockchain.RawTXNotify
                    Blockchain.TCPClientWithTimeout
                    Executable.StratoP2PClient
-                   Blockchain.Servant
     other-modules:
                    Blockchain.TimerSource
                    Executable.StratoP2PClientComm
