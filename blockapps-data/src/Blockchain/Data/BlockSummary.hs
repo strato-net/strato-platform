@@ -15,47 +15,49 @@ import Blockchain.SHA
                 
 data BlockSummary = BlockSummary {
   bSumParentHash::SHA,
-  bSumDifficulty::Integer,
-  bSumTotalDifficulty::Int,
+  bSumDifficulty::Difficulty,
+  bSumTotalDifficulty::Difficulty,
   bSumStateRoot::MP.StateRoot,
   bSumGasLimit::Integer,
   bSumTimestamp::UTCTime,
-  bSumNumber::Integer
+  bSumNumber::Integer,
+  bSumTxCount::Integer
   }
 
-blockHeaderToBSum::BlockData->BlockSummary
-blockHeaderToBSum b =
+blockHeaderToBSum::BlockData->Difficulty->Integer->BlockSummary
+blockHeaderToBSum b totalDiff txCount =
     BlockSummary {
       bSumParentHash = blockDataParentHash b,
       bSumDifficulty = blockDataDifficulty b,
-      bSumTotalDifficulty = 0, -- blockDataTotalDifficulty $ blockBlockData b,
+      bSumTotalDifficulty = totalDiff,
       bSumStateRoot = blockDataStateRoot b,
       bSumGasLimit = blockDataGasLimit b,
       bSumTimestamp = blockDataTimestamp b,
-      bSumNumber = blockDataNumber b
+      bSumNumber = blockDataNumber b,
+      bSumTxCount = txCount
     }
 
 instance RLPSerializable BlockSummary where
-  rlpEncode (BlockSummary p d td sr gl ts n) =
+  rlpEncode (BlockSummary p d td sr gl ts n txcnt) =
     RLPArray [
       rlpEncode p,
       rlpEncode d,
-      rlpEncode $ toInteger td,
+      rlpEncode td,
       rlpEncode sr,
       rlpEncode gl,
       rlpEncode (round $ utcTimeToPOSIXSeconds ts::Integer),
-      rlpEncode n
+      rlpEncode n,
+      rlpEncode txcnt
       ]
-  rlpDecode (RLPArray [p, d, td, sr, gl, ts, n]) =
+  rlpDecode (RLPArray [p, d, td, sr, gl, ts, n, txcnt]) =
     BlockSummary {
       bSumParentHash = rlpDecode p,
       bSumDifficulty = rlpDecode d,
-      bSumTotalDifficulty = fromInteger $ rlpDecode td,
+      bSumTotalDifficulty = rlpDecode td,
       bSumStateRoot = rlpDecode sr,
       bSumGasLimit = rlpDecode gl,
       bSumTimestamp = posixSecondsToUTCTime $ fromInteger $ rlpDecode ts,
-      bSumNumber = rlpDecode n
+      bSumNumber = rlpDecode n,
+      bSumTxCount = rlpDecode txcnt
       }
   rlpDecode x = error $ "rlpDecode for BlockSummary called with data of wrong format: " ++ show x
-
-          

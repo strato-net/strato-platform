@@ -54,7 +54,7 @@ withTemporaryDepBlockDB genesisBlock m = do
 
 feedBackOutputsToInput :: [OutputEvent] -> [IngestEvent]
 feedBackOutputsToInput = map rebox
-    where rebox (OETx t) = IETx . unboxTx $ t
+    where rebox (OETx ts t) = (IETx ts $ unboxTx t)
           rebox (OEBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
           unboxTx (OutputTx origin _ _ base) = IngestTx origin base
           unboxBlockTx (OutputTx _ _ _ base) = base
@@ -92,9 +92,10 @@ spec = do
 
         it "should not deduplicate incoming transactions that are unique" $ do
             gb <- makeGenesisBlock
+            ts <- generate arbitrary
             inTxSize <- generate $ choose (10, (dedupWindow - 1))
             inTxs  <- generate $ vectorOf inTxSize $ arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx <$> inTxs)
+            outTxs <- withTemporaryDepBlockDB gb $ transformEvents ((IETx ts) <$> inTxs)
             -- ^^ in case any arbitrary Txs weren't unique
             dedupedIn <- return $ feedBackOutputsToInput (snd outTxs)
             dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents dedupedIn
@@ -103,9 +104,10 @@ spec = do
 
         it ("should allow duplicate incoming transactions that come in after a specified window (" ++ (show dedupWindow) ++ " txs)") $ do
             gb <- makeGenesisBlock
+            ts <- generate arbitrary
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
             inTxs  <- generate $ vectorOf inTxSize $ arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx <$> inTxs)
+            outTxs <- withTemporaryDepBlockDB gb $ transformEvents ((IETx ts) <$> inTxs)
             -- ^^ in case any arbitrary Txs weren't unique
             dedupedIn <- return $ feedBackOutputsToInput (snd outTxs)
             replicationsNeeded <- return $ (dedupWindow `quot` (length dedupedIn)) + 1

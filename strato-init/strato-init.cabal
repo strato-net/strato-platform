@@ -49,6 +49,7 @@ executable strato-setup
                  , time
                  , transformers
                  , yaml
+                 , binary == 0.7.5.0
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
                    Blockchain.Data.GenesisBlock

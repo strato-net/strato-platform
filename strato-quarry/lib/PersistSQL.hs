@@ -105,7 +105,7 @@ getGreenTXs blockE = do
 
 getBestBlock :: (MonadIO m) => SqlPersistT m (Maybe (Entity Block))
 getBestBlock = do
-    (bhash, _) <- getBestBlockInfoQ
+    (bhash, _, _, _, _) <- getBestBlockInfoQ
     --bid <- getBestIndexBlockInfoQ
     --b <- getJust bid
 

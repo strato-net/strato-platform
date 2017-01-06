@@ -24,6 +24,8 @@ import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.EthConf (runKafkaConfigured)
 import Control.Monad.Logger
 
+import Blockchain.Util (getCurrentMicrotime)
+
 import qualified Prelude as P
 
 retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
@@ -45,7 +47,8 @@ lookupNonce addr' = do
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
 emitKafkaTransactions txs = do
-    let ingestTxs = (IETx . (IngestTx API)) <$> txs
+    ts <- liftIO $ getCurrentMicrotime
+    let ingestTxs = (\t -> IETx ts (IngestTx API t)) <$> txs
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
     case rets of
         Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ (T.pack $ show e)
