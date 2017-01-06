@@ -531,18 +531,23 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 ----------------
 
 replaceBestIfBetter::OutputBlock->ContextM ()
-replaceBestIfBetter b@OutputBlock{obBlockData = bd} = do
-  (_, oldBestBlock) <- getBestBlockInfo
+replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
+  (_, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getBestBlockInfo
 
-  let newNumber    = blockDataNumber bd
-      newStateRoot = blockDataStateRoot bd
-      oldNumber    = blockDataNumber oldBestBlock
-      oldStateRoot = blockDataStateRoot oldBestBlock
-      bH           = outputBlockHash b
+  let newNumber     = blockDataNumber bd
+      newStateRoot  = blockDataStateRoot bd
+      newTxCount    = fromIntegral $ length txs
+      newUncleCount = fromIntegral $ length uncles
+      oldNumber     = blockDataNumber oldBestBlock
+      oldStateRoot  = blockDataStateRoot oldBestBlock
+      bH            = outputBlockHash b
 
   logInfoN $ T.pack $ "newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
-  let shouldReplace = (newNumber > oldNumber|| newNumber == 0)
+  let shouldReplace =     newNumber == 0
+                      || (newNumber > oldNumber)
+                      || ((newNumber == oldNumber) && (td > oldBestDifficulty))
+                      || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
 
   when shouldReplace $ do
     Bagger.processNewBestBlock bH bd
@@ -550,7 +555,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd} = do
 
     when flags_sqlDiff $ do
       commitSqlDiffs diffs
-      putBestBlockInfo bH (obBlockData b)
+      putBestBlockInfo bH (obBlockData b) td newTxCount newUncleCount
 
     when flags_diffPublish $ do
       let diffBS = BL.toStrict $ Aeson.encode diffs

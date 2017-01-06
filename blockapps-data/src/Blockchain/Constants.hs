@@ -4,6 +4,7 @@ module Blockchain.Constants where
 
 import System.FilePath
 
+import Blockchain.Data.DataDefs (Difficulty(..))
 import Blockchain.EthConf
 
 --TODO choose a better Identifier string, add version number

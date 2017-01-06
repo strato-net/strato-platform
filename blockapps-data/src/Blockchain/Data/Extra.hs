@@ -24,19 +24,15 @@ putGenesisHash hash' = do
   _ <- sqlQuery $ SQL.upsert (Extra "genesisHash" $ show hash') []
   return ()
 
-getBestBlockInfo::HasSQLDB m =>
-                  m (SHA, BlockData)
-getBestBlockInfo = 
-  sqlQuery getBestBlockInfoQ 
+getBestBlockInfo :: HasSQLDB m => m (SHA, BlockData, Difficulty, Integer, Integer)
+getBestBlockInfo = sqlQuery getBestBlockInfoQ
 
-getBestBlockInfoQ::MonadIO m =>
-                  SQL.SqlPersistT m (SHA, BlockData)
+getBestBlockInfoQ :: MonadIO m => SQL.SqlPersistT m (SHA, BlockData, Difficulty, Integer, Integer)
 getBestBlockInfoQ = fmap (read . extraValue) $ SQL.getJust (ExtraKey "bestBlock")
 
-putBestBlockInfo::HasSQLDB m=>
-                SHA->BlockData->m ()
-putBestBlockInfo hash' bd = do
-  _ <- sqlQuery $ SQL.upsert (Extra "bestBlock" $ show (hash', bd)) []
+putBestBlockInfo :: HasSQLDB m => SHA->BlockData->Difficulty->Integer->Integer->m ()
+putBestBlockInfo hash' bd totalDiff txCount uncleCount = do
+  _ <- sqlQuery $ SQL.upsert (Extra "bestBlock" $ show (hash', bd, totalDiff, txCount, uncleCount)) []
   return ()
 
 getBestIndexBlockInfo::HasSQLDB m =>
@@ -44,13 +40,10 @@ getBestIndexBlockInfo::HasSQLDB m =>
 getBestIndexBlockInfo =
   sqlQuery getBestIndexBlockInfoQ
 
-getBestIndexBlockInfoQ::MonadIO m =>
-                        SQL.SqlPersistT m (SQL.Key Block)
-getBestIndexBlockInfoQ = 
-  fmap (read . extraValue) $ SQL.getJust (ExtraKey "bestIndexBlock")
+getBestIndexBlockInfoQ :: MonadIO m => SQL.SqlPersistT m (SQL.Key Block)
+getBestIndexBlockInfoQ = (read . extraValue) <$> SQL.getJust (ExtraKey "bestIndexBlock")
 
-putBestIndexBlockInfo::HasSQLDB m=>
-                       SQL.Key Block->m ()
+putBestIndexBlockInfo :: HasSQLDB m => SQL.Key Block->m ()
 putBestIndexBlockInfo bid = do
   _ <- sqlQuery $ SQL.upsert (Extra "bestIndexBlock" $ show bid) []
   return ()

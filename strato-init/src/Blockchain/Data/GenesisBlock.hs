@@ -136,7 +136,7 @@ initializeGenesisBlock backupType genesisBlockName = do
         }
   commitSqlDiffs diff
   
-  putBestBlockInfo (blockHash genesisBlock) (blockBlockData genesisBlock)
+  putBestBlockInfo (blockHash genesisBlock) (blockBlockData genesisBlock) (blockDataDifficulty $ blockBlockData genesisBlock) 0 0
   putBestIndexBlockInfo genBId
 
 bootstrapSequencer :: Block -> IO ()

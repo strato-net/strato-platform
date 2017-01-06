@@ -40,7 +40,10 @@ ethereumVM = do
         firstBlock <- getFirstBlockFromSequencer
         let firstBlockSHA  = outputBlockHash firstBlock
             firstBlockHead = obBlockData firstBlock
-        putBSum firstBlockSHA (blockHeaderToBSum firstBlockHead)
+            firstBlockTD   = obTotalDifficulty firstBlock
+            fbTxsCnt       = fromIntegral $ length $ obReceiptTransactions firstBlock
+            fbUncleCnt     = fromIntegral $ length $ obBlockUncles firstBlock
+        putBSum firstBlockSHA (blockHeaderToBSum firstBlockHead firstBlockTD fbTxsCnt)
         Bagger.processNewBestBlock firstBlockSHA firstBlockHead -- bootstrap Bagger with genesis block
         lastOffsetOrError <- liftIO $ runKafkaConfigured "ethreum-vm" $ 
                              getLastOffset LatestTime 0 (lookupTopic "seqevents")
@@ -73,7 +76,7 @@ ethereumVM = do
 
             let blocks = [b | OEBlock b <- seqEvents]
             logInfoN $ T.pack $ "Running " ++ (show $ length blocks) ++ " blocks"
-            forM_ blocks $ \b -> putBSum (outputBlockHash b) (blockHeaderToBSum $ obBlockData b)
+            forM_ blocks $ \b -> putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
             addBlocks False blocks
 
             when ((not makeLazyBlocks) || (not $ null poolableNewTxs)) $ do
