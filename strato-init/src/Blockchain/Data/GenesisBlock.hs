@@ -116,6 +116,7 @@ initializeGenesisBlock backupType genesisBlockName = do
        return gb
      BlockBackup -> do
        gb <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+       liftIO $ bootstrapSequencer gb
        backupBlocks
        putGenesisHash $ blockHash gb
        return gb
@@ -136,7 +137,7 @@ initializeGenesisBlock backupType genesisBlockName = do
         }
   commitSqlDiffs diff
   
-  putBestBlockInfo (blockHash genesisBlock) (blockBlockData genesisBlock)
+  putBestBlockInfo (blockHash genesisBlock) (blockBlockData genesisBlock) (blockDataDifficulty $ blockBlockData genesisBlock) 0 0
   putBestIndexBlockInfo genBId
 
 bootstrapSequencer :: Block -> IO ()

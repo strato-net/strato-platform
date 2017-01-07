@@ -39,6 +39,8 @@ import Data.Word
 import Data.Aeson
 import GHC.Generics
 
+import qualified Blockchain.Data.RLP as RLP
+
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
@@ -46,3 +48,6 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"]  -- annoying: postgres doe
     $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
 instance ToJSON AddressState
+
+-- todo newtype me
+type Difficulty = Integer

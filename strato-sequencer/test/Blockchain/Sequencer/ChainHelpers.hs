@@ -67,10 +67,10 @@ setIngestBlockNonce val = mapIngestHeader $ \h -> h { blockDataNonce = fromInteg
 
 extractBlocksFromOutputEvents :: [OutputEvent] -> [OutputBlock]
 extractBlocksFromOutputEvents = join . (map convert)
-    where convert (OETx _)    = []
+    where convert (OETx _ _)  = []
           convert (OEBlock b) = [b]
 
 extractTxsFromOutputEvents :: [OutputEvent] -> [OutputTx]
 extractTxsFromOutputEvents = join . (map convert)
-    where convert (OETx t )   = [t]
+    where convert (OETx _ t)  = [t]
           convert (OEBlock _) = []

@@ -25,11 +25,17 @@ import Blockchain.Sequencer.DB.SeenTransactionDB
 
 import Blockchain.Sequencer.BinaryInstances()
 
-data IngestEvent = IETx IngestTx | IEBlock IngestBlock deriving (Eq, Read, Show, GHCG.Generic)
+data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock deriving (Eq, Read, Show, GHCG.Generic)
 
 instance Format IngestEvent where
-  format (IETx o) = format o
+  format (IETx ts o) = show ts ++ " " ++ format o
   format (IEBlock o) = format o
+
+type Timestamp = Microtime
+
+instance Binary Microtime where
+    get = Microtime <$> get
+    put (Microtime a) = put a
 
 data IngestTx = IngestTx { itOrigin      :: TO.TXOrigin
                          , itTransaction :: TX.Transaction
@@ -77,11 +83,10 @@ data JsonRpcCommand =
     jrcBlockString::String
     } deriving (Eq, Read, Show, GHCG.Generic)
 
-
-data OutputEvent = OETx OutputTx | OEBlock OutputBlock | OEJsonRpcCommand JsonRpcCommand deriving (Eq, Read, Show, GHCG.Generic)
+data OutputEvent = OETx Timestamp OutputTx | OEBlock OutputBlock | OEJsonRpcCommand JsonRpcCommand deriving (Eq, Read, Show, GHCG.Generic)
 
 instance Format OutputEvent where
-  format (OETx o) = format o
+  format (OETx ts o) = show ts ++ " " ++ format o
   format (OEBlock o) = format o
   format x = show x  
 
@@ -209,13 +214,15 @@ instance Binary OutputTx where
 instance Binary OutputBlock where
 
 instance Binary IngestEvent where
-    put (IETx t)    = putWord8 0 >> put t
+    -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
+    put (IETx ts t)    = putWord8 2 >> put ts >> put t
     put (IEBlock b) = putWord8 1 >> put b
     get = do
         tag <- getWord8
         case tag of
-            0 -> IETx    <$> get
-            1 -> IEBlock <$> get
+            0 -> (IETx 0) <$> get -- legacy IETx
+            1 -> IEBlock  <$> get
+            2 -> IETx <$> get <*> get
             x -> error $ "unknown InputEvent tag " ++ show x
 
 instance Binary JsonRpcCommand where
@@ -240,15 +247,17 @@ instance Binary JsonRpcCommand where
             x -> error $ "unknown JsonRpcCommand tag " ++ show x
 
 instance Binary OutputEvent where
-    put (OETx t)    = putWord8 0 >> put t
+    -- put (OETx t) = putWord8 0 >> put t -- old OETx without timestamp
+    put (OETx ts t) = putWord8 3 >> put ts >> put t
     put (OEBlock b) = putWord8 1 >> put b
     put (OEJsonRpcCommand c) = putWord8 2 >> put c
     get = do
         tag <- getWord8
         case tag of
-            0 -> OETx    <$> get
+            0 -> (OETx 0) <$> get -- legacy OETx
             1 -> OEBlock <$> get
             2 -> OEJsonRpcCommand <$> get
+            3 -> OETx <$> get <*> get
             x -> error $ "unknown OutputEvent tag " ++ show x
 
 instance Format IngestBlock where

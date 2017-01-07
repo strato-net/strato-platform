@@ -42,6 +42,8 @@ import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestB
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.EthConf (runKafkaConfigured)
 
+import Blockchain.Util (getCurrentMicrotime)
+
 data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | TimerEvt deriving (Show)
 
 setTitleAndProduceBlocks::(MonadLogger m, HasSQLDB m)=>[Block]->m Int
@@ -74,7 +76,8 @@ peerString peer = show (pPeerPubkey peer) ++ "@" ++ T.unpack (pPeerIp peer) ++ "
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
-    let ingestTxs = (IETx . (IngestTx origin)) <$> txs
+    ts <- liftIO $ getCurrentMicrotime
+    let ingestTxs = (\t -> IETx ts (IngestTx origin t)) <$> txs
     rets <- liftIO $ runKafkaConfigured "strato-p2p-client" $ writeUnseqEvents ingestTxs
     case rets of
         Left e      -> logErrorN . T.pack $ "Could not write txs to Kafka: " ++ (show e)

@@ -19,6 +19,10 @@ import Blockchain.EthConf
 import Blockchain.KafkaTopics
 --import Blockchain.Stream.Raw
 
+import qualified Data.Binary as Binary
+import qualified Blockchain.Stream.VMEvent as BSVME
+import qualified Blockchain.Sequencer.Event as BSE
+
 decodeWithCheck::B.ByteString->B.ByteString
 decodeWithCheck x =
   case B16.decode x of
@@ -36,7 +40,14 @@ backupBlocks' = do
 backupBlocks::HasSQLDB m=>m ()
 backupBlocks = do
   rawData <- liftIO $ fmap BLC.lines $ BL.getContents
-  _ <- liftIO $ runKafkaConfigured "blockapps-data" $
-       forM_ rawData $ \line ->
-                     produceMessages $ map (TopicAndMessage (lookupTopic "unseqevents") . makeMessage) [decodeWithCheck . BL.toStrict $ line]
+  decodedBlocks <- liftIO $ runKafkaConfigured "blockapps-data" $
+    forM rawData $ \line -> do
+        let predecoded = decodeWithCheck $ BL.toStrict line
+        let theIngestEvent = Binary.decode $ BLC.fromStrict predecoded
+        _ <- produceMessages $ (TopicAndMessage (lookupTopic "unseqevents") . makeMessage) <$> [predecoded]
+
+        return $ case theIngestEvent of
+            BSE.IEBlock b -> [BSVME.ChainBlock $ BSE.ingestBlockToBlock b]
+            _ -> []
+  forM_ (concat decodedBlocks) BSVME.produceVMEvents
   return ()
