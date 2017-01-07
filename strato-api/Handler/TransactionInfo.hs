@@ -129,9 +129,15 @@ getTransactionR = do
                  limit <- liftIO $ myFetchLimit
 
                  sortParam <- lookupGetParam "sortby"
+                 showRejectedMaybe <- lookupGetParam "rejected"
 
+                 let showReject = case showRejectedMaybe of
+                                    Just "true"  -> -1
+                                    Just "false" -> 0
+                                    Nothing      -> 0
+                 $logDebug $ T.pack $ show showReject
 --                 let offset = (fromIntegral $ (maybe 0 id $ extractPage "page" getParameters)  :: Int64)
-                 let index' = (fromIntegral $ (maybe 0 id $ extractPage "index" getParameters)  :: Int)
+                 let index' = (fromIntegral $ (maybe showReject id $ extractPage' showReject "index" getParameters)  :: Int)
                  let raw    = (fromIntegral $ (maybe 0 id $ extractPage "raw" getParameters) :: Integer) > 0
                  let paramMap = Map.fromList getParameters
                      paramMapRemoved = P.foldr (\param mp -> (Map.delete param mp)) paramMap transactionQueryParams

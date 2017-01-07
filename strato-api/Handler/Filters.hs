@@ -149,9 +149,11 @@ transactionQueryParams = [ "address",
                            "minvalue", 
                            "maxvalue",
                            "blocknumber",
-                           "index" ]
+                           "index", 
+                           "rejected"]
 
 getTransFilter :: (E.Esqueleto query expr backend) => (expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
+getTransFilter  _          ("rejected", _)     = E.val True
 getTransFilter  _          ("page", _)         = E.val True
 getTransFilter  _          ("index", _)        = E.val True
 getTransFilter  _          ("raw", _)          = E.val True
@@ -254,8 +256,11 @@ fromHexText v = res
 extractHash :: String -> [(Text, Text)] ->  Maybe String
 extractHash name ts = Just "" 
 
-extractPage :: String -> [(Text, Text)] ->  Maybe Integer 
-extractPage name ts = Control.Monad.foldM toFold 0 (P.map selectPage ts)
+extractPage :: String -> [(Text, Text)] -> Maybe Integer
+extractPage name ts = extractPage' 0 name ts
+
+extractPage' :: Integer -> String -> [(Text, Text)] -> Maybe Integer 
+extractPage' i name ts = Control.Monad.foldM toFold i (P.map selectPage ts)
      where 
        toFold :: Integer -> Maybe Integer -> Maybe Integer
        toFold n Nothing = Just n

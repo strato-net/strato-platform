@@ -39,7 +39,7 @@ insertRawTXIfNew' rawTXs= do
   forM_ rawTXs $ \rawTX -> do
     ret <- try $ SQL.insertBy rawTX
     case ret of
-     Left e -> liftIO $ error $ "TX already inserted: " ++ show (e::SomeException)
+     Left e -> liftIO $ putStrLn $ "TX already inserted: " ++ show (e::SomeException)
      Right _ -> return ()
 
 {-
