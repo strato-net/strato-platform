@@ -116,6 +116,7 @@ initializeGenesisBlock backupType genesisBlockName = do
        return gb
      BlockBackup -> do
        gb <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+       liftIO $ bootstrapSequencer gb
        backupBlocks
        putGenesisHash $ blockHash gb
        return gb
