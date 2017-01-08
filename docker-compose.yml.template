@@ -44,6 +44,7 @@ services:
       miningThreads: "${miningThreads}"
       blockTime: "${blockTime}"
       minBlockDifficulty: "${minBlockDifficulty}"
+      debugFail: "${debugFail}"
   bloc:
     image: %REPO%bloc
     restart: always
