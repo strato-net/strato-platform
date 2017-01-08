@@ -29,16 +29,19 @@ import Blockchain.Util
 
 --import Debug.Trace
 
-data Capability = ETH Integer | SHH Integer deriving (Show)
+data Capability = ETH Integer | SHH Integer | PAR Integer | UNKNOWNCAP String Integer deriving (Show)
 
 name2Cap::Integer->String->Capability
 name2Cap ver "eth" = ETH ver
 name2Cap ver "shh" = SHH ver
-name2Cap _ x = error $ "Unknown capability string: " ++ x
+name2Cap ver "par" = PAR ver
+name2Cap ver name = UNKNOWNCAP name ver
 
 instance RLPSerializable Capability where
     rlpEncode (ETH ver) = RLPArray [rlpEncode ("eth"::B.ByteString), rlpEncode ver]
     rlpEncode (SHH ver) = RLPArray [rlpEncode ("shh"::B.ByteString), rlpEncode ver]
+    rlpEncode (PAR ver) = RLPArray [rlpEncode ("par"::B.ByteString), rlpEncode ver]
+    rlpEncode (UNKNOWNCAP name ver) = RLPArray [rlpEncode name, rlpEncode ver]
 
     rlpDecode (RLPArray [name, ver]) = name2Cap (rlpDecode ver) $ rlpDecode name
     rlpDecode x = error $ "wrong format given to rlpDecode for Capability: " ++ show (pretty x)
