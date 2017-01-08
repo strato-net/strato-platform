@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, NamedFieldPuns, BangPatterns #-}
 
 module Blockchain.BlockChain (
   addBlock,
@@ -255,7 +255,7 @@ addTransactions::Bool->BlockData->Integer->[OutputTx]->ContextM Integer
 addTransactions _ _ remGas [] = return remGas
 addTransactions isUnmined b blockGas (t:rest) = do
   beforeMap <- getAddressStateDBMap
-  (deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
+  !(deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
   afterMap <- getAddressStateDBMap
   
   printTransactionMessage t result deltaT
@@ -273,7 +273,7 @@ addTransactions isUnmined b blockGas (t:rest) = do
 mineTransactions' :: BlockData -> Integer -> [OutputTx] -> [OutputTx] -> ContextM (Either TransactionFailureCause (), [OutputTx], [OutputTx], Integer)
 mineTransactions' _ remGas ran [] = return $ (Right (), reverse ran, [], remGas)
 mineTransactions' header remGas ran unran@(tx:txs) = do
-    (time, result) <- timeIt . runEitherT $ addTransaction False header remGas tx
+    (time, !result) <- timeIt . runEitherT $ addTransaction False header remGas tx
     printTransactionMessage tx result time
     case result of
         Left f@(TFBlockGasLimitExceeded need have) -> return $ (Left f, reverse ran, unran, have)
@@ -383,7 +383,7 @@ runCodeForTransaction::Bool->Bool->BlockData->Integer->Address->Address->OutputT
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
   when flags_debug $ logInfoN "runCodeForTransaction: ContractCreationTX"
 
-  (result, vmState) <-
+  !(result, vmState) <-
     create isRunningTests' isHomestead S.empty b 0 tAddr tAddr (transactionValue ut) (transactionGasPrice ut) availableGas newAddress (transactionInit ut)
 
   return (const B.empty <$> result, vmState)
