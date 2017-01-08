@@ -47,6 +47,7 @@ library
                  , persistent-postgresql
                  , postgresql-simple
                  , resourcet
+                 , stm
                  , strato-adit
                  , strato-conf
                  , strato-quarry

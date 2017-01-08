@@ -7,12 +7,15 @@ module Executable.EthereumVM (
 import Control.Monad
 import Control.Monad.Logger
 import Control.Monad.IO.Class
+import Control.Monad.STM
 import Data.IORef
 import qualified Data.Text as T
-
 import Network.Kafka
 import Network.Kafka.Protocol
-                    
+import Control.Concurrent
+import Control.Concurrent.STM.TVar
+import System.Directory
+
 import Blockchain.BlockChain
 import Blockchain.Data.BlockSummary
 import Blockchain.DB.BlockSummaryDB
@@ -31,10 +34,23 @@ import qualified Blockchain.Bagger as Bagger
 
 import Blockchain.Util (getCurrentMicrotime, secondsToMicrotime)
 
+savedOffsetFilePath::String
+savedOffsetFilePath = ".ethereumH/vmOffset"
+
 ethereumVM::LoggingT IO ()
 ethereumVM = do
   let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
-  offsetIORef <- liftIO $ newIORef flags_startingBlock
+  readStartingBlock <- liftIO $ getSavedOffset savedOffsetFilePath
+
+  let startingBlock =
+        case (flags_startingBlock, readStartingBlock) of
+         (-1, Just x) -> x
+         (-1, Nothing) -> 1
+         (val, _) -> val
+                     
+  offsetIORef <- liftIO $ newTVarIO startingBlock
+
+  _ <- liftIO $ forkIO $ syncValToFile savedOffsetFilePath startingBlock offsetIORef
   _ <- execContextM $ do
         Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
         firstBlock <- getFirstBlockFromSequencer
@@ -57,7 +73,7 @@ ethereumVM = do
         let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
         forever $ do
             logInfoN "Getting Blocks/Txs"
-            offset <- liftIO $ readIORef offsetIORef
+            offset <- liftIO $ readTVarIO offsetIORef
             seqEvents <- getUnprocessedKafkaEvents offsetIORef
 
             !currentMicrotime <- liftIO $ getCurrentMicrotime
@@ -83,24 +99,40 @@ ethereumVM = do
                 newBlock <- Bagger.makeNewBlock
                 produceUnminedBlocks [(outputBlockToBlock newBlock)]
 
+            liftIO $ atomically $ writeTVar offsetIORef $ offset + fromIntegral (length seqEvents)
+
             return ()
   return ()
 
+getSavedOffset::FilePath->IO (Maybe Integer)
+getSavedOffset filePath = do
+  fileExists <- doesFileExist filePath
+  if fileExists
+    then fmap (Just . read) $ readFile filePath
+    else return Nothing
+      
+syncValToFile::(Read a, Show a, Eq a)=>FilePath->a->TVar a->IO ()
+syncValToFile filePath oldVal tVar = do
+  newVal <- readTVarIO tVar
+  when (oldVal /= newVal) $ writeFile filePath $ show newVal
+  threadDelay 1000000
+  syncValToFile filePath newVal tVar
+  
+
 getFirstBlockFromSequencer :: (MonadLogger m, HasBlockSummaryDB m) => m OutputBlock
 getFirstBlockFromSequencer = do
-    dummyIORef      <- liftIO $ newIORef (0 :: Integer)
+    dummyIORef      <- liftIO $ newTVarIO (0 :: Integer)
     (OEBlock block) <- head <$> getUnprocessedKafkaEvents dummyIORef
     return block
 
 getUnprocessedKafkaEvents::(MonadIO m, MonadLogger m)=>
-                           IORef Integer->m [OutputEvent]
+                           TVar Integer->m [OutputEvent]
 getUnprocessedKafkaEvents offsetIORef = do
-  offset <- liftIO $ readIORef offsetIORef
+  offset <- liftIO $ readTVarIO offsetIORef
   logInfoN $ T.pack $ "Fetching sequenced blockchain events with offset " ++ (show offset)
   ret <-
       liftIO $ runKafkaConfigured "ethereum-vm" $ do
         seqEvents <- readSeqEvents $ Offset $ fromIntegral offset
-        liftIO $ writeIORef offsetIORef $ offset + fromIntegral (length seqEvents)
    
         return seqEvents
 
