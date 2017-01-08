@@ -30,7 +30,7 @@ import Handler.Filters
 import System.Clock
 import Control.DeepSeq
 import Control.Monad.Logger
-
+import Blockchain.DBM
 import Blockchain.Data.Address
 import Blockchain.SHA
 import Blockchain.Format
@@ -64,7 +64,7 @@ postTransactionR = do
        (Success (RawTransaction' raw "")) -> do
           let tx' = rawTX2TX raw
               h = toJSON $ transactionHash tx'
-          insertTXIfNew API Nothing [tx']
+          insertTX Log API Nothing [tx']
           emitKafkaTransactions [tx']
           case h of
             (String h') -> do
@@ -94,7 +94,7 @@ postTransactionListR = do
           $logDebug $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
           insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
           ecRecoverTime <- do
-            a <- insertTXIfNew API Nothing (fmap snd txr)
+            a <- insertTX Log API Nothing (fmap snd txr)
             return a
           $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr)) 
           emitKafkaTransactions $ snd <$> txr
@@ -106,7 +106,7 @@ postTransactionListR = do
                  sendResponseStart - insertTXStart
                 ]) P.++ [ecRecoverTime]
           $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
-          sendResponseStatus status200 $ toJSON hs --times -- This is for debugging
+          sendResponseStatus status200 $ toJSON (fmap transactionHash txs) -- hs --times -- This is for debugging
        _ -> invalidArgs ["couldn't decode transactions"]
     where
       success (a, _) =

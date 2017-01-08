@@ -10,6 +10,7 @@
 
 module Blockchain.DBM (
   DBs(..),
+  DebugMode(..),
   openDBs
   ) where
 
@@ -21,6 +22,8 @@ import qualified Database.Persist.Postgresql as SQL
 
 import Blockchain.DB.SQLDB
 import Blockchain.EthConf
+
+data DebugMode = Log | Fail deriving (Eq)
 
 --import Debug.Trace
 

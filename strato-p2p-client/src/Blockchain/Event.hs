@@ -37,6 +37,7 @@ import Blockchain.Format
 import Blockchain.SHA
 import Blockchain.Stream.VMEvent
 import Blockchain.Verification
+import Blockchain.DBM
 
 import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
@@ -94,8 +95,8 @@ emitKafkaBlock origin baseBlock = do
     return ()
 
 handleEvents::(MonadIO m, HasSQLDB m, MonadState Context m, MonadLogger m)=>
-              PPeer->Conduit Event m Message
-handleEvents peer = awaitForever $ \msg -> do
+              DebugMode->PPeer->Conduit Event m Message
+handleEvents mode peer = awaitForever $ \msg -> do
   case msg of
    MsgEvt Hello{} -> error "A hello message appeared after the handshake"
    MsgEvt Status{} -> error "A status message appeared after the handshake"
@@ -103,7 +104,7 @@ handleEvents peer = awaitForever $ \msg -> do
 
    MsgEvt (Transactions txs) -> do
         let txo = (Origin.PeerString $ peerString peer)
-        _ <- lift $ insertTXIfNew txo Nothing txs
+        _ <- lift $ insertTX mode txo Nothing txs
         emitKafkaTransactions txo txs
         return ()
 

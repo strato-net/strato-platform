@@ -18,8 +18,10 @@ import Blockchain.Data.Peer
 import Blockchain.Data.Wire
 import Blockchain.DB.DetailsDB hiding (getBestBlockHash)
 import Blockchain.DB.SQLDB
+import Blockchain.DBM
 import Blockchain.Event
 import Blockchain.ServOptions
+import Blockchain.Options
 
 ethVersion :: Int
 ethVersion = 62
@@ -68,5 +70,5 @@ handleMsgConduit myPubkey peer = do
    Just _ -> error "Peer communicated before handshake was complete"
    Nothing -> error "peer hung up before handshake finished"
 
-  handleEvents peer
+  handleEvents (if flags_debugFail then Fail else Log) peer
 

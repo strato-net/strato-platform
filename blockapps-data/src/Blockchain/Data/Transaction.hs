@@ -24,6 +24,8 @@ module Blockchain.Data.Transaction (
   txAndTime2RawTX,
   tx2RawTXAndTime,
   rawTX2TX,
+  insertTX,
+  insertTX',
   insertTXIfNew,
   insertTXIfNew',
   createMessageTX,
@@ -58,6 +60,7 @@ import Blockchain.EthConf
 import Blockchain.FastECRecover
 import Blockchain.SHA
 import Blockchain.Util
+import Blockchain.DBM
 
 --import Debug.Trace
 
@@ -93,23 +96,30 @@ tx2RawTXAndTime origin tx = do
   time <- liftIO getCurrentTime
   return $ txAndTime2RawTX origin tx (-1) time
 
-insertTXIfNew::HasSQLDB m=>TXOrigin->Maybe Integer->[Transaction]->m Integer
-insertTXIfNew origin blockNum txs = do
+insertTXIfNew :: HasSQLDB m=>TXOrigin->Maybe Integer->[Transaction]->m Integer
+insertTXIfNew = insertTX Fail
+
+insertTX::HasSQLDB m=>DebugMode->TXOrigin->Maybe Integer->[Transaction]->m Integer
+insertTX mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   beforeECRecover <- liftIO $ getTime Realtime
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   afterECRecover <- rawTXs `deepseq` (liftIO $ getTime Realtime)
-  insertRawTXIfNew $ map id rawTXs
+  insertRawTX mode (map id rawTXs) 
   return $ timeSpecAsNanoSecs $ afterECRecover - beforeECRecover
 
-insertTXIfNew'::(MonadBaseControl IO m, MonadIO m)=>
-                TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
-insertTXIfNew' origin blockNum txs = do
+insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
+                 TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
+insertTXIfNew' = insertTX' Fail
+
+insertTX'::(MonadBaseControl IO m, MonadIO m)=>
+           DebugMode->TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
+insertTX' mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
-  insertRawTXIfNew' $ map id rawTXs
+  insertRawTX' mode (map id rawTXs)
 
 addLeadingZerosTo64::String->String
 addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x

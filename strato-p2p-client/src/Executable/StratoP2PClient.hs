@@ -43,6 +43,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Wire
 import Blockchain.DB.DetailsDB
 import Blockchain.DB.SQLDB
+import Blockchain.DBM
 --import Blockchain.DB.ModifyStateDB
 import Blockchain.Display
 import Blockchain.EthConf hiding (genesisHash,port)
@@ -121,7 +122,7 @@ handleMsg myId peer = do
    Just e -> throwIO $ EventBeforeHandshake e
    Nothing -> throwIO $ PeerDisconnected
 
-  handleEvents peer
+  handleEvents (if flags_debugFail then Fail else Log) peer
 
 
 

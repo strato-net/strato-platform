@@ -25,7 +25,7 @@ function newnode {
 
   if $receiveBlocks
   then echo "Starting strato-p2p-client"
-       runForever strato-p2p-client --cNetworkID=$networkID --sqlPeers=true >> logs/strato-p2p-client 2>&1
+       runForever strato-p2p-client --cNetworkID=$networkID --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
   echo "Starting strato-sequencer"

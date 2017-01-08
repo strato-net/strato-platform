@@ -13,6 +13,8 @@
     
 module Blockchain.Data.RawTransaction (
   RawTransaction(..),
+  insertRawTX,
+  insertRawTX',
   insertRawTXIfNew,
   insertRawTXIfNew'
   ) where
@@ -27,20 +29,31 @@ import qualified Database.Persist.Postgresql as SQL
 
 import Blockchain.Data.DataDefs
 import Blockchain.DB.SQLDB
+import Blockchain.DBM
+
 
 insertRawTXIfNew::HasSQLDB m=>[RawTransaction]->m ()
-insertRawTXIfNew rawTXs= do
-  db <- getSQLDB
-  runResourceT $ SQL.runSqlPool (insertRawTXIfNew' rawTXs) db
+insertRawTXIfNew = insertRawTX Fail
 
 insertRawTXIfNew'::(MonadBaseControl IO m, MonadIO m)=>
                    [RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
-insertRawTXIfNew' rawTXs= do
+insertRawTXIfNew' = insertRawTX' Fail 
+
+insertRawTX :: HasSQLDB m=>DebugMode->[RawTransaction]->m ()
+insertRawTX m rawTXs= do
+  db <- getSQLDB
+  runResourceT $ SQL.runSqlPool (insertRawTX' m rawTXs) db
+
+
+insertRawTX'::(MonadBaseControl IO m, MonadIO m)=>
+             DebugMode->[RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
+insertRawTX' mode rawTXs= do
   forM_ rawTXs $ \rawTX -> do
     ret <- try $ SQL.insertBy rawTX
     case ret of
-     Left e -> liftIO $ putStrLn $ "TX already inserted: " ++ show (e::SomeException)
+     Left e -> liftIO $ (if mode == Log then putStrLn else error) $ "TX already inserted: " ++ show (e::SomeException)
      Right _ -> return ()
+
 
 {-
 instance Format RawTransaction where
