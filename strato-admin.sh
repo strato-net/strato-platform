@@ -34,6 +34,11 @@ function setEnvVars {
   setEnv networkID 6
   setEnv genesisBlock ""
   setEnv bootnode ""
+# env var for collecting backup from the node for strato and bloc containers. 
+# Passed in to strato-setup via docker-compose environment vars. 
+  if [[ ${backup} ]] ; then
+   setEnv backupblocks true
+  fi
 
   setEnv mineBlocks true
   setEnv verifyBlocks false
