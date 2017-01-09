@@ -52,6 +52,15 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --addBootnodes=$addBootnodes $stratoBootnode \
                     --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
+# For backup_restore; the environment var is set during strato-admin.sh invocation. 
+# Required: Backup file to be accessible to strato container at /tmp/backup 
+  if [[ ${backupblocks} ]] ; then
+    cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
+                      --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
+                      --addBootnodes=$addBootnodes $stratoBootnode \
+                      --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true < /tmp/backup/backup_strato_block"
+  fi
+
   echo $cmd
   $cmd
 
