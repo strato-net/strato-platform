@@ -36,7 +36,7 @@ postContract :: Text -> Address -> Value -> ClientM Value
 getContract :: Text -> Address -> ClientM Value
 getContractState :: Text -> Address -> ClientM Value
 postContractMethod :: Text -> Address -> Text -> Address -> ClientM NoContent
-getAddresses :: ClientM [Value]
+getAddresses :: ClientM [Address]
 getUsers
   :<|> postUser
   :<|> getUserAddresses

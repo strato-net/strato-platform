@@ -74,7 +74,7 @@ type API =
     :> "call"
     :> Post '[JSON] NoContent
   :<|> "addresses"
-    :> Get '[JSON] [Value]
+    :> Get '[HTMLifiedJSON] [Address]
 
 -- hack because endpoints are returning stringified json as text/html
 data HTMLifiedJSON
