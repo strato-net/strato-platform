@@ -1,0 +1,7 @@
+resolver: nightly-2016-12-31
+packages:
+- strato
+- bloc
+extra-deps: []
+flags: {}
+extra-package-dbs: []

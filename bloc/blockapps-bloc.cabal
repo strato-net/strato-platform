@@ -1,0 +1,40 @@
+name: blockapps-bloc
+version: 0.1.0.0
+synopsis: Bloc microservice
+description: Bloc microservice
+homepage: https://github.com/blockapps/strato-api-client
+license: BSD3
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    BlockApps.Bloc.API
+    BlockApps.Bloc.API.Client
+  default-language: Haskell2010
+  ghc-options: -Wall -Werror
+  build-depends: base
+    , aeson
+    , servant
+    , servant-client
+
+test-suite blockapps-bloc-test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  ghc-options: -Wall -Werror
+  main-is: Spec.hs
+  other-modules:
+  build-depends: base >=4 && < 5
+    , blockapps-bloc
+    , hspec
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/bloc/bloc

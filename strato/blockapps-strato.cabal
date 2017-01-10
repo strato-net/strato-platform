@@ -1,0 +1,56 @@
+name: blockapps-strato
+version: 0.1.0.0
+synopsis: Strato microservice
+description: Strato microservice
+homepage: https://github.com/blockapps/strato-api-client
+license: BSD3
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    BlockApps.Strato.API
+    BlockApps.Strato.API.Client
+    BlockApps.Strato.Types
+  default-language: Haskell2010
+  ghc-options: -Wall -Werror
+  build-depends: base
+    , aeson
+    , http-api-data
+    , http-client
+    , largeword
+    , servant
+    , servant-client
+    , text
+    , time
+    , unordered-containers
+
+test-suite blockapps-strato-test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  ghc-options: -Wall -Werror
+  main-is: Spec.hs
+  other-modules:
+    BlockApps.Strato.TypesSpec
+    BlockApps.Strato.API.ClientSpec
+  build-depends: base >=4 && < 5
+    , blockapps-strato
+    , aeson
+    , generic-random
+    , hspec
+    , http-client
+    , largeword
+    , QuickCheck
+    , quickcheck-instances
+    , servant-client
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/bloc/strato
