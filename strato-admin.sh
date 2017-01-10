@@ -194,6 +194,8 @@ function bare
 }
 
 setEnvVars
+# Ensure backup folder exists in the node running the containers
+mkdir -p /tmp/backup
 $doFirst
 $doit
 
