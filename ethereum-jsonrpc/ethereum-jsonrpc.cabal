@@ -25,7 +25,7 @@ executable ethereum-jsonrpc
                      , http-client
                      , http-types
                      , json-rpc-server
-                     , milena
+                     , blockapps-milena
                      , mtl
                      , random
                      , strato-conf

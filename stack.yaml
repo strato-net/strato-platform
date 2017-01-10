@@ -1,5 +1,6 @@
 flags: {}
 packages:
+- blockapps-milena
 - strato-conf/
 - miner-ethash/
 - merkle-patricia-db/
@@ -42,7 +43,6 @@ extra-deps:
 - murmur3-1.0.0
 - yesod-raml-0.1.4
 - normaldistribution-1.1.0.3
-- milena-0.5.0.0
 - global-lock-0.1
 - base-prelude-1.0.1.1
 - rebase-1.0.6

@@ -40,7 +40,7 @@ executable queryStrato
                  , leveldb-haskell
                  , lens
                  , merkle-patricia-db
-                 , milena
+                 , blockapps-milena
                  , monad-logger
                  , monad-loops
                  , mtl
@@ -88,7 +88,7 @@ executable restoreStrato
                    base >= 4 && < 5
                  , base16-bytestring
                  , bytestring
-                 , milena
+                 , blockapps-milena
     main-is: Restore.hs
     buildable: True
     hs-source-dirs: src

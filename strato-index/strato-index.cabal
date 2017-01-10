@@ -32,7 +32,7 @@ library
                      , filepath
                      , hflags
                      , lens
-                     , milena
+                     , blockapps-milena
                      , monad-logger
                      , mtl
                      , persistent-postgresql

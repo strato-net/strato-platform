@@ -40,7 +40,7 @@ library
                  , leveldb-haskell
                  , lens
                  , merkle-patricia-db
-                 , milena
+                 , blockapps-milena
                  , mtl
                  , monad-control
                  , monad-logger
@@ -105,7 +105,7 @@ executable ethereum-vm
                  , lens
                  , leveldb-haskell
                  , merkle-patricia-db
-                 , milena
+                 , blockapps-milena
                  , monad-logger
                  , mtl
                  , persistent-postgresql

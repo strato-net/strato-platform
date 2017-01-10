@@ -36,7 +36,7 @@ library
                      , text
                      , strato-conf
                      , leveldb-haskell
-                     , milena
+                     , blockapps-milena
                      , lens
                      , binary
                      , bytestring
@@ -56,7 +56,7 @@ executable strato-sequencer
                      , hflags
                      , monad-logger
                      , containers
-                     , milena
+                     , blockapps-milena
                      , bytestring
   default-language:    Haskell2010
   other-modules: Flags
@@ -73,7 +73,7 @@ test-suite spec
                     , monad-logger
                     , mtl
                     , containers
-                    , milena
+                    , blockapps-milena
                     , bytestring
                     , binary
                     , hspec

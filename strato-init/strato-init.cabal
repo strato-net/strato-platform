@@ -39,7 +39,7 @@ executable strato-setup
                  , hflags
                  , leveldb-haskell
                  , merkle-patricia-db
-                 , milena
+                 , blockapps-milena
                  , monad-logger
                  , persistent-postgresql
                  , process
@@ -89,7 +89,7 @@ executable strato-block-backup
                  , base16-bytestring
                  , blockapps-data
                  , bytestring
-                 , milena
+                 , blockapps-milena
                  , strato-conf
                  , transformers
     buildable: True
