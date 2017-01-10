@@ -22,6 +22,9 @@ library
   build-depends: base
     , blockapps-strato
     , aeson
+    , bytestring
+    , http-api-data
+    , http-media
     , servant
     , servant-client
     , text

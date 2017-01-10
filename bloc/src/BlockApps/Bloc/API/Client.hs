@@ -4,10 +4,11 @@
 
 module BlockApps.Bloc.API.Client
   ( getUsers
-  , postUsers
+  , postUser
   , getUserAddresses
   , postSend
   , getContracts
+  , getContractData
   , postContract
   , getContract
   , getContractState
@@ -25,21 +26,23 @@ import Servant.Client
 import BlockApps.Bloc.API
 import BlockApps.Strato.Types
 
-getUsers :: ClientM [Value]
-postUsers :: Value -> ClientM Value
-getUserAddresses :: Text -> ClientM [Value]
-postSend :: Text -> Address -> Value -> ClientM Value
-getContracts :: Text -> ClientM [Value]
+getUsers :: ClientM [Text]
+postUser :: Text -> PostUserParameters -> ClientM Address
+getUserAddresses :: Text -> ClientM [Address]
+postSend :: Text -> Address -> PostSendParameters -> ClientM PostTransaction
+getContracts :: ClientM Value
+getContractData :: Text -> ClientM Value
 postContract :: Text -> Address -> Value -> ClientM Value
 getContract :: Text -> Address -> ClientM Value
 getContractState :: Text -> Address -> ClientM Value
 postContractMethod :: Text -> Address -> Text -> Address -> ClientM NoContent
 getAddresses :: ClientM [Value]
 getUsers
-  :<|> postUsers
+  :<|> postUser
   :<|> getUserAddresses
   :<|> postSend
   :<|> getContracts
+  :<|> getContractData
   :<|> postContract
   :<|> getContract
   :<|> getContractState
@@ -47,4 +50,4 @@ getUsers
   :<|> getAddresses = client (Proxy @ API)
 
 blocDev :: BaseUrl
-blocDev = BaseUrl Http "tester12.westus.cloudapp.azure.com/" 80 "/bloc"
+blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"
