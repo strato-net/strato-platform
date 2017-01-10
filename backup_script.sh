@@ -11,6 +11,8 @@ docker exec -it silo_bloc_1 bash -c 'rm -rf /tmp/backup_*'
 # Run backup command (specific command for strato) within strato container and collect blocks into a file
 docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; strato-block-backup > /tmp/backup_strato_block'
 # backup and tar users and meta folder from bloc container
+# Ignore failures if meta and user data isn't found in bloc container on a node.
+set +e
 docker exec -it silo_bloc_1 bash -c 'cd /var/run/strato/bloc-server/app/; tar -czvf /tmp/backup_bloc_users.tar.gz users; tar -czvf /tmp/backup_bloc_meta.tar.gz meta'
 
 mkdir -p /tmp/backup/backup-`hostname`-`date +%Y-%m-%d`
