@@ -28,6 +28,8 @@ import Data.String
 import Network.Kafka
 import qualified Network.Kafka.Protocol as KP
 
+import Data.Coerce (coerce)
+
 import Blockchain.PrivateKeyConf
 
 data EthConf = 
@@ -151,3 +153,8 @@ runKafkaConfigured name = runKafka (mkKafkaState name (kh, kp))
   where k = kafkaConfig ethConf
         kh = fromString $ kafkaHost k
         kp = fromIntegral $ kafkaPort k
+
+lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
+lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` nodeId
+    where kStr   = KP._kString kcid
+          nodeId = B8.pack $ "_" ++ (peerId $ ethUniqueId ethConf)

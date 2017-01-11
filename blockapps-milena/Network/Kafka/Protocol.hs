@@ -27,10 +27,13 @@ import qualified Data.ByteString.Char8 as B
 import qualified Network
 
 data ReqResp a where
-  MetadataRR :: MonadIO m => MetadataRequest -> ReqResp (m MetadataResponse)
-  ProduceRR  :: MonadIO m => ProduceRequest  -> ReqResp (m ProduceResponse)
-  FetchRR    :: MonadIO m => FetchRequest    -> ReqResp (m FetchResponse)
-  OffsetRR   :: MonadIO m => OffsetRequest   -> ReqResp (m OffsetResponse)
+  MetadataRR       :: MonadIO m => MetadataRequest         -> ReqResp (m MetadataResponse)
+  ProduceRR        :: MonadIO m => ProduceRequest          -> ReqResp (m ProduceResponse)
+  FetchRR          :: MonadIO m => FetchRequest            -> ReqResp (m FetchResponse)
+  OffsetRR         :: MonadIO m => OffsetRequest           -> ReqResp (m OffsetResponse)
+  CGOffsetFetchRR  :: MonadIO m => OffsetFetchRequest      -> ReqResp (m OffsetFetchResponse)
+  CGOffsetCommitRR :: MonadIO m => OffsetCommitRequest     -> ReqResp (m OffsetCommitResponse)
+  CGCoordinatorRR  :: MonadIO m => GroupCoordinatorRequest -> ReqResp (m GroupCoordinatorResponse)
 
 doRequest' :: (Deserializable a, MonadIO m) => CorrelationId -> Handle -> Request -> m (Either String a)
 doRequest' correlationId h r = do
@@ -48,10 +51,14 @@ doRequest' correlationId h r = do
         isolate (dataLength - 4) deserialize
 
 doRequest :: MonadIO m => ClientId -> CorrelationId -> Handle -> ReqResp (m a) -> m (Either String a)
-doRequest clientId correlationId h (MetadataRR req) = doRequest' correlationId h $ Request (correlationId, clientId, MetadataRequest req)
-doRequest clientId correlationId h (ProduceRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, ProduceRequest req)
-doRequest clientId correlationId h (FetchRR req)    = doRequest' correlationId h $ Request (correlationId, clientId, FetchRequest req)
-doRequest clientId correlationId h (OffsetRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, OffsetRequest req)
+doRequest clientId correlationId h (MetadataRR req)       = doRequest' correlationId h $ Request (correlationId, clientId, MetadataRequest req)
+doRequest clientId correlationId h (ProduceRR req)        = doRequest' correlationId h $ Request (correlationId, clientId, ProduceRequest req)
+doRequest clientId correlationId h (FetchRR req)          = doRequest' correlationId h $ Request (correlationId, clientId, FetchRequest req)
+doRequest clientId correlationId h (OffsetRR req)         = doRequest' correlationId h $ Request (correlationId, clientId, OffsetRequest req)
+doRequest clientId correlationId h (CGOffsetFetchRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
+doRequest clientId correlationId h (CGOffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
+doRequest clientId correlationId h (CGCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
+
 
 class Serializable a where
   serialize :: a -> Put

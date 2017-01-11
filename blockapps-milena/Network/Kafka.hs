@@ -67,6 +67,7 @@ data KafkaClientError = -- | A response did not contain an offset.
                         -- | Could not find a cached broker for the found leader.
                       | KafkaInvalidBroker Leader
                       | KafkaFailedToFetchMetadata
+                      | KafkaFailedToFetchGroupCoordinator KafkaError
                       | KafkaIOException IOException
                         deriving (Eq, Show)
 

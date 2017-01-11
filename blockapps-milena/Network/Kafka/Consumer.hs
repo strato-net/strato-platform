@@ -5,11 +5,15 @@ module Network.Kafka.Consumer where
 
 import Control.Applicative
 import Control.Lens
+import Control.Monad.Except (throwError)
+import Control.Monad.IO.Class
 import System.IO
 import Prelude
 
 import Network.Kafka
 import Network.Kafka.Protocol
+
+import Control.Concurrent (threadDelay)
 
 -- * Fetching
 
@@ -38,3 +42,35 @@ fetch o p topic = do
 fetchMessages :: FetchResponse -> [TopicAndMessage]
 fetchMessages fr = (fr ^.. fetchResponseFields . folded) >>= tam
     where tam a = TopicAndMessage (a ^. _1) <$> a ^.. _2 . folded . _4 . messageSetMembers . folded . setMessage
+
+fetchOffsets :: OffsetFetchRequest -> Kafka OffsetFetchResponse
+fetchOffsets req@(OffsetFetchReq (group, _)) = do
+    coordinator <- getConsumerGroupCoordinator group
+    (withBrokerHandle coordinator) . (flip makeRequest) $ CGOffsetFetchRR req
+
+commitOffsets :: OffsetCommitRequest -> Kafka OffsetCommitResponse
+commitOffsets req@(OffsetCommitReq (group, _)) = do
+    coordinator <- getConsumerGroupCoordinator group
+    (withBrokerHandle coordinator) . (flip makeRequest) $ CGOffsetCommitRR req
+
+fetchSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Kafka (Either KafkaError (Offset, Metadata))
+fetchSingleOffset groupName topic partition = do
+    let req = OffsetFetchReq (groupName, [(topic, [partition])])
+    (OffsetFetchResp [(_, [(_, ofs, md, err)])]) <- fetchOffsets req
+    return $ if err /= NoError then Left err else Right (ofs, md)
+
+commitSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Offset -> Time -> Metadata -> Kafka (Either KafkaError ())
+commitSingleOffset groupName topic partition offset time ofsMetadata = do
+    let req = OffsetCommitReq (groupName, [(topic, [(partition, offset, time, ofsMetadata)])])
+    (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req
+    return $ if err /= NoError then Left err else Right ()
+
+getConsumerGroupCoordinator :: ConsumerGroup -> Kafka Broker
+getConsumerGroupCoordinator group = withAnyHandle $ \handle -> do
+    (GroupCoordinatorResp (err, broker)) <- makeRequest handle $ CGCoordinatorRR $ GroupCoordinatorReq group
+    case err of
+        NoError -> return broker
+        ConsumerCoordinatorNotAvailableCode -> do  -- coordinator not ready, must retry with backoff
+            liftIO $ threadDelay 1000000 -- todo something better than threadDelay?
+            getConsumerGroupCoordinator group
+        other -> throwError $ KafkaFailedToFetchGroupCoordinator other
