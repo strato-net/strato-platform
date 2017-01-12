@@ -89,7 +89,8 @@ var stateToBody = function(state, address) {
       var p = Promise.props(o.state).then(function(sVars) {
         var parsed = traverse(sVars).forEach(function (x) {
           if (Buffer.isBuffer(x)) {
-            this.update(x.toString());
+            // console.log("The buffer is " + x.toString('hex'))
+            this.update(x.toString('hex'));
           }
         });
       return sVars;
@@ -161,7 +162,7 @@ rp(options).promise().then(r => {
                 .then(cleanState)
                 .then(x => {
                   x.address = a;
-		  console.log(x);
+		              // console.log("Body is: " + JSON.stringify(x));
                   var options = { method: 'POST',
                     url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
                     headers:
