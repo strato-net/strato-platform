@@ -83,20 +83,12 @@ instance FromForm Keccak256 where fromForm = parseUnique "hash"
 instance Arbitrary Keccak256 where
   arbitrary = Keccak256 . fromInteger <$> arbitrary
 
-newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
-newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
-instance Monoid Wei where
-  mempty = Wei 0
-  mappend (Wei x) (Wei y) = Wei (x+y)
-
 data AccountState = AccountState
   { accountStateNonce :: Nonce
   , accountStateBalance :: Wei
   , accountStateStorageRoot :: Keccak256
   , accountStateCodeHash :: Keccak256
   } deriving (Eq,Show,Generic)
-
-newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
 
 data Transaction = Transaction
   { transactionNonce :: Nonce
@@ -106,6 +98,18 @@ data Transaction = Transaction
   , transactionValue :: Wei
   , transactionSignature :: CompactRecSig
   } deriving (Eq,Show,Generic)
+
+newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
+
+newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
+instance Monoid Wei where
+  mempty = Wei 0
+  mappend (Wei x) (Wei y) = Wei (x+y)
+
+newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
+instance Monoid Gas where
+  mempty = Gas 0
+  mappend (Gas x) (Gas y) = Gas (x+y)
 
 -- helpers
 padZeros :: Int -> String -> String
