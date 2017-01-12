@@ -46,9 +46,9 @@ data BaggerTxRejection = NonceTooLow    BaggerTxQueue Integer OutputTx -- intege
                        deriving Show
 
 instance Format BaggerTxRejection where
-    format (NonceTooLow    queue actual OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "; actual nonce "     ++ (show actual) ++ ", tx hash " ++ (format hash)
-    format (BalanceTooLow  queue actual OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "; actual tx limit "  ++ (show actual) ++ ", tx hash " ++ (format hash)
-    format (GasLimitTooLow queue actual OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "; actual gas limit " ++ (show actual) ++ ", tx hash " ++ (format hash)
+    format (NonceTooLow    queue actual o@OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "\n\tactual nonce "     ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
+    format (BalanceTooLow  queue actual o@OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "\n\tactual tx limit "  ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
+    format (GasLimitTooLow queue actual o@OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "\n\tactual gas limit " ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
@@ -101,11 +101,14 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
         let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
         liftIO $ traceIO $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
-        if noCachedTxsCulled then
+        if noCachedTxsCulled then do
+            liftIO $ traceIO $ "noCachedTxsCulled = True"
             if (null $ B.promotedTransactions cache) then do
+                    liftIO $ traceIO $ "null $ B.promotedTransactions cache = True"
                     !build <- buildFromMiningCache
                     return build
                 else do
+                    liftIO $ traceIO $ "null $ B.promotedTransactions cache = False"
                     existingStateDbStateRoot <- getStateRoot
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
@@ -132,6 +135,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
                     !build <- buildFromMiningCache
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
+            liftIO $ traceIO $ "noCachedTxsCulled = False"
             let sha    = B.bestBlockSHA cache
             let header = B.bestBlockHeader cache
             processNewBestBlock sha header
@@ -143,24 +147,28 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
 logReady prefix address OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n+++" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n+++")
+    liftIO $ traceIO $ ("\n+++\n" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n+++\n")
 
 logDiscard prefix address expectation OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n===" ++ prefix ++ " expected " ++ (show expectation) ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n===")
+    liftIO $ traceIO $ ("\n===\n" ++ prefix ++ " expected " ++ (show expectation) ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n===\n")
 
 logDiscard' prefix address  OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n---" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n---")
-
+    liftIO $ traceIO $ ("\n---\n" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n---\n")
 
 addToQueued :: MonadBagger m => OutputTx -> m ()
 addToQueued t@OutputTx{otSigner = signer} =
     unlessM (wasSeen t) $ do
         validation <- (isValidForPool t)
+        liftIO $ traceIO $ "validation :: " ++ show validation
         case validation of
-            Left rejection -> txsDroppedCallback [rejection]
+            Left rejection -> do
+                liftIO $ traceIO $ "rejection " ++ show rejection
+                txsDroppedCallback [rejection]
             Right _ -> do
+                liftIO $ traceIO "non-rejection "
                 !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
                 putBaggerState newState
+                liftIO $ traceIO $ show newState
                 forM_ toDiscard removeFromSeen
                 forM_ toDiscard $ logDiscard' "addToQueued" signer
                 addToSeen t
@@ -230,7 +238,10 @@ demoteUnexecutables = do
         forM_ remainingPending $ \t -> removeFromSeen t >> addToQueued t
 
 wasSeen :: MonadBagger m => OutputTx -> m Bool
-wasSeen OutputTx{otHash=sha} = (M.member sha) . B.seen <$> getBaggerState
+wasSeen OutputTx{otHash=sha} = do
+    ret <- (M.member sha) . B.seen <$> getBaggerState
+    liftIO $ traceIO $ "wasSeen " ++ (show sha) ++ " = " ++ (show ret)
+    return ret
 
 isValidForPool :: MonadBagger m => OutputTx -> m (Either BaggerTxRejection ())
 isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
@@ -253,7 +264,9 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
                 return $ Right ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
-addToSeen t = updateBaggerState (B.addToSeen t)
+addToSeen t@OutputTx{otHash=sha} = do
+    liftIO $ traceIO $ "addToSeen " ++ show sha
+    updateBaggerState (B.addToSeen t)
 
 removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)

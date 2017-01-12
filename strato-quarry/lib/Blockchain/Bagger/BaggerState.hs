@@ -23,16 +23,24 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , lastExecutedTxs       :: [OutputTx]
                                , promotedTransactions  :: [OutputTx]
                                , startTimestamp        :: UTCTime
-                               }
+                               } deriving (Show)
 
-data BaggerState = BaggerState { miningCache           :: MiningCache
+data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
                                , queued                :: ATL -- TXs that are lingering in the pool
                                , seen                  :: M.Map SHA OutputTx
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
-                               }
+                               } 
+
+instance Show BaggerState where
+    show b =    "BBBBB\n" 
+             ++ "B miningCache: " ++ (show $ miningCache b) ++ "\n"
+             ++ "B pending:     " ++ (show $ pending b)     ++ "\n"
+             ++ "B queued:      " ++ (show $ queued b)      ++ "\n"
+             ++ "B seen:        " ++ (show $ seen b)        ++ "\n"
+             ++ "BBBBB"
 
 defaultBaggerState :: BaggerState
 defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache

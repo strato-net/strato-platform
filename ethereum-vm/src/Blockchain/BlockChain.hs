@@ -152,9 +152,9 @@ instance Bagger.MonadBagger ContextM where
 
 baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> (format rejection, queue, hash)
-    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> (format rejection, queue, hash)
-    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> (format rejection, queue, hash)
+    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", queue, hash)
+    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", queue, hash)
+    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", queue, hash)
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do
