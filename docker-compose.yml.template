@@ -58,11 +58,14 @@ services:
 
   postgres-cirrus:
     image: postgres:9.6
+    volumes:
+      - /tmp/backup:/tmp/backup
     environment:
       POSTGRES_DB: cirrus
       POSTGRES_USER: postgres
       PG_ENV_POSTGRES_DB: cirrus
       PG_ENV_POSTGRES_USER: postgres
+      backupblocks: "${backupblocks}"
     ports:
       - '5434:5432'
   postgrest:
