@@ -55,14 +55,17 @@ function doInit {
 # For backup_restore; the environment var is set during strato-admin.sh invocation. 
 # Required: Backup file to be accessible to strato container at /tmp/backup 
   if [[ ${backupblocks} ]] ; then
-    cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
-                      --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                      --addBootnodes=$addBootnodes $stratoBootnode \
-                      --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true < /tmp/backup/backup_strato_block"
+     cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
+                       --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
+                       --addBootnodes=$addBootnodes $stratoBootnode \
+                       --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
+     echo $cmd
+     echo "# of lines in block-backup-file: `cat /tmp/backup/backup_strato_block | wc -l`"
+     $cmd < /tmp/backup/backup_strato_block
+  else
+     echo $cmd
+     $cmd
   fi
-
-  echo $cmd
-  $cmd
 
   if $noMinPeers
   then sed -i 's/minAvailablePeers:.*/minAvailablePeers: 0/' .ethereumH/ethconf.yaml
