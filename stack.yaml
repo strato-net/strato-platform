@@ -1,7 +1,8 @@
 resolver: nightly-2016-12-31
 packages:
-- strato
-- bloc
+- blockapps-bloc
+- blockapps-data
+- blockapps-strato
 extra-deps: []
 flags: {}
 extra-package-dbs: []

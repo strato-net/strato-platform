@@ -2,8 +2,7 @@ name: blockapps-strato
 version: 0.1.0.0
 synopsis: Strato microservice
 description: Strato microservice
-homepage: https://github.com/blockapps/strato-api-client
-license: BSD3
+homepage: https://github.com/blockapps/blockapps-haskell/blockapps-strato
 license-file: LICENSE
 author: Eitan Chatav
 maintainer: eitan@blockapps.net
@@ -53,4 +52,4 @@ test-suite blockapps-strato-test
 
 source-repository head
   type: git
-  location: https://github.com/blockapps/bloc/strato
+  location: https://github.com/blockapps/blockapps-haskell/blockapps-strato

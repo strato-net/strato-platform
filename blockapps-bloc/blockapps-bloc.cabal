@@ -2,7 +2,7 @@ name: blockapps-bloc
 version: 0.1.0.0
 synopsis: Bloc microservice
 description: Bloc microservice
-homepage: https://github.com/blockapps/strato-api-client
+homepage: https://github.com/blockapps/blockapps-haskell/blockapps-bloc
 license: BSD3
 license-file: LICENSE
 author: Eitan Chatav
@@ -42,4 +42,4 @@ test-suite blockapps-bloc-test
 
 source-repository head
   type: git
-  location: https://github.com/blockapps/bloc/bloc
+  location: https://github.com/blockapps/blockapps-haskell/blockapps-bloc
