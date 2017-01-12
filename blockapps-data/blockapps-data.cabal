@@ -22,6 +22,8 @@ library
     , aeson
     , http-api-data
     , largeword
+    , QuickCheck
+    , secp256k1
     , text
 
 source-repository head
