@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TemplateHaskell #-}
 
 module Blockchain.IContext (
   IContext(..),
@@ -6,31 +6,34 @@ module Blockchain.IContext (
   runIContextM
   ) where
 
-import Control.Monad.Trans.Resource
 import Control.Monad.Logger
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Resource
 import Control.Monad.Trans.State
 import qualified Database.Persist.Postgresql as SQL
+import qualified Data.Text as T
 
 import Blockchain.DB.SQLDB
 import Blockchain.EthConf
---import Debug.Trace
 
-data IContext =
-  IContext {
-    contextSQLDB::SQLDB
-    }
+import qualified Control.Concurrent as STOP_USING_DELAY_HACKS
+
+data IContext = IContext {
+    contextSQLDB :: SQLDB
+}
 
 type IContextM = StateT IContext (ResourceT (LoggingT IO))
 
 instance HasSQLDB IContextM where
-  getSQLDB = fmap contextSQLDB get
+  getSQLDB = contextSQLDB <$> get
 
+pgPoolSize :: Int
+pgPoolSize = 20
 
-runIContextM::IContextM a->LoggingT IO a
+runIContextM :: IContextM a -> LoggingT IO a
 runIContextM f = do
-  
-  sqldb <-   runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
-
-  (ret, _) <- runResourceT $ flip runStateT (IContext sqldb) $ f
-
-  return ret
+    $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
+    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr' pgPoolSize
+    (ret, _) <- runResourceT $ runStateT f (IContext sqldb)
+    $logInfoS "runIContextM" "runIContextM complete, returning"
+    return ret

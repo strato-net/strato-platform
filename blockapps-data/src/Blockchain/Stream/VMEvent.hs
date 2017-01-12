@@ -1,25 +1,16 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE FlexibleContexts, GADTs, MultiParamTypeClasses, OverloadedStrings, TypeFamilies, ScopedTypeVariables, LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
-
 
 module Blockchain.Stream.VMEvent (
   VMEvent(..),
   produceVMEvents,
   fetchVMEvents,
+  fetchVMEvents',
   fetchVMEventsIO,
   fetchVMEventsOneIO,
   fetchLastVMEvents,
   fetchVMEventsFromTopic,
+  defaultVMEventsTopicName,
   getBestKafkaBlockNumber
 ) where 
 
@@ -28,6 +19,8 @@ import Control.Lens
 import Control.Exception.Lifted
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+
 
 import Network.Kafka
 import Network.Kafka.Producer
@@ -46,23 +39,31 @@ import Blockchain.EthConf
 
 import Control.Monad.State
 
---import Debug.Trace
-
+import qualified Data.Binary as Binary
 
 data VMEvent = ChainBlock Block | NewUnminedBlockAvailable
 
 instance Format VMEvent where
   format (ChainBlock b) = "Block: " ++ format b
   format NewUnminedBlockAvailable = "<NewUnminedBlockAvailable>"
-  
-bytesToVMEvent::B.ByteString->VMEvent
-bytesToVMEvent b | B.head b == 0 = ChainBlock $ rlpDecode $ rlpDeserialize $ B.tail b
-bytesToVMEvent b | B.head b == 1 = NewUnminedBlockAvailable
-bytesToVMEvent _ = error "VMEvent has unsupported first byte"
 
-vmEventToBytes::VMEvent->B.ByteString
-vmEventToBytes (ChainBlock b) = 0 `B.cons` rlpSerialize (rlpEncode b)
-vmEventToBytes NewUnminedBlockAvailable = B.singleton 1
+instance Binary.Binary VMEvent where
+    get = Binary.getWord8 >>= \case
+        0 -> ChainBlock . rlpDecode . rlpDeserialize <$> Binary.get
+        1 -> return NewUnminedBlockAvailable
+        b -> error $ "VMEvent has unexpected tag: " ++ show b
+
+    put NewUnminedBlockAvailable = Binary.putWord8 1
+    put (ChainBlock b) = do
+        Binary.putWord8 0
+        Binary.put . rlpSerialize $ rlpEncode b
+
+-- todo: get rid of these next two completely and use Binary.encode/decode in their place everywhere else
+bytesToVMEvent :: B.ByteString -> VMEvent
+bytesToVMEvent = Binary.decode . BL.fromStrict
+
+vmEventToBytes :: VMEvent -> B.ByteString
+vmEventToBytes = BL.toStrict . Binary.encode
 
 produceVMEvents::(HasSQLDB m, MonadIO m)=>[VMEvent]->m Offset
 produceVMEvents vmEvents = do
@@ -72,44 +73,52 @@ produceVMEvents vmEvents = do
   case result of
    Left e -> error $ show e
    Right x -> do
-     let [offset] = concat $ map (map (\(_, _, x') ->x') . concat . map snd . _produceResponseFields) x
+     let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
          newBlocks = [b | ChainBlock b <- vmEvents]
      (_::Either SomeException ()) <- try $ putBlockOffsets $ map (\(b, o) -> BlockOffset (fromIntegral o) (blockDataNumber $ blockBlockData b) (blockHash b)) $ zip newBlocks [offset..]
      return offset
 
+-- | Reads VMEvents from `defaultVMEventsTopicName`
 fetchVMEvents::Offset->Kafka [VMEvent]
-fetchVMEvents = fetchVMEventsFromTopic "block"
+fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
 
-fetchVMEventsFromTopic :: TopicLabel-> Offset -> Kafka [VMEvent]
-fetchVMEventsFromTopic topic offset = (map bytesToVMEvent) <$> fetchBytes (lookupTopic topic) offset
+-- | Same as `fetchVMEvents`, except sets our commonly-used Milena state configurations
+fetchVMEvents' :: Offset -> Kafka [VMEvent]
+fetchVMEvents' ofs = do
+    setDefaultKafkaState
+    fetchVMEventsFromTopic defaultVMEventsTopicName ofs
+
+fetchVMEventsFromTopic :: TopicName -> Offset -> Kafka [VMEvent]
+fetchVMEventsFromTopic topic offset = map bytesToVMEvent <$> fetchBytes topic offset
+
+defaultVMEventsTopicName :: TopicName
+defaultVMEventsTopicName = lookupTopic "block"
 
 fetchVMEventsRange::Offset->Offset->Kafka [VMEvent]
 fetchVMEventsRange lower upper = do
   events <- fetchVMEvents lower
 
   let returned = length events
-      newOffset = lower + (fromIntegral returned)
-  case (newOffset >= upper) of
-    True -> return (take ((fromIntegral upper) - (fromIntegral lower) + 1) events)
-    False -> do
+      newOffset = lower + fromIntegral returned
+  if newOffset >= upper
+    then return (take (fromIntegral upper - fromIntegral lower + 1) events)
+    else do
       events' <- fetchVMEventsRange newOffset upper
       return (events ++ events')
 
 fetchVMEventsIO::Offset->IO (Maybe [VMEvent])
-fetchVMEventsIO offset = do
-  fmap (fmap (map bytesToVMEvent)) $ fetchBytesIO (lookupTopic "block") offset
+fetchVMEventsIO offset =
+  fmap (map bytesToVMEvent) <$> fetchBytesIO (lookupTopic "block") offset
 
 fetchVMEventsOneIO::Offset->IO (Maybe VMEvent)
-fetchVMEventsOneIO offset = do
-  fmap (fmap bytesToVMEvent) $ fetchBytesOneIO (lookupTopic "block") offset
+fetchVMEventsOneIO offset =
+  fmap bytesToVMEvent <$> fetchBytesOneIO (lookupTopic "block") offset
 
 fetchLastVMEvents::Offset->IO [VMEvent]
 fetchLastVMEvents n = do
   ret <-
     runKafkaConfigured "strato-p2p-client" $ do
-      stateRequiredAcks .= -1
-      stateWaitSize .= 1
-      stateWaitTime .= 100000
+      setDefaultKafkaState
       lastOffset <- getLastOffset LatestTime 0 (lookupTopic "block")
       when (lastOffset == 0) $ error "Block stream is empty, you need to run strato-setup to insert the genesis block."
       let offset = max (lastOffset - n) 0
@@ -125,12 +134,8 @@ lookback = 1000
 getBestKafkaBlockNumber:: IO Integer
 getBestKafkaBlockNumber = do 
   lastOffset <- 
-    runKafkaConfigured "strato-p2p-client" $ do
-      stateRequiredAcks .= -1
-      stateWaitSize .= 1
-      stateWaitTime .= 100000
-      
-      getLastOffset LatestTime 0 (lookupTopic "block")
+    runKafkaConfigured "strato-p2p-client" $
+      setDefaultKafkaState >> getLastOffset LatestTime 0 (lookupTopic "block")
       
   case lastOffset of 
     Left e -> error $ show e
@@ -148,10 +153,7 @@ getBestKafkaBlockHelper::Offset->Offset->IO (Maybe Integer)
 getBestKafkaBlockHelper lower upper = do
   vmEventsErr <-
     runKafkaConfigured "strato-p2p-client" $ do
-      stateRequiredAcks .= -1
-      stateWaitSize .= 1
-      stateWaitTime .= 100000
-
+      setDefaultKafkaState
       fetchVMEventsRange lower upper
 
   case vmEventsErr of
@@ -162,3 +164,8 @@ getBestKafkaBlockHelper lower upper = do
         [] -> return Nothing
         xs -> return . Just $ maximum (map (blockDataNumber . blockBlockData) xs)
   
+setDefaultKafkaState :: Kafka ()
+setDefaultKafkaState = do
+    stateRequiredAcks .= -1
+    stateWaitSize     .= 1
+    stateWaitTime     .= 100000

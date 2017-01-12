@@ -4,7 +4,7 @@ module Blockchain.EthConf (
       EthConf(..),
       DiscoveryConf(..),
       SqlConf(..), postgreSQLConnectionString,
-      KafkaConf(..), runKafkaConfigured,
+      KafkaConf(..), runKafkaConfigured, lookupConsumerGroup,
       LevelDBConf(..),
       QuarryConf(..),
       BlockConf(..),
@@ -100,7 +100,7 @@ instance ToJSON EthUniqueId
 
 postgreSQLConnectionString :: SqlConf -> B.ByteString
 postgreSQLConnectionString sqlc =
-  PS.postgreSQLConnectionString $ ConnectInfo {
+  PS.postgreSQLConnectionString ConnectInfo {
     connectHost = host sqlc,
     connectPort = fromIntegral $ port sqlc,
     connectUser = user sqlc,
@@ -134,10 +134,13 @@ instance ToJSON BlockConf
 
 {- CONFIG: first change, make this local -} 
 
+-- noinline cause its not like we had any guarantee of whether or not the file
+-- got re-read anyway
+{-# NOINLINE ethConf #-}
 ethConf::EthConf
 ethConf = unsafePerformIO $ do
-            contents <- B.readFile $ ".ethereumH/ethconf.yaml"                   
-            return $ (either error id . decodeEither) contents
+    contents <- B.readFile ".ethereumH/ethconf.yaml"
+    return $ (either error id . decodeEither) contents
 
 
 {- CONFIG: clobber connection string -}
@@ -157,4 +160,4 @@ runKafkaConfigured name = runKafka (mkKafkaState name (kh, kp))
 lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
 lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` nodeId
     where kStr   = KP._kString kcid
-          nodeId = B8.pack $ "_" ++ (peerId $ ethUniqueId ethConf)
+          nodeId = B8.pack $ "_" ++ peerId (ethUniqueId ethConf)

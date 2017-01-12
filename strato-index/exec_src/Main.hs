@@ -10,4 +10,4 @@ import Executable.StratoIndex
 main :: IO ()
 main = do
   _ <- $initHFlags "The Strato Indexer"
-  flip runLoggingT printLogMsg stratoIndex
+  runLoggingT stratoIndex (printLogMsg' True True)

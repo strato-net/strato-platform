@@ -1,8 +1,8 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell, LambdaCase #-}
 
 module Executable.StratoIndex (
-  stratoIndex
-  ) where
+    stratoIndex
+) where
 
 import Control.Lens hiding (Context)
 import Control.Monad
@@ -11,6 +11,7 @@ import Control.Monad.Logger
 import Data.List
 import qualified Data.Text as T
 import Network.Kafka
+import Network.Kafka.Consumer
 import Network.Kafka.Protocol
 
 import Blockchain.Constants
@@ -23,64 +24,62 @@ import Blockchain.IOptions
 import Blockchain.SemiPermanent
 import Blockchain.Stream.VMEvent
 import Blockchain.EthConf
+import Blockchain.Util
+
 
 import Data.Ord
 import Database.Persist.Sql
 
-  
-stratoIndex::LoggingT IO ()
-stratoIndex = do
-  offsetVar <- liftIO $ newSemiPermanent 0 $ dbDir "h" ++ indexOffsetPath
 
-  when (flags_iStartingBlock /= -1) $ liftIO $ setSP offsetVar flags_iStartingBlock
+stratoIndex :: LoggingT IO ()
+stratoIndex = runIContextM . forever $ do
+    $logInfoS "stratoIndex" "About to fetch blocks"
+    (offset, vmEvents) <- getUnprocessedKafkaVMEvents
+    $logInfoS "stratoIndex" . T.pack $ "Fetched " ++ show (length vmEvents) ++ " events starting from " ++ show offset
+    let blocks = [b | ChainBlock b <- vmEvents]
+    $logInfoS "stratoIndex" . T.pack $ show (length blocks) ++ " of them are blocks"
+    let nums = map (blockDataNumber . blockBlockData) blocks
+        nextOffset' = offset + fromIntegral (length vmEvents)
+        minedBlocks = filter isMined blocks
+        insertCount = length minedBlocks
+    if insertCount > 0 then do
+        $logInfoS "stratoIndex" $ T.pack $ "  (" ++ show insertCount ++ " of those blocks are mined; inserting those)"
+        results <- putBlocks [(SHA 0, 0)] minedBlocks False
+        let bids = fst <$> results
+        bestBid <- getBestIndexBlockInfo
+        num <- fmap (blockDataNumber . blockBlockData) $ sqlQuery $ getJust bestBid
+        let (num', bid) = maximumBy (comparing fst) $ zip nums bids
+        when (num' > num || num' == 0) $ putBestIndexBlockInfo bid
+    else
+        $logInfoS "stratoIndex" "  (all unmined, not inserting any)"
+    setKafkaCheckpoint nextOffset'
 
-  offset <- liftIO $ getSP offsetVar
-
-  runIContextM $ do
-    genesisBlockHash <- getGenesisHash
-    loop genesisBlockHash offsetVar offset
-
-  where
-    loop genesisBlockHash offsetVar offset = do
-      logInfoNS "strato-index" "About to fetch blocks"      
-      vmEvents <- liftIO $ getUnprocessedKafkaVMEvents offset
-      let blocks = [b | ChainBlock b <- vmEvents]
-      let nums = map (blockDataNumber . blockBlockData) blocks
-          nextOffset' = offset + fromIntegral (length vmEvents)
-          minedBlocks = filter isMined blocks
-          insertCount = length minedBlocks
-      when (nextOffset' > offset) $ do
-        logInfoNS "strato-index" $ T.pack $ if nextOffset' == offset
-                                            then "Considering blocks from " ++ show offset ++ " to " ++ show (nextOffset' - 1)
-                                            else "Considering single block " ++ show offset
-        if insertCount > 0
-          then do
-            logInfoNS "strato-index" $ T.pack $ "  (" ++ show insertCount ++ " of them are mined; inserting those)"
-            results <- putBlocks [(SHA 0, 0)] minedBlocks False
-            let bids = map fst results
---            (bestBlockHash, _) <- getBestBlockInfo
---            let hashes = map blockHash blocks
---            maybe (return ()) putBestIndexBlockInfo $ lookup bestBlockHash $ zip hashes bids
-            bestBid <- getBestIndexBlockInfo
-            num <- fmap (blockDataNumber . blockBlockData) $ sqlQuery $ getJust bestBid            
-            let (num', bid) = maximumBy (comparing fst) $ zip nums bids
-            when (num' > num || num' == 0) $ putBestIndexBlockInfo bid
-          else logInfoNS "strato-index" "  (all unmined, not inserting any)"
-      liftIO $ setSP offsetVar nextOffset'
-      loop genesisBlockHash offsetVar nextOffset'
-
-isMined::Block->Bool
+isMined :: Block->Bool
 isMined Block{blockBlockData=BlockData{blockDataNonce=n}} = n /= 5
 
-getUnprocessedKafkaVMEvents::Integer->IO [VMEvent]
-getUnprocessedKafkaVMEvents offset = do
-  ret <-
-      runKafkaConfigured "strato-index" $ do
-        stateRequiredAcks .= -1
-        stateWaitSize .= 1
-        stateWaitTime .= 100000
-        fetchVMEvents (Offset $ fromIntegral offset)
+kafkaClientIds :: (KafkaClientId, ConsumerGroup)
+kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
 
-  case ret of
-    Left e -> error $ show e
-    Right v -> return v
+getUnprocessedKafkaVMEvents :: (MonadLogger m, MonadIO m) => m (Offset, [VMEvent])
+getUnprocessedKafkaVMEvents = do
+  let topicName       = defaultVMEventsTopicName
+      (client, group) = kafkaClientIds
+  liftIO (runKafkaConfigured client (fetchSingleOffset group topicName 0)) >>= \case
+    Left err -> error $ "Error fetching offset for topic `" ++ show topicName ++ "`: " ++ show err
+    Right (Left UnknownTopicOrPartition) -> -- we've never committed an Offset
+        setKafkaCheckpoint 0 >>= \case
+            Left err -> error $ "Error when bootstrapping the offset to 0: " ++ show err
+            Right (Left err) -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
+            Right (Right ()) -> getUnprocessedKafkaVMEvents
+    Right (Left err) -> error $ "Unexpected response when fetching offset for topic `" ++ show topicName ++ "`: " ++ show err
+    Right (Right (ofs, _)) ->
+        liftIO (runKafkaConfigured client (fetchVMEvents' ofs)) >>= \case
+            Left  err    -> error $ "Error when fetching VMEvents at " ++ show ofs ++ ": " ++ show err
+            Right events -> return (ofs, events)
+
+setKafkaCheckpoint :: (MonadLogger m, MonadIO m) => Offset -> m (Either KafkaClientError (Either KafkaError ()))
+setKafkaCheckpoint ofs = do
+    let (client, group) = kafkaClientIds
+    time <- liftIO $ Time . fromIntegral <$> getCurrentMicrotime
+    $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
+    liftIO $ runKafkaConfigured client $ commitSingleOffset group defaultVMEventsTopicName 0 ofs time ""
