@@ -1,5 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts, LambdaCase #-}
 
 module Network.Kafka.Consumer where
 
@@ -14,6 +13,8 @@ import Network.Kafka
 import Network.Kafka.Protocol
 
 import Control.Concurrent (threadDelay)
+
+import Debug.Trace (trace)
 
 -- * Fetching
 
@@ -46,12 +47,12 @@ fetchMessages fr = (fr ^.. fetchResponseFields . folded) >>= tam
 fetchOffsets :: OffsetFetchRequest -> Kafka OffsetFetchResponse
 fetchOffsets req@(OffsetFetchReq (group, _)) = do
     coordinator <- getConsumerGroupCoordinator group
-    (withBrokerHandle coordinator) . (flip makeRequest) $ CGOffsetFetchRR req
+    withBrokerHandle coordinator . flip makeRequest $ CGOffsetFetchRR req
 
 commitOffsets :: OffsetCommitRequest -> Kafka OffsetCommitResponse
 commitOffsets req@(OffsetCommitReq (group, _)) = do
     coordinator <- getConsumerGroupCoordinator group
-    (withBrokerHandle coordinator) . (flip makeRequest) $ CGOffsetCommitRR req
+    withBrokerHandle coordinator . flip makeRequest $ CGOffsetCommitRR req
 
 fetchSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Kafka (Either KafkaError (Offset, Metadata))
 fetchSingleOffset groupName topic partition = do
@@ -65,12 +66,14 @@ commitSingleOffset groupName topic partition offset time ofsMetadata = do
     (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req
     return $ if err /= NoError then Left err else Right ()
 
+{-# NOINLINE getConsumerGroupCoordinator #-}
 getConsumerGroupCoordinator :: ConsumerGroup -> Kafka Broker
-getConsumerGroupCoordinator group = withAnyHandle $ \handle -> do
-    (GroupCoordinatorResp (err, broker)) <- makeRequest handle $ CGCoordinatorRR $ GroupCoordinatorReq group
-    case err of
-        NoError -> return broker
+getConsumerGroupCoordinator group = do
+    let theReq = CGCoordinatorRR $ GroupCoordinatorReq group
+    (GroupCoordinatorResp (err, broker)) <- withAnyHandle $ flip makeRequest theReq
+    err & \case
         ConsumerCoordinatorNotAvailableCode -> do  -- coordinator not ready, must retry with backoff
-            liftIO $ threadDelay 1000000 -- todo something better than threadDelay?
+            liftIO $ threadDelay 100000 -- todo something better than threadDelay?
             getConsumerGroupCoordinator group
-        other -> throwError $ KafkaFailedToFetchGroupCoordinator other
+        NoError -> return broker
+        other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
