@@ -3,15 +3,10 @@
 
 module BlockApps.DataSpec where
 
--- import Control.Applicative
 import Data.Aeson
--- import Data.LargeWord
--- import Generic.Random.Generic
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
--- import Test.QuickCheck.Instances ()
--- import Text.Read
 import Web.FormUrlEncoded
 import Web.HttpApiData
 
