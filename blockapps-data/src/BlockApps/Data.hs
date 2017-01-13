@@ -2,15 +2,18 @@
     DeriveGeneric
   , OverloadedLists
   , OverloadedStrings
+  , TypeApplications
 #-}
 
 module BlockApps.Data
   ( -- * Addresses
     Address (..)
+  , deriveAddress
   , addressString
   , stringAddress
     -- * Keccak 256 Hashes
   , Keccak256 (..)
+  , keccak256
   , keccak256String
   , stringKeccak256
     -- * Account States
@@ -26,10 +29,15 @@ module BlockApps.Data
   , BloomFilter (..)
   ) where
 
+import Crypto.Hash
 import Crypto.Secp256k1
 import Data.Aeson
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Char8 as Char8
+import qualified Data.ByteString.Base16 as Base16
 import Data.LargeWord
+import Data.Maybe
 import Data.Monoid
 import qualified Data.Text as Text
 import Data.Time
@@ -65,29 +73,44 @@ instance FromForm Address where fromForm = parseUnique "address"
 instance Arbitrary Address where
   arbitrary = Address . fromInteger <$> arbitrary
 
-newtype Keccak256 = Keccak256 Word256 deriving (Eq,Show,Generic)
+deriveAddress :: PubKey -> Address
+deriveAddress
+  = fromMaybe (error "Could not derive Address")
+  . stringAddress
+  . drop 24
+  . keccak256String
+  . keccak256
+  . ByteString.drop 1
+  . exportPubKey False
+
+newtype Keccak256 = Keccak256 (Digest Keccak_256) deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String
-keccak256String (Keccak256 hash) = padZeros 32 (showHex hash "")
+keccak256String (Keccak256 digest) = show digest
 stringKeccak256 :: String -> Maybe Keccak256
-stringKeccak256 string = Keccak256 . fromInteger <$> readMaybe ("0x" ++ string)
+stringKeccak256 string =
+  if ByteString.null r then Keccak256 <$> digestFromByteString bs else Nothing
+  where
+    (bs, r) = Base16.decode $ Char8.pack string
 instance ToJSON Keccak256 where toJSON = toJSON . keccak256String
 instance FromJSON Keccak256 where
   parseJSON value = do
     string <- parseJSON value
     case stringKeccak256 string of
       Nothing -> fail $ "Could not decode Keccak256: " <> string
-      Just hash -> return hash
+      Just hash256 -> return hash256
 instance ToHttpApiData Keccak256 where
   toUrlPiece = Text.pack . keccak256String
 instance FromHttpApiData Keccak256 where
   parseUrlPiece text = case stringKeccak256 (Text.unpack text) of
     Nothing -> Left $ "Could not decode Keccak256: " <> text
-    Just hash -> Right hash
+    Just hash256 -> Right hash256
 instance ToForm Keccak256 where
-  toForm hash = [("hash", toQueryParam hash)]
+  toForm hash256 = [("hash", toQueryParam hash256)]
 instance FromForm Keccak256 where fromForm = parseUnique "hash"
-instance Arbitrary Keccak256 where
-  arbitrary = Keccak256 . fromInteger <$> arbitrary
+-- instance Arbitrary Keccak256 where
+--   arbitrary = keccak256 @ Integer <$> arbitrary
+keccak256 :: ByteString -> Keccak256
+keccak256 = Keccak256 . hash
 
 data AccountState = AccountState
   { accountStateNonce :: Nonce

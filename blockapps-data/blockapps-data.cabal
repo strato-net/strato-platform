@@ -20,9 +20,13 @@ library
   ghc-options: -Wall -Werror
   build-depends: base
     , aeson
+    , base16-bytestring
+    , binary
     , bytestring
+    , cryptonite
     , http-api-data
     , largeword
+    , memory
     , QuickCheck
     , secp256k1
     , text
