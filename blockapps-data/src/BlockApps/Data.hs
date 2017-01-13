@@ -17,19 +17,25 @@ module BlockApps.Data
   , AccountState (..)
     -- * Transactions
   , Transaction (..)
+    -- * Blocks
+  , BlockHeader (..)
     -- * Ethereum Types
   , Nonce (..)
   , Wei (..)
   , Gas (..)
+  , BloomFilter (..)
   ) where
 
 import Crypto.Secp256k1
 import Data.Aeson
+import Data.ByteString (ByteString)
 import Data.LargeWord
 import Data.Monoid
 import qualified Data.Text as Text
+import Data.Time
 import GHC.Generics
 import Numeric
+import Numeric.Natural
 import Test.QuickCheck
 import Text.Read
 import Web.FormUrlEncoded
@@ -97,19 +103,38 @@ data Transaction = Transaction
   , transactionTo :: Maybe Address
   , transactionValue :: Wei
   , transactionSignature :: CompactRecSig
+  , transactionInitOrData :: ByteString
+  } deriving (Eq,Show,Generic)
+
+data BlockHeader = BlockHeader
+  { blockHeaderParentHash :: Keccak256
+  , blockHeaderOmmersHash :: Keccak256
+  , blockHeaderBeneficiary :: Address
+  , blockHeaderStateRoot :: Keccak256
+  , blockHeaderTransactionsRoot :: Keccak256
+  , blockHeaderReceiptsRoot :: Keccak256
+  , blockHeaderLogsBloom :: BloomFilter
+  , blockHeaderDifficulty :: Natural
+  , blockHeaderNumber :: Natural
+  , blockHeaderGasLimit :: Gas
+  , blockHeaderGasUsed :: Gas
+  , blockHeaderTimeStamp :: UTCTime
+  , blockHeaderExtraData :: Word256
+  , blockHeaderMixHash :: Keccak256
+  , blockHeaderNonce :: Nonce
   } deriving (Eq,Show,Generic)
 
 newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
 
 newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
-instance Monoid Wei where
-  mempty = Wei 0
-  mappend (Wei x) (Wei y) = Wei (x+y)
 
 newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
-instance Monoid Gas where
-  mempty = Gas 0
-  mappend (Gas x) (Gas y) = Gas (x+y)
+
+newtype BloomFilter = BloomFilter
+  ( LargeKey
+    (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
+    (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
+  ) deriving (Eq,Show,Generic)
 
 -- helpers
 padZeros :: Int -> String -> String

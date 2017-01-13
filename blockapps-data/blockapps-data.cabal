@@ -20,11 +20,13 @@ library
   ghc-options: -Wall -Werror
   build-depends: base
     , aeson
+    , bytestring
     , http-api-data
     , largeword
     , QuickCheck
     , secp256k1
     , text
+    , time
 
 source-repository head
   type: git
