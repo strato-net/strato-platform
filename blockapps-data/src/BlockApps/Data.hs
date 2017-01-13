@@ -20,6 +20,7 @@ module BlockApps.Data
   , AccountState (..)
     -- * Transactions
   , Transaction (..)
+  , UnsignedTransaction (..)
     -- * Blocks
   , BlockHeader (..)
     -- * Ethereum Types
@@ -127,6 +128,15 @@ data Transaction = Transaction
   , transactionValue :: Wei
   , transactionSignature :: CompactRecSig
   , transactionInitOrData :: ByteString
+  } deriving (Eq,Show,Generic)
+
+data UnsignedTransaction = UnsignedTransaction
+  { unsignedTransactionNonce :: Nonce
+  , unsignedTransactionGasPrice :: Wei
+  , unsignedTransactionGasLimit :: Gas
+  , unsignedTransactionTo :: Maybe Address
+  , unsignedTransactionValue :: Wei
+  , unsignedTransactionInitOrData :: ByteString
   } deriving (Eq,Show,Generic)
 
 data BlockHeader = BlockHeader
