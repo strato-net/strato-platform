@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Blockchain.Bagger.BaggerState where
 
 import Control.Applicative (Alternative, empty)
@@ -54,38 +55,38 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
 
 addToATL :: OutputTx -> ATL -> (Maybe OutputTx, ATL)
 addToATL t atl =
-    case (M.lookup signer atl) of
+    case M.lookup signer atl of
         Nothing  -> (Nothing, M.insert signer (singletonTransactionList t) atl)
-        Just txs -> let (oldTx, newTL) = (insertTransaction t txs) in (oldTx, M.insert signer newTL atl)
+        Just txs -> let (oldTx, newTL) = insertTransaction t txs in (oldTx, M.insert signer newTL atl)
     where signer = otSigner t
 
 modifyATL :: Alternative a => (TransactionList -> (a OutputTx, TransactionList)) -> Address -> ATL -> (a OutputTx, ATL)
-modifyATL f address atl = case (M.lookup address atl) of
+modifyATL f address atl = case M.lookup address atl of
     Nothing -> (empty, atl)
-    Just tl -> let (poppedTx, newTL) = (f tl) in
-        if (M.null newTL)
+    Just tl -> let (poppedTx, newTL) = f tl in
+        if M.null newTL
             then (poppedTx, M.delete address atl)
             else (poppedTx, M.insert address newTL atl)
 
 calculateIntrinsicTxFee :: BaggerState -> (OutputTx -> Integer)
 calculateIntrinsicTxFee bs@BaggerState{ miningCache = MiningCache{ bestBlockHeader = bh } } t@OutputTx{otBaseTx = bt} =
-    (TD.transactionGasPrice bt) * (calculateIntrinsicGasAtNextBlock bs t)
+    TD.transactionGasPrice bt * calculateIntrinsicGasAtNextBlock bs t
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
-calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache{ bestBlockHeader = bh }, calculateIntrinsicGas = cig } t =
-    cig (DD.blockDataNumber bh + 1) t
+calculateIntrinsicGasAtNextBlock BaggerState{ miningCache = MiningCache{ bestBlockHeader = bh }, calculateIntrinsicGas = cig } =
+    cig (DD.blockDataNumber bh + 1)
 
 addToPending :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
-addToPending t s@BaggerState{pending = p} = let (oldTx, newATL) = (addToATL t p) in (oldTx, s { pending = newATL })
+addToPending t s@BaggerState{pending = p} = let (oldTx, newATL) = addToATL t p in (oldTx, s { pending = newATL })
 
 addToQueued :: OutputTx -> BaggerState -> (Maybe OutputTx, BaggerState)
-addToQueued t s@BaggerState{queued = q} = let (oldTx, newATL) = (addToATL t q) in (oldTx, s { queued = newATL })
+addToQueued t s@BaggerState{queued = q} = let (oldTx, newATL) = addToATL t q in (oldTx, s { queued = newATL })
 
 addToSeen :: OutputTx -> BaggerState -> BaggerState
-addToSeen t@OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = (M.insert sha t seen') }
+addToSeen t@OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.insert sha t seen' }
 
 removeFromSeen :: OutputTx -> BaggerState -> BaggerState
-removeFromSeen OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = (M.delete sha seen') }
+removeFromSeen OutputTx{otHash=sha} s@BaggerState{seen = seen'} = s { seen = M.delete sha seen' }
 
 trimBelowNonceFromQueued :: Address -> Integer -> BaggerState -> ([OutputTx], BaggerState)
 trimBelowNonceFromQueued a nonce s@BaggerState{queued = q} =
@@ -111,13 +112,14 @@ popSequentialFromQueued a nonce s@BaggerState{queued = q} =
 
 popAllPending :: BaggerState -> ([OutputTx], BaggerState)
 popAllPending s@BaggerState{pending = p} = (popped, s { pending = M.empty })
-    where popped = concat $ map toList $ M.elems p
+    where popped = concatMap toList $ M.elems p
 
 addToPromotionCache :: OutputTx -> BaggerState -> BaggerState
 addToPromotionCache tx s@BaggerState{ miningCache = mc@MiningCache{ promotedTransactions = pt } } =
-    s { miningCache = mc { promotedTransactions = (upsertPT tx pt) } }
+    s { miningCache = mc { promotedTransactions = upsertPT tx pt } }
 
 upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
-upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = tx:filtered
-    where filtered = filter (not . (\t -> (otSigner t) == addr && (nonce $ otBaseTx t) == (nonce bt))) pt
+upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = ret
+    where filtered = filter (not . (\t -> otSigner t == addr && (nonce (otBaseTx t) == nonce bt))) pt
           nonce = TD.transactionNonce
+          !ret  = tx:filtered

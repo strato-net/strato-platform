@@ -467,11 +467,12 @@ timeIt f = do
 -- todo: strip escapes/colors when calculating length of longest line
 logWithBox :: MonadLogger m => T.Text -> [String] -> m ()
 logWithBox source lines = do
-    let longestLine = maximum (length <$> lines)
-        withBorder  = addBorder <$> lines
-        indent      = "    "
+    let longestLine     = maximum (length . stripEscapes <$> lines)
+        withBorder      = addBorder <$> lines
+        indent          = "    "
         headerAndFooter = indent ++ CL.magenta (replicate (longestLine + 4) '=')
-        addBorder line = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
+        addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
+        stripEscapes    = id -- todo
     $logInfoS source $ T.pack headerAndFooter
     forM_ withBorder $ \l -> $logInfoS source (T.pack $ rightPad longestLine ' ' l)
     $logInfoS source $ T.pack headerAndFooter
@@ -494,7 +495,7 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=txHash} (Rig
   logWithBox "printTx/ok" [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ CL.magenta " // " ++ show tNonce
                           , "Tx hash: " ++ format txHash
                           , txPretty
-                          , "t = " ++ printf "%.2f" (realToFrac deltaT::Double) ++ "s"
+                          , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
                           ]
 
 indexMaybe::[a]->Int->Maybe a

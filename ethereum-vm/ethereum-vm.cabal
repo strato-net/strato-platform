@@ -75,6 +75,7 @@ library
                      Blockchain.VM.VMState
                      Executable.EthereumVM
                      Executable.EVMFlags
+                     Executable.EVMCheckpoint
     other-modules:
                   Blockchain.DB.ModifyStateDB
                   Blockchain.JsonRpcCommand

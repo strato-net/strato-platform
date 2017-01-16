@@ -4,6 +4,7 @@ module Blockchain.Bagger where
 
 import Control.Monad.Extra
 import Control.Monad.IO.Class
+import Control.Monad.Logger
 
 import Data.Time.Clock
 import Data.Maybe (isJust, fromJust)
@@ -50,13 +51,21 @@ instance Format BaggerTxRejection where
     format (BalanceTooLow  queue actual OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "; actual tx limit "  ++ (show actual) ++ ", tx hash " ++ (format hash)
     format (GasLimitTooLow queue actual OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "; actual gas limit " ++ (show actual) ++ ", tx hash " ++ (format hash)
 
-class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) => MonadBagger m where
+class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [BaggerTxRejection] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
+
+    getCheckpointableState :: m (SHA, DD.BlockData)
+    getCheckpointableState = do
+        state <- getBaggerState
+        let miningCache = B.miningCache state
+            bestSHA     = B.bestBlockSHA miningCache
+            bestHeader  = B.bestBlockHeader miningCache
+        return (bestSHA, bestHeader)
 
     updateBaggerState :: (B.BaggerState -> B.BaggerState) -> m ()
     updateBaggerState f = putBaggerState =<< (f <$> getBaggerState)
@@ -75,7 +84,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
         existingStateDbStateRoot <- getStateRoot
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
-        time  <- liftIO $ getCurrentTime
+        time  <- liftIO getCurrentTime
         let oldCache       = B.miningCache state
         let newMiningCache = B.MiningCache { B.bestBlockSHA          = blockHash
                                            , B.bestBlockHeader       = bd
@@ -100,9 +109,9 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
         let lastExecLen = length lastExec
         let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
-        liftIO $ traceIO $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
+        liftIO $ traceIO $ show lastExecLen ++ " =?= " ++ show lastExecGuardLen
         if noCachedTxsCulled then
-            if (null $ B.promotedTransactions cache) then do
+            if null $ B.promotedTransactions cache then do
                     !build <- buildFromMiningCache
                     return build
                 else do
