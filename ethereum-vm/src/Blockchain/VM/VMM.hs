@@ -36,6 +36,10 @@ type VMM = EitherT VMException (StateT VMState (ResourceT (LoggingT IO)))
 instance MonadResource VMM where
   liftResourceT = error "liftResourceT undefined for VMM"
 
+-- todo: what the actual fuck
+instance MonadLogger VMM where
+    monadLoggerLog = monadLoggerLog
+
 instance HasMemAddressStateDB VMM where
   getAddressStateDBMap = do
       cxt <- lift get
@@ -201,16 +205,12 @@ addGas gas = do
 pay'::String->Address->Address->Integer->VMM ()
 pay' reason from to val = do
   success <- pay reason from to val
-  if success
-    then return ()
-    else left InsufficientFunds
+  unless success $ left InsufficientFunds
 
 addToBalance'::Address->Integer->VMM ()
 addToBalance' address' val = do
   success <- addToBalance address' val
-  if success
-    then return ()
-    else left InsufficientFunds
+  unless success $ left InsufficientFunds
 
 getStorageKeyVal::Word256->VMM Word256
 getStorageKeyVal key = do

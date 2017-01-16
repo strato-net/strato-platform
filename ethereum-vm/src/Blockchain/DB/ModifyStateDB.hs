@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 
 module Blockchain.DB.ModifyStateDB (
   addToBalance,
@@ -6,6 +6,7 @@ module Blockchain.DB.ModifyStateDB (
 ) where
 
 import Control.Monad
+import Control.Monad.Logger
 import Control.Monad.Trans
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
@@ -15,6 +16,8 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
 import Blockchain.VMOptions
+
+import qualified Data.Text as T
 
 --import Debug.Trace
 
@@ -31,17 +34,17 @@ addToBalance address val = do
     putAddressState address addressState{addressStateBalance = newVal}
     return True
 
-pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
+pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m)=>
      String->Address->Address->Integer->m Bool
 pay description fromAddr toAddr val = do
   when flags_debug $ do
-    liftIO $ putStrLn $ "payment: from " ++ show (pretty fromAddr) ++ " to " ++ show (pretty toAddr) ++ ": " ++ show val ++ ", " ++ description
+    $logDebugS "pay" . T.pack $ "payment: from " ++ show (pretty fromAddr) ++ " to " ++ show (pretty toAddr) ++ ": " ++ show val ++ ", " ++ description
     fromAddressState <- getAddressState fromAddr
-    liftIO $ putStrLn $ "from Funds: " ++ show (addressStateBalance fromAddressState)
+    $logDebugS "pay" . T.pack $ "from Funds: " ++ show (addressStateBalance fromAddressState)
     toAddressState <- getAddressState toAddr
-    liftIO $ putStrLn $ "to Funds: " ++ show (addressStateBalance toAddressState)
+    $logDebugS "pay" . T.pack $ "to Funds: " ++ show (addressStateBalance toAddressState)
     when (addressStateBalance fromAddressState < val) $
-       liftIO $ putStrLn "insufficient funds"
+        $logDebugS "pay" "insufficient funds"
 
   fromAddressState <- getAddressState fromAddr
   if addressStateBalance fromAddressState < val

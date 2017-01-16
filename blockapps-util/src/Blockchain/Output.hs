@@ -3,6 +3,8 @@ module Blockchain.Output (
     printLogMsg,
     printLogMsg',
     printToFile,
+    leftPad,  -- todo: not enough NPM
+    rightPad  -- todo: not enough NPM
 ) where
 
 import Control.Monad.Logger

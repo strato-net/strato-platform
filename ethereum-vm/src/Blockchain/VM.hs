@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 
 module Blockchain.VM (
   runCodeFromStart,
@@ -168,7 +168,7 @@ accountCreationHack address' = do
 
 getBlockHashWithNumber::Integer->SHA->VMM (Maybe SHA)
 getBlockHashWithNumber num h = do
-  lift $ logInfoN $ T.pack $ "getBlockHashWithNumber, calling getBSum with " ++ format h
+  lift $ $logInfoS "getBlockHashWithNumber" . T.pack $ "calling getBSum with " ++ format h
   bSum <- getBSum h
   case num `compare` bSumNumber bSum of
    Ordering.LT -> getBlockHashWithNumber num $ bSumParentHash bSum
@@ -513,12 +513,12 @@ runOperation CALL = do
   (result, maybeBytes) <-
     case (callDepth' > 1023, fromIntegral value > addressStateBalance addressState, debugCallCreates vmState) of
       (True, _, _) -> do
-        lift $ logInfoN $ T.pack $ CL.red "Call stack too deep."
+        lift $ $logInfoS "runOp/CALL" . T.pack $ CL.red "Call stack too deep."
         addGas $ fromIntegral stipend
         addGas $ fromIntegral gas
         return (0, Nothing)
       (_, True, _) -> do
-        lift $ logInfoN $ T.pack $ CL.red "Not enough ether to transfer the value."
+        lift $ $logInfoS "runOp/CALL" . T.pack $ CL.red "Not enough ether to transfer the value."
         addGas $ fromIntegral $ gas + fromIntegral stipend
         return (0, Nothing)
       (_, _, Nothing) -> do
@@ -577,7 +577,7 @@ runOperation CALLCODE = do
       (_, True, _) -> do
         addGas $ fromIntegral gas
         addGas $ fromIntegral stipend
-        when flags_debug $ lift $ logInfoN $ T.pack $ CL.red "Insufficient balance"
+        when flags_debug $ lift $ $logInfoS "runOp/CALLCODE" $ T.pack $ CL.red "Insufficient balance"
         return (0, Nothing)
       (_, _, Nothing) -> do
         nestedRun_debugWrapper False (fromIntegral gas+stipend) owner to owner value inputData 
@@ -587,7 +587,7 @@ runOperation CALLCODE = do
         addGas $ fromIntegral gas
         addDebugCallCreate DebugCallCreate {
           ccData=inputData,
-          ccDestination=Just $  owner,
+          ccDestination=Just owner,
           ccGasLimit=fromIntegral gas + stipend,
           ccValue=fromIntegral value
           }
@@ -661,7 +661,7 @@ runOperation DELEGATECALL = do
 
     else do
       let MalformedOpcode opcode = DELEGATECALL
-      when flags_debug $ lift $ logInfoN $ T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
+      when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
       left MalformedOpcodeException
 
 
@@ -685,7 +685,7 @@ runOperation SUICIDE = do
 
 
 runOperation (MalformedOpcode opcode) = do
-  when flags_debug $ lift $ logInfoN $ T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
+  when flags_debug $ lift $ $logInfoS "runOp/MalformedOpcode" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
   left MalformedOpcodeException
 
 runOperation x = error $ "Missing case in runOperation: " ++ show x
@@ -818,17 +818,17 @@ printTrace _ _ _15 _ op stateBefore stateAfter = do
   lift $ logInfoN $ "EVM [ eth ] "-}
 
   --GO style trace
-  lift $ logInfoN $ T.pack $ "PC " ++ printf "%08d" (toInteger $ pc stateBefore) ++ ": " ++ formatOp op ++ " GAS: " ++ show (vmGasRemaining stateAfter) ++ " COST: " ++ show (vmGasRemaining stateBefore - vmGasRemaining stateAfter)
+  lift $ $logInfoS "printTrace" . T.pack $ "PC " ++ printf "%08d" (toInteger $ pc stateBefore) ++ ": " ++ formatOp op ++ " GAS: " ++ show (vmGasRemaining stateAfter) ++ " COST: " ++ show (vmGasRemaining stateBefore - vmGasRemaining stateAfter)
 
   -- memByteString <- liftIO $ getMemAsByteString (memory stateAfter)
   _ <- liftIO $ getMemAsByteString (memory stateAfter)
-  lift $ logInfoN "    STACK"
-  lift $ logInfoN $ T.pack $ unlines (padZeros 64 <$> flip showHex "" <$> (reverse $ stack stateAfter))
---  lift $ logInfoN $ T.pack $ "    MEMORY\n" ++ showMem 0 (B.unpack $ memByteString)
+  lift $ $logInfoS "printTrace" "    STACK"
+  lift $ $logInfoS "printTrace" . T.pack $ unlines (padZeros 64 <$> flip showHex "" <$> (reverse $ stack stateAfter))
+--  lift $ $logInfoS "printTrace" . T.pack $ "    MEMORY\n" ++ showMem 0 (B.unpack $ memByteString)
 {-  
-  lift $ logInfoN $ "    STORAGE"
+  lift $ $logInfoS "printTrace" "    STORAGE"
   kvs <- getAllStorageKeyVals
-  lift $ logInfoN $ T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
+  lift $ $logInfoS "printTrace" . T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
 -}
 
 runCode::Int->VMM ()
@@ -839,7 +839,7 @@ runCode c = do
   vmState <- lift get
 
   let (op, len) = getOperationAt code (pc vmState)
-  --lift $ logInfoN $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
+  --lift $ $logInfoS "runCode" . T.pack $ "EVM [ 19:22" ++ show op ++ " #" ++ show c ++ " (" ++ show (vmGasRemaining state) ++ ")"
 
   (val, theRefund) <- opGasPriceAndRefund op
 
@@ -872,7 +872,7 @@ runCodeFromStart = do
   theData <- getEnvVar envInputData
 
   when flags_debug $
-     lift $ logInfoN $ T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode 0 code))
+     lift $ $logInfoS "runCodeFromStart" . T.pack $ "running code: " ++ tab (CL.magenta ("\n" ++ showCode 0 code))
 
 
   case code of
@@ -898,15 +898,15 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
 
   case result of
       (Left e, vmState') -> do
-          lift $ logInfoN $ T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
-          when flags_debug $ logInfoN "VM has finished running"
+          lift $ $logInfoS "runVMM/Left" . T.pack $ CL.red $ "Exception caught (" ++ show e ++ "), reverting state"
+          when flags_debug $ $logDebugS "runVMM/Left" "VM has finished running"
           return (Left e, vmState'{logs=[]})
       (_, stateAfter) -> do
           setStateDBStateRoot $ MP.stateRoot $ contextStateDB $ dbs $ stateAfter
           putStorageMap $ contextStorageMap $ dbs stateAfter
           putAddressStateDBMap $ contextAddressStateDBMap $ dbs stateAfter
           
-          when flags_debug $ liftIO $ putStrLn "VM has finished running"
+          when flags_debug $ lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
 --bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _gas, bytesConstRef _init, Address _origin)
@@ -974,17 +974,20 @@ create' = do
   owner <- getEnvVar envOwner
   
   let codeBytes' = fromMaybe B.empty $ returnVal vmState
-  when flags_debug $ lift $ logInfoN $ T.pack $ "Result: " ++ show codeBytes'
+  when flags_debug $ lift $ $logInfoS "create'" . T.pack $ "Result: " ++ show codeBytes'
 
-  lift $ logInfoN $ T.pack $ "Trying to create contract\n" ++
-        "The amount of ether you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes')) ++ "\n" ++
-        "The amount of ether you have: " ++ show (vmGasRemaining vmState)
-  
+  lift $ do
+    $logInfoS "create'" "Trying to create contract"
+    $logInfoS "create'" . T.pack $ "The amount of ether you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes'))
+    $logInfoS "create'" . T.pack $ "The amount of ether you have: " ++ show (vmGasRemaining vmState)
+
+  -- this used to say "not enough ether, but im pretty sure it meant gas -io
   if (not $ vmIsHomestead vmState) && (vmGasRemaining vmState < gCREATEDATA * toInteger (B.length codeBytes'))
     then do
-      lift $ logInfoN $ T.pack $ CL.red $ "Not enough ether to create contract, contract being thrown away (account was created though)\n" ++
-        "The amount of ether you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes')) ++ "\n" ++
-        "The amount of ether you have: " ++ show (vmGasRemaining vmState)
+      lift $ do
+        $logInfoS "create'/lowGas" . T.pack $ CL.red "Not enough gas to create contract, contract being thrown away (account was created though)"
+        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you need: " ++ show (gCREATEDATA * toInteger (B.length codeBytes'))
+        $logInfoS "create'/lowGas" . T.pack $ "The amount of gas you have: " ++ show (vmGasRemaining vmState)
       lift $ put vmState{returnVal=Nothing}
       assignCode "" owner
       return $ Code ""

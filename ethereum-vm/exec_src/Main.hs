@@ -12,4 +12,4 @@ import Executable.EVMFlags
 main :: IO ()
 main = do
   _ <- $initHFlags "Ethereum VM"
-  flip runLoggingT printLogMsg ethereumVM
+  runLoggingT ethereumVM (printLogMsg' True True)

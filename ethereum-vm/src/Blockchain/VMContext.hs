@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, FlexibleContexts, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
 
 module Blockchain.VMContext (
   Context(..),
@@ -6,10 +6,6 @@ module Blockchain.VMContext (
   runContextM,
   evalContextM,
   execContextM,
---  getDebugMsg,
---  clearDebugMsg,
-  getCachedBestProcessedBlock,
-  putCachedBestProcessedBlock,      
   incrementNonce,
   getNewAddress,
   purgeStorageMap
@@ -55,7 +51,6 @@ data Context =
     contextCodeDB::CodeDB,
     contextBlockSummaryDB::BlockSummaryDB,
     contextSQLDB::SQLDB,
-    cachedBestProcessedBlock::Maybe Block,
     contextAddressStateDBMap::M.Map Address AddressStateModification,
     contextStorageMap::M.Map (Address, Word256) Word256,
     contextBaggerState :: !BaggerState
@@ -82,8 +77,8 @@ instance HasMemAddressStateDB ContextM where
 instance HasStorageDB ContextM where
   getStorageDB = do
     cxt <- get
-    return $ (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
-              contextStorageMap cxt)
+    return (MP.ldb $ contextStateDB cxt, --storage and states use the same database!
+            contextStorageMap cxt)
   putStorageMap theMap = do
     cxt <- get
     put cxt{contextStorageMap=theMap}
@@ -112,62 +107,35 @@ runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ResourceT m) a -> m (a, Context)
 runContextM f = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-
-  r <-
-    runResourceT $ do
-      sdb <- DB.open (dbDir "h" ++ stateDBPath)
+  runResourceT $ do
+    sdb <- DB.open (dbDir "h" ++ stateDBPath)
              DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-      hdb <- DB.open (dbDir "h" ++ hashDBPath)
+    hdb <- DB.open (dbDir "h" ++ hashDBPath)
              DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-      cdb <- DB.open (dbDir "h" ++ codeDBPath)
+    cdb <- DB.open (dbDir "h" ++ codeDBPath)
              DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-      blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
+    blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
              DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+    conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
 
-      conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
+    runStateT f (Context
+                    MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                    hdb
+                    cdb
+                    blksumdb
+                    conn
+                    M.empty
+                    M.empty
+                    defaultBaggerState)
 
-      runStateT f (Context
-                   MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
-                   hdb
-                   cdb
-                   blksumdb
-                   conn
-                   Nothing
-                   M.empty
-                   M.empty
-                   defaultBaggerState)
-
-  return r
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m (a)
-evalContextM f = fst <$> (runContextM f) 
+                 StateT Context (ResourceT m) a -> m a
+evalContextM f = fst <$> runContextM f
 
 execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m (Context)
-execContextM f = snd <$> (runContextM f)
-
-{-
-getDebugMsg::ContextM String
-getDebugMsg = do
-  cxt <- get
-  return $ concat $ reverse $ vmTrace cxt
-
-clearDebugMsg::ContextM ()
-clearDebugMsg = do
-  cxt <- get
-  put cxt{vmTrace=[]}
--}
-
-getCachedBestProcessedBlock::ContextM (Maybe Block)
-getCachedBestProcessedBlock = do
-  cxt <- get
-  return $ cachedBestProcessedBlock cxt
-
-putCachedBestProcessedBlock::Block->ContextM ()
-putCachedBestProcessedBlock b = do
-  cxt <- get
-  put cxt{cachedBestProcessedBlock=Just b}
+                 StateT Context (ResourceT m) a -> m Context
+execContextM f = snd <$> runContextM f
 
 incrementNonce::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
                 Address->m ()
