@@ -39,7 +39,7 @@ sequencer = forever $ do
         (emittedLDBWrites, outEv) <- transformEvents [inEv]
         let pendingLDBWrites = catMaybes emittedLDBWrites
             lenOutEv         = length outEv
-        $logInfoS "sequencer" . T.pack $ "Have " ++ (show . length $ pendingLDBWrites) ++ " pending LDB writes and " ++ show lenOutEv ++ " output events"
+        $logInfoS "sequencer" . T.pack $ "Have " ++ show (length pendingLDBWrites) ++ " pending LDB writes and " ++ show lenOutEv ++ " output events"
         applyLDBBatchWrites pendingLDBWrites
         $logInfoS "sequencer" "Applied pending LDB writes"
         unless (lenOutEv == 0) $ do
