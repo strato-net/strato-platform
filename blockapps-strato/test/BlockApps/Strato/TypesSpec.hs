@@ -22,9 +22,6 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse read/show" $ readShowProp @ (Hex Word)
   describe "Strung" $
     prop "has inverse JSON decode/encode" $ jsonProp @ (Strung Integer)
-  describe "Sha256" $ do
-    prop "has inverse JSON decode/encode" $ jsonProp @ Sha256
-    prop "has inverse read/show" $ readShowProp @ Sha256
   describe "TransactionType" $
     prop "has inverse JSON decode/encode" $ jsonProp @ TransactionType
   describe "Transaction" $
@@ -59,7 +56,6 @@ instance Arbitrary x => Arbitrary (Strung x) where
 instance Arbitrary x => Arbitrary (Hex x) where arbitrary = genericArbitrary
 instance Arbitrary TransactionType where arbitrary = genericArbitrary
 instance Arbitrary Addresses where arbitrary = genericArbitrary
-instance Arbitrary Sha256 where arbitrary = genericArbitrary
 instance (Arbitrary x, Arbitrary y) => Arbitrary (LargeKey x y) where
   arbitrary = LargeKey <$> arbitrary <*> arbitrary
 instance Arbitrary Transaction where arbitrary = genericArbitrary
