@@ -152,9 +152,9 @@ instance Bagger.MonadBagger ContextM where
 
 baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", queue, hash)
-    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", queue, hash)
-    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", queue, hash)
+    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> (format rejection, queue, hash)
+    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> (format rejection, queue, hash)
+    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> (format rejection, queue, hash)
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do
@@ -542,12 +542,12 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
       oldStateRoot  = blockDataStateRoot oldBestBlock
       bH            = outputBlockHash b
 
-  logInfoN $ T.pack $ "newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
-
   let shouldReplace =     newNumber == 0
                       || (newNumber > oldNumber)
                       || ((newNumber == oldNumber) && (td > oldBestDifficulty))
                       || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+
+  logInfoN $ T.pack $ "shouldReplace = " ++ (show shouldReplace) ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
   when shouldReplace $ do
     Bagger.processNewBestBlock bH bd
