@@ -4,7 +4,8 @@ module Blockchain.Stream.Raw (
   produceBytes,
   fetchBytes,
   fetchBytesIO,
-  fetchBytesOneIO
+  fetchBytesOneIO,
+  setDefaultKafkaState
   ) where
 
 import Control.Lens
@@ -19,17 +20,21 @@ import Network.Kafka.Protocol hiding (Message)
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 
+
 produceBytes::MonadIO m=>String->[B.ByteString]->m ()
 produceBytes topic items = do
   _ <- liftIO $ runKafkaConfigured "blockapps-data" $
     produceMessages $ map (TopicAndMessage (lookupTopic topic) . makeMessage) items
   return ()
 
-fetchBytes::TopicName->Offset->Kafka [B.ByteString]
-fetchBytes topic offset = do
+fetchBytes :: TopicName -> Offset -> Kafka [B.ByteString]
+fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
+
+fetchBytes' :: TopicName -> Offset -> Kafka [(Offset, B.ByteString)]
+fetchBytes' topic offset = do
   fetched <- fetch offset 0 topic
-  let datas = (map tamPayload' . fetchMessages) $ fetched
-  return datas
+  let datas = (map tamPayload' . fetchMessages) fetched
+  return $ zip [offset..] datas
 
 tamPayload' :: TopicAndMessage -> B.ByteString
 tamPayload' = foldOf (tamMessage . payload)
@@ -40,14 +45,9 @@ fetchBytesIO topic offset = do
       runKafkaConfigured "blockapps-data" $ do
       lastOffset <- getLastOffset LatestTime 0 topic
 
-      if (offset > lastOffset)
+      if offset > lastOffset
         then return Nothing
-        else do
-          stateRequiredAcks .= -1
-          stateWaitSize .= 1
-          stateWaitTime .= 100000
-          fmap Just $ fetchBytes topic offset
-
+        else setDefaultKafkaState >> Just <$> fetchBytes topic offset
 
   case ret of
    Left e -> error $ show e
@@ -60,3 +60,9 @@ fetchBytesOneIO topic offset = do
    Nothing -> return Nothing
    Just (x:_) -> return $ Just x
    Just [] -> error "something impossible happened in fetchBytesOneIO"              
+
+setDefaultKafkaState :: Kafka ()
+setDefaultKafkaState = do
+    stateRequiredAcks .= -1
+    stateWaitSize     .= 1
+    stateWaitTime     .= 100000

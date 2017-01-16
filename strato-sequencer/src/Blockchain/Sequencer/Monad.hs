@@ -4,9 +4,8 @@ module Blockchain.Sequencer.Monad (
   , SequencerConfig(..)
   , SequencerM
   , runSequencerM
-  , getLastIngestedOffset
-  , setLastIngestedOffset
   , getKafkaClientID
+  , getKafkaConsumerGroup
 ) where
 
 import Control.Monad.Logger
@@ -17,7 +16,6 @@ import Control.Monad.Trans.Resource
 import Blockchain.Constants
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.SHA
 
 import System.Directory (createDirectoryIfMissing)
 
@@ -30,7 +28,6 @@ type SequencerM  = StateT SequencerContext (ResourceT (ReaderT SequencerConfig (
 data SequencerContext = SequencerContext
                       { dependentBlockDB   :: DependentBlockDB
                       , seenTransactionDB  :: SeenTransactionDB
-                      , lastIngestedOffset :: KP.Offset
                       }
 
 data SequencerConfig =
@@ -38,6 +35,7 @@ data SequencerConfig =
                      , depBlockDBPath        :: String
                      , seenTransactionDBSize :: Int
                      , kafkaClientId         :: K.KafkaClientId
+                     , kafkaConsumerGroup    :: KP.ConsumerGroup
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
                      , startOffset           :: Integer
@@ -58,26 +56,20 @@ instance HasSeenTransactionDB SequencerM where
 runSequencerM :: SequencerConfig -> SequencerM a -> LoggingT IO a
 runSequencerM c m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    a <- (flip runReaderT) c $ runResourceT $ do
+    a <- flip runReaderT c $ runResourceT $ do
         dbCS     <- depBlockDBCacheSize <$> ask
         dbPath   <- depBlockDBPath      <$> ask
         stxSize  <- seenTransactionDBSize <$> ask
         startOfs <- startOffset <$> ask
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
-        runStateT m $ SequencerContext
+        runStateT m SequencerContext
             { dependentBlockDB   = depBlock
             , seenTransactionDB  = mkSeenTxDB stxSize
-            , lastIngestedOffset = KP.Offset . fromIntegral $ startOfs
             }
     return $ fst a
 
-getLastIngestedOffset :: SequencerM KP.Offset
-getLastIngestedOffset = lastIngestedOffset <$> get
-
-setLastIngestedOffset :: KP.Offset -> SequencerM ()
-setLastIngestedOffset newOffset = do
-    ctx <- get
-    put $ ctx { lastIngestedOffset = newOffset }
-
 getKafkaClientID :: SequencerM K.KafkaClientId
 getKafkaClientID = kafkaClientId <$> ask
+
+getKafkaConsumerGroup :: SequencerM KP.ConsumerGroup
+getKafkaConsumerGroup = kafkaConsumerGroup <$> ask

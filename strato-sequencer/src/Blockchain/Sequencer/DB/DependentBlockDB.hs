@@ -50,10 +50,10 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
 
     appendDependentBlock :: SequencedBlock -> m ()
     appendDependentBlock b = do
+        let parentHash = parentHashBS b
         db                  <- getDependentBlockDB
         readOptions         <- getReadOptions
         writeOptions        <- getWriteOptions
-        parentHash          <- return $ parentHashBS b
         maybeExistingParent <- LDB.get db readOptions parentHash
         case (decode . B.fromStrict) <$> maybeExistingParent of -- if emitted or already queued, nothing to do
             Just (Emitted _) -> return ()
@@ -66,10 +66,10 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
     enqueueIfParentNotEmitted :: SequencedBlock -> m EmissionReadiness
     enqueueIfParentNotEmitted b = do
 --         (logInfo) . pack $ "enqueueIfParentNotEmitted :: " ++ sequencedBlockShortName b
+        let parentHash = parentHashBS b
         db                  <- getDependentBlockDB
         readOptions         <- getReadOptions
         writeOptions        <- getWriteOptions
-        parentHash          <- return $ parentHashBS b
         maybeExistingParent <- LDB.get db readOptions parentHash
         case (decode . B.fromStrict) <$> maybeExistingParent of
             Just (Emitted totalDifficulty) ->
@@ -89,14 +89,14 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
         readOptions  <- getReadOptions
         children     <- LDB.get db readOptions thisBlockHash
         case (decode . B.fromStrict) <$> children of
-            Nothing -> return $ [theRet]
+            Nothing -> return [theRet]
             Just (Emitted _) -> return [] -- we already emitted this hash somehow? wtf???
             Just (DependentBlocks blocks) -> do
-                subChains <- sequence $ ((flip buildEmissionChain) totalDifficulty) <$> blocks
-                return $ theRet : (join subChains)
+                subChains <- sequence $ flip buildEmissionChain totalDifficulty <$> blocks
+                return $ theRet : join subChains
         where
             thisBlockHash   = blockHashBS b
-            totalDifficulty = lastTotalDifficulty + (sequencedBlockDifficulty b)
-            thePutOperation = Just $ (LDB.Put thisBlockHash) . (B.toStrict . encode) $ Emitted totalDifficulty
+            totalDifficulty = lastTotalDifficulty + sequencedBlockDifficulty b
+            thePutOperation = Just . LDB.Put thisBlockHash . B.toStrict . encode $ Emitted totalDifficulty
             theBlock        = sequencedBlockToOutputBlock b totalDifficulty
             theRet          = (thePutOperation, OEBlock theBlock)

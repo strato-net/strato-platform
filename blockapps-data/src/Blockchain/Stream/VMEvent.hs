@@ -163,9 +163,3 @@ getBestKafkaBlockHelper lower upper = do
       case blocks of
         [] -> return Nothing
         xs -> return . Just $ maximum (map (blockDataNumber . blockBlockData) xs)
-  
-setDefaultKafkaState :: Kafka ()
-setDefaultKafkaState = do
-    stateRequiredAcks .= -1
-    stateWaitSize     .= 1
-    stateWaitTime     .= 100000

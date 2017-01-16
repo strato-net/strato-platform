@@ -35,12 +35,15 @@ import Blockchain.Stream.VMEvent
 
 import Blockchain.Sequencer (bootstrap)
 import Blockchain.Sequencer.Monad
+import qualified Blockchain.Sequencer.Constants as SeqConstants
 import Blockchain.Constants (dbDir, sequencerDependentBlockDBPath)
 import Blockchain.Output (printLogMsg)
 import Control.Monad.Logger (runLoggingT)
 import qualified Network.Kafka.Protocol as KP
 
 import qualified Data.Map as Map
+
+import Blockchain.EthConf (lookupConsumerGroup)
 
 --import Debug.Trace
 
@@ -68,7 +71,7 @@ genesisInfoToGenesisBlock::(HasStateDB m, HasHashDB m)=>
 genesisInfoToGenesisBlock gi = do
   initializeStateDB $ genesisInfoAccountInfo gi
   db <- getStateDB
-  return $
+  return
     Block {
       blockBlockData =
          BlockData {
@@ -142,9 +145,11 @@ initializeGenesisBlock backupType genesisBlockName = do
 
 bootstrapSequencer :: Block -> IO ()
 bootstrapSequencer gb = do
+    let clientId = KP.KString $ C8.pack SeqConstants.defaultKafkaClientId'
     let dummySequencerCfg = SequencerConfig { depBlockDBCacheSize   = 0
-                                            , depBlockDBPath        = (dbDir "h" ++ sequencerDependentBlockDBPath)
-                                            , kafkaClientId         = KP.KString . C8.pack $ "strato-init"
+                                            , depBlockDBPath        = dbDir "h" ++ sequencerDependentBlockDBPath
+                                            , kafkaClientId         = clientId
+                                            , kafkaConsumerGroup    = lookupConsumerGroup clientId
                                             , seenTransactionDBSize = 10
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
