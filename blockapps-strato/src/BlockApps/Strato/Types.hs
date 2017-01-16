@@ -10,6 +10,7 @@ module BlockApps.Strato.Types
   ( Hex (..)
   , Strung (..)
   , Address (..)
+  , addressString
   , stringAddress
   , Addresses (..)
   , Keccak256 (..)
@@ -40,15 +41,23 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time
 import Data.Word
+import Generic.Random.Generic
 import GHC.Generics
 import Numeric
 import Numeric.Natural
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
 import Text.Read
 import Text.Read.Lex
 import Web.HttpApiData
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 
-import BlockApps.Data (Address (..), stringAddress, Keccak256 (..))
+import BlockApps.Data
+  ( Address (..)
+  , addressString
+  , stringAddress
+  , Keccak256 (..)
+  )
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 instance (Integral n, Show n) => Show (Hex n) where
@@ -66,6 +75,7 @@ instance (Integral n, Show n) => ToJSON (Hex n) where
   toJSON = toJSON . show
 instance (Integral n, Show n) => ToHttpApiData (Hex n) where
   toUrlPiece = Text.pack . show
+instance Arbitrary x => Arbitrary (Hex x) where arbitrary = genericArbitrary
 
 -- hack to deal with weird `ToJSON`s
 newtype Strung x = Strung { unStrung :: x } deriving (Eq, Show, Generic)
@@ -77,6 +87,7 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
       Just y -> return $ Strung y
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
+instance Arbitrary x => Arbitrary (Strung x) where arbitrary = genericArbitrary
 
 newtype Addresses = Addresses { unAddresses :: NonEmpty (Hex Word160) }
   deriving (Eq, Show, Generic)
@@ -148,6 +159,7 @@ instance FromJSON PostTransaction where
 instance ToJSON PostTransaction where
   toJSON = genericToJSON
     defaultOptions{ fieldLabelModifier = idOrStripPrefix "ptx_" }
+instance Arbitrary PostTransaction where arbitrary = genericArbitrary
 
 toPostTx :: Transaction -> PostTransaction
 toPostTx Transaction{..} = PostTransaction

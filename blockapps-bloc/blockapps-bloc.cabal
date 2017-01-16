@@ -17,16 +17,30 @@ library
   exposed-modules:
     BlockApps.Bloc.API
     BlockApps.Bloc.API.Client
+    BlockApps.Bloc.API.Mock
+    BlockApps.Bloc.API.Server
+    BlockApps.Bloc.Store
+    BlockApps.Bloc.User
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
+    , blockapps-data
     , blockapps-strato
+    , acid-state
     , aeson
+    , containers
     , bytestring
+    , generic-random
     , http-api-data
     , http-media
+    , mtl
+    , QuickCheck
+    , quickcheck-instances
+    , safecopy
     , servant
     , servant-client
+    , servant-mock
+    , servant-server
     , text
 
 test-suite blockapps-bloc-test
