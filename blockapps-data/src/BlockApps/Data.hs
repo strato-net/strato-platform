@@ -14,6 +14,7 @@ module BlockApps.Data
     -- * Keccak 256 Hashes
   , Keccak256 (..)
   , keccak256
+  , keccak256lazy
   , keccak256String
   , stringKeccak256
     -- * Account States
@@ -33,10 +34,12 @@ module BlockApps.Data
 import Crypto.Hash
 import Crypto.Secp256k1
 import Data.Aeson
+import qualified Data.Binary as Binary
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Lazy as Lazy (ByteString)
 import Data.LargeWord
 import Data.Maybe
 import Data.Monoid
@@ -108,10 +111,12 @@ instance FromHttpApiData Keccak256 where
 instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
 instance FromForm Keccak256 where fromForm = parseUnique "hash"
--- instance Arbitrary Keccak256 where
---   arbitrary = keccak256 @ Integer <$> arbitrary
+instance Arbitrary Keccak256 where
+  arbitrary = keccak256lazy . Binary.encode @ Integer <$> arbitrary
 keccak256 :: ByteString -> Keccak256
 keccak256 = Keccak256 . hash
+keccak256lazy :: Lazy.ByteString -> Keccak256
+keccak256lazy = Keccak256 . hashlazy
 
 data AccountState = AccountState
   { accountStateNonce :: Nonce
