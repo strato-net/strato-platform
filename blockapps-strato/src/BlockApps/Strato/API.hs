@@ -50,7 +50,7 @@ type API =
     :> QueryParam "txaddress" Address
     :> QueryParam "address" Address
     :> QueryParam "coinbase" Address
-    :> QueryParam "hash" Sha256
+    :> QueryParam "hash" Keccak256
     :> Get '[JSON] [WithNext Block]
   :<|> "block"
     :> "last"

@@ -74,7 +74,7 @@ data BlocksFilterParams = BlocksFilterParams
   , qbTxAddress :: Maybe Address
   , qbAddress :: Maybe Address
   , qbCoinbase :: Maybe Address
-  , qbHash :: Maybe Sha256
+  , qbHash :: Maybe Keccak256
   } deriving (Eq, Show, Generic)
 
 blocksFilterParams :: BlocksFilterParams

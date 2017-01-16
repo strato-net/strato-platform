@@ -10,8 +10,9 @@ module BlockApps.Strato.Types
   ( Hex (..)
   , Strung (..)
   , Address (..)
+  , stringAddress
   , Addresses (..)
-  , Sha256 (..)
+  , Keccak256 (..)
   , WithNext (..)
   , TransactionType (..)
   , Transaction (..)
@@ -47,7 +48,7 @@ import Text.Read.Lex
 import Web.HttpApiData
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 
-import BlockApps.Data (Address (..))
+import BlockApps.Data (Address (..), stringAddress, Keccak256 (..))
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 instance (Integral n, Show n) => Show (Hex n) where
@@ -76,16 +77,6 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
       Just y -> return $ Strung y
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
-
-newtype Sha256 = Sha256 { unSha256 :: Hex Word256 }
-  deriving (Eq, Generic)
-instance Show Sha256 where
-  show (Sha256 hex) = pad (show hex) where
-    pad string = replicate (64 - length string) '0' ++ string
-instance Read Sha256 where readPrec = Sha256 <$> readPrec
-instance ToJSON Sha256 where toJSON = toJSON . show
-instance FromJSON Sha256 where parseJSON = fmap Sha256 . parseJSON
-instance ToHttpApiData Sha256 where toUrlPiece = Text.pack . show
 
 newtype Addresses = Addresses { unAddresses :: NonEmpty (Hex Word160) }
   deriving (Eq, Show, Generic)
@@ -116,7 +107,7 @@ data TransactionType
 
 data Transaction = Transaction
   { tx_transactionType :: TransactionType
-  , tx_hash :: Sha256
+  , tx_hash :: Keccak256
   , tx_gasLimit :: Strung Natural
   , tx_codeOrData :: Maybe Text
   , tx_gasPrice :: Strung Natural
@@ -139,7 +130,7 @@ instance ToJSON Transaction where
     defaultOptions{ fieldLabelModifier = idOrStripPrefix "tx_" }
 
 data PostTransaction = PostTransaction
-  { ptx_hash :: Sha256
+  { ptx_hash :: Keccak256
   , ptx_gasLimit :: Strung Natural
   , ptx_codeOrData :: Text
   , ptx_gasPrice :: Strung Natural
@@ -178,17 +169,17 @@ data BlockData = BlockData
   , blockData_gasUsed :: Natural
   , blockData_gasLimit :: Natural
   , blockData_kind :: Text
-  , blockData_unclesHash :: Text
-  , blockData_mixHash :: Text
+  , blockData_unclesHash :: Keccak256
+  , blockData_mixHash :: Keccak256
   , blockData_receiptsRoot :: Text
   , blockData_number :: Natural
   , blockData_difficulty :: Natural
   , blockData_timestamp :: UTCTime
   , blockData_coinbase :: Hex Natural
-  , blockData_parentHash :: Text
+  , blockData_parentHash :: Keccak256
   , blockData_nonce :: Word64
-  , blockData_stateRoot :: Text
-  , blockData_transactionsRoot :: Text
+  , blockData_stateRoot :: Keccak256
+  , blockData_transactionsRoot :: Keccak256
   } deriving (Eq, Show, Generic)
 instance FromJSON BlockData where
   parseJSON = genericParseJSON
@@ -214,8 +205,8 @@ data Account = Account
   { acct_address :: Address
   , acct_nonce :: Natural
   , acct_balance :: Strung Natural
-  , acct_contractRoot :: Text
-  , acct_code :: Text
+  , acct_contractRoot :: Keccak256
+  , acct_code :: Keccak256
   , acct_latestBlockNum :: Natural
   } deriving (Eq, Show, Generic)
 instance FromJSON Account where
