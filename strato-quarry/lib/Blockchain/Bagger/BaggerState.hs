@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+
 module Blockchain.Bagger.BaggerState where
 
 import Control.Applicative (Alternative, empty)
@@ -14,6 +15,9 @@ import Blockchain.Database.MerklePatricia (StateRoot(..), blankStateRoot)
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.SHA
+import Debug.Trace
+
+{-# NOINLINE upsertPT #-}
 
 type ATL = M.Map Address TransactionList
 
@@ -24,33 +28,41 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , lastExecutedTxs       :: [OutputTx]
                                , promotedTransactions  :: [OutputTx]
                                , startTimestamp        :: UTCTime
-                               }
+                               } deriving (Show)
 
-data BaggerState = BaggerState { miningCache           :: MiningCache
+data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , pending               :: ATL -- TXs that are going in the next block
                                , queued                :: ATL -- TXs that are lingering in the pool
                                , seen                  :: M.Map SHA OutputTx
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
-                               }
+                               } 
+
+instance Show BaggerState where
+    show b =    "BBBBB\n" 
+             ++ "B miningCache: " ++ show (miningCache b) ++ "\n"
+             ++ "B pending:     " ++ show (pending b)     ++ "\n"
+             ++ "B queued:      " ++ show (queued b)      ++ "\n"
+             ++ "B seen:        " ++ show (seen b)        ++ "\n"
+             ++ "BBBBB"
 
 defaultBaggerState :: BaggerState
 defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   , pending               = M.empty
                                   , queued                = M.empty
                                   , seen                  = M.empty
-                                  , calculateIntrinsicGas = error "wyd bro"
+                                  , calculateIntrinsicGas = error "reached defaultBaggerState"
                                   }
 
 defaultMiningCache :: MiningCache
 defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
-                                  , bestBlockHeader       = error "dont taze me bro"
+                                  , bestBlockHeader       = error "reached defaultMiningCache"
                                   , lastExecutedStateRoot = blankStateRoot
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
-                                  , startTimestamp        = error "dbaa"
+                                  , startTimestamp        = error "reached defaultMiningCache"
                                   }
 
 addToATL :: OutputTx -> ATL -> (Maybe OutputTx, ATL)
@@ -120,6 +132,7 @@ addToPromotionCache tx s@BaggerState{ miningCache = mc@MiningCache{ promotedTran
 
 upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
 upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = ret
-    where filtered = filter (not . (\t -> otSigner t == addr && (nonce (otBaseTx t) == nonce bt))) pt
+    where filtered = filter (not . (\t -> otSigner t == addr && nonce (otBaseTx t) == nonce bt)) pt
           nonce = TD.transactionNonce
-          !ret  = tx:filtered
+          !ret = tx : filtered
+

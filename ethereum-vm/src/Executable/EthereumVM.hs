@@ -100,8 +100,10 @@ ethereumVM = do
             addBlocks False blocks
 
             when (not makeLazyBlocks || not (null poolableNewTxs)) $ do
+                $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
                 newBlock <- Bagger.makeNewBlock
-                produceUnminedBlocks [outputBlockToBlock newBlock]
+                logInfoS "evm/loop/newBlock" "calling produceUnminedBlocks"
+                produceUnminedBlocks [(outputBlockToBlock newBlock)]
 
             liftIO $ atomically $ writeTVar offsetIORef $ offset + fromIntegral (length seqEvents)
 

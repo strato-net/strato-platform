@@ -1,13 +1,15 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE OverloadedStrings, BangPatterns, TemplateHaskell #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
 import Control.Monad.Extra
 import Control.Monad.IO.Class
 import Control.Monad.Logger
+import Control.Arrow ((&&&)) -- yes. very yes.
 
 import Data.Time.Clock
 import Data.Maybe (isJust, fromJust)
+import qualified Data.Text as T
 import Numeric (readHex)
 
 import Blockchain.DB.MemAddressStateDB
@@ -47,9 +49,9 @@ data BaggerTxRejection = NonceTooLow    BaggerTxQueue Integer OutputTx -- intege
                        deriving Show
 
 instance Format BaggerTxRejection where
-    format (NonceTooLow    queue actual OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "; actual nonce "     ++ (show actual) ++ ", tx hash " ++ (format hash)
-    format (BalanceTooLow  queue actual OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "; actual tx limit "  ++ (show actual) ++ ", tx hash " ++ (format hash)
-    format (GasLimitTooLow queue actual OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "; actual gas limit " ++ (show actual) ++ ", tx hash " ++ (format hash)
+    format (NonceTooLow    queue actual o@OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "\n\tactual nonce "     ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
+    format (BalanceTooLow  queue actual o@OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "\n\tactual tx limit "  ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
+    format (GasLimitTooLow queue actual o@OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "\n\tactual gas limit " ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
@@ -109,12 +111,15 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let lastExecLen = length lastExec
         let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
-        liftIO $ traceIO $ show lastExecLen ++ " =?= " ++ show lastExecGuardLen
-        if noCachedTxsCulled then
+        -- $logDebugS "Bagger.makeNewBlock/sanity" . T.pack $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
+        if noCachedTxsCulled then do
+            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
             if null $ B.promotedTransactions cache then do
+                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
                     !build <- buildFromMiningCache
                     return build
                 else do
+                    $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = False"
                     existingStateDbStateRoot <- getStateRoot
                     let lastSR          = B.lastExecutedStateRoot cache
                     let lastSHA         = B.bestBlockSHA cache
@@ -123,7 +128,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let time            = B.startTimestamp cache
                     let tempBlockHeader = buildNextBlockHeader lastHead lastSHA [] lastSR [] time
                     let remGas          = B.remainingGas cache
-                    liftIO $ traceIO $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
+                    $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
                     let (newSR, newGas, newExec, newUnexec) = case run of
                             Left (GasLimitReached rtx urtx nsr nbg) -> (nsr, nbg, lastExec ++ rtx, urtx)
@@ -135,12 +140,13 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                                 , B.lastExecutedTxs       = newExec
                                                 , B.promotedTransactions  = newUnexec
                                                 }
-                    liftIO $ traceIO $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
+                    $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
                     updateBaggerState (\s -> s { B.miningCache = newMiningCache })
                     setStateDBStateRoot existingStateDbStateRoot
                     !build <- buildFromMiningCache
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
+            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
             let sha    = B.bestBlockSHA cache
             let header = B.bestBlockHeader cache
             processNewBestBlock sha header
@@ -152,24 +158,28 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
 logReady prefix address OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n+++" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n+++")
+    liftIO $ traceIO $ ("\n+++\n" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n+++\n")
 
 logDiscard prefix address expectation OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n===" ++ prefix ++ " expected " ++ (show expectation) ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n===")
+    liftIO $ traceIO $ ("\n===\n" ++ prefix ++ " expected " ++ (show expectation) ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n===\n")
 
 logDiscard' prefix address  OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n---" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n---")
-
+    liftIO $ traceIO $ ("\n---\n" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n---\n")
 
 addToQueued :: MonadBagger m => OutputTx -> m ()
 addToQueued t@OutputTx{otSigner = signer} =
     unlessM (wasSeen t) $ do
-        validation <- (isValidForPool t)
+        validation <- isValidForPool t
+        $logDebugS "Bagger.addToQueued" . T.pack $ "validation :: " ++ show validation
         case validation of
-            Left rejection -> txsDroppedCallback [rejection]
+            Left rejection -> do
+                $logDebugS "Bagger.addToQueued/Left" . T.pack $ "rejection :: " ++ show rejection
+                txsDroppedCallback [rejection]
             Right _ -> do
+                -- $logDebugS "Bagger.addToQueued/Right" "non-rejection "
                 !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
                 putBaggerState newState
+                -- $logDebugS "Bagger.addToQueued/Right" . T.pack $show newState
                 forM_ toDiscard removeFromSeen
                 forM_ toDiscard $ logDiscard' "addToQueued" signer
                 addToSeen t
@@ -196,8 +206,8 @@ promoteExecutables = do
         forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
 
         -- todo callback per promotion call instead of per-address?
-        let nonceDrops = (NonceTooLow Queued addressNonce)     <$> discardedByNonce
-        let costDrops  = (BalanceTooLow Queued addressBalance) <$> discardedByCost
+        let nonceDrops = NonceTooLow Queued addressNonce     <$> discardedByNonce
+        let costDrops  = BalanceTooLow Queued addressBalance <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops)
         forM_ readyToMine promoteTx
 
@@ -228,8 +238,8 @@ demoteUnexecutables = do
         forM_ discardedByCost $ logDiscard "demoteUnexecutables  Pending Balance" address addressBalance
 
         -- todo callback per demotion call instead of per-address?
-        let nonceDrops = (NonceTooLow Queued addressNonce)     <$> discardedByNonce
-        let costDrops  = (BalanceTooLow Queued addressBalance) <$> discardedByCost
+        let nonceDrops = NonceTooLow Queued addressNonce     <$> discardedByNonce
+        let costDrops  = BalanceTooLow Queued addressBalance <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops)
 
         -- drop all existing pending transactions, and try to see if they're
@@ -239,7 +249,10 @@ demoteUnexecutables = do
         forM_ remainingPending $ \t -> removeFromSeen t >> addToQueued t
 
 wasSeen :: MonadBagger m => OutputTx -> m Bool
-wasSeen OutputTx{otHash=sha} = (M.member sha) . B.seen <$> getBaggerState
+wasSeen OutputTx{otHash=sha} = do
+    ret <- (M.member sha) . B.seen <$> getBaggerState
+    -- $logDebugS "Bagger.wasSeen" . T.pack $ "wasSeen " ++ (show sha) ++ " = " ++ (show ret)
+    return ret
 
 isValidForPool :: MonadBagger m => OutputTx -> m (Either BaggerTxRejection ())
 isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
@@ -262,13 +275,15 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
                 return $ Right ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
-addToSeen t = updateBaggerState (B.addToSeen t)
+addToSeen t@OutputTx{otHash=sha} = do
+    -- $logDebugS "Bagger.addToSeen" . T.pack $ "addToSeen " ++ show sha
+    updateBaggerState (B.addToSeen t)
 
 removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)
 
 getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
-getAddressNonceAndBalance addr = (\aS -> (DD.addressStateNonce aS, DD.addressStateBalance aS)) <$> getAddressState addr
+getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$> getAddressState addr
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
 addToPromotionCache tx = updateBaggerState $ B.addToPromotionCache tx
@@ -291,9 +306,9 @@ buildFromMiningCache = do
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty False parentNum parentDiff parentTS time
     previousStateRoot <- getStateRoot
-    liftIO $ traceIO $ "pre-reward :: (" ++ format stateRoot ++ ")"
+    $logInfoN "Bagger.buildFromMiningCache" . T.pack $ "pre-reward :: (" ++ format stateRoot ++ ")"
     rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
-    liftIO $ traceIO $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
+    $logInfoN "Bagger.buildFromMiningCache" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
     setStateDBStateRoot previousStateRoot
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
