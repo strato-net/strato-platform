@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Blockchain.Bagger.BaggerState where
 
 import Control.Applicative (Alternative, empty)
@@ -13,6 +15,9 @@ import Blockchain.Database.MerklePatricia (StateRoot(..), blankStateRoot)
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.SHA
+import Debug.Trace
+
+{-# NOINLINE upsertPT #-}
 
 type ATL = M.Map Address TransactionList
 
@@ -47,17 +52,17 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
                                   , pending               = M.empty
                                   , queued                = M.empty
                                   , seen                  = M.empty
-                                  , calculateIntrinsicGas = error "wyd bro"
+                                  , calculateIntrinsicGas = error "reached defaultBaggerState"
                                   }
 
 defaultMiningCache :: MiningCache
 defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
-                                  , bestBlockHeader       = error "dont taze me bro"
+                                  , bestBlockHeader       = error "reached defaultMiningCache"
                                   , lastExecutedStateRoot = blankStateRoot
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
-                                  , startTimestamp        = error "dbaa"
+                                  , startTimestamp        = error "reached defaultMiningCache"
                                   }
 
 addToATL :: OutputTx -> ATL -> (Maybe OutputTx, ATL)
@@ -126,6 +131,7 @@ addToPromotionCache tx s@BaggerState{ miningCache = mc@MiningCache{ promotedTran
     s { miningCache = mc { promotedTransactions = (upsertPT tx pt) } }
 
 upsertPT :: OutputTx -> [OutputTx] -> [OutputTx]
-upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = tx:filtered
+upsertPT tx@OutputTx{otSigner=addr, otBaseTx=bt} pt = ret
     where filtered = filter (not . (\t -> (otSigner t) == addr && (nonce $ otBaseTx t) == (nonce bt))) pt
           nonce = TD.transactionNonce
+          !ret = tx : filtered

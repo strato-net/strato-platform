@@ -100,7 +100,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m) =>
         let lastExecLen = length lastExec
         let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
-        liftIO $ traceIO $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
+        -- liftIO $ traceIO $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
         if noCachedTxsCulled then do
             liftIO $ traceIO $ "noCachedTxsCulled = True"
             if (null $ B.promotedTransactions cache) then do
@@ -159,16 +159,16 @@ addToQueued :: MonadBagger m => OutputTx -> m ()
 addToQueued t@OutputTx{otSigner = signer} =
     unlessM (wasSeen t) $ do
         validation <- (isValidForPool t)
-        liftIO $ traceIO $ "validation :: " ++ show validation
+        -- liftIO $ traceIO $ "validation :: " ++ show validation
         case validation of
             Left rejection -> do
-                liftIO $ traceIO $ "rejection " ++ show rejection
+                -- liftIO $ traceIO $ "rejection " ++ show rejection
                 txsDroppedCallback [rejection]
             Right _ -> do
-                liftIO $ traceIO "non-rejection "
+                -- liftIO $ traceIO "non-rejection "
                 !(toDiscard, newState) <- B.addToQueued t <$> getBaggerState
                 putBaggerState newState
-                liftIO $ traceIO $ show newState
+                -- liftIO $ traceIO $ show newState
                 forM_ toDiscard removeFromSeen
                 forM_ toDiscard $ logDiscard' "addToQueued" signer
                 addToSeen t
@@ -240,7 +240,7 @@ demoteUnexecutables = do
 wasSeen :: MonadBagger m => OutputTx -> m Bool
 wasSeen OutputTx{otHash=sha} = do
     ret <- (M.member sha) . B.seen <$> getBaggerState
-    liftIO $ traceIO $ "wasSeen " ++ (show sha) ++ " = " ++ (show ret)
+    -- liftIO $ traceIO $ "wasSeen " ++ (show sha) ++ " = " ++ (show ret)
     return ret
 
 isValidForPool :: MonadBagger m => OutputTx -> m (Either BaggerTxRejection ())
@@ -265,7 +265,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
 addToSeen t@OutputTx{otHash=sha} = do
-    liftIO $ traceIO $ "addToSeen " ++ show sha
+    -- liftIO $ traceIO $ "addToSeen " ++ show sha
     updateBaggerState (B.addToSeen t)
 
 removeFromSeen :: MonadBagger m => OutputTx -> m ()

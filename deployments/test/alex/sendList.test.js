@@ -153,6 +153,7 @@ describe('Bloc - List', function() {
       .then(rest.getBalance(aliceAddress))
       .then(function(scope) {
         // assert the final balance
+        console.log("balances: " + JSON.stringify(scope.balances))
         prettyBalance(scope.balances[aliceAddress]);
         const listTxFee = scope.fee.mul(txCount);
         const listTxValue = new BigNumber(txValue).mul(common.constants.ETHER).mul(txCount);
