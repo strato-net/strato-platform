@@ -47,6 +47,8 @@ import Text.Read.Lex
 import Web.HttpApiData
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 
+import BlockApps.Data (Address (..))
+
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 instance (Integral n, Show n) => Show (Hex n) where
   show (Hex n) = showHex n ""
@@ -74,18 +76,6 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
       Just y -> return $ Strung y
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
-
-newtype Address = Address { unAddress :: Hex Word160 }
-  deriving (Eq, Generic)
-instance Show Address where show = show . unAddress
-instance Read Address where readPrec = Address <$> readPrec
-instance FromJSON Address where parseJSON = fmap Address . parseJSON
-instance ToJSON Address where toJSON = toJSON . unAddress
-instance ToHttpApiData Address where
-  toUrlPiece = Text.pack . show . unAddress
-instance ToForm Address where
-  toForm (Address hex) = Form $ HashMap.singleton
-    "address" [Text.pack (show hex)]
 
 newtype Sha256 = Sha256 { unSha256 :: Hex Word256 }
   deriving (Eq, Generic)

@@ -20,6 +20,7 @@ library
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
+    , blockapps-data
     , aeson
     , http-api-data
     , http-client
