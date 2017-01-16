@@ -24,7 +24,6 @@ import GHC.Generics
 import qualified Network.HTTP.Media as M
 import Numeric.Natural
 import Servant.API
-import Text.Read
 import Web.FormUrlEncoded
 
 import BlockApps.Strato.Types
@@ -35,7 +34,7 @@ type API =
   :<|> "users"
     :> Capture "user" Text
     :> ReqBody '[FormUrlEncoded] PostUserParameters
-    :> Post '[HTMLifiedRead] Address
+    :> Post '[HTMLifiedAddress] Address
   :<|> "users"
     :> Capture "user" Text
     :> Get '[HTMLifiedJSON] [Address]
@@ -83,11 +82,13 @@ instance Accept HTMLifiedJSON where
 instance FromJSON x => MimeUnrender HTMLifiedJSON x where
   mimeUnrender _ = eitherDecode
 
-data HTMLifiedRead
-instance Accept HTMLifiedRead where
+data HTMLifiedAddress
+instance Accept HTMLifiedAddress where
   contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
-instance Read x => MimeUnrender HTMLifiedRead x where
-  mimeUnrender _ = readEither . LBS.unpack
+instance MimeUnrender HTMLifiedAddress Address where
+  mimeUnrender _
+    = maybe (Left "could not unrender Address") Right
+    . stringAddress . LBS.unpack
 
 -- hack because endpoints are returning stringified json
 -- as application/octet-stream
