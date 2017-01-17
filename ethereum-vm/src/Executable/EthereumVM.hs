@@ -39,10 +39,15 @@ import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
+    -- todo STOPSHIP NO MERGE THX
+    block <- getFirstBlockFromSequencer
+    initBlockSummary block
+
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffset, EVMCheckpoint cpHash cpHead) <- getCheckpoint
-    Bagger.processNewBestBlock cpHash cpHead -- bootstrap Bagger with genesis block
+    (cpOffset, _ {-EVMCheckpoint cpHash cpHead-}) <- getCheckpoint
+    --Bagger.processNewBestBlock cpHash cpHead -- bootstrap Bagger with genesis block
+    Bagger.processNewBestBlock (outputBlockHash block) (obBlockData block)
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffset
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
@@ -86,20 +91,33 @@ clientId = "ethereum-vm"
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
-getFirstBlockFromSequencer :: (MonadIO m, MonadLogger m) => m OutputBlock
+getFirstBlockFromSequencer :: ContextM OutputBlock
 getFirstBlockFromSequencer = do
     (OEBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
     return block
 
 -- this one starts at 1, 0 is reserved for genesis block and is used to
 -- bootstrap a ton of this
-initializeCheckpoint :: (MonadIO m, MonadLogger m) => m ()
-initializeCheckpoint = do
-    block@OutputBlock{obBlockData=header} <- getFirstBlockFromSequencer
-    let sha = outputBlockHash block
-    setCheckpoint 1 (EVMCheckpoint sha header)
+-- Also seeds the BlockSummaryDatabase
+initializeCheckpointAndBlockSummary :: ContextM ()
+initializeCheckpointAndBlockSummary = do
+    block <- getFirstBlockFromSequencer
+    initBlockSummary block
+    let sha  = outputBlockHash block
+        head = obBlockData block
+    setCheckpoint 1 (EVMCheckpoint sha head)
 
-getCheckpoint :: (MonadIO m, MonadLogger m) => m (KP.Offset, EVMCheckpoint)
+
+initBlockSummary :: OutputBlock -> ContextM ()
+initBlockSummary block =
+    let sha   = outputBlockHash block
+        head  = obBlockData block
+        td    = obTotalDifficulty block
+        txCnt = fromIntegral $ length (obReceiptTransactions block)
+        in
+            putBSum sha (blockHeaderToBSum head td txCnt)
+
+getCheckpoint :: ContextM (KP.Offset, EVMCheckpoint)
 getCheckpoint = do
     let topic  = seqEventsTopicName
         topic' = show topic
@@ -107,15 +125,18 @@ getCheckpoint = do
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for topic " ++ topic' ++ "#0 for CG " ++ cg'
     liftIO (runKafkaConfigured clientId (KC.fetchSingleOffset consumerGroup topic 0)) >>= \case
         Left err -> error $ "Error fetching checkpoint `" ++ topic' ++ "`: " ++ show err
-        Right (Left KP.UnknownTopicOrPartition) -> initializeCheckpoint >> getCheckpoint
+        Right (Left KP.UnknownTopicOrPartition) -> initializeCheckpointAndBlockSummary >> getCheckpoint
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
-        Right (Right (ofs, md)) -> return (ofs, fromKafkaMetadata md)
+        Right (Right (ofs, md)) -> do
+            $logInfoS "getCheckpoint" . T.pack $ "received ofs=" ++ show ofs ++ " / md=" ++ show md
+            return (ofs, DummyEVMCP {-fromKafkaMetadata md-})
 
 
-setCheckpoint :: (MonadIO m, MonadLogger m) => KP.Offset -> EVMCheckpoint -> m ()
+setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
+    $logInfoS "setCheckpoint" . T.pack $ "KMD " ++ show kMetadata
     time <- liftIO $ KP.Time . fromIntegral <$> getCurrentMicrotime
     ret  <- liftIO $ runKafkaConfigured clientId $
         KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs time kMetadata
@@ -124,7 +145,7 @@ setCheckpoint ofs checkpoint = do
         Right (Left e) -> error $ show e
         Right _ -> return ()
 
-getUnprocessedKafkaEvents :: (MonadIO m, MonadLogger m) => KP.Offset -> m [OutputEvent]
+getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
     ret <- liftIO $ runKafkaConfigured clientId (readSeqEvents offset)
