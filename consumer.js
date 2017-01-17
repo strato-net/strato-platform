@@ -85,10 +85,6 @@ function startConsumer() {
     var offsets = Promise.promisifyAll(new kafka.Offset(client));
     var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
 
-    // TODO: Need to wire to environment variable, only be true on restore of strato
-    scope.restore = true;
-    // -- end TODO
-
     var consumer = offset.then(function(offset) {
 
       return new kafka.Consumer(
