@@ -11,6 +11,7 @@ module BlockApps.Data
   , deriveAddress
   , addressString
   , stringAddress
+  , newSecKey
     -- * Keccak 256 Hashes
   , Keccak256 (..)
   , keccak256
@@ -32,6 +33,7 @@ module BlockApps.Data
   ) where
 
 import Crypto.Hash
+import Crypto.Random
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.Binary as Binary
@@ -53,7 +55,7 @@ import Text.Read
 import Web.FormUrlEncoded
 import Web.HttpApiData
 
-newtype Address = Address Word160 deriving (Eq,Show,Generic)
+newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
 addressString (Address address) = padZeros 20 (showHex address "")
 stringAddress :: String -> Maybe Address
@@ -86,6 +88,9 @@ deriveAddress
   . keccak256
   . ByteString.drop 1
   . exportPubKey False
+
+newSecKey :: IO (Maybe SecKey)
+newSecKey = secKey <$> getRandomBytes 32
 
 newtype Keccak256 = Keccak256 (Digest Keccak_256) deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String

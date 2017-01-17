@@ -26,22 +26,25 @@ library
   build-depends: base
     , blockapps-data
     , blockapps-strato
-    , acid-state
     , aeson
     , containers
+    , cryptonite
     , bytestring
     , generic-random
     , http-api-data
+    , http-client
     , http-media
     , mtl
     , QuickCheck
     , quickcheck-instances
-    , safecopy
+    , secp256k1
     , servant
     , servant-client
     , servant-mock
     , servant-server
+    , stm
     , text
+    , warp
 
 test-suite blockapps-bloc-test
   default-language: Haskell2010
