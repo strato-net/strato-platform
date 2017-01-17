@@ -36,7 +36,7 @@ function startCirrus() {
       var _ = require('lodash/fp');
       var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
 
-      
+
       // create the pool somewhere globally so its lifetime
       // lasts for as long as your app is running
       var pool = scope.pool;
@@ -54,9 +54,9 @@ function startCirrus() {
 
         console.log("global.contractMap: " + JSON.stringify(global.contractMap));
 
-           pool
-            .query(schema)
-        .then(_ => console.log("done creating new schema for contract"))
+        pool
+          .query(schema)
+          .then(_ => console.log("done creating new table for contract"))
 
         console.log("Schema: " + schema)
         res.send(schema)

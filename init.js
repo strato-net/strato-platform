@@ -7,7 +7,6 @@ var toSchemaString = util.toSchemaString;
 function initCirrus(scope) {
   scope.contractMap = {};
   scope.pool = {};
-  scope.contractMap = {};
 
   var pgConfig = {
     host: (process.env.POSTGRES || 'postgres'),
@@ -31,6 +30,7 @@ function getPostgres(pgConfig) {
     return new Promise(function(resolve, reject) {
         scope.pool = new Pool(pgConfig);
 
+        // exit the process for docker to restart, make sure environment variables always sent
         scope.pool.on('error', function(error, client) {
           console.log("Couldn't connect to postgres: " + error);
           process.exit(1);
@@ -94,12 +94,13 @@ function generateContractTables() {
   return function(scope) {
     var schemas = []
     for(codeHash in global.contractMap) {
+      console.log('rebuilding DB', codeHash);
       schemas.push(toSchemaString(global.contractMap[codeHash]));
     }
     return Promise
       .each(schemas, function(schema){
         scope.pool.query(schema)
-          .then(_ => console.log("done creating new schema for contract"));
+          .then(_ => console.log("done creating table for contract"));
       })
       .then(function(){
         return scope;

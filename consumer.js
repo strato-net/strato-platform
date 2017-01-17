@@ -5,6 +5,7 @@ var yaml = require('yaml-parser');
 var child_process = require("child_process");
 var bajs = require('blockapps-js');
 var util = require('./lib/util');
+// var cleanState = util.
 
 var traverse = require('traverse');
 
@@ -84,7 +85,10 @@ function startConsumer() {
     var offsets = Promise.promisifyAll(new kafka.Offset(client));
     var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
 
+    // TODO: Need to wire to environment variable, only be true on restore of strato
     scope.restore = true;
+    // -- end TODO
+
     var consumer = offset.then(function(offset) {
 
       return new kafka.Consumer(
