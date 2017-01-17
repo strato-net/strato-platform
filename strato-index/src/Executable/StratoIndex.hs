@@ -57,21 +57,23 @@ stratoIndex = runIContextM . forever $ do
 isMined :: Block->Bool
 isMined Block{blockBlockData=BlockData{blockDataNonce=n}} = n /= 5
 
+targetTopicName :: TopicName
+targetTopicName = defaultVMEventsTopicName
+
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
 
 getUnprocessedKafkaVMEvents :: (MonadLogger m, MonadIO m) => m (Offset, [VMEvent])
 getUnprocessedKafkaVMEvents = do
-  let topicName       = defaultVMEventsTopicName
-      (client, group) = kafkaClientIds
-  liftIO (runKafkaConfigured client (fetchSingleOffset group topicName 0)) >>= \case
-    Left err -> error $ "Error fetching offset for topic `" ++ show topicName ++ "`: " ++ show err
+  let (client, group) = kafkaClientIds
+  liftIO (runKafkaConfigured client (fetchSingleOffset group targetTopicName 0)) >>= \case
+    Left err -> error $ "Error fetching offset for topic `" ++ show targetTopicName ++ "`: " ++ show err
     Right (Left UnknownTopicOrPartition) -> -- we've never committed an Offset
         setKafkaCheckpoint 0 >>= \case
             Left err -> error $ "Error when bootstrapping the offset to 0: " ++ show err
             Right (Left err) -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
             Right (Right ()) -> getUnprocessedKafkaVMEvents
-    Right (Left err) -> error $ "Unexpected response when fetching offset for topic `" ++ show topicName ++ "`: " ++ show err
+    Right (Left err) -> error $ "Unexpected response when fetching offset for topic `" ++ show targetTopicName ++ "`: " ++ show err
     Right (Right (ofs, _)) ->
         liftIO (runKafkaConfigured client (fetchVMEvents' ofs)) >>= \case
             Left  err    -> error $ "Error when fetching VMEvents at " ++ show ofs ++ ": " ++ show err
@@ -82,4 +84,4 @@ setKafkaCheckpoint ofs = do
     let (client, group) = kafkaClientIds
     time <- liftIO $ Time . fromIntegral <$> getCurrentMicrotime
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    liftIO $ runKafkaConfigured client $ commitSingleOffset group defaultVMEventsTopicName 0 ofs time ""
+    liftIO $ runKafkaConfigured client $ commitSingleOffset group targetTopicName 0 ofs time ""
