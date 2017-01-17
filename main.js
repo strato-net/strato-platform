@@ -9,6 +9,6 @@ init(scope)
   .then(expressApp())
   .then(consumer())
   .catch(err => {
-    console.log('Failed to launch cirrus')
+    console.log('Failed to launch cirrus', err)
   })
   // .then(consumer())

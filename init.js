@@ -1,5 +1,8 @@
 var Pool = require('pg-pool');
 var rp = require("request-promise");
+var util = require('./lib/util');
+var Promise = require('bluebird');
+var toSchemaString = util.toSchemaString;
 
 function initCirrus(scope) {
   scope.contractMap = {};
@@ -14,8 +17,9 @@ function initCirrus(scope) {
     port: 5432
   };
   return getPostgres(pgConfig)(scope)
-    .then(createContractTable())
+    .then(createContractABITable())
     .then(fetchABIs())
+    .then(generateContractTables())
     .then(getKafkaTopic())
     .catch(err => {
       console.log('Failed to init', err)
@@ -71,7 +75,7 @@ function fetchABIs() {
   }
 }
 
-function createContractTable() {
+function createContractABITable() {
   return function(scope) {
     var contractTable = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "codeHash" text PRIMARY KEY, "name" text, "abi" text); CREATE INDEX IF NOT EXISTS idx ON "contract" ("codeHash"); COMMIT;'
     return scope.pool.query(contractTable)
@@ -84,6 +88,23 @@ function createContractTable() {
         return scope;
       });
   }
+}
+
+function generateContractTables() {
+  return function(scope) {
+    var schemas = []
+    for(codeHash in global.contractMap) {
+      schemas.push(toSchemaString(global.contractMap[codeHash]));
+    }
+    return Promise
+      .each(schemas, function(schema){
+        scope.pool.query(schema)
+          .then(_ => console.log("done creating new schema for contract"));
+      })
+      .then(function(){
+        return scope;
+      })
+  };
 }
 
 function getKafkaTopic() {

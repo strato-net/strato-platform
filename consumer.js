@@ -79,23 +79,26 @@ function startConsumer() {
     console.log("Connections are:\n\tstrato: " + stratoHost + "\n\tpostgrest: " + postgrestHost + "\n\tzookeeper: " + zookeeperHost);
 
     var client = new kafka.Client(zookeeperHost);
+    // if()
     var topic = scope.kafkaTopic;
     var offsets = Promise.promisifyAll(new kafka.Offset(client));
     var offset = offsets.fetchLatestOffsetsAsync([topic]).get(topic).get(0);
 
+    scope.restore = true;
     var consumer = offset.then(function(offset) {
-     return new kafka.Consumer(
+
+      return new kafka.Consumer(
        client,
        [{
          topic: topic,
-         offset: offset,
+         offset: scope.restore ? 0 : offset,
          partition: 0
        }],
        {
          fromOffset: true,
          fetchMaxBytes: 1024*1024*15
        }
-     );
+      );
     });
 
     consumer.call('on', 'message', function (m) {

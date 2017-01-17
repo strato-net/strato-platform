@@ -18,6 +18,8 @@ var bajs = require('blockapps-js');
 
 var util = require('./lib/util');
 
+var toSchemaString = util.toSchemaString;
+
 var router = express.Router();
 
 function startCirrus() {
@@ -34,30 +36,7 @@ function startCirrus() {
       var _ = require('lodash/fp');
       var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
 
-      const typeMapping = {'Bytes':'text', 'Bool':'boolean', 'String':'text', 'Int':'integer DEFAULT 0', 'Address':'text', 'json':'json DEFAULT \'{}\''}
-
-      // toSchema :: [(key: value)] -> Object -> Schema
-      // we might want to filter on `public` here in the future
-      var toSchema = typeMapping => _.flow(
-                                       _.omitBy(o => o.type == 'Mapping')
-                                      ,_.mapValues(v => v.typedef !== undefined ? 'String' : v.type)
-                                      ,_.mapValues(v => v == 'Array' ? 'json' : v) // this is perhaps fast if it is array
-                                      ,_.mapValues(v => typeMapping[v])
-                                      ,_.merge({address: "text PRIMARY KEY"})
-                                    )
-
-      // this should arguably be replaced by `sequelize`
-      var toSchemaString = function(json){
-        var types = toSchema(typeMapping)(json.xabi.vars)
-        var end = __.map(types, (v, k) => "\x22"+ k + "\x22" + " " + v);
-        var tableCreate = "CREATE TABLE IF NOT EXISTS " + "\x22" + json.name + "\x22" + " (" + end.join(', ') + " ); ";
-        var indexCreate = "CREATE INDEX IF NOT EXISTS idx ON " + "\x22" + json.name + "\x22" + " (address); ";
-        var nameAdd = "INSERT INTO contract VALUES (DEFAULT, '" + json.codeHash + "', '" + json.name + "', '" + JSON.stringify(json.xabi) +  "' ) ON CONFLICT DO NOTHING; ";
-
-        return "BEGIN; " + tableCreate + indexCreate + nameAdd + " COMMIT;"
-      }
-      var nameSchema = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "codeHash" text PRIMARY KEY, "name" text, "abi" text); CREATE INDEX IF NOT EXISTS idx ON "contract" ("codeHash"); COMMIT;'
-
+      
       // create the pool somewhere globally so its lifetime
       // lasts for as long as your app is running
       var pool = scope.pool;
