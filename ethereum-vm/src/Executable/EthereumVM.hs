@@ -1,8 +1,8 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, BangPatterns, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell, BangPatterns, LambdaCase #-}
 
 module Executable.EthereumVM (
   ethereumVM
-  ) where
+) where
 
 import Control.Monad
 import Control.Monad.Logger
@@ -37,92 +37,48 @@ import qualified Blockchain.Bagger as Bagger
 
 import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
 
-savedOffsetFilePath::String
-savedOffsetFilePath = ".ethereumH/vmOffset"
+ethereumVM :: LoggingT IO ()
+ethereumVM = void . execContextM $ do
+    let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
+    Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
+    (cpOffset, EVMCheckpoint cpHash cpHead) <- getCheckpoint
+    Bagger.processNewBestBlock cpHash cpHead -- bootstrap Bagger with genesis block
 
-ethereumVM::LoggingT IO ()
-ethereumVM = do
-  let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
-  readStartingBlock <- liftIO $ getSavedOffset savedOffsetFilePath
+    $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffset
+    let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
+    forever $ do
+        (cpOffset, _) <- getCheckpoint
+        $logInfoS "evm/loop" "Getting Blocks/Txs"
+        seqEvents <- getUnprocessedKafkaEvents cpOffset
 
-  let startingBlock =
-        case (flags_startingBlock, readStartingBlock) of
-         (-1, Just x) -> x
-         (-1, Nothing) -> 1
-         (val, _) -> val
-                     
-  offsetIORef <- liftIO $ newTVarIO startingBlock
+        !currentMicrotime <- liftIO getCurrentMicrotime
+        $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
-  _ <- liftIO $ forkIO $ syncValToFile savedOffsetFilePath startingBlock offsetIORef
-  _ <- execContextM $ do
-        Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-        firstBlock <- getFirstBlockFromSequencer
-        let firstBlockSHA  = outputBlockHash firstBlock
-            firstBlockHead = obBlockData firstBlock
-            firstBlockTD   = obTotalDifficulty firstBlock
-            fbTxsCnt       = fromIntegral $ length $ obReceiptTransactions firstBlock
-            fbUncleCnt     = fromIntegral $ length $ obBlockUncles firstBlock
-        putBSum firstBlockSHA (blockHeaderToBSum firstBlockHead firstBlockTD fbTxsCnt)
-        Bagger.processNewBestBlock firstBlockSHA firstBlockHead -- bootstrap Bagger with genesis block
-        lastOffsetOrError <- liftIO $ runKafkaConfigured clientId $
-                             K.getLastOffset K.LatestTime 0 (lookupTopic "seqevents")
+        let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
+        forM_ newCommands runJsonRpcCommand
 
-        let lastOffset =
-              case lastOffsetOrError of
-               Left e -> error $ show e
-               Right val -> val
+        let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
+        forM_ allNewTxs $ \(ts, t) ->
+            $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
+        let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
+        $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
+        unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
 
-        $logInfoS "evm/preLoop" $ T.pack $ "lastOffset = " ++ show lastOffset
-        let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
-        forever $ do
-            $logInfoS "evm/loop" "Getting Blocks/Txs"
-            offset <- liftIO $ readTVarIO offsetIORef
-            seqEvents <- getUnprocessedKafkaEvents offsetIORef
+        let blocks = [b | OEBlock b <- seqEvents]
+        $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
+        forM_ blocks $ \b ->
+            putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
+        addBlocks False blocks
 
-            !currentMicrotime <- liftIO getCurrentMicrotime
-            $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
+        when (not makeLazyBlocks || not (null poolableNewTxs)) $ do
+            $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
+            newBlock <- Bagger.makeNewBlock
+            $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocks"
+            produceUnminedBlocks [outputBlockToBlock newBlock]
 
-            when (fromIntegral offset >= lastOffset) $ do
-              let newCommands = [c | OEJsonRpcCommand c <- seqEvents]
-              forM_ newCommands runJsonRpcCommand
-            
-            let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
-            forM_ allNewTxs $ \(ts, t) ->
-                $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
-            let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
-            $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
-            unless (null poolableNewTxs) $ Bagger.addTransactionsToMempool poolableNewTxs
-
-            let blocks = [b | OEBlock b <- seqEvents]
-            $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
-            forM_ blocks $ \b ->
-                putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
-            addBlocks False blocks
-
-            when (not makeLazyBlocks || not (null poolableNewTxs)) $ do
-                $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
-                newBlock <- Bagger.makeNewBlock
-                $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocks"
-                produceUnminedBlocks [outputBlockToBlock newBlock]
-
-            liftIO $ atomically $ writeTVar offsetIORef $ offset + fromIntegral (length seqEvents)
-
-            return ()
-  return ()
-
-getSavedOffset::FilePath->IO (Maybe Integer)
-getSavedOffset filePath = do
-  fileExists <- doesFileExist filePath
-  if fileExists
-    then (Just . read) <$> readFile filePath
-    else return Nothing
-      
-syncValToFile::(Read a, Show a, Eq a)=>FilePath->a->TVar a->IO ()
-syncValToFile filePath oldVal tVar = do
-  newVal <- readTVarIO tVar
-  when (oldVal /= newVal) $ writeFile filePath $ show newVal
-  threadDelay 1000000
-  syncValToFile filePath newVal tVar
+        let newOffset = cpOffset + fromIntegral (length seqEvents)
+        checkpointData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
+        setCheckpoint newOffset checkpointData
 
 clientId :: K.KafkaClientId
 clientId = "ethereum-vm"
@@ -132,8 +88,7 @@ consumerGroup = lookupConsumerGroup "ethereum-vm"
 
 getFirstBlockFromSequencer :: (MonadIO m, MonadLogger m) => m OutputBlock
 getFirstBlockFromSequencer = do
-    dummyIORef      <- liftIO $ newTVarIO (0 :: Integer)
-    (OEBlock block) <- head <$> getUnprocessedKafkaEvents dummyIORef
+    (OEBlock block) <- head <$> getUnprocessedKafkaEvents (KP.Offset 0)
     return block
 
 -- this one starts at 1, 0 is reserved for genesis block and is used to
@@ -169,16 +124,12 @@ setCheckpoint ofs checkpoint = do
         Right (Left e) -> error $ show e
         Right _ -> return ()
 
-getUnprocessedKafkaEvents::(MonadIO m, MonadLogger m)=>
-                           TVar Integer->m [OutputEvent]
-getUnprocessedKafkaEvents offsetIORef = do
-  offset <- liftIO $ readTVarIO offsetIORef
-  $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-  ret <-
-      liftIO $ runKafkaConfigured clientId $ readSeqEvents $ KP.Offset $ fromIntegral offset
-
-  case ret of
-    Left e -> error $ show e
-    Right v -> do 
-      $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ (show . length $ v) ++ " unprocessed blocks/txs"
-      return v
+getUnprocessedKafkaEvents :: (MonadIO m, MonadLogger m) => KP.Offset -> m [OutputEvent]
+getUnprocessedKafkaEvents offset = do
+    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
+    ret <- liftIO $ runKafkaConfigured clientId (readSeqEvents offset)
+    case ret of
+        Left e -> error $ show e
+        Right v -> do
+            $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ (show . length $ v) ++ " unprocessed blocks/txs"
+            return v
