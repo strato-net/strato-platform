@@ -59,7 +59,7 @@ function fetchABIs() {
         if(response.length > 0) {
           response.forEach(x => {
             // scope.contractMap[x.codeHash] = x.abi
-            global.contractMap[x.codeHash] = x.abi;
+            global.contractMap[x.codeHash] = JSON.parse(x.abi);
           });
         }
         return scope;
