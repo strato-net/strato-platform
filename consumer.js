@@ -95,7 +95,7 @@ function startConsumer() {
        client,
        [{
          topic: topic,
-         offset: scope.restore ? 0 : offset,
+         offset: 0 ,
          partition: 0
        }],
        {
