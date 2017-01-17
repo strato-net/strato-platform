@@ -15,7 +15,6 @@ import Blockchain.Database.MerklePatricia (StateRoot(..), blankStateRoot)
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.SHA
-import Debug.Trace
 
 {-# NOINLINE upsertPT #-}
 

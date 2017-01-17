@@ -47,7 +47,7 @@ formatLogStr = BC.unpack . fromLogStr
 
 formatLogOutput :: Bool -> Bool -> String -> Loc -> LogSource -> LogLevel -> LogStr -> BC.ByteString
 formatLogOutput showLoc showTS timestamp loc logSource level msg = BC.pack $
-    printf "%s%s%s | %s | %s" tsAndDivider locAndDivider (formatLogSource logSource) (formatLogLevel level) (formatLogStr msg)
+    printf "%s%s%s | %s | %s" tsAndDivider locAndDivider (formatLogLevel level) (formatLogSource logSource) (formatLogStr msg)
     where locAndDivider = if showLoc then formatLoc loc ++ " | " else ""
           tsAndDivider = if showTS then '[':(timestamp ++ "] ") else ""
 

@@ -464,39 +464,37 @@ timeIt f = do
   return (timeAfter - timeBefore, result)
 
 
--- todo: strip escapes/colors when calculating length of longest line
-logWithBox :: MonadLogger m => T.Text -> [String] -> m ()
-logWithBox source lines = do
-    let longestLine     = maximum (length . stripEscapes <$> lines)
-        withBorder      = addBorder <$> lines
-        indent          = "    "
-        headerAndFooter = indent ++ CL.magenta (replicate (longestLine + 4) '=')
+logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
+logWithBox source headerSize lines = do
+    let headerAndFooter = indent ++ CL.magenta (replicate headerSize '=')
         addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
-        stripEscapes    = id -- todo
+        indent          = "    "
     $logInfoS source $ T.pack headerAndFooter
-    forM_ withBorder $ \l -> $logInfoS source (T.pack $ rightPad longestLine ' ' l)
+    forM_ (addBorder <$> lines) ($logInfoS source . T.pack)
     $logInfoS source $ T.pack headerAndFooter
 
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
 printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=txHash} (Left errMsg) deltaT = do
   let tNonce = transactionNonce baseTx
-  logWithBox "printTx/err" [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ CL.magenta " // " ++ show tNonce
-                           , "Tx hash: " ++ format txHash
-                           , CL.red "Transaction failure: " ++ CL.red (show errMsg)
-                           , "t = " ++ printf "%.2f" (realToFrac deltaT::Double) ++ "s"
-                           ]
+  logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
+                              , "Tx hash:  " ++ format txHash
+                              , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                              , CL.red "Transaction failure: " ++ CL.red (show errMsg)
+                              , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
+                              ]
 
 printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=txHash} (Right results) deltaT = do
   let tNonce = transactionNonce t
       txPretty = if isMessageTX t
-        then "MessageTX to " ++ show (pretty $ transactionTo t)
-        else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results)
-  logWithBox "printTx/ok" [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ CL.magenta " // " ++ show tNonce
-                          , "Tx hash: " ++ format txHash
-                          , txPretty
-                          , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s"
-                          ]
+        then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
+        else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results) ++ "                  "
+  logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
+                             , "Tx hash:  " ++ format txHash
+                             , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                             , txPretty
+                             , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
+                             ]
 
 indexMaybe::[a]->Int->Maybe a
 indexMaybe _ i | i < 0 = error "indexMaybe called for i < 0"

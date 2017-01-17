@@ -158,13 +158,29 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
 logReady prefix address OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n+++\n" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n+++\n")
+    $logDebugS "Bagger.logReady++++++++" "+++++++++++++++++++"
+    $logDebugS "Bagger.logReady+status " . T.pack $ prefix
+    $logDebugS "Bagger.logReady+address" . T.pack $ format address
+    $logDebugS "Bagger.logReady+hash   " . T.pack $ format h
+    $logDebugS "Bagger.logReady+nonce  " . T.pack $ show (TD.transactionNonce t)
+    $logDebugS "Bagger.logReady++++++++" "+++++++++++++++++++"
 
 logDiscard prefix address expectation OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n===\n" ++ prefix ++ " expected " ++ (show expectation) ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n===\n")
+    $logDebugS "Bagger.logDiscard========" "==================="
+    $logDebugS "Bagger.logDiscard=status " . T.pack $ prefix
+    $logDebugS "Bagger.logDiscard=expect " . T.pack $ show expectation
+    $logDebugS "Bagger.logDiscard=address" . T.pack $ format address
+    $logDebugS "Bagger.logDiscard=hash   " . T.pack $ format h
+    $logDebugS "Bagger.logDiscard=nonce  " . T.pack $ show (TD.transactionNonce t)
+    $logDebugS "Bagger.logDiscard========" "==================="
 
-logDiscard' prefix address  OutputTx{otHash=h, otBaseTx=t} = do
-    liftIO $ traceIO $ ("\n---\n" ++ prefix ++ " for address " ++ (format address) ++ ";\n tx was \nh=" ++ (format h) ++ "\nn=" ++ (show $ TD.transactionNonce t) ++ "\n---\n")
+logDiscard' prefix address OutputTx{otHash=h, otBaseTx=t} = do
+    $logDebugS "Bagger.logDiscard'--------" "-------------------"
+    $logDebugS "Bagger.logDiscard'-status " . T.pack $ prefix
+    $logDebugS "Bagger.logDiscard'-address" . T.pack $ format address
+    $logDebugS "Bagger.logDiscard'-hash   " . T.pack $ format h
+    $logDebugS "Bagger.logDiscard'-nonce  " . T.pack $ show (TD.transactionNonce t)
+    $logDebugS "Bagger.logDiscard'--------" "-------------------"
 
 addToQueued :: MonadBagger m => OutputTx -> m ()
 addToQueued t@OutputTx{otSigner = signer} =
@@ -306,9 +322,9 @@ buildFromMiningCache = do
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty False parentNum parentDiff parentTS time
     previousStateRoot <- getStateRoot
-    $logInfoN "Bagger.buildFromMiningCache" . T.pack $ "pre-reward :: (" ++ format stateRoot ++ ")"
+    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "pre-reward :: (" ++ format stateRoot ++ ")"
     rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
-    $logInfoN "Bagger.buildFromMiningCache" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
+    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
     setStateDBStateRoot previousStateRoot
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
