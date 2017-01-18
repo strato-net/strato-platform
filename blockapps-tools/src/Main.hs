@@ -9,6 +9,7 @@ import BlockGO
 import Hash
 --import Init
 import Code
+import Checkpoints
 import DumpKafkaBlocks
 import DumpKafkaUnminedBlocks
 import DumpKafkaSequencer
@@ -41,6 +42,7 @@ data Options =
   | Raw{filename::String}
   | RLP{filename::String}
   | Init{hash::String, db::String}
+  | Checkpoints{}
   | DumpKafkaBlocks{startingBlock::Int}
   | DumpKafkaSequencer{startingBlock::Int}
   | DumpKafkaUnSequencer{startingBlock::Int}
