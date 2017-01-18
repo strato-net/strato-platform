@@ -60,7 +60,7 @@ addPeersIfNeeded::(MonadIO m, MonadLogger m)=>
 addPeersIfNeeded prv sock= do
   numAvailablePeers <- liftIO getNumAvailablePeers
   when (numAvailablePeers < minAvailablePeers (discoveryConfig ethConf)) $ do
-    bondedPeers <- liftIO getBondedPeers
+    bondedPeers <- liftIO getBondedPeersForUDP
     if length bondedPeers /= 0
       then do
         peerNumber <- liftIO $ randomRIO (0, length bondedPeers - 1)
@@ -69,6 +69,7 @@ addPeersIfNeeded prv sock= do
         time <- liftIO $ round `fmap` getPOSIXTime
         randomBytes <- liftIO $ getEntropy 64
         sendPacket sock prv (addrAddress peeraddr) $ FindNeighbors (NodeID randomBytes) (time + 50)
+        liftIO $ disableUDPPeerForSeconds thePeer 10
       else logInfoN "no peers available to bootstrap from, will try again soon."
 
 attemptBond::(MonadIO m, MonadLogger m)=>
@@ -123,6 +124,7 @@ udpHandshakeServer prv sock portNum = do
                        pPeerLastMsg  = T.pack "msg",
                        pPeerLastMsgTime = curTime,
                        pPeerEnableTime = curTime,
+                       pPeerUdpEnableTime = curTime,
                        pPeerLastBestBlockHash = SHA 0,
                        pPeerBondState = 0,
                        pPeerVersion = T.pack "61" -- fix
@@ -153,6 +155,7 @@ udpHandshakeServer prv sock portNum = do
                                       pPeerLastMsg  = T.pack "msg",
                                       pPeerLastMsgTime = curTime,
                                       pPeerEnableTime = curTime,
+                                      pPeerUdpEnableTime = curTime,
                                       pPeerLastBestBlockHash = SHA 0,
                                       pPeerBondState = 0,
                                       pPeerVersion = T.pack "61" -- fix
