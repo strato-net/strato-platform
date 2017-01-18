@@ -34,6 +34,7 @@ PPeer
     lastMsg T.Text
     lastMsgTime UTCTime
     enableTime UTCTime
+    udpEnableTime UTCTime
     lastTotalDifficulty Integer
     lastBestBlockHash SHA
     bondState Int
@@ -56,6 +57,7 @@ createPeer peerString =
     pPeerLastMsg  = T.pack "msg",
     pPeerLastMsgTime = jamshidBirth,
     pPeerEnableTime = jamshidBirth,
+    pPeerUdpEnableTime = jamshidBirth,
     pPeerLastBestBlockHash = SHA 0,
     pPeerBondState=0,
     pPeerVersion = T.pack "61" -- fix
@@ -90,6 +92,13 @@ getBondedPeers = do
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
+getBondedPeersForUDP::IO [PPeer]
+getBondedPeersForUDP = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ SQL.createPostgresqlPool connStr' 20
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+    SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
+
 getUnbondedPeers::IO [PPeer]
 getUnbondedPeers = do
   currentTime <- getCurrentTime
@@ -107,6 +116,7 @@ defaultPeer = PPeer{
   pPeerLastMsg="",
   pPeerLastMsgTime=posixSecondsToUTCTime 0,
   pPeerEnableTime=posixSecondsToUTCTime 0,
+  pPeerUdpEnableTime=posixSecondsToUTCTime 0,
   pPeerLastTotalDifficulty=0,
   pPeerLastBestBlockHash=SHA 0,
   pPeerBondState=0,
@@ -119,5 +129,13 @@ disablePeerForSeconds peer seconds = do
   sqldb <- runNoLoggingT $ SQL.createPostgresqlPool connStr' 20
   flip SQL.runSqlPool sqldb $ 
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
+  return ()
+  
+disableUDPPeerForSeconds::PPeer->Int->IO ()
+disableUDPPeerForSeconds peer seconds = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ SQL.createPostgresqlPool connStr' 20
+  flip SQL.runSqlPool sqldb $ 
+    SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
   
