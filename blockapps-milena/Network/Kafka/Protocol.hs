@@ -83,7 +83,10 @@ data RequestMessage = MetadataRequest MetadataRequest
                     deriving (Show, Eq)
 
 newtype MetadataRequest = MetadataReq [TopicName] deriving (Show, Eq, Serializable, Deserializable)
-newtype TopicName = TName { _tName :: KafkaString } deriving (Show, Eq, Ord, Deserializable, Serializable, IsString)
+newtype TopicName = TName { _tName :: KafkaString } deriving (Eq, Ord, Deserializable, Serializable, IsString)
+
+instance Show TopicName where
+    show (TName t) = "TopicName " ++ show (_kString t)
 
 newtype KafkaBytes = KBytes { _kafkaByteString :: ByteString } deriving (Show, Eq, IsString)
 newtype KafkaString = KString { _kString :: ByteString } deriving (Show, Eq, Ord, IsString)
@@ -174,10 +177,16 @@ data ResponseMessage = MetadataResponse MetadataResponse
 
 newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Show, Eq, Serializable)
 
-newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, [(TopicName, [(Partition, Offset, Time, Metadata)])]) deriving (Show, Eq, Serializable)
+newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable)
 newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable)
-newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
-newtype Metadata = Metadata KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
+newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Eq, Serializable, Deserializable, IsString)
+
+instance Show ConsumerGroup where
+    show (ConsumerGroup g) = "ConsumerGroup " ++ show (_kString g)
+
+newtype ConsumerGroupGeneration = ConsumerGroupGeneration Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
+newtype ConsumerId = ConsumerId KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
+newtype Metadata = Metadata { _kMetadata :: KafkaString } deriving (Show, Eq, Serializable, Deserializable, IsString)
 
 errorKafka :: KafkaError -> Int16
 errorKafka NoError                             = 0
@@ -260,16 +269,18 @@ requestBytes x = runPut $ do
     where mr = runPut $ serialize x
 
 apiVersion :: RequestMessage -> ApiVersion
-apiVersion _ = ApiVersion 0 -- everything is at version 0 right now
+apiVersion OffsetFetchRequest{}  = 1 -- have to be V1 to use kafka storage to allow metadata
+apiVersion OffsetCommitRequest{} = 2 -- ditto
+apiVersion _ = ApiVersion 0 -- everything else is at version 0 right now
 
 apiKey :: RequestMessage -> ApiKey
-apiKey (ProduceRequest{}) = ApiKey 0
-apiKey (FetchRequest{}) = ApiKey 1
-apiKey (OffsetRequest{}) = ApiKey 2
-apiKey (MetadataRequest{}) = ApiKey 3
-apiKey (OffsetCommitRequest{}) = ApiKey 8
-apiKey (OffsetFetchRequest{}) = ApiKey 9
-apiKey (GroupCoordinatorRequest{}) = ApiKey 10
+apiKey ProduceRequest{}          = ApiKey 0
+apiKey FetchRequest{}            = ApiKey 1
+apiKey OffsetRequest{}           = ApiKey 2
+apiKey MetadataRequest{}         = ApiKey 3
+apiKey OffsetCommitRequest{}     = ApiKey 8
+apiKey OffsetFetchRequest{}      = ApiKey 9
+apiKey GroupCoordinatorRequest{} = ApiKey 10
 
 instance Serializable RequestMessage where
   serialize (ProduceRequest r) = serialize r

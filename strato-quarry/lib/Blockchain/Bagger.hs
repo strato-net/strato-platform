@@ -49,9 +49,9 @@ data BaggerTxRejection = NonceTooLow    BaggerTxQueue Integer OutputTx -- intege
                        deriving Show
 
 instance Format BaggerTxRejection where
-    format (NonceTooLow    queue actual o@OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "\n\tactual nonce "     ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
-    format (BalanceTooLow  queue actual o@OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "\n\tactual tx limit "  ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
-    format (GasLimitTooLow queue actual o@OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "\n\tactual gas limit " ++ (show actual) ++ "\n\ttx hash " ++ (format hash) ++ "\n" ++ (format o)
+    format (NonceTooLow    queue actual o@OutputTx{otHash=hash}) = "NonceTooLow at stage "    ++ show queue ++ "\n\tactual nonce "     ++ show actual ++ "\n\ttx hash " ++ format hash ++ "\n" ++ format o
+    format (BalanceTooLow  queue actual o@OutputTx{otHash=hash}) = "BalanceTooLow at stage "  ++ show queue ++ "\n\tactual tx limit "  ++ show actual ++ "\n\ttx hash " ++ format hash ++ "\n" ++ format o
+    format (GasLimitTooLow queue actual o@OutputTx{otHash=hash}) = "GasLimitTooLow at stage " ++ show queue ++ "\n\tactual gas limit " ++ show actual ++ "\n\ttx hash " ++ format hash ++ "\n" ++ format o
 
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
@@ -202,9 +202,9 @@ addToQueued t@OutputTx{otSigner = signer} =
 
 promoteExecutables :: MonadBagger m => m ()
 promoteExecutables = do
-    state <- getBaggerState
-    let queued' = M.keysSet $ B.queued state
+    queued' <- M.keysSet . B.queued <$> getBaggerState
     forM_ queued' $ \address -> do
+        state <- getBaggerState
         (addressNonce, addressBalance) <- getAddressNonceAndBalance address
 
         let !(discardedByNonce, state') = B.trimBelowNonceFromQueued address addressNonce state

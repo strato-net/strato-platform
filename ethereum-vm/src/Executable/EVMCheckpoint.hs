@@ -1,20 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Executable.EVMCheckpoint where
 
+import qualified Data.ByteString.Base16 as B16
+
 import Blockchain.SHA
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.DataDefs as DD
 import Blockchain.Data.BlockDB (blockHeaderHash) -- for `instance RLPSerializable DD.BlockData` and blockHeaderHash
 import Blockchain.Format
-
-import Debug.Trace (trace)
+import qualified Blockchain.Colors as CL
 
 import qualified Network.Kafka.Protocol as KP
 
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA  :: SHA,
     checkpointHead :: DD.BlockData
-} | DummyEVMCP deriving (Read, Show)
+} deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
     rlpDecode (RLPArray [sha, header]) = EVMCheckpoint (rlpDecode sha) (rlpDecode header)
@@ -22,10 +23,14 @@ instance RLPSerializable EVMCheckpoint where
 
 instance Format EVMCheckpoint where
     format (EVMCheckpoint sha head) =
-        "EVMCheckpoint {sha=" ++ format sha ++ ", hash=" ++ format (blockHeaderHash head) ++ "}"
+        "EVMCheckpoint " ++ CL.red (short sha)
+            where short = take 16 . formatSHAWithoutColor
 
 toKafkaMetadata :: EVMCheckpoint -> KP.Metadata
-toKafkaMetadata = KP.Metadata . KP.KString . rlpSerialize . rlpEncode
+toKafkaMetadata = KP.Metadata . KP.KString . B16.encode . rlpSerialize . rlpEncode
 
 fromKafkaMetadata :: KP.Metadata -> EVMCheckpoint
-fromKafkaMetadata (KP.Metadata (KP.KString s)) = trace (show s) $ rlpDecode (rlpDeserialize s)
+fromKafkaMetadata = rlpDecode . rlpDeserialize . decode' . KP._kString . KP._kMetadata
+    where decode' bs = case B16.decode bs of
+                        (result, "") -> result
+                        _ -> error "Couldn't completely Base16 decode a string!"

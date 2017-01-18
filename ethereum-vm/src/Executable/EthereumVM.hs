@@ -39,15 +39,10 @@ import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
-    -- todo STOPSHIP NO MERGE THX
-    block <- getFirstBlockFromSequencer
-    initBlockSummary block
-
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffset, _ {-EVMCheckpoint cpHash cpHead-}) <- getCheckpoint
-    --Bagger.processNewBestBlock cpHash cpHead -- bootstrap Bagger with genesis block
-    Bagger.processNewBestBlock (outputBlockHash block) (obBlockData block)
+    (cpOffset, EVMCheckpoint cpHash cpHead) <- getCheckpoint
+    Bagger.processNewBestBlock cpHash cpHead -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffset
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
@@ -122,24 +117,23 @@ getCheckpoint = do
     let topic  = seqEventsTopicName
         topic' = show topic
         cg'    = show consumerGroup
-    $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for topic " ++ topic' ++ "#0 for CG " ++ cg'
+    $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
     liftIO (runKafkaConfigured clientId (KC.fetchSingleOffset consumerGroup topic 0)) >>= \case
         Left err -> error $ "Error fetching checkpoint `" ++ topic' ++ "`: " ++ show err
         Right (Left KP.UnknownTopicOrPartition) -> initializeCheckpointAndBlockSummary >> getCheckpoint
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
         Right (Right (ofs, md)) -> do
-            $logInfoS "getCheckpoint" . T.pack $ "received ofs=" ++ show ofs ++ " / md=" ++ show md
-            return (ofs, DummyEVMCP {-fromKafkaMetadata md-})
+            let md' = fromKafkaMetadata md
+            $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
+            return (ofs, md')
 
 
 setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
-    $logInfoS "setCheckpoint" . T.pack $ "KMD " ++ show kMetadata
-    time <- liftIO $ KP.Time . fromIntegral <$> getCurrentMicrotime
     ret  <- liftIO $ runKafkaConfigured clientId $
-        KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs time kMetadata
+        KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
     case ret of
         Left e         -> error $ show e
         Right (Left e) -> error $ show e
