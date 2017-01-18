@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 module Executable.EVMCheckpoint where
 
 import qualified Data.ByteString.Base16 as B16
@@ -11,6 +11,8 @@ import Blockchain.Format
 import qualified Blockchain.Colors as CL
 
 import qualified Network.Kafka.Protocol as KP
+
+import Control.Arrow ((>>>))
 
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA  :: SHA,
@@ -31,6 +33,6 @@ toKafkaMetadata = KP.Metadata . KP.KString . B16.encode . rlpSerialize . rlpEnco
 
 fromKafkaMetadata :: KP.Metadata -> EVMCheckpoint
 fromKafkaMetadata = rlpDecode . rlpDeserialize . decode' . KP._kString . KP._kMetadata
-    where decode' bs = case B16.decode bs of
+    where decode' = B16.decode >>> \case
                         (result, "") -> result
                         _ -> error "Couldn't completely Base16 decode a string!"
