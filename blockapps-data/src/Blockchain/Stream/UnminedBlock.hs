@@ -30,17 +30,13 @@ import Control.Monad.State
 import Blockchain.KafkaTopics
 import Blockchain.EthConf
 
-produceUnminedBlocks::MonadIO m=>[Block]->m ()
-produceUnminedBlocks blocks = do
-  forM_ blocks $ \block -> do
-    _ <- liftIO $ runKafkaConfigured "blockapps-data" $ produceMessages [TopicAndMessage (lookupTopic "unminedblock") $ makeMessage $ rlpSerialize $ rlpEncode $ block]
-    --liftIO $ print result
-    return ()
+produceUnminedBlocks :: MonadIO m => [Block] -> m ()
+produceUnminedBlocks blocks = forM_ blocks $ \block ->
+    void $ liftIO $ runKafkaConfigured "blockapps-data" $ produceMessages [TopicAndMessage (lookupTopic "unminedblock") $ makeMessage $ rlpSerialize $ rlpEncode $ block]
 
-fetchUnminedBlocks::Offset->Kafka [Block]
-
+fetchUnminedBlocks :: Kafka k => Offset -> k [Block]
 fetchUnminedBlocks = fmap (map (rlpDecode . rlpDeserialize)) . fetchBytes (lookupTopic "unminedblock")
 
-fetchUnminedBlocksIO::Offset->IO (Maybe [Block])
-fetchUnminedBlocksIO offset = do
-  fmap (fmap (map (rlpDecode . rlpDeserialize))) $ fetchBytesIO (lookupTopic "unminedblock") offset
+fetchUnminedBlocksIO :: Offset -> IO (Maybe [Block])
+fetchUnminedBlocksIO offset =
+    fmap (map (rlpDecode . rlpDeserialize)) <$> fetchBytesIO (lookupTopic "unminedblock") offset

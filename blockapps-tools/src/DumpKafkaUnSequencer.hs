@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 module DumpKafkaUnSequencer where
 
@@ -18,7 +18,6 @@ import qualified Data.Aeson as Aeson
 import Blockchain.Data.StateDiff
 
 import Blockchain.Stream.Raw
-import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Sequencer.Kafka
 

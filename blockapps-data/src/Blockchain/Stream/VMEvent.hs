@@ -79,22 +79,22 @@ produceVMEvents vmEvents = do
      return offset
 
 -- | Reads VMEvents from `defaultVMEventsTopicName`
-fetchVMEvents::Offset->Kafka [VMEvent]
+fetchVMEvents :: Kafka k => Offset -> k [VMEvent]
 fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
 
 -- | Same as `fetchVMEvents`, except sets our commonly-used Milena state configurations
-fetchVMEvents' :: Offset -> Kafka [VMEvent]
+fetchVMEvents' :: Kafka k => Offset -> k [VMEvent]
 fetchVMEvents' ofs = do
     setDefaultKafkaState
     fetchVMEventsFromTopic defaultVMEventsTopicName ofs
 
-fetchVMEventsFromTopic :: TopicName -> Offset -> Kafka [VMEvent]
+fetchVMEventsFromTopic :: Kafka k => TopicName -> Offset -> k [VMEvent]
 fetchVMEventsFromTopic topic offset = map bytesToVMEvent <$> fetchBytes topic offset
 
 defaultVMEventsTopicName :: TopicName
 defaultVMEventsTopicName = lookupTopic "block"
 
-fetchVMEventsRange::Offset->Offset->Kafka [VMEvent]
+fetchVMEventsRange :: Kafka k => Offset -> Offset -> k [VMEvent]
 fetchVMEventsRange lower upper = do
   events <- fetchVMEvents lower
 

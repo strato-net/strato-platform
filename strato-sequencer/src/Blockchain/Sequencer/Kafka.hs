@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Blockchain.Sequencer.Kafka (
     assertTopicCreation,
     unseqEventsTopicName,
@@ -27,23 +28,23 @@ unseqEventsTopicName = lookupTopic "unseqevents"
 seqEventsTopicName :: KP.TopicName
 seqEventsTopicName = lookupTopic "seqevents"
 
-assertTopicCreation :: K.Kafka ()
+assertTopicCreation :: K.Kafka k => k ()
 assertTopicCreation = do
     K.updateMetadata unseqEventsTopicName
     K.updateMetadata seqEventsTopicName
 
-readUnseqEvents :: KP.Offset -> K.Kafka [IngestEvent]
+readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
 readUnseqEvents offset = setDefaultKafkaState >>
     map (decode . BL.fromStrict) <$> fetchBytes unseqEventsTopicName offset
 
-readSeqEvents :: KP.Offset -> K.Kafka [OutputEvent]
+readSeqEvents :: K.Kafka k => KP.Offset -> k [OutputEvent]
 readSeqEvents offset = setDefaultKafkaState >>
     map (decode . BL.fromStrict) <$> fetchBytes seqEventsTopicName offset
 
-writeUnseqEvents :: [IngestEvent] -> K.Kafka [KP.ProduceResponse]
+writeUnseqEvents :: K.Kafka k => [IngestEvent] -> k [KP.ProduceResponse]
 writeUnseqEvents events = KW.produceMessages $
     (K.TopicAndMessage unseqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
-writeSeqEvents :: [OutputEvent] -> K.Kafka [KP.ProduceResponse]
+writeSeqEvents :: K.Kafka k => [OutputEvent] -> k [KP.ProduceResponse]
 writeSeqEvents events = KW.produceMessages $
     (K.TopicAndMessage seqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events

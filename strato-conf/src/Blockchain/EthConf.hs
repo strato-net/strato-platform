@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, FlexibleContexts #-}
 
 module Blockchain.EthConf ( 
       EthConf(..),
@@ -15,6 +15,10 @@ module Blockchain.EthConf (
       connStr,
       connStr'
     ) where
+
+import Control.Monad.Except (ExceptT(..))
+import Control.Monad.Trans.State
+import Control.Monad.State.Class (MonadState)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
@@ -151,7 +155,7 @@ connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 connStr'::B.ByteString
 connStr' = postgreSQLConnectionString . sqlConfig $ ethConf
 
-runKafkaConfigured :: KafkaClientId -> Kafka a -> IO (Either KafkaClientError a)
+runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkKafkaState name (kh, kp))
   where k = kafkaConfig ethConf
         kh = fromString $ kafkaHost k
