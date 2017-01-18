@@ -48,20 +48,27 @@ fetchOffsets req@(OffsetFetchReq (group, _)) = do
     withBrokerHandle coordinator . flip makeRequest $ CGOffsetFetchRR req
 
 commitOffsets :: OffsetCommitRequest -> Kafka OffsetCommitResponse
-commitOffsets req@(OffsetCommitReq (group, _)) = do
+commitOffsets req@(OffsetCommitReq (group, _, _, _, _)) = do
     coordinator <- getConsumerGroupCoordinator group
     withBrokerHandle coordinator . flip makeRequest $ CGOffsetCommitRR req
 
 fetchSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Kafka (Either KafkaError (Offset, Metadata))
 fetchSingleOffset groupName topic partition = do
-    let req = OffsetFetchReq (groupName, [(topic, [partition])])
+    let req   = OffsetFetchReq (groupName, [(topic, [partition])])
+        retry = fetchSingleOffset groupName topic partition
     (OffsetFetchResp [(_, [(_, ofs, md, err)])]) <- fetchOffsets req
-    return $ if err /= NoError then Left err else Right (ofs, md)
+    case (err, ofs) of
+        (NoError, -1) -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
+        (NoError, _)  -> return $ Right (ofs, md)
+        (NotCoordinatorForConsumerCode, _)       -> retry
+        (ConsumerCoordinatorNotAvailableCode, _) -> retry
+        (OffsetsLoadInProgressCode, _)           -> retry
+        (err, _) -> return $ Left err
 
-commitSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Offset -> Time -> Metadata -> Kafka (Either KafkaError ())
-commitSingleOffset groupName topic partition offset time ofsMetadata = do
-    let req = OffsetCommitReq (groupName, [(topic, [(partition, offset, time, ofsMetadata)])])
-    (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req
+commitSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> Kafka (Either KafkaError ())
+commitSingleOffset groupName topic partition offset ofsMetadata = do
+    let req = OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
+    (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req -- todo: handle the empty response (though that probably indicates protocol error)
     return $ if err /= NoError then Left err else Right ()
 
 {-# NOINLINE getConsumerGroupCoordinator #-}

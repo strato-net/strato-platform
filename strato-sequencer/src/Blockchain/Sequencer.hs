@@ -149,19 +149,18 @@ getNextIngestedOffset = do
   client <- getKafkaClientID
   group  <- getKafkaConsumerGroup
   liftIO (runKafkaConfigured client (KC.fetchSingleOffset group unseqEventsTopicName 0)) >>= \case
-    Left err -> error $ "Error fetching offset for topic `" ++ show unseqEventsTopicName ++ "`: " ++ show err
+    Left err -> error $ "Error fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
     Right (Left KP.UnknownTopicOrPartition) -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
-    Right (Left err) -> error $ "Unexpected response when fetching offset for topic `" ++ show unseqEventsTopicName ++ "`: " ++ show err
+    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
     Right (Right (ofs, _)) -> return ofs
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
     client <- getKafkaClientID
     group  <- getKafkaConsumerGroup
-    time   <- liftIO $ KP.Time . fromIntegral <$> getCurrentMicrotime
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-    op <- liftIO $ runKafkaConfigured client $ KC.commitSingleOffset group unseqEventsTopicName 0 newOffset time ""
+    op <- liftIO $ runKafkaConfigured client $ KC.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
             error $ "Error when setting the offset to " ++ show newOffset ++ ": " ++ show err

@@ -62,13 +62,13 @@ getUnprocessedSeqEvents :: (MonadLogger m, MonadIO m) => m (Offset, [OutputEvent
 getUnprocessedSeqEvents = do
   let (client, group) = kafkaClientIds
   liftIO (runKafkaConfigured client (fetchSingleOffset group targetTopicName 0)) >>= \case
-    Left err -> error $ "Error fetching offset for topic `" ++ show targetTopicName ++ "`: " ++ show err
+    Left err -> error $ "Error fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (Left UnknownTopicOrPartition) -> -- we've never committed an Offset
         setKafkaCheckpoint 0 >>= \case
             Left err -> error $ "Error when bootstrapping the offset to 0: " ++ show err
             Right (Left err) -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
             Right (Right ()) -> getUnprocessedSeqEvents
-    Right (Left err) -> error $ "Unexpected response when fetching offset for topic `" ++ show targetTopicName ++ "`: " ++ show err
+    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (Right (ofs, _)) ->
         liftIO (runKafkaConfigured client (readSeqEvents ofs)) >>= \case
             Left  err    -> error $ "Error when fetching VMEvents at " ++ show ofs ++ ": " ++ show err
@@ -77,6 +77,5 @@ getUnprocessedSeqEvents = do
 setKafkaCheckpoint :: (MonadLogger m, MonadIO m) => Offset -> m (Either KafkaClientError (Either KafkaError ()))
 setKafkaCheckpoint ofs = do
     let (client, group) = kafkaClientIds
-    time <- liftIO $ Time . fromIntegral <$> getCurrentMicrotime
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    liftIO $ runKafkaConfigured client $ commitSingleOffset group targetTopicName 0 ofs time ""
+    liftIO $ runKafkaConfigured client $ commitSingleOffset group targetTopicName 0 ofs ""
