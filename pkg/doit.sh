@@ -20,7 +20,9 @@ function newnode {
 
   if $serveBlocks
   then echo "Starting strato-p2p-server"
-       runForever strato-p2p-server --networkID=$networkID >> logs/strato-p2p-server 2>&1
+       runForever strato-p2p-server --runUDPServer=false --networkID=$networkID >> logs/strato-p2p-server 2>&1
+       echo "Starting ethereum-discover"
+       runForever ethereum-discover >> logs/ethereum-discover 2>&1
   fi
 
   if $receiveBlocks
@@ -52,8 +54,8 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --addBootnodes=$addBootnodes $stratoBootnode \
                     --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
-# For backup_restore; the environment var is set during strato-admin.sh invocation. 
-# Required: Backup file to be accessible to strato container at /tmp/backup 
+# For backup_restore; the environment var is set during strato-admin.sh invocation.
+# Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ ${backupblocks} ]] ; then
      cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
