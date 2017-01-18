@@ -14,8 +14,6 @@ import Network.Kafka.Protocol
 
 import Control.Concurrent (threadDelay)
 
-import Debug.Trace (traceShowId)
-
 -- * Fetching
 
 -- | Default: @-1@

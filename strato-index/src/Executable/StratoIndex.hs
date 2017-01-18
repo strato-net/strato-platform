@@ -22,7 +22,8 @@ import Blockchain.DB.SQLDB
 import Blockchain.IContext
 import Blockchain.IOptions
 import Blockchain.SemiPermanent
-import Blockchain.Stream.VMEvent
+import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Kafka
 import Blockchain.EthConf
 import Blockchain.Util
 
@@ -34,37 +35,31 @@ import Database.Persist.Sql
 stratoIndex :: LoggingT IO ()
 stratoIndex = runIContextM . forever $ do
     $logInfoS "stratoIndex" "About to fetch blocks"
-    (offset, vmEvents) <- getUnprocessedKafkaVMEvents
-    $logInfoS "stratoIndex" . T.pack $ "Fetched " ++ show (length vmEvents) ++ " events starting from " ++ show offset
-    let blocks = [b | ChainBlock b <- vmEvents]
-    $logInfoS "stratoIndex" . T.pack $ show (length blocks) ++ " of them are blocks"
-    let nums = map (blockDataNumber . blockBlockData) blocks
-        nextOffset' = offset + fromIntegral (length vmEvents)
-        minedBlocks = filter isMined blocks
-        insertCount = length minedBlocks
-    if insertCount > 0 then do
-        $logInfoS "stratoIndex" $ T.pack $ "  (" ++ show insertCount ++ " of those blocks are mined; inserting those)"
-        results <- putBlocks [(SHA 0, 0)] minedBlocks False
+    (offset, seqEvents) <- getUnprocessedSeqEvents
+    $logInfoS "stratoIndex" . T.pack $ "Fetched " ++ show (length seqEvents) ++ " events starting from " ++ show offset
+    let blocks = [b | OEBlock b <- seqEvents]
+    let nums = map (blockDataNumber . obBlockData) blocks
+        nextOffset' = offset + fromIntegral (length seqEvents)
+        insertCount = length blocks
+    $logInfoS "stratoIndex" . T.pack $ show insertCount ++ " of them are blocks"
+    when (insertCount > 0) $ do
+        $logInfoS "stratoIndex" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
+        results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
         let bids = fst <$> results
         bestBid <- getBestIndexBlockInfo
-        num <- fmap (blockDataNumber . blockBlockData) $ sqlQuery $ getJust bestBid
+        num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
         let (num', bid) = maximumBy (comparing fst) $ zip nums bids
         when (num' > num || num' == 0) $ putBestIndexBlockInfo bid
-    else
-        $logInfoS "stratoIndex" "  (all unmined, not inserting any)"
     setKafkaCheckpoint nextOffset'
 
-isMined :: Block->Bool
-isMined Block{blockBlockData=BlockData{blockDataNonce=n}} = n /= 5
-
 targetTopicName :: TopicName
-targetTopicName = defaultVMEventsTopicName
+targetTopicName = seqEventsTopicName
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
 
-getUnprocessedKafkaVMEvents :: (MonadLogger m, MonadIO m) => m (Offset, [VMEvent])
-getUnprocessedKafkaVMEvents = do
+getUnprocessedSeqEvents :: (MonadLogger m, MonadIO m) => m (Offset, [OutputEvent])
+getUnprocessedSeqEvents = do
   let (client, group) = kafkaClientIds
   liftIO (runKafkaConfigured client (fetchSingleOffset group targetTopicName 0)) >>= \case
     Left err -> error $ "Error fetching offset for " ++ show targetTopicName ++ ": " ++ show err
@@ -72,10 +67,10 @@ getUnprocessedKafkaVMEvents = do
         setKafkaCheckpoint 0 >>= \case
             Left err -> error $ "Error when bootstrapping the offset to 0: " ++ show err
             Right (Left err) -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
-            Right (Right ()) -> getUnprocessedKafkaVMEvents
+            Right (Right ()) -> getUnprocessedSeqEvents
     Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
     Right (Right (ofs, _)) ->
-        liftIO (runKafkaConfigured client (fetchVMEvents' ofs)) >>= \case
+        liftIO (runKafkaConfigured client (readSeqEvents ofs)) >>= \case
             Left  err    -> error $ "Error when fetching VMEvents at " ++ show ofs ++ ": " ++ show err
             Right events -> return (ofs, events)
 
