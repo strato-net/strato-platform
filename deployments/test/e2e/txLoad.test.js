@@ -83,7 +83,7 @@ describe('Bloc - TX load', function() {
     // })
 
 
-    const batches = [...Array(batchCount).keys()];
+    const batches = [Array(batchCount).keys()];
     Promise.each(batches, function(batch) {
         // console.log('-------------------- batch', batch, batchCount);
         const endTime = new Date();
