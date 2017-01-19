@@ -33,7 +33,7 @@ import Database.Persist.Sql
 
 
 stratoIndex :: LoggingT IO ()
-stratoIndex = runIContextM . forever $ do
+stratoIndex = runIContextM (fst kafkaClientIds) . forever $ do
     $logInfoS "stratoIndex" "About to fetch blocks"
     (offset, seqEvents) <- getUnprocessedSeqEvents
     $logInfoS "stratoIndex" . T.pack $ "Fetched " ++ show (length seqEvents) ++ " events starting from " ++ show offset
@@ -58,24 +58,19 @@ targetTopicName = seqEventsTopicName
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
 
-getUnprocessedSeqEvents :: (MonadLogger m, MonadIO m) => m (Offset, [OutputEvent])
+getUnprocessedSeqEvents :: IContextM (Offset, [OutputEvent])
 getUnprocessedSeqEvents = do
-  let (client, group) = kafkaClientIds
-  liftIO (runKafkaConfigured client (fetchSingleOffset group targetTopicName 0)) >>= \case
-    Left err -> error $ "Error fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (Left UnknownTopicOrPartition) -> -- we've never committed an Offset
+  let group = snd kafkaClientIds
+  withKafkaViolently (fetchSingleOffset group targetTopicName 0) >>= \case
+    Left UnknownTopicOrPartition -> -- we've never committed an Offset
         setKafkaCheckpoint 0 >>= \case
-            Left err -> error $ "Error when bootstrapping the offset to 0: " ++ show err
-            Right (Left err) -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
-            Right (Right ()) -> getUnprocessedSeqEvents
-    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (Right (ofs, _)) ->
-        liftIO (runKafkaConfigured client (readSeqEvents ofs)) >>= \case
-            Left  err    -> error $ "Error when fetching VMEvents at " ++ show ofs ++ ": " ++ show err
-            Right events -> return (ofs, events)
+            Left err -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
+            Right () -> getUnprocessedSeqEvents
+    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
+    Right (ofs, _) -> withKafkaViolently (readSeqEvents ofs) >>= \evs -> return (ofs, evs)
 
-setKafkaCheckpoint :: (MonadLogger m, MonadIO m) => Offset -> m (Either KafkaClientError (Either KafkaError ()))
+setKafkaCheckpoint :: Offset -> IContextM (Either KafkaError ())
 setKafkaCheckpoint ofs = do
-    let (client, group) = kafkaClientIds
+    let group = snd kafkaClientIds
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    liftIO $ runKafkaConfigured client $ commitSingleOffset group targetTopicName 0 ofs ""
+    withKafkaViolently $ commitSingleOffset group targetTopicName 0 ofs ""

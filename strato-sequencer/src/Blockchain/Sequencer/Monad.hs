@@ -14,6 +14,7 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 
 import Blockchain.Constants
+import Blockchain.EthConf (mkConfiguredKafkaState)
 import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.DB.DependentBlockDB
 
@@ -26,8 +27,9 @@ import qualified Network.Kafka.Protocol as KP
 type SequencerM  = StateT SequencerContext (ResourceT (ReaderT SequencerConfig (LoggingT IO)))
 
 data SequencerContext = SequencerContext
-                      { dependentBlockDB   :: DependentBlockDB
-                      , seenTransactionDB  :: SeenTransactionDB
+                      { dependentBlockDB    :: DependentBlockDB
+                      , seenTransactionDB   :: SeenTransactionDB
+                      , sequencerKafkaState :: K.KafkaState
                       }
 
 data SequencerConfig =
@@ -50,8 +52,14 @@ instance HasDependentBlockDB SequencerM where
 instance HasSeenTransactionDB SequencerM where
     getSeenTransactionDB = seenTransactionDB <$> get
     putSeenTransactionDB new = do
-            ctx <- get
-            put $ ctx { seenTransactionDB = new }
+        ctx <- get
+        put $ ctx { seenTransactionDB = new }
+
+instance K.HasKafkaState SequencerM where
+    getKafkaState = sequencerKafkaState <$> get
+    putKafkaState newS = do
+        ctx <- get
+        put $ ctx { sequencerKafkaState = newS }
 
 runSequencerM :: SequencerConfig -> SequencerM a -> LoggingT IO a
 runSequencerM c m = do
@@ -61,10 +69,12 @@ runSequencerM c m = do
         dbPath   <- depBlockDBPath      <$> ask
         stxSize  <- seenTransactionDBSize <$> ask
         startOfs <- startOffset <$> ask
+        kClId    <- kafkaClientId <$> ask
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         runStateT m SequencerContext
-            { dependentBlockDB   = depBlock
-            , seenTransactionDB  = mkSeenTxDB stxSize
+            { dependentBlockDB    = depBlock
+            , seenTransactionDB   = mkSeenTxDB stxSize
+            , sequencerKafkaState = mkConfiguredKafkaState kClId
             }
     return $ fst a
 

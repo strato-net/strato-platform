@@ -16,10 +16,13 @@ import qualified Data.Text as T
 import Blockchain.DB.SQLDB
 import Blockchain.EthConf
 
+import Network.Kafka
+
 import qualified Control.Concurrent as STOP_USING_DELAY_HACKS
 
 data IContext = IContext {
-    contextSQLDB :: SQLDB
+    contextSQLDB :: SQLDB,
+    contextKafkaState :: KafkaState
 }
 
 type IContextM = StateT IContext (ResourceT (LoggingT IO))
@@ -27,13 +30,19 @@ type IContextM = StateT IContext (ResourceT (LoggingT IO))
 instance HasSQLDB IContextM where
   getSQLDB = contextSQLDB <$> get
 
+instance HasKafkaState IContextM where
+    getKafkaState = contextKafkaState <$> get
+    putKafkaState ks = do
+        st <- get
+        put st { contextKafkaState = ks }
+
 pgPoolSize :: Int
 pgPoolSize = 20
 
-runIContextM :: IContextM a -> LoggingT IO a
-runIContextM f = do
+runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
+runIContextM cid f = do
     $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
     sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr' pgPoolSize
-    (ret, _) <- runResourceT $ runStateT f (IContext sqldb)
+    (ret, _) <- runResourceT $ runStateT f (IContext sqldb (mkConfiguredKafkaState cid))
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret

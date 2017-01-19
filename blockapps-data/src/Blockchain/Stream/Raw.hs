@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 module Blockchain.Stream.Raw (
   produceBytes,
@@ -27,10 +27,10 @@ produceBytes topic items = do
     produceMessages $ map (TopicAndMessage (lookupTopic topic) . makeMessage) items
   return ()
 
-fetchBytes :: TopicName -> Offset -> Kafka [B.ByteString]
+fetchBytes :: Kafka k => TopicName -> Offset -> k [B.ByteString]
 fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)
 
-fetchBytes' :: TopicName -> Offset -> Kafka [(Offset, B.ByteString)]
+fetchBytes' :: Kafka k => TopicName -> Offset -> k [(Offset, B.ByteString)]
 fetchBytes' topic offset = do
   fetched <- fetch offset 0 topic
   let datas = (map tamPayload' . fetchMessages) fetched
@@ -61,7 +61,7 @@ fetchBytesOneIO topic offset = do
    Just (x:_) -> return $ Just x
    Just [] -> error "something impossible happened in fetchBytesOneIO"              
 
-setDefaultKafkaState :: Kafka ()
+setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do
     stateRequiredAcks .= -1
     stateWaitSize     .= 1

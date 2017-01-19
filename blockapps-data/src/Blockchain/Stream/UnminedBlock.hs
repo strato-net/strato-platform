@@ -1,19 +1,8 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# OPTIONS_GHC -fno-warn-orphans       #-}
-
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 
 module Blockchain.Stream.UnminedBlock (
   produceUnminedBlocks,
+  produceUnminedBlocksM,
   fetchUnminedBlocks,
   fetchUnminedBlocksIO
 ) where 
@@ -30,17 +19,16 @@ import Control.Monad.State
 import Blockchain.KafkaTopics
 import Blockchain.EthConf
 
-produceUnminedBlocks::MonadIO m=>[Block]->m ()
-produceUnminedBlocks blocks = do
-  forM_ blocks $ \block -> do
-    _ <- liftIO $ runKafkaConfigured "blockapps-data" $ produceMessages [TopicAndMessage (lookupTopic "unminedblock") $ makeMessage $ rlpSerialize $ rlpEncode $ block]
-    --liftIO $ print result
-    return ()
+produceUnminedBlocks :: MonadIO m => [Block] -> m ()
+produceUnminedBlocks = void . liftIO . runKafkaConfigured "blockapps-data" . produceUnminedBlocksM
 
-fetchUnminedBlocks::Offset->Kafka [Block]
+produceUnminedBlocksM :: Kafka k => [Block] -> k ()
+produceUnminedBlocksM = void . produceMessages . fmap makeMessage'
+    where makeMessage' = TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode
 
+fetchUnminedBlocks :: Kafka k => Offset -> k [Block]
 fetchUnminedBlocks = fmap (map (rlpDecode . rlpDeserialize)) . fetchBytes (lookupTopic "unminedblock")
 
-fetchUnminedBlocksIO::Offset->IO (Maybe [Block])
-fetchUnminedBlocksIO offset = do
-  fmap (fmap (map (rlpDecode . rlpDeserialize))) $ fetchBytesIO (lookupTopic "unminedblock") offset
+fetchUnminedBlocksIO :: Offset -> IO (Maybe [Block])
+fetchUnminedBlocksIO offset =
+    fmap (map (rlpDecode . rlpDeserialize)) <$> fetchBytesIO (lookupTopic "unminedblock") offset

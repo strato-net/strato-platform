@@ -21,7 +21,7 @@ ordinaryConsumerId :: ReplicaId
 ordinaryConsumerId = ReplicaId (-1)
 
 -- | Construct a fetch request from the values in the state.
-fetchRequest :: Offset -> Partition -> TopicName -> Kafka FetchRequest
+fetchRequest :: Kafka m => Offset -> Partition -> TopicName -> m FetchRequest
 fetchRequest o p topic = do
   wt <- use stateWaitTime
   ws <- use stateWaitSize
@@ -29,10 +29,10 @@ fetchRequest o p topic = do
   return $ FetchReq (ordinaryConsumerId, wt, ws, [(topic, [(p, o, bs)])])
 
 -- | Execute a fetch request and get the raw fetch response.
-fetch' :: Handle -> FetchRequest -> Kafka FetchResponse
+fetch' :: Kafka m => Handle -> FetchRequest -> m FetchResponse
 fetch' h request = makeRequest h $ FetchRR request
 
-fetch :: Offset -> Partition -> TopicName -> Kafka FetchResponse
+fetch :: Kafka m => Offset -> Partition -> TopicName -> m FetchResponse
 fetch o p topic = do
   broker <- getTopicPartitionLeader topic p
   withBrokerHandle broker (\handle -> fetch' handle =<< fetchRequest o p topic)
@@ -42,17 +42,17 @@ fetchMessages :: FetchResponse -> [TopicAndMessage]
 fetchMessages fr = (fr ^.. fetchResponseFields . folded) >>= tam
     where tam a = TopicAndMessage (a ^. _1) <$> a ^.. _2 . folded . _4 . messageSetMembers . folded . setMessage
 
-fetchOffsets :: OffsetFetchRequest -> Kafka OffsetFetchResponse
+fetchOffsets :: Kafka m => OffsetFetchRequest -> m OffsetFetchResponse
 fetchOffsets req@(OffsetFetchReq (group, _)) = do
     coordinator <- getConsumerGroupCoordinator group
     withBrokerHandle coordinator . flip makeRequest $ CGOffsetFetchRR req
 
-commitOffsets :: OffsetCommitRequest -> Kafka OffsetCommitResponse
+commitOffsets :: Kafka m => OffsetCommitRequest -> m OffsetCommitResponse
 commitOffsets req@(OffsetCommitReq (group, _, _, _, _)) = do
     coordinator <- getConsumerGroupCoordinator group
     withBrokerHandle coordinator . flip makeRequest $ CGOffsetCommitRR req
 
-fetchSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Kafka (Either KafkaError (Offset, Metadata))
+fetchSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> m (Either KafkaError (Offset, Metadata))
 fetchSingleOffset groupName topic partition = do
     let req   = OffsetFetchReq (groupName, [(topic, [partition])])
         retry = fetchSingleOffset groupName topic partition
@@ -65,14 +65,14 @@ fetchSingleOffset groupName topic partition = do
         (OffsetsLoadInProgressCode, _)           -> retry
         (err, _) -> return $ Left err
 
-commitSingleOffset :: ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> Kafka (Either KafkaError ())
+commitSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> m (Either KafkaError ())
 commitSingleOffset groupName topic partition offset ofsMetadata = do
     let req = OffsetCommitReq (groupName, -1, "", -1, [(topic, [(partition, offset, ofsMetadata)])])
     (OffsetCommitResp [(_, [(_, err)])]) <- commitOffsets req -- todo: handle the empty response (though that probably indicates protocol error)
     return $ if err /= NoError then Left err else Right ()
 
 {-# NOINLINE getConsumerGroupCoordinator #-}
-getConsumerGroupCoordinator :: ConsumerGroup -> Kafka Broker
+getConsumerGroupCoordinator :: Kafka m => ConsumerGroup -> m Broker
 getConsumerGroupCoordinator group = do
     let theReq = CGCoordinatorRR $ GroupCoordinatorReq group
     (GroupCoordinatorResp (err, broker)) <- withAnyHandle $ flip makeRequest theReq

@@ -4,6 +4,7 @@
 module Blockchain.Stream.VMEvent (
   VMEvent(..),
   produceVMEvents,
+  produceVMEventsM,
   fetchVMEvents,
   fetchVMEvents',
   fetchVMEventsIO,
@@ -12,9 +13,7 @@ module Blockchain.Stream.VMEvent (
   fetchVMEventsFromTopic,
   defaultVMEventsTopicName,
   getBestKafkaBlockNumber
-) where 
-
-import Control.Lens
+) where
 
 import Control.Exception.Lifted
 
@@ -65,6 +64,18 @@ bytesToVMEvent = Binary.decode . BL.fromStrict
 vmEventToBytes :: VMEvent -> B.ByteString
 vmEventToBytes = BL.toStrict . Binary.encode
 
+produceVMEventsM :: (HasSQLDB m, HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
+produceVMEventsM vmEvents = do
+    x <- withKafkaViolently . produceMessages $
+        map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
+
+    let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+        newBlocks = [b | ChainBlock b <- vmEvents]
+    (_::Either SomeException ()) <- try $
+        putBlockOffsets $ map (\(b, o) -> BlockOffset (fromIntegral o) (blockDataNumber $ blockBlockData b) (blockHash b)) $ zip newBlocks [offset..]
+    return offset
+
+-- todo: refactor this to consume produceVMEventsM
 produceVMEvents::(HasSQLDB m, MonadIO m)=>[VMEvent]->m Offset
 produceVMEvents vmEvents = do
   result <- liftIO $ runKafkaConfigured "blockapps-data" $
@@ -79,22 +90,22 @@ produceVMEvents vmEvents = do
      return offset
 
 -- | Reads VMEvents from `defaultVMEventsTopicName`
-fetchVMEvents::Offset->Kafka [VMEvent]
+fetchVMEvents :: Kafka k => Offset -> k [VMEvent]
 fetchVMEvents = fetchVMEventsFromTopic defaultVMEventsTopicName
 
 -- | Same as `fetchVMEvents`, except sets our commonly-used Milena state configurations
-fetchVMEvents' :: Offset -> Kafka [VMEvent]
+fetchVMEvents' :: Kafka k => Offset -> k [VMEvent]
 fetchVMEvents' ofs = do
     setDefaultKafkaState
     fetchVMEventsFromTopic defaultVMEventsTopicName ofs
 
-fetchVMEventsFromTopic :: TopicName -> Offset -> Kafka [VMEvent]
+fetchVMEventsFromTopic :: Kafka k => TopicName -> Offset -> k [VMEvent]
 fetchVMEventsFromTopic topic offset = map bytesToVMEvent <$> fetchBytes topic offset
 
 defaultVMEventsTopicName :: TopicName
 defaultVMEventsTopicName = lookupTopic "block"
 
-fetchVMEventsRange::Offset->Offset->Kafka [VMEvent]
+fetchVMEventsRange :: Kafka k => Offset -> Offset -> k [VMEvent]
 fetchVMEventsRange lower upper = do
   events <- fetchVMEvents lower
 
