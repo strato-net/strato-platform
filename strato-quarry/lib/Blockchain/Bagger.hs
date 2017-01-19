@@ -238,9 +238,9 @@ promoteTx tx@OutputTx{otSigner=signer} = do
 
 demoteUnexecutables :: MonadBagger m => m ()
 demoteUnexecutables = do
-    state <- getBaggerState
-    let pending' = M.keysSet $ B.pending state
+    pending' <- M.keysSet . B.pending <$> getBaggerState
     forM_ pending' $ \address -> do
+        state <- getBaggerState
         (addressNonce, addressBalance) <- getAddressNonceAndBalance address
 
         let !(discardedByNonce, state') = B.trimBelowNonceFromPending address addressNonce state
