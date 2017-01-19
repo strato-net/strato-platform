@@ -8,7 +8,6 @@ import Data.Maybe (catMaybes, fromMaybe)
 import Data.Function ((&))
 import qualified Data.Text as T
 
-import Blockchain.EthConf (runKafkaConfigured)
 import Blockchain.Format
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.DB.DependentBlockDB
@@ -117,54 +116,33 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                       prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
 
 assertTopicCreation' :: SequencerM ()
-assertTopicCreation' = do
-    useKafkaClientId <- getKafkaClientID
-    _ <- liftIO $ runKafkaConfigured useKafkaClientId assertTopicCreation
-    return ()
+assertTopicCreation' = void $ K.withKafkaViolently assertTopicCreation
 
 readUnseqEvents' :: SequencerM [(KP.Offset, IngestEvent)]
 readUnseqEvents' = do
-    offset           <- getNextIngestedOffset
+    offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    useKafkaClientId <- getKafkaClientID
-    events           <- liftIO $
-        runKafkaConfigured useKafkaClientId $ readUnseqEvents offset
-
-    case events of
-        Left e    -> error . show $ e
-        Right evs -> return $ zip [(offset+1)..] evs -- its really [(nextOffset, eventAtThisOffset)]
+    zip [(offset+1)..] <$> K.withKafkaViolently (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
 
 writeSeqEvents' :: [OutputEvent] -> SequencerM ()
-writeSeqEvents' events = do
-    useKafkaClientId <- getKafkaClientID
-    results          <- liftIO $
-        runKafkaConfigured useKafkaClientId $ writeSeqEvents events
-
-    case results of
-        Left e  -> error $ "Unexpected response when committing SeqEvents: " ++ show e
-        Right _ -> return ()
+writeSeqEvents' events = void $ K.withKafkaViolently (writeSeqEvents events)
 
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
-  client <- getKafkaClientID
   group  <- getKafkaConsumerGroup
-  liftIO (runKafkaConfigured client (KC.fetchSingleOffset group unseqEventsTopicName 0)) >>= \case
-    Left err -> error $ "Error fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
-    Right (Left KP.UnknownTopicOrPartition) -> -- we've never committed an Offset
+  K.withKafkaViolently (KC.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
+    Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
-    Right (Left err) -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
-    Right (Right (ofs, _)) -> return ofs
+    Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
+    Right (ofs, _) -> return ofs
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
-    client <- getKafkaClientID
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
-    op <- liftIO $ runKafkaConfigured client $ KC.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
+    op <- K.withKafkaViolently $ KC.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
-            error $ "Error when setting the offset to " ++ show newOffset ++ ": " ++ show err
-        Right (Left err) ->
             error $ "Unexpected response when setting the offset to " ++ show newOffset ++ ": " ++ show err
-        Right (Right ()) -> return ()
+        Right () -> return ()
 
