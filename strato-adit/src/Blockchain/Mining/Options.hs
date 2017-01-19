@@ -13,6 +13,8 @@ defineFlag "threads" (1 :: Int) "Number of mining threads"
 defineFlag "blocktime" (10000 :: Int) "Blocktime in milliseconds for Normal miner"
 defineFlag "variance" (1000 :: Int) "Blocktime variance in milliseconds for Normal miner"
 
+defineFlag "pgPoolSize" (5 :: Int) "Size of postgres pool"
+
 -- -- You can also do simple range checks with this.
 -- defineCustomFlag "coinbase" [| 57 :: Integer |] "ADDRESS"
 --   [| \s -> let (p,q) = head $ ((readHex s) :: [(Integer, String)])

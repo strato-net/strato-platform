@@ -4,6 +4,7 @@
 module Blockchain.Stream.VMEvent (
   VMEvent(..),
   produceVMEvents,
+  produceVMEventsM,
   fetchVMEvents,
   fetchVMEvents',
   fetchVMEventsIO,
@@ -12,9 +13,7 @@ module Blockchain.Stream.VMEvent (
   fetchVMEventsFromTopic,
   defaultVMEventsTopicName,
   getBestKafkaBlockNumber
-) where 
-
-import Control.Lens
+) where
 
 import Control.Exception.Lifted
 
@@ -65,6 +64,18 @@ bytesToVMEvent = Binary.decode . BL.fromStrict
 vmEventToBytes :: VMEvent -> B.ByteString
 vmEventToBytes = BL.toStrict . Binary.encode
 
+produceVMEventsM :: (HasSQLDB m, HasKafkaState m, MonadIO m) => [VMEvent] -> m Offset
+produceVMEventsM vmEvents = do
+    x <- withKafkaViolently . produceMessages $
+        map (TopicAndMessage (lookupTopic "block") . makeMessage . vmEventToBytes) vmEvents
+
+    let [offset] = concatMap (map (\(_, _, x') ->x') . concatMap snd . _produceResponseFields) x
+        newBlocks = [b | ChainBlock b <- vmEvents]
+    (_::Either SomeException ()) <- try $
+        putBlockOffsets $ map (\(b, o) -> BlockOffset (fromIntegral o) (blockDataNumber $ blockBlockData b) (blockHash b)) $ zip newBlocks [offset..]
+    return offset
+
+-- todo: refactor this to consume produceVMEventsM
 produceVMEvents::(HasSQLDB m, MonadIO m)=>[VMEvent]->m Offset
 produceVMEvents vmEvents = do
   result <- liftIO $ runKafkaConfigured "blockapps-data" $

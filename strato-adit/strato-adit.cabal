@@ -52,7 +52,9 @@ library
                        lifted-base,
                        text,
                        strato-conf,
-                       strato-sequencer
+                       strato-sequencer,
+                       mtl,
+                       resourcet
 
   exposed-modules: 
                        Blockchain.Mining
@@ -61,6 +63,7 @@ library
                        Blockchain.Mining.Instant
                        Blockchain.Mining.Options
                        Executable.StratoAdit
+  other-modules:       Executable.AditM
 
 executable strato-adit
   main-is:             Main.hs
