@@ -4,7 +4,7 @@ module Blockchain.EthConf (
       EthConf(..),
       DiscoveryConf(..),
       SqlConf(..), postgreSQLConnectionString,
-      KafkaConf(..), runKafkaConfigured, lookupConsumerGroup,
+      KafkaConf(..), runKafkaConfigured, lookupConsumerGroup, mkConfiguredKafkaState,
       LevelDBConf(..),
       QuarryConf(..),
       BlockConf(..),
@@ -156,10 +156,13 @@ connStr'::B.ByteString
 connStr' = postgreSQLConnectionString . sqlConfig $ ethConf
 
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
-runKafkaConfigured name = runKafka (mkKafkaState name (kh, kp))
-  where k = kafkaConfig ethConf
-        kh = fromString $ kafkaHost k
-        kp = fromIntegral $ kafkaPort k
+runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)
+
+mkConfiguredKafkaState :: KafkaClientId -> KafkaState
+mkConfiguredKafkaState cid = mkKafkaState cid (kh, kp)
+    where k = kafkaConfig ethConf
+          kh = fromString $ kafkaHost k
+          kp = fromIntegral $ kafkaPort k
 
 lookupConsumerGroup :: KafkaClientId -> KP.ConsumerGroup
 lookupConsumerGroup kcid = KP.ConsumerGroup . KP.KString $ kStr `B8.append` nodeId

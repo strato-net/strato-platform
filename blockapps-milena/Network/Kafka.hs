@@ -56,6 +56,10 @@ data KafkaState = KafkaState { -- | Name to use as a client ID.
 
 makeLenses ''KafkaState
 
+class HasKafkaState m where
+    getKafkaState :: m KafkaState
+    putKafkaState :: KafkaState -> m ()
+
 -- | The core Kafka monad.
 type Kafka m = (MonadState KafkaState m, MonadError KafkaClientError m, MonadIO m, MonadBaseControl IO m)
 
@@ -156,6 +160,17 @@ addKafkaAddress = over stateAddresses . NE.nub .: cons
 -- | Run the underlying Kafka monad.
 runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafka s k = runExceptT $ evalStateT k s
+
+withKafkaViolently :: (MonadIO m, HasKafkaState m) => StateT KafkaState (ExceptT KafkaClientError IO) a -> m a
+withKafkaViolently k = do
+    s <- getKafkaState
+    r <- liftIO . runExceptT $ runStateT k s
+    case r of
+        Left err -> error $ show err
+        Right (a, newS) -> do
+            putKafkaState newS
+            return a
+
 
 -- | Catch 'IOException's and wrap them in 'KafkaIOException's.
 tryKafka :: Kafka m => m a -> m a
