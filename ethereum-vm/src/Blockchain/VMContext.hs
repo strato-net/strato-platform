@@ -42,6 +42,8 @@ import Blockchain.VMOptions
 import Blockchain.Bagger
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
 
+import qualified Network.Kafka as K
+
 --import Debug.Trace
 
 data Context =
@@ -53,7 +55,8 @@ data Context =
     contextSQLDB::SQLDB,
     contextAddressStateDBMap::M.Map Address AddressStateModification,
     contextStorageMap::M.Map (Address, Word256) Word256,
-    contextBaggerState :: !BaggerState
+    contextBaggerState :: !BaggerState,
+    contextKafkaState :: K.KafkaState
     }
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
@@ -65,6 +68,12 @@ instance HasStateDB ContextM where
   setStateDBStateRoot sr = do
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
+
+instance K.HasKafkaState ContextM where
+    getKafkaState = contextKafkaState <$> get
+    putKafkaState ks = do
+        ctx <- get
+        put $ ctx {contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
   getAddressStateDBMap = do
@@ -117,7 +126,7 @@ runContextM f = do
     blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
              DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
     conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
-
+    let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
     runStateT f (Context
                     MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
                     hdb
@@ -126,7 +135,8 @@ runContextM f = do
                     conn
                     M.empty
                     M.empty
-                    defaultBaggerState)
+                    defaultBaggerState
+                    initialKafkaState)
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>

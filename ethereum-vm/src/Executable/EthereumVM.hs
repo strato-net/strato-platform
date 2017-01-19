@@ -27,7 +27,7 @@ import Blockchain.VMOptions
 import Blockchain.VMContext
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
-import Blockchain.Stream.UnminedBlock (produceUnminedBlocks)
+import Blockchain.Stream.UnminedBlock (produceUnminedBlocksM)
 import Blockchain.Format (format)
 
 import Executable.EVMFlags
@@ -73,8 +73,8 @@ ethereumVM = void . execContextM $ do
         when (not makeLazyBlocks || not (null poolableNewTxs)) $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
-            $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocks"
-            produceUnminedBlocks [outputBlockToBlock newBlock]
+            $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
+            K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         checkpointData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
@@ -118,11 +118,10 @@ getCheckpoint = do
         topic' = show topic
         cg'    = show consumerGroup
     $logInfoS "getCheckpoint" . T.pack $ "Getting checkpoint for " ++ topic' ++ "#0 for " ++ cg'
-    liftIO (runKafkaConfigured clientId (KC.fetchSingleOffset consumerGroup topic 0)) >>= \case
-        Left err -> error $ "Error fetching checkpoint `" ++ topic' ++ "`: " ++ show err
-        Right (Left KP.UnknownTopicOrPartition) -> initializeCheckpointAndBlockSummary >> getCheckpoint
-        Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
-        Right (Right (ofs, md)) -> do
+    K.withKafkaViolently (KC.fetchSingleOffset consumerGroup topic 0) >>= \case
+        Left KP.UnknownTopicOrPartition -> initializeCheckpointAndBlockSummary >> getCheckpoint
+        Left err -> error $ "Unexpected response when fetching checkpoint: " ++ show err
+        Right (ofs, md) -> do
             let md' = fromKafkaMetadata md
             $logInfoS "getCheckpoint" . T.pack $ show ofs ++ " / " ++ format md'
             return (ofs, md')
@@ -132,19 +131,12 @@ setCheckpoint :: KP.Offset -> EVMCheckpoint -> ContextM ()
 setCheckpoint ofs checkpoint = do
     $logInfoS "setCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ format checkpoint
     let kMetadata = toKafkaMetadata checkpoint
-    ret  <- liftIO $ runKafkaConfigured clientId $
-        KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
-    case ret of
-        Left e         -> error $ show e
-        Right (Left e) -> error $ show e
-        Right _ -> return ()
+    ret  <- K.withKafkaViolently $ KC.commitSingleOffset consumerGroup seqEventsTopicName 0 ofs kMetadata
+    either (error . show) return ret
 
 getUnprocessedKafkaEvents :: KP.Offset -> ContextM [OutputEvent]
 getUnprocessedKafkaEvents offset = do
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Fetching sequenced blockchain events with offset " ++ show offset
-    ret <- liftIO $ runKafkaConfigured clientId (readSeqEvents offset)
-    case ret of
-        Left e -> error $ show e
-        Right v -> do
-            $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ (show . length $ v) ++ " unprocessed blocks/txs"
-            return v
+    ret <- K.withKafkaViolently (readSeqEvents offset)
+    $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
+    return ret

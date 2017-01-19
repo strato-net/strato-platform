@@ -1,19 +1,8 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# OPTIONS_GHC -fno-warn-orphans       #-}
-
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 
 module Blockchain.Stream.UnminedBlock (
   produceUnminedBlocks,
+  produceUnminedBlocksM,
   fetchUnminedBlocks,
   fetchUnminedBlocksIO
 ) where 
@@ -31,8 +20,11 @@ import Blockchain.KafkaTopics
 import Blockchain.EthConf
 
 produceUnminedBlocks :: MonadIO m => [Block] -> m ()
-produceUnminedBlocks blocks = forM_ blocks $ \block ->
-    void $ liftIO $ runKafkaConfigured "blockapps-data" $ produceMessages [TopicAndMessage (lookupTopic "unminedblock") $ makeMessage $ rlpSerialize $ rlpEncode $ block]
+produceUnminedBlocks = void . liftIO . runKafkaConfigured "blockapps-data" . produceUnminedBlocksM
+
+produceUnminedBlocksM :: Kafka k => [Block] -> k ()
+produceUnminedBlocksM = void . produceMessages . fmap makeMessage'
+    where makeMessage' = TopicAndMessage (lookupTopic "unminedblock") . makeMessage . rlpSerialize . rlpEncode
 
 fetchUnminedBlocks :: Kafka k => Offset -> k [Block]
 fetchUnminedBlocks = fmap (map (rlpDecode . rlpDeserialize)) . fetchBytes (lookupTopic "unminedblock")

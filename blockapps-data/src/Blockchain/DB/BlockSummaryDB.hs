@@ -39,5 +39,5 @@ putBSum blockHash bSum = do
 hasBSum::(MonadResource m, HasBlockSummaryDB m)=>SHA->m Bool
 hasBSum blockHash = do
     db <- getBlockSummaryDB
-    isJust <$> (LDB.get db LDB.defaultReadOptions $ BL.toStrict $ encode blockHash)
+    isJust <$> LDB.get db LDB.defaultReadOptions (BL.toStrict $ encode blockHash)
 
