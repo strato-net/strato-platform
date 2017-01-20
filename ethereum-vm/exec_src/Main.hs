@@ -4,7 +4,6 @@ import Control.Monad.Logger
 import HFlags
 
 import Blockchain.Output
-import Blockchain.Quarry.Flags ()
 import Blockchain.VMOptions ()
 import Executable.EthereumVM
 import Executable.EVMFlags

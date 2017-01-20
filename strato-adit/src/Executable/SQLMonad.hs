@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
-module SQLMonad where
+module Executable.SQLMonad where
 
 import Blockchain.DB.SQLDB
 import Blockchain.EthConf

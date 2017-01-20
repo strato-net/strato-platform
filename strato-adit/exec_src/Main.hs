@@ -11,5 +11,5 @@ import Executable.StratoAdit
 main :: IO ()
 main = do
   _ <- $initHFlags "Pluggable mining module for Strato"
-  flip runLoggingT printLogMsg stratoAdit
+  runLoggingT stratoAdit (printLogMsg' True True)
 

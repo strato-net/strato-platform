@@ -39,8 +39,6 @@ import Blockchain.KafkaTopics
 
 import Blockchain.Stream.Raw (setDefaultKafkaState)
 
-import Blockchain.Quarry.SQL.Conn
-
 import Blockchain.Mining.Options
 
 import Blockchain.Sequencer.Event
@@ -48,6 +46,7 @@ import Blockchain.Sequencer.Kafka
 import qualified Blockchain.Data.TXOrigin as TO
 
 import Executable.AditM
+import Executable.SQLMonad
 
 lookupMiner :: MinerType -> Miner
 lookupMiner = \case

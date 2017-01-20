@@ -64,6 +64,7 @@ library
                        Blockchain.Mining.Options
                        Executable.StratoAdit
   other-modules:       Executable.AditM
+                       Executable.SQLMonad
 
 executable strato-adit
   main-is:             Main.hs
