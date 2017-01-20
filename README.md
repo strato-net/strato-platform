@@ -1,17 +1,17 @@
-# cirrus
+# Cirrus
 
 With `cirrus`, you can search your `strato` blockchain! It leverages [postgrest](http://postgrest.com) for your smart contracts.
 
-## pre-requirements and installation
+## Pre-requirements and installation
 
 `cirrus` is now part of `silo` and hence is automatically deployed. For debugging purposes you can connect your `cirrus` container to an existing `silo` network and use `nodemon` for automatic restart.
 
-## tutorial
+## Tutorial
 
 1. `POST` the output of `bloc`'s `/state` route to `cirrus/contract/`, alternatively enable the option to `bloc` to post this on compilation. 
 2. run `e2e/contract.test.js`
 
-## routes
+## Routes
 
 | Type   |      Route      |  Content-type | Info | Result |
 |--------|-----------------|---------------|------|--------|
@@ -19,7 +19,7 @@ With `cirrus`, you can search your `strato` blockchain! It leverages [postgrest]
 | `GET`  |  `cirrus/search/` | |  Returns contract types | |
 | `GET`  | `cirrus/search/<ContractName>` | | Query a specific contract, see the [API reference](http://postgrest.com/api/reading/) | |
 
-## architecture
+## Architecture
 
 ![             ┌──────────────────────────────────────────┐
              │                           stateDiffStream│                             ┌─────────────────────────────────────────────────────────┐
@@ -183,7 +183,7 @@ contract Cb {
 
 The reason that `cirrus` is still able to use the intersaction of the capabilities of these contracts for search, is that `blockapps-js` is able to distinguish `public` variables from non-public ones, and so is preventing variables that are non-public to get into the tables of `cirrus`.
 
-## roadmap
+## Roadmap
 
 + build our own `postgrest` instead of official docker image to enable:
  + history of accounts, using [temporal_tables](https://github.com/arkhipov/temporal_tables)
