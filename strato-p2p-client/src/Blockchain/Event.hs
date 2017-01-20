@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase #-}
 
 module Blockchain.Event (
   Event(..),
@@ -52,7 +52,7 @@ setTitleAndProduceBlocks blocks = do
   lastVMEvents <- liftIO $ fetchLastVMEvents 200
   let lastBlockHashes = [blockHash b | ChainBlock b <- lastVMEvents]
   let newBlocks = filter (not . (`elem` lastBlockHashes) . blockHash) blocks
-  when (not $ null newBlocks) $ do
+  unless (null newBlocks) $ do
     liftIO $ setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
     _ <- produceVMEvents $ map ChainBlock newBlocks
     return ()
@@ -77,12 +77,12 @@ peerString peer = show (pPeerPubkey peer) ++ "@" ++ T.unpack (pPeerIp peer) ++ "
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
-    ts <- liftIO $ getCurrentMicrotime
-    let ingestTxs = (\t -> IETx ts (IngestTx origin t)) <$> txs
+    ts <- liftIO getCurrentMicrotime
+    let ingestTxs = IETx ts . IngestTx origin <$> txs
     rets <- liftIO $ runKafkaConfigured "strato-p2p-client" $ writeUnseqEvents ingestTxs
     case rets of
-        Left e      -> logErrorN . T.pack $ "Could not write txs to Kafka: " ++ (show e)
-        Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ (show resps)
+        Left e      -> logErrorN . T.pack $ "Could not write txs to Kafka: " ++ show e
+        Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ show resps
     return ()
 
 emitKafkaBlock :: (MonadIO m, MonadLogger m) => Origin.TXOrigin -> Block -> m ()
@@ -90,20 +90,19 @@ emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
     rets <- liftIO $ runKafkaConfigured "strato-p2p-client" $ writeUnseqEvents [ingestBlock]
     case rets of
-        Left e      -> logErrorN . T.pack $ "Could not write block to Kafka: " ++ (show e)
-        Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ (show resps)
+        Left e      -> logErrorN . T.pack $ "Could not write block to Kafka: " ++ show e
+        Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ show resps
     return ()
 
 handleEvents::(MonadIO m, HasSQLDB m, MonadState Context m, MonadLogger m)=>
               DebugMode->PPeer->Conduit Event m Message
-handleEvents mode peer = awaitForever $ \msg -> do
-  case msg of
+handleEvents mode peer = awaitForever $ \case
    MsgEvt Hello{} -> error "A hello message appeared after the handshake"
    MsgEvt Status{} -> error "A status message appeared after the handshake"
    MsgEvt Ping -> yield Pong
 
    MsgEvt (Transactions txs) -> do
-        let txo = (Origin.PeerString $ peerString peer)
+        let txo = Origin.PeerString (peerString peer)
         _ <- lift $ insertTX mode txo Nothing txs
         emitKafkaTransactions txo txs
         return ()
@@ -136,7 +135,7 @@ handleEvents mode peer = awaitForever $ \msg -> do
             [] -> return []
             (blockOffset:_) -> do
                     vmEvents <- liftIO $ fmap (fromMaybe []) $ fetchVMEventsIO $ fromIntegral blockOffset
-                    return $ [b | ChainBlock b <- vmEvents]
+                    return [b | ChainBlock b <- vmEvents]
 
           let blocksWithHashes = map (\b -> (blockHash b, b)) blocks
           existingHashes <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ map fst blocksWithHashes
@@ -161,8 +160,8 @@ handleEvents mode peer = awaitForever $ \msg -> do
                      neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
                      unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
 
-                 when (not $ null unfoundParents) $ do
-                      error $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format $ unfoundParents)
+                 unless (null unfoundParents) $
+                      error $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
 
                  lift $ putBlockHeaders neededHeaders
                  logInfoN $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
@@ -189,7 +188,7 @@ handleEvents mode peer = awaitForever $ \msg -> do
                clearActionTimestamp
                headers <- lift getBlockHeaders
                let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
-               when (not verified) $ error "headers don't match bodies"
+               unless verified $ error "headers don't match bodies"
                --when (length headers /= length bodies) $ error "not enough bodies returned"
                logInfoN $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
                let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
@@ -198,12 +197,9 @@ handleEvents mode peer = awaitForever $ \msg -> do
                let remainingHeaders = drop (length bodies) headers
                lift $ putBlockHeaders remainingHeaders
                if null remainingHeaders
-                 then 
-                    if newCount > 0
-                      then do
-                        yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) maxReturnedHeaders 0 Forward
-                        stampActionTimestamp
-                      else return ()
+                 then when (newCount > 0) $ do
+                    yield $ GetBlockHeaders (BlockHash $ headerHash $ last headers) maxReturnedHeaders 0 Forward
+                    stampActionTimestamp
                  else do
                    yield $ GetBlockBodies $ map headerHash remainingHeaders
                    stampActionTimestamp
@@ -234,7 +230,7 @@ handleEvents mode peer = awaitForever $ \msg -> do
         liftIO $ setTitle $ "timer: " ++ show (60 - ts `diffUTCTime` oldTS)
         when (ts `diffUTCTime` oldTS > 60) $ do
           yield $ Disconnect UselessPeer
-          liftIO $ setTitle $ "timer timed out!"
+          liftIO $ setTitle "timer timed out!"
           error "Peer did not respond"
       Nothing -> return ()
                  

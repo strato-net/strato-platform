@@ -16,8 +16,8 @@ main = do
   if flags_runUDPServer 
     then do
       putStrLn "Starting UDP server"
-      _ <- forkIO $ flip runLoggingT printLogMsg ethereumDiscovery
+      _ <- forkIO $ runLoggingT ethereumDiscovery (printLogMsg' True True)
       return ()
     else putStrLn "UDP server disabled"
 
-  flip runLoggingT printLogMsg stratoP2PServer
+  runLoggingT stratoP2PServer (printLogMsg' True True)

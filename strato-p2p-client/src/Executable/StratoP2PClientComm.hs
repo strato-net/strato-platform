@@ -14,21 +14,21 @@ import qualified Data.Set as S
 
 import Network.JsonRpc.Server
 
-runStratoP2PClientComm::TVar (S.Set String) -> IO ()
-runStratoP2PClientComm addresses = do
-  runTCPServer (serverSettings 14001 "*") $ \app -> do
+runStratoP2PClientComm :: TVar (S.Set String) -> IO ()
+runStratoP2PClientComm addresses =
+  runTCPServer (serverSettings 14001 "*") $ \app ->
     appSource app =$= serve addresses $$ appSink app
 
-serve::TVar (S.Set String)->Conduit B.ByteString IO B.ByteString
+serve :: TVar (S.Set String) -> Conduit B.ByteString IO B.ByteString
 serve addresses = do
   Just request <- await
   Just response <- liftIO $ call [getPeers addresses] $ BLC.fromStrict request
-  yield $ BLC.toStrict $ response
+  yield $ BLC.toStrict response
 
 
-getPeers::TVar (S.Set String)->Method IO
+getPeers :: TVar (S.Set String) -> Method IO
 getPeers theSet = toMethod "getPeers" f ()
-  where f::RpcResult IO [String]
+  where f :: RpcResult IO [String]
         f = do
           val <- readTVar theSet
           return $ S.toList val
