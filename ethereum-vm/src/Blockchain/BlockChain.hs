@@ -123,15 +123,12 @@ instance Bagger.MonadBagger ContextM where
         return newStateRoot
 
     -- todo batch insert results
-    txsDroppedCallback rejections = forM_ rejections $ \rejection -> do
-        let (message, queue, txHash) = baggerRejectionToTransactionResultBits rejection
-        -- if a tx is dropped from Queued, it means it was likely culled during the demotion as the new best block we were just mined
-        -- came in
-        -- todo MAJOR :: there is an edge case if a DIFFERENT transaction w/ same nonce is put into BestBlock causing this one to get
-        -- todo culled. also if the best block includes stuff that somehow impoverishes the sender
-        -- todo when blockapps.js supports it, this should simply always write the failed TxResult and have ba.js pick the best
-        -- todo txresult
-        when (flags_createTransactionResults && (queue /= Bagger.Queued)) $ do
+    txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
+        let (message, stage, queue, txHash) = baggerRejectionToTransactionResultBits rejection
+        -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
+        -- new best block we just mined came in
+        let isRecentlyRan = txHash `elem` bestBlockShas
+        when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format rejection
             _ <- putTransactionResult
                      TransactionResult {
@@ -151,11 +148,18 @@ instance Bagger.MonadBagger ContextM where
                        }
             return ()
 
-baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
+baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    Bagger.NonceTooLow    queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx nonce", queue, hash)
-    Bagger.BalanceTooLow  queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low account balance", queue, hash)
-    Bagger.GasLimitTooLow queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at " ++ (show queue) ++ " due to low tx gas limit", queue, hash)
+    Bagger.NonceTooLow    stage queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to low tx nonce", stage, queue, hash)
+    Bagger.BalanceTooLow  stage queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to low account balance", stage, queue, hash)
+    Bagger.GasLimitTooLow stage queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to low tx gas limit", stage, queue, hash)
+    Bagger.LessLucrative  stage queue OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
+        ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to " ++ formatSHAWithoutColor hashBetter ++
+         " being a more lucrative transaction", stage, queue, hashWorse)
+
+isNonceRejection :: Bagger.BaggerTxRejection -> Bool
+isNonceRejection Bagger.NonceTooLow{} = True
+isNonceRejection _ = False
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do
@@ -520,6 +524,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
       oldNumber     = blockDataNumber oldBestBlock
       oldStateRoot  = blockDataStateRoot oldBestBlock
       bH            = outputBlockHash b
+      bTHs          = otHash <$> txs
 
   let shouldReplace =     newNumber == 0
                       || (newNumber > oldNumber)
@@ -529,7 +534,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
   $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
   when shouldReplace $ do
-    Bagger.processNewBestBlock bH bd
+    Bagger.processNewBestBlock bH bd bTHs
     diffs <- stateDiff newNumber bH oldStateRoot newStateRoot
 
     when flags_sqlDiff $ do
@@ -542,4 +547,5 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
       produceBytes "statediff" [diffBS]
 
   -- we're replaying SeqEvents, and need to notify the mempool
-  when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) (Bagger.processNewBestBlock bH bd)
+  when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
+    Bagger.processNewBestBlock bH bd bTHs

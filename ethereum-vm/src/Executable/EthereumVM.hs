@@ -37,12 +37,15 @@ import qualified Blockchain.Bagger as Bagger
 
 import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
 
+uncurry3 :: (a -> b -> c -> d) -> ((a, b, c) -> d)
+uncurry3 f (a, b, c) = f a b c
+
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffset, EVMCheckpoint cpHash cpHead) <- getCheckpoint
-    Bagger.processNewBestBlock cpHash cpHead -- bootstrap Bagger with genesis block
+    (cpOffset, EVMCheckpoint cpHash cpHead cpShas) <- getCheckpoint
+    Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffset
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
@@ -77,7 +80,7 @@ ethereumVM = void . execContextM $ do
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
-        checkpointData <- uncurry EVMCheckpoint <$> Bagger.getCheckpointableState
+        checkpointData <- uncurry3 EVMCheckpoint <$> Bagger.getCheckpointableState
         setCheckpoint newOffset checkpointData
 
 clientId :: K.KafkaClientId
@@ -100,7 +103,8 @@ initializeCheckpointAndBlockSummary = do
     initBlockSummary block
     let sha  = outputBlockHash block
         head = obBlockData block
-    setCheckpoint 1 (EVMCheckpoint sha head)
+        txHs = otHash <$> obReceiptTransactions block
+    setCheckpoint 1 (EVMCheckpoint sha head txHs)
 
 
 initBlockSummary :: OutputBlock -> ContextM ()

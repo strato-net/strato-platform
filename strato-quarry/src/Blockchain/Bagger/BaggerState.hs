@@ -22,6 +22,7 @@ type ATL = M.Map Address TransactionList
 
 data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockHeader       :: DD.BlockData
+                               , bestBlockTxHashes     :: [SHA]
                                , lastExecutedStateRoot :: StateRoot
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [OutputTx]
@@ -57,6 +58,7 @@ defaultBaggerState  = BaggerState { miningCache           = defaultMiningCache
 defaultMiningCache :: MiningCache
 defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , bestBlockHeader       = error "reached defaultMiningCache"
+                                  , bestBlockTxHashes     = []
                                   , lastExecutedStateRoot = blankStateRoot
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []

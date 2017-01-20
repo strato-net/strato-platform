@@ -16,17 +16,21 @@ import Control.Arrow ((>>>))
 
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA  :: SHA,
-    checkpointHead :: DD.BlockData
+    checkpointHead :: DD.BlockData,
+    checkpointTXs  :: [SHA]
 } deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
-    rlpDecode (RLPArray [sha, header]) = EVMCheckpoint (rlpDecode sha) (rlpDecode header)
-    rlpEncode (EVMCheckpoint sha head) = RLPArray [rlpEncode sha, rlpEncode head]
+    rlpDecode (RLPArray [sha, header, RLPArray txShas]) =
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode <$> txShas)
+    rlpEncode (EVMCheckpoint sha head txShas) =
+        RLPArray [rlpEncode sha, rlpEncode head, RLPArray (rlpEncode <$> txShas)]
 
 instance Format EVMCheckpoint where
-    format (EVMCheckpoint sha head) =
-        "EVMCheckpoint " ++ CL.red (short sha)
+    format (EVMCheckpoint sha head txhs) =
+        "EVMCheckpoint " ++ CL.red (short sha) ++ (' ':count)
             where short = take 16 . formatSHAWithoutColor
+                  count = CL.green $ show (length txhs)
 
 toKafkaMetadata :: EVMCheckpoint -> KP.Metadata
 toKafkaMetadata = KP.Metadata . KP.KString . B16.encode . rlpSerialize . rlpEncode
