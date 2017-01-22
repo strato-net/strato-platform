@@ -5,7 +5,7 @@ packages:
 - blockapps-strato
 - location:
     git: https://github.com/blockapps/secp256k1-haskell/
-    commit: a63de7f0b4cf2f374934dd9658e5dea953c53dce
+    commit: 0a6db54f31defdd7a5edecdf6932af3deea6ca57
   extra-dep: true
 extra-deps: []
 flags: {}
