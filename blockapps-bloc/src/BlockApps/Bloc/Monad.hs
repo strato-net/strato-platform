@@ -19,6 +19,7 @@ newtype Bloc x = Bloc
   ( Functor
   , Applicative
   , Monad
+  , MonadIO
   , MonadReader BlocEnv
   , MonadError BlocError
   , MonadLog (WithSeverity Doc)
