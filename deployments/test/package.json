@@ -37,10 +37,12 @@
     "whatwg-fetch": "^1.0.0"
   },
   "devDependencies": {
-    "blockapps-js": "blockapps/blockapps-js#develop",
+    "blockapps-js": "blockapps/blockapps-js#monostrato-cutover",
     "chai": "^3.5.0",
     "chai-as-promised": "^5.1.0",
+    "lodash": "^4.17.4",
     "mocha": "^2.4.5",
-    "q": "^1.4.1"
+    "q": "^1.4.1",
+    "request-promise": "^4.1.1"
   }
 }
