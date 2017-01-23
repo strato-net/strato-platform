@@ -62,15 +62,15 @@ type API =
     :> "contract"
     :> ReqBody '[FormUrlEncoded] SrcPassword
     :> Post '[JSON] Keccak256
-  -- :<|> "contracts"
-  --   :> Capture "contractName" Text
-  --   :> Capture "contractAddress" Address
-  --   :> Get '[JSON] Value
-  -- :<|> "contracts"
-  --   :> Capture "contractName" Text
-  --   :> Capture "contractAddress" Address
-  --   :> "state"
-  --   :> Get '[JSON] Value -- change to HTML
+  :<|> "contracts"
+    :> Capture "contractName" Text
+    :> Capture "contractAddress" Address
+    :> Get '[JSON] Value
+  :<|> "contracts"
+    :> Capture "contractName" Text
+    :> Capture "contractAddress" Address
+    :> "state"
+    :> Get '[JSON] Value -- change to HTML
   :<|> "users"
     :> Capture "user" Text
     :> Capture "userAddress" Address

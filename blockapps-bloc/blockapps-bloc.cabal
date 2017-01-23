@@ -17,7 +17,8 @@ library
   exposed-modules:
     BlockApps.Bloc.API
     BlockApps.Bloc.API.Client
-    BlockApps.Bloc.API.Mock
+    BlockApps.Bloc.API.Docs
+    -- BlockApps.Bloc.API.Mock
     BlockApps.Bloc.API.Server
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Store
