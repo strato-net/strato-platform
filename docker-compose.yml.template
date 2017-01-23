@@ -31,6 +31,10 @@ services:
       - zookeeper
       - kafka
       - postgres
+    depends_on:
+      - zookeeper
+      - kafka
+      - postgres
     restart: always
     ports:
       - "30303:30303"
