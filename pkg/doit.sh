@@ -81,7 +81,7 @@ function doInit {
 
 function doRegister {
   echo "Registering with the blockchain explorer"
-  fqdn=${stratoHost:-$(curl ident.me)}
+  fqdn=${stratoHost:-$(curl -s ident.me)}
   until [[ $(curl -s -d "url=http://$fqdn/" http://$explorerHost:9000/api/nodes) == "SUCCESS" ]] ; do : ; done
 }
 
