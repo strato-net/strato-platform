@@ -10,8 +10,9 @@ module BlockApps.Bloc.API.Client
   , getContracts
   , getContractData
   , postContract
-  -- , getContract
-  -- , getContractState
+  , postUploadList
+  , getContract
+  , getContractState
   , postContractMethod
   , getAddresses
   , blocDev
@@ -36,8 +37,9 @@ postSend
 getContracts :: ClientM Contracts
 getContractData :: ContractName -> ClientM [Address]
 postContract :: UserName -> Address -> SrcPassword -> ClientM Keccak256
--- getContract :: ContractName -> Address -> ClientM Value
--- getContractState :: ContractName -> Address -> ClientM Value
+postUploadList :: UserName -> Address -> UploadList -> ClientM UnstructuredJSON
+getContract :: ContractName -> Address -> ClientM UnstructuredJSON
+getContractState :: ContractName -> Address -> ClientM UnstructuredJSON
 postContractMethod
   :: UserName
   -> Address
@@ -52,8 +54,9 @@ getUsers
   :<|> getContracts
   :<|> getContractData
   :<|> postContract
-  -- :<|> getContract
-  -- :<|> getContractState
+  :<|> postUploadList
+  :<|> getContract
+  :<|> getContractState
   :<|> postContractMethod
   :<|> getAddresses = client (Proxy @ BlocAPI)
 

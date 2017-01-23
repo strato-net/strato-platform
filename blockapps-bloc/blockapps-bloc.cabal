@@ -18,7 +18,7 @@ library
     BlockApps.Bloc.API
     BlockApps.Bloc.API.Client
     BlockApps.Bloc.API.Docs
-    -- BlockApps.Bloc.API.Mock
+    BlockApps.Bloc.API.Mock
     BlockApps.Bloc.API.Server
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Store
@@ -48,6 +48,7 @@ library
     , servant-server
     , stm
     , text
+    , unordered-containers
     , warp
     , wl-pprint-text
 

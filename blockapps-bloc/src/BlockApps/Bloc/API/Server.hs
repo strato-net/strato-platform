@@ -37,8 +37,9 @@ blocServer store =
     :<|> getContracts
     :<|> getContractData
     :<|> postContract
-    -- :<|> getContract
-    -- :<|> getContractState
+    :<|> postUploadList
+    :<|> getContract
+    :<|> getContractState
     :<|> postContractMethod
     :<|> getAddresses
     where
@@ -69,7 +70,8 @@ blocServer store =
       getContracts = undefined
       getContractData = undefined
       postContract = undefined
-      -- getContract = undefined
-      -- getContractState = undefined
+      postUploadList = undefined
+      getContract = undefined
+      getContractState = undefined
       postContractMethod = undefined
       getAddresses = undefined

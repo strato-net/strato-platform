@@ -10,5 +10,5 @@ import Servant.Mock
 
 import BlockApps.Bloc.API
 
-mockServer :: Server API
-mockServer = mock (Proxy @ API) Proxy
+mockServer :: Server BlocAPI
+mockServer = mock (Proxy @ BlocAPI) Proxy

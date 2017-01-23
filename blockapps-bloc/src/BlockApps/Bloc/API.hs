@@ -18,11 +18,16 @@ module BlockApps.Bloc.API
   , SrcPassword (..)
   , UserName (..)
   , ContractName (..)
+  , UploadList (..)
+  , UploadListContract (..)
+  , TxParams (..)
+  , UnstructuredJSON (..)
   ) where
 
 import Data.Aeson
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.HashMap.Strict (HashMap)
 import Data.List
 import Data.Maybe
 import Data.Text (Text)
@@ -66,15 +71,21 @@ type BlocAPI =
     :> "contract"
     :> ReqBody '[FormUrlEncoded] SrcPassword
     :> Post '[JSON] Keccak256
-  -- :<|> "contracts"
-  --   :> Capture "contractName" ContractName
-  --   :> Capture "contractAddress" Address
-  --   :> Get '[JSON] Value
-  -- :<|> "contracts"
-  --   :> Capture "contractName" ContractName
-  --   :> Capture "contractAddress" Address
-  --   :> "state"
-  --   :> Get '[JSON] Value -- change to HTML
+  :<|> "users"
+    :> Capture "user" UserName
+    :> Capture "address" Address
+    :> "uploadList"
+    :> ReqBody '[JSON] UploadList
+    :> Post '[JSON] UnstructuredJSON
+  :<|> "contracts"
+    :> Capture "contractName" ContractName
+    :> Capture "contractAddress" Address
+    :> Get '[JSON] UnstructuredJSON
+  :<|> "contracts"
+    :> Capture "contractName" ContractName
+    :> Capture "contractAddress" Address
+    :> "state"
+    :> Get '[JSON] UnstructuredJSON -- change to HTML
   :<|> "users"
     :> Capture "user" UserName
     :> Capture "userAddress" Address
@@ -86,7 +97,7 @@ type BlocAPI =
   :<|> "addresses"
     :> Get '[HTMLifiedJSON] [Address]
 
-newtype UserName = UserName Text
+newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where
   toUrlPiece (UserName name) = name
 instance FromHttpApiData UserName where
@@ -100,6 +111,7 @@ instance ToSample UserName where
     [ UserName name | name <- ["samrit", "eitan", "ilya", "ilir"]]
 instance ToCapture (Capture "user" UserName) where
   toCapture _ = DocCapture "user" "a user name"
+instance Arbitrary UserName where arbitrary = genericArbitrary
 
 newtype ContractName = ContractName Text
 instance ToHttpApiData ContractName where
@@ -216,6 +228,55 @@ instance ToSample SrcPassword where
       \{ return storedData; } }"
     , password = "securePassword"
     }
+
+data UploadList = UploadList
+  { ul_password :: Text
+  , ul_contracts :: [UploadListContract]
+  , ul_resolve :: Bool
+  } deriving (Eq,Show,Generic)
+instance ToJSON UploadList where
+  toJSON = genericToJSON defaultOptions
+    {JSON.fieldLabelModifier = idOrStripPrefix "ul_"}
+instance FromJSON UploadList where
+  parseJSON = genericParseJSON defaultOptions
+    {JSON.fieldLabelModifier = idOrStripPrefix "ul_"}
+instance ToSample UploadList where
+  toSamples _ = noSamples
+
+data UploadListContract = UploadListContract
+  { ulc_contractName :: Text
+  , ulc_args :: HashMap Text Text
+  , ulc_txParams :: TxParams
+  } deriving (Eq,Show,Generic)
+instance ToJSON UploadListContract where
+  toJSON = genericToJSON defaultOptions
+    {JSON.fieldLabelModifier = idOrStripPrefix "ulc_"}
+instance FromJSON UploadListContract where
+  parseJSON = genericParseJSON defaultOptions
+    {JSON.fieldLabelModifier = idOrStripPrefix "ulc_"}
+
+data TxParams = TxParams
+  { txp_gasLimit :: Natural
+  , txp_gasPrice :: Natural
+  } deriving (Eq,Show,Generic)
+instance ToJSON TxParams where
+  toJSON = genericToJSON defaultOptions
+    {JSON.fieldLabelModifier = idOrStripPrefix "txp_"}
+instance FromJSON TxParams where
+  parseJSON = genericParseJSON defaultOptions
+    {JSON.fieldLabelModifier = idOrStripPrefix "txp_"}
+
+newtype UnstructuredJSON = UnstructuredJSON LBS.ByteString
+  deriving (Eq,Show,Generic)
+instance ToSample UnstructuredJSON where
+  toSamples _ = noSamples
+instance ToJSON UnstructuredJSON where
+  toJSON (UnstructuredJSON blob) =
+    fromMaybe (error "unstructured json") (decode blob)
+instance FromJSON UnstructuredJSON where
+  parseJSON = return . UnstructuredJSON . encode
+instance Arbitrary UnstructuredJSON where
+  arbitrary = return $ UnstructuredJSON "unstructured json"
 
 -- helpers
 idOrStripPrefix :: String -> String -> String
