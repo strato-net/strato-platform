@@ -358,3 +358,14 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 ```javascript
 
 ```
+## Missing API Calls
+1. user: uploadList
+2. user: import
+3. user: callList
+4. user: sendList
+5. contract: state
+6. contract
+7. contract state lookup
+8. compile
+9. search
+10. search reduced
