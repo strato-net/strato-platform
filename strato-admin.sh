@@ -9,6 +9,7 @@ usage='
   --run-tag <tag> [--bare|--reset]    Start strato from a given Docker tag.  When
                                       the containers are already running, stops
                                       and restarts them.
+  --run-local                         In case you you do a local build and want to run strato locally.
     --bare                            Install necessary software for first-time run
     --reset                           On running containers, rather than
                                       stopping, does a --wipe
@@ -49,6 +50,7 @@ function setEnvVars {
   setEnv noMinPeers false
 }
 
+
 if [[ $# -eq 0 ]]
 then
   echo >&2 "Must pass an argument.  Possible arguments are:"
@@ -65,6 +67,11 @@ case $1 in
       printf "%s" "$usage"
       exit 1
     fi
+    if [ -z "$genesisBlock" ]; then
+      echo "====================> Genesis Block (gb.json) is missing."
+      exit 1
+    fi
+
     doit="runTag $1"
     shift
     if [[ -z $1 ]]
@@ -88,6 +95,10 @@ case $1 in
     fi
     ;;
   "--run-local")
+    if [ -z "$genesisBlock" ]; then
+      echo "====================> Genesis Block (gb.json) is missing."
+      exit 1
+    fi
     doit="runLocal"
     doFirst=""
     ;;
