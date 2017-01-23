@@ -47,7 +47,7 @@ getUsers
   :<|> getContract
   :<|> getContractState
   :<|> postContractMethod
-  :<|> getAddresses = client (Proxy @ API)
+  :<|> getAddresses = client (Proxy @ BlocAPI)
 
 blocDev :: BaseUrl
 blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

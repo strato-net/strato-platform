@@ -26,9 +26,9 @@ bloc = do
   run 8000 (blocApplication store)
 
 blocApplication :: TVar Store -> Application
-blocApplication = serve (Proxy @ API) . blocServer
+blocApplication = serve (Proxy @ BlocAPI) . blocServer
 
-blocServer :: TVar Store -> Server API
+blocServer :: TVar Store -> Server BlocAPI
 blocServer store =
     getUsers
     :<|> postUser

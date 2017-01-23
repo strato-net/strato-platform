@@ -10,7 +10,7 @@
 #-}
 
 module BlockApps.Bloc.API
-  ( API
+  ( BlocAPI
   , PostUserParameters (..)
   , PostSendParameters (..)
   , Contract (..)
@@ -35,7 +35,7 @@ import Web.FormUrlEncoded
 
 import BlockApps.Strato.Types
 
-type API =
+type BlocAPI =
   "users"
     :> Get '[HTMLifiedJSON] [Text]
   :<|> "users"
