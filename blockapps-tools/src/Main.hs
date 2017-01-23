@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
 
 import System.Console.CmdArgs
@@ -26,32 +26,33 @@ import InsertTX
 --import Debug.Trace
 
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Char8  as BC
+import qualified Network.Kafka.Protocol as KP
 --import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+
+import Data.Int
 
 import qualified Blockchain.Database.MerklePatricia as MP
 
-data Options = 
-  State{root::String, db::String} 
-  | Block{hash::String, db::String} 
-  | BlockGO{hash::String, db::String} 
-  | Hash{hash::String, db::String} 
-  | Code{hash::String, db::String}
-  | RawMP{stateRoot::String, filename::String}
-  | FRawMP{stateRoot::String, filename::String}
-  | Raw{filename::String}
-  | RLP{filename::String}
-  | Init{hash::String, db::String}
-  | Checkpoints{}
-  | DumpKafkaBlocks{startingBlock::Int}
-  | DumpKafkaSequencer{startingBlock::Int}
-  | DumpKafkaUnSequencer{startingBlock::Int}
-  | DumpKafkaUnminedBlocks{startingBlock::Int}
-  | DumpKafkaRaw{startingBlock::Int}
-  | DumpKafkaStateDiff{startingBlock::Int}
-  | Psql{}
-  | InsertTX{}
-  deriving (Show, Data, Typeable)
+data Options = State{root::String, db::String}
+             | Block{hash::String, db::String}
+             | BlockGO{hash::String, db::String}
+             | Hash{hash::String, db::String}
+             | Code{hash::String, db::String}
+             | RawMP{stateRoot::String, filename::String}
+             | FRawMP{stateRoot::String, filename::String}
+             | Raw{filename::String}
+             | RLP{filename::String}
+             | Checkpoints{service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
+             | DumpKafkaBlocks{startingBlock::Int}
+             | DumpKafkaSequencer{startingBlock::Int}
+             | DumpKafkaUnSequencer{startingBlock::Int}
+             | DumpKafkaUnminedBlocks{startingBlock::Int}
+             | DumpKafkaRaw{startingBlock::Int}
+             | DumpKafkaStateDiff{startingBlock::Int}
+             | Psql{}
+             | InsertTX{}
+             deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
 stateOptions = 
@@ -77,13 +78,6 @@ blockGoOptions =
 hashOptions::Annotate Ann
 hashOptions = 
   record Hash{hash=undefined, db=undefined} [
-    hash := def += typ "FILENAME" += argPos 1 += opt ("-"::String),
-    db := def += typ "DBSTRING" += argPos 0
-    ]
-
-initOptions::Annotate Ann
-initOptions = 
-  record Init{hash=undefined, db=undefined} [
     hash := def += typ "FILENAME" += argPos 1 += opt ("-"::String),
     db := def += typ "DBSTRING" += argPos 0
     ]
@@ -165,12 +159,21 @@ insertTXOptions::Annotate Ann
 insertTXOptions =
   record InsertTX{} []
 
+checkpointOptions :: Annotate Ann
+checkpointOptions =
+    record Checkpoints{service = nil, operation = nil, offset = nil, cp = nil}
+        [ service   := NullService   += typ "SERVICE" += explicit += name "s" += name "service"
+        , operation := NullOperation += typ "OP"      += explicit += name "o" += name "op"
+        , offset    := Nothing       += typ "INT"     += explicit += name "i" += name "offset"
+        , cp        := Nothing       += typ "DATA"    += explicit += name "m" += name "metadata"
+        ]
+    where nil = undefined
+
 options::Annotate Ann
 options = modes_ [stateOptions
                 , blockOptions
                 , blockGoOptions
                 , hashOptions
-                , initOptions
                 , codeOptions
                 , rawOptions
                 , rlpOptions
@@ -183,7 +186,8 @@ options = modes_ [stateOptions
                 , dumpKafkaRawOptions
                 , dumpKafkaStateDiffOptions
                 , psqlOptions
-                , insertTXOptions]
+                , insertTXOptions
+                , checkpointOptions]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
 
@@ -195,59 +199,24 @@ main = do
 -------------------
 
 run::Options->IO ()
-
-run State{root=r, db=db'} = do
-  let sr = MP.StateRoot $ fst $ B16.decode $ BC.pack r
-  State.doit db' sr
-
-run Block{hash=h, db=db'} = do
-  Block.doit db' h
-
-run BlockGO{hash=h} = do
-  BlockGO.doit h
-         
-run Hash{hash=h, db=db'} = do
-  Hash.doit db' h
-
-run Init{} = do
-  undefined
---  Init.doit db' h
-
-run Code{hash=h, db=db'} = do
-  Code.doit db' h
-
-run Raw{filename=f} = do
-  Raw.doit f
-
-run RLP{filename=f} = do
-  RLP.doit f
-
-run RawMP{stateRoot=sr, filename=f} = do
-  RawMP.doit f (MP.StateRoot $ fst $ B16.decode $ BC.pack sr)
-
-run FRawMP{stateRoot=sr, filename=f} = do
-  FRawMP.doit f (MP.StateRoot $ fst $ B16.decode $ BC.pack sr)
-
-run DumpKafkaSequencer{startingBlock = sb} =
-  dumpKafkaSequencer $ fromIntegral sb
-
-run DumpKafkaUnSequencer{startingBlock = sb} =
-  dumpKafkaUnSequencer $ fromIntegral sb
-
-run DumpKafkaBlocks{startingBlock=sb} =
-  dumpKafkaBlocks $ fromIntegral sb
-
-run DumpKafkaUnminedBlocks{startingBlock=sb} =
-  dumpKafkaUnminedBlocks $ fromIntegral sb
-
-run DumpKafkaRaw{startingBlock=sb} =
-  dumpKafkaRaw $ fromIntegral sb
-
-run DumpKafkaStateDiff{startingBlock=sb} =
-  dumpKafkaStateDiff $ fromIntegral sb
-
-run Psql{} =
-  psql
-
-run InsertTX{} =
-  insertTX
+run State{..}                  = let sr = MP.StateRoot $ fst $ B16.decode $ BC.pack root in State.doit db sr
+run Block{..}                  = Block.doit db hash
+run BlockGO{..}                = BlockGO.doit hash
+run Hash{..}                   = Hash.doit db hash
+run Code{..}                   = Code.doit db hash
+run Raw{..}                    = Raw.doit filename
+run RLP{..}                    = RLP.doit filename
+run RawMP{..}                  = RawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
+run FRawMP{..}                 = FRawMP.doit filename (MP.StateRoot . fst . B16.decode $ BC.pack stateRoot)
+run DumpKafkaSequencer{..}     = dumpKafkaSequencer (fromIntegral startingBlock)
+run DumpKafkaUnSequencer{..}   = dumpKafkaUnSequencer (fromIntegral startingBlock)
+run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
+run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)
+run DumpKafkaRaw{..}           = dumpKafkaRaw (fromIntegral startingBlock)
+run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
+run Psql{}                     = psql
+run InsertTX{}                 = insertTX
+run Checkpoints{..}            = case operation of
+    Get           -> doCheckpointGet service
+    Put           -> doCheckpointPut service (fromIntegral <$> offset) cp
+    NullOperation -> doCheckpointUsage
