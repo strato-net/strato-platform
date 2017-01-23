@@ -37,16 +37,16 @@ blocServer store =
     :<|> getContracts
     :<|> getContractData
     :<|> postContract
-    :<|> getContract
-    :<|> getContractState
+    -- :<|> getContract
+    -- :<|> getContractState
     :<|> postContractMethod
     :<|> getAddresses
     where
 
       getUsers = liftIO . atomically $
-        map userName . Set.elems . users <$> readTVar store
+        map (UserName . userName) . Set.elems . users <$> readTVar store
 
-      postUser userName PostUserParameters{..} = do
+      postUser (UserName userName) PostUserParameters{..} = do
         Just sk <- liftIO newSecKey -- don't do partial matching
         let
           pk = derivePubKey sk
@@ -59,7 +59,7 @@ blocServer store =
         liftIO . atomically $ modifyTVar store insertUser
         return userAddress
 
-      getUserAddresses userName' = liftIO . atomically
+      getUserAddresses (UserName userName') = liftIO . atomically
         $ Set.elems
         . Set.map userAddress
         . Set.filter ((== userName') . userName)
@@ -69,7 +69,7 @@ blocServer store =
       getContracts = undefined
       getContractData = undefined
       postContract = undefined
-      getContract = undefined
-      getContractState = undefined
+      -- getContract = undefined
+      -- getContractState = undefined
       postContractMethod = undefined
       getAddresses = undefined

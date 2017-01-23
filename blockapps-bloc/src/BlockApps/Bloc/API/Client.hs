@@ -10,32 +10,40 @@ module BlockApps.Bloc.API.Client
   , getContracts
   , getContractData
   , postContract
-  , getContract
-  , getContractState
+  -- , getContract
+  -- , getContractState
   , postContractMethod
   , getAddresses
   , blocDev
   ) where
 
-import Data.Aeson
+-- import Data.Aeson
 import Data.Proxy
-import Data.Text
 import Servant.API
 import Servant.Client
 
 import BlockApps.Bloc.API
 import BlockApps.Strato.Types
 
-getUsers :: ClientM [Text]
-postUser :: Text -> PostUserParameters -> ClientM Address
-getUserAddresses :: Text -> ClientM [Address]
-postSend :: Text -> Address -> PostSendParameters -> ClientM PostTransaction
+getUsers :: ClientM [UserName]
+postUser :: UserName -> PostUserParameters -> ClientM Address
+getUserAddresses :: UserName -> ClientM [Address]
+postSend
+  :: UserName
+  -> Address
+  -> PostSendParameters
+  -> ClientM PostTransaction
 getContracts :: ClientM Contracts
-getContractData :: Text -> ClientM [Text]
-postContract :: Text -> Address -> SrcPassword -> ClientM Keccak256
-getContract :: Text -> Address -> ClientM Value
-getContractState :: Text -> Address -> ClientM Value
-postContractMethod :: Text -> Address -> Text -> Address -> ClientM NoContent
+getContractData :: ContractName -> ClientM [Address]
+postContract :: UserName -> Address -> SrcPassword -> ClientM Keccak256
+-- getContract :: ContractName -> Address -> ClientM Value
+-- getContractState :: ContractName -> Address -> ClientM Value
+postContractMethod
+  :: UserName
+  -> Address
+  -> ContractName
+  -> Address
+  -> ClientM NoContent
 getAddresses :: ClientM [Address]
 getUsers
   :<|> postUser
@@ -44,8 +52,8 @@ getUsers
   :<|> getContracts
   :<|> getContractData
   :<|> postContract
-  :<|> getContract
-  :<|> getContractState
+  -- :<|> getContract
+  -- :<|> getContractState
   :<|> postContractMethod
   :<|> getAddresses = client (Proxy @ BlocAPI)
 

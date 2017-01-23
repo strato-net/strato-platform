@@ -43,6 +43,7 @@ library
     , secp256k1
     , servant
     , servant-client
+    , servant-docs
     , servant-mock
     , servant-server
     , stm

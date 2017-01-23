@@ -1,0 +1,406 @@
+## GET /addresses
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `text/html;charset=utf-8`
+
+-
+
+```html
+[]
+```
+
+-
+
+```html
+["000000000000deadbeef"]
+```
+
+-
+
+```html
+["000000000000deadbeef","000000000000deadbeef"]
+```
+
+-
+
+```html
+["00000000000012345678"]
+```
+
+-
+
+```html
+["000000000000deadbeef","000000000000deadbeef","000000000000deadbeef"]
+```
+
+## GET /contracts
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `application/json`
+
+- Response body as below.
+
+```javascript
+{"Address":[{"createdAt":1484957995000,"address":"309e10eddc6333b82889bfc25a2b107b9c2c9a8c"},{"createdAt":1485193000000,"address":"Addressed"}]}
+```
+
+## GET /contracts/:contractName
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Captures:
+
+- *contractName*: a contract name
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `application/octet-stream`
+
+-
+
+```
+[]
+```
+
+-
+
+```
+["000000000000deadbeef"]
+```
+
+-
+
+```
+["000000000000deadbeef","000000000000deadbeef"]
+```
+
+-
+
+```
+["00000000000012345678"]
+```
+
+-
+
+```
+["000000000000deadbeef","000000000000deadbeef","000000000000deadbeef"]
+```
+
+## GET /users
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `text/html;charset=utf-8`
+
+-
+
+```html
+[]
+```
+
+-
+
+```html
+["samrit"]
+```
+
+-
+
+```html
+["samrit","samrit"]
+```
+
+-
+
+```html
+["eitan"]
+```
+
+-
+
+```html
+["samrit","samrit","samrit"]
+```
+
+## GET /users/:user
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Captures:
+
+- *user*: a user name
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `text/html;charset=utf-8`
+
+-
+
+```html
+[]
+```
+
+-
+
+```html
+["000000000000deadbeef"]
+```
+
+-
+
+```html
+["000000000000deadbeef","000000000000deadbeef"]
+```
+
+-
+
+```html
+["00000000000012345678"]
+```
+
+-
+
+```html
+["000000000000deadbeef","000000000000deadbeef","000000000000deadbeef"]
+```
+
+## POST /users/:user
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Captures:
+
+- *user*: a user name
+
+#### Request:
+
+- Supported content types are:
+
+    - `application/x-www-form-urlencoded`
+
+- Example: `application/x-www-form-urlencoded`
+
+```
+faucet=1&password=securePassword
+```
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `text/html;charset=utf-8`
+
+-
+
+```html
+000000000000deadbeef
+```
+
+-
+
+```html
+00000000000012345678
+```
+
+## POST /users/:user/:address/contract
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Captures:
+
+- *user*: a user name
+- *address*: an Ethereum address
+
+#### Request:
+
+- Supported content types are:
+
+    - `application/x-www-form-urlencoded`
+
+- Example: `application/x-www-form-urlencoded`
+
+```
+password=securePassword&src=contract%20SimpleStorage%20%7B%20uint%20storedData%3B%20function%20set%28uint%20x%29%20%7B%20storedData%20%3D%20x%3B%20%7D%20function%20get%28%29%20returns%20%28uint%20retVal%29%20%7B%20return%20storedData%3B%20%7D%20%7D
+```
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `application/json`
+
+-
+
+```javascript
+"4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4"
+```
+
+-
+
+```javascript
+"b4c9eaf404872994677d9def95dee3fe36bfbcd9be2312670ef7be131a502f32"
+```
+
+-
+
+```javascript
+"ff35fbab09d19d5c3d4d457d9084fdba3dfc43a3381062b832f561040b37c871"
+```
+
+-
+
+```javascript
+"edc75d89745d355ec53c70a580afd905f28b3ee2027975afcf25e859322c829e"
+```
+
+-
+
+```javascript
+"ed17f216c16a13951965ab89cd89616a856c3fc2ee714ec1a532d6aef36cec1c"
+```
+
+## POST /users/:user/:address/send
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Captures:
+
+- *user*: a user name
+- *address*: an Ethereum address
+
+#### Request:
+
+- Supported content types are:
+
+    - `application/x-www-form-urlencoded`
+
+- Example: `application/x-www-form-urlencoded`
+
+```
+toAddress=000000000000deadbeef&value=10&password=securePassword
+```
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `text/html;charset=utf-8`
+
+- Response body as below.
+
+```html
+{"hash":"4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4","gasLimit":"21000","codeOrData":"","gasPrice":"50000000000","to":"000000000000deadbeef","value":"10000000000000000000","from":"111dec89c25cbda1c12d67621ee3c10ddb8196bf","r":"1","s":"1","v":"1c","nonce":"0"}
+```
+
+## POST /users/:user/:userAddress/contract/:contractName/:contractAddress/call
+
+#### Authentication
+
+
+
+Clients must supply the following data
+
+
+#### Captures:
+
+- *user*: a user name
+- *userAddress*: an Ethereum address
+- *contractName*: a contract name
+- *contractAddress*: an Ethereum address
+
+#### Response:
+
+- Status code 200
+- Headers: []
+
+- Supported content types are:
+
+    - `application/json`
+
+- Response body as below.
+
+```javascript
+
+```

@@ -4,6 +4,7 @@
   , DeriveGeneric
   , OverloadedStrings
   , RecordWildCards
+  , TypeApplications
 #-}
 
 module BlockApps.Strato.Types
@@ -31,6 +32,7 @@ module BlockApps.Strato.Types
 import Control.Applicative
 import Data.Aeson
 import Data.Aeson.Types
+import qualified Data.Binary as Binary
 import Data.Foldable
 import qualified Data.HashMap.Strict as HashMap
 import Data.LargeWord
@@ -45,6 +47,7 @@ import Generic.Random.Generic
 import GHC.Generics
 import Numeric
 import Numeric.Natural
+import Servant.Docs
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Text.Read
@@ -57,6 +60,7 @@ import BlockApps.Data
   , addressString
   , stringAddress
   , Keccak256 (..)
+  , keccak256lazy
   )
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
@@ -160,6 +164,20 @@ instance ToJSON PostTransaction where
   toJSON = genericToJSON
     defaultOptions{ fieldLabelModifier = idOrStripPrefix "ptx_" }
 instance Arbitrary PostTransaction where arbitrary = genericArbitrary
+instance ToSample PostTransaction where
+  toSamples _ = singleSample PostTransaction
+    { ptx_hash = keccak256lazy (Binary.encode @ Integer 1)
+    , ptx_gasLimit = Strung 21000
+    , ptx_codeOrData = ""
+    , ptx_gasPrice = Strung 50000000000
+    , ptx_to = Just $ Address 0xdeadbeef
+    , ptx_from = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
+    , ptx_value = Strung 10000000000000000000
+    , ptx_r = Hex 1 -- make valid examples
+    , ptx_s = Hex 1 -- make valid examples
+    , ptx_v = Hex 0x1c
+    , ptx_nonce = Strung 0
+    }
 
 toPostTx :: Transaction -> PostTransaction
 toPostTx Transaction{..} = PostTransaction
