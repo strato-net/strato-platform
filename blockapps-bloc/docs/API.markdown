@@ -1,11 +1,5 @@
 ## GET /addresses
 
-#### Authentication
-
-
-
-Clients must supply the following data
-
 
 #### Response:
 
@@ -48,11 +42,6 @@ Clients must supply the following data
 
 ## GET /contracts
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Response:
@@ -72,11 +61,6 @@ Clients must supply the following data
 
 ## GET /contracts/:contractName
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Captures:
@@ -124,11 +108,6 @@ Clients must supply the following data
 
 ## GET /users
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Response:
@@ -172,11 +151,6 @@ Clients must supply the following data
 
 ## GET /users/:user
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Captures:
@@ -224,11 +198,6 @@ Clients must supply the following data
 
 ## POST /users/:user
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Captures:
@@ -270,11 +239,6 @@ faucet=1&password=securePassword
 
 ## POST /users/:user/:address/contract
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Captures:
@@ -335,11 +299,6 @@ password=securePassword&src=contract%20SimpleStorage%20%7B%20uint%20storedData%3
 
 ## POST /users/:user/:address/send
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Captures:
@@ -376,11 +335,6 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 
 ## POST /users/:user/:userAddress/contract/:contractName/:contractAddress/call
 
-#### Authentication
-
-
-
-Clients must supply the following data
 
 
 #### Captures:
