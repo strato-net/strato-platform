@@ -467,9 +467,15 @@ timeIt f = do
 
   return (timeAfter - timeBefore, result)
 
+data BoxMode = Pre | Ok | Err deriving (Eq)
 
-logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
-logWithBox source headerSize lines = do
+modeToColor :: BoxMode -> (String -> String)
+modeToColor Pre = CL.blue
+modeToColor Ok  = CL.magenta
+modeToColor Err = CL.red
+
+logWithBox :: MonadLogger m => T.Text -> Int -> BoxMode -> [String] -> m ()
+logWithBox source headerSize mode lines = do
     let headerAndFooter = indent ++ CL.magenta (replicate headerSize '=')
         addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
         indent          = "    "
@@ -481,24 +487,24 @@ printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
 printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=txHash} (Left errMsg) deltaT = do
   let tNonce = transactionNonce baseTx
-  logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                              , "Tx hash:  " ++ format txHash
-                              , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
-                              , CL.red "Transaction failure: " ++ CL.red (show errMsg)
-                              , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
-                              ]
+  logWithBox "printTx/err" 78 Err [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
+                                  , "Tx hash:  " ++ format txHash
+                                  , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                                  , CL.red "Transaction failure: " ++ CL.red (show errMsg)
+                                  , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
+                                  ]
 
 printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=txHash} (Right results) deltaT = do
   let tNonce = transactionNonce t
       txPretty = if isMessageTX t
         then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
         else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results) ++ "                  "
-  logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                             , "Tx hash:  " ++ format txHash
-                             , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
-                             , txPretty
-                             , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
-                             ]
+  logWithBox "printTx/ok" 78 Ok [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
+                                , "Tx hash:  " ++ format txHash
+                                , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                                , txPretty
+                                , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
+                                ]
 
 indexMaybe::[a]->Int->Maybe a
 indexMaybe _ i | i < 0 = error "indexMaybe called for i < 0"
