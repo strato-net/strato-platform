@@ -4,23 +4,21 @@ var Queue = require('promise-queue');
 var express = require('express');
 var path = require('path');
 var bodyParser = require('body-parser');
-
 var logger = require('morgan');
-
 var debug = require('debug')('myapp:server');
 var cors = require('cors');
-
 var bodyParser = require('body-parser')
-
 var express = require('express');
-
 var bajs = require('blockapps-js');
-
 var util = require('./lib/util');
-
 var toSchemaString = util.toSchemaString;
 
 var router = express.Router();
+
+
+
+
+
 
 function startCirrus() {
   return function(scope) {
@@ -28,6 +26,7 @@ function startCirrus() {
       // scope.app = express();
       // var app = scope.app;
       //app.use(bodyParser.json())
+
       var app = express();
       app.use(bodyParser.json({limit: '500mb'}));
       app.use(bodyParser.urlencoded({limit: '500mb', extended: true }));

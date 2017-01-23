@@ -3,11 +3,14 @@ var rp = require("request-promise");
 var util = require('./lib/util');
 var Promise = require('bluebird');
 var toSchemaString = util.toSchemaString;
+var EventEmitter = require('events');
+var utilNode = require('util');
+utilNode.inherits(CirrusEmitter, EventEmitter);
 
 function initCirrus(scope) {
   scope.contractMap = {};
   scope.pool = {};
-
+  scope.cirrusEmitter = new CirrusEmitter();
   var pgConfig = {
     host: (process.env.POSTGRES || 'postgres'),
     user: 'postgres',
@@ -22,6 +25,7 @@ function initCirrus(scope) {
     .then(getKafkaTopic())
     .catch(err => {
       console.log('Failed to init', err)
+      throw new Error(err);
     })
 }
 
@@ -128,4 +132,10 @@ function getKafkaTopic() {
       })
   }
 }
+
+function CirrusEmitter() {
+  EventEmitter.call(this);
+}
+
+
 module.exports = initCirrus;
