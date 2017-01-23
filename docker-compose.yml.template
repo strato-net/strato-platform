@@ -62,6 +62,7 @@ services:
 
   postgres-cirrus:
     image: postgres:9.6
+    restart: always
     volumes:
       - /tmp/backup:/tmp/backup
     environment:
