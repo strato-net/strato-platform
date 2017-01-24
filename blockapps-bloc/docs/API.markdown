@@ -1,5 +1,12 @@
-## GET /addresses
+# Addresses
 
+## GET /addresses
+This end-point currently redirects to explorer. It should return a list of all addresses from the app/users folder.
+
+This call is non blocking.
+
+#### Backend Calls:
+This end point does not use any backend calls.
 
 #### Response:
 
@@ -10,7 +17,7 @@
 
     - `text/html;charset=utf-8`
 
--
+#### Expected Response (But this is not what we get)
 
 ```html
 []
@@ -39,6 +46,43 @@
 ```html
 ["000000000000deadbeef","000000000000deadbeef","000000000000deadbeef"]
 ```
+
+## GET /addresses/:address/pending
+This call is expected to return details for a user account pending confirmation.
+
+This call is non blocking.
+
+#### Captures
+
+- *address*: User account address previously returned by Bloc.
+
+#### Backend Calls
+
+This call does not make any backend calls.
+
+#### Response
+
+Unknown
+
+## GET /addresses/:address/pending/remove/:time
+This call is expected to return details for a user account pending confirmation.
+
+This call is non blocking.
+
+#### Captures
+
+- *address*: User account address previously returned by Bloc.
+- *time*: The unix time stamp for the request (obtained from the GET /addresses/:address/pending call)
+
+#### Backend Calls
+
+This call does not make any backend calls.
+
+#### Response
+
+Unknown
+
+# Contract
 
 ## GET /contracts
 
