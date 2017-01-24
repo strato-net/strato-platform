@@ -264,7 +264,7 @@ This call is non blocking
 ## GET /contracts/:contractName/:contractAddress/state
 This call returns the current state of the contract (values of all the symbols and functions).
 
-This call is non blocking.
+#### Backend Calls
 
 #### Captures
 
@@ -287,7 +287,7 @@ This call is non blocking.
 ```
 
 ## GET /contracts/:contractName/:contractAddress/state/:mapping/:key
-This call returns the current state of the contract (values of all the symbols).
+This call returns specfic values from a solidity mapping in a contract.
 
 This call is non blocking.
 
@@ -295,10 +295,23 @@ This call is non blocking.
 
 - *contractName*: a contract name
 - *contractAddress*: a contract address
-- *mapping*: a contract address
-- *key*: a contract address
+- *mapping*: the symbol name representing the map
+- *key*: the key for the desired value
 
 #### Response
+
+```javascript
+//http://tester12.westus.cloudapp.azure.com/bloc/contracts/SimpleMapping/d1d29ee74a6d03244189ddb39239adc2a5f77ba91a8df459f17a172dbd96213d/state/m/1
+
+{
+  "m": {
+    "1": {
+      "type": "Buffer",
+      "data": []
+    }
+  }
+}
+```
 
 ## GET /contracts/:contractName/all/states/
 This call returns the current state of all contracts with the *:contractName*.
@@ -309,22 +322,48 @@ This call returns the current state of all contracts with the *:contractName*.
 
 #### Response
 
-See _GET /contracts/:contractName/:contractAddress/state_
+See _GET /contracts/:contractName/:contractAddress/state_. This call returns the same information in an array.
 
 ## POST /contracts/compile
 This call accepts an array of contract sources as its request body and returns an array of contract names and their code hashes.
 
 #### Backend Calls
+This call blocks on the following backend calls:
+- `strato-api/eth/v1.2/solc` or `strato-api/eth/v1.2/extabi`, depending on wether this is called with the source or the source object.
+- If the contracts is searchable, it posts the contract to cirrus.
 
 #### Request
 
+```javascript
+Content-Type: application/json
+
+[
+	{
+		"searchable": ["SimpleStorage"],
+		"contractName": "SimpleStorage",
+		"source": "contract SimpleStorage {    uint storedData;    function set(uint x) {        storedData = x;    }    function get() returns (uint retVal) {        return storedData;    }}"
+	}
+]
+```
+
 #### Response
+
+```javascript
+[
+  {
+    "contractName": "SimpleStorage",
+    "codeHash": "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
+  }
+]
+
+```
 
 # Users
 
 ## GET /users
+Returns a list of all users that bloc is aware of.
 
-
+This call is non blocking.
 
 #### Response:
 
