@@ -5,8 +5,6 @@ This end-point currently redirects to explorer. It should return a list of all a
 
 This call is non blocking.
 
-#### Backend Calls:
-This end point does not use any backend calls.
 
 #### Response:
 
@@ -56,10 +54,6 @@ This call is non blocking.
 
 - *address*: User account address previously returned by Bloc.
 
-#### Backend Calls
-
-This call does not make any backend calls.
-
 #### Response
 
 Unknown
@@ -74,10 +68,6 @@ This call is non blocking.
 - *address*: User account address previously returned by Bloc.
 - *time*: The unix time stamp for the request (obtained from the GET /addresses/:address/pending call)
 
-#### Backend Calls
-
-This call does not make any backend calls.
-
 #### Response
 
 Unknown
@@ -85,7 +75,9 @@ Unknown
 # Contract
 
 ## GET /contracts
+This returns a list of contracts along with their creation timestamps.
 
+This call is non blocking.
 
 
 #### Response:
@@ -104,7 +96,9 @@ Unknown
 ```
 
 ## GET /contracts/:contractName
+This call currently redirects to explorer. This should return a list of addresses for the given contract name.
 
+This call is non blocking.
 
 
 #### Captures:
@@ -149,6 +143,184 @@ Unknown
 ```
 ["000000000000deadbeef","000000000000deadbeef","000000000000deadbeef"]
 ```
+
+## GET /contracts/:contractName/:contractAddress\.:extension?
+This call shows the contract details for the given contract address.
+
+This call is non blocking.
+
+
+#### Captures:
+
+- *contractName*: a contract name
+- *contractAddress*: a contract address
+- *extension*: extension for the response expected? The only value the code is looking for is `html`. If the extension is `html`, the response includes some frontend JS code.
+
+#### Response
+
+```javascript
+{
+  "bin": "606060405260206040519081016040528060008152602001506001600050...0508156",
+  "bin-runtime": "60606040526000357......................68201915b50505050508156",
+  "codeHash": "9a15f6fd4ff8396f006d7234b054bc73ebc9f0245ff53500d0ca6c2a54fa272c",
+  "xabi": {
+    "funcs": {
+      "increment": {
+        "args": {},
+        "selector": "d09de08a",
+        "vals": {
+          "#0": {
+            "type": "Int",
+            "index": 0,
+            "bytes": 32
+          }
+        }
+      }
+    },
+    "constr": {
+      "_id": {
+        "dynamic": true,
+        "type": "String",
+        "index": 0,
+        "name": "_id"
+      }
+    },
+    "vars": {
+      "value": {
+        "atBytes": 64,
+        "type": "Int",
+        "bytes": 32
+      },
+      "busyList": {
+        "atBytes": 0,
+        "dynamic": true,
+        "entry": {
+          "typedef": "Busy",
+          "type": "Contract",
+          "bytes": 20
+        },
+        "type": "Array"
+      },
+      "id": {
+        "atBytes": 32,
+        "dynamic": true,
+        "type": "String"
+      }
+    }
+  },
+  "name": "BusyWork",
+  "address": "a248737a9eda29869825f6701a6930699e11fc27"
+}
+```
+
+## GET /contracts/:contractName/:contractAddress/functions
+This call returns a list of functions in this contract.
+
+This call is non blocking 
+
+#### Captures
+
+- *contractName*: a contract name
+- *contractAddress*: a contract address
+
+#### Response
+
+-
+
+```javascript
+["increment"]
+```
+
+-
+
+```javascript
+["functionCall1","functionCall2"]
+```
+
+## GET /contracts/:contractName/:contractAddress/symbols
+This call returns a list of symbols in this contract.
+
+This call is non blocking 
+
+#### Captures
+
+- *contractName*: a contract name
+- *contractAddress*: a contract address
+
+#### Response
+
+-
+
+```javascript
+["value","busyList","id"]
+```
+
+-
+
+```javascript
+["variable1","variable2"]
+```
+
+## GET /contracts/:contractName/:contractAddress/state
+This call returns the current state of the contract (values of all the symbols and functions).
+
+This call is non blocking.
+
+#### Captures
+
+- *contractName*: a contract name
+- *contractAddress*: a contract address
+
+#### Response
+
+```javascript
+{
+  "increment": "function () returns (Int)",
+  "value": "180",
+  "busyList": [
+    "40390397d98a3b864398c3d33246f46d5de13fb5",
+    "a713e44725c42c4dcf719be0ff04688461cec31a",
+    "f04d217de5ba796144b960fe92ce07c0ae85794c"
+  ],
+  "id": "UID_29892_31308598"
+}
+```
+
+## GET /contracts/:contractName/:contractAddress/state/:mapping/:key
+This call returns the current state of the contract (values of all the symbols).
+
+This call is non blocking.
+
+#### Captures
+
+- *contractName*: a contract name
+- *contractAddress*: a contract address
+- *mapping*: a contract address
+- *key*: a contract address
+
+#### Response
+
+## GET /contracts/:contractName/all/states/
+This call returns the current state of all contracts with the *:contractName*.
+
+#### Captures
+
+- *contractName*: a contract name
+
+#### Response
+
+See _GET /contracts/:contractName/:contractAddress/state_
+
+## POST /contracts/compile
+This call accepts an array of contract sources as its request body and returns an array of contract names and their code hashes.
+
+#### Backend Calls
+
+#### Request
+
+#### Response
+
+# Users
 
 ## GET /users
 
@@ -212,31 +384,31 @@ Unknown
 
 -
 
-```html
+```javascript
 []
 ```
 
 -
 
-```html
+```javascript
 ["000000000000deadbeef"]
 ```
 
 -
 
-```html
+```javascript
 ["000000000000deadbeef","000000000000deadbeef"]
 ```
 
 -
 
-```html
+```javascript
 ["00000000000012345678"]
 ```
 
 -
 
-```html
+```javascript
 ["000000000000deadbeef","000000000000deadbeef","000000000000deadbeef"]
 ```
 
