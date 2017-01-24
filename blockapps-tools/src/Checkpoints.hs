@@ -20,7 +20,7 @@ import qualified Network.Kafka.Protocol as KP
 import qualified Blockchain.Sequencer.Kafka as SeqKafka
 import qualified Blockchain.Sequencer.Constants as SeqConst
 
-data CheckpointService   = Sequencer | EVM | Indexer | Adit | NullService deriving (Eq, Ord, Enum, Data)
+data CheckpointService   = Sequencer | EVM | Indexer | NullService deriving (Eq, Ord, Enum, Data)
 data CheckpointOperation = Get | Put | NullOperation deriving (Eq, Ord, Enum, Data)
 
 -- have to manually do these cause theres no way to lowercase them for glorious lowercase cli
@@ -44,7 +44,6 @@ instance Read CheckpointService where
             "sequencer"   -> return Sequencer
             "evm"         -> return EVM
             "indexer"     -> return Indexer
-            "adit"        -> return Adit
             "NullService" -> return NullService
             _             -> P.pfail
 
