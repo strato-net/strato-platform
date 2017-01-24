@@ -71,8 +71,8 @@ hasCheckpointData EVM = True
 hasCheckpointData _   = False
 
 makeCheckpointData :: CheckpointService -> KP.Metadata -> String -> KP.Metadata
-makeCheckpointData EVM oldMD arg = error "todo makeCheckpointData EVM"
-makeCheckpointData _   oldMD _   = oldMD
+makeCheckpointData EVM _ arg = KP.Metadata . KP.KString $ S8.pack arg
+makeCheckpointData _ oldMD _ = oldMD
 
 lookupByBits :: KafkaBits -> IO CPTuple
 lookupByBits bits@(clientId, consumerId, topicName) =
@@ -86,9 +86,10 @@ lookupByBits bits@(clientId, consumerId, topicName) =
 showOffset :: CPTuple -> IO ()
 showOffset = putStrLn . ("Offset is " ++) . show . fst
 
+-- todo:
 showCheckpointData :: CheckpointService -> CPTuple -> IO ()
-showCheckpointData EVM t = error "showCheckpointData EVM"
-showCheckpointData svc _ = error $"showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
+showCheckpointData EVM = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
+showCheckpointData svc = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
 
 getAndDisplayExistingData :: CheckpointService -> IO CPTuple
 getAndDisplayExistingData service = do
