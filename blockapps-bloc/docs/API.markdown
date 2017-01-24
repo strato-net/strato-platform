@@ -513,6 +513,10 @@ password=securePassword&src=contract%20SimpleStorage%20%7B%20uint%20storedData%3
 "ed17f216c16a13951965ab89cd89616a856c3fc2ee714ec1a532d6aef36cec1c"
 ```
 
+## POST /users/:user/:address/import
+
+## POST /users/:user/:address/uploadList
+
 ## POST /users/:user/:address/send
 
 
@@ -549,6 +553,8 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 {"hash":"4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4","gasLimit":"21000","codeOrData":"","gasPrice":"50000000000","to":"000000000000deadbeef","value":"10000000000000000000","from":"111dec89c25cbda1c12d67621ee3c10ddb8196bf","r":"1","s":"1","v":"1c","nonce":"0"}
 ```
 
+## POST /users/:user/:userAddress/sendList
+
 ## POST /users/:user/:userAddress/contract/:contractName/:contractAddress/call
 
 
@@ -574,6 +580,8 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 ```javascript
 
 ```
+## POST /users/:user/:address/callList
+
 ## Missing API Calls
 1. user: uploadList
 2. user: import
