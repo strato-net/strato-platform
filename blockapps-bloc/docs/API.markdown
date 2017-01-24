@@ -605,7 +605,9 @@ This call is non blocking,
 
 This call returns the state for all contracts found with the same name, similar to _GET /contracts/all/states_.
 
-This call is non blocking.
+#### Backend Calls
+
+This call blocks on a call to `strato-api/eth/v1.2/accounts?codehash=:codeHash`.
 
 #### Captures
 
@@ -644,6 +646,12 @@ This call is non blocking.
 ## GET /search/:contractName/state/reduced
 
 This call is used to return values for specific symbols for all contracts that match the _contractName_.
+
+
+#### Backend Calls
+
+This call blocks on a call to `strato-api/eth/v1.2/accounts?codehash=:codeHash`.
+
 
 #### Captures
 
@@ -692,3 +700,16 @@ This call is used to return values for specific symbols for all contracts that m
 ## GET /search/:contractName/state/summary
 
 This end point is currently returning 502 Bad Gateway in the latest builds.
+
+
+#### Backend Calls
+
+This call blocks on a call to `strato-api/eth/v1.2/accounts?codehash=:codeHash`.
+
+#### Captures
+
+- *contractName*: name of the contract.
+
+#### Response
+
+Unknown
