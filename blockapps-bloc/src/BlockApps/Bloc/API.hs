@@ -25,10 +25,10 @@ module BlockApps.Bloc.API
   ) where
 
 import Data.Aeson
+import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.HashMap.Strict (HashMap)
-import Data.List
 import Data.Maybe
 import Data.Text (Text)
 import Generic.Random.Generic
@@ -152,37 +152,33 @@ instance ToJSON x => MimeRender OctetStream x where
   mimeRender _ = encode
 
 data PostUserParameters = PostUserParameters
-  { user_faucet :: Int
-  , user_password :: Text
+  { userFaucet :: Int
+  , userPassword :: Text
   } deriving (Eq, Show, Generic)
 instance ToForm PostUserParameters where
-  toForm = genericToForm
-    defaultFormOptions{ fieldLabelModifier = idOrStripPrefix "user_" }
+  toForm = genericToForm (FormOptions (camelCase . drop 4))
 instance FromForm PostUserParameters where
-  fromForm = genericFromForm
-    defaultFormOptions{ fieldLabelModifier = idOrStripPrefix "user_" }
+  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
 instance ToSample PostUserParameters where
   toSamples _ = singleSample PostUserParameters
-    { user_faucet = 1
-    , user_password = "securePassword"
+    { userFaucet = 1
+    , userPassword = "securePassword"
     }
 
 data PostSendParameters = PostSendParameters
-  { send_toAddress :: Address
-  , send_value :: Natural
-  , send_password :: Text
+  { sendToAddress :: Address
+  , sendValue :: Natural
+  , sendPassword :: Text
   } deriving (Eq, Show, Generic)
 instance ToForm PostSendParameters where
-  toForm = genericToForm
-    defaultFormOptions{ fieldLabelModifier = idOrStripPrefix "send_" }
+  toForm = genericToForm (FormOptions (camelCase . drop 4))
 instance FromForm PostSendParameters where
-  fromForm = genericFromForm
-    defaultFormOptions{ fieldLabelModifier = idOrStripPrefix "send_" }
+  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
 instance ToSample PostSendParameters where
   toSamples _ = singleSample PostSendParameters
-    { send_toAddress = Address 0xdeadbeef
-    , send_value = 10
-    , send_password = "securePassword"
+    { sendToAddress = Address 0xdeadbeef
+    , sendValue = 10
+    , sendPassword = "securePassword"
     }
 
 data Contract = Contract
@@ -193,7 +189,7 @@ instance ToJSON Contract
 instance FromJSON Contract
 instance Arbitrary Contract where arbitrary = genericArbitrary
 
-data Contracts = Contracts
+newtype Contracts = Contracts
   { addresses :: [Contract] } deriving (Eq, Show, Generic)
 instance ToJSON Contracts where
   toJSON = genericToJSON defaultOptions
@@ -230,41 +226,35 @@ instance ToSample SrcPassword where
     }
 
 data UploadList = UploadList
-  { ul_password :: Text
-  , ul_contracts :: [UploadListContract]
-  , ul_resolve :: Bool
+  { uploadlistPassword :: Text
+  , uploadlistContracts :: [UploadListContract]
+  , uploadlistResolve :: Bool
   } deriving (Eq,Show,Generic)
 instance ToJSON UploadList where
-  toJSON = genericToJSON defaultOptions
-    {JSON.fieldLabelModifier = idOrStripPrefix "ul_"}
+  toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadList where
-  parseJSON = genericParseJSON defaultOptions
-    {JSON.fieldLabelModifier = idOrStripPrefix "ul_"}
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample UploadList where
   toSamples _ = noSamples
 
 data UploadListContract = UploadListContract
-  { ulc_contractName :: Text
-  , ulc_args :: HashMap Text Text
-  , ulc_txParams :: TxParams
+  { uploadlistcontractContractName :: Text
+  , uploadlistcontractArgs :: HashMap Text Text
+  , uploadlistcontractTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 instance ToJSON UploadListContract where
-  toJSON = genericToJSON defaultOptions
-    {JSON.fieldLabelModifier = idOrStripPrefix "ulc_"}
+  toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadListContract where
-  parseJSON = genericParseJSON defaultOptions
-    {JSON.fieldLabelModifier = idOrStripPrefix "ulc_"}
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 data TxParams = TxParams
-  { txp_gasLimit :: Natural
-  , txp_gasPrice :: Natural
+  { txparamsGasLimit :: Natural
+  , txparamsGasPrice :: Natural
   } deriving (Eq,Show,Generic)
 instance ToJSON TxParams where
-  toJSON = genericToJSON defaultOptions
-    {JSON.fieldLabelModifier = idOrStripPrefix "txp_"}
+  toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
-  parseJSON = genericParseJSON defaultOptions
-    {JSON.fieldLabelModifier = idOrStripPrefix "txp_"}
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 newtype UnstructuredJSON = UnstructuredJSON LBS.ByteString
   deriving (Eq,Show,Generic)
@@ -277,7 +267,3 @@ instance FromJSON UnstructuredJSON where
   parseJSON = return . UnstructuredJSON . encode
 instance Arbitrary UnstructuredJSON where
   arbitrary = return $ UnstructuredJSON "unstructured json"
-
--- helpers
-idOrStripPrefix :: String -> String -> String
-idOrStripPrefix prefix string = fromMaybe string $ stripPrefix prefix string

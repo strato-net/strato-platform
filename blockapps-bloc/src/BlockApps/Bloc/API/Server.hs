@@ -53,7 +53,7 @@ blocServer store =
           pk = derivePubKey sk
           userAddress = deriveAddress pk
         userPasswordHash <- fmap Text.decodeUtf8 . liftIO $
-            hashPassword 12 (Text.encodeUtf8 user_password)
+            hashPassword 12 (Text.encodeUtf8 userPassword)
         let
           user = User userName userPasswordHash userAddress
           insertUser = Store . Set.insert user . users

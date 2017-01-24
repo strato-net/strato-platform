@@ -29,6 +29,7 @@ library
     , blockapps-data
     , blockapps-strato
     , aeson
+    , aeson-casing
     , containers
     , cryptonite
     , bytestring
