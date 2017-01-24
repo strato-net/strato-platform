@@ -405,7 +405,7 @@ This call is non blocking.
 ```
 
 ## GET /users/:user
-
+This returns a list of known addresses for the provided username. This call is non blocking.
 
 
 #### Captures:
@@ -452,8 +452,10 @@ This call is non blocking.
 ```
 
 ## POST /users/:user
+This creates a new user with the provided user name
 
-
+#### Backend Call
+This call blocks on the `strato-api/eth/v1.2/faucet` call.
 
 #### Captures:
 
@@ -494,7 +496,10 @@ faucet=1&password=securePassword
 
 ## POST /users/:user/:address/contract
 
+This call allows a user to upload a sincle contracts.
 
+#### Backend Calls
+This call block on  `strato-api/eth/v1.2/solc`.
 
 #### Captures:
 
@@ -554,11 +559,63 @@ password=securePassword&src=contract%20SimpleStorage%20%7B%20uint%20storedData%3
 
 ## POST /users/:user/:address/import
 
+This call is similar to the _/users/:user/:address/contract_ call but it uses a JSON object instead of the contract source code string. This end point is not completely functional.
+
+#### Expected Behavior
+This should accept JSON that covers all the needed files for the import dependencies to be satisfied. JSON would probably contain files as a hashmap with path + filename as key and the file contents as the value.
+
+#### Backend Calls
+This call block on  `strato-api/eth/v1.2/extabi`.
+
+#### Captures:
+
+- *user*: a user name
+- *address*: an Ethereum address
+
+#### Response:
+This call is currently not being used. 
+
 ## POST /users/:user/:address/uploadList
+This call is used to upload a list of previously compiled contracts (see _/contracts/compile_).
+
+#### Backend Calls
+This call block on  `strato-api/eth/v1.2/solc`.
+
+#### Captures:
+
+- *user*: a user name
+- *address*: an Ethereum address
+
+#### Request
+
+```javascript
+{
+	"password": "1234",
+	"resolve": "true",
+	"contracts": [
+		{
+			"contractName": "SimpleStorage",
+			"args": {}
+		}
+	]
+}
+```
+
+#### Response
+
+```javascript
+[
+  {
+    "contractJSON": "{\"bin\":\"606060405260978060106000396000f360606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056\",\"bin-runtime\":\"60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056\",\"codeHash\":\"989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8\",\"xabi\":{\"funcs\":{\"set\":{\"args\":{\"x\":{\"type\":\"Int\",\"index\":0,\"bytes\":32,\"name\":\"x\"}},\"selector\":\"60fe47b1\",\"vals\":{}},\"get\":{\"args\":{},\"selector\":\"6d4ce63c\",\"vals\":{\"retVal\":{\"type\":\"Int\",\"index\":0,\"bytes\":32}}}},\"vars\":{\"storedData\":{\"atBytes\":0,\"type\":\"Int\",\"bytes\":32}}},\"name\":\"SimpleStorage\",\"address\":\"40453f2cf0e76c1be5abab998e7e7392acd7f80e\"}"
+  }
+]
+```
 
 ## POST /users/:user/:address/send
+This call is used to send ether to another address.
 
-
+#### Backend Calls
+This route blocks on the `strato-api/eth/v1.2/transaction` call.
 
 #### Captures:
 
@@ -593,10 +650,61 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 ```
 
 ## POST /users/:user/:userAddress/sendList
+This call is used to batch multiple ether transfers into a single API call.
+
+#### Backend Calls
+This route blocks on the `strato-api/eth/v1.2/transaction` call.
+
+#### Captures:
+
+- *user*: a user name
+- *address*: an Ethereum address
+
+#### Request
+
+```javascript
+{
+	"password": "1234",
+	"resolve": true,
+	"txs": [
+		{
+			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905", 
+			"value": 100
+		},
+		{
+			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905", 
+			"value": 100
+		},
+		{
+			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905", 
+			"value": 100
+		}
+	]
+}
+```
+
+#### Response
+```javascript
+[
+  {
+    "senderBalance": "999999999999911419598"
+  },
+  {
+    "senderBalance": "999999999999911419598"
+  },
+  {
+    "senderBalance": "999999999999911419598"
+  }
+]
+```
 
 ## POST /users/:user/:userAddress/contract/:contractName/:contractAddress/call
 
+This call is used to make Solidity function call against a deployed contract.
 
+#### Backend Calls
+
+This end point blocks on the `strato-api/eth/v1.2/transaction` call.
 
 #### Captures:
 
@@ -604,6 +712,19 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 - *userAddress*: an Ethereum address
 - *contractName*: a contract name
 - *contractAddress*: an Ethereum address
+
+#### Request
+
+```javascript
+// POST /users/Admin_51899_20511857248/d2b381613722d7e30e334e2aa45dde8236d1856d/contract/BusyWork/64eb79d62cd19923c126e3d6b796270dea0689d5/call
+
+{
+	"password": "1234",
+	"method": "increment",
+	"args": {},
+	"value": 0
+}
+```
 
 #### Response:
 
@@ -617,9 +738,58 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 - Response body as below.
 
 ```javascript
-
+transaction returned: 1
 ```
 ## POST /users/:user/:address/callList
+This end point is used to batch multiple calls to Solidity functions against deployed contracts.
+
+#### Backend Calls
+
+This end point blocks on the `strato-api/eth/v1.2/transaction` call.
+
+#### Captures:
+
+- *user*: a user name
+- *userAddress*: an Ethereum address
+
+#### Request
+
+```javascript
+{
+	"password": "1234",
+	"resolve": "true",
+	"txs": [
+		{
+			"contractName": "BusyWork",
+			"contractAddress": "a248737a9eda29869825f6701a6930699e11fc27",
+			"methodName": "increment",
+			"args": {},
+			"value": 0			
+		},
+		{
+			"contractName": "BusyWork",
+			"contractAddress": "a248737a9eda29869825f6701a6930699e11fc27",
+			"methodName": "increment",
+			"args": {},
+			"value": 0			
+		}
+	]
+	
+}
+```
+
+#### Response
+
+```javascript
+[
+  {
+    "returnValue": "181"
+  },
+  {
+    "returnValue": "182"
+  }
+]
+```
 
 # Search
 
@@ -627,7 +797,7 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 
 This call returns a collection of contract addresses, similar to _GET /contracts/:contractName_. 
 
-This call is non blocking,
+This call is non blocking.
 
 #### Captures
 
