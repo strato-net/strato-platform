@@ -23,6 +23,7 @@ library
     , binary
     , blockapps-data
     , aeson
+    , aeson-casing
     , generic-random
     , http-api-data
     , http-client
