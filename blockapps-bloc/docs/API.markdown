@@ -1,7 +1,7 @@
 # Addresses
 
 ## GET /addresses
-This end-point currently redirects to explorer. It should return a list of all addresses from the app/users folder.
+This end-point returns a list of all addresses from the app/users folder.
 
 This call is non blocking.
 
@@ -96,7 +96,7 @@ This call is non blocking.
 ```
 
 ## GET /contracts/:contractName
-This call currently redirects to explorer. This should return a list of addresses for the given contract name.
+This returns a list of addresses for the given contract name.
 
 This call is non blocking.
 
