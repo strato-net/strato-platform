@@ -586,8 +586,109 @@ toAddress=000000000000deadbeef&value=10&password=securePassword
 
 ## GET /search/:contractName
 
+This call returns a collection of contract addresses, similar to _GET /contracts/:contractName_. 
+
+This call is non blocking,
+
+#### Captures
+
+- *contractName*: Name of the contract
+
+#### Response
+
+```javascript
+["Busy","BusyWork","Latest","a248737a9eda29869825f6701a6930699e11fc27"]
+```
+
+
 ## GET /search/:contractName/state
+
+This call returns the state for all contracts found with the same name, similar to _GET /contracts/all/states_.
+
+This call is non blocking.
+
+#### Captures
+
+- *contractName*: Name of the contract
+
+#### Response
+
+```javascript
+[
+  {
+    "address": "64eb79d62cd19923c126e3d6b796270dea0689d5",
+    "state": {
+      "increment": "function () returns (Int)",
+      "value": "0",
+      "busyList": [],
+      "id": "unused"
+    }
+  },
+  {
+    "address": "a248737a9eda29869825f6701a6930699e11fc27",
+    "state": {
+      "increment": "function () returns (Int)",
+      "value": "180",
+      "busyList": [
+        "40390397d98a3b864398c3d33246f46d5de13fb5",
+        "a713e44725c42c4dcf719be0ff04688461cec31a",
+        "f04d217de5ba796144b960fe92ce07c0ae85794c"
+      ],
+      "id": "UID_29892_31308598"
+    }
+  }
+]
+```
+
 
 ## GET /search/:contractName/state/reduced
 
+This call is used to return values for specific symbols for all contracts that match the _contractName_.
+
+#### Captures
+
+- *contractName*: name of the contract.
+
+#### Response
+- _/search/:contractName/state/reduced?props=id_
+
+```javascript
+[
+  {
+    "address": "64eb79d62cd19923c126e3d6b796270dea0689d5",
+    "state": {
+      "id": "unused"
+    }
+  },
+  {
+    "address": "a248737a9eda29869825f6701a6930699e11fc27",
+    "state": {
+      "id": "UID_29892_31308598"
+    }
+  }
+]
+```
+- _/search/:contractName/state/reduced?props=id&props=value_
+
+```javascript
+[
+  {
+    "address": "64eb79d62cd19923c126e3d6b796270dea0689d5",
+    "state": {
+      "id": "unused",
+      "value": "0"
+    }
+  },
+  {
+    "address": "a248737a9eda29869825f6701a6930699e11fc27",
+    "state": {
+      "id": "UID_29892_31308598",
+      "value": "180"
+    }
+  }
+]
+```
+
 ## GET /search/:contractName/state/summary
+
+This end point is currently returning 502 Bad Gateway in the latest builds.
