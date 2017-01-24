@@ -51,15 +51,11 @@ readShowProp = liftA2 (===) (readMaybe . show) Just
 
 -- orphans
 
-instance Arbitrary x => Arbitrary (Strung x) where
-  arbitrary = genericArbitrary
-instance Arbitrary x => Arbitrary (Hex x) where arbitrary = genericArbitrary
 instance Arbitrary TransactionType where arbitrary = genericArbitrary
 instance Arbitrary Addresses where arbitrary = genericArbitrary
 instance (Arbitrary x, Arbitrary y) => Arbitrary (LargeKey x y) where
   arbitrary = LargeKey <$> arbitrary <*> arbitrary
 instance Arbitrary Transaction where arbitrary = genericArbitrary
-instance Arbitrary PostTransaction where arbitrary = genericArbitrary
 instance Arbitrary x => Arbitrary (WithNext x) where
   arbitrary = genericArbitrary
 instance Arbitrary BlockData where arbitrary = genericArbitrary
