@@ -22,6 +22,8 @@ module BlockApps.Bloc.API
   , UploadListContract (..)
   , TxParams (..)
   , UnstructuredJSON (..)
+  , PostCompileRequest (..)
+  , PostCompileResponse (..)
   , GetUsers
   , PostUser
   , GetUserAddresses
@@ -35,6 +37,12 @@ module BlockApps.Bloc.API
   , PostContractMethod
   , GetAddresses
   , GetAddressPending
+  , RemovePendingAddress
+  , GetContractFunctions
+  , GetContractSymbols
+  , GetContractStateMapping
+  , GetContractStates
+  , PostContractCompile
   ) where
 
 import Data.Aeson
@@ -70,6 +78,12 @@ type BlocAPI = GetUsers
   :<|> PostContractMethod
   :<|> GetAddresses
   -- :<|> GetAddressPending
+  -- :<|> RemovePendingAddress
+  -- :<|> GetContractFunctions
+  -- :<|> GetContractSymbols
+  -- :<|> GetContractStateMapping
+  -- :<|> GetContractStates
+  -- :<|> PostContractCompile
 
 type GetUsers = "users"
   :> Get '[HTMLifiedJSON] [UserName]
@@ -111,6 +125,7 @@ type PostUploadList = "users"
   :> ReqBody '[JSON] UploadList
   :> Post '[JSON] UnstructuredJSON
 
+-- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
 type GetContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
@@ -139,6 +154,51 @@ type GetAddressPending = "addresses"
   :> Capture "address" Address
   :> "pending"
   :> Get '[JSON] Value
+
+-- GET /addresses/:address/pending/remove/:time
+type RemovePendingAddress = "addresses"
+  :> Capture "address" Address
+  :> "pending"
+  :> "remove"
+  :> Capture "time" Integer
+  :> Get '[JSON] Value
+
+-- GET /contracts/:contractName/:contractAddress/functions
+type GetContractFunctions = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> "functions"
+  :> Get '[JSON] [String]
+
+-- GET /contracts/:contractName/:contractAddress/symbols
+type GetContractSymbols = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> "symbols"
+  :> Get '[JSON] [String]
+
+-- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
+type GetContractStateMapping = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> "state"
+  :> Capture "mapping" String
+  :> Capture "key" String
+  :> Get '[JSON] UnstructuredJSON
+
+-- GET /contracts/:contractName/all/states/
+type GetContractStates = "contracts"
+  :> Capture "contractName" ContractName
+  :> "all"
+  :> "states"
+  :> Get '[JSON] UnstructuredJSON
+
+-- POST /contracts/compile
+type PostContractCompile = "contracts"
+  :> "compile"
+  :> ReqBody '[JSON] [PostCompileRequest]
+  :> Post '[JSON] [PostCompileResponse]
+
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where
@@ -252,6 +312,10 @@ instance ToSample Contracts where
       , createdAt = 1485193000000
       }
     ]
+
+-- stubs
+data PostCompileRequest = PostCompileRequest
+data PostCompileResponse = PostCompileResponse
 
 data SrcPassword = SrcPassword
   { src :: Text
