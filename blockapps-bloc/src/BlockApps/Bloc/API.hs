@@ -62,8 +62,8 @@ import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.HashMap.Strict (HashMap)
-import Data.Maybe
 import Data.Text (Text)
+import Data.Maybe
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Network.HTTP.Media as M
@@ -89,7 +89,7 @@ type BlocAPI = GetUsers
   :<|> GetContractState
   :<|> PostContractMethod
   :<|> GetAddresses
-  -- :<|> GetAddressPending
+  :<|> GetAddressPending
   -- :<|> GetRemovePendingAddress
   -- :<|> GetContractFunctions
   -- :<|> GetContractSymbols
@@ -171,15 +171,15 @@ type GetAddresses = "addresses"
 type GetAddressPending = "addresses"
   :> Capture "address" Address
   :> "pending"
-  :> Get '[JSON] Value
+  :> Get '[JSON] NoContent
 
 -- GET /addresses/:address/pending/remove/:time
 type GetRemovePendingAddress = "addresses"
   :> Capture "address" Address
   :> "pending"
   :> "remove"
-  :> Capture "time" Integer
-  :> Get '[JSON] Value
+  :> Capture "time" Int
+  :> Get '[JSON] NoContent
 
 -- GET /contracts/:contractName/:contractAddress/functions
 type GetContractFunctions = "contracts"
