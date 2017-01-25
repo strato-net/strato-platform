@@ -34,6 +34,7 @@ module BlockApps.Bloc.API
   , GetContractState
   , PostContractMethod
   , GetAddresses
+  , GetAddressPending
   ) where
 
 import Data.Aeson
@@ -68,6 +69,7 @@ type BlocAPI = GetUsers
   :<|> GetContractState
   :<|> PostContractMethod
   :<|> GetAddresses
+  -- :<|> GetAddressPending
 
 type GetUsers = "users"
   :> Get '[HTMLifiedJSON] [UserName]
@@ -131,6 +133,12 @@ type PostContractMethod = "users"
 
 type GetAddresses = "addresses"
   :> Get '[HTMLifiedJSON] [Address]
+
+-- GET /addresses/:address/pending
+type GetAddressPending = "addresses"
+  :> Capture "address" Address
+  :> "pending"
+  :> Get '[JSON] Value
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where
