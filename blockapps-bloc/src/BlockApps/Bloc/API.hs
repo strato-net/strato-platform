@@ -22,6 +22,18 @@ module BlockApps.Bloc.API
   , UploadListContract (..)
   , TxParams (..)
   , UnstructuredJSON (..)
+  , GetUsers
+  , PostUser
+  , GetUserAddresses
+  , PostSend
+  , GetContracts
+  , GetContractData
+  , PostContract
+  , PostUploadList
+  , GetContract
+  , GetContractState
+  , PostContractMethod
+  , GetAddresses
   ) where
 
 import Data.Aeson
@@ -44,58 +56,81 @@ import Web.FormUrlEncoded
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
 
-type BlocAPI =
-  "users"
-    :> Get '[HTMLifiedJSON] [UserName]
-  :<|> "users"
-    :> Capture "user" UserName
-    :> ReqBody '[FormUrlEncoded] PostUserParameters
-    :> Post '[HTMLifiedAddress] Address
-  :<|> "users"
-    :> Capture "user" UserName
-    :> Get '[HTMLifiedJSON] [Address]
-  :<|> "users"
-    :> Capture "user" UserName
-    :> Capture "address" Address
-    :> "send"
-    :> ReqBody '[FormUrlEncoded] PostSendParameters
-    :> Post '[HTMLifiedJSON] PostTransaction
-  :<|> "contracts"
-    :> Get '[JSON] Contracts
-  :<|> "contracts"
-    :> Capture "contractName" ContractName
-    :> Get '[OctetStream] [Address]
-  :<|> "users"
-    :> Capture "user" UserName
-    :> Capture "address" Address
-    :> "contract"
-    :> ReqBody '[FormUrlEncoded] SrcPassword
-    :> Post '[JSON] Keccak256
-  :<|> "users"
-    :> Capture "user" UserName
-    :> Capture "address" Address
-    :> "uploadList"
-    :> ReqBody '[JSON] UploadList
-    :> Post '[JSON] UnstructuredJSON
-  :<|> "contracts"
-    :> Capture "contractName" ContractName
-    :> Capture "contractAddress" Address
-    :> Get '[JSON] UnstructuredJSON
-  :<|> "contracts"
-    :> Capture "contractName" ContractName
-    :> Capture "contractAddress" Address
-    :> "state"
-    :> Get '[JSON] UnstructuredJSON -- change to HTML
-  :<|> "users"
-    :> Capture "user" UserName
-    :> Capture "userAddress" Address
-    :> "contract"
-    :> Capture "contractName" ContractName
-    :> Capture "contractAddress" Address
-    :> "call"
-    :> Post '[JSON] NoContent
-  :<|> "addresses"
-    :> Get '[HTMLifiedJSON] [Address]
+type BlocAPI = GetUsers
+  :<|> PostUser
+  :<|> GetUserAddresses
+  :<|> PostSend
+  :<|> GetContracts
+  :<|> GetContractData
+  :<|> PostContract
+  :<|> PostUploadList
+  :<|> GetContract
+  :<|> GetContractState
+  :<|> PostContractMethod
+  :<|> GetAddresses
+
+type GetUsers = "users"
+  :> Get '[HTMLifiedJSON] [UserName]
+
+type PostUser = "users"
+  :> Capture "user" UserName
+  :> ReqBody '[FormUrlEncoded] PostUserParameters
+  :> Post '[HTMLifiedAddress] Address
+
+type GetUserAddresses = "users"
+  :> Capture "user" UserName
+  :> Get '[HTMLifiedJSON] [Address]
+
+type PostSend = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "send"
+  :> ReqBody '[FormUrlEncoded] PostSendParameters
+  :> Post '[HTMLifiedJSON] PostTransaction
+
+type GetContracts = "contracts"
+  :> Get '[JSON] Contracts
+
+type GetContractData = "contracts"
+  :> Capture "contractName" ContractName
+  :> Get '[OctetStream] [Address]
+
+type PostContract = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "contract"
+  :> ReqBody '[FormUrlEncoded] SrcPassword
+  :> Post '[JSON] Keccak256
+
+type PostUploadList = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "uploadList"
+  :> ReqBody '[JSON] UploadList
+  :> Post '[JSON] UnstructuredJSON
+
+type GetContract = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> Get '[JSON] UnstructuredJSON
+
+type GetContractState = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> "state"
+  :> Get '[JSON] UnstructuredJSON -- change to HTML
+
+type PostContractMethod = "users"
+  :> Capture "user" UserName
+  :> Capture "userAddress" Address
+  :> "contract"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> "call"
+  :> Post '[JSON] NoContent
+
+type GetAddresses = "addresses"
+  :> Get '[HTMLifiedJSON] [Address]
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where
