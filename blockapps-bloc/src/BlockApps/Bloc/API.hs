@@ -24,6 +24,13 @@ module BlockApps.Bloc.API
   , UnstructuredJSON (..)
   , PostCompileRequest (..)
   , PostCompileResponse (..)
+  , PostSendListRequest (..)
+  , PostSendListResponse (..)
+  , SendTransaction (..)
+  , PostMethodListRequest (..)
+  , MethodCall (..)
+  , PostMethodListResponse (..)
+  , SearchContractState (..)
   , GetUsers
   , PostUser
   , GetUserAddresses
@@ -37,12 +44,17 @@ module BlockApps.Bloc.API
   , PostContractMethod
   , GetAddresses
   , GetAddressPending
-  , RemovePendingAddress
+  , GetRemovePendingAddress
   , GetContractFunctions
   , GetContractSymbols
   , GetContractStateMapping
   , GetContractStates
   , PostContractCompile
+  , PostSendList
+  , PostContractMethodList
+  , GetSearchContract
+  , GetSearchContractState
+  , GetSearchContractStateReduced
   ) where
 
 import Data.Aeson
@@ -78,12 +90,17 @@ type BlocAPI = GetUsers
   :<|> PostContractMethod
   :<|> GetAddresses
   -- :<|> GetAddressPending
-  -- :<|> RemovePendingAddress
+  -- :<|> GetRemovePendingAddress
   -- :<|> GetContractFunctions
   -- :<|> GetContractSymbols
   -- :<|> GetContractStateMapping
   -- :<|> GetContractStates
   -- :<|> PostContractCompile
+  -- :<|> PostSendList
+  -- :<|> PostContractMethodList
+  -- :<|> GetSearchContract
+  -- :<|> GetSearchContractState
+  -- :<|> GetSearchContractStateReduced
 
 type GetUsers = "users"
   :> Get '[HTMLifiedJSON] [UserName]
@@ -137,6 +154,7 @@ type GetContractState = "contracts"
   :> "state"
   :> Get '[JSON] UnstructuredJSON -- change to HTML
 
+-- This should return the return value from the method call
 type PostContractMethod = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
@@ -156,7 +174,7 @@ type GetAddressPending = "addresses"
   :> Get '[JSON] Value
 
 -- GET /addresses/:address/pending/remove/:time
-type RemovePendingAddress = "addresses"
+type GetRemovePendingAddress = "addresses"
   :> Capture "address" Address
   :> "pending"
   :> "remove"
@@ -198,6 +216,41 @@ type PostContractCompile = "contracts"
   :> "compile"
   :> ReqBody '[JSON] [PostCompileRequest]
   :> Post '[JSON] [PostCompileResponse]
+
+-- POST /users/:user/:userAddress/sendList
+type PostSendList = "users"
+  :> Capture "user" UserName
+  :> Capture "userAddress" Address
+  :> "sendList"
+  :> ReqBody '[JSON] PostSendListRequest
+  :> Post '[JSON] [PostSendListResponse]
+
+--POST /users/:user/:address/callList
+type PostContractMethodList = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "callList"
+  :> ReqBody '[JSON] PostMethodListRequest
+  :> Post '[JSON] [PostMethodListResponse]
+
+-- GET /search/:contractName
+type GetSearchContract = "search"
+  :> Capture "contractName" ContractName
+  :> Get '[JSON] [String]
+
+-- GET /search/:contractName/state
+type GetSearchContractState = "search"
+  :> Capture "contractName" ContractName
+  :> "state"
+  :> Get '[JSON] [SearchContractState]
+
+-- GET /search/:contractName/state/reduced
+type GetSearchContractStateReduced = "search"
+  :> Capture "contractName" ContractName
+  :> "state"
+  :> "reduced"
+  :> QueryParams "props" String
+  :> Get '[JSON] [SearchContractState]
 
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
@@ -268,6 +321,15 @@ instance ToSample PostUserParameters where
     , userPassword = "securePassword"
     }
 
+data SearchContractState = SearchContractState
+  { searchcontractstateAddress :: Address
+  , searchcontractstateState :: HashMap Text Value
+  } deriving (Eq, Show, Generic)
+instance ToJSON SearchContractState where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON SearchContractState where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
@@ -283,6 +345,65 @@ instance ToSample PostSendParameters where
     , sendValue = 10
     , sendPassword = "securePassword"
     }
+
+data PostSendListResponse = PostSendListResponse
+  { senderBalance :: String
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostSendListResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostSendListResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data PostSendListRequest = PostSendListRequest
+  { postsendlistrequestPassword :: String
+  , postsendlistrequestResolve :: Bool
+  , postsendlistrequestTxs :: [SendTransaction]
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostSendListRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostSendListRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data SendTransaction = SendTransaction
+  { sendtransactionToAddress :: String
+  , sendtransactionValue :: Natural
+  , sendtransactionTxParams :: TxParams
+  } deriving (Eq,Show,Generic)
+instance ToJSON SendTransaction where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON SendTransaction where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data PostMethodListRequest = PostMethodListRequest
+  { postmethodlistrequestPassword :: String
+  , postmethodlistrequestResolve :: Bool
+  , postmethodlistrequestTxs :: [MethodCall]
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostMethodListRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostMethodListRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data PostMethodListResponse = PostMethodListResponse
+  { postmethodlistresponseReturnValue :: String
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostMethodListResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostMethodListResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data MethodCall = MethodCall
+  { methodcallContractName :: String
+  , methodcallContractAddress :: Address
+  , methodcallMethodName :: String
+  , methodcallArgs :: HashMap Text Value
+  , methodcallValue :: Natural
+  , methodcallTxParams :: TxParams
+  } deriving (Eq,Show,Generic)
+instance ToJSON MethodCall where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON MethodCall where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 data Contract = Contract
   { createdAt :: Integer
@@ -313,9 +434,24 @@ instance ToSample Contracts where
       }
     ]
 
--- stubs
 data PostCompileRequest = PostCompileRequest
+  { postcompilerequestSearchable :: [String]
+  , postcompilerequestContractName :: String
+  , postcompilerequestSource :: String
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostCompileRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostCompileRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
 data PostCompileResponse = PostCompileResponse
+  { postcompileresponseContractName :: String
+  , postcompileresponseCodeHash :: String
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostCompileResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostCompileResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 data SrcPassword = SrcPassword
   { src :: Text
