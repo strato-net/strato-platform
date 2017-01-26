@@ -57,6 +57,8 @@ extra-deps:
 - monadIO-0.10.1.4
 - monad-logger-0.3.20.1
 
+compiler-check: match-exact
+
 resolver: lts-3.4
 extra-include-dirs:
 - /usr/local/include

@@ -8,3 +8,4 @@ sftp-config.json
 # mkdir .stack-unpack && stack list-dependencies --separator "-" | while read pkg; do bash -c "cd .stack-unpack && stack unpack $pkg"; done
 .stack-unpack/
 .idea/
+*.iml
