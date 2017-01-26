@@ -43,18 +43,18 @@ type BlocAPI =
   :<|> PostUsersContractMethodList
   -- /address endpoints
   :<|> GetAddresses
-  :<|> GetAddressPending
-  :<|> GetRemovePendingAddress
+  :<|> GetAddressesPending
+  :<|> GetAddressesPendingRemove
   -- /contracts endpoints
   :<|> GetContracts
-  :<|> GetContractData
-  :<|> GetContract
-  :<|> GetContractState
-  :<|> GetContractFunctions
-  :<|> GetContractSymbols
-  :<|> GetContractStateMapping
-  :<|> GetContractStates
-  :<|> PostContractCompile
+  :<|> GetContractsData
+  :<|> GetContractsContract
+  :<|> GetContractsState
+  :<|> GetContractsFunctions
+  :<|> GetContractsSymbols
+  :<|> GetContractsStateMapping
+  :<|> GetContractsStates
+  :<|> PostContractsCompile
   -- /search endpoints
   :<|> GetSearchContract
   :<|> GetSearchContractState
@@ -70,7 +70,7 @@ type GetUsersUser = "users"
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
-  :> ReqBody '[FormUrlEncoded] PostUserParameters
+  :> ReqBody '[FormUrlEncoded] PostUsersUserRequest
   :> Post '[HTMLifiedAddress] Address
 
 type PostUsersSend = "users"
@@ -120,64 +120,62 @@ type PostUsersContractMethodList = "users"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [PostMethodListResponse]
 
-type GetAddresses = "addresses"
-  :> Get '[HTMLifiedJSON] [Address]
+type GetAddresses = "addresses" :> Get '[HTMLifiedJSON] [Address]
 
 -- GET /addresses/:address/pending
-type GetAddressPending = "addresses"
+type GetAddressesPending = "addresses"
   :> Capture "address" Address
   :> "pending"
   :> Get '[JSON] NoContent
 
 -- GET /addresses/:address/pending/remove/:time
-type GetRemovePendingAddress = "addresses"
+type GetAddressesPendingRemove = "addresses"
   :> Capture "address" Address
   :> "pending"
   :> "remove"
   :> Capture "time" Int
   :> Get '[JSON] NoContent
 
-type GetContracts = "contracts"
-  :> Get '[JSON] Contracts
+type GetContracts = "contracts" :> Get '[JSON] Contracts
 
-type GetContractData = "contracts"
+type GetContractsData = "contracts"
   :> Capture "contractName" ContractName
   :> Get '[OctetStream] [Address]
 
 -- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
-type GetContract = "contracts"
+type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> Get '[JSON] UnstructuredJSON
 
-type GetContractState = "contracts"
+type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "state"
   :> Get '[JSON] UnstructuredJSON -- change to HTML
 
 -- GET /contracts/:contractName/:contractAddress/functions
-type GetContractFunctions = "contracts"
+type GetContractsFunctions = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "functions"
   :> Get '[HTMLifiedJSON] [FunctionName]
 
 -- GET /contracts/:contractName/:contractAddress/symbols
-type GetContractSymbols = "contracts"
+type GetContractsSymbols = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "symbols"
   :> Get '[JSON] [SymbolName]
 
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
-type GetContractStateMapping = "contracts"
+type GetContractsStateMapping = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "state"
   :> Capture "mapping" SymbolName
   :> Capture "key" Text
-  :> Get '[JSON] GetContractStateMappingResponse
+  :> Get '[JSON] GetContractsStateMappingResponse
 
 instance ToCapture (Capture "key" Text) where
   toCapture _ = DocCapture "key" "a mapping key"
@@ -186,14 +184,14 @@ instance ToCapture (Capture "mapping" SymbolName) where
   toCapture _ = DocCapture "mapping" "the mapping's name"
 
 -- GET /contracts/:contractName/all/states/
-type GetContractStates = "contracts"
+type GetContractsStates = "contracts"
   :> Capture "contractName" ContractName
   :> "all"
   :> "states"
   :> Get '[JSON] UnstructuredJSON
 
 -- POST /contracts/compile
-type PostContractCompile = "contracts"
+type PostContractsCompile = "contracts"
   :> "compile"
   :> ReqBody '[JSON] [PostCompileRequest]
   :> Post '[JSON] [PostCompileResponse]
@@ -300,16 +298,16 @@ instance FromJSON x => MimeUnrender OctetStream x where
 instance ToJSON x => MimeRender OctetStream x where
   mimeRender _ = encode
 
-data PostUserParameters = PostUserParameters
+data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
   , userPassword :: Text
   } deriving (Eq, Show, Generic)
-instance ToForm PostUserParameters where
+instance ToForm PostUsersUserRequest where
   toForm = genericToForm (FormOptions (camelCase . drop 4))
-instance FromForm PostUserParameters where
+instance FromForm PostUsersUserRequest where
   fromForm = genericFromForm (FormOptions (camelCase . drop 4))
-instance ToSample PostUserParameters where
-  toSamples _ = singleSample PostUserParameters
+instance ToSample PostUsersUserRequest where
+  toSamples _ = singleSample PostUsersUserRequest
     { userFaucet = 1
     , userPassword = "securePassword"
     }
@@ -400,16 +398,16 @@ instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
 instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary
 
-newtype GetContractStateMappingResponse = GetContractStateMappingResponse
+newtype GetContractsStateMappingResponse = GetContractsStateMappingResponse
   { getContractStateMappingResponseValue :: Value
   } deriving (Eq,Show,Generic)
-instance ToJSON GetContractStateMappingResponse where
-  toJSON (GetContractStateMappingResponse resp) = toJSON resp
-instance FromJSON GetContractStateMappingResponse where
-  parseJSON = fmap GetContractStateMappingResponse . parseJSON
-instance Arbitrary GetContractStateMappingResponse where
-  arbitrary = return $ GetContractStateMappingResponse Null
-instance ToSample GetContractStateMappingResponse where
+instance ToJSON GetContractsStateMappingResponse where
+  toJSON (GetContractsStateMappingResponse resp) = toJSON resp
+instance FromJSON GetContractsStateMappingResponse where
+  parseJSON = fmap GetContractsStateMappingResponse . parseJSON
+instance Arbitrary GetContractsStateMappingResponse where
+  arbitrary = return $ GetContractsStateMappingResponse Null
+instance ToSample GetContractsStateMappingResponse where
   toSamples _ = noSamples
 
 data MethodCall = MethodCall

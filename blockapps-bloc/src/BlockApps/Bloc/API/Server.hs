@@ -47,7 +47,7 @@ blocServer store =
       getUsers = liftIO . atomically $
         map (UserName . userName) . Set.elems . users <$> readTVar store
 
-      postUser (UserName userName) PostUserParameters{..} = do
+      postUser (UserName userName) PostUsersUserRequest{..} = do
         Just sk <- liftIO newSecKey -- don't do partial matching
         let
           pk = derivePubKey sk

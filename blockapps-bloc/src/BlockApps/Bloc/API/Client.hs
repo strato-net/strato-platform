@@ -20,7 +20,7 @@ getUsers = client (Proxy @ GetUsers)
 getUsersUser :: UserName -> ClientM [Address]
 getUsersUser = client (Proxy @ GetUsersUser)
 
-postUsersUser :: UserName -> PostUserParameters -> ClientM Address
+postUsersUser :: UserName -> PostUsersUserRequest -> ClientM Address
 postUsersUser = client (Proxy @ PostUsersUser)
 
 postUsersSend :: UserName -> Address -> PostSendParameters -> ClientM PostTransaction
@@ -41,41 +41,41 @@ postUsersSendList = client (Proxy @ PostUsersSendList)
 postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> ClientM [PostMethodListResponse]
 postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 
-getContracts :: ClientM Contracts
-getContracts = client (Proxy @ GetContracts)
-
-getContractData :: ContractName -> ClientM [Address]
-getContractData = client (Proxy @ GetContractData)
-
-getContract :: ContractName -> Address -> ClientM UnstructuredJSON
-getContract = client (Proxy @ GetContract)
-
-getContractState :: ContractName -> Address -> ClientM UnstructuredJSON
-getContractState = client (Proxy @ GetContractState)
-
 getAddresses :: ClientM [Address]
 getAddresses = client (Proxy @ GetAddresses)
 
-getAddressPending :: Address -> ClientM NoContent
-getAddressPending = client (Proxy @ GetAddressPending)
+getAddressesPending :: Address -> ClientM NoContent
+getAddressesPending = client (Proxy @ GetAddressesPending)
 
-getRemovePendingAddress :: Address -> Int -> ClientM NoContent
-getRemovePendingAddress = client (Proxy @ GetRemovePendingAddress)
+getAddressesPendingRemove :: Address -> Int -> ClientM NoContent
+getAddressesPendingRemove = client (Proxy @ GetAddressesPendingRemove)
 
-getContractFunctions :: ContractName -> Address -> ClientM [FunctionName]
-getContractFunctions = client (Proxy @ GetContractFunctions)
+getContracts :: ClientM Contracts
+getContracts = client (Proxy @ GetContracts)
 
-getContractSymbols :: ContractName -> Address -> ClientM [SymbolName]
-getContractSymbols = client (Proxy @ GetContractSymbols)
+getContractsData :: ContractName -> ClientM [Address]
+getContractsData = client (Proxy @ GetContractsData)
 
-getContractStateMapping :: ContractName -> Address -> SymbolName -> Text -> ClientM GetContractStateMappingResponse
-getContractStateMapping = client (Proxy @ GetContractStateMapping)
+getContractsContract :: ContractName -> Address -> ClientM UnstructuredJSON
+getContractsContract = client (Proxy @ GetContractsContract)
 
-getContractStates :: ContractName -> ClientM UnstructuredJSON
-getContractStates = client (Proxy @ GetContractStates)
+getContractsState :: ContractName -> Address -> ClientM UnstructuredJSON
+getContractsState = client (Proxy @ GetContractsState)
 
-postContractCompile :: [PostCompileRequest] -> ClientM [PostCompileResponse]
-postContractCompile = client (Proxy @ PostContractCompile)
+getContractsFunctions :: ContractName -> Address -> ClientM [FunctionName]
+getContractsFunctions = client (Proxy @ GetContractsFunctions)
+
+getContractsSymbols :: ContractName -> Address -> ClientM [SymbolName]
+getContractsSymbols = client (Proxy @ GetContractsSymbols)
+
+getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> ClientM GetContractsStateMappingResponse
+getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
+
+getContractsStates :: ContractName -> ClientM UnstructuredJSON
+getContractsStates = client (Proxy @ GetContractsStates)
+
+postContractsCompile :: [PostCompileRequest] -> ClientM [PostCompileResponse]
+postContractsCompile = client (Proxy @ PostContractsCompile)
 
 getSearchContract :: ContractName -> ClientM UnstructuredJSON
 getSearchContract = client (Proxy @ GetSearchContract)
