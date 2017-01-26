@@ -20,6 +20,12 @@ module BlockApps.Bloc.API.Client
   , getContractFunctions
   , getContractSymbols
   , getContractStateMapping
+  , getContractStates
+  , postContractCompile
+  , getSearchContract
+  , getSearchContractState
+  , getSearchContractStateReduced
+  , postSendList
   , blocDev
   ) where
 
@@ -81,6 +87,24 @@ getContractStateMapping
   -> Text
   -> ClientM GetContractStateMappingResponse
 getContractStateMapping = client (Proxy @ GetContractStateMapping)
+
+getContractStates :: ContractName -> ClientM UnstructuredJSON
+getContractStates = client (Proxy @ GetContractStates)
+
+postContractCompile :: [PostCompileRequest] -> ClientM [PostCompileResponse]
+postContractCompile = client (Proxy @ PostContractCompile)
+
+getSearchContract :: ContractName -> ClientM UnstructuredJSON
+getSearchContract = client (Proxy @ GetSearchContract)
+
+getSearchContractState :: ContractName -> ClientM [SearchContractState]
+getSearchContractState = client (Proxy @ GetSearchContractState)
+
+getSearchContractStateReduced :: ContractName -> [Text] -> ClientM [SearchContractState]
+getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
+
+postSendList :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
+postSendList = client (Proxy @ PostSendList)
 
 blocDev :: BaseUrl
 blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

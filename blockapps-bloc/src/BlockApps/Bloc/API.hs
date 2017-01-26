@@ -66,7 +66,6 @@ import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
-import Data.Maybe
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Network.HTTP.Media as M
@@ -97,13 +96,13 @@ type BlocAPI = GetUsers
   :<|> GetContractFunctions
   :<|> GetContractSymbols
   :<|> GetContractStateMapping
-  -- :<|> GetContractStates
-  -- :<|> PostContractCompile
-  -- :<|> PostSendList
+  :<|> GetContractStates
+  :<|> PostContractCompile
+  :<|> PostSendList
   -- :<|> PostContractMethodList
-  -- :<|> GetSearchContract
-  -- :<|> GetSearchContractState
-  -- :<|> GetSearchContractStateReduced
+  :<|> GetSearchContract
+  :<|> GetSearchContractState
+  :<|> GetSearchContractStateReduced
 
 type GetUsers = "users"
   :> Get '[HTMLifiedJSON] [UserName]
@@ -245,7 +244,7 @@ type PostContractMethodList = "users"
 -- GET /search/:contractName
 type GetSearchContract = "search"
   :> Capture "contractName" ContractName
-  :> Get '[JSON] [String]
+  :> Get '[OctetStream] UnstructuredJSON
 
 -- GET /search/:contractName/state
 type GetSearchContractState = "search"
@@ -258,8 +257,13 @@ type GetSearchContractStateReduced = "search"
   :> Capture "contractName" ContractName
   :> "state"
   :> "reduced"
-  :> QueryParams "props" String
+  :> QueryParams "props" Text
   :> Get '[JSON] [SearchContractState]
+
+instance ToParam (QueryParams "props" Text) where
+  toParam _ = DocQueryParam "props" ["id","value"] "Names of contract variables" List
+
+
 
 newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
 instance ToSample SymbolName where
@@ -357,12 +361,16 @@ instance ToSample PostUserParameters where
 
 data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
-  , searchcontractstateState :: HashMap Text Value
+  , searchcontractstateState :: HashMap Text UnstructuredJSON
   } deriving (Eq, Show, Generic)
 instance ToJSON SearchContractState where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON SearchContractState where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample SearchContractState where
+  toSamples _ = noSamples
+instance Arbitrary SearchContractState where
+  arbitrary = genericArbitrary
 
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
@@ -381,12 +389,16 @@ instance ToSample PostSendParameters where
     }
 
 newtype PostSendListResponse = PostSendListResponse
-  { senderBalance :: String
+  { postsendlistresponseSenderBalance :: String
   } deriving (Eq,Show,Generic)
 instance ToJSON PostSendListResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostSendListResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostSendListResponse where
+  toSamples _ = noSamples
+instance Arbitrary PostSendListResponse where
+  arbitrary = genericArbitrary
 
 data PostSendListRequest = PostSendListRequest
   { postsendlistrequestPassword :: String
@@ -397,11 +409,13 @@ instance ToJSON PostSendListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostSendListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostSendListRequest where
+  toSamples _ = noSamples
 
 data SendTransaction = SendTransaction
-  { sendtransactionToAddress :: String
+  { sendtransactionToAddress :: Address
   , sendtransactionValue :: Natural
-  , sendtransactionTxParams :: TxParams
+  , sendtransactionTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 instance ToJSON SendTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -481,14 +495,16 @@ instance ToSample Contracts where
     ]
 
 data PostCompileRequest = PostCompileRequest
-  { postcompilerequestSearchable :: [String]
-  , postcompilerequestContractName :: String
-  , postcompilerequestSource :: String
+  { postcompilerequestSearchable :: [Text]
+  , postcompilerequestContractName :: Text
+  , postcompilerequestSource :: Text
   } deriving (Eq,Show,Generic)
 instance ToJSON PostCompileRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostCompileRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostCompileRequest where
+  toSamples _ = noSamples
 
 data PostCompileResponse = PostCompileResponse
   { postcompileresponseContractName :: String
@@ -498,6 +514,10 @@ instance ToJSON PostCompileResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostCompileResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostCompileResponse where
+  toSamples _ = noSamples
+instance Arbitrary PostCompileResponse where
+  arbitrary = genericArbitrary
 
 data SrcPassword = SrcPassword
   { src :: Text
@@ -545,14 +565,14 @@ instance ToJSON TxParams where
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-newtype UnstructuredJSON = UnstructuredJSON LBS.ByteString
-  deriving (Eq,Show,Generic)
+newtype UnstructuredJSON = UnstructuredJSON
+  { getUnstructuredJSON :: Value
+  } deriving (Eq,Show,Generic)
+instance ToJSON UnstructuredJSON where
+  toJSON (UnstructuredJSON resp) = toJSON resp
+instance FromJSON UnstructuredJSON where
+  parseJSON = fmap UnstructuredJSON . parseJSON
+instance Arbitrary UnstructuredJSON where
+  arbitrary = return $ UnstructuredJSON Null
 instance ToSample UnstructuredJSON where
   toSamples _ = noSamples
-instance ToJSON UnstructuredJSON where
-  toJSON (UnstructuredJSON blob) =
-    fromMaybe (error "unstructured json") (decode blob)
-instance FromJSON UnstructuredJSON where
-  parseJSON = return . UnstructuredJSON . encode
-instance Arbitrary UnstructuredJSON where
-  arbitrary = return $ UnstructuredJSON "unstructured json"
