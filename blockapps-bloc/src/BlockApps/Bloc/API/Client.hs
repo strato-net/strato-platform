@@ -26,6 +26,7 @@ module BlockApps.Bloc.API.Client
   , getSearchContractState
   , getSearchContractStateReduced
   , postSendList
+  , postContractMethodList
   , blocDev
   ) where
 
@@ -105,6 +106,10 @@ getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
 
 postSendList :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
 postSendList = client (Proxy @ PostSendList)
+
+
+postContractMethodList :: UserName -> Address -> PostMethodListRequest -> ClientM [PostMethodListResponse]
+postContractMethodList = client (Proxy @ PostContractMethodList)
 
 blocDev :: BaseUrl
 blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

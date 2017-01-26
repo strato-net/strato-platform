@@ -99,7 +99,7 @@ type BlocAPI = GetUsers
   :<|> GetContractStates
   :<|> PostContractCompile
   :<|> PostSendList
-  -- :<|> PostContractMethodList
+  :<|> PostContractMethodList
   :<|> GetSearchContract
   :<|> GetSearchContractState
   :<|> GetSearchContractStateReduced
@@ -431,14 +431,19 @@ instance ToJSON PostMethodListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostMethodListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostMethodListRequest where
+  toSamples _ = noSamples
 
 newtype PostMethodListResponse = PostMethodListResponse
-  { postmethodlistresponseReturnValue :: String
+  { postmethodlistresponseReturnValue :: Text
   } deriving (Eq,Show,Generic)
 instance ToJSON PostMethodListResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostMethodListResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostMethodListResponse where
+  toSamples _ = noSamples
+instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary
 
 newtype GetContractStateMappingResponse = GetContractStateMappingResponse
   { getContractStateMappingResponseValue :: Value
