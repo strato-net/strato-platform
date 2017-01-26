@@ -8,6 +8,7 @@ module Blockchain.DB.SQLDB (
 
 import Control.Monad.Trans.Resource
 import qualified Database.Persist.Postgresql as SQL
+import qualified Database.Redis
 
 type SQLDB = SQL.ConnectionPool
 
@@ -21,5 +22,4 @@ sqlQuery q = do
   db <- getSQLDB
   runResourceT $
                SQL.runSqlPool q db
-
        
