@@ -20,6 +20,8 @@ library
     BlockApps.Bloc.API.Docs
     BlockApps.Bloc.API.Mock
     BlockApps.Bloc.API.Server
+    BlockApps.Bloc.API.Users
+    BlockApps.Bloc.API.Utils
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Store
     BlockApps.Bloc.User
