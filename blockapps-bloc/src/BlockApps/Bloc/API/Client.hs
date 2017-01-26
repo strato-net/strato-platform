@@ -55,23 +55,22 @@ getAddressPending :: Address -> ClientM NoContent
 getRemovePendingAddress :: Address -> Int -> ClientM NoContent
 getContractFunctions :: ContractName -> Address -> ClientM [FunctionName]
 getContractSymbols :: ContractName -> Address -> ClientM [SymbolName]
-getUsers
-  :<|> postUser
-  :<|> getUserAddresses
-  :<|> postSend
-  :<|> getContracts
-  :<|> getContractData
-  :<|> postContract
-  :<|> postUploadList
-  :<|> getContract
-  :<|> getContractState
-  :<|> postContractMethod
-  :<|> getAddresses
-  :<|> getAddressPending
-  :<|> getRemovePendingAddress
-  :<|> getContractFunctions
-  :<|> getContractSymbols
-    = client (Proxy @ BlocAPI)
+getUsers = client (Proxy @ GetUsers)
+postUser = client (Proxy @ PostUser)
+getUserAddresses = client (Proxy @ GetUserAddresses)
+postSend = client (Proxy @ PostSend)
+getContracts = client (Proxy @ GetContracts)
+getContractData = client (Proxy @ GetContractData)
+postContract = client (Proxy @ PostContract)
+postUploadList = client (Proxy @ PostUploadList)
+getContract = client (Proxy @ GetContract)
+getContractState = client (Proxy @ GetContractState)
+postContractMethod = client (Proxy @ PostContractMethod)
+getAddresses = client (Proxy @ GetAddresses)
+getAddressPending = client (Proxy @ GetAddressPending)
+getRemovePendingAddress = client (Proxy @ GetRemovePendingAddress)
+getContractFunctions = client (Proxy @ GetContractFunctions)
+getContractSymbols = client (Proxy @ GetContractSymbols)
 
 blocDev :: BaseUrl
 blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

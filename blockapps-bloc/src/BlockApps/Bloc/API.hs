@@ -95,7 +95,7 @@ type BlocAPI = GetUsers
   :<|> GetRemovePendingAddress
   :<|> GetContractFunctions
   :<|> GetContractSymbols
-  -- :<|> GetContractStateMapping
+  :<|> GetContractStateMapping
   -- :<|> GetContractStates
   -- :<|> PostContractCompile
   -- :<|> PostSendList
