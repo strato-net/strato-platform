@@ -1,5 +1,6 @@
 {-# LANGUAGE
-    DeriveGeneric
+    DataKinds
+  , DeriveGeneric
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
@@ -9,6 +10,7 @@ module BlockApps.Bloc.API.Utils where
 
 import Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+import Data.Text (Text)
 import GHC.Generics
 import Servant.API
 import Servant.Docs
@@ -47,3 +49,15 @@ instance Arbitrary UnstructuredJSON where
   arbitrary = return $ UnstructuredJSON Null
 instance ToSample UnstructuredJSON where
   toSamples _ = noSamples
+
+newtype ContractName = ContractName Text
+instance ToHttpApiData ContractName where
+  toUrlPiece (ContractName name) = name
+instance FromHttpApiData ContractName where
+  parseUrlPiece = Right . ContractName
+instance ToJSON ContractName where
+  toJSON (ContractName name) = toJSON name
+instance FromJSON ContractName where
+  parseJSON = fmap ContractName . parseJSON
+instance ToCapture (Capture "contractName" ContractName) where
+  toCapture _ = DocCapture "contractName" "a contract name"

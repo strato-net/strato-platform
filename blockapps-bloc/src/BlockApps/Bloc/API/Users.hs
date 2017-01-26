@@ -1,10 +1,10 @@
 {-# LANGUAGE
     DataKinds
-  , DeriveAnyClass
   , DeriveGeneric
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , TypeApplications
   , TypeOperators
 #-}
 
@@ -13,12 +13,13 @@ module BlockApps.Bloc.API.Users where
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.HashMap.Strict (HashMap)
+import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
 import Numeric.Natural
 import Servant.API
--- import Servant.Client
+import Servant.Client
 import Servant.Docs
 import Test.QuickCheck
 import Web.FormUrlEncoded
@@ -27,41 +28,114 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
 
-type GetUsers = "users"
-  :> Get '[HTMLifiedJSON] [UserName]
+type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
+getUsers :: ClientM [UserName]
+getUsers = client (Proxy @ GetUsers)
 
-type PostUser = "users"
-  :> Capture "user" UserName
-  :> ReqBody '[FormUrlEncoded] PostUserParameters
-  :> Post '[HTMLifiedAddress] Address
-
-type GetUserAddresses = "users"
+type GetUsersUser = "users"
   :> Capture "user" UserName
   :> Get '[HTMLifiedJSON] [Address]
+getUsersUser :: UserName -> ClientM [Address]
+getUsersUser = client (Proxy @ GetUsersUser)
 
-type PostSend = "users"
+type PostUsersUser = "users"
+  :> Capture "user" UserName
+  :> ReqBody '[FormUrlEncoded] PostUsersUserRequest
+  :> Post '[HTMLifiedAddress] Address
+postUsersUser :: UserName -> PostUsersUserRequest -> ClientM Address
+postUsersUser = client (Proxy @ PostUsersUser)
+data PostUsersUserRequest = PostUsersUserRequest
+  { userFaucet :: Int
+  , userPassword :: Text
+  } deriving (Eq, Show, Generic)
+instance ToForm PostUsersUserRequest where
+  toForm = genericToForm (FormOptions (camelCase . drop 4))
+instance FromForm PostUsersUserRequest where
+  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
+instance ToSample PostUsersUserRequest where
+  toSamples _ = singleSample PostUsersUserRequest
+    { userFaucet = 1
+    , userPassword = "securePassword"
+    }
+
+type PostUsersSend = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "send"
   :> ReqBody '[FormUrlEncoded] PostSendParameters
   :> Post '[HTMLifiedJSON] PostTransaction
+postUsersSend :: UserName -> Address -> PostSendParameters -> ClientM PostTransaction
+postUsersSend = client (Proxy @ PostUsersSend)
+data PostSendParameters = PostSendParameters
+  { sendToAddress :: Address
+  , sendValue :: Natural
+  , sendPassword :: Text
+  } deriving (Eq, Show, Generic)
+instance ToForm PostSendParameters where
+  toForm = genericToForm (FormOptions (camelCase . drop 4))
+instance FromForm PostSendParameters where
+  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
+instance ToSample PostSendParameters where
+  toSamples _ = singleSample PostSendParameters
+    { sendToAddress = Address 0xdeadbeef
+    , sendValue = 10
+    , sendPassword = "securePassword"
+    }
 
-type PostContract = "users"
+type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
-  :> ReqBody '[FormUrlEncoded] SrcPassword
+  :> ReqBody '[FormUrlEncoded] PostUsersContractRequest
   :> Post '[JSON] Keccak256
+postUsersContract :: UserName -> Address -> PostUsersContractRequest -> ClientM Keccak256
+postUsersContract = client (Proxy @ PostUsersContract)
+data PostUsersContractRequest = PostUsersContractRequest
+  { src :: Text
+  , password :: Text
+  } deriving (Eq,Show,Generic)
+instance ToForm PostUsersContractRequest
+instance FromForm PostUsersContractRequest
+instance ToSample PostUsersContractRequest where
+  toSamples _ = singleSample PostUsersContractRequest
+    { src =
+      "contract SimpleStorage { uint storedData; function set(uint x) \
+      \{ storedData = x; } function get() returns (uint retVal) \
+      \{ return storedData; } }"
+    , password = "securePassword"
+    }
 
-type PostUploadList = "users"
+type PostUsersUploadList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "uploadList"
-  :> ReqBody '[JSON] UploadList
+  :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] UnstructuredJSON
+postUsersUploadListRequest :: UserName -> Address -> UploadListRequest -> ClientM UnstructuredJSON
+postUsersUploadListRequest = client (Proxy @ PostUsersUploadList)
+data UploadListRequest = UploadListRequest
+  { uploadlistPassword :: Text
+  , uploadlistContracts :: [UploadListContract]
+  , uploadlistResolve :: Bool
+  } deriving (Eq,Show,Generic)
+instance ToJSON UploadListRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON UploadListRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample UploadListRequest where
+  toSamples _ = noSamples
+data UploadListContract = UploadListContract
+  { uploadlistcontractContractName :: Text
+  , uploadlistcontractArgs :: HashMap Text Text
+  , uploadlistcontractTxParams :: TxParams
+  } deriving (Eq,Show,Generic)
+instance ToJSON UploadListContract where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON UploadListContract where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 -- This should return the return value from the method call
-type PostContractMethod = "users"
+type PostUsersContractMethod = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "contract"
@@ -69,6 +143,82 @@ type PostContractMethod = "users"
   :> Capture "contractAddress" Address
   :> "call"
   :> Post '[JSON] NoContent
+postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> ClientM NoContent
+postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
+
+-- POST /users/:user/:userAddress/sendList
+type PostUsersSendList = "users"
+  :> Capture "user" UserName
+  :> Capture "userAddress" Address
+  :> "sendList"
+  :> ReqBody '[JSON] PostSendListRequest
+  :> Post '[JSON] [PostSendListResponse]
+postUsersSendList :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
+postUsersSendList = client (Proxy @ PostUsersSendList)
+
+data PostSendListRequest = PostSendListRequest
+  { postsendlistrequestPassword :: String
+  , postsendlistrequestResolve :: Bool
+  , postsendlistrequestTxs :: [SendTransaction]
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostSendListRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostSendListRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostSendListRequest where
+  toSamples _ = noSamples
+data SendTransaction = SendTransaction
+  { sendtransactionToAddress :: Address
+  , sendtransactionValue :: Natural
+  , sendtransactionTxParams :: Maybe TxParams
+  } deriving (Eq,Show,Generic)
+instance ToJSON SendTransaction where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON SendTransaction where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+--POST /users/:user/:address/callList
+type PostUsersContractMethodList = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "callList"
+  :> ReqBody '[JSON] PostMethodListRequest
+  :> Post '[JSON] [PostMethodListResponse]
+postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> ClientM [PostMethodListResponse]
+postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
+data PostMethodListRequest = PostMethodListRequest
+  { postmethodlistrequestPassword :: String
+  , postmethodlistrequestResolve :: Bool
+  , postmethodlistrequestTxs :: [MethodCall]
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostMethodListRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostMethodListRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostMethodListRequest where
+  toSamples _ = noSamples
+newtype PostMethodListResponse = PostMethodListResponse
+  { postmethodlistresponseReturnValue :: Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostMethodListResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostMethodListResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostMethodListResponse where
+  toSamples _ = noSamples
+instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary
+data MethodCall = MethodCall
+  { methodcallContractName :: String
+  , methodcallContractAddress :: Address
+  , methodcallMethodName :: String
+  , methodcallArgs :: HashMap Text Value
+  , methodcallValue :: Natural
+  , methodcallTxParams :: TxParams
+  } deriving (Eq,Show,Generic)
+instance ToJSON MethodCall where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON MethodCall where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where
@@ -86,73 +236,6 @@ instance ToCapture (Capture "user" UserName) where
   toCapture _ = DocCapture "user" "a user name"
 instance Arbitrary UserName where arbitrary = genericArbitrary
 
-data PostUserParameters = PostUserParameters
-  { userFaucet :: Int
-  , userPassword :: Text
-  } deriving (Eq, Show, Generic)
-instance ToForm PostUserParameters where
-  toForm = genericToForm (FormOptions (camelCase . drop 4))
-instance FromForm PostUserParameters where
-  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
-instance ToSample PostUserParameters where
-  toSamples _ = singleSample PostUserParameters
-    { userFaucet = 1
-    , userPassword = "securePassword"
-    }
-
-data PostSendParameters = PostSendParameters
-  { sendToAddress :: Address
-  , sendValue :: Natural
-  , sendPassword :: Text
-  } deriving (Eq, Show, Generic)
-instance ToForm PostSendParameters where
-  toForm = genericToForm (FormOptions (camelCase . drop 4))
-instance FromForm PostSendParameters where
-  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
-instance ToSample PostSendParameters where
-  toSamples _ = singleSample PostSendParameters
-    { sendToAddress = Address 0xdeadbeef
-    , sendValue = 10
-    , sendPassword = "securePassword"
-    }
-
-data SrcPassword = SrcPassword
-  { src :: Text
-  , password :: Text
-  } deriving (Eq,Show,Generic)
-instance ToForm SrcPassword
-instance FromForm SrcPassword
-instance ToSample SrcPassword where
-  toSamples _ = singleSample SrcPassword
-    { src =
-      "contract SimpleStorage { uint storedData; function set(uint x) \
-      \{ storedData = x; } function get() returns (uint retVal) \
-      \{ return storedData; } }"
-    , password = "securePassword"
-    }
-
-data UploadList = UploadList
-  { uploadlistPassword :: Text
-  , uploadlistContracts :: [UploadListContract]
-  , uploadlistResolve :: Bool
-  } deriving (Eq,Show,Generic)
-instance ToJSON UploadList where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON UploadList where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToSample UploadList where
-  toSamples _ = noSamples
-
-data UploadListContract = UploadListContract
-  { uploadlistcontractContractName :: Text
-  , uploadlistcontractArgs :: HashMap Text Text
-  , uploadlistcontractTxParams :: TxParams
-  } deriving (Eq,Show,Generic)
-instance ToJSON UploadListContract where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON UploadListContract where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
 data TxParams = TxParams
   { txparamsGasLimit :: Natural
   , txparamsGasPrice :: Natural
@@ -161,3 +244,15 @@ instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+newtype PostSendListResponse = PostSendListResponse
+  { postsendlistresponseSenderBalance :: String
+  } deriving (Eq,Show,Generic)
+
+instance ToJSON PostSendListResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostSendListResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostSendListResponse where
+  toSamples _ = noSamples
+instance Arbitrary PostSendListResponse where
+  arbitrary = genericArbitrary
