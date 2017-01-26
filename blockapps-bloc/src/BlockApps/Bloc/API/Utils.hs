@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE
     DataKinds
   , DeriveGeneric
@@ -61,3 +62,10 @@ instance FromJSON ContractName where
   parseJSON = fmap ContractName . parseJSON
 instance ToCapture (Capture "contractName" ContractName) where
   toCapture _ = DocCapture "contractName" "a contract name"
+
+-- hack because endpoints are returning stringified json
+-- as application/octet-stream
+instance FromJSON x => MimeUnrender OctetStream x where
+  mimeUnrender _ = eitherDecode
+instance ToJSON x => MimeRender OctetStream x where
+  mimeRender _ = encode
