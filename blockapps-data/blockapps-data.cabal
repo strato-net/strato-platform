@@ -64,6 +64,7 @@ library
                  , process
                  , hflags
                  , monad-control
+                 , hedis
 
     exposed-modules: 
                    Blockchain.Constants
