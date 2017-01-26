@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE
     DataKinds
   , FlexibleInstances
@@ -12,6 +13,7 @@ module BlockApps.Bloc.API.Address where
 import Data.Proxy
 import Servant.API
 import Servant.Client
+import Servant.Docs
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Data
@@ -37,3 +39,5 @@ type GetAddressesPendingRemove = "addresses"
   :> Get '[JSON] NoContent
 getAddressesPendingRemove :: Address -> Int -> ClientM NoContent
 getAddressesPendingRemove = client (Proxy @ GetAddressesPendingRemove)
+instance ToCapture (Capture "time" Int) where
+  toCapture _ = DocCapture "time" "a unix timestamp"
