@@ -5,8 +5,8 @@
 
 module BlockApps.Bloc.API
   ( BlocAPI
-  , blocDocs
-  , blocMarkdown
+  , markdownBloc
+  , mockBloc
   , module Address
   , module Contracts
   , module Search
@@ -21,8 +21,9 @@ import BlockApps.Bloc.API.Users as Users
 import BlockApps.Bloc.API.Utils as Utils
 
 import Data.Proxy
-import Servant.API
+import Servant
 import Servant.Docs
+import Servant.Mock
 
 type BlocAPI =
   -- /users endpoints
@@ -54,8 +55,8 @@ type BlocAPI =
   :<|> GetSearchContractState
   :<|> GetSearchContractStateReduced
 
-blocDocs :: API
-blocDocs = docs (Proxy @ BlocAPI)
+markdownBloc :: String
+markdownBloc = markdown $ docs (Proxy @ BlocAPI)
 
-blocMarkdown :: String
-blocMarkdown = markdown blocDocs
+mockBloc :: Server BlocAPI
+mockBloc = mock (Proxy @ BlocAPI) Proxy

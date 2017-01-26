@@ -43,6 +43,8 @@ type GetSearchContractStateReduced = "search"
   :> "reduced"
   :> QueryParams "props" Text
   :> Get '[JSON] [SearchContractState]
+instance ToParam (QueryParams "props" Text) where
+  toParam _ = DocQueryParam "props" ["id","value"] "Names of contract variables" List
 
 data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
