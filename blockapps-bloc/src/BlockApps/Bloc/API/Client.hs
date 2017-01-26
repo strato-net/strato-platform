@@ -16,6 +16,9 @@ module BlockApps.Bloc.API.Client
   , postContractMethod
   , getAddresses
   , getAddressPending
+  , getRemovePendingAddress
+  , getContractFunctions
+  , getContractSymbols
   , blocDev
   ) where
 
@@ -49,6 +52,9 @@ postContractMethod
   -> ClientM NoContent
 getAddresses :: ClientM [Address]
 getAddressPending :: Address -> ClientM NoContent
+getRemovePendingAddress :: Address -> Int -> ClientM NoContent
+getContractFunctions :: ContractName -> Address -> ClientM [FunctionName]
+getContractSymbols :: ContractName -> Address -> ClientM [SymbolName]
 getUsers
   :<|> postUser
   :<|> getUserAddresses
@@ -61,7 +67,11 @@ getUsers
   :<|> getContractState
   :<|> postContractMethod
   :<|> getAddresses
-  :<|> getAddressPending = client (Proxy @ BlocAPI)
+  :<|> getAddressPending
+  :<|> getRemovePendingAddress
+  :<|> getContractFunctions
+  :<|> getContractSymbols
+    = client (Proxy @ BlocAPI)
 
 blocDev :: BaseUrl
 blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

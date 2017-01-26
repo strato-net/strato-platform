@@ -31,6 +31,8 @@ module BlockApps.Bloc.API
   , MethodCall (..)
   , PostMethodListResponse (..)
   , SearchContractState (..)
+  , SymbolName (..)
+  , FunctionName (..)
   , GetUsers
   , PostUser
   , GetUserAddresses
@@ -90,9 +92,9 @@ type BlocAPI = GetUsers
   :<|> PostContractMethod
   :<|> GetAddresses
   :<|> GetAddressPending
-  -- :<|> GetRemovePendingAddress
-  -- :<|> GetContractFunctions
-  -- :<|> GetContractSymbols
+  :<|> GetRemovePendingAddress
+  :<|> GetContractFunctions
+  :<|> GetContractSymbols
   -- :<|> GetContractStateMapping
   -- :<|> GetContractStates
   -- :<|> PostContractCompile
@@ -186,14 +188,14 @@ type GetContractFunctions = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "functions"
-  :> Get '[JSON] [String]
+  :> Get '[HTMLifiedJSON] [FunctionName]
 
 -- GET /contracts/:contractName/:contractAddress/symbols
 type GetContractSymbols = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "symbols"
-  :> Get '[JSON] [String]
+  :> Get '[JSON] [SymbolName]
 
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
 type GetContractStateMapping = "contracts"
@@ -252,6 +254,30 @@ type GetSearchContractStateReduced = "search"
   :> QueryParams "props" String
   :> Get '[JSON] [SearchContractState]
 
+newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
+instance ToSample SymbolName where
+  toSamples _ = samples
+    [ SymbolName name | name <- ["variable1","variable2"]]
+instance FromJSON SymbolName where
+  parseJSON = fmap SymbolName . parseJSON
+instance ToJSON SymbolName where
+  toJSON (SymbolName name) = toJSON name
+instance Arbitrary SymbolName where
+  arbitrary = genericArbitrary
+
+newtype FunctionName = FunctionName Text deriving(Eq,Show,Generic)
+instance ToSample FunctionName where
+  toSamples _ = samples
+    [ FunctionName name | name <- ["functionCall1","functionCall2"]]
+instance FromJSON FunctionName where
+  parseJSON = fmap FunctionName . parseJSON
+instance ToJSON FunctionName where
+  toJSON (FunctionName name) = toJSON name
+instance Arbitrary FunctionName where
+  arbitrary = genericArbitrary
+
+instance ToCapture (Capture "time" Int) where
+  toCapture _ = DocCapture "time" "a unix timestamp"
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where
