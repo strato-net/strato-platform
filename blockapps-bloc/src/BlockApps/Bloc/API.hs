@@ -9,56 +9,7 @@
   , TypeOperators
 #-}
 
-module BlockApps.Bloc.API
-  ( BlocAPI
-  , PostUserParameters (..)
-  , PostSendParameters (..)
-  , Contract (..)
-  , Contracts (..)
-  , SrcPassword (..)
-  , UserName (..)
-  , ContractName (..)
-  , UploadList (..)
-  , UploadListContract (..)
-  , TxParams (..)
-  , UnstructuredJSON (..)
-  , PostCompileRequest (..)
-  , PostCompileResponse (..)
-  , PostSendListRequest (..)
-  , PostSendListResponse (..)
-  , SendTransaction (..)
-  , PostMethodListRequest (..)
-  , MethodCall (..)
-  , PostMethodListResponse (..)
-  , GetContractStateMappingResponse (..)
-  , SearchContractState (..)
-  , SymbolName (..)
-  , FunctionName (..)
-  , GetUsers
-  , PostUser
-  , GetUserAddresses
-  , PostSend
-  , GetContracts
-  , GetContractData
-  , PostContract
-  , PostUploadList
-  , GetContract
-  , GetContractState
-  , PostContractMethod
-  , GetAddresses
-  , GetAddressPending
-  , GetRemovePendingAddress
-  , GetContractFunctions
-  , GetContractSymbols
-  , GetContractStateMapping
-  , GetContractStates
-  , PostContractCompile
-  , PostSendList
-  , PostContractMethodList
-  , GetSearchContract
-  , GetSearchContractState
-  , GetSearchContractStateReduced
-  ) where
+module BlockApps.Bloc.API where
 
 import Data.Aeson
 import Data.Aeson.Casing
@@ -79,85 +30,72 @@ import Web.FormUrlEncoded
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
 
-type BlocAPI = GetUsers
-  :<|> PostUser
-  :<|> GetUserAddresses
-  :<|> PostSend
-  :<|> GetContracts
-  :<|> GetContractData
-  :<|> PostContract
-  :<|> PostUploadList
-  :<|> GetContract
-  :<|> GetContractState
-  :<|> PostContractMethod
+type BlocAPI =
+  -- /users endpoints
+       GetUsers
+  :<|> PostUsersUser
+  :<|> GetUsersUser
+  :<|> PostUsersSend
+  :<|> PostUsersContract
+  :<|> PostUsersUploadList
+  :<|> PostUsersContractMethod
+  :<|> PostUsersSendList
+  :<|> PostUsersContractMethodList
+  -- /address endpoints
   :<|> GetAddresses
   :<|> GetAddressPending
   :<|> GetRemovePendingAddress
+  -- /contracts endpoints
+  :<|> GetContracts
+  :<|> GetContractData
+  :<|> GetContract
+  :<|> GetContractState
   :<|> GetContractFunctions
   :<|> GetContractSymbols
   :<|> GetContractStateMapping
   :<|> GetContractStates
   :<|> PostContractCompile
-  :<|> PostSendList
-  :<|> PostContractMethodList
+  -- /search endpoints
   :<|> GetSearchContract
   :<|> GetSearchContractState
   :<|> GetSearchContractStateReduced
 
-type GetUsers = "users"
-  :> Get '[HTMLifiedJSON] [UserName]
+-- /user endpoint types
 
-type PostUser = "users"
+type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
+
+type GetUsersUser = "users"
+  :> Capture "user" UserName
+  :> Get '[HTMLifiedJSON] [Address]
+
+type PostUsersUser = "users"
   :> Capture "user" UserName
   :> ReqBody '[FormUrlEncoded] PostUserParameters
   :> Post '[HTMLifiedAddress] Address
 
-type GetUserAddresses = "users"
-  :> Capture "user" UserName
-  :> Get '[HTMLifiedJSON] [Address]
-
-type PostSend = "users"
+type PostUsersSend = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "send"
   :> ReqBody '[FormUrlEncoded] PostSendParameters
   :> Post '[HTMLifiedJSON] PostTransaction
 
-type GetContracts = "contracts"
-  :> Get '[JSON] Contracts
-
-type GetContractData = "contracts"
-  :> Capture "contractName" ContractName
-  :> Get '[OctetStream] [Address]
-
-type PostContract = "users"
+type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
   :> ReqBody '[FormUrlEncoded] SrcPassword
   :> Post '[JSON] Keccak256
 
-type PostUploadList = "users"
+type PostUsersUploadList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "uploadList"
   :> ReqBody '[JSON] UploadList
   :> Post '[JSON] UnstructuredJSON
 
--- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
-type GetContract = "contracts"
-  :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
-  :> Get '[JSON] UnstructuredJSON
-
-type GetContractState = "contracts"
-  :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
-  :> "state"
-  :> Get '[JSON] UnstructuredJSON -- change to HTML
-
 -- This should return the return value from the method call
-type PostContractMethod = "users"
+type PostUsersContractMethod = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "contract"
@@ -165,6 +103,22 @@ type PostContractMethod = "users"
   :> Capture "contractAddress" Address
   :> "call"
   :> Post '[JSON] NoContent
+
+-- POST /users/:user/:userAddress/sendList
+type PostUsersSendList = "users"
+  :> Capture "user" UserName
+  :> Capture "userAddress" Address
+  :> "sendList"
+  :> ReqBody '[JSON] PostSendListRequest
+  :> Post '[JSON] [PostSendListResponse]
+
+--POST /users/:user/:address/callList
+type PostUsersContractMethodList = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "callList"
+  :> ReqBody '[JSON] PostMethodListRequest
+  :> Post '[JSON] [PostMethodListResponse]
 
 type GetAddresses = "addresses"
   :> Get '[HTMLifiedJSON] [Address]
@@ -182,6 +136,25 @@ type GetRemovePendingAddress = "addresses"
   :> "remove"
   :> Capture "time" Int
   :> Get '[JSON] NoContent
+
+type GetContracts = "contracts"
+  :> Get '[JSON] Contracts
+
+type GetContractData = "contracts"
+  :> Capture "contractName" ContractName
+  :> Get '[OctetStream] [Address]
+
+-- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
+type GetContract = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> Get '[JSON] UnstructuredJSON
+
+type GetContractState = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" Address
+  :> "state"
+  :> Get '[JSON] UnstructuredJSON -- change to HTML
 
 -- GET /contracts/:contractName/:contractAddress/functions
 type GetContractFunctions = "contracts"
@@ -225,22 +198,6 @@ type PostContractCompile = "contracts"
   :> ReqBody '[JSON] [PostCompileRequest]
   :> Post '[JSON] [PostCompileResponse]
 
--- POST /users/:user/:userAddress/sendList
-type PostSendList = "users"
-  :> Capture "user" UserName
-  :> Capture "userAddress" Address
-  :> "sendList"
-  :> ReqBody '[JSON] PostSendListRequest
-  :> Post '[JSON] [PostSendListResponse]
-
---POST /users/:user/:address/callList
-type PostContractMethodList = "users"
-  :> Capture "user" UserName
-  :> Capture "address" Address
-  :> "callList"
-  :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [PostMethodListResponse]
-
 -- GET /search/:contractName
 type GetSearchContract = "search"
   :> Capture "contractName" ContractName
@@ -262,8 +219,6 @@ type GetSearchContractStateReduced = "search"
 
 instance ToParam (QueryParams "props" Text) where
   toParam _ = DocQueryParam "props" ["id","value"] "Names of contract variables" List
-
-
 
 newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
 instance ToSample SymbolName where
