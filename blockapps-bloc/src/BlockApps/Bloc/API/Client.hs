@@ -19,11 +19,13 @@ module BlockApps.Bloc.API.Client
   , getRemovePendingAddress
   , getContractFunctions
   , getContractSymbols
+  , getContractStateMapping
   , blocDev
   ) where
 
 -- import Data.Aeson
 import Data.Proxy
+import Data.Text (Text)
 import Servant.API
 import Servant.Client
 
@@ -71,6 +73,14 @@ getAddressPending = client (Proxy @ GetAddressPending)
 getRemovePendingAddress = client (Proxy @ GetRemovePendingAddress)
 getContractFunctions = client (Proxy @ GetContractFunctions)
 getContractSymbols = client (Proxy @ GetContractSymbols)
+
+getContractStateMapping
+  :: ContractName
+  -> Address
+  -> SymbolName
+  -> Text
+  -> ClientM GetContractStateMappingResponse
+getContractStateMapping = client (Proxy @ GetContractStateMapping)
 
 blocDev :: BaseUrl
 blocDev = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

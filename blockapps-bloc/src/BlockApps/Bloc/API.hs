@@ -30,6 +30,7 @@ module BlockApps.Bloc.API
   , PostMethodListRequest (..)
   , MethodCall (..)
   , PostMethodListResponse (..)
+  , GetContractStateMappingResponse (..)
   , SearchContractState (..)
   , SymbolName (..)
   , FunctionName (..)
@@ -202,9 +203,15 @@ type GetContractStateMapping = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "state"
-  :> Capture "mapping" String
-  :> Capture "key" String
-  :> Get '[JSON] UnstructuredJSON
+  :> Capture "mapping" SymbolName
+  :> Capture "key" Text
+  :> Get '[JSON] GetContractStateMappingResponse
+
+instance ToCapture (Capture "key" Text) where
+  toCapture _ = DocCapture "key" "a mapping key"
+
+instance ToCapture (Capture "mapping" SymbolName) where
+  toCapture _ = DocCapture "mapping" "the mapping's name"
 
 -- GET /contracts/:contractName/all/states/
 type GetContractStates = "contracts"
@@ -258,12 +265,13 @@ newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
 instance ToSample SymbolName where
   toSamples _ = samples
     [ SymbolName name | name <- ["variable1","variable2"]]
-instance FromJSON SymbolName where
-  parseJSON = fmap SymbolName . parseJSON
-instance ToJSON SymbolName where
-  toJSON (SymbolName name) = toJSON name
-instance Arbitrary SymbolName where
-  arbitrary = genericArbitrary
+instance FromJSON SymbolName where parseJSON = fmap SymbolName . parseJSON
+instance ToJSON SymbolName where toJSON (SymbolName name) = toJSON name
+instance Arbitrary SymbolName where arbitrary = genericArbitrary
+instance ToHttpApiData SymbolName where
+  toUrlPiece (SymbolName name) = name
+instance FromHttpApiData SymbolName where
+  parseUrlPiece = Right . SymbolName
 
 newtype FunctionName = FunctionName Text deriving(Eq,Show,Generic)
 instance ToSample FunctionName where
@@ -372,7 +380,7 @@ instance ToSample PostSendParameters where
     , sendPassword = "securePassword"
     }
 
-data PostSendListResponse = PostSendListResponse
+newtype PostSendListResponse = PostSendListResponse
   { senderBalance :: String
   } deriving (Eq,Show,Generic)
 instance ToJSON PostSendListResponse where
@@ -410,13 +418,25 @@ instance ToJSON PostMethodListRequest where
 instance FromJSON PostMethodListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-data PostMethodListResponse = PostMethodListResponse
+newtype PostMethodListResponse = PostMethodListResponse
   { postmethodlistresponseReturnValue :: String
   } deriving (Eq,Show,Generic)
 instance ToJSON PostMethodListResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostMethodListResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+newtype GetContractStateMappingResponse = GetContractStateMappingResponse
+  { getContractStateMappingResponseValue :: Value
+  } deriving (Eq,Show,Generic)
+instance ToJSON GetContractStateMappingResponse where
+  toJSON (GetContractStateMappingResponse resp) = toJSON resp
+instance FromJSON GetContractStateMappingResponse where
+  parseJSON = fmap GetContractStateMappingResponse . parseJSON
+instance Arbitrary GetContractStateMappingResponse where
+  arbitrary = return $ GetContractStateMappingResponse Null
+instance ToSample GetContractStateMappingResponse where
+  toSamples _ = noSamples
 
 data MethodCall = MethodCall
   { methodcallContractName :: String
