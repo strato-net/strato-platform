@@ -13,7 +13,9 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockHeader       :: b -> h
     blockTransactions :: b -> [t]
     blockUncleHeaders :: b -> [h]
-    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders #-}
+
+    buildBlock :: h -> t -> [h] -> b
+    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
 
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
@@ -47,7 +49,8 @@ data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
 -- todo: newtype all these vague Integers
 class RLPSerializable t => TransactionLike t where
     txHash        :: t -> SHA
-    txSigner      :: t -> Address
+    txPartialHash :: t -> SHA
+    txSigner      :: t -> Maybe Address
     txNonce       :: t -> Integer
     txType        :: t -> TransactionType
     txSignature   :: t -> (Integer, Integer, Word8)
@@ -58,7 +61,7 @@ class RLPSerializable t => TransactionLike t where
     txCode        :: t -> Maybe Code
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
 
-    {-# MINIMAL txHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
+    {-# MINIMAL txHash, txPartialHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
                 txCode, txData #-}
 
     txSigR :: t -> Integer

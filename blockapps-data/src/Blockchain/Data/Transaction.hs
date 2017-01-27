@@ -1,16 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE DeriveGeneric              #-}
-
 
 module Blockchain.Data.Transaction (
 {-  Transaction(transactionNonce,
@@ -70,6 +64,8 @@ import Blockchain.ExtendedECDSA
 import Control.DeepSeq
 import System.Clock
 
+import Blockchain.Strato.Model.Class
+
 instance NFData Address
 instance NFData Code
 instance NFData SHA
@@ -77,6 +73,27 @@ instance NFData TXOrigin
 instance NFData Transaction
 instance NFData RawTransaction
 
+instance TransactionLike Transaction where
+    txHash        = hash . rlpSerialize . rlpEncode
+    txPartialHash = hash . rlpSerialize . partialRLPEncode
+    txSigner      = whoSignedThisTransaction
+    txNonce       = transactionNonce
+    txSignature t = (transactionR t, transactionS t, transactionV t)
+    txValue       = transactionValue
+    txGasPrice    = transactionGasPrice
+    txGasLimit    = transactionGasLimit
+
+    txType MessageTX{}          = Message
+    txType ContractCreationTX{} = ContractCreation
+
+    txDestination MessageTX{..}        = Just transactionTo
+    txDestination ContractCreationTX{} = Nothing
+
+    txCode MessageTX{}            = Nothing
+    txCode ContractCreationTX{..} = Just transactionInit
+
+    txData MessageTX{..}        = Just transactionData
+    txData ContractCreationTX{} = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = (MessageTX nonce' gp gl to' val dat r s v)
@@ -185,12 +202,11 @@ createContractCreationTX n gp gl val init' prvKey = do
   Switch to Either?
 -}
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction t = 
-    fmap pubKey2Address $ getPubKeyFromSignature' xSignature theHash
+whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature' xSignature theHash
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t
-          getPubKeyFromSignature' = if (fastECRecover $ generalConfig ethConf)
+          getPubKeyFromSignature' = if fastECRecover (generalConfig ethConf)
                                     then getPubKeyFromSignature_fast
                                     else getPubKeyFromSignature
 

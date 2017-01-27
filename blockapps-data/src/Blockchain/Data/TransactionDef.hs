@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric, OverloadedStrings, RecordWildCards #-}
 
 module Blockchain.Data.TransactionDef (
   Transaction(..),
@@ -45,8 +45,6 @@ data Transaction =
     transactionS::Integer,
     transactionV::Word8
     } deriving (Show, Read, Eq, Ord, Generic)
-
-
 
 instance Format Transaction where
   format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
