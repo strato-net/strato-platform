@@ -9,6 +9,7 @@ module Blockchain.Database.MerklePatricia.Internal (
   openMPDB,
   emptyTriePtr,
   sha2StateRoot,
+  unboxStateRoot,
   unsafePutKeyVal,
   unsafeGetKeyVals,
   unsafeGetAllKeyVals,
