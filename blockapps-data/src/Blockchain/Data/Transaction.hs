@@ -58,7 +58,7 @@ import Blockchain.DBM
 
 --import Debug.Trace
 
-import Network.Haskoin.Internals hiding (Address)
+import Network.Haskoin.Internals hiding (Address, txSignature)
 import Blockchain.ExtendedECDSA
 
 import Control.DeepSeq
@@ -94,6 +94,19 @@ instance TransactionLike Transaction where
 
     txData MessageTX{..}        = Just transactionData
     txData ContractCreationTX{} = Nothing
+
+    morphTx t = case type' of
+        Message          -> MessageTX n gp gl dest val dat r s v
+        ContractCreation -> ContractCreationTX n gp gl val code r s v
+        where type'     = txType t
+              n         = txNonce t
+              gp        = txGasPrice t
+              gl        = txGasLimit t
+              val       = txValue t
+              dest      = fromJust (txDestination t)
+              dat       = fromJust (txData t)
+              code      = fromJust (txCode t)
+              (r, s, v) = txSignature t
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = (MessageTX nonce' gp gl to' val dat r s v)
