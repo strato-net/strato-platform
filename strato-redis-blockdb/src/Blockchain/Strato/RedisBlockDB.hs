@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 module Blockchain.Strato.RedisBlockDB
     ( getHeader, getTransactions, getUncles, getBlock
     , putHeader, putBlock
@@ -11,12 +13,14 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Strato.RedisBlockDB.Models
 
-import qualified Data.ByteString                       as B
+import qualified Data.Binary                           as Binary
+import qualified Data.ByteString.Char8                 as S8
+import qualified Data.ByteString.Lazy                  as BL
 import           Data.Maybe                            (fromJust, isNothing)
 import           Database.Redis
 
-inNamespace :: BlockDBNamespace -> SHA -> B.ByteString
-inNamespace ns sha = ns' `B.append` sha'
+inNamespace :: BlockDBNamespace -> SHA -> S8.ByteString
+inNamespace ns sha = ns' `S8.append` sha'
     where sha' = error "todo"
           ns'  = case ns of
                     Headers      -> "h:"
@@ -25,29 +29,29 @@ inNamespace ns sha = ns' `B.append` sha'
                     Uncles       -> "u:"
 
 
-getInNamespace :: BlockDBNamespace -> SHA -> Redis (Maybe B.ByteString)
+getInNamespace :: BlockDBNamespace -> SHA -> Redis (Either Reply (Maybe S8.ByteString))
 getInNamespace ns sha = get $ inNamespace ns sha
 
 getHeader :: BlockHeaderLike h => SHA -> Redis (Maybe h)
-getHeader sha = do
-    head' <- getInNamespace Headers sha
-    if isNothing head'
-    then return Nothing
-    else let (RedisHeader h) = decode (fromJust head') in return . Just $ morphBlockHeader h
+getHeader sha = getInNamespace Headers sha >>= \case
+        Left _             -> return Nothing
+        Right Nothing      -> return Nothing
+        Right (Just rhead) -> let (h :: RedisHeader) = Binary.decode (BL.fromStrict rhead) in
+            return . Just $ morphBlockHeader h
 
 getTransactions :: TransactionLike t => SHA -> Redis (Maybe [t])
-getTransactions sha = do
-    txs' <- getInNamespace Transactions sha
-    if isNothing txs'
-    then return Nothing
-    else let (RedisTxs txs) = decode (fromJust txs') in return . Just $ morphTx <$> txs
+getTransactions sha = getInNamespace Transactions sha >>= \case
+        Left _             -> return Nothing
+        Right Nothing      -> return Nothing
+        Right (Just rtxs ) -> let (RedisTxs txs) = Binary.decode (BL.fromStrict rtxs) in
+            return . Just $ morphTx <$> txs
 
 getUncles :: BlockHeaderLike h => SHA -> Redis (Maybe [h])
-getUncles sha = do
-    uncles' <- getInNamespace Headers sha
-    if isNothing uncles'
-    then return Nothing
-    else let (RedisUncles uncles) = decode (fromJust uncles') in return . Just $ morphBlockHeader <$> uncles
+getUncles sha = getInNamespace Headers sha >>= \case
+        Left _           -> return Nothing
+        Right Nothing    -> return Nothing
+        Right (Just rus) -> let (RedisUncles uncles) = Binary.decode (BL.fromStrict rus) in
+            return . Just $ morphBlockHeader <$> uncles
 
 getBlock :: BlockLike h t b => SHA -> Redis (Maybe b)
 getBlock sha = do
@@ -62,7 +66,10 @@ getBlock sha = do
             uncles <- getUncles sha
             if isNothing uncles
             then return Nothing
-            else return . Just $ buildBlock head txs uncles
+            else let head' = fromJust head
+                     txs'  = fromJust txs
+                     uncs' = fromJust uncles
+                     in return . Just $ buildBlock head' txs' uncs'
 
 putHeader :: Redis ()
 putHeader = undefined
