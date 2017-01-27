@@ -15,7 +15,8 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockUncleHeaders :: b -> [h]
 
     buildBlock :: h -> t -> [h] -> b
-    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
+    morphBlock :: (BlockHeaderLike h2, TransactionLike t2, BlockLike h2 t2 b2) => b2 -> b
+    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock, morphBlock #-}
 
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
@@ -38,16 +39,17 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderTimestamp        :: h -> UTCTime
     blockHeaderMixHash          :: h -> SHA
 
+    morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
     {-# MINIMAL blockHeaderHash, blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
                 blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
                 blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
-                blockHeaderMixHash #-}
+                blockHeaderMixHash, morphBlockHeader #-}
 
 data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
 
 -- todo: newtype all these vague Integers
-class RLPSerializable t => TransactionLike t where
+class (RLPSerializable t) => TransactionLike t where
     txHash        :: t -> SHA
     txPartialHash :: t -> SHA
     txSigner      :: t -> Maybe Address
@@ -61,8 +63,9 @@ class RLPSerializable t => TransactionLike t where
     txCode        :: t -> Maybe Code
     txData        :: t -> Maybe B.ByteString -- todo make a `Code` newtype
 
+    morphTx :: (TransactionLike t2) => t2 -> t
     {-# MINIMAL txHash, txPartialHash, txSigner, txNonce, txType, txSignature, txValue, txDestination, txGasPrice, txGasLimit,
-                txCode, txData #-}
+                txCode, txData, morphTx #-}
 
     txSigR :: t -> Integer
     txSigR t = let (r, _, _) = txSignature t in r
