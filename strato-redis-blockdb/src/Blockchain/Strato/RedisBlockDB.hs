@@ -13,15 +13,14 @@ import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Strato.RedisBlockDB.Models
 
-import qualified Data.Binary                           as Binary
+import qualified Data.Serialize                        as Serialize
 import qualified Data.ByteString.Char8                 as S8
-import qualified Data.ByteString.Lazy                  as BL
 import           Data.Maybe                            (fromJust, isNothing)
 import           Database.Redis
 
 inNamespace :: BlockDBNamespace -> SHA -> S8.ByteString
 inNamespace ns sha = ns' `S8.append` sha'
-    where sha' = error "todo"
+    where sha' = S8.pack $ "bytestringy sha of" ++ show sha
           ns'  = case ns of
                     Headers      -> "h:"
                     Transactions -> "t:"
@@ -36,40 +35,40 @@ getHeader :: BlockHeaderLike h => SHA -> Redis (Maybe h)
 getHeader sha = getInNamespace Headers sha >>= \case
         Left _             -> return Nothing
         Right Nothing      -> return Nothing
-        Right (Just rhead) -> let (h :: RedisHeader) = Binary.decode (BL.fromStrict rhead) in
-            return . Just $ morphBlockHeader h
+        Right (Just rhead) -> let (h :: Either String RedisHeader) = Serialize.decode rhead in
+            either (error . show) (return . Just . morphBlockHeader) h
 
 getTransactions :: TransactionLike t => SHA -> Redis (Maybe [t])
 getTransactions sha = getInNamespace Transactions sha >>= \case
         Left _             -> return Nothing
         Right Nothing      -> return Nothing
-        Right (Just rtxs ) -> let (RedisTxs txs) = Binary.decode (BL.fromStrict rtxs) in
+        Right (Just rtxs ) -> let (Right (RedisTxs txs)) = Serialize.decode rtxs in
             return . Just $ morphTx <$> txs
 
 getUncles :: BlockHeaderLike h => SHA -> Redis (Maybe [h])
 getUncles sha = getInNamespace Headers sha >>= \case
         Left _           -> return Nothing
         Right Nothing    -> return Nothing
-        Right (Just rus) -> let (RedisUncles uncles) = Binary.decode (BL.fromStrict rus) in
+        Right (Just rus) -> let (Right (RedisUncles uncles)) = Serialize.decode rus in
             return . Just $ morphBlockHeader <$> uncles
 
 getBlock :: BlockLike h t b => SHA -> Redis (Maybe b)
 getBlock sha = do
-    head <- getHeader sha
-    if isNothing head
+    mybHeader <- getHeader sha
+    if isNothing mybHeader
     then return Nothing
     else do
-        txs <- getTransactions sha
-        if isNothing txs
+        mybTxs <- getTransactions sha
+        if isNothing mybTxs
         then return Nothing
         else do
-            uncles <- getUncles sha
-            if isNothing uncles
+            mybUncles <- getUncles sha
+            if isNothing mybUncles
             then return Nothing
-            else let head' = fromJust head
-                     txs'  = fromJust txs
-                     uncs' = fromJust uncles
-                     in return . Just $ buildBlock head' txs' uncs'
+            else let header = fromJust mybHeader
+                     txs    = fromJust mybTxs
+                     uncles = fromJust mybUncles
+                     in return . Just $ buildBlock header txs uncles
 
 putHeader :: Redis ()
 putHeader = undefined

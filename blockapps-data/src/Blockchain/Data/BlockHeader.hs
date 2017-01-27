@@ -23,6 +23,7 @@ import Blockchain.Format
 import Blockchain.SHA
 import Blockchain.Util
 
+import Blockchain.Strato.Model.Class
 
 data BlockHeader =
   BlockHeader {
@@ -41,7 +42,7 @@ data BlockHeader =
     extraData::Integer,
     mixHash::SHA,
     nonce::Word64
-    } deriving (Show, Eq)
+    } deriving (Eq, Read, Show)
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
@@ -98,6 +99,9 @@ instance RLPSerializable BlockHeader where
       nonce=bytesToWord64 $ B.unpack $ rlpDecode nonce'
       }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
+
+instance BlockHeaderLike BlockHeader where
+
 
 headerHash::BlockHeader->SHA
 headerHash header = hash . rlpSerialize . rlpEncode $ header

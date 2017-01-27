@@ -1,33 +1,47 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
-import qualified Data.Binary as Binary
+import qualified Data.Serialize                as Serialize
+import qualified Data.Serialize.Get            as Get
+import qualified Data.Serialize.Put            as Put
+
+import qualified Data.ByteString.Char8         as S8
 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Data.RLP
-
-import GHC.Generics
+import qualified Blockchain.Data.BlockHeader   as BHD
+import qualified Blockchain.Data.Transaction   as TXD
 
 data BlockDBNamespace = Headers | Transactions | Numbers | Uncles
     deriving (Eq, Read, Show)
 
-data RedisHeader = RedisHeader {
-                 } deriving (Eq, Read, Show, Generic)
-
-data RedisTx = RedisTx {
-             } deriving (Eq, Read, Show, Generic)
+newtype RedisHeader = RedisHeader BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
+newtype RedisTx     = RedisTx     TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 
 newtype RedisTxs = RedisTxs [RedisTx]
-    deriving (Eq, Read, Show, Binary.Binary, Generic)
+    deriving (Eq, Read, Show, Serialize.Serialize)
 
 newtype RedisUncles = RedisUncles [RedisHeader]
-    deriving (Eq, Read, Show, Binary.Binary, Generic)
+    deriving (Eq, Read, Show, Serialize.Serialize)
 
-instance RLPSerializable RedisTx
-instance RLPSerializable RedisHeader
+instance Serialize.Serialize RedisTx where
+    put (RedisTx t) = do
+        let serialized = rlpSerialize (rlpEncode t)
+            len        = S8.length serialized
+        Put.putWord64be (fromIntegral len)
+        Put.putByteString serialized
+    get = do
+        size <- fromIntegral <$> Get.getWord64be
+        dat  <- Get.getByteString size
+        return . RedisTx $ rlpDecode (rlpDeserialize dat)
 
-instance TransactionLike RedisTx
-instance BlockHeaderLike RedisHeader
-
-instance Binary.Binary RedisTx
-instance Binary.Binary RedisHeader
+instance Serialize.Serialize RedisHeader where
+    put (RedisHeader h) = do
+        let serialized = rlpSerialize (rlpEncode h)
+            len        = S8.length serialized
+        Put.putWord64be (fromIntegral len)
+        Put.putByteString serialized
+    get = do
+        size <- fromIntegral <$> Get.getWord64be
+        dat  <- Get.getByteString size
+        return . RedisHeader $ rlpDecode (rlpDeserialize dat)
