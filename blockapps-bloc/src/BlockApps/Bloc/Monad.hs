@@ -7,13 +7,14 @@ module BlockApps.Bloc.Monad where
 import Control.Monad.Except
 import Control.Monad.Log
 import Control.Monad.Reader
+import Servant
 import Text.PrettyPrint.Leijen.Text
 
 newtype Bloc x = Bloc
   { runBloc ::
       ReaderT BlocEnv
         ( LoggingT (WithSeverity Doc)
-          (ExceptT BlocError IO)
+          ( ExceptT ServantErr IO )
         ) x
   } deriving
   ( Functor
@@ -21,9 +22,8 @@ newtype Bloc x = Bloc
   , Monad
   , MonadIO
   , MonadReader BlocEnv
-  , MonadError BlocError
+  , MonadError ServantErr
   , MonadLog (WithSeverity Doc)
   )
 
 data BlocEnv
-data BlocError
