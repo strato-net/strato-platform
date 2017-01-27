@@ -33,4 +33,8 @@ addressesTable =
   \);"
 
 contractsTable :: ByteString
-contractsTable = "CREATE TABLE contracts();"
+contractsTable =
+  "CREATE TABLE contracts(\
+    \name VARCHAR (255) PRIMARY KEY,\
+    \ \
+  \);"
