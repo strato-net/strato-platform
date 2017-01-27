@@ -24,6 +24,8 @@ packages:
 - strato-sequencer/
 - ethereum-jsonrpc/
 - strato-model/
+- strato-redis-blockdb/strato-redis-blockdb-model
+- strato-redis-blockdb/strato-redis-blockdb-functions
 - location:
     git: https://github.com/haskoin/haskoin
     commit: b71bcfa4701e129b69776e6951fe0bb7c8b26ea3

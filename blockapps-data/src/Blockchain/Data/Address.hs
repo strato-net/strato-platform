@@ -90,6 +90,7 @@ instance Binary Address where
     return (Address $ fromInteger $ byteString2Integer byteString)
 
 
+
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s

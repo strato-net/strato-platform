@@ -10,12 +10,10 @@ import           Data.Maybe                           (fromMaybe)
 import           Blockchain.Strato.Model.ExtendedWord (Word160)
 import           Blockchain.Strato.Model.Util
 import           Data.Binary
-import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
-import qualified Data.NibbleString                    as N
 
-import           Network.Haskoin.Crypto               hiding (Address)
-import           Network.Haskoin.Internals            hiding (Address)
+import           Network.Haskoin.Crypto               hiding (Address, Word160)
+import           Network.Haskoin.Internals            hiding (Address, Word160)
 
 import           GHC.Generics
 

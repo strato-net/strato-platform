@@ -1,22 +1,46 @@
-{-# LANGUAGE Rank2Types #-}
 module Blockchain.Strato.Model.Class where
 
 import qualified Data.ByteString as B
 import           Data.Word
+import           Data.Time.Clock
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.SHA
 
-class RLPSerializable b => BlockLike b where
-    blockHash         :: b -> SHA
-    blockHeader       :: forall h. BlockHeaderLike h => b -> h
-    blockTransactions :: forall t. TransactionLike t => b -> [t]
-    blockUncleHeaders :: forall h. BlockHeaderLike h => b -> [h]
+class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
+    blockHeader       :: b -> h
+    blockTransactions :: b -> [t]
+    blockUncleHeaders :: b -> [h]
+    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders #-}
+
+    blockHash :: b -> SHA
+    blockHash = blockHeaderHash . blockHeader
 
 class RLPSerializable h => BlockHeaderLike h where
-    blockHeaderHash :: h -> SHA
+    blockHeaderHash             :: h -> SHA
+    blockHeaderBlockNumber      :: h -> Integer
+    blockHeaderParentHash       :: h -> SHA
+    blockHeaderOmmersHash       :: h -> SHA
+    blockHeaderBeneficiary      :: h -> Address
+    blockHeaderStateRoot        :: h -> B.ByteString -- todo: "StateRoot" thats not the MPDB StateRoot
+    blockHeaderTransactionsRoot :: h -> B.ByteString -- todo: ditto
+    blockHeaderReceiptsRoot     :: h -> B.ByteString -- todo: ditto
+    blockHeaderLogsBloom        :: h -> B.ByteString -- todo: "Bloom" data?
+    blockHeaderGasLimit         :: h -> Integer -- todo: "gas" newtype?
+    blockHeaderGasUsed          :: h -> Integer -- todo: ditto
+    blockHeaderDifficulty       :: h -> Integer
+    blockHeaderNonce            :: h -> Word64 -- todo: nonce newtype
+    blockHeaderExtraData        :: h -> Integer -- todo: extradata newtype
+    blockHeaderTimestamp        :: h -> UTCTime
+    blockHeaderMixHash          :: h -> SHA
+
+    {-# MINIMAL blockHeaderHash, blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
+                blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
+                blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
+                blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
+                blockHeaderMixHash #-}
 
 data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
 

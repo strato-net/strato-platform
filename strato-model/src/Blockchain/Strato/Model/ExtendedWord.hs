@@ -1,8 +1,9 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Model.ExtendedWord
  (
-    Word128(..), Word160(..), Word256(..), Word512(..),
+    Word128, Word160, Word256, Word512,
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,
@@ -14,9 +15,7 @@ import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Lazy      as BL
-import           Data.Int
 import           Data.Ix
-import           Data.Word
 import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512)
 
 import           Blockchain.Data.RLP
