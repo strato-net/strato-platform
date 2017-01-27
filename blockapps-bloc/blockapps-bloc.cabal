@@ -16,7 +16,7 @@ library
   hs-source-dirs: src
   exposed-modules:
     BlockApps.Bloc.API
-    BlockApps.Bloc.API.Address
+    BlockApps.Bloc.API.Addresses
     BlockApps.Bloc.API.Contracts
     BlockApps.Bloc.API.Search
     BlockApps.Bloc.API.Users

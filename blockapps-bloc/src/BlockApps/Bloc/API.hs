@@ -9,14 +9,14 @@ module BlockApps.Bloc.API
   , mockBloc
   , layoutBloc
   , serveBloc
-  , module Address
+  , module Addresses
   , module Contracts
   , module Search
   , module Users
   , module Utils
   ) where
 
-import BlockApps.Bloc.API.Address as Address
+import BlockApps.Bloc.API.Addresses as Addresses
 import BlockApps.Bloc.API.Contracts as Contracts
 import BlockApps.Bloc.API.Search as Search
 import BlockApps.Bloc.API.Users as Users

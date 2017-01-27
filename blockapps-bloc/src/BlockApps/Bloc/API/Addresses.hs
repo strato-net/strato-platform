@@ -8,7 +8,7 @@
   , TypeOperators
 #-}
 
-module BlockApps.Bloc.API.Address where
+module BlockApps.Bloc.API.Addresses where
 
 import Data.Proxy
 import Servant.API
