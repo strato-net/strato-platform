@@ -7,6 +7,7 @@ module BlockApps.Bloc.API
   ( BlocAPI
   , markdownBloc
   , mockBloc
+  , layoutBloc
   , serveBloc
   , module Address
   , module Contracts
@@ -23,6 +24,7 @@ import BlockApps.Bloc.API.Utils as Utils
 import BlockApps.Bloc.Monad
 
 import Data.Proxy
+import Data.Text (Text)
 import Servant
 import Servant.Docs
 import Servant.Mock
@@ -62,6 +64,9 @@ markdownBloc = markdown $ docs (Proxy @ BlocAPI)
 
 mockBloc :: Server BlocAPI
 mockBloc = mock (Proxy @ BlocAPI) Proxy
+
+layoutBloc :: Text
+layoutBloc = layout (Proxy @ BlocAPI)
 
 serveBloc :: ServerT BlocAPI Bloc
 serveBloc =
