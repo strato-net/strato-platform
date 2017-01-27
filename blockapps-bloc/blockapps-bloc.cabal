@@ -19,12 +19,10 @@ library
     BlockApps.Bloc.API.Address
     BlockApps.Bloc.API.Contracts
     BlockApps.Bloc.API.Search
-    BlockApps.Bloc.API.Server
     BlockApps.Bloc.API.Users
     BlockApps.Bloc.API.Utils
+    BlockApps.Bloc.Database
     BlockApps.Bloc.Monad
-    BlockApps.Bloc.Store
-    BlockApps.Bloc.User
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
@@ -36,6 +34,7 @@ library
     , cryptonite
     , bytestring
     , generic-random
+    , hasql
     , http-api-data
     , http-client
     , http-media
