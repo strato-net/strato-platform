@@ -91,10 +91,6 @@ bloc =
   :<|> getContractsStateMapping
   :<|> getContractsStates
   :<|> postContractsCompile
-  :<|> serveGetSearchContract
-  :<|> serveGetSearchContractState
-  :<|> serveGetSearchContractStateReduced
-  where
-    serveGetSearchContract = undefined
-    serveGetSearchContractState = undefined
-    serveGetSearchContractStateReduced = undefined
+  :<|> getSearchContract
+  :<|> getSearchContractState
+  :<|> getSearchContractStateReduced
