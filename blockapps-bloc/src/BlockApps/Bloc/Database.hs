@@ -66,11 +66,11 @@ contractsInstanceTable =
   \);"
 
 contractsLookupTable :: ByteString
-  contractsLookupTable =
-    "CREATE TABLE contracts_lookup(\
-      \contract_metadata_id REFERENCES contracts_metadata(id),\
-      \linked_metadata_id REFERENCES contracts_metadata(id),\
-      \PRIMARY KEY (contract_metadata_id, linked_metadata_id),\
-      \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
-      \FOREIGN KEY (linked_metadata_id) REFERENCES contracts_metadata(id)\
-    \);"
+contractsLookupTable =
+  "CREATE TABLE contracts_lookup(\
+    \contract_metadata_id REFERENCES contracts_metadata(id),\
+    \linked_metadata_id REFERENCES contracts_metadata(id),\
+    \PRIMARY KEY (contract_metadata_id, linked_metadata_id),\
+    \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
+    \FOREIGN KEY (linked_metadata_id) REFERENCES contracts_metadata(id)\
+  \);"
