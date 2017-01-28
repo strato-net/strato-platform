@@ -7,13 +7,17 @@ module BlockApps.Bloc.Monad where
 import Control.Monad.Except
 import Control.Monad.Log
 import Control.Monad.Reader
+import Hasql.Connection
+import Network.HTTP.Client
+import Servant
+import Servant.Client
 import Text.PrettyPrint.Leijen.Text
 
 newtype Bloc x = Bloc
   { runBloc ::
-      ReaderT BlocEnv
-        ( LoggingT (WithSeverity Doc)
-          (ExceptT BlocError IO)
+      ReaderT BlocEnv -- global immutable environment variable
+        ( LoggingT (WithSeverity Doc) -- log all the things
+          ( ExceptT ServantErr IO ) -- throw and catch errors
         ) x
   } deriving
   ( Functor
@@ -21,9 +25,12 @@ newtype Bloc x = Bloc
   , Monad
   , MonadIO
   , MonadReader BlocEnv
-  , MonadError BlocError
+  , MonadError ServantErr
   , MonadLog (WithSeverity Doc)
   )
 
-data BlocEnv
-data BlocError
+data BlocEnv = BlocEnv
+  { urlStrato :: BaseUrl
+  , httpManager :: Manager
+  , dbConnection :: Connection
+  }

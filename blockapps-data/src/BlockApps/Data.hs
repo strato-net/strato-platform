@@ -1,5 +1,7 @@
 {-# LANGUAGE
-    DeriveGeneric
+    DataKinds
+  , DeriveGeneric
+  , FlexibleInstances
   , OverloadedLists
   , OverloadedStrings
   , TypeApplications
@@ -50,10 +52,11 @@ import Data.Time
 import GHC.Generics
 import Numeric
 import Numeric.Natural
+import Servant.API
+import Servant.Docs
 import Test.QuickCheck
 import Text.Read
 import Web.FormUrlEncoded
-import Web.HttpApiData
 
 newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
@@ -78,6 +81,14 @@ instance ToForm Address where
 instance FromForm Address where fromForm = parseUnique "address"
 instance Arbitrary Address where
   arbitrary = Address . fromInteger <$> arbitrary
+instance ToSample Address where
+  toSamples _ = samples [Address 0xdeadbeef, Address 0x12345678]
+instance ToCapture (Capture "address" Address) where
+  toCapture _ = DocCapture "address" "an Ethereum address"
+instance ToCapture (Capture "contractAddress" Address) where
+  toCapture _ = DocCapture "contractAddress" "an Ethereum address"
+instance ToCapture (Capture "userAddress" Address) where
+  toCapture _ = DocCapture "userAddress" "an Ethereum address"
 
 deriveAddress :: PubKey -> Address
 deriveAddress
@@ -122,6 +133,9 @@ keccak256 :: ByteString -> Keccak256
 keccak256 = Keccak256 . hash
 keccak256lazy :: Lazy.ByteString -> Keccak256
 keccak256lazy = Keccak256 . hashlazy
+instance ToSample Keccak256 where
+  toSamples _ =
+    samples [keccak256lazy (Binary.encode @ Integer n) | n <- [1..10]]
 
 data AccountState = AccountState
   { accountStateNonce :: Nonce

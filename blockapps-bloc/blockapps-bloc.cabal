@@ -16,22 +16,25 @@ library
   hs-source-dirs: src
   exposed-modules:
     BlockApps.Bloc.API
-    BlockApps.Bloc.API.Client
-    BlockApps.Bloc.API.Mock
-    BlockApps.Bloc.API.Server
+    BlockApps.Bloc.API.Addresses
+    BlockApps.Bloc.API.Contracts
+    BlockApps.Bloc.API.Search
+    BlockApps.Bloc.API.Users
+    BlockApps.Bloc.API.Utils
+    BlockApps.Bloc.Database
     BlockApps.Bloc.Monad
-    BlockApps.Bloc.Store
-    BlockApps.Bloc.User
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
     , blockapps-data
     , blockapps-strato
     , aeson
+    , aeson-casing
     , containers
     , cryptonite
     , bytestring
     , generic-random
+    , hasql
     , http-api-data
     , http-client
     , http-media
@@ -42,10 +45,12 @@ library
     , secp256k1
     , servant
     , servant-client
+    , servant-docs
     , servant-mock
     , servant-server
     , stm
     , text
+    , unordered-containers
     , warp
     , wl-pprint-text
 

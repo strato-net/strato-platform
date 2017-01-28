@@ -29,6 +29,8 @@ library
     , memory
     , QuickCheck
     , secp256k1
+    , servant
+    , servant-docs
     , text
     , time
 
