@@ -6,6 +6,7 @@
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , TypeApplications
   , TypeOperators
 #-}
 
@@ -14,16 +15,50 @@ module BlockApps.Bloc.API.Contracts where
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
+import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
 import Servant.API
+import Servant.Client
 import Servant.Docs
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-import BlockApps.Data
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.Monad
+import BlockApps.Data
+
+class Monad m => MonadContracts m where
+  getContracts :: m Contracts
+  getContractsData :: ContractName -> m [Address]
+  getContractsContract :: ContractName -> Address -> m UnstructuredJSON
+  getContractsState :: ContractName -> Address -> m UnstructuredJSON
+  getContractsFunctions :: ContractName -> Address -> m [FunctionName]
+  getContractsSymbols :: ContractName -> Address -> m [SymbolName]
+  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m GetContractsStateMappingResponse
+  getContractsStates :: ContractName -> m UnstructuredJSON
+  postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
+instance MonadContracts ClientM where
+  getContracts = client (Proxy @ GetContracts)
+  getContractsData = client (Proxy @ GetContractsData)
+  getContractsContract = client (Proxy @ GetContractsContract)
+  getContractsState = client (Proxy @ GetContractsState)
+  getContractsFunctions = client (Proxy @ GetContractsFunctions)
+  getContractsSymbols = client (Proxy @ GetContractsSymbols)
+  getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
+  getContractsStates = client (Proxy @ GetContractsStates)
+  postContractsCompile = client (Proxy @ PostContractsCompile)
+instance MonadContracts Bloc where
+  getContracts = undefined
+  getContractsData = undefined
+  getContractsContract = undefined
+  getContractsState = undefined
+  getContractsFunctions = undefined
+  getContractsStateMapping = undefined
+  getContractsStates = undefined
+  postContractsCompile = undefined
+  getContractsSymbols = undefined
 
 type GetContracts = "contracts" :> Get '[JSON] Contracts
 data Contract = Contract
@@ -130,7 +165,6 @@ type PostContractsCompile = "contracts"
   :> "compile"
   :> ReqBody '[JSON] [PostCompileRequest]
   :> Post '[JSON] [PostCompileResponse]
-
 data PostCompileRequest = PostCompileRequest
   { postcompilerequestSearchable :: [Text]
   , postcompilerequestContractName :: Text
@@ -142,7 +176,6 @@ instance FromJSON PostCompileRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostCompileRequest where
   toSamples _ = noSamples
-
 data PostCompileResponse = PostCompileResponse
   { postcompileresponseContractName :: String
   , postcompileresponseCodeHash :: String

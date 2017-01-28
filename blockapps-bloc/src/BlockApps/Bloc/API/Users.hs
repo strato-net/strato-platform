@@ -25,25 +25,51 @@ import Test.QuickCheck
 import Web.FormUrlEncoded
 
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.Monad
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
 
+class Monad m => MonadUsers m where
+  getUsers :: m [UserName]
+  getUsersUser :: UserName -> m [Address]
+  postUsersUser :: UserName -> PostUsersUserRequest -> m Address
+  postUsersSend :: UserName -> Address -> PostSendParameters -> m PostTransaction
+  postUsersContract :: UserName -> Address -> PostUsersContractRequest -> m Keccak256
+  postUsersUploadList :: UserName -> Address -> UploadListRequest -> m UnstructuredJSON
+  postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> m NoContent
+  postUsersSendList :: UserName -> Address -> PostSendListRequest -> m [PostSendListResponse]
+  postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> m [PostMethodListResponse]
+instance MonadUsers ClientM where
+  getUsers = client (Proxy @ GetUsers)
+  getUsersUser = client (Proxy @ GetUsersUser)
+  postUsersUser = client (Proxy @ PostUsersUser)
+  postUsersSend = client (Proxy @ PostUsersSend)
+  postUsersContract = client (Proxy @ PostUsersContract)
+  postUsersUploadList = client (Proxy @ PostUsersUploadList)
+  postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
+  postUsersSendList = client (Proxy @ PostUsersSendList)
+  postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
+instance MonadUsers Bloc where
+  getUsers = undefined
+  getUsersUser = undefined
+  postUsersUser = undefined
+  postUsersSend = undefined
+  postUsersContract = undefined
+  postUsersUploadList = undefined
+  postUsersContractMethod = undefined
+  postUsersSendList = undefined
+  postUsersContractMethodList = undefined
+
 type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
-getUsers :: ClientM [UserName]
-getUsers = client (Proxy @ GetUsers)
 
 type GetUsersUser = "users"
   :> Capture "user" UserName
   :> Get '[HTMLifiedJSON] [Address]
-getUsersUser :: UserName -> ClientM [Address]
-getUsersUser = client (Proxy @ GetUsersUser)
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
   :> ReqBody '[FormUrlEncoded] PostUsersUserRequest
   :> Post '[HTMLifiedAddress] Address
-postUsersUser :: UserName -> PostUsersUserRequest -> ClientM Address
-postUsersUser = client (Proxy @ PostUsersUser)
 data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
   , userPassword :: Text
@@ -64,8 +90,6 @@ type PostUsersSend = "users"
   :> "send"
   :> ReqBody '[FormUrlEncoded] PostSendParameters
   :> Post '[HTMLifiedJSON] PostTransaction
-postUsersSend :: UserName -> Address -> PostSendParameters -> ClientM PostTransaction
-postUsersSend = client (Proxy @ PostUsersSend)
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
@@ -88,8 +112,6 @@ type PostUsersContract = "users"
   :> "contract"
   :> ReqBody '[FormUrlEncoded] PostUsersContractRequest
   :> Post '[JSON] Keccak256
-postUsersContract :: UserName -> Address -> PostUsersContractRequest -> ClientM Keccak256
-postUsersContract = client (Proxy @ PostUsersContract)
 data PostUsersContractRequest = PostUsersContractRequest
   { src :: Text
   , password :: Text
@@ -111,8 +133,6 @@ type PostUsersUploadList = "users"
   :> "uploadList"
   :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] UnstructuredJSON
-postUsersUploadListRequest :: UserName -> Address -> UploadListRequest -> ClientM UnstructuredJSON
-postUsersUploadListRequest = client (Proxy @ PostUsersUploadList)
 data UploadListRequest = UploadListRequest
   { uploadlistPassword :: Text
   , uploadlistContracts :: [UploadListContract]
@@ -143,8 +163,6 @@ type PostUsersContractMethod = "users"
   :> Capture "contractAddress" Address
   :> "call"
   :> Post '[JSON] NoContent
-postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> ClientM NoContent
-postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
 
 -- POST /users/:user/:userAddress/sendList
 type PostUsersSendList = "users"
@@ -153,9 +171,6 @@ type PostUsersSendList = "users"
   :> "sendList"
   :> ReqBody '[JSON] PostSendListRequest
   :> Post '[JSON] [PostSendListResponse]
-postUsersSendList :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
-postUsersSendList = client (Proxy @ PostUsersSendList)
-
 data PostSendListRequest = PostSendListRequest
   { postsendlistrequestPassword :: String
   , postsendlistrequestResolve :: Bool
@@ -176,6 +191,17 @@ instance ToJSON SendTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON SendTransaction where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+newtype PostSendListResponse = PostSendListResponse
+  { postsendlistresponseSenderBalance :: String
+  } deriving (Eq,Show,Generic)
+instance ToJSON PostSendListResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostSendListResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostSendListResponse where
+  toSamples _ = noSamples
+instance Arbitrary PostSendListResponse where
+  arbitrary = genericArbitrary
 
 --POST /users/:user/:address/callList
 type PostUsersContractMethodList = "users"
@@ -184,8 +210,6 @@ type PostUsersContractMethodList = "users"
   :> "callList"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [PostMethodListResponse]
-postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> ClientM [PostMethodListResponse]
-postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: String
   , postmethodlistrequestResolve :: Bool
@@ -244,15 +268,3 @@ instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-newtype PostSendListResponse = PostSendListResponse
-  { postsendlistresponseSenderBalance :: String
-  } deriving (Eq,Show,Generic)
-
-instance ToJSON PostSendListResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON PostSendListResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToSample PostSendListResponse where
-  toSamples _ = noSamples
-instance Arbitrary PostSendListResponse where
-  arbitrary = genericArbitrary

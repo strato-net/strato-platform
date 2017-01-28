@@ -8,7 +8,7 @@ module BlockApps.Bloc.API
   , markdownBloc
   , mockBloc
   , layoutBloc
-  , serveBloc
+  , bloc
   , module Addresses
   , module Contracts
   , module Search
@@ -68,54 +68,33 @@ mockBloc = mock (Proxy @ BlocAPI) Proxy
 layoutBloc :: Text
 layoutBloc = layout (Proxy @ BlocAPI)
 
-serveBloc :: ServerT BlocAPI Bloc
-serveBloc =
-       serveGetUsers
-  :<|> servePostUsersUser
-  :<|> serveGetUsersUser
-  :<|> servePostUsersSend
-  :<|> servePostUsersContract
-  :<|> servePostUsersUploadList
-  :<|> servePostUsersContractMethod
-  :<|> servePostUsersSendList
-  :<|> servePostUsersContractMethodList
-  :<|> serveGetAddresses
-  :<|> serveGetAddressesPending
-  :<|> serveGetAddressesPendingRemove
-  :<|> serveGetContracts
-  :<|> serveGetContractsData
-  :<|> serveGetContractsContract
-  :<|> serveGetContractsState
-  :<|> serveGetContractsFunctions
-  :<|> serveGetContractsSymbols
-  :<|> serveGetContractsStateMapping
-  :<|> serveGetContractsStates
-  :<|> servePostContractsCompile
+bloc :: ServerT BlocAPI Bloc
+bloc =
+       getUsers
+  :<|> postUsersUser
+  :<|> getUsersUser
+  :<|> postUsersSend
+  :<|> postUsersContract
+  :<|> postUsersUploadList
+  :<|> postUsersContractMethod
+  :<|> postUsersSendList
+  :<|> postUsersContractMethodList
+  :<|> getAddresses
+  :<|> getAddressesPending
+  :<|> getAddressesPendingRemove
+  :<|> getContracts
+  :<|> getContractsData
+  :<|> getContractsContract
+  :<|> getContractsState
+  :<|> getContractsFunctions
+  :<|> getContractsSymbols
+  :<|> getContractsStateMapping
+  :<|> getContractsStates
+  :<|> postContractsCompile
   :<|> serveGetSearchContract
   :<|> serveGetSearchContractState
   :<|> serveGetSearchContractStateReduced
   where
-    serveGetUsers = undefined
-    servePostUsersUser = undefined
-    serveGetUsersUser = undefined
-    servePostUsersSend = undefined
-    servePostUsersContract = undefined
-    servePostUsersUploadList = undefined
-    servePostUsersContractMethod = undefined
-    servePostUsersSendList = undefined
-    servePostUsersContractMethodList = undefined
-    serveGetAddresses = undefined
-    serveGetAddressesPending = undefined
-    serveGetAddressesPendingRemove = undefined
-    serveGetContracts = undefined
-    serveGetContractsData = undefined
-    serveGetContractsContract = undefined
-    serveGetContractsState = undefined
-    serveGetContractsFunctions = undefined
-    serveGetContractsSymbols = undefined
-    serveGetContractsStateMapping = undefined
-    serveGetContractsStates = undefined
-    servePostContractsCompile = undefined
     serveGetSearchContract = undefined
     serveGetSearchContractState = undefined
     serveGetSearchContractStateReduced = undefined

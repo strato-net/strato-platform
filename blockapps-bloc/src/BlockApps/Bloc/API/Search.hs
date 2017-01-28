@@ -6,6 +6,7 @@
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , TypeApplications
   , TypeOperators
 #-}
 
@@ -14,16 +15,32 @@ module BlockApps.Bloc.API.Search where
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.HashMap.Strict (HashMap)
+import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
 import Servant.API
+import Servant.Client
 import Servant.Docs
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-import BlockApps.Data
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.Monad
+import BlockApps.Data
+
+class Monad m => MonadSearchContract m where
+  getSearchContract :: ContractName -> m UnstructuredJSON
+  getSearchContractState :: ContractName -> m [SearchContractState]
+  getSearchContractStateReduced :: ContractName -> [Text] -> m [SearchContractState]
+instance MonadSearchContract ClientM where
+  getSearchContract = client (Proxy @ GetSearchContract)
+  getSearchContractState = client (Proxy @ GetSearchContractState)
+  getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
+instance MonadSearchContract Bloc where
+  getSearchContract = undefined
+  getSearchContractState = undefined
+  getSearchContractStateReduced = undefined
 
 -- GET /search/:contractName
 type GetSearchContract = "search"
