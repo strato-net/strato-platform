@@ -1,30 +1,31 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Sequencer.Event where
 
-import Data.Binary
-import Data.List (intercalate)
-import Data.Maybe (fromJust)
+import           Data.Binary
+import           Data.List                                 (intercalate)
+import           Data.Maybe                                (fromJust)
 
-import qualified Blockchain.Data.Address     as A
-import qualified Blockchain.Data.DataDefs    as DD
-import qualified Blockchain.Data.BlockDB     as BDB
-import qualified Blockchain.Data.Transaction as TX
-import qualified Blockchain.Data.TXOrigin    as TO
+import qualified Blockchain.Data.Address                   as A
+import qualified Blockchain.Data.BlockDB                   as BDB
+import qualified Blockchain.Data.DataDefs                  as DD
+import           Blockchain.Data.RLP
+import qualified Blockchain.Data.Transaction               as TX
+import qualified Blockchain.Data.TXOrigin                  as TO
 
-import qualified GHC.Generics as GHCG
+import qualified GHC.Generics                              as GHCG
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Format
+import qualified Blockchain.Colors                         as CL
+import           Blockchain.Format
 
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.SHA (SHA(..))
-import Blockchain.Util
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA               (SHA (..))
+import           Blockchain.Util
 
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString      as BS
-import Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Sequencer.DB.SeenTransactionDB
+import qualified Data.ByteString                           as BS
+import qualified Data.ByteString.Lazy                      as B
 
-import Blockchain.Sequencer.BinaryInstances()
+import           Blockchain.Sequencer.BinaryInstances      ()
 
 data IngestEvent = IETx Timestamp IngestTx | IEBlock IngestBlock deriving (Eq, Read, Show, GHCG.Generic)
 
@@ -52,40 +53,23 @@ data SequencedBlock = SequencedBlock { sbOrigin              :: TO.TXOrigin
                                      , sbBlockUncles         :: [DD.BlockData]
                                      } deriving (Read, Show, GHCG.Generic)
 
-data JsonRpcCommand =
-  JRCGetBalance {
-    jrcAddress::A.Address,
-    jrcId::String,
-    jrcBlockString::String
-    } |
-  JRCGetCode {
-    jrcAddress::A.Address,
-    jrcId::String,
-    jrcBlockString::String
-    } |
-  JRCGetTransactionCount {
-    jrcAddress::A.Address,
-    jrcId::String,
-    jrcBlockString::String
-    } |
-  JRCGetStorageAt {
-    jrcAddress::A.Address,
-    jrcKey::BS.ByteString,
-    jrcId::String,
-    jrcBlockString::String
-    } |
-  JRCCall {
-    jrcCode::BS.ByteString,
-    jrcId::String,
-    jrcBlockString::String
-    } deriving (Eq, Read, Show, GHCG.Generic)
+data JsonRpcCommand
+    = JRCGetBalance { jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String}
+    | JRCGetCode { jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String }
+    | JRCGetTransactionCount { jrcAddress :: A.Address, jrcId :: String, jrcBlockString :: String }
+    | JRCGetStorageAt { jrcAddress :: A.Address, jrcKey :: BS.ByteString, jrcId :: String, jrcBlockString :: String }
+    | JRCCall { jrcCode :: BS.ByteString, jrcId :: String, jrcBlockString :: String}
+    deriving (Eq, Read, Show, GHCG.Generic)
 
-data OutputEvent = OETx Timestamp OutputTx | OEBlock OutputBlock | OEJsonRpcCommand JsonRpcCommand deriving (Eq, Read, Show, GHCG.Generic)
+data OutputEvent = OETx Timestamp OutputTx
+                 | OEBlock OutputBlock
+                 | OEJsonRpcCommand JsonRpcCommand
+                 deriving (Eq, Read, Show, GHCG.Generic)
 
 instance Format OutputEvent where
   format (OETx ts o) = show ts ++ " " ++ format o
   format (OEBlock o) = format o
-  format x = show x  
+  format x           = show x
 
 data OutputTx = OutputTx { otOrigin :: TO.TXOrigin
                          , otHash   :: SHA
@@ -111,21 +95,21 @@ ingestBlockToBlock IngestBlock{ibBlockData=bd, ibReceiptTransactions = txs, ibBl
 ingestBlockToSequencedBlock :: IngestBlock -> Maybe SequencedBlock
 ingestBlockToSequencedBlock ib =
     let theHash = (BDB.blockHeaderHash . ibBlockData $ ib)
-        in case sequence $ (wrapIngestBlockTransaction theHash) <$> (ibReceiptTransactions ib) of
-            Nothing -> Nothing
-            Just outputTxs -> Just $ SequencedBlock { sbOrigin              = (ibOrigin ib)
-                                                    , sbHash                = theHash
-                                                    , sbBlockData           = (ibBlockData ib)
-                                                    , sbReceiptTransactions = outputTxs
-                                                    , sbBlockUncles         = (ibBlockUncles ib)
-                                                    }
+            in case sequence $ wrapIngestBlockTransaction theHash <$> ibReceiptTransactions ib of
+                Nothing -> Nothing
+                Just outputTxs -> Just SequencedBlock { sbOrigin              = ibOrigin ib
+                                                      , sbHash                = theHash
+                                                      , sbBlockData           = ibBlockData ib
+                                                      , sbReceiptTransactions = outputTxs
+                                                      , sbBlockUncles         = ibBlockUncles ib
+                                                      }
 
 sequencedBlockToOutputBlock :: SequencedBlock -> Integer -> OutputBlock
-sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin              = (sbOrigin sb)
+sequencedBlockToOutputBlock sb totalDifficulty = OutputBlock { obOrigin              = sbOrigin sb
                                                              , obTotalDifficulty     = totalDifficulty
-                                                             , obBlockData           = (sbBlockData sb)
-                                                             , obReceiptTransactions = (sbReceiptTransactions sb)
-                                                             , obBlockUncles         = (sbBlockUncles sb)
+                                                             , obBlockData           = sbBlockData sb
+                                                             , obReceiptTransactions = sbReceiptTransactions sb
+                                                             , obBlockUncles         = sbBlockUncles sb
                                                              }
 
 sequencedBlockShortName :: SequencedBlock -> String
@@ -134,23 +118,23 @@ sequencedBlockShortName SequencedBlock{sbBlockData=d, sbHash=theHash} =
 
 wrapTransaction :: IngestTx -> Maybe OutputTx
 wrapTransaction tx@IngestTx{} =
-    let baseTx = itTransaction tx in case (TX.whoSignedThisTransaction baseTx) of
+    let baseTx = itTransaction tx in case TX.whoSignedThisTransaction baseTx of
             Nothing -> Nothing
-            Just signer -> Just $ OutputTx { otOrigin = itOrigin tx
-                                           , otHash   = TX.transactionHash baseTx
-                                           , otSigner = signer
-                                           , otBaseTx = baseTx
-                                           }
+            Just signer -> Just OutputTx { otOrigin = itOrigin tx
+                                         , otHash   = TX.transactionHash baseTx
+                                         , otSigner = signer
+                                         , otBaseTx = baseTx
+                                         }
 
 wrapIngestBlockTransaction :: SHA -> TX.Transaction -> Maybe OutputTx
 wrapIngestBlockTransaction hash tx =
-    case TX.whoSignedThisTransaction $ tx of
+    case TX.whoSignedThisTransaction tx of
         Nothing -> Nothing
-        Just signer -> Just $ OutputTx { otOrigin = TO.BlockHash hash
-                                       , otSigner = signer
-                                       , otBaseTx = tx
-                                       , otHash   = TX.transactionHash tx
-                                       }
+        Just signer -> Just OutputTx { otOrigin = TO.BlockHash hash
+                                     , otSigner = signer
+                                     , otBaseTx = tx
+                                     , otHash   = TX.transactionHash tx
+                                     }
 
 parentHashBS :: SequencedBlock -> BS.ByteString
 parentHashBS = B.toStrict . encode . DD.blockDataParentHash . sbBlockData
@@ -175,7 +159,7 @@ outputBlockHash = BDB.blockHeaderHash . obBlockData
 
 outputBlockToBlock :: OutputBlock -> DD.Block
 outputBlockToBlock OutputBlock{obBlockData=bd,obReceiptTransactions=txs,obBlockUncles=us}=
-    BDB.Block{BDB.blockBlockData = bd,BDB.blockReceiptTransactions=(otBaseTx <$> txs),BDB.blockBlockUncles=us}
+    BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions=otBaseTx <$> txs, BDB.blockBlockUncles=us}
 
 quarryBlockToOutputBlock :: BDB.Block -> OutputBlock
 quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransactions=txs,BDB.blockBlockUncles=us} =
@@ -199,7 +183,7 @@ instance Witnessable OutputTx where
     witnessableHash = otHash
 
 instance Eq SequencedBlock where
-    a == b = (sbHash a) == (sbHash b)
+    a == b = sbHash a == sbHash b
 
 instance Ord OutputTx where
     compare OutputTx{otHash = hA} OutputTx{otHash = hB} = compare hA hB
@@ -212,7 +196,7 @@ instance Binary OutputBlock where
 
 instance Binary IngestEvent where
     -- put (IETx t)    = putWord8 0 >> put t -- legacy IETx
-    put (IETx ts t)    = putWord8 2 >> put ts >> put t
+    put (IETx ts t) = putWord8 2 >> put ts >> put t
     put (IEBlock b) = putWord8 1 >> put b
     get = do
         tag <- getWord8
@@ -245,8 +229,8 @@ instance Binary JsonRpcCommand where
 
 instance Binary OutputEvent where
     -- put (OETx t) = putWord8 0 >> put t -- old OETx without timestamp
-    put (OETx ts t) = putWord8 3 >> put ts >> put t
-    put (OEBlock b) = putWord8 1 >> put b
+    put (OETx ts t)          = putWord8 3 >> put ts >> put t
+    put (OEBlock b)          = putWord8 1 >> put b
     put (OEJsonRpcCommand c) = putWord8 2 >> put c
     get = do
         tag <- getWord8
@@ -304,5 +288,28 @@ instance Format IngestTx where
                    } =
            CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format base))
 
--- instance TransactionLike IngestTx where
--- instance TransactionLike OutputTx where
+-- todo: can we get away with this? seems like there'd be overhead recomputing
+-- todo: otSigner
+instance RLPSerializable OutputTx where
+    rlpEncode = rlpEncode . otBaseTx
+    rlpDecode = morphTx . (rlpDecode :: RLPObject -> TX.Transaction)
+
+instance TransactionLike OutputTx where
+    txHash        = otHash
+    txPartialHash = txPartialHash . otBaseTx
+    txSigner      = Just . otSigner
+    txNonce       = txNonce . otBaseTx
+    txType        = txType . otBaseTx
+    txSignature   = txSignature . otBaseTx
+    txValue       = txValue . otBaseTx
+    txDestination = txDestination . otBaseTx
+    txGasPrice    = txGasPrice . otBaseTx
+    txGasLimit    = txGasLimit . otBaseTx
+    txCode        = txCode . otBaseTx
+    txData        = txData . otBaseTx
+
+    morphTx t = OutputTx { otOrigin = TO.Direct -- todo: introduce a "morph" conversion?
+                         , otHash   = txHash t
+                         , otSigner = fromJust (txSigner t) -- todo: D A N G E R
+                         , otBaseTx = morphTx t
+                         }

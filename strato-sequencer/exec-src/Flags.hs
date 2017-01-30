@@ -15,4 +15,3 @@ defineFlag "s:syncwrites" False "Whether or not to sync() all dependent block DB
 
 -- kafka-related flags
 defineFlag "k:kafkaclientid" defaultKafkaClientId' "KafkaClientId (for runKafkaConfigured)"
-defineFlag "o:startoffset" (0 :: Integer) "Offset to start reading kafka from (-1 = latest, -2 = earliest)"

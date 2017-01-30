@@ -154,6 +154,5 @@ bootstrapSequencer gb = do
                                             , seenTransactionDBSize = 10
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
-                                            , startOffset           = -2
                                             }
     flip runLoggingT printLogMsg $ runSequencerM dummySequencerCfg (bootstrap gb)

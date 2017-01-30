@@ -5,7 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeFamilies               #-}
-
+{-# OPTIONS  -fno-warn-orphans          #-}
 module Blockchain.Data.Transaction (
 {-  Transaction(transactionNonce,
               transactionGasPrice,
@@ -58,7 +58,7 @@ import Blockchain.DBM
 
 --import Debug.Trace
 
-import Network.Haskoin.Internals hiding (Address, txSignature)
+import Network.Haskoin.Internals hiding (Address, txSignature, txHash)
 import Blockchain.ExtendedECDSA
 
 import Control.DeepSeq
@@ -109,15 +109,18 @@ instance TransactionLike Transaction where
               (r, s, v) = txSignature t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = (MessageTX nonce' gp gl to' val dat r s v)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = (ContractCreationTX nonce' gp gl val (Code init') r s v)
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = MessageTX nonce' gp gl to' val dat r s v
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') r s v
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
-    (MessageTX nonce' gp gl to' val dat r s v) -> (RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral $ blkNum) (hash $ rlpSerialize $ rlpEncode tx) origin)
-    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) -> error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
-    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->  (RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral $ blkNum) (hash $ rlpSerialize $ rlpEncode tx) origin)
+    (MessageTX nonce' gp gl to' val dat r s v) ->
+        RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) ->
+        error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
+    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->
+        RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -135,8 +138,8 @@ insertTX mode origin blockNum txs = do
   beforeECRecover <- liftIO $ getTime Realtime
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
-  afterECRecover <- rawTXs `deepseq` (liftIO $ getTime Realtime)
-  insertRawTX mode (map id rawTXs) 
+  afterECRecover <- rawTXs `deepseq` liftIO (getTime Realtime)
+  insertRawTX mode rawTXs
   return $ timeSpecAsNanoSecs $ afterECRecover - beforeECRecover
 
 insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
@@ -149,7 +152,7 @@ insertTX' mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
-  insertRawTX' mode (map id rawTXs)
+  insertRawTX' mode rawTXs
 
 addLeadingZerosTo64::String->String
 addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
@@ -230,7 +233,6 @@ isMessageTX _ = False
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _ = False
-
 
 transactionHash::Transaction->SHA
 transactionHash = hash . rlpSerialize . rlpEncode

@@ -66,7 +66,7 @@ instance Format Transaction where
       "gasPrice: " ++ show gp ++ "\n" ++
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
-      "tInit: " ++ (codeToString theCode) ++ "\n" ++
+      "tInit: " ++ codeToString theCode ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init') = format init'

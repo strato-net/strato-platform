@@ -70,6 +70,7 @@ test-suite spec
     main-is:          Spec.hs
     build-depends:    base >=4.8 && <4.9
                     , strato-sequencer
+                    , strato-conf
                     , blockapps-util
                     , hflags
                     , monad-logger

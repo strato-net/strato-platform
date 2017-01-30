@@ -24,8 +24,6 @@ import qualified Blockchain.Data.TXOrigin       as TO
 
 import qualified Database.LevelDB as LDB
 
-import Blockchain.Util (Microtime, getCurrentMicrotime)
-
 import qualified Network.Kafka          as K
 import qualified Network.Kafka.Protocol as KP
 import qualified Network.Kafka.Consumer as KC
@@ -59,7 +57,7 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
           difficulty = BDB.blockDataDifficulty bd
           kludge t   = fromMaybe fallback (wrapIngestBlockTransaction hash t)
               where fallback = OutputTx { otOrigin = TO.BlockHash hash
-                                        , otSigner = A.Address . fromIntegral $ 0
+                                        , otSigner = A.Address 0
                                         , otBaseTx = t
                                         , otHash   = TX.transactionHash t
                                         }

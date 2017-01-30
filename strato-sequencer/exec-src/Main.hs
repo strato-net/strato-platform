@@ -27,6 +27,5 @@ main = do
     , seenTransactionDBSize = flags_txdedupwindow
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True
-    , startOffset           = flags_startoffset
   }
   runLoggingT (runSequencerM cfg sequencer) (printLogMsg' True True)
