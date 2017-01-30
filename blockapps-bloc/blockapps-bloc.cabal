@@ -31,6 +31,7 @@ library
     , aeson
     , aeson-casing
     , containers
+    , contravariant
     , cryptonite
     , bytestring
     , generic-random

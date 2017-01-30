@@ -71,7 +71,25 @@ instance MonadContracts Bloc where
     case contractsEither of
       Left err -> throwError $ DBError err
       Right cntrcts -> return . Contracts $ catMaybes cntrcts
-  getContractsData = undefined
+  getContractsData (ContractName contractName) = do
+    conn <- asks dbConnection
+    let
+      contractsDataQuery = statement
+        "SELECT CI.address\
+        \ FROM\
+        \ Contracts C JOIN contracts_metadata CM\
+        \ ON CM.contract_id = C.id\
+        \ JOIN contracts_instance CI\
+        \ ON CI.contract_metadata_id = CM.id\
+        \ WHERE C.name = $1;"
+        (Encoders.value Encoders.text)
+        (Decoders.rowsList (Decoders.value addressDecoder))
+        False
+    addressesEither <- liftIO $
+      run (query contractName contractsDataQuery) conn
+    case addressesEither of
+      Left err -> throwError $ DBError err
+      Right addresses -> return $ catMaybes addresses
   getContractsContract = undefined
   getContractsState = undefined
   getContractsFunctions = undefined
