@@ -77,7 +77,7 @@ instance MonadUsers Bloc where
       encoder = Encoders.value Encoders.text
       decoder = Decoders.rowsList (Decoders.value addressDecoder)
       sqlString =
-        "SELECT CI.address FROM users U JOIN addresses A\
+        "SELECT A.address FROM users U JOIN addresses A\
         \ ON A.user_id = U.id WHERE U.name = $1;"
       sqlStatement = statement sqlString encoder decoder False
     addressesEither <- liftIO $ run (query name sqlStatement) conn

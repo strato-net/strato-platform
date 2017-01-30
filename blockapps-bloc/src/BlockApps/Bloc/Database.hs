@@ -91,7 +91,7 @@ xabiVariablesTable =
     \name varchar(512) NOT NULL,\
     \type varchar(512) NOT NULL,\
     \at_bytes integer NOT NULL,\
-    \bytes integer NOT NULL,\
+    \bytes integer,\
     \is_dynamic boolean NOT NULL,\
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
     \FOREIGN KEY (entry_id) REFERENCES xabi_complex_entries(id)\
@@ -112,7 +112,7 @@ contractsInstanceTable =
     \id serial PRIMARY KEY,\
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
     \address bytea NOT NULL UNIQUE,\
-    \timestamp timestamp NOT NULL,\
+    \timestamp timestamptz NOT NULL,\
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)\
   \);"
 

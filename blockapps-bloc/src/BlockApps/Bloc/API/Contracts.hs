@@ -94,6 +94,79 @@ instance MonadContracts Bloc where
       Right addresses -> return $ catMaybes addresses
 
   getContractsContract = undefined
+  -- getContractsContract (ContractName contractName) addr = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoderContAddr = contramap fst (Encoders.value Encoders.text)
+  --       <> contramap snd (Encoders.value addressEncoder)
+  --     encoderId = Encoders.value Encoders.int2
+  --     decoderCont = undefined
+  --     decoderArgs = undefined
+  --     decoderRet = undefined
+  --     decoderConstr = undefined
+  --     decoderVars = undefined
+  --     decoderVarEnt = undefined
+  --     -- GET Contract Info
+  --     sqlStringCont =
+  --       "SELECT CM.bin, CM.bin_runtime, CM.code_hash, C.name, CI.address\
+  --       \ FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2"
+  --     -- GET function arguments
+  --     sqlStringArgs =
+  --       "SELECT XFP.name, XFP.type, XFP.index, XFP.bytes, XFP.is_dynamic\
+  --       \ FROM xabi_functions XF\
+  --       \ LEFT OUTER JOIN xabi_function_parameters XFP\
+  --       \ ON XFP.function_id = XF.id\
+  --       \ WHERE XF.id = $1 AND NOT XFP.is_return_type"
+  --     -- GET function return types
+  --     sqlStringRet =
+  --       "SELECT XFP.name, XFP.type, XFP.index, XFP.bytes, XFP.is_dynamic\
+  --       \ FROM xabi_functions XF\
+  --       \ LEFT OUTER JOIN xabi_function_parameters XFP\
+  --       \ ON XFP.function_id = XF.id\
+  --       \ WHERE XF.id = $1 AND XFP.is_return_type"
+  --     -- GET Constructor
+  --     sqlStringConstr =
+  --       "SELECT XF.id, XF.name, XF.selector\
+  --       \ FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2 AND XF.is_constructor"
+  --     -- GET Variables
+  --     sqlStringVars =
+  --       "SELECT XV.id, XV.name, XV.type, XV.bytes, XV.at_bytes, XV.is_dynamic\
+  --       \ FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2"
+  --     -- GET Variable Entry
+  --     sqlStringVarEnt =
+  --       "SELECT XCE.typedef, XCE.type, XCE.bytes\
+  --       \ FROM xabi_complex_entries XCE\
+  --       \ WHERE XCE.id = $1"
+  --     sqlStatementCont =
+  --       statement sqlStringCont encoderContAddr decoderCont False
+  --     sqlStatementArgs =
+  --       statement sqlStringArgs encoderId decoderArgs False
+  --     sqlStatementRet =
+  --       statement sqlStringRet encoderId decoderRet False
+  --     sqlStatementConstr =
+  --       statement sqlStringCont encoderContAddr decoderConstr False
+  --     sqlStatementVars =
+  --       statement sqlStringVars encoderContAddr decoderVars False
+  --     sqlStatementVarEnt =
+  --       statement sqlStringVars encoderId decoderVarEnt False
+  --   undefined
+  --   -- contractEither <- liftIO $
+  --   --   run (query (contractName,addr) sqlStatementContract) conn
+  --   -- case contractEither of
+  --   --   Left err -> throwError $ DBError err
+  --   --   Right contract -> return contract
+
   getContractsState = undefined
 
   getContractsFunctions (ContractName contractName) addr = do
@@ -103,7 +176,12 @@ instance MonadContracts Bloc where
         <> contramap snd (Encoders.value addressEncoder)
       decoder =
         Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
-      sqlString = "" -- fill in SQL here
+      sqlString =
+        "SELECT XF.Name FROM contracts C\
+        \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+        \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+        \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
+        \ WHERE C.name = $1 AND CI.address = $2 AND NOT XF.is_constructor"
       sqlStatement = statement sqlString encoder decoder False
     functionsEither <- liftIO $
       run (query (contractName,addr) sqlStatement) conn
@@ -118,7 +196,12 @@ instance MonadContracts Bloc where
         <> contramap snd (Encoders.value addressEncoder)
       decoder =
         Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
-      sqlString = "" -- fill in SQL here
+      sqlString =
+        "SELECT XV.Name FROM contracts C\
+        \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+        \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+        \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
+        \ WHERE C.name = $1 AND CI.address = $2"
       sqlStatement = statement sqlString encoder decoder False
     symbolsEither <- liftIO $
       run (query (contractName,addr) sqlStatement) conn
@@ -148,7 +231,7 @@ instance MonadContracts Bloc where
 
 type GetContracts = "contracts" :> Get '[JSON] Contracts
 data Contract = Contract
-  { createdAt :: LocalTime
+  { createdAt :: UTCTime
   , address :: Address
   } deriving (Eq, Show, Generic)
 instance ToJSON Contract
@@ -167,11 +250,11 @@ instance ToSample Contracts where
   toSamples _ = singleSample $ Contracts
     [ Contract
       { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
-      , createdAt = LocalTime (ModifiedJulianDay 100) midnight
+      , createdAt = UTCTime (ModifiedJulianDay 100) 0
       }
     , Contract
       { address = Address 0xdeadbeef
-      , createdAt = LocalTime (ModifiedJulianDay 101) midday
+      , createdAt = UTCTime (ModifiedJulianDay 101) 0
       }
     ]
 
@@ -197,7 +280,7 @@ type GetContractsFunctions = "contracts"
   :> Capture "contractAddress" Address
   :> "functions"
   :> Get '[HTMLifiedJSON] [FunctionName]
-newtype FunctionName = FunctionName Text deriving(Eq,Show,Generic)
+newtype FunctionName = FunctionName Text deriving (Eq,Show,Generic)
 instance ToSample FunctionName where
   toSamples _ = samples
     [ FunctionName name | name <- ["functionCall1","functionCall2"]]
@@ -278,7 +361,7 @@ instance FromHttpApiData SymbolName where
 
 contractDecoder :: Decoders.Row (Maybe Contract)
 contractDecoder = contractMaybe
-  <$> Decoders.value Decoders.timestamp
+  <$> Decoders.value Decoders.timestamptz
   <*> Decoders.value addressDecoder
   where
     contractMaybe _time Nothing = Nothing
