@@ -15,6 +15,8 @@ import Blockchain.ExtWord
 import Data.Ratio (numerator)
 import Data.Time.Clock.POSIX (POSIXTime, getPOSIXTime)
 
+import qualified Data.Binary as Binary
+
 showHex4 :: Word256 -> String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput
     where rawOutput = showHex i ""
@@ -100,3 +102,7 @@ secondsToMicrotime = Microtime . (* 1000000)
 
 getCurrentMicrotime :: IO Microtime
 getCurrentMicrotime = posixTimeToMicrotime <$> getPOSIXTime
+
+instance Binary.Binary Microtime where
+    get = Microtime <$> Binary.get
+    put (Microtime a) = Binary.put a

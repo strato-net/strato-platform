@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, DefaultSignatures #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Blockchain.Sequencer.Event where
 
 import Data.Binary
@@ -16,7 +16,8 @@ import qualified GHC.Generics as GHCG
 import qualified Blockchain.Colors as CL
 import Blockchain.Format
 
-import Blockchain.SHA (SHA(..))
+import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.SHA (SHA(..))
 import Blockchain.Util
 
 import qualified Data.ByteString.Lazy as B
@@ -32,10 +33,6 @@ instance Format IngestEvent where
   format (IEBlock o) = format o
 
 type Timestamp = Microtime
-
-instance Binary Microtime where
-    get = Microtime <$> get
-    put (Microtime a) = put a
 
 data IngestTx = IngestTx { itOrigin      :: TO.TXOrigin
                          , itTransaction :: TX.Transaction
@@ -185,7 +182,7 @@ quarryBlockToOutputBlock BDB.Block{BDB.blockBlockData=bd,BDB.blockReceiptTransac
     OutputBlock { obOrigin              = TO.Quarry
                 , obBlockData           = bd
                 , obBlockUncles         = us
-                , obReceiptTransactions = (wrapQuarryReceipt <$> txs)
+                , obReceiptTransactions = wrapQuarryReceipt <$> txs
                 , obTotalDifficulty     = 0
                 }
 
@@ -220,7 +217,7 @@ instance Binary IngestEvent where
     get = do
         tag <- getWord8
         case tag of
-            0 -> (IETx 0) <$> get -- legacy IETx
+            0 -> IETx 0 <$> get -- legacy IETx
             1 -> IEBlock  <$> get
             2 -> IETx <$> get <*> get
             x -> error $ "unknown InputEvent tag " ++ show x
@@ -254,7 +251,7 @@ instance Binary OutputEvent where
     get = do
         tag <- getWord8
         case tag of
-            0 -> (OETx 0) <$> get -- legacy OETx
+            0 -> OETx 0 <$> get -- legacy OETx
             1 -> OEBlock <$> get
             2 -> OEJsonRpcCommand <$> get
             3 -> OETx <$> get <*> get
@@ -266,7 +263,7 @@ instance Format IngestBlock where
                          , ibReceiptTransactions = receipts
                          , ibBlockUncles         = uncles
                          } =
-        CL.blue ("Block #" ++ show (BDB.blockDataNumber bd)) ++ " (via " ++ (format origin) ++ ") " ++
+        CL.blue ("Block #" ++ show (BDB.blockDataNumber bd)) ++ " (via " ++ format origin ++ ") " ++
         tab (format (ingestBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
@@ -283,7 +280,7 @@ instance Format OutputBlock where
                          , obReceiptTransactions = receipts
                          , obBlockUncles         = uncles
                          } =
-        CL.blue ("OutputBlock #" ++ show (BDB.blockDataNumber bd) ++ "; total diff" ++ (show totDiff)) ++ " (via " ++ (format origin) ++ ") " ++
+        CL.blue ("OutputBlock #" ++ show (BDB.blockDataNumber bd) ++ "; total diff" ++ show totDiff) ++ " (via " ++ format origin ++ ") " ++
         tab (format (outputBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
@@ -299,10 +296,13 @@ instance Format OutputTx where
                    , otBaseTx = base
                    } =
            CL.red("OutputTx from address " ++ format signer)
-                ++ tab (" via " ++ (format origin) ++ "\n" ++ (format base))
+                ++ tab (" via " ++ format origin ++ "\n" ++ format base)
 
 instance Format IngestTx where
     format IngestTx{ itOrigin      = origin
                    , itTransaction = base
                    } =
-           CL.red("IngestTx via " ++ (format origin) ++ "\n" ++ tab (format base))
+           CL.red("IngestTx via " ++ format origin ++ "\n" ++ tab (format base))
+
+-- instance TransactionLike IngestTx where
+-- instance TransactionLike OutputTx where

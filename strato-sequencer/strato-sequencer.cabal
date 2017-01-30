@@ -25,6 +25,7 @@ library
                      , Blockchain.Sequencer.Constants
                      , Blockchain.Sequencer.BinaryInstances
   build-depends:       base >=4.8 && <4.9
+                     , strato-model
                      , blockapps-data
                      , blockapps-util
                      , strato-conf
