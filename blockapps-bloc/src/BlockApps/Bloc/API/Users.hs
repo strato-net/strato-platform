@@ -10,13 +10,20 @@
 
 module BlockApps.Bloc.API.Users where
 
+import Control.Monad.Except
+import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.HashMap.Strict (HashMap)
+import Data.Maybe
 import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
+import qualified Hasql.Decoders as Decoders
+import qualified Hasql.Encoders as Encoders
+import Hasql.Query
+import Hasql.Session
 import Numeric.Natural
 import Servant.API
 import Servant.Client
@@ -24,6 +31,7 @@ import Servant.Docs
 import Test.QuickCheck
 import Web.FormUrlEncoded
 
+import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
@@ -50,8 +58,33 @@ instance MonadUsers ClientM where
   postUsersSendList = client (Proxy @ PostUsersSendList)
   postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 instance MonadUsers Bloc where
-  getUsers = undefined
-  getUsersUser = undefined
+
+  getUsers = do
+    conn <- asks dbConnection
+    let
+      encoder = Encoders.unit
+      decoder = Decoders.rowsList (Decoders.value (UserName <$> Decoders.text))
+      sqlString = "SELECT name FROM users;"
+      sqlStatement = statement sqlString encoder decoder False
+    usersEither <- liftIO $ run (query () sqlStatement) conn
+    case usersEither of
+      Left err -> throwError $ DBError err
+      Right users -> return users
+
+  getUsersUser (UserName name) = do
+    conn <- asks dbConnection
+    let
+      encoder = Encoders.value Encoders.text
+      decoder = Decoders.rowsList (Decoders.value addressDecoder)
+      sqlString =
+        "SELECT CI.address FROM users U JOIN addresses A\
+        \ ON A.user_id = U.id WHERE U.name = $1;"
+      sqlStatement = statement sqlString encoder decoder False
+    addressesEither <- liftIO $ run (query name sqlStatement) conn
+    case addressesEither of
+      Left err -> throwError $ DBError err
+      Right addresses -> return $ catMaybes addresses
+
   postUsersUser = undefined
   postUsersSend = undefined
   postUsersContract = undefined
