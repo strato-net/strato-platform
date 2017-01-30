@@ -50,6 +50,7 @@ library
     , servant-server
     , stm
     , text
+    , time
     , unordered-containers
     , warp
     , wl-pprint-text

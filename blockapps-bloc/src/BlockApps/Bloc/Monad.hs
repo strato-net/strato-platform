@@ -8,8 +8,8 @@ import Control.Monad.Except
 import Control.Monad.Log
 import Control.Monad.Reader
 import Hasql.Connection
+import Hasql.Session
 import Network.HTTP.Client
-import Servant
 import Servant.Client
 import Text.PrettyPrint.Leijen.Text
 
@@ -17,7 +17,7 @@ newtype Bloc x = Bloc
   { runBloc ::
       ReaderT BlocEnv -- global immutable environment variable
         ( LoggingT (WithSeverity Doc) -- log all the things
-          ( ExceptT ServantErr IO ) -- throw and catch errors
+          ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
   } deriving
   ( Functor
@@ -25,7 +25,7 @@ newtype Bloc x = Bloc
   , Monad
   , MonadIO
   , MonadReader BlocEnv
-  , MonadError ServantErr
+  , MonadError BlocError
   , MonadLog (WithSeverity Doc)
   )
 
@@ -34,3 +34,7 @@ data BlocEnv = BlocEnv
   , httpManager :: Manager
   , dbConnection :: Connection
   }
+
+data BlocError
+  = DBError Error
+  | StratoError ServantError

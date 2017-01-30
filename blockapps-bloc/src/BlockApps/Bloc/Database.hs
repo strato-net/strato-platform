@@ -62,7 +62,7 @@ xabiFunctionsTable =
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
     \is_constructor boolean NOT NULL,\
     \name varchar(512) NOT NULL,\
-    \selector bytea NOT NULL,
+    \selector bytea NOT NULL,\
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metatdata(id)\
   \);"
 
@@ -112,6 +112,7 @@ contractsInstanceTable =
     \id serial PRIMARY KEY,\
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
     \address bytea NOT NULL UNIQUE,\
+    \timestamp timestamp NOT NULL,\
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)\
   \);"
 

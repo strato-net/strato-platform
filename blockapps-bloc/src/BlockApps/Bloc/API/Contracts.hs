@@ -12,19 +12,28 @@
 
 module BlockApps.Bloc.API.Contracts where
 
+import Control.Monad.Except
+import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
+import Data.Maybe
 import Data.Proxy
 import Data.Text (Text)
+import Data.Time
 import Generic.Random.Generic
 import GHC.Generics
+import qualified Hasql.Decoders as Decoders
+import qualified Hasql.Encoders as Encoders
+import Hasql.Query
+import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
+import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
@@ -50,7 +59,18 @@ instance MonadContracts ClientM where
   getContractsStates = client (Proxy @ GetContractsStates)
   postContractsCompile = client (Proxy @ PostContractsCompile)
 instance MonadContracts Bloc where
-  getContracts = undefined
+  getContracts = do
+    conn <- asks dbConnection
+    let
+      contractsQuery = statement
+        "SELECT address, timestamp FROM contracts_instance;"
+        Encoders.unit
+        (Decoders.rowsList contractDecoder)
+        False
+    contractsEither <- liftIO $ run (query () contractsQuery) conn
+    case contractsEither of
+      Left err -> throwError $ DBError err
+      Right cntrcts -> return . Contracts $ catMaybes cntrcts
   getContractsData = undefined
   getContractsContract = undefined
   getContractsState = undefined
@@ -62,14 +82,14 @@ instance MonadContracts Bloc where
 
 type GetContracts = "contracts" :> Get '[JSON] Contracts
 data Contract = Contract
-  { createdAt :: Integer
-  , address :: Text
+  { createdAt :: LocalTime
+  , address :: Address
   } deriving (Eq, Show, Generic)
 instance ToJSON Contract
 instance FromJSON Contract
 instance Arbitrary Contract where arbitrary = genericArbitrary
 newtype Contracts = Contracts
-  { addresses :: [Contract] } deriving (Eq, Show, Generic)
+  { contracts :: [Contract] } deriving (Eq, Show, Generic)
 instance ToJSON Contracts where
   toJSON = genericToJSON defaultOptions
     {JSON.fieldLabelModifier = const "Address"}
@@ -80,12 +100,12 @@ instance Arbitrary Contracts where arbitrary = genericArbitrary
 instance ToSample Contracts where
   toSamples _ = singleSample $ Contracts
     [ Contract
-      { address = "309e10eddc6333b82889bfc25a2b107b9c2c9a8c"
-      , createdAt = 1484957995000
+      { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
+      , createdAt = LocalTime (ModifiedJulianDay 100) midnight
       }
     , Contract
-      { address = "Addressed"
-      , createdAt = 1485193000000
+      { address = Address 0xdeadbeef
+      , createdAt = LocalTime (ModifiedJulianDay 101) midday
       }
     ]
 
@@ -200,3 +220,11 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
+
+contractDecoder :: Decoders.Row (Maybe Contract)
+contractDecoder = contractMaybe
+  <$> Decoders.value Decoders.timestamp
+  <*> Decoders.value addressDecoder
+  where
+    contractMaybe _time Nothing = Nothing
+    contractMaybe time (Just addr) = Just $ Contract time addr

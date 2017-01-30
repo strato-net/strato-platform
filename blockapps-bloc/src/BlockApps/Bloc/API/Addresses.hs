@@ -10,7 +10,15 @@
 
 module BlockApps.Bloc.API.Addresses where
 
+import Control.Monad.Except
+import Control.Monad.Reader
+import qualified Data.ByteString.Char8 as Char8
+import Data.Maybe
 import Data.Proxy
+import qualified Hasql.Decoders as Decoders
+import qualified Hasql.Encoders as Encoders
+import Hasql.Query
+import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -28,7 +36,18 @@ instance MonadAddresses ClientM where
   getAddressesPending = client (Proxy @ GetAddressesPending)
   getAddressesPendingRemove = client (Proxy @ GetAddressesPendingRemove)
 instance MonadAddresses Bloc where
-  getAddresses = undefined
+  getAddresses = do
+    conn <- asks dbConnection
+    let
+      addressesQuery = statement
+        "SELECT address from addresses;"
+        Encoders.unit
+        (Decoders.rowsList (Decoders.value addressDecoder))
+        False
+    addressesEither <- liftIO $ run (query () addressesQuery) conn
+    case addressesEither of
+      Left err -> throwError $ DBError err
+      Right addresses -> return (catMaybes addresses)
   getAddressesPending = undefined
   getAddressesPendingRemove = undefined
 
@@ -49,3 +68,6 @@ type GetAddressesPendingRemove = "addresses"
   :> Get '[JSON] NoContent
 instance ToCapture (Capture "time" Int) where
   toCapture _ = DocCapture "time" "a unix timestamp"
+
+addressDecoder :: Decoders.Value (Maybe Address)
+addressDecoder = stringAddress . Char8.unpack <$> Decoders.bytea
