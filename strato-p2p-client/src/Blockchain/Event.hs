@@ -45,6 +45,8 @@ import Blockchain.EthConf (runKafkaConfigured)
 
 import Blockchain.Util (getCurrentMicrotime)
 
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+
 data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | TimerEvt deriving (Show)
 
 setTitleAndProduceBlocks::(MonadLogger m, HasSQLDB m)=>[Block]->m Int
@@ -94,7 +96,7 @@ emitKafkaBlock origin baseBlock = do
         Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ show resps
     return ()
 
-handleEvents::(MonadIO m, HasSQLDB m, MonadState Context m, MonadLogger m)=>
+handleEvents::(MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)=>
               DebugMode->PPeer->Conduit Event m Message
 handleEvents mode peer = awaitForever $ \case
    MsgEvt Hello{} -> error "A hello message appeared after the handshake"

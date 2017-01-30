@@ -75,6 +75,7 @@ library
                  , strato-conf
                  , strato-sequencer
                  , strato-redis-blockdb
+                 , hedis
 
     exposed-modules:
                    Blockchain.BlockNotify

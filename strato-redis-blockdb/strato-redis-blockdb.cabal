@@ -11,6 +11,7 @@ library
   exposed-modules:     Blockchain.Strato.RedisBlockDB
   other-modules:       Blockchain.Strato.RedisBlockDB.Models
   build-depends:       base
+                     , mtl
                      , ethereum-rlp
                      , bytestring
                      , strato-model
