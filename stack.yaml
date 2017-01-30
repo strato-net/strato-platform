@@ -58,6 +58,7 @@ extra-deps:
 - json-rpc-server-0.2.5.0
 - monadIO-0.10.1.4
 - monad-logger-0.3.20.1
+- tasty-hunit-adapter-1.1
 
 compiler-check: match-exact
 
@@ -76,4 +77,4 @@ ghc-options:
   strato-init: -Wall -Werror
   strato-p2p-client: -Wall -Werror
   strato-p2p-server: -Wall -Werror
-  strato-redis-blockdb: -Wall -Werror
+  #  strato-redis-blockdb: -Wall -Werror

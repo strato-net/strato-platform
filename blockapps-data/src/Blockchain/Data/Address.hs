@@ -23,14 +23,11 @@ module Blockchain.Data.Address (
 
 import Control.Monad
        
-import qualified Crypto.Hash.SHA3 as C
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.NibbleString as N
-import Data.Maybe
 import Network.Haskoin.Crypto hiding (Address)
-import Network.Haskoin.Internals hiding (Address)
 import Numeric
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
@@ -42,7 +39,6 @@ import qualified Data.Text as T
 import qualified Data.Aeson as AS
 import Data.Aeson.Types
        
-import GHC.Generics
 import qualified Blockchain.Colors as C
 import Blockchain.Format
 import Blockchain.SHA
