@@ -17,7 +17,9 @@ import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
+import Data.Functor.Contravariant
 import Data.Maybe
+import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import Data.Time
@@ -45,7 +47,7 @@ class Monad m => MonadContracts m where
   getContractsState :: ContractName -> Address -> m UnstructuredJSON
   getContractsFunctions :: ContractName -> Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> Address -> m [SymbolName]
-  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m GetContractsStateMappingResponse
+  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON
   getContractsStates :: ContractName -> m UnstructuredJSON
   postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
 instance MonadContracts ClientM where
@@ -59,43 +61,90 @@ instance MonadContracts ClientM where
   getContractsStates = client (Proxy @ GetContractsStates)
   postContractsCompile = client (Proxy @ PostContractsCompile)
 instance MonadContracts Bloc where
+
   getContracts = do
     conn <- asks dbConnection
     let
-      contractsQuery = statement
-        "SELECT address, timestamp FROM contracts_instance;"
-        Encoders.unit
-        (Decoders.rowsList contractDecoder)
-        False
-    contractsEither <- liftIO $ run (query () contractsQuery) conn
+      encoder = Encoders.unit
+      decoder = Decoders.rowsList contractDecoder
+      sqlString = "SELECT address, timestamp FROM contracts_instance;"
+      sqlStatement = statement sqlString encoder decoder False
+    contractsEither <- liftIO $ run (query () sqlStatement) conn
     case contractsEither of
       Left err -> throwError $ DBError err
       Right cntrcts -> return . Contracts $ catMaybes cntrcts
+
   getContractsData (ContractName contractName) = do
     conn <- asks dbConnection
     let
-      contractsDataQuery = statement
+      encoder = Encoders.value Encoders.text
+      decoder = Decoders.rowsList (Decoders.value addressDecoder)
+      sqlString =
         "SELECT CI.address\
         \ FROM Contracts C JOIN contracts_metadata CM\
         \ ON CM.contract_id = C.id\
         \ JOIN contracts_instance CI\
         \ ON CI.contract_metadata_id = CM.id\
         \ WHERE C.name = $1;"
-        (Encoders.value Encoders.text)
-        (Decoders.rowsList (Decoders.value addressDecoder))
-        False
+      sqlStatement = statement sqlString encoder decoder False
     addressesEither <- liftIO $
-      run (query contractName contractsDataQuery) conn
+      run (query contractName sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
       Right addresses -> return $ catMaybes addresses
+
   getContractsContract = undefined
   getContractsState = undefined
-  getContractsFunctions = undefined
+
+  getContractsFunctions (ContractName contractName) addr = do
+    conn <- asks dbConnection
+    let
+      encoder = contramap fst (Encoders.value Encoders.text)
+        <> contramap snd (Encoders.value addressEncoder)
+      decoder =
+        Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
+      sqlString = "" -- fill in SQL here
+      sqlStatement = statement sqlString encoder decoder False
+    functionsEither <- liftIO $
+      run (query (contractName,addr) sqlStatement) conn
+    case functionsEither of
+      Left err -> throwError $ DBError err
+      Right functions -> return functions
+
+  getContractsSymbols (ContractName contractName) addr = do
+    conn <- asks dbConnection
+    let
+      encoder = contramap fst (Encoders.value Encoders.text)
+        <> contramap snd (Encoders.value addressEncoder)
+      decoder =
+        Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
+      sqlString = "" -- fill in SQL here
+      sqlStatement = statement sqlString encoder decoder False
+    symbolsEither <- liftIO $
+      run (query (contractName,addr) sqlStatement) conn
+    case symbolsEither of
+      Left err -> throwError $ DBError err
+      Right symbols -> return symbols
+
   getContractsStateMapping = undefined
+    -- (ContractName contractName) addr (SymbolName mapping) key = do
+    --   conn <- asks dbConnection
+    --   let
+    --     encoder = contramap (\(a,_,_,_) -> a) (Encoders.value Encoders.text)
+    --       <> contramap (\(_,b,_,_) -> b) (Encoders.value addressEncoder)
+    --       <> contramap (\(_,_,c,_) -> c) (Encoders.value Encoders.text)
+    --       <> contramap (\(_,_,_,d) -> d) (Encoders.value Encoders.text)
+    --     decoder = _
+    --     sqlString = "" -- fill in SQL here
+    --     sqlStatement = statement sqlString encoder decoder False
+    --   stateMappingResponseEither <- liftIO $
+    --     run (query (contractName,addr,mapping,key) sqlStatement) conn
+    --   case stateMappingResponseEither of
+    --     Left err -> throwError $ DBError err
+    --     Right stateMappingResponse -> return stateMappingResponse
+
   getContractsStates = undefined
   postContractsCompile = undefined
-  getContractsSymbols = undefined
 
 type GetContracts = "contracts" :> Get '[JSON] Contracts
 data Contract = Contract
@@ -173,18 +222,7 @@ type GetContractsStateMapping = "contracts"
   :> "state"
   :> Capture "mapping" SymbolName
   :> Capture "key" Text
-  :> Get '[JSON] GetContractsStateMappingResponse
-newtype GetContractsStateMappingResponse = GetContractsStateMappingResponse
-  { getContractStateMappingResponseValue :: Value
-  } deriving (Eq,Show,Generic)
-instance ToJSON GetContractsStateMappingResponse where
-  toJSON (GetContractsStateMappingResponse resp) = toJSON resp
-instance FromJSON GetContractsStateMappingResponse where
-  parseJSON = fmap GetContractsStateMappingResponse . parseJSON
-instance Arbitrary GetContractsStateMappingResponse where
-  arbitrary = return $ GetContractsStateMappingResponse Null
-instance ToSample GetContractsStateMappingResponse where
-  toSamples _ = noSamples
+  :> Get '[JSON] UnstructuredJSON
 instance ToCapture (Capture "key" Text) where
   toCapture _ = DocCapture "key" "a mapping key"
 instance ToCapture (Capture "mapping" SymbolName) where

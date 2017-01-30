@@ -13,6 +13,7 @@ module BlockApps.Bloc.API.Addresses where
 import Control.Monad.Except
 import Control.Monad.Reader
 import qualified Data.ByteString.Char8 as Char8
+import Data.Functor.Contravariant
 import Data.Maybe
 import Data.Proxy
 import qualified Hasql.Decoders as Decoders
@@ -71,3 +72,6 @@ instance ToCapture (Capture "time" Int) where
 
 addressDecoder :: Decoders.Value (Maybe Address)
 addressDecoder = stringAddress . Char8.unpack <$> Decoders.bytea
+
+addressEncoder :: Encoders.Value Address
+addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
