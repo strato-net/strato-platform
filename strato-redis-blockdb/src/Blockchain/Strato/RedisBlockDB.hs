@@ -16,6 +16,7 @@ import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Data.Serialize                        as Serialize
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Maybe                            (fromJust, isNothing)
+import           Control.Monad
 import           Database.Redis
 
 inNamespace :: BlockDBNamespace -> SHA -> S8.ByteString
@@ -26,7 +27,7 @@ inNamespace ns sha = ns' `S8.append` sha'
                     Transactions -> "t:"
                     Numbers      -> "n:"
                     Uncles       -> "u:"
-
+                    Body         -> "b:"
 
 getInNamespace :: BlockDBNamespace -> SHA -> Redis (Either Reply (Maybe S8.ByteString))
 getInNamespace ns sha = get $ inNamespace ns sha
@@ -70,8 +71,43 @@ getBlock sha = do
                      uncles = fromJust mybUncles
                      in return . Just $ buildBlock header txs uncles
 
-putHeader :: Redis ()
-putHeader = undefined
+putInNamespace :: BlockDBNamespace -> SHA -> S8.ByteString -> Redis (Either Reply Status)
+putInNamespace ns sha = set (inNamespace ns sha)  
 
-putBlock :: Redis ()
-putBlock = undefined
+putHeader' :: (BlockHeaderLike h, Serialize.Serialize h) => SHA -> h -> Redis (Either Reply Status)
+putHeader' sha h = do
+    a <- putInNamespace Headers sha (Serialize.encode h)
+    putInNamespace Numbers sha (Serialize.encode $ blockHeaderBlockNumber h)
+
+putHeader :: (BlockHeaderLike h, Serialize.Serialize h) => SHA -> h -> Redis (Either Reply Status)
+putHeader sha h = do
+    res <- multiExec $ do
+      _ <- set (inNamespace Headers sha) (Serialize.encode h)
+      set (inNamespace Numbers sha) (Serialize.encode $ blockHeaderBlockNumber h)
+    case res of
+        TxSuccess a -> pure $ Right Ok 
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")  
+        TxError e   -> pure . Left $ SingleLine (S8.pack e) 
+
+putBlock' :: (BlockLike h t b, Serialize.Serialize b, Serialize.Serialize h) => SHA -> b -> Redis (Either Reply Status)
+putBlock' sha b = do
+    let uncles = blockUncleHeaders b
+    r1 <- putInNamespace Body sha (Serialize.encode b)
+    r2 <- putInNamespace Uncles sha (Serialize.encode uncles)
+    _ <- forM_ uncles $ putHeader sha
+    return r1
+    
+putBlock :: (BlockLike h t b, Serialize.Serialize b, Serialize.Serialize h) => SHA -> b -> Redis (Either Reply Status)
+putBlock sha b = do
+    let uncles = blockUncleHeaders b
+    res <- multiExec $ do
+        _ <- set (inNamespace Body sha) (Serialize.encode b)
+        _ <- forM_ uncles $ \h-> do 
+            s1 <- set (inNamespace Headers sha) (Serialize.encode h)
+            set (inNamespace Numbers sha) (Serialize.encode $ blockHeaderBlockNumber h)
+        set (inNamespace Uncles sha) (Serialize.encode uncles)
+    case res of
+        TxSuccess a -> pure $ Right Ok 
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")  
+        TxError e   -> pure . Left $ SingleLine (S8.pack e) 
+
