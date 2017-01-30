@@ -22,7 +22,6 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockHash = blockHeaderHash . blockHeader
 
 class RLPSerializable h => BlockHeaderLike h where
-    blockHeaderHash             :: h -> SHA
     blockHeaderBlockNumber      :: h -> Integer
     blockHeaderParentHash       :: h -> SHA
     blockHeaderOmmersHash       :: h -> SHA
@@ -40,11 +39,14 @@ class RLPSerializable h => BlockHeaderLike h where
     blockHeaderMixHash          :: h -> SHA
 
     morphBlockHeader :: (BlockHeaderLike h2) => h2 -> h
-    {-# MINIMAL blockHeaderHash, blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
+    {-# MINIMAL blockHeaderBlockNumber, blockHeaderParentHash, blockHeaderOmmersHash,
                 blockHeaderBeneficiary, blockHeaderStateRoot, blockHeaderTransactionsRoot, blockHeaderReceiptsRoot,
                 blockHeaderLogsBloom, blockHeaderDifficulty, blockHeaderGasLimit, blockHeaderGasUsed,
                 blockHeaderDifficulty, blockHeaderNonce, blockHeaderExtraData, blockHeaderTimestamp,
                 blockHeaderMixHash, morphBlockHeader #-}
+
+    blockHeaderHash :: h -> SHA
+    blockHeaderHash = superProprietaryStratoSHAHash . rlpSerialize . rlpEncode
 
 data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
 

@@ -56,6 +56,7 @@ instance PathPiece SHA where
       [(x, "")] -> Just $ SHA x
       _ -> Nothing
 
-hash::BC.ByteString->SHA
-hash = SHA . fromIntegral . byteString2Integer . C.hash 256
+
+hash :: BC.ByteString -> SHA
+hash = superProprietaryStratoSHAHash
 

@@ -1,15 +1,10 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
-{-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# OPTIONS_GHC -fno-warn-orphans       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 
 
 module Blockchain.Data.BlockDB (
@@ -22,63 +17,46 @@ module Blockchain.Data.BlockDB (
   nextDifficulty,
   homesteadNextDifficulty,
   createBlockFromHeaderAndBody
-) where 
+) where
 
-import Database.Persist hiding (get)
-import qualified Database.Persist.Postgresql as SQL
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto           as E
+import           Database.Persist             hiding (get)
+import qualified Database.Persist.Postgresql  as SQL
 
-import Data.Bits
-import qualified Data.ByteString as B
+import           Data.Bits
+import qualified Data.ByteString              as B
 
-import Data.List
-import qualified Data.Map as M
-import Data.Maybe
-import qualified Data.Set as S
+import           Data.List
+import qualified Data.Map                     as M
+import           Data.Maybe
+import qualified Data.Set                     as S
 
-import Data.Time.Clock
-import Data.Time.Clock.POSIX
+import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
 
-import Numeric
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           Numeric
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import Blockchain.Constants
-import Blockchain.Data.BlockHeader
-import qualified Blockchain.Colors as CL
+import qualified Blockchain.Colors            as CL
+import           Blockchain.Constants
+import           Blockchain.Data.BlockHeader
 
-import Blockchain.DB.SQLDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.Database.MerklePatricia (StateRoot(..), unboxStateRoot)
 
-import Blockchain.ExtWord
-import Blockchain.Format
-import Blockchain.Data.RLP
-import Blockchain.SHA
-import Blockchain.Util
-import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
-import Blockchain.Data.DataDefs
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
+import           Blockchain.ExtWord
+import           Blockchain.Format
+import           Blockchain.SHA
+import           Blockchain.Util
 
-import Control.Monad.State
-import Control.Monad.Trans.Resource
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
 
---import Debug.Trace
-
-{-calcTotalDifficulty :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>
-                       Block -> BlockId -> m Integer
-calcTotalDifficulty b _ = do
-  db <- getSQLDB
-  let bd = blockBlockData b
-
-  parent <- runResourceT $
-     SQL.runSqlPool (getParent (blockDataParentHash bd)) db
-  case parent of
-    Nothing ->
-      case (blockDataNumber bd) of
-        0 -> return (blockDataDifficulty bd)
-        _ ->  error $ "couldn't find parent to calculate difficulty, parent hash is " ++ format (blockDataParentHash bd)
-    Just p -> return $ (blockDataRefTotalDifficulty . entityVal $ p) + (blockDataDifficulty bd)
-     
-  where getParent h = do
-          SQL.selectFirst [ BlockDataRefHash SQL.==. h ] [] -}
+import           Blockchain.Strato.Model.Class
 
 blk2BlkDataRef :: (HasSQLDB m, MonadResource m) =>
                   M.Map SHA Integer->(Block, SHA)->BlockId->Bool->m BlockDataRef
@@ -88,7 +66,7 @@ blk2BlkDataRef dm (b, hash') blkId makeHashOne= do
   return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
   where
       hash'' = if makeHashOne then SHA 1 else hash'
-      bd = (blockBlockData b)
+      bd = blockBlockData b
       pH = blockDataParentHash bd
       uH = blockDataUnclesHash bd
       cB = blockDataCoinbase bd
@@ -104,7 +82,7 @@ blk2BlkDataRef dm (b, hash') blkId makeHashOne= do
       eD = blockDataExtraData bd
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
-      
+
 getBlock::(HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
           SHA->m (Maybe Block)
 getBlock h = do
@@ -113,17 +91,17 @@ getBlock h = do
     SQL.runSqlPool actions db
 
   case entBlkL of
-    [] -> return Nothing
+    []  -> return Nothing
     lst -> return $ Just . entityVal . head $ lst
   where actions = E.select $ E.from $ \(bdRef, block) -> do
                                    E.where_ ( (bdRef E.^. BlockDataRefHash E.==. E.val h ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. block E.^. BlockId ))
-                                   return block                        
+                                   return block
 
 nextDifficulty::Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
 nextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
-  (max nextDiff' minimumDifficulty) + if useTestnet then 0 else expAdjustment
+  max nextDiff' minimumDifficulty + if useTestnet then 0 else expAdjustment
     where
-      nextDiff' = 
+      nextDiff' =
           if round (utcTimeToPOSIXSeconds newTime) >=
                  (round (utcTimeToPOSIXSeconds oldTime) + difficultyDurationLimit useTestnet::Integer)
           then oldDifficulty - oldDifficulty `shiftR` difficultyAdjustment
@@ -136,11 +114,11 @@ nextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
 
 homesteadNextDifficulty::Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
 homesteadNextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
-  (max nextDiff' minimumDifficulty) + if useTestnet then 0 else expAdjustment
+  max nextDiff' minimumDifficulty + if useTestnet then 0 else expAdjustment
     where
       block_timestamp = round (utcTimeToPOSIXSeconds newTime)::Integer
       parent_timestamp = round (utcTimeToPOSIXSeconds oldTime)::Integer
-      nextDiff' = oldDifficulty + oldDifficulty `quot` 2048 * (max (1 - (block_timestamp - parent_timestamp) `quot` 10) (-99))
+      nextDiff' = oldDifficulty + oldDifficulty `quot` 2048 * max (1 - (block_timestamp - parent_timestamp) `quot` 10) (-99)
       periodCount = (parentNumber+1) `quot` difficultyExpDiffPeriod
       expAdjustment =
         if periodCount > 1
@@ -152,12 +130,12 @@ getDifficulties hashes = do
   db <- getSQLDB
   blocks <-
     runResourceT $
-    flip SQL.runSqlPool db $ 
+    flip SQL.runSqlPool db $
     E.select $
     E.from $ \bd -> do
       E.where_ ((bd E.^. BlockDataRefHash) `E.in_` E.valList hashes)
       return (bd E.^. BlockDataRefHash, bd E.^. BlockDataRefTotalDifficulty)
-      
+
   return $ map f blocks
 
   where
@@ -166,7 +144,7 @@ getDifficulties hashes = do
 
 addDifficulties::M.Map SHA Integer->[(SHA, Integer, SHA)]->M.Map SHA Integer
 addDifficulties dm [] = dm
-addDifficulties dm ((hash', blockDifficulty, parentHash'):rest) = 
+addDifficulties dm ((hash', blockDifficulty, parentHash'):rest) =
   let parentDifficulty = fromMaybe (error $ "missing hash in difficulty map in addDifficulties: " ++ format parentHash' ++ ", hash=" ++ format hash') $ M.lookup parentHash' dm
       dm' = M.insert hash' (parentDifficulty + blockDifficulty) dm
   in addDifficulties dm' rest
@@ -177,7 +155,7 @@ getDifficultyMap difficultyBase blocksAndHashes = do
   let hashes = S.fromList $ map snd blocksAndHashes
       parents = S.fromList $ map (blockDataParentHash . blockBlockData . fst) blocksAndHashes
 
-  dm' <- fmap (M.fromList . (difficultyBase ++)) $ getDifficulties (S.toList $ parents S.\\ hashes)
+  dm' <- M.fromList . (difficultyBase ++) <$> getDifficulties (S.toList $ parents S.\\ hashes)
 
   return $ addDifficulties dm'
     (map (\(x, y) ->
@@ -199,20 +177,18 @@ putBlocks difficultyBase blocks makeHashOne = do
       insertTXIfNew' (BlockHash $ blockHash b) (Just $ blockDataNumber $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==.  blockHash b] []
-      
+
       case existingBlockData of
            [] -> do
              --liftIO $ putStrLn "block is new"
-             blkId <- SQL.insert $ b
+             blkId <- SQL.insert b
              toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') blkId makeHashOne
              forM_ (blockReceiptTransactions b) $ \tx -> do
                txID <- updateBlockNumber b $ transactionHash tx
                SQL.insert $ BlockTransaction blkId txID
-             blkDataRefId <- SQL.insert $ toInsert
+             blkDataRefId <- SQL.insert toInsert
              return (blkId, blkDataRefId)
-           [bd] -> do
-             --liftIO $ putStrLn "block exists"
-             return (blockDataRefBlockId $ SQL.entityVal bd, SQL.entityKey bd)
+           [bd] -> return (blockDataRefBlockId $ SQL.entityVal bd, SQL.entityKey bd)
            _ -> error "DB has multiple blocks with the same hash"
 
   where
@@ -236,7 +212,7 @@ instance Format Block where
          (if null uncles
           then "        (no uncles)"
           else tab ("Uncles:" ++ tab ("\n" ++ intercalate "\n    " (format <$> uncles)))))
-              
+
 instance RLPSerializable Block where
   rlpDecode (RLPArray [bd, RLPArray transactionReceipts, RLPArray uncles]) =
     Block (rlpDecode bd) (rlpDecode <$> transactionReceipts) (rlpDecode <$> uncles)
@@ -264,7 +240,7 @@ instance RLPSerializable BlockData where
       blockDataExtraData = rlpDecode v13,
       blockDataMixHash = rlpDecode v14,
       blockDataNonce = bytesToWord64 $ B.unpack $ rlpDecode v15
-      }  
+      }
   rlpDecode (RLPArray arr) = error ("Error in rlpDecode for Block: wrong number of items, expected 15, got " ++ show (length arr) ++ ", arr = " ++ show (pretty arr))
   rlpDecode x = error ("rlp2BlockData called on non block object: " ++ show x)
 
@@ -288,16 +264,11 @@ instance RLPSerializable BlockData where
       rlpEncode $ B.pack $ word64ToBytes $ blockDataNonce bd
       ]
 
-blockHash::Block->SHA
-blockHash (Block info _ _) = blockHeaderHash info
-
-blockHeaderHash :: BlockData -> SHA
-blockHeaderHash = hash . rlpSerialize . rlpEncode
 
 instance Format BlockData where
-  format b = 
+  format b =
     "parentHash: " ++ format (blockDataParentHash b) ++ "\n" ++
-    "unclesHash: " ++ format (blockDataUnclesHash b) ++ 
+    "unclesHash: " ++ format (blockDataUnclesHash b) ++
     (if blockDataUnclesHash b == hash (B.pack [0xc0]) then " (the empty array)\n" else "\n") ++
     "coinbase: " ++ show (pretty $ blockDataCoinbase b) ++ "\n" ++
     "stateRoot: " ++ format (blockDataStateRoot b) ++ "\n" ++
@@ -309,6 +280,52 @@ instance Format BlockData where
     "timestamp: " ++ show (blockDataTimestamp b) ++ "\n" ++
     "extraData: " ++ show (pretty $ blockDataExtraData b) ++ "\n" ++
     "nonce: " ++ showHex (blockDataNonce b) "" ++ "\n"
+
+instance BlockLike BlockData Transaction Block where
+    blockHeader       = blockBlockData
+    blockTransactions = blockTransactions
+    blockUncleHeaders = blockBlockUncles
+
+    buildBlock = Block
+    morphBlock bl = let header' = morphBlockHeader (blockHeader bl)
+                        txs'    = morphTx <$> blockTransactions bl
+                        uncles' = morphBlockHeader <$> blockUncleHeaders bl
+                    in  Block header' txs' uncles'
+
+instance BlockHeaderLike BlockData where
+    blockHeaderBlockNumber      = blockDataNumber
+    blockHeaderParentHash       = blockDataParentHash
+    blockHeaderOmmersHash       = blockDataUnclesHash
+    blockHeaderBeneficiary      = blockDataCoinbase
+    blockHeaderStateRoot        = unboxStateRoot . blockDataStateRoot
+    blockHeaderTransactionsRoot = unboxStateRoot . blockDataTransactionsRoot
+    blockHeaderReceiptsRoot     = unboxStateRoot . blockDataReceiptsRoot
+    blockHeaderLogsBloom        = blockDataLogBloom
+    blockHeaderGasLimit         = blockDataGasLimit
+    blockHeaderGasUsed          = blockDataGasUsed
+    blockHeaderDifficulty       = blockDataDifficulty
+    blockHeaderNonce            = blockDataNonce
+    blockHeaderExtraData        = blockDataExtraData
+    blockHeaderTimestamp        = blockDataTimestamp
+    blockHeaderMixHash          = blockDataMixHash
+
+    morphBlockHeader h2 =
+        BlockData { blockDataNumber           = blockHeaderBlockNumber h2
+                  , blockDataParentHash       = blockHeaderParentHash h2
+                  , blockDataUnclesHash       = blockHeaderOmmersHash h2
+                  , blockDataCoinbase         = blockHeaderBeneficiary h2
+                  , blockDataStateRoot        = StateRoot $ blockHeaderStateRoot h2
+                  , blockDataTransactionsRoot = StateRoot $ blockHeaderTransactionsRoot h2
+                  , blockDataReceiptsRoot     = StateRoot $ blockHeaderReceiptsRoot h2
+                  , blockDataLogBloom         = blockHeaderLogsBloom h2
+                  , blockDataGasLimit         = blockHeaderGasLimit h2
+                  , blockDataGasUsed          = blockHeaderGasUsed h2
+                  , blockDataDifficulty       = blockHeaderDifficulty h2
+                  , blockDataNonce            = blockHeaderNonce h2
+                  , blockDataExtraData        = blockHeaderExtraData h2
+                  , blockDataTimestamp        = blockHeaderTimestamp h2
+                  , blockDataMixHash          = blockHeaderMixHash h2
+                  }
 
 createBlockFromHeaderAndBody::BlockHeader->([Transaction], [BlockHeader])->Block
 createBlockFromHeaderAndBody header (transactions, uncles) =

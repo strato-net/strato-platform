@@ -5,7 +5,7 @@ import qualified Data.ByteString as B
 import           Data.Word
 
 byteString2Integer :: B.ByteString -> Integer
-byteString2Integer x = bytes2Integer $ B.unpack x
+byteString2Integer = bytes2Integer . B.unpack
 
 bytes2Integer :: [Word8] -> Integer
 bytes2Integer [] = 0
