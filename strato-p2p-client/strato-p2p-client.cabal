@@ -74,6 +74,7 @@ library
                  , ansi-wl-pprint
                  , strato-conf
                  , strato-sequencer
+                 , strato-redis-blockdb
 
     exposed-modules:
                    Blockchain.BlockNotify

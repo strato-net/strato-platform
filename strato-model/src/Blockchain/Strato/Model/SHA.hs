@@ -4,6 +4,7 @@ module Blockchain.Strato.Model.SHA where
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.Util
 import           Control.Monad                        (replicateM)
+import qualified Crypto.Hash.SHA3                     as SuperProprietaryWrongFuckingHash
 import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
@@ -34,3 +35,6 @@ shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex
 -- todo: this shouldn't be partial... ever...
 shaFromHex :: String -> SHA
 shaFromHex = SHA . fst . head . readHex
+
+superProprietaryStratoSHAHash :: S8.ByteString -> SHA
+superProprietaryStratoSHAHash = SHA . fromIntegral . byteString2Integer . SuperProprietaryWrongFuckingHash.hash 256

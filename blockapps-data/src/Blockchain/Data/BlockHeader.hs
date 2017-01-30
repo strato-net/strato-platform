@@ -101,7 +101,6 @@ instance RLPSerializable BlockHeader where
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
 instance BlockHeaderLike BlockHeader where
-    blockHeaderHash             = headerHash
     blockHeaderBlockNumber      = number
     blockHeaderParentHash       = parentHash
     blockHeaderOmmersHash       = ommersHash 
@@ -118,8 +117,8 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderTimestamp        = timestamp 
     blockHeaderMixHash          = mixHash
 
-headerHash::BlockHeader->SHA
-headerHash = hash . rlpSerialize . rlpEncode
+headerHash :: BlockHeader->SHA
+headerHash = blockHeaderHash
 
 blockToBlockHeader::Block->BlockHeader
 blockToBlockHeader Block{blockBlockData=bd} = blockDataToBlockHeader bd
