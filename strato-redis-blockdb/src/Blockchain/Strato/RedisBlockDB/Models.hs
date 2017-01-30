@@ -12,7 +12,7 @@ import           Blockchain.Data.RLP
 import qualified Blockchain.Data.BlockHeader   as BHD
 import qualified Blockchain.Data.Transaction   as TXD
 
-data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Body
+data BlockDBNamespace = Headers | Transactions | Numbers | Uncles
     deriving (Eq, Read, Show)
 
 newtype RedisHeader = RedisHeader BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
