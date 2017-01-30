@@ -76,3 +76,4 @@ ghc-options:
   strato-init: -Wall -Werror
   strato-p2p-client: -Wall -Werror
   strato-p2p-server: -Wall -Werror
+  strato-redis-blockdb: -Wall -Werror

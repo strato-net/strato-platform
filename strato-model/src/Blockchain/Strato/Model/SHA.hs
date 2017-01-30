@@ -10,11 +10,11 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as S8
 import qualified Data.ByteString.Lazy                 as BL
 import           GHC.Generics
-import           Numeric                              (showHex)
+import           Numeric                              (showHex, readHex)
 
 import           Blockchain.Data.RLP
 
-newtype SHA = SHA Word256 deriving (Show, Eq, Ord, Read, Generic)
+newtype SHA = SHA Word256 deriving (Eq, Read, Show, Ord, Generic)
 
 instance Binary SHA where
     put (SHA x) = sequence_ (put <$> word256ToBytes x)
@@ -26,3 +26,11 @@ instance RLPSerializable SHA where
     rlpDecode x = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
     rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ S8.pack $ padZeros 64 $ showHex val ""
+
+shaToHex :: SHA -> String
+shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex
+    where hex = showHex sha ""
+
+-- todo: this shouldn't be partial... ever...
+shaFromHex :: String -> SHA
+shaFromHex = SHA . fst . head . readHex

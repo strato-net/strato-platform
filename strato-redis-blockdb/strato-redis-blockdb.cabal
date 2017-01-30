@@ -12,11 +12,10 @@ library
   other-modules:       Blockchain.Strato.RedisBlockDB.Models
   build-depends:       base
                      , ethereum-rlp
-                     , cereal
                      , bytestring
                      , strato-model
                      , blockapps-data
                      , hedis
   hs-source-dirs:      src
   default-language:    Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror

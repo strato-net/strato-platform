@@ -1,47 +1,55 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
-import qualified Data.Serialize                as Serialize
-import qualified Data.Serialize.Get            as Get
-import qualified Data.Serialize.Put            as Put
+import qualified Data.ByteString.Char8                as S8
 
-import qualified Data.ByteString.Char8         as S8
-
-import           Blockchain.Strato.Model.Class
+import qualified Blockchain.Data.BlockHeader          as BHD
 import           Blockchain.Data.RLP
-import qualified Blockchain.Data.BlockHeader   as BHD
-import qualified Blockchain.Data.Transaction   as TXD
+import qualified Blockchain.Data.Transaction          as TXD
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
 
 data BlockDBNamespace = Headers | Transactions | Numbers | Uncles
     deriving (Eq, Read, Show)
 
+class RedisDBKeyable k where
+    toKey :: k -> S8.ByteString
+
+class RedisDBValuable v where
+    toValue   :: v -> S8.ByteString
+    fromValue :: S8.ByteString -> v
+
+instance RedisDBKeyable S8.ByteString where
+    toKey = id
+
+instance RedisDBValuable S8.ByteString where
+    toValue   = id
+    fromValue = id
+
+instance RedisDBKeyable SHA where
+    toKey = S8.pack . shaToHex
+
+instance RedisDBValuable SHA where
+    toValue   = S8.pack . shaToHex
+    fromValue = shaFromHex . S8.unpack
+
+instance RedisDBKeyable Integer where
+    toKey = S8.pack . show
+
+instance RedisDBValuable RedisHeader where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = RedisHeader . rlpDecode . rlpDeserialize
+
+instance RedisDBValuable RedisTx where
+    toValue   = rlpSerialize . rlpEncode
+    fromValue = rlpDecode . rlpDeserialize
+
+instance (RLPSerializable a, RedisDBValuable a) => RedisDBValuable [a] where
+    toValue         = rlpSerialize . RLPArray . fmap rlpEncode
+    fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
+
+
 newtype RedisHeader = RedisHeader BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
 newtype RedisTx     = RedisTx     TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
-
-newtype RedisTxs = RedisTxs [RedisTx]
-    deriving (Eq, Read, Show, Serialize.Serialize)
-
-newtype RedisUncles = RedisUncles [RedisHeader]
-    deriving (Eq, Read, Show, Serialize.Serialize)
-
-instance Serialize.Serialize RedisTx where
-    put (RedisTx t) = do
-        let serialized = rlpSerialize (rlpEncode t)
-            len        = S8.length serialized
-        Put.putWord64be (fromIntegral len)
-        Put.putByteString serialized
-    get = do
-        size <- fromIntegral <$> Get.getWord64be
-        dat  <- Get.getByteString size
-        return . RedisTx $ rlpDecode (rlpDeserialize dat)
-
-instance Serialize.Serialize RedisHeader where
-    put (RedisHeader h) = do
-        let serialized = rlpSerialize (rlpEncode h)
-            len        = S8.length serialized
-        Put.putWord64be (fromIntegral len)
-        Put.putByteString serialized
-    get = do
-        size <- fromIntegral <$> Get.getWord64be
-        dat  <- Get.getByteString size
-        return . RedisHeader $ rlpDecode (rlpDeserialize dat)
+newtype RedisTxs    = RedisTxs    [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
+newtype RedisUncles = RedisUncles [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
