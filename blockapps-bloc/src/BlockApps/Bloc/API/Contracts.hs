@@ -76,8 +76,7 @@ instance MonadContracts Bloc where
     let
       contractsDataQuery = statement
         "SELECT CI.address\
-        \ FROM\
-        \ Contracts C JOIN contracts_metadata CM\
+        \ FROM Contracts C JOIN contracts_metadata CM\
         \ ON CM.contract_id = C.id\
         \ JOIN contracts_instance CI\
         \ ON CI.contract_metadata_id = CM.id\

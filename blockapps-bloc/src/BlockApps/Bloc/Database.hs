@@ -4,10 +4,12 @@
 
 module BlockApps.Bloc.Database where
 
-import Data.ByteString (ByteString)
+import qualified Hasql.Decoders as Decoders
+import qualified Hasql.Encoders as Encoders
+import Hasql.Query
 
-usersTable :: ByteString
-usersTable =
+usersTable :: Query () ()
+usersTable = statement
   "CREATE TABLE users(\
     \id serial PRIMARY KEY,\
     \name varchar (512) NOT NULL UNIQUE,\
@@ -15,9 +17,12 @@ usersTable =
     \salt bytea NOT NULL,\
     \sig_bytes integer NOT NULL\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-addressesTable :: ByteString
-addressesTable =
+addressesTable :: Query () ()
+addressesTable = statement
   "CREATE TABLE addresses(\
     \id serial PRIMARY KEY,\
     \address bytea NOT NULL UNIQUE,\
@@ -34,16 +39,22 @@ addressesTable =
     \hd_index integer NOT NULL,\
     \FOREIGN KEY (user_id) REFERENCES users(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-contractsTable :: ByteString
-contractsTable =
+contractsTable :: Query () ()
+contractsTable = statement
   "CREATE TABLE contracts(\
     \id serial PRIMARY KEY,\
     \name varchar (512) NOT NULL UNIQUE\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-contractsMetaDataTable :: ByteString
-contractsMetaDataTable =
+contractsMetaDataTable :: Query () ()
+contractsMetaDataTable = statement
   "CREATE TABLE contracts_metadata(\
     \id serial PRIMARY KEY,\
     \contract_id NOT NULL REFERENCES contracts(id),\
@@ -54,9 +65,12 @@ contractsMetaDataTable =
     \UNIQUE (bin_runtime_hash, code_hash),\
     \FOREIGN KEY (contract_id) REFERENCES contracts(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-xabiFunctionsTable :: ByteString
-xabiFunctionsTable =
+xabiFunctionsTable :: Query () ()
+xabiFunctionsTable = statement
   "CREATE TABLE xabi_functions(\
     \id serial PRIMARY KEY,\
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
@@ -65,9 +79,12 @@ xabiFunctionsTable =
     \selector bytea NOT NULL,\
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metatdata(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-xabiFunctionParametersTable :: ByteString
-xabiFunctionParametersTable =
+xabiFunctionParametersTable :: Query () ()
+xabiFunctionParametersTable = statement
   "CREATE TABLE xabi_function_parameters(\
     \id serial PRIMARY KEY,\
     \xabi_function_id NOT NULL REFERENCES xabi_functions(id),\
@@ -81,9 +98,12 @@ xabiFunctionParametersTable =
     \FOREIGN KEY (xabi_function_id) REFERENCES xabi_functions(id),\
     \FOREIGN KEY (entry_id) REFERENCES xabi_complex_entries(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-xabiVariablesTable :: ByteString
-xabiVariablesTable =
+xabiVariablesTable :: Query () ()
+xabiVariablesTable = statement
   "CREATE TABLE xabi_variables(\
     \id serial PRIMARY KEY,\
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
@@ -96,18 +116,24 @@ xabiVariablesTable =
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
     \FOREIGN KEY (entry_id) REFERENCES xabi_complex_entries(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-xabiComplexEntriesTable :: ByteString
-xabiComplexEntriesTable =
+xabiComplexEntriesTable :: Query () ()
+xabiComplexEntriesTable = statement
   "CREATE TABLE xabi_complex_entries(\
     \id serial PRIMARY KEY,\
     \typedef varchar(512) NOT NULL,\
     \type varchar(512) NOT NULL,\
     \bytes integer NOT NULL,\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-contractsInstanceTable :: ByteString
-contractsInstanceTable =
+contractsInstanceTable :: Query () ()
+contractsInstanceTable = statement
   "CREATE TABLE contracts_instance(\
     \id serial PRIMARY KEY,\
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
@@ -115,9 +141,12 @@ contractsInstanceTable =
     \timestamp timestamp NOT NULL,\
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
 
-contractsLookupTable :: ByteString
-contractsLookupTable =
+contractsLookupTable :: Query () ()
+contractsLookupTable = statement
   "CREATE TABLE contracts_lookup(\
     \contract_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
     \linked_metadata_id NOT NULL REFERENCES contracts_metadata(id),\
@@ -125,3 +154,6 @@ contractsLookupTable =
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
     \FOREIGN KEY (linked_metadata_id) REFERENCES contracts_metadata(id)\
   \);"
+  Encoders.unit
+  Decoders.unit
+  False
