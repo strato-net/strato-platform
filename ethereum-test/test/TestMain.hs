@@ -17,6 +17,7 @@ import qualified TestDescriptions as TD
 import qualified Data.Map as M
 import qualified Data.ByteString.Lazy as BL
 
+import           Blockchain.VMOptions()
 import           Blockchain.VMContext
 import           TestEthereum
 import           TestFiles

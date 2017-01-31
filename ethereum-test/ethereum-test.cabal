@@ -45,7 +45,6 @@ executable ethereum-test
                      , TestDescriptions
                      , TestEthereum
 
-
 Test-Suite test-ethereum-test
   default-language: Haskell98
   type:             exitcode-stdio-1.0
@@ -86,11 +85,7 @@ Test-Suite test-ethereum-test
                   , ethereum-rlp
                   , ethereum-vm
                   , filepath
-                  , blockapps-haskoin
                   , hflags
-                  , IfElse
-                  , leveldb-haskell
-                  , merkle-patricia-db
                   , mtl
                   , nibblestring
                   , resourcet
@@ -99,7 +94,8 @@ Test-Suite test-ethereum-test
                   , time
                   , transformers
                   , unordered-containers
-                  , ansi-wl-pprint
                   , monad-logger
-                  , strato-sequencer
-
+                  , blockapps-haskoin
+  other-modules:  TestDescriptions
+                , TestEthereum
+                , TestFiles

@@ -4,8 +4,9 @@ import Control.Monad
 import Control.Monad.Logger
 import HFlags
 import System.Directory
-import Blockchain.VMContext
 
+import Blockchain.VMOptions()
+import Blockchain.VMContext
 import TestEthereum
 
 main::IO ()

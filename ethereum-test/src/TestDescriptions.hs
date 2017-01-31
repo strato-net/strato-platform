@@ -6,26 +6,25 @@ module TestDescriptions (
   AddressState'(..),
   Exec(..),
   Transaction'(..),
---  CallCreate(..),
   RawData(..),
   InputWrapper(..),
   Test(..),
   Tests
   ) where
 
-import Data.Aeson
+import           Data.Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.HashMap.Lazy as H
 import qualified Data.Map as M
-import Data.Maybe
+import           Data.Maybe
 import qualified Data.Text as T
-import Data.Time.Clock
-import Data.Time.Clock.POSIX
-import GHC.Generics hiding (to)
+import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
+import           GHC.Generics hiding (to)
 import qualified Network.Haskoin.Internals as Haskoin
-import Numeric
+import           Numeric
 
 import Blockchain.Data.Address
 import Blockchain.Data.Code
