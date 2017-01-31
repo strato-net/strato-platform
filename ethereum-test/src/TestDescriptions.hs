@@ -13,7 +13,6 @@ module TestDescriptions (
   Tests
   ) where
 
-import Control.Applicative
 import Data.Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -31,7 +30,6 @@ import Numeric
 import Blockchain.Data.Address
 import Blockchain.Data.Code
 import Blockchain.Data.Log
-import Blockchain.Database.MerklePatricia
 import Blockchain.SHA
 import Blockchain.Util
 import Blockchain.VM.VMState
@@ -65,7 +63,7 @@ data Exec =
     caller::Address,
     code::Code,
     data'::RawData,
-    gas::String,
+    gas'::String,
     gasPrice'::String,
     origin::Address,
     value'::String
@@ -198,7 +196,7 @@ sloppyParseHexNumber x =
   where
     x' = removeOptional0x $ T.unpack x
     removeOptional0x ('0':'x':rest) = rest
-    removeOptional0x x = x                                  
+    removeOptional0x x'' = x''                                  
 
 sloppyParseHexByteString::T.Text->B.ByteString
 sloppyParseHexByteString x =
@@ -208,7 +206,7 @@ sloppyParseHexByteString x =
   where
     x' = removeOptional0x $ T.unpack x
     removeOptional0x ('0':'x':rest) = rest
-    removeOptional0x x = x                                  
+    removeOptional0x x'' = x''                                  
          
 instance FromJSON Transaction' where
   parseJSON (Object v) =
@@ -221,12 +219,12 @@ instance FromJSON Transaction' where
     v .: "to" <*>
     v .: "value"
     where
-      transaction' d gl gp n sk to' v =
+      transaction' d gl gp n sk to' v' =
         let fixedTo =
               if T.null to'
               then Nothing
               else Just $ Address $ fromIntegral $ sloppyParseHexNumber to'
-        in Transaction' d gl gp n sk fixedTo v
+        in Transaction' d gl gp n sk fixedTo v'
   parseJSON x = error $ "Wrong format when trying to parse Transaction' from JSON: " ++ show x
 
 instance FromJSON Env where
