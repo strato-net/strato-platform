@@ -15,7 +15,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockUncleHeaders :: b -> [h]
 
     buildBlock :: h -> [t] -> [h] -> b
-    morphBlock :: (BlockHeaderLike h2, TransactionLike t2, BlockLike h2 t2 b2) => b2 -> b
+    morphBlock :: (BlockLike h2 t2 b2) => b2 -> b
     {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock, morphBlock #-}
 
     blockHash :: b -> SHA

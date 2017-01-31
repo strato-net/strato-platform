@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# OPTIONS -fno-warn-warnings-deprecations #-}
 module Blockchain.Strato.Model.SHA where
 
 import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)

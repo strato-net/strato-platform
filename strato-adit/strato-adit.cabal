@@ -21,7 +21,7 @@ library
   buildable:           True
   other-extensions:    OverloadedStrings
   default-language:    Haskell2010
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.9 && <4.10,
                        bytestring,
                        esqueleto,
                        monad-logger,
@@ -71,7 +71,7 @@ executable strato-adit
   ghc-options:         -Wall -O2
   hs-source-dirs:      exec_src
   other-extensions:    OverloadedStrings
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.9 && <4.10,
                        bytestring,
                        esqueleto,
                        monad-logger,

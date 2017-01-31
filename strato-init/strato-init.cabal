@@ -49,7 +49,7 @@ executable strato-setup
                  , time
                  , transformers
                  , yaml
-                 , binary == 0.7.5.0
+                 , binary
                  , stm
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
@@ -111,7 +111,7 @@ executable genesis-setup
                  , bytestring
                  , directory
                  , entropy
-                 , haskoin
+                 , blockapps-haskoin
                  , hflags
                  , merkle-patricia-db
                  , time

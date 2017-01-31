@@ -37,7 +37,7 @@ library
                        ethereum-encryption,
                        esqueleto,
                        ethereum-rlp,
-                       haskoin,
+                       blockapps-haskoin,
                        hflags,
                        json-rpc-server,
                        lifted-async,

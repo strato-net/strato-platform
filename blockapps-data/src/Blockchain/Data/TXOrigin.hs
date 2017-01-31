@@ -3,8 +3,6 @@
 module Blockchain.Data.TXOrigin where
 
 import Data.Binary
-import Data.Binary.Get
-import Data.Binary.Put
 
 import Database.Persist.TH
 
@@ -16,7 +14,6 @@ import Blockchain.MiscJSON ()
 import Blockchain.Format
 import Blockchain.SHA
 
-import qualified GHC.Word as GW
 import GHC.Generics
 
 data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String deriving (Show, Read, Eq, Generic)
@@ -40,10 +37,11 @@ instance Binary TXOrigin where
             2 -> BlockHash  <$> get
             3 -> PeerString <$> get
             4 -> return Quarry
+            _ -> error "the impossible happened in get of Binary instance of TXOrigin"
 
 instance Format TXOrigin where
     format Direct          = "Direct"
     format API             = "API"
     format Quarry          = "Quarry"
-    format (PeerString p)  = "PeerString " ++ (show p)
-    format (BlockHash sha) = "BlockHash " ++ (format sha)
+    format (PeerString p)  = "PeerString " ++ show p
+    format (BlockHash sha) = "BlockHash " ++ format sha

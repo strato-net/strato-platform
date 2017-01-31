@@ -21,9 +21,8 @@ import Blockchain.SHA
 
 type BlockSummaryDB = LDB.DB
 
-class MonadResource m=>
-      HasBlockSummaryDB m where
-  getBlockSummaryDB::Monad m=>m BlockSummaryDB
+class MonadResource m => HasBlockSummaryDB m where
+  getBlockSummaryDB :: m BlockSummaryDB
 
         
 getBSum::(MonadResource m, HasBlockSummaryDB m)=>SHA->m BlockSummary
@@ -40,4 +39,3 @@ hasBSum::(MonadResource m, HasBlockSummaryDB m)=>SHA->m Bool
 hasBSum blockHash = do
     db <- getBlockSummaryDB
     isJust <$> LDB.get db LDB.defaultReadOptions (BL.toStrict $ encode blockHash)
-

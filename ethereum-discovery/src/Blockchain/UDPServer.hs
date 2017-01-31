@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
-
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.UDPServer (
       runEthUDPServer,
       connectMe,
@@ -18,7 +18,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import           Data.Time.Clock.POSIX
-import           Data.Time.Clock
 import qualified Data.Text as T
 
 import System.Entropy

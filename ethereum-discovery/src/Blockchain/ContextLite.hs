@@ -1,7 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-
+{-# LANGUAGE FlexibleContexts               #-}
+{-# LANGUAGE FlexibleInstances              #-}
+{-# LANGUAGE TypeSynonymInstances           #-}
+{-# LANGUAGE GADTs                          #-}
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.ContextLite (
   ContextLite, -- (..),
   initContextLite,

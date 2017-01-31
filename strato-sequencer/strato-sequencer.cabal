@@ -24,7 +24,7 @@ library
                      , Blockchain.Sequencer.Kafka
                      , Blockchain.Sequencer.Constants
                      , Blockchain.Sequencer.BinaryInstances
-  build-depends:       base >=4.8 && <4.9
+  build-depends:       base >=4.8 && <4.10
                      , strato-model
                      , blockapps-data
                      , blockapps-util
@@ -50,7 +50,7 @@ executable strato-sequencer
   hs-source-dirs:      exec-src
   main-is:             Main.hs
   ghc-options:         -Wall -O2 -threaded
-  build-depends:       base >=4.8 && <4.9
+  build-depends:       base >=4.8 && <4.10
                      , strato-sequencer
                      , blockapps-data
                      , blockapps-util
@@ -68,7 +68,7 @@ test-suite spec
     hs-source-dirs:   test
     ghc-options:      -Wall -O2 -threaded
     main-is:          Spec.hs
-    build-depends:    base >=4.8 && <4.9
+    build-depends:    base >=4.8 && <4.10
                     , strato-sequencer
                     , strato-conf
                     , blockapps-util
@@ -90,7 +90,7 @@ test-suite spec
                     , directory
                     , merkle-patricia-db
                     , ethereum-rlp
-                    , haskoin
+                    , blockapps-haskoin
                     , random
     default-language: Haskell2010
     other-modules: Blockchain.Sequencer.ArbitraryInstances

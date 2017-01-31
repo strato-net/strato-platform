@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
 import qualified Data.ByteString.Char8                as S8

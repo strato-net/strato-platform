@@ -36,7 +36,7 @@ executable queryStrato
                  , ethereum-rlp
                  , ethereum-vm
                  , filepath
-                 , haskoin
+                 , blockapps-haskoin
                  , leveldb-haskell
                  , lens
                  , merkle-patricia-db

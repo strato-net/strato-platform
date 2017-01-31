@@ -37,7 +37,7 @@ library
                        monad-control >=1.0      && <1.1,
                        random        >=1.0      && <1.2,
                        transformers  >=0.3      && <0.6,
-                       lens          >=4.4      && <4.14,
+                       lens          >=4.4      && <=4.14,
                        resource-pool >=0.2.3.2  && <0.3,
                        lifted-base   >=0.2.3.6  && <0.3,
                        murmur-hash   >=0.1.0.8  && <0.2,

@@ -40,7 +40,7 @@ library
                  , ethereum-rlp
                  , fast-ecrecover
                  , filepath
-                 , haskoin
+                 , blockapps-haskoin
                  , lens
                  , leveldb-haskell
                  , lifted-base

@@ -28,6 +28,6 @@ getPubKeyFromSignature_fast (D.ExtendedSignature sig yIsOdd) hashWord =
     sigS =
       C.getBigWordInteger (C.sigS sig)
     recId =
-      bool 0 1 yIsOdd
+        if yIsOdd then 1 else 0
     hash =
       C.getBigWordInteger hashWord

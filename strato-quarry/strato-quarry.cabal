@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 
 library
   default-language:    Haskell2010
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.8 && <4.10,
                        bytestring,
                        persistent,
                        persistent-postgresql,
@@ -30,7 +30,7 @@ library
                        containers,
                        text,
                        time,
-                       haskoin,
+                       blockapps-haskoin,
                        strato-conf,
                        resourcet,
                        transformers,

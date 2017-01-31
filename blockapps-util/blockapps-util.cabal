@@ -27,10 +27,11 @@ library
                      , fast-logger
                      , filepath
                      , global-lock
-                     , haskoin
+                     , blockapps-haskoin
                      , monad-logger
                      , nibblestring
                      , path-pieces
+                     , http-api-data
                      , stm
                      , text
                      , unix

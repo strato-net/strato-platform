@@ -21,7 +21,7 @@ executable ethereum-jsonrpc
                      , containers
                      , cryptohash
                      , ethereum-rlp
-                     , haskoin
+                     , blockapps-haskoin
                      , http-client
                      , http-types
                      , json-rpc-server

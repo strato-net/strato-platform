@@ -20,7 +20,7 @@ library
                       , bytestring
                       , nibblestring
                       , cryptohash
-                      , haskoin
+                      , blockapps-haskoin
                       , time
   hs-source-dirs:        src
   default-language:     Haskell2010
@@ -32,4 +32,4 @@ library
                       , LambdaCase
                       , RecordWildCards
                       , FunctionalDependencies
-  ghc-options:        -Wall -Werror
+  ghc-options:        -Wall -Werror -fno-warn-warnings-deprecations

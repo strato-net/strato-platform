@@ -49,7 +49,7 @@ library
                  , ethereum-discovery
                  , ethereum-encryption
                  , ethereum-rlp
-                 , haskoin
+                 , blockapps-haskoin
                  , hflags
                  , json-rpc-server
                  , lifted-base

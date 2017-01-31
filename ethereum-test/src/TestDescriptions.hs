@@ -185,10 +185,10 @@ instance FromJSON Exec where
     v .: "value"
   parseJSON x = error $ "Wrong format when trying to parse Exec from JSON: " ++ show x
 
-instance FromJSON (Maybe Address) where
-  parseJSON (String "") = pure Nothing
-  parseJSON (String v) = fmap Just $ parseJSON (String v)
-  parseJSON x = error $ "Wrong format when trying to parse 'Maybe Address' from JSON: " ++ show x
+-- instance FromJSON (Maybe Address) where
+--   parseJSON (String "") = pure Nothing
+--   parseJSON (String v) = fmap Just $ parseJSON (String v)
+--   parseJSON x = error $ "Wrong format when trying to parse 'Maybe Address' from JSON: " ++ show x
 
 sloppyParseHexNumber::T.Text->Integer
 sloppyParseHexNumber x =

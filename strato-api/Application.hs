@@ -64,6 +64,8 @@ import Handler.LogInfo
 import Handler.UUIDInfo
 import Handler.Peers
 
+import Yesod.Core.Types (YesodSubRunnerEnv)
+
 import Blockchain.EthConf
 
 mkYesodDispatch "App" resourcesApp

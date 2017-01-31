@@ -1,4 +1,4 @@
-
+{-# OPTIONS -fno-warn-redundant-constraints #-} -- todo fixme
 module Blockchain.DB.MemAddressStateDB (
   HasMemAddressStateDB(..),
   AddressStateModification(..),
@@ -28,14 +28,13 @@ instance Format AddressStateModification where
   format ASDeleted = "Address Deleted"
 
 formatAddressStateDBMap::M.Map Address AddressStateModification->String
-formatAddressStateDBMap theMap = do
-  unlines $ 
+formatAddressStateDBMap theMap = unlines $
     map (\(a, am) -> format a ++ ": " ++ format am)
      (M.toList theMap)
 
 class HasMemAddressStateDB m where
-  getAddressStateDBMap::m (M.Map Address AddressStateModification)
-  putAddressStateDBMap::M.Map Address AddressStateModification->m ()
+  getAddressStateDBMap :: m (M.Map Address AddressStateModification)
+  putAddressStateDBMap :: M.Map Address AddressStateModification -> m ()
 
 getAddressState::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
                  Address->m AddressState

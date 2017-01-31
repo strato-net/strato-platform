@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module Blockchain.SHA (
   module Blockchain.Strato.Model.SHA,
@@ -17,6 +17,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import Numeric
 import Web.PathPieces
+import Web.HttpApiData
 
 import qualified Blockchain.Colors as CL
 import Blockchain.Data.RLP
@@ -56,6 +57,14 @@ instance PathPiece SHA where
       [(x, "")] -> Just $ SHA x
       _ -> Nothing
 
+instance ToHttpApiData SHA where
+    toUrlPiece = toPathPiece
+
+instance FromHttpApiData SHA where
+    parseUrlPiece = unmaybe . fromPathPiece
+        where unmaybe = \case
+                Nothing -> Left "couldn't parse SHA"
+                Just x  -> Right x
 
 hash :: BC.ByteString -> SHA
 hash = superProprietaryStratoSHAHash

@@ -22,7 +22,7 @@ executable ethereum-test
                      , ethereum-rlp
                      , ethereum-vm
                      , filepath
-                     , haskoin
+                     , blockapps-haskoin
                      , hflags
                      , IfElse
                      , leveldb-haskell
@@ -73,33 +73,33 @@ Test-Suite test-ethereum-test
                   , ansi-wl-pprint
                   , merkle-patricia-db
                   , directory
-                   , aeson
-                     , base16-bytestring
-                     , binary
-                     , blockapps-data
-                     , blockapps-util
-                     , bytestring
-                     , containers
-                     , cryptohash
-                     , directory
-                     , either
-                     , ethereum-rlp
-                     , ethereum-vm
-                     , filepath
-                     , haskoin
-                     , hflags
-                     , IfElse
-                     , leveldb-haskell
-                     , merkle-patricia-db
-                     , mtl
-                     , nibblestring
-                     , resourcet
-                     , scientific
-                     , text
-                     , time
-                     , transformers
-                     , unordered-containers
-                     , ansi-wl-pprint
-                     , monad-logger
-                     , strato-sequencer
- 
+                  , aeson
+                  , base16-bytestring
+                  , binary
+                  , blockapps-data
+                  , blockapps-util
+                  , bytestring
+                  , containers
+                  , cryptohash
+                  , directory
+                  , either
+                  , ethereum-rlp
+                  , ethereum-vm
+                  , filepath
+                  , blockapps-haskoin
+                  , hflags
+                  , IfElse
+                  , leveldb-haskell
+                  , merkle-patricia-db
+                  , mtl
+                  , nibblestring
+                  , resourcet
+                  , scientific
+                  , text
+                  , time
+                  , transformers
+                  , unordered-containers
+                  , ansi-wl-pprint
+                  , monad-logger
+                  , strato-sequencer
+

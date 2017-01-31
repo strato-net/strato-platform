@@ -21,7 +21,7 @@ library
                      , entropy
                      , ethereum-encryption
                      , ethereum-rlp
-                     , haskoin
+                     , blockapps-haskoin
                      , lifted-base
                      , monad-logger
                      , mtl
