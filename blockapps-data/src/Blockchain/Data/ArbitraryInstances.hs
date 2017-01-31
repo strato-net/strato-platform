@@ -93,6 +93,17 @@ instance Arbitrary BlockData where
                          , blockDataMixHash          = mixHash
                          }
 
+instance Arbitrary Block where
+    arbitrary = do
+        bData         <- arbitrary
+        bTransactions <- arbitrary
+        bUncles       <- arbitrary
+
+        return Block { blockBlockData            = bData
+                     , blockBlockUncles          = bUncles
+                     , blockReceiptTransactions  = bTransactions
+                     }
+
 instance Arbitrary Transaction where
     arbitrary = do
         nonce     <- unboxPI <$> arbitrary

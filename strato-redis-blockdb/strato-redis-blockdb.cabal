@@ -27,6 +27,7 @@ test-suite strato-redis-blockdb-test
     main-is: Test.hs
     build-depends:
         blockapps-data,
+        blockapps-util,
         base,
         bytestring,
         hedis,
@@ -39,6 +40,7 @@ test-suite strato-redis-blockdb-test
         text,
         mtl,
         strato-redis-blockdb,
+        strato-model,
         test-framework,
         test-framework-hunit,
         time
