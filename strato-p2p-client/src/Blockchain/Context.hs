@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, FlexibleContexts #-}
-
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, FlexibleContexts, UndecidableInstances #-}
+{-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
     , ContextM
@@ -36,7 +36,7 @@ data Context =
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
 
-instance RBDB.HasRedisBlockDB ContextM where
+instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
 instance (MonadResource m, MonadBaseControl IO m)=>HasSQLDB (StateT Context m) where

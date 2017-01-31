@@ -161,55 +161,46 @@ theCurve = getCurveByName SEC_p256k1
 runPeer::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
          TVar (S.Set String)->PPeer->PrivateNumber->m ()
 runPeer connectedPeers peer myPriv = do
-  let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
-  logInfoN $ T.pack $ C.blue "Welcome to strato-p2p-client"
-  logInfoN $ T.pack $ C.blue "============================"
-  logInfoN $ T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
+    logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
+    logInfoN . T.pack $ C.blue "============================"
+    logInfoN . T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
 
-  let myPublic = calculatePublic theCurve myPriv
-  logInfoN $ T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
+    let myPublic = calculatePublic theCurve myPriv
+    logInfoN . T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
 
-  logInfoN $ T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
-  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-  runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server -> 
-      runResourceT $ do
-      
-        let peerString = show (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+    logInfoN . T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+    redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+    runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server ->
+        runResourceT $ do
+            let peerString = show (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+            void $ modifyTVar connectedPeers $ S.insert peerString
+            pool <- runNoLoggingT $ SQL.createPostgresqlPool
+                    connStr' 20
 
-        _ <- modifyTVar connectedPeers $ S.insert peerString
+            void $ flip runStateT (Context pool redisBDBPool [] [] Nothing) $ do
+                (_, (outCxt, inCxt)) <- liftIO $
+                    appSource server $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink server
 
-        pool <- runNoLoggingT $ SQL.createPostgresqlPool
-                connStr' 20
+                eventSource <- mergeSourcesCloseForAny [
+                  appSource server =$=
+                  ethDecrypt inCxt =$=
+                  bytesToMessages =$=
+                  tap (displayMessage False "") =$=
+                  CL.map MsgEvt,
+                  txNotificationSource "client_tx" =$= CL.map NewTX,
+                  blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst),
+                  timerSource
+                  ] 2
 
-        _ <- flip runStateT (Context pool redisBDBPool [] [] Nothing) $ do
-          (_, (outCxt, inCxt)) <- liftIO $ 
-            appSource server $$+
-            ethCryptConnect myPriv otherPubKey `fuseUpstream`
-            appSink server
-            
-          eventSource <- mergeSourcesCloseForAny [
-            appSource server =$=
-            ethDecrypt inCxt =$=
-            bytesToMessages =$=
-            tap (displayMessage False "") =$=
-            CL.map MsgEvt,
-            txNotificationSource "client_tx" =$= CL.map NewTX,
-            blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst),
-            timerSource
-            ] 2
+                _ <- eventSource =$=
+                      handleMsg myPublic peer =$=
+                      transPipe lift (tap (displayMessage True "")) =$=
+                      messagesToBytes =$=
+                      ethEncrypt outCxt $$
+                      transPipe liftIO (appSink server)
 
-          eventSource =$=
-            handleMsg myPublic peer =$=
-            transPipe lift (tap (displayMessage True "")) =$=
-            messagesToBytes =$=
-            ethEncrypt outCxt $$
-            transPipe liftIO (appSink server)
-
-          _ <- modifyTVar connectedPeers $ S.delete peerString
-
-          return ()
-
-        return ()
+                void $ modifyTVar connectedPeers $ S.delete peerString
 
 getPubKeyRunPeer::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
                   TVar (S.Set String)->PPeer->m ()
@@ -228,7 +219,7 @@ getPubKeyRunPeer connectedPeers peer = do
     Just _ -> runPeer connectedPeers peer myPriv
                       
 
-runPeerInList::(MonadIO m, RBDB.HasRedisBlockDB m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
+runPeerInList::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
                --[(String, PortNumber, Maybe Point)]->Maybe Int->m ()
                TVar (S.Set String)->[PPeer]->Int->m ()
 runPeerInList connectedPeers peers peerNumber = do
