@@ -63,7 +63,7 @@ executable strato-sequencer
   default-language:    Haskell2010
   other-modules: Flags
 
-test-suite spec
+test-suite strato-sequencer-spec
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     ghc-options:      -Wall -O2 -threaded
@@ -92,12 +92,13 @@ test-suite spec
                     , ethereum-rlp
                     , blockapps-haskoin
                     , random
+                    , blockapps-data
     default-language: Haskell2010
-    other-modules: Blockchain.Sequencer.ArbitraryInstances
-                 , Blockchain.Sequencer.ChainHelpers
-                 , Blockchain.Sequencer.EventSpec
-                 , Blockchain.Sequencer.SequencerSpec
-                 , Blockchain.Sequencer.OrderValidator
+    other-modules:  Blockchain.Sequencer.ArbitraryInstances 
+                  , Blockchain.Sequencer.ChainHelpers
+                  , Blockchain.Sequencer.EventSpec
+                  , Blockchain.Sequencer.SequencerSpec
+                  , Blockchain.Sequencer.OrderValidator
 
 
 

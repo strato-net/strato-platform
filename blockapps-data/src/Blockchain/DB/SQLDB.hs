@@ -10,7 +10,6 @@ module Blockchain.DB.SQLDB (
 
 import Control.Monad.Trans.Resource
 import qualified Database.Persist.Postgresql as SQL
-import qualified Database.Redis
 
 import Control.Monad.Logger (MonadLogger)
 import Control.Monad.Trans.Reader

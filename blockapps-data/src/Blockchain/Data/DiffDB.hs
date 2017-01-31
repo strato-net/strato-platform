@@ -20,8 +20,6 @@ import Blockchain.Util
 import Blockchain.SHA
 
 import Control.Monad.Trans.Resource
-
-import Data.Map (Map)
 import qualified Data.Map as Map
 
 type SqlDbM m = SQL.SqlPersistT m

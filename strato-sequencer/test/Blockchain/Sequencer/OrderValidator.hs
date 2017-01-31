@@ -6,7 +6,6 @@ module Blockchain.Sequencer.OrderValidator ( OrderValidateable
 
 import Control.Monad.State hiding (runState)
 
-import Data.Either
 import qualified Data.Map.Strict as Map
 
 import Blockchain.Data.DataDefs

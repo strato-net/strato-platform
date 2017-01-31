@@ -2,7 +2,6 @@ module Blockchain.Sequencer.ChainHelpers where
 
 import Blockchain.SHA
 import Blockchain.Data.DataDefs
-import Blockchain.Data.BlockDB (blockHeaderHash)
 import Blockchain.Sequencer.Event
 
 import Blockchain.Verification (ommersVerificationValue)
