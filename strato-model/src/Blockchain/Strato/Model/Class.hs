@@ -21,6 +21,10 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
 
+    buildBlock' :: (BlockHeaderLike h2, TransactionLike t2) => h2 -> [t2] -> [h2] -> b
+    buildBlock' head' txs' uncles' =
+        buildBlock (morphBlockHeader head') (morphTx <$> txs') (morphBlockHeader <$> uncles')
+
 class RLPSerializable h => BlockHeaderLike h where
     blockHeaderBlockNumber      :: h -> Integer
     blockHeaderParentHash       :: h -> SHA
