@@ -28,13 +28,13 @@ test-suite strato-redis-blockdb-test
     build-depends:
         blockapps-data,
         blockapps-util,
+        async,
         base,
         bytestring,
         hedis,
         HUnit,
-        async,
+        hspec-contrib,
         hspec,
-        HUnit,
         QuickCheck,
         stm,
         text,
@@ -43,6 +43,10 @@ test-suite strato-redis-blockdb-test
         strato-model,
         test-framework,
         test-framework-hunit,
+        tasty,
+        tasty-hspec,
+        tasty-hunit,
+        tasty-quickcheck,
         time
     -- We use -O0 here, since GHC takes *very* long to compile so many constants
     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind
