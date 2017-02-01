@@ -46,9 +46,7 @@ This call is non blocking.
 ```
 
 ## GET /addresses/:address/pending
-This call is expected to return details for a user account pending confirmation.
-
-This call is non blocking.
+This call returns pending transactions calls for a user. This endpoint is remnant from an old use case where the user's private key is stored on a mobile device unlockable by a fingerprint. Users could still submit transactions from other devices. Transactions submitted through these other devices would be returned by this endpoint. These transactions would then be resubmitted by the authorized device with the correct key at a later point in time. This is no longer required. This is a valid use case but needs to be incorporated in a more robust manner.
 
 #### Captures
 
@@ -59,9 +57,7 @@ This call is non blocking.
 Unknown
 
 ## GET /addresses/:address/pending/remove/:time
-This call is expected to return details for a user account pending confirmation.
-
-This call is non blocking.
+This lets us remove pending transactions created by a user account registered on another device. See previous call. This need not be implemented.
 
 #### Captures
 
@@ -216,7 +212,7 @@ This call is non blocking.
 ## GET /contracts/:contractName/:contractAddress/functions
 This call returns a list of functions in this contract.
 
-This call is non blocking 
+This call is non blocking
 
 #### Captures
 
@@ -240,7 +236,7 @@ This call is non blocking
 ## GET /contracts/:contractName/:contractAddress/symbols
 This call returns a list of symbols in this contract.
 
-This call is non blocking 
+This call is non blocking
 
 #### Captures
 
@@ -452,7 +448,7 @@ This returns a list of known addresses for the provided username. This call is n
 ```
 
 ## POST /users/:user
-This creates a new user with the provided user name
+This creates a new user with the provided user name.
 
 #### Backend Call
 This call blocks on the `strato-api/eth/v1.2/faucet` call.
@@ -471,6 +467,16 @@ This call blocks on the `strato-api/eth/v1.2/faucet` call.
 
 ```
 faucet=1&password=securePassword
+```
+
+The following call is used to register users who store their private key on a device. See `GET /address/:address/pending`. We do not need to support this feature.
+```
+register=1&token=secureToken&password=securePassword
+```
+
+This deletes the user information from Bloc.
+```
+remove=1&password=securePassword
 ```
 
 #### Response:
@@ -573,7 +579,7 @@ This call block on  `strato-api/eth/v1.2/extabi`.
 - *address*: an Ethereum address
 
 #### Response:
-This call is currently not being used. 
+This call is currently not being used.
 
 ## POST /users/:user/:address/uploadList
 This call is used to upload a list of previously compiled contracts (see _/contracts/compile_).
@@ -668,15 +674,15 @@ This route blocks on the `strato-api/eth/v1.2/transaction` call.
 	"resolve": true,
 	"txs": [
 		{
-			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905", 
+			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905",
 			"value": 100
 		},
 		{
-			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905", 
+			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905",
 			"value": 100
 		},
 		{
-			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905", 
+			"toAddress": "eac05b64528acad20b6dcd48da763d2487c8e905",
 			"value": 100
 		}
 	]
@@ -774,7 +780,7 @@ This end point blocks on the `strato-api/eth/v1.2/transaction` call.
 			"value": 0			
 		}
 	]
-	
+
 }
 ```
 
@@ -795,7 +801,7 @@ This end point blocks on the `strato-api/eth/v1.2/transaction` call.
 
 ## GET /search/:contractName
 
-This call returns a collection of contract addresses, similar to _GET /contracts/:contractName_. 
+This call returns a collection of contract addresses, similar to _GET /contracts/:contractName_.
 
 This call is non blocking.
 
