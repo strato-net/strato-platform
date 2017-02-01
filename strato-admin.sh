@@ -2,21 +2,43 @@
 
 set -e
 
-# Will also include "local" one day
 mode=docker
 
 usage='
   --run-tag <tag> [--bare|--reset]    Start strato from a given Docker tag.  When
                                       the containers are already running, stops
                                       and restarts them.
-  --run-local                         In case you you do a local build and want to run strato locally.
+
+  --run-local [--bare|--reset]        In case you you do a local build and want to run strato locally.
+
     --bare                            Install necessary software for first-time run
     --reset                           On running containers, rather than
                                       stopping, does a --wipe
-  --wipe                              Kill and delete all strato containers and 
+
+  --wipe                              Kill and delete all strato containers and
                                       their volumes.  This will, naturally,
                                       COMPLETELY ERASE THE BLOCKCHAIN and is a
                                       DANGEROUS last resort.
+
+  environment variables:
+
+  ssl             - default: false     - If true then copy certificates, i.e. pem & key files, to /etc/ssl/certs & /etc/ssl/private so that you can use strato with SSL.
+  genesis         - default: stablenet - Which genesis block name prefix to use in a strato node setup; e.g. stablenetGenesis.json, livenetGenesis.json, testnetGenesis.json (see: /strato-init/src/Main.hs)
+  miningAlgorithm - default: Instant   - Which block mining algorithm to use in the strato adit process; e.g. Instant or SHA (see: /strato-adit/Blockchain/Mining)
+  stratoHost      - default: ""        - The hostname or ip address of the machine to which bloc should connect to to access the strato API (see: /bloc/pkg/README.md)
+  networkID       - default: 6         - Network identifier used in p2p communication
+  genesisBlock    - default: ""        - Provides your own genesis block; e.g. genesisBlock=$(< gb.json) (see: /silo/README.md)
+  bootnode        - default: ""        - Provides the IP address of the boot-node machine in case of a v-net; e.g. bootnode=10.0.0.15 (see: silo/README.md)
+  mineBlocks      - default: true      - Run strato-adit and strato-quarry processes if set to true (see: silo/monstrato/pkg/doit.sh)
+  verifyBlocks    - default: false     - Indicates if mining verification will be performed (see: silo/monstrato/ethereum-vm/src/Blockchain/Verifier.hs)
+  lazyBlocks      - default: true      - Indicates if lazy/empty blocks will be created (see: /monstrato/strato-quarry/lib/BlockConstruction.hs & /monstrato/ethereum-vm/src/Executable/EthereumVM.hs
+  serveBlocks     - default: true      - Run strato-p2p-server if set to true (see: /monstrato/pkg/doit.sh)
+  receiveBlocks   - default: true      - Run strato-p2p-client if set to true (see: /monstrato/pkg/doit.sh)
+  addBootnodes    - default: false     - Get a single node connected to the public network; genesis must be set to livenet (see: /monstrato/deployments/docker/HowToDeploy.md)
+  noMinPeers      - default: false     - Forces minAvailablePeers to 0 (typically set to 100; see: /monstrato/strato-init/src/Blockchain/Setup.hs)
+
+  apiUrlOverride  - default: not specified - Overrides the strato api url in the bloc server config file; e.g. http://strato:3000 (see: /bloc/pkg/doit.sh)
+
 '
 
 function setEnv {
