@@ -5,8 +5,10 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB
-    ( getHeader, getTransactions, getUncles
-    , getBlock, getParent, getChildren
+    ( getHeader, getHeadersByNumber
+    , getTransactions, getUncles
+    , getBlock, getBlocksByNumber
+    , getParent, getChildren
     , putHeader, putBlock
     , HasRedisBlockDB(..), withRedisBlockDB
     ) where
@@ -52,6 +54,12 @@ getHeader sha = getInNamespace Headers sha >>= \case
         Right (Just rhead) -> let (RedisHeader h) = fromValue rhead in
             return . Just $ morphBlockHeader h
 
+getHeadersByNumber :: Integer -> Redis (Maybe [SHA])
+getHeadersByNumber n = getMembersInNamespace Numbers n >>= \case
+        Left _             -> return Nothing
+        Right hs           -> let hashes = fromValue <$> hs in
+            return (Just hashes)
+
 getTransactions :: TransactionLike t => SHA -> Redis (Maybe [t])
 getTransactions sha = getInNamespace Transactions sha >>= \case
         Left _             -> return Nothing
@@ -78,6 +86,9 @@ getChildren sha = getMembersInNamespace Children sha >>= \case
         Left _             -> return Nothing
         Right chs          -> let children = fromValue <$> chs in
             return (Just children)
+
+getBlocksByNumber :: BlockLike h t b => Integer -> Redis (Maybe [b])
+getBlocksByNumber = undefined
 
 getBlock :: BlockLike h t b => SHA -> Redis (Maybe b)
 getBlock sha = do

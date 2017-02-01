@@ -39,16 +39,12 @@ withConn = bracket openConn closeConn
 specTest :: Spec
 specTest = around withConn $ describe "BlockData" $ do
     it "Should not have a header for SHA 0" $ \c -> do
-        r <- runRedis c $ do
-            h <- RDB.getHeader $ SHA 0 :: Redis (Maybe BlockData)
-            return $ isNothing h
-        HUnit.assertBool "Found header for SHA 0" r
+        r <- runRedis c $ (RDB.getHeader $ SHA 0 :: Redis (Maybe BlockData))
+        HUnit.assertBool "Found header for SHA 0" $ isNothing r
 
     it "Should not have a block for SHA 0" $ \c -> do
-        r <- runRedis c $ do
-            b <- RDB.getBlock $ SHA 0 :: Redis (Maybe Block) 
-            return $ isNothing b
-        HUnit.assertBool "Found block for SHA 0" r
+        r <- runRedis c $ (RDB.getBlock $ SHA 0 :: Redis (Maybe Block))
+        HUnit.assertBool "Found block for SHA 0" $ isNothing r
 
     it "Should put and get a header" $ \c -> do
         b <- generate arbitrary :: IO BlockData
@@ -81,7 +77,7 @@ specTest = around withConn $ describe "BlockData" $ do
         HUnit.assertEqual
             ("Couldn't recover tranasctions from block with hash: " ++ format theHash) 
             txCount r
-    
+
     it "Should put a block and get its uncles" $ \c -> do
         b <- generate arbitrary :: IO Block 
         let theHash = blockHash b
@@ -98,19 +94,22 @@ specTest = around withConn $ describe "BlockData" $ do
             ("Couldn't recover uncles from block with hash: " ++ format theHash)
             uCount r
 
-   --     it "Should put a block with parent and get back the parent" $ \c -> do
---         b <- generate arbitrary :: IO Block 
---         let theHash = blockHash b
---         r <- runRedis c $ do
---             void $ RDB.putBlock b
---             p  <- RDB.getParent theHash :: Redis (Maybe SHA)
---             pb <- RDB.getBlock p :: Redis (Maybe BlockData)
---             return $ case ts of
---                 Nothing -> SHA 0
---                 Just pp -> blockHash pp
---         liftIO $ putStrLn $ "Uncles got: " ++ show r 
---         HUnit.assertEqual
---             ("Couldn't recover parent from block with hash: " ++ format theHash)
---             (SHA 1) r
+    it "Should put a block with parent and get back the parent" $ \c -> do
+        b <- generate arbitrary :: IO Block 
+        let theHash = blockHash b
+        r <- runRedis c $ do
+            void $ RDB.putBlock b
+            p  <- RDB.getParent theHash :: Redis (Maybe SHA)
+            case p of
+                Nothing -> undefined
+                Just pp -> do
+                    pb <- RDB.getBlock pp :: Redis (Maybe Block)
+                    return $ case pb of
+                        Nothing -> SHA 0
+                        Just ppp -> blockHash ppp
+        liftIO $ putStrLn $ "Uncles got: " ++ show r 
+        HUnit.assertEqual
+            ("Couldn't recover parent from block with hash: " ++ format theHash)
+            (SHA 1) r
 
 
