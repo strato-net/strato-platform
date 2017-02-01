@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, DeriveGeneric #-}
 module Blockchain.Sequencer.Event where
 
 import           Data.Binary
@@ -313,3 +313,14 @@ instance TransactionLike OutputTx where
                          , otSigner = fromJust (txSigner t) -- todo: D A N G E R
                          , otBaseTx = morphTx t
                          }
+
+instance RLPSerializable OutputBlock where
+    rlpEncode = rlpEncode . (morphBlock :: OutputBlock -> DD.Block)
+    rlpDecode = morphBlock . (rlpDecode :: RLPObject -> DD.Block)
+
+instance BlockLike DD.BlockData OutputTx OutputBlock where
+    blockHeader       = obBlockData
+    blockTransactions = obReceiptTransactions
+    blockUncleHeaders = obBlockUncles
+
+    buildBlock = OutputBlock TO.Morphism 0

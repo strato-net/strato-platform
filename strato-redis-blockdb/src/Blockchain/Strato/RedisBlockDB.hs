@@ -115,8 +115,8 @@ putBlock b = do
     let sha    = blockHash b
         number = blockHeaderBlockNumber (blockHeader b)
         header = morphBlockHeader (blockHeader b) :: RedisHeader
-        txs    = RedisTxs $ (morphTx <$> blockTransactions b :: [Models.RedisTx])
-        uncles = RedisUncles $ morphBlockHeader <$> blockUncleHeaders b
+        txs    = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
+        uncles = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
         inNS'  = flip inNamespace sha
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue header)
