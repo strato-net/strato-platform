@@ -56,8 +56,6 @@ import Blockchain.SHA
 import Blockchain.Util
 import Blockchain.DBM
 
---import Debug.Trace
-
 import Network.Haskoin.Internals hiding (Address, txSignature, txHash)
 import Blockchain.ExtendedECDSA
 

@@ -283,14 +283,10 @@ instance Format BlockData where
 
 instance BlockLike BlockData Transaction Block where
     blockHeader       = blockBlockData
-    blockTransactions = blockTransactions
+    blockTransactions = blockReceiptTransactions
     blockUncleHeaders = blockBlockUncles
 
     buildBlock = Block
-    morphBlock bl = let header' = morphBlockHeader (blockHeader bl)
-                        txs'    = morphTx <$> blockTransactions bl
-                        uncles' = morphBlockHeader <$> blockUncleHeaders bl
-                    in  Block header' txs' uncles'
 
 instance BlockHeaderLike BlockData where
     blockHeaderBlockNumber      = blockDataNumber

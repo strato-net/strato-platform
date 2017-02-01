@@ -49,7 +49,6 @@ instance (RLPSerializable a, RedisDBValuable a) => RedisDBValuable [a] where
     toValue         = rlpSerialize . RLPArray . fmap rlpEncode
     fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
 
-
 newtype RedisHeader = RedisHeader BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
 newtype RedisTx     = RedisTx     TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs    = RedisTxs    [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)

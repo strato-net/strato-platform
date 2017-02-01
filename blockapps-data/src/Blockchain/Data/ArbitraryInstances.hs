@@ -95,9 +95,11 @@ instance Arbitrary BlockData where
 
 instance Arbitrary Block where
     arbitrary = do
+        txCount       <- choose (0, 20) 
+        uncleCount    <- choose (0, 2) 
         bData         <- arbitrary
-        bTransactions <- arbitrary
-        bUncles       <- arbitrary
+        bTransactions <- vectorOf txCount arbitrary
+        bUncles       <- vectorOf uncleCount arbitrary
 
         return Block { blockBlockData            = bData
                      , blockBlockUncles          = bUncles

@@ -37,6 +37,7 @@ test-suite strato-redis-blockdb-test
         hspec,
         QuickCheck,
         stm,
+        ethereum-rlp,
         text,
         mtl,
         strato-redis-blockdb,

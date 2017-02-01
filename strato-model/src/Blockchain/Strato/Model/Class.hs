@@ -15,8 +15,7 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     blockUncleHeaders :: b -> [h]
 
     buildBlock :: h -> [t] -> [h] -> b
-    morphBlock :: (BlockLike h2 t2 b2) => b2 -> b
-    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock, morphBlock #-}
+    {-# MINIMAL blockHeader, blockTransactions, blockUncleHeaders, buildBlock #-}
 
     blockHash :: b -> SHA
     blockHash = blockHeaderHash . blockHeader
@@ -24,6 +23,9 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     buildBlock' :: (BlockHeaderLike h2, TransactionLike t2) => h2 -> [t2] -> [h2] -> b
     buildBlock' head' txs' uncles' =
         buildBlock (morphBlockHeader head') (morphTx <$> txs') (morphBlockHeader <$> uncles')
+    
+    morphBlock :: (BlockHeaderLike h2, TransactionLike t2, BlockLike h2 t2 b2) => b2 -> b 
+    morphBlock b2 = buildBlock' (blockHeader b2) (blockTransactions b2) (blockUncleHeaders b2)
 
 class RLPSerializable h => BlockHeaderLike h where
     blockHeaderBlockNumber      :: h -> Integer

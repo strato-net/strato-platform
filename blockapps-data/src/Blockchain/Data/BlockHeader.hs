@@ -117,6 +117,23 @@ instance BlockHeaderLike BlockHeader where
     blockHeaderTimestamp        = timestamp 
     blockHeaderMixHash          = mixHash
 
+    morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
+                                              , parentHash       = blockHeaderParentHash b
+                                              , ommersHash       = blockHeaderOmmersHash b
+                                              , beneficiary      = blockHeaderBeneficiary b
+                                              , stateRoot        = MP.StateRoot $ blockHeaderStateRoot b
+                                              , transactionsRoot = MP.StateRoot $ blockHeaderTransactionsRoot b
+                                              , receiptsRoot     = MP.StateRoot $ blockHeaderReceiptsRoot b
+                                              , logsBloom        = blockHeaderLogsBloom b
+                                              , gasLimit         = blockHeaderGasLimit b
+                                              , gasUsed          = blockHeaderGasUsed b
+                                              , difficulty       = blockHeaderDifficulty b
+                                              , nonce            = blockHeaderNonce b
+                                              , extraData        = blockHeaderExtraData b
+                                              , timestamp        = blockHeaderTimestamp b
+                                              , mixHash          = blockHeaderMixHash b
+                                              } 
+
 headerHash :: BlockHeader->SHA
 headerHash = blockHeaderHash
 
