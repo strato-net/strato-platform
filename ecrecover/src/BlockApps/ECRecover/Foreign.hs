@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude, ForeignFunctionInterface #-}
 module BlockApps.ECRecover.Foreign
 where
 

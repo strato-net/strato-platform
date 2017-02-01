@@ -14,7 +14,7 @@ import Crypto.Types.PubKey.ECC
 import Blockchain.BlockSynchronizerSql
 import Blockchain.Constants hiding (ethVersion)
 import Blockchain.Context
-import Blockchain.Data.Peer
+import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Data.Wire
 import Blockchain.DB.DetailsDB hiding (getBestBlockHash)
 import Blockchain.DB.SQLDB

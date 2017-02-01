@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 -- |
 -- Low-level operations on pointers.
 module BlockApps.ECRecover.Pointers

@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module BlockApps.ECRecover.Prelude
 (
   module Exports,

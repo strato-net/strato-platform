@@ -24,7 +24,7 @@ import Control.Monad.Trans.Resource
 import Blockchain.Context
 import Blockchain.DBM
 import Blockchain.DB.SQLDB
-import Blockchain.Data.Peer
+import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 
 import qualified Database.Persist.Postgresql as SQL
