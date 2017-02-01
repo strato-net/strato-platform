@@ -6,7 +6,7 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB
     ( getHeader, getHeaders
-    , getHeadersByNumber
+    , getSHAsForNumber
     , getTransactions, getUncles
     , getBlock, getBlocks
     , getBlocksByNumber, getBlocksByNumbers
@@ -50,7 +50,7 @@ getInNamespace :: BlockDBNamespace -> SHA -> Redis (Either Reply (Maybe S8.ByteS
 getInNamespace ns sha = get $ inNamespace ns sha
 
 getMembersInNamespace :: (RedisDBKeyable key) => BlockDBNamespace -> key -> Redis (Either Reply [S8.ByteString])
-getMembersInNamespace ns = smembers . inNamespace ns . toKey
+getMembersInNamespace ns = smembers . inNamespace ns
 
 getHeader :: BlockHeaderLike h => SHA -> Redis (Maybe h)
 getHeader sha = getInNamespace Headers sha >>= \case
@@ -62,8 +62,8 @@ getHeader sha = getInNamespace Headers sha >>= \case
 getHeaders :: BlockHeaderLike h => [SHA] -> Redis [(SHA, Maybe h)]
 getHeaders = zipM' getHeader
 
-getHeadersByNumber :: Integer -> Redis (Maybe [SHA])
-getHeadersByNumber n = getMembersInNamespace Numbers n >>= \case
+getSHAsForNumber :: Integer -> Redis (Maybe [SHA])
+getSHAsForNumber n = getMembersInNamespace Numbers n >>= \case
         Left _             -> return Nothing
         Right hs           -> let hashes = fromValue <$> hs in
             return (Just hashes)
@@ -76,7 +76,7 @@ getTransactions sha = getInNamespace Transactions sha >>= \case
             return . Just $ morphTx <$> txs
 
 getUncles :: BlockHeaderLike h => SHA -> Redis (Maybe [h])
-getUncles sha = getInNamespace Headers sha >>= \case
+getUncles sha = getInNamespace Uncles sha >>= \case
         Left _             -> return Nothing
         Right Nothing      -> return Nothing
         Right (Just rus)   -> let (RedisUncles uncles) = fromValue rus in
@@ -150,7 +150,7 @@ putBlock b = do
         void $ setnx (inNS' Headers) (toValue header)
         void $ setnx (inNS' Transactions) (toValue txs)
         void $ setnx (inNS' Uncles) (toValue uncles)
-        sadd (inNamespace Numbers number) [toValue sha]
+        sadd (inNamespace Numbers number) [toKey sha]
         --forM_ uncles -- todo index the uncles' headers/numbers/etc?
     case res of
         TxSuccess _ -> pure $ Right Ok
