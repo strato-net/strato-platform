@@ -28,6 +28,11 @@ import           Database.Redis
 zipM' :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t (a, b))
 zipM' f = mapM (\x -> (,) x <$> f x)
 
+-- zipA' :: (Traversable t, Applicative a) => (x -> a b) -> t x -> a (t (x, y))
+-- zipA' f = traverse (strength . id &&& f)
+--     where
+--         strength (x, fy) = fmap (,) x fy
+
 class (Monad m) => HasRedisBlockDB m where
     getRedisBlockDB :: m Connection
 

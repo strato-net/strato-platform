@@ -31,6 +31,7 @@ test-suite strato-redis-blockdb-test
         blockapps-util,
         async,
         base,
+        microlens,
         bytestring,
         hedis,
         HUnit,

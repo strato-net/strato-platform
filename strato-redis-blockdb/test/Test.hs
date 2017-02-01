@@ -36,6 +36,9 @@ closeConn _ = return ()
 withConn :: (Connection -> IO ()) -> IO ()
 withConn = bracket openConn closeConn 
 
+--makeParent :: BlockHeaderLike h => h -> h -> h
+--makeParent p c = c { blockHeaderParentHash = headerHash p} 
+
 specTest :: Spec
 specTest = around withConn $ describe "BlockData" $ do
     it "Should not have a header for SHA 0" $ \c -> do
@@ -54,6 +57,18 @@ specTest = around withConn $ describe "BlockData" $ do
             b' <- RDB.getHeader theHash :: Redis (Maybe BlockData)
             return $ isJust b'
         HUnit.assertBool "Couldn't recover header after put" r
+
+    it "Should put a BlockHeader with parent and get back the parent" $ \conn -> do
+        p <- generate arbitrary :: IO BlockData
+        let pHash = blockHeaderHash p
+        c <- generate arbitrary :: IO BlockData
+        let c' = c --{blockHeaderParentHash = blockHeaderHash p}
+        let cHash = blockHeaderParentHash c'  
+        _ <- runRedis conn $ do
+            return False
+        HUnit.assertEqual
+            ("Couldn' match parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
+            pHash cHash
 
     it "Should put and get a block" $ \c -> do
         b <- generate arbitrary :: IO Block
@@ -95,10 +110,11 @@ specTest = around withConn $ describe "BlockData" $ do
             uCount r
 
     it "Should put a block with parent and get back the parent" $ \c -> do
-        b <- generate arbitrary :: IO Block 
-        let theHash = blockHash b
+        b1 <- generate arbitrary :: IO Block
+        --b2 <- generate arbitrary :: IO Block
+        let theHash = blockHash b1
         r <- runRedis c $ do
-            void $ RDB.putBlock b
+            void $ RDB.putBlock b1
             p  <- RDB.getParent theHash :: Redis (Maybe SHA)
             case p of
                 Nothing -> undefined
