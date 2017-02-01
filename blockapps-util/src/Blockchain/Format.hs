@@ -16,7 +16,7 @@ class Format a where
   format::a->String
 
 instance Format B.ByteString where
-  format x = BC.unpack (B16.encode x)
+  format = BC.unpack . B16.encode 
 
 instance Format N.NibbleString where
   format (N.EvenNibbleString bs) = format bs

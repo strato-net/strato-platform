@@ -98,3 +98,19 @@ specTest = around withConn $ describe "BlockData" $ do
             ("Couldn't recover uncles from block with hash: " ++ format theHash)
             uCount r
 
+--     it "Should put a block with parent and get back the parent" $ \c -> do
+--         b <- generate arbitrary :: IO Block 
+--         let theHash = blockHash b
+--         r <- runRedis c $ do
+--             void $ RDB.putBlock b
+--             p  <- RDB.getParent theHash :: Redis (Maybe SHA)
+--             pb <- RDB.getBlock p :: Redis (Maybe BlockData)
+--             return $ case ts of
+--                 Nothing -> SHA 0
+--                 Just pp -> blockHash pp
+--         liftIO $ putStrLn $ "Uncles got: " ++ show r 
+--         HUnit.assertEqual
+--             ("Couldn't recover parent from block with hash: " ++ format theHash)
+--             (SHA 1) r
+
+

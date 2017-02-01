@@ -2,15 +2,18 @@
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
+import qualified Data.ByteString                      as S
 import qualified Data.ByteString.Char8                as S8
+import qualified Data.ByteString.Base16               as SB16
 
 import qualified Blockchain.Data.BlockHeader          as BHD
 import           Blockchain.Data.RLP
 import qualified Blockchain.Data.Transaction          as TXD
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.ExtendedWord as EW
 
-data BlockDBNamespace = Headers | Transactions | Numbers | Uncles
+data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Parent | Children
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
@@ -21,7 +24,7 @@ class RedisDBValuable v where
     fromValue :: S8.ByteString -> v
 
 instance RedisDBKeyable S8.ByteString where
-    toKey = id
+    toKey = SB16.encode
 
 instance RedisDBValuable S8.ByteString where
     toValue   = id
@@ -31,8 +34,8 @@ instance RedisDBKeyable SHA where
     toKey = S8.pack . shaToHex
 
 instance RedisDBValuable SHA where
-    toValue   = S8.pack . shaToHex
-    fromValue = shaFromHex . S8.unpack
+    toValue (SHA x) = S.pack $ EW.word256ToBytes x
+    fromValue       = SHA . EW.bytesToWord256 . S.unpack  
 
 instance RedisDBKeyable Integer where
     toKey = S8.pack . show
@@ -49,7 +52,9 @@ instance (RLPSerializable a, RedisDBValuable a) => RedisDBValuable [a] where
     toValue         = rlpSerialize . RLPArray . fmap rlpEncode
     fromValue bytes = let (RLPArray elems) = rlpDeserialize bytes in rlpDecode <$> elems
 
-newtype RedisHeader = RedisHeader BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
-newtype RedisTx     = RedisTx     TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
-newtype RedisTxs    = RedisTxs    [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
-newtype RedisUncles = RedisUncles [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
+newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show, RLPSerializable, BlockHeaderLike)
+newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
+newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
+newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
+--newtype RedisParent    = RedisParent   SHA             deriving (Eq, Read, Show, RedisDBValuable)
+--newtype RedisChildren  = RedisChildren [SHA]           deriving (Eq, Read, Show, RedisDBValuable)

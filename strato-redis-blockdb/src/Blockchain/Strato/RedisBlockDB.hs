@@ -5,7 +5,8 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB
-    ( getHeader, getTransactions, getUncles, getBlock
+    ( getHeader, getTransactions, getUncles
+    , getBlock, getParent, getChildren
     , putHeader, putBlock
     , HasRedisBlockDB(..), withRedisBlockDB
     ) where
@@ -35,9 +36,14 @@ inNamespace ns k = ns' `S8.append` toKey k
             Transactions -> "t:"
             Numbers      -> "n:"
             Uncles       -> "u:"
+            Parent       -> "p:"
+            Children     -> "c:"
 
 getInNamespace :: BlockDBNamespace -> SHA -> Redis (Either Reply (Maybe S8.ByteString))
 getInNamespace ns sha = get $ inNamespace ns sha
+
+getMembersInNamespace :: (RedisDBKeyable key) => BlockDBNamespace -> key -> Redis (Either Reply [S8.ByteString])
+getMembersInNamespace ns = smembers . inNamespace ns . toKey
 
 getHeader :: BlockHeaderLike h => SHA -> Redis (Maybe h)
 getHeader sha = getInNamespace Headers sha >>= \case
@@ -48,17 +54,30 @@ getHeader sha = getInNamespace Headers sha >>= \case
 
 getTransactions :: TransactionLike t => SHA -> Redis (Maybe [t])
 getTransactions sha = getInNamespace Transactions sha >>= \case
-        Left _            -> return Nothing
-        Right Nothing     -> return Nothing
-        Right (Just rtxs) -> let (RedisTxs txs) = fromValue rtxs in
+        Left _             -> return Nothing
+        Right Nothing      -> return Nothing
+        Right (Just rtxs)  -> let (RedisTxs txs) = fromValue rtxs in
             return . Just $ morphTx <$> txs
 
 getUncles :: BlockHeaderLike h => SHA -> Redis (Maybe [h])
 getUncles sha = getInNamespace Headers sha >>= \case
-        Left _           -> return Nothing
-        Right Nothing    -> return Nothing
-        Right (Just rus) -> let (RedisUncles uncles) = fromValue rus in
+        Left _             -> return Nothing
+        Right Nothing      -> return Nothing
+        Right (Just rus)   -> let (RedisUncles uncles) = fromValue rus in
             return . Just $ morphBlockHeader <$> uncles
+
+getParent :: SHA -> Redis (Maybe SHA)
+getParent sha = getInNamespace Parent sha >>= \case
+        Left _             -> return Nothing
+        Right Nothing      -> return Nothing
+        Right (Just rps)   -> let parent = fromValue rps in
+            return . Just $ parent
+
+getChildren :: SHA -> Redis (Maybe [SHA])
+getChildren sha = getMembersInNamespace Children sha >>= \case
+        Left _             -> return Nothing
+        Right chs          -> let children = fromValue <$> chs in
+            return (Just children)
 
 getBlock :: BlockLike h t b => SHA -> Redis (Maybe b)
 getBlock sha = do
