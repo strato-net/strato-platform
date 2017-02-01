@@ -25,7 +25,7 @@ import           Control.Monad
 import           Control.Monad.Trans
 import           Database.Redis
 
-zipM' :: (Monad m) => (a -> m b) -> [a] -> m [(a, b)]
+zipM' :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t (a, b))
 zipM' f = mapM (\x -> (,) x <$> f x)
 
 class (Monad m) => HasRedisBlockDB m where
@@ -99,7 +99,6 @@ getBlocksByNumber :: (BlockLike h t b) => Integer -> Redis [(SHA, Maybe b)]
 getBlocksByNumber n = getMembersInNamespace Numbers n >>= \case
         Left _       -> return []
         Right hashes -> getBlocks (fromValue <$> hashes)
-
 
 getBlocksByNumbers :: (BlockLike h t b) => [Integer] -> Redis [(Integer, [(SHA, Maybe b)])]
 getBlocksByNumbers = zipM' getBlocksByNumber
