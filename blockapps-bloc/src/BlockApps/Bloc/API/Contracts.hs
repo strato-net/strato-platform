@@ -228,6 +228,19 @@ instance MonadContracts Bloc where
 
   getContractsStates = undefined
   postContractsCompile = undefined
+  -- postContractsCompile reqs = do
+  --   conn <- asks dbConnection
+  --   url <- asks urlStrato
+  --   mgr <- asks httpManager
+  --   let
+  --     encoder = _
+  --     decoder = _
+  --     sqlString =
+  --       ""
+  --     sqlStatement = statement sqlString encoder decoder True
+  --   resps <- for reqs $ \PostCompileRequest{..} -> do
+  --     runClientM
+
 
 type GetContracts = "contracts" :> Get '[JSON] Contracts
 data Contract = Contract
