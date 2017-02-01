@@ -128,4 +128,4 @@ specTest = around withConn $ describe "BlockData" $ do
             ("Couldn't recover parent from block with hash: " ++ format theHash)
             (SHA 1) r
 
-
+    it "Should get chain of parent" $ const pending
