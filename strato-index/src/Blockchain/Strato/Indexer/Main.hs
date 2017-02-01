@@ -1,35 +1,34 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, LambdaCase #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
-module Executable.StratoIndex (
+module Blockchain.Strato.Indexer.Main (
     stratoIndex
 ) where
 
-import Control.Lens hiding (Context)
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Data.List
-import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Consumer
-import Network.Kafka.Protocol
+import           Control.Monad
+import           Control.Monad.Logger
+import           Data.List                          hiding (group)
+import qualified Data.Text                          as T
+import           Network.Kafka
+import           Network.Kafka.Consumer
+import           Network.Kafka.Protocol
 
-import Blockchain.Constants
-import Blockchain.Data.BlockDB
-import Blockchain.Data.Extra
-import Blockchain.SHA
-import Blockchain.DB.SQLDB
-import Blockchain.IContext
-import Blockchain.IOptions
-import Blockchain.SemiPermanent
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
-import Blockchain.EthConf
-import Blockchain.Util
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Extra
+import           Blockchain.DB.SQLDB
+import           Blockchain.EthConf
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Kafka
+import           Blockchain.SHA
+import           Blockchain.Format
 
+import           Blockchain.Strato.Indexer.IContext
 
-import Data.Ord
-import Database.Persist.Sql
+import           Data.Ord
+import           Database.Persist.Sql
+
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 
 stratoIndex :: LoggingT IO ()
@@ -50,6 +49,9 @@ stratoIndex = runIContextM (fst kafkaClientIds) . forever $ do
         num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
         let (num', bid) = maximumBy (comparing fst) $ zip nums bids
         when (num' > num || num' == 0) $ putBestIndexBlockInfo bid
+        forM_ blocks $ \b -> do
+            $logInfoS "stratoIndex/redis" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
+            RBDB.withRedisBlockDB $ RBDB.putBlock b
     setKafkaCheckpoint nextOffset'
 
 targetTopicName :: TopicName

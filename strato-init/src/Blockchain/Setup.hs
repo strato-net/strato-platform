@@ -64,6 +64,8 @@ defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If
 defineFlag "stratoBootnode" ("" :: String) "Replaces the default set of public boot nodes with the provided ip address, considered as the address of a strato node"
 defineFlag "blockTime" (13 :: Integer) "Blocktime"
 defineFlag "minBlockDifficulty" (131072 :: Integer) "Minimum block difficulty"
+defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
+defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 
 data SetupDBs =
   SetupDBs {
@@ -165,8 +167,8 @@ defaultDiscoveryConfig =
 
 defaultRedisBlockDBConfig :: RedisBlockDBConf
 defaultRedisBlockDBConfig = RedisBlockDBConf {
-    redisHost           = "localhost",
-    redisPort           = 6379,
+    redisHost           = flags_redisHost,
+    redisPort           = flags_redisPort,
     redisAuth           = Nothing,
     redisDBNumber       = 0,
     redisMaxConnections = 10,
@@ -441,17 +443,19 @@ oneTimeSetup genesisBlockName = do
                         Just usr -> usr
 
           cfg = defaultConfig { 
-                  sqlConfig = defaultSqlConfig { 
-                    user = user'',
-                    host = fromMaybe "localhost" maybePGhost,
-                    password = fromMaybe "" maybePGpass
-                  },
-                  blockConfig = defaultBlockConfig{blockTime = flags_blockTime, minBlockDifficulty = flags_minBlockDifficulty},
-                  quarryConfig = defaultQuarryConfig{lazyBlocks = flags_lazyblocks}
+                    sqlConfig = defaultSqlConfig {
+                        user     = user'',
+                        host     = fromMaybe "localhost" maybePGhost,
+                        password = fromMaybe "" maybePGpass
+                    },
+                    blockConfig = defaultBlockConfig {
+                        blockTime          = flags_blockTime,
+                        minBlockDifficulty = flags_minBlockDifficulty
+                    },
+                    quarryConfig = defaultQuarryConfig {
+                        lazyBlocks = flags_lazyblocks
+                    }
                 }
-
-
-
 
      {- CONFIG: create database and write default config files, including strato-api -}
      

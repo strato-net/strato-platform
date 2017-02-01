@@ -45,10 +45,10 @@ library
                      , containers
                      , strato-conf
                      , strato-sequencer
-  exposed-modules: Executable.StratoIndex
-                   Blockchain.IOptions
-  other-modules: Blockchain.IContext
-                 Blockchain.SemiPermanent
+                     , hedis
+                     , strato-redis-blockdb
+  exposed-modules: Blockchain.Strato.Indexer.Main
+  other-modules:   Blockchain.Strato.Indexer.IContext
 
   default-language:    Haskell2010
 
