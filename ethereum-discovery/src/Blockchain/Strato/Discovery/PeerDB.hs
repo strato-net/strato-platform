@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, OverloadedStrings, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.PeerDB where
+module Blockchain.Strato.Discovery.PeerDB where
 
 import Control.Monad.Logger    (runNoLoggingT)
 import Data.Bits
@@ -12,11 +12,12 @@ import Data.Maybe
 import Data.Time.Clock
 import qualified Database.Persist.Postgresql as SQL
 
-import Blockchain.Data.Peer
 import Blockchain.EthConf
 import Blockchain.ExtWord
-import Blockchain.UDP
 import Blockchain.DB.SQLDB (createPostgresqlPool')
+
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.UDP
 
 getClosePeers::NodeID->IO [PPeer]
 getClosePeers target = do

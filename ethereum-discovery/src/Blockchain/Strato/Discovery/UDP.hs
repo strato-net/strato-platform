@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.UDP (
+module Blockchain.Strato.Discovery.UDP (
   dataToPacket,
   sendPacket,
   getServerPubKey,
@@ -42,13 +42,14 @@ import System.Endian
 import System.Timeout
     
 import qualified Blockchain.Colors as CL
-import Blockchain.Data.Peer
 import Blockchain.Data.RLP
 import Blockchain.ExtendedECDSA
 import Blockchain.ExtWord
 import Blockchain.Format
 import Blockchain.SHA
 import Blockchain.Util
+
+import Blockchain.Strato.Discovery.Data.Peer
 
 --import Debug.Trace
 
@@ -66,8 +67,7 @@ hPubKeyToPubKey pubKey =
     hPoint = H.pubKeyPoint pubKey
 
 encrypt::H.PrvKey->Word256->H.SecretT IO ExtendedSignature
-encrypt prvKey' theHash = do
-  extSignMsg theHash prvKey'
+encrypt = flip extSignMsg
 
 data RawNodeDiscoveryPacket =
   RawNDPacket SHA ExtendedSignature Integer RLPObject deriving (Show)

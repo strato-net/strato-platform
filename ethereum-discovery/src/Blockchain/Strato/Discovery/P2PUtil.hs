@@ -1,5 +1,5 @@
 
-module Blockchain.P2PUtil (
+module Blockchain.Strato.Discovery.P2PUtil (
   theCurve,
   hPubKeyToPubKey,
   ecdsaSign,
@@ -42,8 +42,7 @@ hPubKeyToPubKey pubKey = Point (fromIntegral x) (fromIntegral y)
      hPoint = H.pubKeyPoint pubKey
 
 ecdsaSign::H.PrvKey->Word256->H.SecretT IO ExtendedSignature
-ecdsaSign prvKey' theHash = do
-    extSignMsg theHash prvKey'    
+ecdsaSign = flip extSignMsg
 
 intToBytes::Integer->[Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
-module Blockchain.UDPServer (
+module Blockchain.Strato.Discovery.UDPServer (
       runEthUDPServer,
       connectMe,
       udpHandshakeServer
@@ -23,17 +23,17 @@ import qualified Data.Text as T
 import System.Entropy
 import System.Random
 
-import qualified Blockchain.Colors as CL
 import Blockchain.Data.PubKey
-import Blockchain.EthConf
+import qualified Blockchain.Colors as CL
+import           Blockchain.EthConf
 import           Blockchain.Format
-import           Blockchain.UDP
-import           Blockchain.SHA
-import           Blockchain.Data.Peer
 import           Blockchain.DB.SQLDB
-import           Blockchain.ContextLite
-import           Blockchain.P2PUtil
-import           Blockchain.PeerDB
+import           Blockchain.SHA
+import           Blockchain.Strato.Discovery.UDP
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.ContextLite
+import           Blockchain.Strato.Discovery.P2PUtil
+import           Blockchain.Strato.Discovery.PeerDB
                       
 import qualified Network.Haskoin.Internals as H
     

@@ -6,7 +6,7 @@ import Control.Monad
 import Control.Monad.Logger
 import Database.Persist.Postgresql
 
-import Blockchain.Data.Peer
+import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.EthConf
 
 setup:: Maybe [String] ->LoggingT IO ()

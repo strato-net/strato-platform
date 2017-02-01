@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances           #-}
 {-# LANGUAGE GADTs                          #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
-module Blockchain.ContextLite (
+module Blockchain.Strato.Discovery.ContextLite (
   ContextLite, -- (..),
   initContextLite,
   addPeer,
@@ -15,11 +15,10 @@ import Control.Monad.Trans.Resource
 
 import Blockchain.DBM
 import Blockchain.DB.SQLDB
-import Blockchain.Data.Peer
-
 import qualified Database.Persist.Postgresql as SQL
-
 import qualified Data.Text as T
+
+import Blockchain.Strato.Discovery.Data.Peer
 
 data ContextLite =
   ContextLite { liteSQLDB::SQLDB }
@@ -39,10 +38,7 @@ addPeer peer = do
   runResourceT $
     SQL.runSqlPool (actions maybePeer) db
   where actions mp = case mp of
-            Nothing -> do
-              peerid <- SQL.insert $ peer        
-              return peerid
-  
+            Nothing -> SQL.insert peer
             Just peer'-> do 
               SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]  
               return (SQL.entityKey peer')
