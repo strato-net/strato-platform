@@ -30,7 +30,7 @@ import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockOffset
 import Blockchain.Data.NewBlk
-import Blockchain.Data.Peer
+import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.DB.SQLDB

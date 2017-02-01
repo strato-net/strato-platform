@@ -1,9 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Hashimoto where
+module Blockchain.Strato.Mining.Ethash.Hashimoto where
 
 import Control.Monad
-import Constants
 import qualified Crypto.Hash.SHA3 as SHA3
 import qualified Data.Array.IO as MA
 import Data.Binary.Get
@@ -13,8 +12,9 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Word
 
-import Dataset
-import Util
+import Blockchain.Strato.Mining.Ethash.Constants
+import Blockchain.Strato.Mining.Ethash.Dataset
+import Blockchain.Strato.Mining.Ethash.Util
 
 --import Debug.Trace
 

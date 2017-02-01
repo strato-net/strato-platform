@@ -1,5 +1,5 @@
 
-module TimeIt where
+module Blockchain.Strato.Mining.Ethash.TimeIt where
 
 import Data.Time.Clock.POSIX
 

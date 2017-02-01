@@ -8,17 +8,12 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Internal
---import Data.Word
---import Foreign.Storable
 import Numeric
 import System.IO.MMap
 
-import TimeIt
-
---import Cache
-import Constants
---import Dataset
-import Hashimoto
+import Blockchain.Strato.Mining.Ethash.Constants
+import Blockchain.Strato.Mining.Ethash.Hashimoto
+import Blockchain.Strato.Mining.Ethash.TimeIt
 
 encodeWord8::Word8->String
 encodeWord8 c | c < 0x20 || c > 0x7e = "\\x" ++ showHex c ""
@@ -48,9 +43,8 @@ main = do
 
   let getItem' i = A.newListArray (0,15) $ word32Unpack $ B.take 64 $ B.drop (64 * fromIntegral i) s
 
-  timeIt $ do
-    forM_ [0..15000::Integer] $ \_ -> do 
-      (mixDigest, result) <- hashimoto block nonce fullSize' (getItem') -- getItem
+  timeIt . forM_ [0..15000::Integer] $ \_ -> do
+      (mixDigest, result) <- hashimoto block nonce fullSize' getItem' -- getItem
       putStrLn $ "mixDigest: " ++ encodeByteString mixDigest
       putStrLn $ "result: " ++ encodeByteString result
       return ()

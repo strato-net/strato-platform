@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude, OverloadedStrings #-}
 -- |
 -- Use the Integer encoding of bytes with a presumption that those store 256 bits.
 -- 

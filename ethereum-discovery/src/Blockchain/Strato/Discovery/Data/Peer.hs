@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
     
-module Blockchain.Data.Peer where
+module Blockchain.Strato.Discovery.Data.Peer where
 
 import Control.Monad.Logger
 import Crypto.Types.PubKey.ECC

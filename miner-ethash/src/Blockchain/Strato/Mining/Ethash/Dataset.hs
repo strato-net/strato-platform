@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections, FlexibleContexts #-}
 
-module Dataset (
+module Blockchain.Strato.Mining.Ethash.Dataset (
   Slice,
   calcDatasetItem
 --  calcDataset
@@ -8,16 +8,15 @@ module Dataset (
 
 import Control.Monad
 import qualified Crypto.Hash.SHA3 as SHA3
-import Constants
 import qualified Data.Array.Base as A
 import qualified Data.Array.IO as A
 import Data.Bits
 import Data.Word
 
-import Cache
-import Util
+import Blockchain.Strato.Mining.Ethash.Cache
+import Blockchain.Strato.Mining.Ethash.Constants
+import Blockchain.Strato.Mining.Ethash.Util
 
---import Debug.Trace
 
 type Slice = A.IOUArray Word32 Word32
 

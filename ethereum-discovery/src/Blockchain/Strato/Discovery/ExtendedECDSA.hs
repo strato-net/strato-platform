@@ -1,5 +1,5 @@
 
-module Blockchain.ExtendedECDSA (
+module Blockchain.Strato.Discovery.ExtendedECDSA (
   ExtendedSignature(..),
   extSignMsg,
   getPubKeyFromSignature 

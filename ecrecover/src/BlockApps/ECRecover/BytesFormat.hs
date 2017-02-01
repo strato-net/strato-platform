@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude, OverloadedStrings, LambdaCase #-}
 module BlockApps.ECRecover.BytesFormat
 where
 

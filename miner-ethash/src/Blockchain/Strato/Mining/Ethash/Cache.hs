@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Cache (
+module Blockchain.Strato.Mining.Ethash.Cache (
   Cache,
   mkCache,
   getCacheWidth
@@ -8,14 +8,14 @@ module Cache (
 
 import Control.Monad
 import qualified Crypto.Hash.SHA3 as SHA3
-import Constants
 import qualified Data.Array.Unboxed as A
 import qualified Data.Array.IO as MA
 import qualified Data.Array.IO.Internals as MA
 import qualified Data.ByteString as B
 import Data.Word
 
-import Util
+import Blockchain.Strato.Mining.Ethash.Constants
+import Blockchain.Strato.Mining.Ethash.Util
 
 type Cache = A.UArray (Word32, Word32) Word32
 

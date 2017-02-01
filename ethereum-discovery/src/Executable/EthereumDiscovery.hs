@@ -16,11 +16,12 @@ import qualified Network.Socket as S
 import qualified Network.Haskoin.Internals as H
     
 import qualified Blockchain.Colors as CL
-import Blockchain.ContextLite
 import Blockchain.Data.PubKey
 import Blockchain.EthConf
-import Blockchain.P2PUtil
-import Blockchain.UDPServer
+
+import Blockchain.Strato.Discovery.ContextLite
+import Blockchain.Strato.Discovery.P2PUtil
+import Blockchain.Strato.Discovery.UDPServer
 
 privateKey :: H.PrvKey
 privateKey = fromMaybe (error "Bad value for hardcoded private key in ethconf.yaml") $ H.makePrvKey $ unPrivKey $ privKey ethConf

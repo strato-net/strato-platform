@@ -25,7 +25,6 @@ import qualified Network.Haskoin.Internals as H
 import System.Random
 
 import Blockchain.Frame
-import Blockchain.UDP
 import Blockchain.RLPx
 
 import Blockchain.BlockNotify
@@ -34,7 +33,6 @@ import Blockchain.Constants
 import Blockchain.Context
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
-import Blockchain.Data.Peer
 import Blockchain.Data.RLP
 import Blockchain.Data.Wire
 import Blockchain.DB.DetailsDB
@@ -61,6 +59,8 @@ import Data.Maybe
 import qualified Database.Redis                 as Redis
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.UDP
 
 awaitMsg::MonadIO m=>
           ConduitM Event Message m (Maybe Message)
