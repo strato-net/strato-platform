@@ -5,9 +5,11 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB
-    ( getHeader, getHeadersByNumber
+    ( getHeader, getHeaders
+    , getHeadersByNumber
     , getTransactions, getUncles
-    , getBlock, getBlocksByNumber
+    , getBlock, getBlocks
+    , getBlocksByNumber, getBlocksByNumbers
     , getParent, getChildren
     , putHeader, putBlock
     , HasRedisBlockDB(..), withRedisBlockDB
@@ -22,6 +24,9 @@ import           Data.Maybe                            (fromJust, isNothing)
 import           Control.Monad
 import           Control.Monad.Trans
 import           Database.Redis
+
+zipM' :: (Monad m) => (a -> m b) -> [a] -> m [(a, b)]
+zipM' f = mapM (\x -> (,) x <$> f x)
 
 class (Monad m) => HasRedisBlockDB m where
     getRedisBlockDB :: m Connection
@@ -53,6 +58,9 @@ getHeader sha = getInNamespace Headers sha >>= \case
         Right Nothing      -> return Nothing
         Right (Just rhead) -> let (RedisHeader h) = fromValue rhead in
             return . Just $ morphBlockHeader h
+
+getHeaders :: BlockHeaderLike h => [SHA] -> Redis [(SHA, Maybe h)]
+getHeaders = zipM' getHeader
 
 getHeadersByNumber :: Integer -> Redis (Maybe [SHA])
 getHeadersByNumber n = getMembersInNamespace Numbers n >>= \case
@@ -87,8 +95,14 @@ getChildren sha = getMembersInNamespace Children sha >>= \case
         Right chs          -> let children = fromValue <$> chs in
             return (Just children)
 
-getBlocksByNumber :: BlockLike h t b => Integer -> Redis (Maybe [b])
-getBlocksByNumber = undefined
+getBlocksByNumber :: (BlockLike h t b) => Integer -> Redis [(SHA, Maybe b)]
+getBlocksByNumber n = getMembersInNamespace Numbers n >>= \case
+        Left _       -> return []
+        Right hashes -> getBlocks (fromValue <$> hashes)
+
+
+getBlocksByNumbers :: (BlockLike h t b) => [Integer] -> Redis [(Integer, [(SHA, Maybe b)])]
+getBlocksByNumbers = zipM' getBlocksByNumber
 
 getBlock :: BlockLike h t b => SHA -> Redis (Maybe b)
 getBlock sha = do
@@ -107,6 +121,9 @@ getBlock sha = do
                      txs    = fromJust mybTxs
                      uncles = fromJust mybUncles
                  in return . Just $ buildBlock header txs uncles
+
+getBlocks :: BlockLike h t b => [SHA] -> Redis [(SHA, Maybe b)]
+getBlocks = zipM' getBlock
 
 putHeader :: (BlockHeaderLike h) => h -> Redis (Either Reply Status)
 putHeader h = do

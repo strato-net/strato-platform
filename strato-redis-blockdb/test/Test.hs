@@ -39,11 +39,11 @@ withConn = bracket openConn closeConn
 specTest :: Spec
 specTest = around withConn $ describe "BlockData" $ do
     it "Should not have a header for SHA 0" $ \c -> do
-        r <- runRedis c $ (RDB.getHeader $ SHA 0 :: Redis (Maybe BlockData))
+        r <- runRedis c (RDB.getHeader $ SHA 0 :: Redis (Maybe BlockData))
         HUnit.assertBool "Found header for SHA 0" $ isNothing r
 
     it "Should not have a block for SHA 0" $ \c -> do
-        r <- runRedis c $ (RDB.getBlock $ SHA 0 :: Redis (Maybe Block))
+        r <- runRedis c (RDB.getBlock $ SHA 0 :: Redis (Maybe Block))
         HUnit.assertBool "Found block for SHA 0" $ isNothing r
 
     it "Should put and get a header" $ \c -> do
