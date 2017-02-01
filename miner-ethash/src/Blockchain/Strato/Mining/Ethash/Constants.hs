@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC  -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 
-module Constants where
+module Blockchain.Strato.Mining.Ethash.Constants where
 
 import Math.NumberTheory.Primes.Testing
 import Data.List

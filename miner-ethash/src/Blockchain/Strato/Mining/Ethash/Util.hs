@@ -1,5 +1,5 @@
 
-module Util (
+module Blockchain.Strato.Mining.Ethash.Util (
   xorBS,
   fnv,
   shatter,
