@@ -81,7 +81,7 @@ specTest = around withConn $ describe "BlockData" $ do
         HUnit.assertEqual
             ("Couldn't recover tranasctions from block with hash: " ++ format theHash) 
             txCount r
-
+    
     it "Should put a block and get its uncles" $ \c -> do
         b <- generate arbitrary :: IO Block 
         let theHash = blockHash b
@@ -98,7 +98,7 @@ specTest = around withConn $ describe "BlockData" $ do
             ("Couldn't recover uncles from block with hash: " ++ format theHash)
             uCount r
 
---     it "Should put a block with parent and get back the parent" $ \c -> do
+   --     it "Should put a block with parent and get back the parent" $ \c -> do
 --         b <- generate arbitrary :: IO Block 
 --         let theHash = blockHash b
 --         r <- runRedis c $ do
