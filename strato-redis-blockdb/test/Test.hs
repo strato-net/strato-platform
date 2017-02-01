@@ -3,6 +3,7 @@ module Main (main) where
 import           Control.Exception (bracket)
 import           Data.Maybe
 import           Control.Monad
+import           Control.Monad.IO.Class
 import qualified Test.HUnit as HUnit
 import           Database.Redis
 import           Test.Hspec
@@ -10,8 +11,10 @@ import           Test.QuickCheck
 
 import qualified Blockchain.Strato.RedisBlockDB as RDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Transaction
 import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.Class
 import           Blockchain.Format
 
 ------------------------------------------------------------------------------
@@ -64,3 +67,34 @@ specTest = around withConn $ describe "BlockData" $ do
             b' <- RDB.getBlock theHash :: Redis (Maybe Block)
             return $ isJust b'
         HUnit.assertBool ("Couldn't recover block after put for hash: " ++ format theHash) r
+
+    it "Should put a block and get its transactions" $ \c -> do
+        b <- generate arbitrary :: IO Block 
+        let theHash = blockHash b
+        let txCount = length $ blockTransactions b
+        r <- runRedis c $ do
+            void $ RDB.putBlock b
+            ts <- RDB.getTransactions theHash :: Redis (Maybe [Transaction])
+            return $ case ts of
+                Nothing -> -1
+                Just tss -> length tss
+        HUnit.assertEqual
+            ("Couldn't recover tranasctions from block with hash: " ++ format theHash) 
+            txCount r
+
+    it "Should put a block and get its uncles" $ \c -> do
+        b <- generate arbitrary :: IO Block 
+        let theHash = blockHash b
+        let uCount = length $ blockUncleHeaders b
+        liftIO $ putStrLn $ "Uncles put: " ++ show uCount
+        r <- runRedis c $ do
+            void $ RDB.putBlock b
+            ts <- RDB.getUncles theHash :: Redis (Maybe [BlockData])
+            return $ case ts of
+                Nothing -> -1
+                Just tss -> length tss
+        liftIO $ putStrLn $ "Uncles got: " ++ show r 
+        HUnit.assertEqual
+            ("Couldn't recover uncles from block with hash: " ++ format theHash)
+            uCount r
+

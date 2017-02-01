@@ -109,4 +109,3 @@ putBlock b = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")  
         TxError e   -> pure . Left $ SingleLine (S8.pack e) 
-
