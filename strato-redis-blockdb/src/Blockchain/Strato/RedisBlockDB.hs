@@ -22,6 +22,7 @@ import           Blockchain.Strato.RedisBlockDB.Models as Models
 
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Maybe                            (fromJust, isJust, isNothing)
+import           Control.Arrow                         (second)
 import           Control.Monad
 import           Control.Monad.Trans
 import           Database.Redis
@@ -74,8 +75,8 @@ getMembersInNamespace ns = smembers . inNamespace ns
 getSHAsByNumber :: Integer
                 -> Redis (Maybe [SHA])
 getSHAsByNumber n = getMembersInNamespace Numbers n >>= \case
-    Left _             -> return Nothing
-    Right hs           -> let hashes = fromValue <$> hs in
+    Left _   -> return Nothing
+    Right hs -> let hashes = fromValue <$> hs in
         return (Just hashes)
 
 getHeader :: BlockHeaderLike h
@@ -108,26 +109,26 @@ getTransactions :: TransactionLike t
                 => SHA
                 -> Redis (Maybe [t])
 getTransactions sha = getInNamespace Transactions sha >>= \case
-    Left _             -> return Nothing
-    Right Nothing      -> return Nothing
-    Right (Just rtxs)  -> let (RedisTxs txs) = fromValue rtxs in
+    Left _            -> return Nothing
+    Right Nothing     -> return Nothing
+    Right (Just rtxs) -> let (RedisTxs txs) = fromValue rtxs in
         return . Just $ morphTx <$> txs
 
 getUncles :: BlockHeaderLike h
           => SHA
           -> Redis (Maybe [h])
 getUncles sha = getInNamespace Uncles sha >>= \case
-    Left _             -> return Nothing
-    Right Nothing      -> return Nothing
-    Right (Just rus)   -> let (RedisUncles uncles) = fromValue rus in
+    Left _           -> return Nothing
+    Right Nothing    -> return Nothing
+    Right (Just rus) -> let (RedisUncles uncles) = fromValue rus in
         return . Just $ morphBlockHeader <$> uncles
 
 getParent :: SHA
           -> Redis (Maybe SHA)
 getParent sha = getInNamespace Parent sha >>= \case
-    Left _             -> return Nothing
-    Right Nothing      -> return Nothing
-    Right (Just rps)   -> return . Just $ fromValue rps
+    Left _           -> return Nothing
+    Right Nothing    -> return Nothing
+    Right (Just rps) -> return . Just $ fromValue rps
 
 getParents :: (Traversable f)
            => f SHA
@@ -142,29 +143,29 @@ getParentChain start limit = (start:) <$> helper start limit
                      | otherwise = getParent h >>= maybe (return []) chainDown
           chainDown parent = (parent:) <$> helper parent (limit - 1)
 
-getZippedParentChain :: (SHA -> Redis (Maybe t)) -> SHA -> Int -> Redis [(SHA, Maybe t)]
+getZippedParentChain :: (SHA -> Redis (Maybe t)) -> SHA -> Int -> Redis [(SHA, t)]
 getZippedParentChain mapper start limit = do
     shaChain <- getParentChain start limit
     mapChain <- zipM' mapper shaChain
-    return $ takeWhile (isJust . snd) mapChain
+    return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
 getHeaderChain :: (BlockHeaderLike h)
                => SHA
                -> Int
-               -> Redis [(SHA, Maybe h)]
+               -> Redis [(SHA, h)]
 getHeaderChain = getZippedParentChain getHeader
 
 getBlockChain :: (BlockLike h t b)
               => SHA
               -> Int
-              -> Redis [(SHA, Maybe b)]
+              -> Redis [(SHA, b)]
 getBlockChain = getZippedParentChain getBlock
 
 getChildren :: SHA
             -> Redis (Maybe [SHA])
 getChildren sha = getMembersInNamespace Children sha >>= \case
-    Left _             -> return Nothing
-    Right chs          -> return . Just $ fromValue <$> chs
+    Left _    -> return Nothing
+    Right chs -> return . Just $ fromValue <$> chs
 
 getBlock :: BlockLike h t b
          => SHA
