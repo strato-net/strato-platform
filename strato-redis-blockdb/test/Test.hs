@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell, Rank2Types #-}
+
 module Main (main) where
 
 import           Control.Exception (bracket)
@@ -8,6 +10,7 @@ import qualified Test.HUnit as HUnit
 import           Database.Redis
 import           Test.Hspec
 import           Test.QuickCheck
+import           Lens.Micro
 
 import qualified Blockchain.Strato.RedisBlockDB as RDB
 import           Blockchain.Data.BlockDB
@@ -16,6 +19,15 @@ import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Format
+
+parentHashL :: Lens' BlockData SHA
+parentHashL = lens blockDataParentHash (\b newPH -> b { blockDataParentHash = newPH })
+
+blockDataL :: Lens' Block BlockData
+blockDataL = lens blockBlockData (\b newBlockData -> b { blockBlockData = newBlockData })
+
+--blockParentHashL :: Lens' Block SHA
+--blockParentHashL = lens blockParentHash (\b newPH -> b { blockParentHash = newPH })
 
 ------------------------------------------------------------------------------
 -- Main and helpers
@@ -35,9 +47,6 @@ closeConn _ = return ()
 
 withConn :: (Connection -> IO ()) -> IO ()
 withConn = bracket openConn closeConn 
-
---makeParent :: BlockHeaderLike h => h -> h -> h
---makeParent p c = c { blockHeaderParentHash = headerHash p} 
 
 specTest :: Spec
 specTest = around withConn $ describe "BlockData" $ do
@@ -62,7 +71,7 @@ specTest = around withConn $ describe "BlockData" $ do
         p <- generate arbitrary :: IO BlockData
         let pHash = blockHeaderHash p
         c <- generate arbitrary :: IO BlockData
-        let c' = c --{blockHeaderParentHash = blockHeaderHash p}
+        let c' = over parentHashL (const $ blockHeaderHash p) c 
         let cHash = blockHeaderParentHash c'  
         _ <- runRedis conn $ do
             return False
@@ -109,14 +118,16 @@ specTest = around withConn $ describe "BlockData" $ do
             ("Couldn't recover uncles from block with hash: " ++ format theHash)
             uCount r
 
-    it "Should put a block with parent and get back the parent" $ \c -> do
-        b1 <- generate arbitrary :: IO Block
-        --b2 <- generate arbitrary :: IO Block
-        let theHash = blockHash b1
-        r <- runRedis c $ do
-            void $ RDB.putBlock b1
-            p  <- RDB.getParent theHash :: Redis (Maybe SHA)
-            case p of
+    it "Should put a block with parent and get back the parent" $ \conn -> do
+        p <- generate arbitrary :: IO Block
+        let theHash = blockHash p
+        c <- generate arbitrary :: IO Block
+        let c' = over (blockDataL . parentHashL) (const $ blockHash p) c
+        let cHash = blockDataParentHash $ blockBlockData c'
+        r <- runRedis conn $ do
+            void $ RDB.putBlock p 
+            ph  <- RDB.getParent theHash :: Redis (Maybe SHA)
+            case ph of
                 Nothing -> undefined
                 Just pp -> do
                     pb <- RDB.getBlock pp :: Redis (Maybe Block)
@@ -126,6 +137,6 @@ specTest = around withConn $ describe "BlockData" $ do
         liftIO $ putStrLn $ "Uncles got: " ++ show r 
         HUnit.assertEqual
             ("Couldn't recover parent from block with hash: " ++ format theHash)
-            (SHA 1) r
+            cHash r
 
     it "Should get chain of parent" $ const pending
