@@ -18,6 +18,7 @@ import GHC.Generics
 import qualified Hasql.Decoders as Decoders
 import qualified Hasql.Encoders as Encoders
 import Servant.API
+import Servant.Client
 import Servant.Docs
 import qualified Network.HTTP.Media as M
 import Test.QuickCheck
@@ -79,3 +80,6 @@ addressDecoder = stringAddress . Char8.unpack <$> Decoders.bytea
 
 addressEncoder :: Encoders.Value Address
 addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
+
+urlTesterBloc :: BaseUrl
+urlTesterBloc = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"

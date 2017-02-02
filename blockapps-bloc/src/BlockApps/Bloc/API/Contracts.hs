@@ -18,11 +18,12 @@ import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import Data.Functor.Contravariant
+import Data.Int
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
-import Data.Time
+-- import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -38,6 +39,8 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
+-- import BlockApps.Strato.API.Client
+-- import BlockApps.Strato.Types hiding (Contract)
 
 class Monad m => MonadContracts m where
   getContracts :: m Contracts
@@ -237,14 +240,19 @@ instance MonadContracts Bloc where
   --     sqlString =
   --       ""
   --     sqlStatement = statement sqlString encoder decoder True
-  --   resps <- for reqs $ \PostCompileRequest{..} -> do
-  --     runClientM
-
+  --   for reqs $ \ PostCompileRequest
+  --     { postcompilerequestSearchable = searchable
+  --     , postcompilerequestContractName = contractName
+  --     , postcompilerequestSource = source
+  --     } -> do
+  --       (xabi,comp) <- liftIO $ flip runClientM (ClientEnv mgr url) $
+  --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  --       return $ PostCompileResponse contractName _hash
 
 type GetContracts = "contracts" :> Get '[JSON] Contracts
 data Contract = Contract
-  { createdAt :: UTCTime
-  , address :: Address
+  { createdAt :: Int64
+  , address :: MaybeNamed Address
   } deriving (Eq, Show, Generic)
 instance ToJSON Contract
 instance FromJSON Contract
@@ -261,12 +269,12 @@ instance Arbitrary Contracts where arbitrary = genericArbitrary
 instance ToSample Contracts where
   toSamples _ = singleSample $ Contracts
     [ Contract
-      { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
-      , createdAt = UTCTime (ModifiedJulianDay 100) 0
+      { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
+      , createdAt = 100
       }
     , Contract
-      { address = Address 0xdeadbeef
-      , createdAt = UTCTime (ModifiedJulianDay 101) 0
+      { address = Named "Addressed"
+      , createdAt = 101
       }
     ]
 
@@ -349,7 +357,7 @@ instance ToSample PostCompileRequest where
   toSamples _ = noSamples
 data PostCompileResponse = PostCompileResponse
   { postcompileresponseContractName :: String
-  , postcompileresponseCodeHash :: String
+  , postcompileresponseCodeHash :: Keccak256
   } deriving (Eq,Show,Generic)
 instance ToJSON PostCompileResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -374,8 +382,15 @@ instance FromHttpApiData SymbolName where
 
 contractDecoder :: Decoders.Row (Maybe Contract)
 contractDecoder = contractMaybe
-  <$> Decoders.value Decoders.timestamptz
+  <$> Decoders.value Decoders.int8
   <*> Decoders.value addressDecoder
   where
     contractMaybe _time Nothing = Nothing
     contractMaybe time (Just addr) = Just $ Contract time addr
+
+data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
+instance ToJSON a => ToJSON (MaybeNamed a) where
+  toJSON (Named name) = toJSON name
+  toJSON (Unnamed a) = toJSON a
+instance FromJSON a => FromJSON (MaybeNamed a) where
+  parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
