@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase, ScopedTypeVariables #-}
 
 module Blockchain.Event (
   Event(..),
@@ -44,6 +44,7 @@ import Blockchain.EthConf (runKafkaConfigured)
 
 import Blockchain.Util (getCurrentMicrotime)
 
+import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 import Debug.Trace (trace)
@@ -137,7 +138,14 @@ handleEvents mode peer = awaitForever $ \case
         Reverse -> do
             headers <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain start max'
             yield . BlockHeaders . skipEntries skip' $ snd <$> headers
-        Forward -> yield $ BlockHeaders [] -- todo
+        Forward -> do
+            maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
+            case maybeHeader of
+                Nothing -> yield (BlockBodies [])
+                Just head' -> do
+                    let num = blockHeaderBlockNumber head'
+                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain num max'
+                    yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         clearActionTimestamp

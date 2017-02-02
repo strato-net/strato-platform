@@ -11,6 +11,7 @@ module Blockchain.Strato.RedisBlockDB
     , getTransactions, getUncles
     , getParent, getParents
     , getParentChain, getHeaderChain, getBlockChain
+    , getCanonicalHeader, getCanonicalHeaderChain
     , getChildren
     , putHeader, putHeaders, putBlock, putBlocks
     , HasRedisBlockDB(..), withRedisBlockDB
@@ -160,6 +161,19 @@ getBlockChain :: (BlockLike h t b)
               -> Int
               -> Redis [(SHA, b)]
 getBlockChain = getZippedParentChain getBlock
+
+getCanonicalHeader :: (BlockHeaderLike h)
+                   => Integer
+                   -> Int
+                   -> Redis (Maybe h)
+getCanonicalHeader = undefined
+
+getCanonicalHeaderChain :: (BlockHeaderLike h)
+                        => Integer
+                        -> Int
+                        -> Redis [(SHA, h)]
+getCanonicalHeaderChain = undefined
+
 
 getChildren :: SHA
             -> Redis (Maybe [SHA])
