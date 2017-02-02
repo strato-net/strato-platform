@@ -144,16 +144,20 @@ putHeader h = do
 
 putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t) => b -> Redis (Either Reply Status)
 putBlock b = do
-    let sha    = blockHash b
-        number = blockHeaderBlockNumber (blockHeader b)
-        header = morphBlockHeader (blockHeader b) :: RedisHeader
-        txs    = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
-        uncles = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
-        inNS'  = flip inNamespace sha
+    let sha     = blockHash b
+        header  = blockHeader b
+        number  = blockHeaderBlockNumber header
+        parent  = blockHeaderParentHash header
+        header' = morphBlockHeader header :: RedisHeader
+        txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
+        uncles  = RedisUncles (morphBlockHeader <$> blockUncleHeaders b)
+        inNS'   = flip inNamespace sha
     res <- multiExec $ do
-        void $ setnx (inNS' Headers) (toValue header)
+        void $ setnx (inNS' Headers) (toValue header')
         void $ setnx (inNS' Transactions) (toValue txs)
         void $ setnx (inNS' Uncles) (toValue uncles)
+        void $ setnx (inNS' Parent) (toValue parent)
+        void $ sadd (inNamespace Children parent) [toKey sha]
         sadd (inNamespace Numbers number) [toKey sha]
         --forM_ uncles -- todo index the uncles' headers/numbers/etc?
     case res of
