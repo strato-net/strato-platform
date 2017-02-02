@@ -42,8 +42,6 @@ type BlocAPI =
   :<|> PostUsersContractMethodList
   -- /address endpoints
   :<|> GetAddresses
-  :<|> GetAddressesPending
-  :<|> GetAddressesPendingRemove
   -- /contracts endpoints
   :<|> GetContracts
   :<|> GetContractsData
@@ -80,8 +78,6 @@ bloc =
   :<|> postUsersSendList
   :<|> postUsersContractMethodList
   :<|> getAddresses
-  :<|> getAddressesPending
-  :<|> getAddressesPendingRemove
   :<|> getContracts
   :<|> getContractsData
   :<|> getContractsContract

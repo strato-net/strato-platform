@@ -12,8 +12,6 @@ module BlockApps.Bloc.API.Addresses where
 
 import Control.Monad.Except
 import Control.Monad.Reader
-import qualified Data.ByteString.Char8 as Char8
-import Data.Functor.Contravariant
 import Data.Maybe
 import Data.Proxy
 import qualified Hasql.Decoders as Decoders
@@ -22,7 +20,6 @@ import Hasql.Query
 import Hasql.Session
 import Servant.API
 import Servant.Client
-import Servant.Docs
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
@@ -30,12 +27,8 @@ import BlockApps.Data
 
 class Monad m => MonadAddresses m where
   getAddresses :: m [Address]
-  getAddressesPending :: Address -> m NoContent
-  getAddressesPendingRemove :: Address -> Int -> m NoContent
 instance MonadAddresses ClientM where
   getAddresses = client (Proxy @ GetAddresses)
-  getAddressesPending = client (Proxy @ GetAddressesPending)
-  getAddressesPendingRemove = client (Proxy @ GetAddressesPendingRemove)
 instance MonadAddresses Bloc where
   getAddresses = do
     conn <- asks dbConnection
@@ -49,29 +42,5 @@ instance MonadAddresses Bloc where
     case addressesEither of
       Left err -> throwError $ DBError err
       Right addresses -> return (catMaybes addresses)
-  getAddressesPending = undefined
-  getAddressesPendingRemove = undefined
 
 type GetAddresses = "addresses" :> Get '[HTMLifiedJSON] [Address]
-
--- GET /addresses/:address/pending
-type GetAddressesPending = "addresses"
-  :> Capture "address" Address
-  :> "pending"
-  :> Get '[JSON] NoContent
-
--- GET /addresses/:address/pending/remove/:time
-type GetAddressesPendingRemove = "addresses"
-  :> Capture "address" Address
-  :> "pending"
-  :> "remove"
-  :> Capture "time" Int
-  :> Get '[JSON] NoContent
-instance ToCapture (Capture "time" Int) where
-  toCapture _ = DocCapture "time" "a unix timestamp"
-
-addressDecoder :: Decoders.Value (Maybe Address)
-addressDecoder = stringAddress . Char8.unpack <$> Decoders.bytea
-
-addressEncoder :: Encoders.Value Address
-addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea

@@ -31,7 +31,6 @@ import Servant.Docs
 import Test.QuickCheck
 import Web.FormUrlEncoded
 
-import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data

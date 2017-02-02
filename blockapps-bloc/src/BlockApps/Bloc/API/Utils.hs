@@ -10,9 +10,13 @@
 module BlockApps.Bloc.API.Utils where
 
 import Data.Aeson
+import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+import Data.Functor.Contravariant
 import Data.Text (Text)
 import GHC.Generics
+import qualified Hasql.Decoders as Decoders
+import qualified Hasql.Encoders as Encoders
 import Servant.API
 import Servant.Docs
 import qualified Network.HTTP.Media as M
@@ -69,3 +73,9 @@ instance FromJSON x => MimeUnrender OctetStream x where
   mimeUnrender _ = eitherDecode
 instance ToJSON x => MimeRender OctetStream x where
   mimeRender _ = encode
+
+addressDecoder :: Decoders.Value (Maybe Address)
+addressDecoder = stringAddress . Char8.unpack <$> Decoders.bytea
+
+addressEncoder :: Encoders.Value Address
+addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
