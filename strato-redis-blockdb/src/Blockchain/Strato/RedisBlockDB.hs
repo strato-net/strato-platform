@@ -61,6 +61,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             Uncles       -> "u:"
             Parent       -> "p:"
             Children     -> "c:"
+            Canonical    -> "q:"
 
 getInNamespace :: BlockDBNamespace
                -> SHA

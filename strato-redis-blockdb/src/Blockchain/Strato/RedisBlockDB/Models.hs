@@ -11,7 +11,7 @@ import qualified Blockchain.Data.Transaction          as TXD
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
-data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Parent | Children
+data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Parent | Children | Canonical
     deriving (Eq, Read, Show)
 
 class RedisDBKeyable k where
