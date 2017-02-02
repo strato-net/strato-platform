@@ -74,6 +74,7 @@ library
                  , ansi-wl-pprint
                  , strato-conf
                  , strato-sequencer
+                 , strato-model
                  , strato-redis-blockdb
                  , hedis
 
