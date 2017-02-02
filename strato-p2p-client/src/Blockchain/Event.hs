@@ -13,14 +13,11 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.State
 import Data.Conduit
-import Data.List
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
 import Network.Kafka.Protocol (Offset)
-
-import Control.Arrow ((&&&))
 
 import Blockchain.Colors
 import Blockchain.Context
@@ -61,8 +58,18 @@ setTitleAndProduceBlocks blocks = do
     unless (null newBlocks) $ do
         liftIO . setTitle $ "Block #" ++ show (maximum $ map (blockDataNumber . blockBlockData) newBlocks)
         void . produceVMEvents $ map ChainBlock newBlocks
-
     return $ length newBlocks
+
+-- drop every n-th element from the list
+-- e.g. skipEntries 0 [1..20] => [1..20]
+--      skipEntries 1 [1..20] => [1,3,5,7,9,11,13,15,17,19]
+--      skipEntries 2 [1..20] => [1,4,7,10,13,16,19]
+--      skipEntries 3 [1..20] => [1,5,9,13,17]
+skipEntries :: Int -> [a] -> [a]
+skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
+    where helper xs' = case drop n xs' of
+                           (y:ys) -> y : helper ys
+                           [] -> []
 
 -- todo: seriously???
 fetchLimit :: Offset
@@ -125,23 +132,12 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (NewBlockHashes _) -> syncFetch
 
-    MsgEvt (GetBlockHeaders start max' 0 Forward) -> do
-        blockOffsets <-
-            case start of
-                BlockNumber n -> lift $ fmap (map blockOffsetOffset) $ getBlockOffsetsForNumber $ fromIntegral n
-                BlockHash h -> lift $ getOffsetsForHashes [h]
-        logInfoN $ T.pack $ "blockOffsets: " ++ show blockOffsets
-        blocks <-
-            case blockOffsets of
-                [] -> return []
-                (blockOffset:_) -> do
-                    vmEvents <- liftIO $ fromMaybe [] <$> fetchVMEventsIO (fromIntegral blockOffset)
-                    return [b | ChainBlock b <- vmEvents]
-        let blocksWithHashes = (blockHash &&& id) <$>  blocks
-        existingHashes <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ map fst blocksWithHashes
-        let existingBlocks = snd <$> filter ((`elem` existingHashes) . fst) blocksWithHashes
-        yield . BlockHeaders . nub . map blockToBlockHeader  . take max' $ existingBlocks
-        return ()
+    MsgEvt (GetBlockHeaders (BlockNumber _) _ _ _) -> yield $ BlockHeaders [] -- todo
+    MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> case dir of
+        Reverse -> do
+            headers <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain start max'
+            yield . BlockHeaders . skipEntries skip' $ snd <$> headers
+        Forward -> yield $ BlockHeaders [] -- todo
 
     MsgEvt (BlockHeaders headers) -> do
         clearActionTimestamp
