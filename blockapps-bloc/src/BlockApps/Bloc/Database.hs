@@ -86,8 +86,8 @@ xabiFunctionsTable =
     \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metatdata(id)\
   \);"
 
-xabiFunctionArguments :: ByteString
-xabiFunctionArguments =
+xabiFunctionArgumentsTable :: ByteString
+xabiFunctionArgumentsTable =
   "CREATE TABLE xabi_function_arguments(\
     \id serial PRIMARY KEY,\
     \function_id NOT NULL REFERENCES xabi_functions(id),\
@@ -98,8 +98,8 @@ xabiFunctionArguments =
     \FOREIGN KEY (type_id) REFERENCES xabi_types(id)\
   \);"
 
-xabiFunctionValues :: ByteString
-xabiFunctionValues =
+xabiFunctionValuesTable :: ByteString
+xabiFunctionValuesTable =
   "CREATE TABLE xabi_function_values(\
     \id serial PRIMART KEY,\
     \function_id NOT NULL REFERENCES xabi_functions(id),\
@@ -109,8 +109,8 @@ xabiFunctionValues =
     \FOREIGN KEY (type_id) REFERENCES xabi_types(id)\
   \);"
 
-xabiTypes :: ByteString
-xabiTypes =
+xabiTypesTable :: ByteString
+xabiTypesTable =
   "CREATE TABLE xabi_types(\
     \id serial PRIMARY KEY,\
     \type varchar(50) NOT NULL,\
