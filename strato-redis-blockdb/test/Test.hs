@@ -1,4 +1,6 @@
-{-# LANGUAGE TemplateHaskell, Rank2Types #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module Main (main) where
 
@@ -10,7 +12,7 @@ import qualified Test.HUnit as HUnit
 import           Database.Redis
 import           Test.Hspec
 import           Test.QuickCheck
-import           Lens.Micro
+import           Lens.Family2
 
 import qualified Blockchain.Strato.RedisBlockDB as RDB
 import           Blockchain.Data.BlockDB
@@ -19,25 +21,13 @@ import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Format
-
-parentHashL :: Lens' BlockData SHA
-parentHashL = lens blockDataParentHash (\b newPH -> b { blockDataParentHash = newPH })
-
-blockDataL :: Lens' Block BlockData
-blockDataL = lens blockBlockData (\b newBlockData -> b { blockBlockData = newBlockData })
-
---blockParentHashL :: Lens' Block SHA
---blockParentHashL = lens blockParentHash (\b newPH -> b { blockParentHash = newPH })
+import           TestChain
 
 ------------------------------------------------------------------------------
 -- Main and helpers
 --
 main :: IO ()
 main = hspec specTest
-
-------------------------------------------------------------------------------
--- Tests
---
 
 openConn :: IO Connection
 openConn = connect defaultConnectInfo
@@ -48,6 +38,9 @@ closeConn _ = return ()
 withConn :: (Connection -> IO ()) -> IO ()
 withConn = bracket openConn closeConn 
 
+-----------------------------------------------------------------------------
+-- Tests
+--
 specTest :: Spec
 specTest = around withConn $ describe "BlockData" $ do
     it "Should not have a header for SHA 0" $ \c -> do
@@ -71,13 +64,15 @@ specTest = around withConn $ describe "BlockData" $ do
         p <- generate arbitrary :: IO BlockData
         let pHash = blockHeaderHash p
         c <- generate arbitrary :: IO BlockData
-        let c' = over parentHashL (const $ blockHeaderHash p) c 
+        let c' = over _blockDataParentHash (const $ blockHeaderHash p) c 
         let cHash = blockHeaderParentHash c'  
-        _ <- runRedis conn $ do
-            return False
+        p' <- runRedis conn $ do
+            void $ RDB.putHeader p
+            void $ RDB.putHeader c'
+            RDB.getParent (blockHeaderHash c') :: Redis (Maybe SHA)
         HUnit.assertEqual
             ("Couldn' match parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
-            pHash cHash
+            (Just pHash) p'
 
     it "Should put and get a block" $ \c -> do
         b <- generate arbitrary :: IO Block
@@ -122,21 +117,18 @@ specTest = around withConn $ describe "BlockData" $ do
         p <- generate arbitrary :: IO Block
         let theHash = blockHash p
         c <- generate arbitrary :: IO Block
-        let c' = over (blockDataL . parentHashL) (const $ blockHash p) c
+        let c' = over (_blockBlockData . _blockDataParentHash) (const $ blockHash p) c
         let cHash = blockDataParentHash $ blockBlockData c'
         r <- runRedis conn $ do
-            void $ RDB.putBlock p 
-            ph  <- RDB.getParent theHash :: Redis (Maybe SHA)
-            case ph of
+            void $ RDB.putBlock p
+            void $ RDB.putBlock c'
+            cph  <- RDB.getParent theHash :: Redis (Maybe SHA)
+            case cph of
                 Nothing -> undefined
-                Just pp -> do
-                    pb <- RDB.getBlock pp :: Redis (Maybe Block)
-                    return $ case pb of
-                        Nothing -> SHA 0
-                        Just ppp -> blockHash ppp
+                Just pp -> RDB.getBlock pp :: Redis (Maybe Block)
         liftIO $ putStrLn $ "Uncles got: " ++ show r 
         HUnit.assertEqual
-            ("Couldn't recover parent from block with hash: " ++ format theHash)
-            cHash r
+            ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format theHash)
+            (Just cHash) (blockHash <$> r)
 
     it "Should get chain of parent" $ const pending
