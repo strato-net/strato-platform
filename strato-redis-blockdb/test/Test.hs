@@ -131,12 +131,15 @@ specTest = around withConn $ describe "BlockData" $ do
             ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format theHash)
             (Just cHash) (blockHash <$> r)
 
-    it "Should get chain of parent" $ \conn -> do
-        _ <- runRedis conn $ do 
-            g' <- liftIO $ makeGenesisBlock
-            chain <- liftIO $ buildChain g' 1 1
-            return chain
-        liftIO $ putStrLn $ "Hello"
+    it "Should get genesis from chain" $ \conn -> do
+        g <- liftIO $ makeGenesisBlock
+        let genHash = blockHeaderHash g
+        r <- runRedis conn $ do 
+            chain <- liftIO $ buildChain g 2 2
+            void $ RDB.putHeaders chain
+            RDB.getHeader genHash :: Redis (Maybe BlockData)
         HUnit.assertEqual
             "chain..."
-            (0 :: Integer) (0 :: Integer) 
+            (Just genHash) (blockHeaderHash <$> r)
+
+    it "Should get a whole chain" $ \_ -> pending
