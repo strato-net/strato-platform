@@ -63,9 +63,12 @@ test-suite blockapps-bloc-test
   ghc-options: -Wall -Werror
   main-is: Spec.hs
   other-modules:
+    BlockApps.Bloc.APISpec
+  other-modules:
   build-depends: base >=4 && < 5
     , blockapps-bloc
     , hspec
+    , servant-aeson-specs
 
 source-repository head
   type: git

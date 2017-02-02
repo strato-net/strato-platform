@@ -341,6 +341,7 @@ data PostCompileRequest = PostCompileRequest
   , postcompilerequestContractName :: Text
   , postcompilerequestSource :: Text
   } deriving (Eq,Show,Generic)
+instance Arbitrary PostCompileRequest where arbitrary = genericArbitrary
 instance ToJSON PostCompileRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostCompileRequest where

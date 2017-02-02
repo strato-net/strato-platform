@@ -107,6 +107,11 @@ data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
   , userPassword :: Text
   } deriving (Eq, Show, Generic)
+instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary
+instance ToJSON PostUsersUserRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostUsersUserRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToForm PostUsersUserRequest where
   toForm = genericToForm (FormOptions (camelCase . drop 4))
 instance FromForm PostUsersUserRequest where
@@ -128,6 +133,11 @@ data PostSendParameters = PostSendParameters
   , sendValue :: Natural
   , sendPassword :: Text
   } deriving (Eq, Show, Generic)
+instance Arbitrary PostSendParameters where arbitrary = genericArbitrary
+instance ToJSON PostSendParameters where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostSendParameters where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToForm PostSendParameters where
   toForm = genericToForm (FormOptions (camelCase . drop 4))
 instance FromForm PostSendParameters where
@@ -149,6 +159,9 @@ data PostUsersContractRequest = PostUsersContractRequest
   { src :: Text
   , password :: Text
   } deriving (Eq,Show,Generic)
+instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary
+instance ToJSON PostUsersContractRequest
+instance FromJSON PostUsersContractRequest
 instance ToForm PostUsersContractRequest
 instance FromForm PostUsersContractRequest
 instance ToSample PostUsersContractRequest where
@@ -175,6 +188,7 @@ instance ToJSON UploadListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary UploadListRequest where arbitrary = genericArbitrary
 instance ToSample UploadListRequest where
   toSamples _ = noSamples
 data UploadListContract = UploadListContract
@@ -182,6 +196,7 @@ data UploadListContract = UploadListContract
   , uploadlistcontractArgs :: HashMap Text Text
   , uploadlistcontractTxParams :: TxParams
   } deriving (Eq,Show,Generic)
+instance Arbitrary UploadListContract where arbitrary = genericArbitrary
 instance ToJSON UploadListContract where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadListContract where
@@ -209,6 +224,7 @@ data PostSendListRequest = PostSendListRequest
   , postsendlistrequestResolve :: Bool
   , postsendlistrequestTxs :: [SendTransaction]
   } deriving (Eq,Show,Generic)
+instance Arbitrary PostSendListRequest where arbitrary = genericArbitrary
 instance ToJSON PostSendListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostSendListRequest where
@@ -220,6 +236,7 @@ data SendTransaction = SendTransaction
   , sendtransactionValue :: Natural
   , sendtransactionTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
+instance Arbitrary SendTransaction where arbitrary = genericArbitrary
 instance ToJSON SendTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON SendTransaction where
@@ -248,6 +265,7 @@ data PostMethodListRequest = PostMethodListRequest
   , postmethodlistrequestResolve :: Bool
   , postmethodlistrequestTxs :: [MethodCall]
   } deriving (Eq,Show,Generic)
+instance Arbitrary PostMethodListRequest where arbitrary = genericArbitrary
 instance ToJSON PostMethodListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostMethodListRequest where
@@ -268,10 +286,11 @@ data MethodCall = MethodCall
   { methodcallContractName :: String
   , methodcallContractAddress :: Address
   , methodcallMethodName :: String
-  , methodcallArgs :: HashMap Text Value
+  , methodcallArgs :: HashMap Text UnstructuredJSON
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams
   } deriving (Eq,Show,Generic)
+instance Arbitrary MethodCall where arbitrary = genericArbitrary
 instance ToJSON MethodCall where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON MethodCall where
@@ -297,6 +316,7 @@ data TxParams = TxParams
   { txparamsGasLimit :: Natural
   , txparamsGasPrice :: Natural
   } deriving (Eq,Show,Generic)
+instance Arbitrary TxParams where arbitrary = genericArbitrary
 instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
