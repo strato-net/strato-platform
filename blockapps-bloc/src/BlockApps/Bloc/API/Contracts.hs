@@ -44,11 +44,11 @@ class Monad m => MonadContracts m where
   getContracts :: m Contracts
   getContractsData :: ContractName -> m [Address]
   getContractsContract :: ContractName -> Address -> m UnstructuredJSON
-  getContractsState :: ContractName -> Address -> m UnstructuredJSON
+  getContractsState :: ContractName -> Address -> m UnstructuredJSON -- state-translation
   getContractsFunctions :: ContractName -> Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> Address -> m [SymbolName]
-  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON
-  getContractsStates :: ContractName -> m UnstructuredJSON
+  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON -- state-translation
+  getContractsStates :: ContractName -> m UnstructuredJSON -- state-translation
   postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
 instance MonadContracts ClientM where
   getContracts = client (Proxy @ GetContracts)
