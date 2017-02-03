@@ -12,6 +12,7 @@
 
 module BlockApps.Bloc.API.Contracts where
 
+import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Aeson
@@ -19,7 +20,6 @@ import Data.Aeson.Casing
 import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import Data.Functor.Contravariant
 import Data.Int
-import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
@@ -74,7 +74,7 @@ instance MonadContracts Bloc where
     contractsEither <- liftIO $ run (query () sqlStatement) conn
     case contractsEither of
       Left err -> throwError $ DBError err
-      Right cntrcts -> return . Contracts $ catMaybes cntrcts
+      Right cons -> return $ Contracts cons
 
   getContractsData (ContractName contractName) = do
     conn <- asks dbConnection
@@ -93,7 +93,7 @@ instance MonadContracts Bloc where
       run (query contractName sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
-      Right addresses -> return $ catMaybes addresses
+      Right addresses -> return addresses
 
   getContractsContract = undefined
   -- getContractsContract (ContractName contractName) addr = do
@@ -380,13 +380,10 @@ instance ToHttpApiData SymbolName where
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
 
-contractDecoder :: Decoders.Row (Maybe Contract)
-contractDecoder = contractMaybe
+contractDecoder :: Decoders.Row Contract
+contractDecoder = Contract
   <$> Decoders.value Decoders.int8
-  <*> Decoders.value addressDecoder
-  where
-    contractMaybe _time Nothing = Nothing
-    contractMaybe time (Just addr) = Just $ Contract time addr
+  <*> Decoders.value (Unnamed <$> addressDecoder <|> Named <$> Decoders.text)
 
 data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
 instance ToJSON a => ToJSON (MaybeNamed a) where
@@ -394,3 +391,5 @@ instance ToJSON a => ToJSON (MaybeNamed a) where
   toJSON (Unnamed a) = toJSON a
 instance FromJSON a => FromJSON (MaybeNamed a) where
   parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
+instance Arbitrary a => Arbitrary (MaybeNamed a) where
+  arbitrary = genericArbitrary

@@ -13,6 +13,7 @@ import Data.Aeson
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Functor.Contravariant
+import Data.Maybe
 import Data.Text (Text)
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -75,8 +76,11 @@ instance FromJSON x => MimeUnrender OctetStream x where
 instance ToJSON x => MimeRender OctetStream x where
   mimeRender _ = encode
 
-addressDecoder :: Decoders.Value (Maybe Address)
-addressDecoder = stringAddress . Char8.unpack <$> Decoders.bytea
+addressDecoder :: Decoders.Value Address
+addressDecoder
+  = fromMaybe (error "cannot decode address")
+  . stringAddress
+  . Char8.unpack <$> Decoders.bytea
 
 addressEncoder :: Encoders.Value Address
 addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
