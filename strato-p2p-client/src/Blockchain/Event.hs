@@ -133,7 +133,19 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (NewBlockHashes _) -> syncFetch
 
-    MsgEvt (GetBlockHeaders (BlockNumber _) _ _ _) -> yield $ BlockHeaders [] -- todo
+    MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> case dir of
+        Reverse -> do
+            maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader start
+            case maybeHeader of
+                Nothing    -> yield (BlockBodies [])
+                Just head' -> do
+                    let hash' = blockHeaderHash head'
+                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain hash' max
+                    yield . BlockHeaders . skipEntries skip' $ snd <$> chain
+        Forward -> do
+            headers <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start max'
+            yield BlockHeaders . skipEntries skip' $ snd <$> headers
+
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> case dir of
         Reverse -> do
             headers <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain start max'
@@ -141,7 +153,7 @@ handleEvents mode peer = awaitForever $ \case
         Forward -> do
             maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
             case maybeHeader of
-                Nothing -> yield (BlockBodies [])
+                Nothing    -> yield (BlockBodies [])
                 Just head' -> do
                     let num = blockHeaderBlockNumber head'
                     chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain num max'
