@@ -165,7 +165,6 @@ getBlockChain = getZippedParentChain getBlock
 
 getCanonicalHeader :: (BlockHeaderLike h)
                    => Integer
-                   -> Int
                    -> Redis (Maybe h)
 getCanonicalHeader = undefined
 

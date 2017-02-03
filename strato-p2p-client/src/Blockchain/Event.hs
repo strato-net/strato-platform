@@ -13,7 +13,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.State
 import Data.Conduit
-import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
@@ -76,12 +75,6 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
 fetchLimit :: Offset
 fetchLimit = 50
 
-filterRequestedBlocks :: [SHA] -> [Block] -> [Block]
-filterRequestedBlocks _ [] = []
-filterRequestedBlocks [] _ = []
-filterRequestedBlocks (h:hRest) (b:bRest) | blockHash b == h = b:filterRequestedBlocks hRest bRest
-filterRequestedBlocks hashes (_:bRest) = filterRequestedBlocks hashes bRest
-
 -- todo: seriously???
 maxReturnedHeaders :: Int
 maxReturnedHeaders=1000
@@ -140,11 +133,11 @@ handleEvents mode peer = awaitForever $ \case
                 Nothing    -> yield (BlockBodies [])
                 Just head' -> do
                     let hash' = blockHeaderHash head'
-                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain hash' max
+                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain hash' max'
                     yield . BlockHeaders . skipEntries skip' $ snd <$> chain
         Forward -> do
             headers <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start max'
-            yield BlockHeaders . skipEntries skip' $ snd <$> headers
+            yield . BlockHeaders . skipEntries skip' $ snd <$> headers
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> case dir of
         Reverse -> do
@@ -179,18 +172,9 @@ handleEvents mode peer = awaitForever $ \case
             stampActionTimestamp
 
     MsgEvt (GetBlockBodies []) -> yield $ BlockBodies []
-    MsgEvt (GetBlockBodies headers@(first:_)) -> lift (getOffsetsForHashes [first]) >>= \case
-        [] -> do
-            logInfoN $ T.pack $ "########### Warning: peer is asking for a block I don't have: " ++ format first
-            yield $ BlockBodies []
-        (o:_) -> do
-            vmEvents <- liftIO $ fromMaybe crashViolentlyWithNoRegardForHumanLife <$> fetchVMEventsIO (fromIntegral o)
-            let blocks = [b | ChainBlock b <- vmEvents]
-            let requestedBlocks = filterRequestedBlocks headers blocks
-            yield $ BlockBodies $ map blockToBody requestedBlocks
-
-        where crashViolentlyWithNoRegardForHumanLife = error
-                  "Internal error: an offset in SQL points to a value ouside of the block stream."
+    MsgEvt (GetBlockBodies _) -> do
+        -- blocks :: [(SHA, Maybe Block)] <- RBDB.withRedisBlockDB $ RBDB.getBlocks shas
+        yield $ BlockBodies []
 
     MsgEvt (BlockBodies []) -> clearActionTimestamp
     MsgEvt (BlockBodies bodies) -> do
