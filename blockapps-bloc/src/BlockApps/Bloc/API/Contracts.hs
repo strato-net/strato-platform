@@ -115,41 +115,42 @@ instance MonadContracts Bloc where
   --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
   --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
   --       \ WHERE C.name = $1 AND CI.address = $2"
+  --     -- GET Functions
+  --     sqlStringCont =
+  --       "SELECT id, name, selector, is_constructor FROM xabi_functions\
+  --       \ WHERE contract_metadata_id = $1\
   --     -- GET function arguments
   --     sqlStringArgs =
-  --       "SELECT XFP.name, XFP.type, XFP.index, XFP.bytes, XFP.is_dynamic\
+  --       "SELECT XFA.name, XFA.index, XT.type, XT.typedef, \
+  --       \ XT.is_dynamic, XT.is_signed, XT.is_public, XT.bytes, \
+  --       \ EXT.type [entry_type], EXT.bytes [entry_bytes], EXT.typedef [entry_typedef]\
   --       \ FROM xabi_functions XF\
-  --       \ LEFT OUTER JOIN xabi_function_parameters XFP\
-  --       \ ON XFP.function_id = XF.id\
-  --       \ WHERE XF.id = $1 AND NOT XFP.is_return_type"
-  --     -- GET function return types
-  --     sqlStringRet =
-  --       "SELECT XFP.name, XFP.type, XFP.index, XFP.bytes, XFP.is_dynamic\
+  --       \ LEFT OUTER JOIN xabi_function_arguments XFA\
+  --       \ ON XFA.function_id = XF.id\
+  --       \ LEFT OUTER JOIN xabi_types XT\
+  --       \ ON XT.id = XF.type_id\
+  --       \ LEFT OUTER JOIN xabi_types EXT\
+  --       \ ON EXT.id = XT.entry_type_id\
+  --       \ WHERE XFA.function_id = $1 "
+  --     -- GET function variables
+  --     sqlStringArgs =
+  --       "SELECT XFV.name, XFV.at_bytes, XFV.index, XT.type, XT.typedef, \
+  --       \ XT.is_dynamic, XT.is_signed, XT.is_public, XT.bytes, \
+  --       \ EXT.type [entry_type], EXT.bytes [entry_bytes], EXT.typedef [entry_typedef]\
+  --       \ VXT.type [value_type], VXT.bytes [value_bytes], VXT.typedef [value_typedef]\
+  --       \ KXT.type [key_type], KXT.bytes [key_bytes], KXT.typedef [key_typedef]\
   --       \ FROM xabi_functions XF\
-  --       \ LEFT OUTER JOIN xabi_function_parameters XFP\
-  --       \ ON XFP.function_id = XF.id\
-  --       \ WHERE XF.id = $1 AND XFP.is_return_type"
-  --     -- GET Constructor
-  --     sqlStringConstr =
-  --       "SELECT XF.id, XF.name, XF.selector\
-  --       \ FROM contracts C\
-  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-  --       \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
-  --       \ WHERE C.name = $1 AND CI.address = $2 AND XF.is_constructor"
-  --     -- GET Variables
-  --     sqlStringVars =
-  --       "SELECT XV.id, XV.name, XV.type, XV.bytes, XV.at_bytes, XV.is_dynamic\
-  --       \ FROM contracts C\
-  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-  --       \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
-  --       \ WHERE C.name = $1 AND CI.address = $2"
-  --     -- GET Variable Entry
-  --     sqlStringVarEnt =
-  --       "SELECT XCE.typedef, XCE.type, XCE.bytes\
-  --       \ FROM xabi_complex_entries XCE\
-  --       \ WHERE XCE.id = $1"
+  --       \ LEFT OUTER JOIN xabi_function_variables XFV\
+  --       \ ON XFA.function_id = XF.id\
+  --       \ LEFT OUTER JOIN xabi_types XT\
+  --       \ ON XT.id = XF.type_id\
+  --       \ LEFT OUTER JOIN xabi_types EXT\
+  --       \ ON EXT.id = XT.entry_type_id\
+  --       \ LEFT OUTER JOIN xabi_types VXT\
+  --       \ ON VXT.id = XT.entry_type_id\
+  --       \ LEFT OUTER JOIN xabi_types KXT\
+  --       \ ON KXT.id = XT.entry_type_id\
+  --       \ WHERE XFV.contract_metadata_id = $1 "
   --     sqlStatementCont =
   --       statement sqlStringCont encoderContAddr decoderCont False
   --     sqlStatementArgs =
