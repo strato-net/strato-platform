@@ -392,4 +392,7 @@ instance ToJSON a => ToJSON (MaybeNamed a) where
 instance FromJSON a => FromJSON (MaybeNamed a) where
   parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
 instance Arbitrary a => Arbitrary (MaybeNamed a) where
-  arbitrary = genericArbitrary
+  arbitrary = oneof
+    [ elements [Named "name1", Named "name2", Named "name3"]
+    , Unnamed <$> arbitrary
+    ]
