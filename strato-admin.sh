@@ -95,10 +95,6 @@ case $1 in
     fi
     ;;
   "--run-local")
-    if [ -z "$genesisBlock" ]; then
-      echo "====================> Genesis Block (gb.json) is missing."
-      exit 1
-    fi
     doit="runLocal"
     doFirst=""
     ;;
