@@ -1,0 +1,3 @@
+contract Contract {
+  byte byteVar;
+}

@@ -1,0 +1,2 @@
+nocontract Contract {
+}
