@@ -14,14 +14,14 @@ usersTable :: ByteString
 usersTable =
   "CREATE TABLE IF NOT EXISTS users(\
     \id serial PRIMARY KEY,\
-    \name varchar(512) NOT NULL UNIQUE,\
-    \password_hash bytea NOT NULL\
+    \name varchar(512) NOT NULL UNIQUE\
   \);"
 
 addressesTable :: ByteString
 addressesTable =
   "CREATE TABLE IF NOT EXISTS addresses(\
     \id serial PRIMARY KEY,\
+    \password_hash bytea NOT NULL,\
     \address bytea NOT NULL UNIQUE,\
     \user_id int NOT NULL REFERENCES users(id),\
     \FOREIGN KEY (user_id) REFERENCES users(id)\
