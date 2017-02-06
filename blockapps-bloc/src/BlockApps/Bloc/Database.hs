@@ -98,10 +98,10 @@ xabiFunctionArgumentsTable =
     \FOREIGN KEY (type_id) REFERENCES xabi_types(id)\
   \);"
 
-xabiFunctionValuesTable :: ByteString
-xabiFunctionValuesTable =
-  "CREATE TABLE xabi_function_values(\
-    \id serial PRIMART KEY,\
+xabiFunctionReturnsTable :: ByteString
+xabiFunctionReturnsTable =
+  "CREATE TABLE xabi_function_returns(\
+    \id serial PRIMARY KEY,\
     \function_id NOT NULL REFERENCES xabi_functions(id),\
     \index integer NOT NULL,\
     \type_id NOT NULL REFERENCES xabi_types(id),\
