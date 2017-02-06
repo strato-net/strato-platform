@@ -101,45 +101,52 @@ specTest = around withConn $ describe "BlockData" $ do
         b <- generate arbitrary :: IO Block 
         let theHash = blockHash b
         let uCount = length $ blockUncleHeaders b
-        liftIO $ putStrLn $ "Uncles put: " ++ show uCount
         r <- runRedis c $ do
             void $ RDB.putBlock b
             ts <- RDB.getUncles theHash :: Redis (Maybe [BlockData])
             return $ case ts of
                 Nothing -> -1
                 Just tss -> length tss
-        liftIO $ putStrLn $ "Uncles got: " ++ show r 
         HUnit.assertEqual
             ("Couldn't recover uncles from block with hash: " ++ format theHash)
             uCount r
 
     it "Should put a block with parent and get back the parent" $ \conn -> do
         p <- generate arbitrary :: IO Block
-        let theHash = blockHash p
+        let pHash = blockHash p
         c <- generate arbitrary :: IO Block
-        let c' = over (_blockBlockData . _blockDataParentHash) (const $ blockHash p) c
-        let cHash = blockDataParentHash $ blockBlockData c'
+        let c' = over (_blockBlockData . _blockDataParentHash) (const $ pHash) c
+        let cHash = blockHash c'
         r <- runRedis conn $ do
             void $ RDB.putBlock p
             void $ RDB.putBlock c'
-            cph  <- RDB.getParent theHash :: Redis (Maybe SHA)
+            cph <- RDB.getParent cHash :: Redis (Maybe SHA)
             case cph of
-                Nothing -> undefined
+                Nothing -> pure Nothing 
                 Just pp -> RDB.getBlock pp :: Redis (Maybe Block)
-        liftIO $ putStrLn $ "Uncles got: " ++ show r 
         HUnit.assertEqual
-            ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format theHash)
-            (Just cHash) (blockHash <$> r)
+            ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
+            (Just pHash) (blockHash <$> r)
 
     it "Should get genesis from chain" $ \conn -> do
         g <- liftIO $ makeGenesisBlock
         let genHash = blockHeaderHash g
+        chain <- liftIO $ buildChain g 2 2
         r <- runRedis conn $ do 
-            chain <- liftIO $ buildChain g 2 2
             void $ RDB.putHeaders chain
             RDB.getHeader genHash :: Redis (Maybe BlockData)
         HUnit.assertEqual
-            "chain..."
+            "Couldn't find header for genesis block from chain generated from genesis block"
             (Just genHash) (blockHeaderHash <$> r)
 
-    it "Should get a whole chain" $ \_ -> pending
+    it "Should get a whole chain" $ \conn -> do
+        let n = 10
+        g <- liftIO $ makeGenesisBlock
+        chain <- liftIO $ buildChain g n 0
+        r <- runRedis conn $ do
+            void $ RDB.putCanonical chain
+            chainHashes <- RDB.getCanonicalChain 1 n :: Redis [SHA]
+            RDB.getHeaders chainHashes :: Redis [(SHA, Maybe BlockData)]
+        HUnit.assertEqual
+            "Couldn't fetch canonical chain"
+            (length r) n

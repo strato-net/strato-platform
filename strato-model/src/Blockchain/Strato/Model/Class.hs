@@ -9,6 +9,8 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.Code
 import           Blockchain.Strato.Model.SHA
 
+-- data Chain e = H (Chain e) e [Chain e]
+
 class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t b | b -> h t where
     blockHeader       :: b -> h
     blockTransactions :: b -> [t]

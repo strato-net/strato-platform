@@ -46,4 +46,4 @@ buildChain seed depth maxSiblings = do
     expanded        <- forM withUpdates $ \sibling -> do
                            grandchildren <- buildChain sibling (depth - 1) maxSiblings
                            return $ sibling : grandchildren
-    return . join $ expanded
+    return $ seed : join expanded
