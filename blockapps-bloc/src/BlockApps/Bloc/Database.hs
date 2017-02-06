@@ -11,9 +11,7 @@ usersTable =
   "CREATE TABLE users(\
     \id serial PRIMARY KEY,\
     \name varchar (512) NOT NULL UNIQUE,\
-    \key_hash bytea NOT NULL,\
-    \salt bytea NOT NULL,\
-    \sig_bytes integer NOT NULL\
+    \password_hash bytea NOT NULL\
   \);"
 
 addressesTable :: ByteString
@@ -22,16 +20,6 @@ addressesTable =
     \id serial PRIMARY KEY,\
     \address bytea NOT NULL UNIQUE,\
     \user_id NOT NULL REFERENCES users(id),\
-    \seed_encryption_string bytea NOT NULL,\
-    \seed_encryption_iv bytea NOT NULL,\
-    \seed_encryption_salt bytea NOT NULL,\
-    \hd_root_string bytea NOT NULL,\
-    \hd_root_iv bytea NOT NULL,\
-    \hd_root_salt bytea NOT NULL,\
-    \encryption_key bytea NOT NULL,\
-    \encryption_iv bytea NOT NULL,\
-    \encryption_salt bytea NOT NULL,\
-    \hd_index integer NOT NULL,\
     \FOREIGN KEY (user_id) REFERENCES users(id)\
   \);"
 

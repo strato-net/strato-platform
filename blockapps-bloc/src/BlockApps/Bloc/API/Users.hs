@@ -10,14 +10,20 @@
 
 module BlockApps.Bloc.API.Users where
 
+import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
+import Crypto.KDF.BCrypt
+import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
+import Data.Functor.Contravariant
 import Data.HashMap.Strict (HashMap)
 import Data.Maybe
+import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
+import qualified Data.Text.Encoding as Encoding
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -35,6 +41,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
+import BlockApps.Strato.API.Client
 
 class Monad m => MonadUsers m where
   getUsers :: m [UserName]
@@ -84,7 +91,36 @@ instance MonadUsers Bloc where
       Left err -> throwError $ DBError err
       Right addresses -> return $ catMaybes addresses
 
-  postUsersUser = undefined
+  postUsersUser (UserName name) (PostUsersUserRequest faucet pw) = do
+    let
+      pwBytes = Encoding.encodeUtf8 pw
+      sk = newSecKey pwBytes
+      pk = derivePubKey sk
+      addr = deriveAddress pk
+      encoder = contramap (\(x,_,_) -> x) (Encoders.value Encoders.text)
+        <> contramap (\(_,y,_) -> y) (Encoders.value Encoders.bytea)
+        <> contramap (\(_,_,z) -> z) (Encoders.value addressEncoder)
+      decoder = Decoders.rowsAffected
+      sqlString =
+        "WITH userid AS (\
+        \ INSERT INTO users (name, password_hash)\
+        \ VALUES ($1, $2) RETURNING id)\
+        \ INSERT INTO addresses (address, user_id)\
+        \ SELECT $3, id FROM userid;"
+      sqlStatement = statement sqlString encoder decoder False
+    conn <- asks dbConnection
+    mgr <- asks httpManager
+    url <- asks urlStrato
+    pwHash <- liftIO $ hashPassword 15 pwBytes
+    resultEither <- liftIO $
+      run (query (name, pwHash, addr) sqlStatement) conn
+    case resultEither of
+      Left err -> throwError $ DBError err
+      Right _ -> do
+        liftIO . when (faucet == 1) $
+          void $ runClientM (postFaucet addr) (ClientEnv mgr url)
+        return addr
+
   postUsersSend = undefined
   postUsersContract = undefined
   postUsersUploadList = undefined

@@ -7,9 +7,11 @@ module BlockApps.Bloc.Monad where
 import Control.Monad.Except
 import Control.Monad.Log
 import Control.Monad.Reader
+import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Hasql.Connection
 import Hasql.Session
 import Network.HTTP.Client
+import Servant
 import Servant.Client
 import Text.PrettyPrint.Leijen.Text
 
@@ -38,3 +40,10 @@ data BlocEnv = BlocEnv
 data BlocError
   = DBError Error
   | StratoError ServantError
+  deriving Show
+
+enterBloc :: BlocEnv -> Bloc x -> ExceptT ServantErr IO x
+enterBloc env x
+  = withExceptT (\err -> err500{errBody = Lazy.Char8.pack (show err)})
+  $ flip runLoggingT (liftIO . print)
+  $ flip runReaderT env $ runBloc x
