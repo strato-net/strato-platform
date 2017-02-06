@@ -11,7 +11,7 @@ module Blockchain.Strato.RedisBlockDB
     , getTransactions, getUncles
     , getParent, getParents
     , getParentChain, getHeaderChain, getBlockChain
-    , getCanonicalHeader, getCanonicalHeaderChain
+    , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
     , getChildren
     , putHeader, putHeaders, putBlock, putBlocks
     , HasRedisBlockDB(..), withRedisBlockDB
@@ -22,7 +22,7 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
 import qualified Data.ByteString.Char8                 as S8
-import           Data.Maybe                            (fromJust, isJust, isNothing)
+import           Data.Maybe                            (catMaybes, fromJust, isJust, isNothing)
 import           Control.Arrow                         (second)
 import           Control.Monad
 import           Control.Monad.Trans
@@ -33,11 +33,6 @@ zipM' :: (Traversable t, Monad m)
       -> t a
       -> m (t (a, b))
 zipM' f = mapM (\x -> (,) x <$> f x)
-
--- zipA' :: (Traversable t, Applicative a) => (x -> a b) -> t x -> a (t (x, y))
--- zipA' f = traverse (strength . id &&& f)
---     where
---         strength (x, fy) = fmap (,) x fy
 
 class (Monad m) => HasRedisBlockDB m where
     getRedisBlockDB :: m Connection
@@ -63,10 +58,11 @@ inNamespace ns k = ns' `S8.append` toKey k
             Children     -> "c:"
             Canonical    -> "q:"
 
-getInNamespace :: BlockDBNamespace
-               -> SHA
+getInNamespace :: (RedisDBKeyable key)
+               => BlockDBNamespace
+               -> key 
                -> Redis (Either Reply (Maybe S8.ByteString))
-getInNamespace ns sha = get $ inNamespace ns sha
+getInNamespace ns key = get $ inNamespace ns key
 
 getMembersInNamespace :: (RedisDBKeyable key)
                       => BlockDBNamespace
@@ -137,15 +133,24 @@ getParents :: (Traversable f)
            -> Redis (f (SHA, Maybe SHA))
 getParents = zipM' getParent
 
+getChain :: (a -> Redis (Maybe a))
+         -> a
+         -> Int
+         -> Redis [a]
+getChain getNext start limit = (start:) <$> helper start limit
+    where helper h l | l <= 0    = return []
+                     | otherwise = getNext h >>= maybe (return []) chainDown
+          chainDown next = (next:) <$> helper next (limit - 1)
+
 getParentChain :: SHA
                -> Int
                -> Redis [SHA]
-getParentChain start limit = (start:) <$> helper start limit
-    where helper h l | l <= 0    = return []
-                     | otherwise = getParent h >>= maybe (return []) chainDown
-          chainDown parent = (parent:) <$> helper parent (limit - 1)
+getParentChain = getChain getParent
 
-getZippedParentChain :: (SHA -> Redis (Maybe t)) -> SHA -> Int -> Redis [(SHA, t)]
+getZippedParentChain :: (SHA -> Redis (Maybe t)) 
+                     -> SHA 
+                     -> Int 
+                     -> Redis [(SHA, t)]
 getZippedParentChain mapper start limit = do
     shaChain <- getParentChain start limit
     mapChain <- zipM' mapper shaChain
@@ -163,17 +168,41 @@ getBlockChain :: (BlockLike h t b)
               -> Redis [(SHA, b)]
 getBlockChain = getZippedParentChain getBlock
 
+getCanonical :: Integer
+             -> Redis (Maybe SHA)
+getCanonical n = getInNamespace Canonical n >>= \case
+    Left _           -> return Nothing
+    Right Nothing    -> return Nothing
+    Right (Just sha) -> return . Just $ fromValue sha
+
 getCanonicalHeader :: (BlockHeaderLike h)
                    => Integer
                    -> Redis (Maybe h)
-getCanonicalHeader = undefined
+getCanonicalHeader n = getCanonical n >>= \case
+    Nothing  -> return Nothing
+    Just sha -> getHeader sha
+
+getCanonicalChain :: Integer 
+                  -> Int 
+                  -> Redis [SHA]
+getCanonicalChain start limit = do
+    let chain = forM (take limit [start..]) getCanonical
+    catMaybes <$> chain
+
+getZippedCanonicalChain :: (SHA -> Redis (Maybe t))
+                        -> Integer 
+                        -> Int
+                        -> Redis [(SHA, t)]
+getZippedCanonicalChain mapper start limit = do
+    shaChain <- getCanonicalChain start limit
+    mapChain <- zipM' mapper shaChain
+    return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
 getCanonicalHeaderChain :: (BlockHeaderLike h)
                         => Integer
                         -> Int
                         -> Redis [(SHA, h)]
-getCanonicalHeaderChain = undefined
-
+getCanonicalHeaderChain = getZippedCanonicalChain getHeader
 
 getChildren :: SHA
             -> Redis (Maybe [SHA])
