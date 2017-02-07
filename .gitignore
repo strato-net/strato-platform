@@ -5,3 +5,4 @@ server.key
 server.pem
 .idea/
 docker-compose.yml
+tmp/
