@@ -178,8 +178,12 @@ addBlocks isUnmined blocks = do
     forM_ blocks' $ timeit "Block insertion" . addBlock isUnmined
     $logInfoS "addBlocks" "done inserting, now will replace best if best is among the list"
     unless isUnmined $ do
-        let highestDifficulty = maximum $ map (blockDataDifficulty . obBlockData) blocks' --maximum OK, since I filtered out the empty list case in a funciton pattern match
-        replaceBestIfBetter $ fromJust $ find ((highestDifficulty ==) . blockDataDifficulty . obBlockData) blocks' --fromJust is OK, because we just got this value from the list
+        let highestDifficulty = maximum $ map obTotalDifficulty blocks'
+        replaceBestIfBetter $ fromJust $ find ((highestDifficulty ==) . obTotalDifficulty) blocks'
+    
+    -- unless isUnmined $ do
+    --     let highestDifficulty = maximum $ map (blockDataDifficulty . obBlockData) blocks' --maximum OK, since I filtered out the empty list case in a funciton pattern match
+    --     replaceBestIfBetter $ fromJust $ find ((highestDifficulty ==) . blockDataDifficulty . obBlockData) blocks' --fromJust is OK, because we just got this value from the list
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
