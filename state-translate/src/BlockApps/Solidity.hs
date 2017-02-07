@@ -4,6 +4,7 @@
 
 module BlockApps.Solidity where
 
+import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
@@ -16,38 +17,14 @@ import BlockApps.Data (Address)
 
 data Type
   = TypeBool
-  | TypeUInt8
-  | TypeUInt16
-  | TypeUInt24
-  | TypeUInt32
-  | TypeUInt40
-  | TypeUInt48
-  | TypeUInt56
-  | TypeUInt64
-  | TypeUInt72
-  | TypeUInt80
-  | TypeUInt88
-  | TypeUInt96
-  | TypeUInt104
-  | TypeUInt112
-  | TypeUInt120
-  | TypeUInt128
-  | TypeUInt136
-  | TypeUInt144
-  | TypeUInt152
-  | TypeUInt160
-  | TypeUInt168
-  | TypeUInt176
-  | TypeUInt184
-  | TypeUInt192
-  | TypeUInt200
-  | TypeUInt208
-  | TypeUInt216
-  | TypeUInt224
-  | TypeUInt232
-  | TypeUInt240
-  | TypeUInt248
-  | TypeUInt256
+  | TypeUInt (Maybe Int)
+  -- ^ uint<M>: unsigned integer type of M bits,
+  -- 0 < M <= 256, M % 8 == 0. e.g. uint32, uint8, uint256.
+  -- uint: synonyms for uint256
+  | TypeInt (Maybe Int)
+  -- ^ int<M>: integer type of M bits,
+  -- 0 < M <= 256, M % 8 == 0. e.g. int32, int8, int256.
+  -- int: synonyms for int256
   | TypeFixed (Maybe (Int,Int))
   -- ^ fixed<M>x<N>: fixed-point signed number of M+N bits,
   -- 0 < M + N <= 256, M % 8 == N % 8 == 0.
@@ -71,63 +48,9 @@ data Type
   -- <type>[]: a variable-length array of the given fixed-length type.
   | TypeMapping Type Type
 
-type Word24 = LargeKey Word16 Word8
-type Word40 = LargeKey Word32 Word8
-type Word48 = LargeKey Word32 Word16
-type Word56 = LargeKey Word32 Word24
-type Word72 = LargeKey Word64 Word8
-type Word80 = LargeKey Word64 Word16
-type Word88 = LargeKey Word64 Word24
-type Word104 = LargeKey Word96 Word8
-type Word112 = LargeKey Word96 Word16
-type Word120 = LargeKey Word96 Word24
-type Word136 = LargeKey Word128 Word8
-type Word144 = LargeKey Word128 Word16
-type Word152 = LargeKey Word128 Word24
-type Word168 = LargeKey Word160 Word8
-type Word176 = LargeKey Word160 Word16
-type Word184 = LargeKey Word160 Word24
-type Word200 = LargeKey Word192 Word8
-type Word208 = LargeKey Word192 Word16
-type Word216 = LargeKey Word192 Word24
-type Word232 = LargeKey Word224 Word8
-type Word240 = LargeKey Word224 Word16
-type Word248 = LargeKey Word224 Word24
-
 data Value
   = ValueBool Bool
-  | ValueUInt8 Word8
-  | ValueUInt16 Word16
-  | ValueUInt24 Word24
-  | ValueUInt32 Word32
-  | ValueUInt40 Word40
-  | ValueUInt48 Word48
-  | ValueUInt56 Word56
-  | ValueUInt64 Word64
-  | ValueUInt72 Word72
-  | ValueUInt80 Word80
-  | ValueUInt88 Word88
-  | ValueUInt96 Word96
-  | ValueUInt104 Word104
-  | ValueUInt112 Word112
-  | ValueUInt120 Word120
-  | ValueUInt128 Word128
-  | ValueUInt136 Word136
-  | ValueUInt144 Word144
-  | ValueUInt152 Word152
-  | ValueUInt160 Word160
-  | ValueUInt168 Word168
-  | ValueUInt176 Word176
-  | ValueUInt184 Word184
-  | ValueUInt192 Word192
-  | ValueUInt200 Word200
-  | ValueUInt208 Word208
-  | ValueUInt216 Word216
-  | ValueUInt224 Word224
-  | ValueUInt232 Word232
-  | ValueUInt240 Word240
-  | ValueUInt248 Word248
-  | ValueUInt256 Word256
+  | ValueUInt Natural
   | ValueInt Integer
   | ValueAddress Address
   | ValueFixed Double
@@ -141,40 +64,16 @@ decodeValue
   -> Int
   -> Type
   -> Value
-decodeValue storage start = \case
-  TypeBool -> undefined
-  TypeUInt8 -> undefined
-  TypeUInt16 -> undefined
-  TypeUInt24 -> undefined
-  TypeUInt32 -> undefined
-  TypeUInt40 -> undefined
-  TypeUInt48 -> undefined
-  TypeUInt56 -> undefined
-  TypeUInt64 -> undefined
-  TypeUInt72 -> undefined
-  TypeUInt80 -> undefined
-  TypeUInt88 -> undefined
-  TypeUInt96 -> undefined
-  TypeUInt104 -> undefined
-  TypeUInt112 -> undefined
-  TypeUInt120 -> undefined
-  TypeUInt128 -> undefined
-  TypeUInt136 -> undefined
-  TypeUInt144 -> undefined
-  TypeUInt152 -> undefined
-  TypeUInt160 -> undefined
-  TypeUInt168 -> undefined
-  TypeUInt176 -> undefined
-  TypeUInt184 -> undefined
-  TypeUInt192 -> undefined
-  TypeUInt200 -> undefined
-  TypeUInt208 -> undefined
-  TypeUInt216 -> undefined
-  TypeUInt224 -> undefined
-  TypeUInt232 -> undefined
-  TypeUInt240 -> undefined
-  TypeUInt248 -> undefined
-  TypeUInt256 -> undefined
+decodeValue storage offset = \case
+  TypeBool -> ValueBool (ByteString.index bytes 31 /= 0)
+    where
+      bytes = slice 32 storage
+  TypeUInt (Just n) ->
+    ValueUInt . sum $ zipWith shiftL bytes [8*(n-1),8*(n-2)..0]
+    where
+      bytes = map fromIntegral . ByteString.unpack $ slice n storage
+  TypeUInt Nothing -> decodeValue storage offset (TypeUInt (Just 256))
+  TypeInt _ -> undefined
   TypeFixed (Just (n,m)) -> undefined
   TypeFixed Nothing -> undefined
   TypeBytes (Just n) -> undefined
@@ -187,4 +86,4 @@ decodeValue storage start = \case
     decodeStrict :: Binary x => ByteString -> x
     decodeStrict = decode . ByteString.Lazy.fromStrict
     slice :: Int -> ByteString -> ByteString
-    slice len = ByteString.take len . ByteString.drop start
+    slice len = ByteString.take len . ByteString.drop offset
