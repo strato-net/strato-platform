@@ -3,6 +3,7 @@ version: '2'
 services:
   dashboard:
     image: %REPO%dashboard
+    tty: true
     restart: always
   zookeeper:
     image: %REPO%zookeeper-packager
@@ -57,39 +58,7 @@ services:
       minBlockDifficulty: "${minBlockDifficulty}"
       debugFail: "${debugFail}"
       backupblocks: "${backupblocks}"
- 
 
-
-  strato2:
-    image: %REPO%monstrato
-    volumes:
-      - /tmp/backup:/tmp/backup
-    links:
-      - zookeeper
-      - kafka
-      - postgres
-    depends_on:
-      - zookeeper
-      - kafka
-      - postgres
-      - redis
-    restart: always
-    ports:
-      - "30304:30303"
-      - "30304:30303/udp"
-    environment:
-      networkID : "${networkID}"
-      genesis: "${genesis}"
-      genesisBlock: "${genesisBlock}"
-      bootnode: "${bootnode}"
-      addBootnodes: "${addBootnodes}"
-      lazyBlocks: "${lazyBlocks}"
-      miningAlgorithm: "${miningAlgorithm}"
-      miningThreads: "${miningThreads}"
-      blockTime: "${blockTime}"
-      minBlockDifficulty: "${minBlockDifficulty}"
-      debugFail: "${debugFail}"
-      backupblocks: "${backupblocks}"
   redis:
     image: redis:3.2
     restart: always
