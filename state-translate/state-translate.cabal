@@ -18,7 +18,9 @@ library
                      , ProcessSimpleTypes
                      , ProcessComplexTypes
                      , SolidityStateTranslate
+                     , BlockApps.Solidity
   build-depends:       base >= 4.7 && < 5
+                     , blockapps-data
                      , aeson
                      , bytestring
                      , solidity-abi
