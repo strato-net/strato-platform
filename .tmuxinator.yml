@@ -1,6 +1,6 @@
 # ~/.tmuxinator/strato-dashboard.yml
 
-name: strato-dashboard
+name: strato
 root: ~/
 
 # Optional tmux socket
@@ -16,13 +16,13 @@ root: ~/
 # tmux_options: -f ~/.tmux.mac.conf
 
 # Change the command to call tmux.  This can be used by derivatives/wrappers like byobu.
-tmux_command: byobu
+#tmux_command: byobu
 
 # Specifies (by name or index) which window will be selected on project startup. If not set, the first window is used.
-# startup_window: logs
+#startup_window: backbone
 
 # Controls whether the tmux session should be attached to automatically. Defaults to true.
-# attach: false
+#attach: false
 
 # Runs after everything. Use it to attach to tmux with custom options etc.
 # post: tmux -CC attach -t strato-dashboard
@@ -66,7 +66,7 @@ windows:
       layout: tiled
       panes:
         - ethconf.yaml:
-          - docker exec -it silo_strato_1 watch -n 5 cat /var/lib/strato/.ethereumH/ethconf.yaml
+          - docker exec -it silo_strato_1 bash -c 'cat /var/lib/strato/.ethereumH/ethconf.yaml'
 
   - queryStrato:
       layout: even-horizontal 
