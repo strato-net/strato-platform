@@ -86,4 +86,4 @@ addressEncoder :: Encoders.Value Address
 addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
 
 urlTesterBloc :: BaseUrl
-urlTesterBloc = BaseUrl Http "tester8.centralus.cloudapp.azure.com" 80 "/bloc"
+urlTesterBloc = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
