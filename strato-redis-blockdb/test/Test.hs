@@ -139,14 +139,24 @@ specTest = around withConn $ describe "BlockData" $ do
             "Couldn't find header for genesis block from chain generated from genesis block"
             (Just genHash) (blockHeaderHash <$> r)
 
-    it "Should get a whole chain" $ \conn -> do
-        let n = 10
-        g <- liftIO $ makeGenesisBlock
-        chain <- liftIO $ buildChain g n 0
-        r <- runRedis conn $ do
-            void $ RDB.putCanonical chain
-            chainHashes <- RDB.getCanonicalChain 1 n :: Redis [SHA]
-            RDB.getHeaders chainHashes :: Redis [(SHA, Maybe BlockData)]
-        HUnit.assertEqual
-            "Couldn't fetch canonical chain"
-            (length r) n
+--     it "Should get common ancestor for two chains" $ \conn -> do
+--         let n = 10
+--         g <- liftIO $ makeGenesisBlock
+--         chain <- liftIO $ buildChain g n 2
+--         r <- runRedis conn $ do
+--             void $ RDB.putBestBlockInfo 
+
+
+--     it "Should get a whole chain" $ \conn -> do
+--         let n = 10
+--         g <- liftIO $ makeGenesisBlock
+--         chain <- liftIO $ buildChain g n 0
+--         r <- runRedis conn $ do
+--             void $ RDB.putCanonical chain
+--             chainHashes <- RDB.getCanonicalChain 1 n :: Redis [SHA]
+--             RDB.getHeaders chainHashes :: Redis [(SHA, Maybe BlockData)]
+--         HUnit.assertEqual
+--             "Couldn't fetch canonical chain"
+--             (length r) n
+
+
