@@ -21,6 +21,7 @@ library
                      , entropy
                      , ethereum-encryption
                      , ethereum-rlp
+                     , exceptions
                      , haskoin
                      , lifted-base
                      , monad-logger

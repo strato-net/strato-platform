@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, ScopedTypeVariables #-}
 
 module Blockchain.UDPServer (
       runEthUDPServer,
@@ -9,7 +9,7 @@ module Blockchain.UDPServer (
 import Network.Socket
 import qualified Network.Socket.ByteString as NB
 import System.Timeout
-
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
@@ -38,7 +38,7 @@ import           Blockchain.PeerDB
                       
 import qualified Network.Haskoin.Internals as H
     
-runEthUDPServer::(MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadLogger m)=>
+runEthUDPServer::(MonadIO m, MonadThrow m, MonadCatch m, MonadBaseControl IO m, MonadLogger m)=>
                  ContextLite->H.PrvKey->Int->Socket->m ()
 runEthUDPServer cxt myPriv portNum sock = do
   _ <- runResourceT $ flip runStateT cxt $ udpHandshakeServer myPriv sock portNum
@@ -92,12 +92,83 @@ attemptBond prv sock portNum = do
                    (time+50)
       liftIO $ setPeerBondingState (T.unpack $ pPeerIp p) (pPeerUdpPort p) 1
 
-udpHandshakeServer::(HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m, MonadIO m, MonadLogger m)=>
+udpHandshakeServer::(MonadCatch m, HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m, MonadIO m, MonadLogger m)=>
                     H.PrvKey->Socket->Int->m ()
 udpHandshakeServer prv sock portNum = do
-  addPeersIfNeeded prv sock
-  attemptBond prv sock portNum
+    addPeersIfNeeded prv sock
+    attemptBond prv sock portNum
+    
+    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280  -- liftIO unavoidable?
   
+    case maybePacketData of
+     Nothing -> do
+       logInfoN "timeout triggered"
+     Just (msg,addr) -> do
+       logInfoN $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
+       catch (return (dataToPacket msg) >>= handleValidPacket msg addr) (\(_ :: SomeException) -> logInfoN "malformed UDP packet" >>  udpHandshakeServer prv sock portNum)
+     where
+       handleValidPacket :: (MonadCatch m, HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m, MonadIO m, MonadLogger m)
+                         => B.ByteString->SockAddr->(NodeDiscoveryPacket, H.PubKey)->m ()
+       handleValidPacket msg addr (packet, otherPubkey) = do
+         logInfoN "before the logInfoN line"
+         logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes $ hPubKeyToPubKey otherPubkey) ++ "....) " ++ format (fst $ dataToPacket msg)
+         logInfoN "after the logInfoN line"
+  
+         case packet of
+          Ping _ _ _ _ -> do
+                     let ip = sockAddrToIP addr
+                     curTime <- liftIO $ getCurrentTime
+                     let peer = PPeer {
+                           pPeerPubkey = Just $ hPubKeyToPubKey $ otherPubkey,
+                           pPeerIp = T.pack ip,
+                           pPeerUdpPort = fromIntegral $ getAddrPort addr,
+                           pPeerTcpPort = fromIntegral $ getAddrPort addr, --TODO- put correct TCP port in here
+                           pPeerNumSessions = 0,
+                           pPeerLastTotalDifficulty = 0,
+                           pPeerLastMsg  = T.pack "msg",
+                           pPeerLastMsgTime = curTime,
+                           pPeerEnableTime = curTime,
+                           pPeerLastBestBlockHash = SHA 0,
+                           pPeerBondState = 0,
+                           pPeerVersion = T.pack "61" -- fix
+                           }
+                     _ <- addPeer peer
+            
+                     time <- liftIO $ round `fmap` getPOSIXTime
+                     peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1"
+                     sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
+  
+          Pong _ _ _ -> 
+            liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral $ getAddrPort addr) 2
+  
+          FindNeighbors _ _ -> do
+                     time <- liftIO $ round `fmap` getPOSIXTime
+                     sendPacket sock prv addr $ Neighbors [] (time + 50)
+                            
+          Neighbors neighbors _ -> do
+                     forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
+                                    curTime <- liftIO $ getCurrentTime
+                                    let peer = PPeer {
+                                          pPeerPubkey = Just $ nodeIDToPoint nodeID,
+                                          pPeerIp = T.pack $ format addr',
+                                          pPeerUdpPort = fromIntegral udpPort,
+                                          pPeerTcpPort = fromIntegral tcpPort,
+                                          pPeerNumSessions = 0,
+                                          pPeerLastTotalDifficulty = 0,
+                                          pPeerLastMsg  = T.pack "msg",
+                                          pPeerLastMsgTime = curTime,
+                                          pPeerEnableTime = curTime,
+                                          pPeerLastBestBlockHash = SHA 0,
+                                          pPeerBondState = 0,
+                                          pPeerVersion = T.pack "61" -- fix
+                                          }
+                                    _ <- addPeer peer
+                         
+                                    return ()
+  
+  
+  
+<<<<<<< HEAD
   maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280  -- liftIO unavoidable?
 
   case maybePacketData of
@@ -162,12 +233,7 @@ udpHandshakeServer prv sock portNum = do
                                       }
                                 _ <- addPeer peer
                      
-                                return ()
-
-
-
-                 
-  udpHandshakeServer prv sock portNum
+         udpHandshakeServer prv sock portNum
 
 getAddrPort::SockAddr->PortNumber
 getAddrPort (SockAddrInet portNumber _) = portNumber
