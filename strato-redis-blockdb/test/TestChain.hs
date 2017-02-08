@@ -8,6 +8,7 @@ import           Control.Monad
 import           Test.QuickCheck
 import           Lens.Family2
 import           Lens.Family2.TH
+import           Data.List
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ArbitraryInstances()
@@ -47,3 +48,13 @@ buildChain seed depth maxSiblings = do
                            grandchildren <- buildChain sibling (depth - 1) maxSiblings
                            return $ sibling : grandchildren
     return $ seed : join expanded
+
+
+-------------------------------------
+-- ugh fix this tomorrow morning
+partitionChain :: [BlockData] -> [[Integer]]
+partitionChain bd = (blockDataNumber <$>) <$> g
+    where g = (groupBy (\x y -> blockDataNumber x == blockDataNumber y)) bd :: [[BlockData]]
+
+showChain :: [BlockData] -> IO ()
+showChain = putStrLn . show . partitionChain 

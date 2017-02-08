@@ -316,8 +316,8 @@ putBestBlockInfo :: SHA
 putBestBlockInfo newSha newNumber newTDiff = do
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
-        Left err      -> return (Left err)
-        Right (oldSha, oldNumber, _) -> do
+        Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
+        Just (oldSha, oldNumber, _) -> do
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> return (Left err)
@@ -353,9 +353,11 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               --
               -- the second case is impossible because `helper`, which calls mkParentChain,
               -- always gets called with a list of at least length 1
+              mkParentChain :: SHA -> [SHA] -> [SHA]
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
+              --complete :: SHA -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer])) 
               complete lca = getHeader lca >>= \case
                       Nothing -> return . Left . SingleLine . S8.pack $
                                     "Could not get ancestor header for SHA " ++ shaToHex lca
@@ -364,9 +366,9 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                           -- todo: build the new chain, figure out what needs to get deleted.
                           error $ "todo: we did it reddit! LCA num " ++ show number ++ " sha " ++ shaToHex lca
 
-getBestBlockInfo :: Redis (Either Reply (SHA, Integer, Integer))
+getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 getBestBlockInfo = get bestBlockInfoKey >>= \case
-    Left l  -> return (Left l)
+    Left e  -> return Nothing 
     Right r -> case r of
-        Nothing -> return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-        Just bs -> let (RedisBestBlock (sha, num, tDiff)) = fromValue bs in return $ Right (sha, num, tDiff)
+        Nothing -> return Nothing --return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
+        Just bs -> let (RedisBestBlock (sha, num, tDiff)) = fromValue bs in return $ Just (sha, num, tDiff)
