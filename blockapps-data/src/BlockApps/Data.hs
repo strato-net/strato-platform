@@ -35,10 +35,10 @@ module BlockApps.Data
   ) where
 
 import Crypto.Hash
-import Crypto.Random
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.Binary as Binary
+import Data.ByteArray (convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
@@ -100,8 +100,12 @@ deriveAddress
   . ByteString.drop 1
   . exportPubKey False
 
-newSecKey :: IO (Maybe SecKey)
-newSecKey = secKey <$> getRandomBytes 32
+newSecKey :: ByteString -> SecKey
+newSecKey bytes =
+  fromMaybe err . secKey $ convert hash32
+  where
+    Keccak256 hash32 = keccak256 bytes
+    err = error "could not generate secret key"
 
 newtype Keccak256 = Keccak256 (Digest Keccak_256) deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String

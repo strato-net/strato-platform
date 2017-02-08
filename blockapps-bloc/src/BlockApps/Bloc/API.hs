@@ -9,6 +9,8 @@ module BlockApps.Bloc.API
   , mockBloc
   , layoutBloc
   , bloc
+  , serveBloc
+  , appBloc
   , module Addresses
   , module Contracts
   , module Search
@@ -90,3 +92,9 @@ bloc =
   :<|> getSearchContract
   :<|> getSearchContractState
   :<|> getSearchContractStateReduced
+
+serveBloc :: BlocEnv -> Server BlocAPI
+serveBloc env = enter (Nat (enterBloc env)) bloc
+
+appBloc :: BlocEnv -> Application
+appBloc = serve (Proxy @ BlocAPI) . serveBloc
