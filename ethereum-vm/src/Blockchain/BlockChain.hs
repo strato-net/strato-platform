@@ -22,6 +22,7 @@ import qualified Data.ByteString.Char8 as BC
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Ord (comparing)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -177,9 +178,7 @@ addBlocks isUnmined blocks = do
                                            (show . blockDataNumber . obBlockData $ head blocks))
     forM_ blocks' $ timeit "Block insertion" . addBlock isUnmined
     $logInfoS "addBlocks" "done inserting, now will replace best if best is among the list"
-    unless isUnmined $ do
-        let highestDifficulty = maximum $ map (blockDataDifficulty . obBlockData) blocks' --maximum OK, since I filtered out the empty list case in a funciton pattern match
-        replaceBestIfBetter $ fromJust $ find ((highestDifficulty ==) . blockDataDifficulty . obBlockData) blocks' --fromJust is OK, because we just got this value from the list
+    unless isUnmined . replaceBestIfBetter $ maximumBy (comparing obTotalDifficulty) blocks'
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
