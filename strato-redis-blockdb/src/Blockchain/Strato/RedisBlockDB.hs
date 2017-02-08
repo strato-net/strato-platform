@@ -318,7 +318,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
     case oldBBI' of
         Left err      -> return (Left err)
         Right (oldSha, oldNumber, _) -> do
-            helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha (Set.singleton oldSha)
+            helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> return (Left err)
                 Right (ancestorSha, ancestorNumber, updates, deletions) -> do
@@ -332,18 +332,37 @@ putBestBlockInfo newSha newNumber newTDiff = do
                         TxError e   -> return . Left $ SingleLine (S8.pack e)
 
 commonAncestorHelper :: Integer -> Integer
-                     -> SHA -> SHA
-                     -> Set.Set SHA
+                     -> SHA     -> SHA
                      -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer]))
-commonAncestorHelper oldNum newNum oldSha newSha seen = do
-    ps@[newParent, oldParent] <- mapM (\x -> fromMaybe x <$> getParent x) [newSha, oldSha]
-    let seen' = Set.union seen (Set.fromList ps) -- todo double Set.insert is probably more optimal
-    if newParent `Set.member` seen'
-        then complete newParent
-        else commonAncestorHelper oldNum newNum oldParent newParent seen'
+commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.singleton oldSha')
+        where helper oldShaChain newShaChain seen = do
+                  let oldSha = head oldShaChain
+                      newSha = head newShaChain
+                  ps@[newParent, oldParent] <- mapM (\x -> fromMaybe x <$> getParent x) [newSha, oldSha]
+                  let seen' = Set.union seen (Set.fromList ps) -- todo double Set.insert is probably more optimal
+                  if newParent `Set.member` seen'
+                  then complete newParent
+                  else if oldParent `Set.member` seen
+                       then complete oldParent
+                       else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
-    where complete ancestor = error "todo: we did it reddit!"
+              -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
+              -- deeper (i.e., we hit genesis block, and cant get any more parents for that chain)
+              -- this prevents the cycling from prepending the same block over and over to the chain head
+              -- and messing up the chain lengths
+              --
+              -- the second case is impossible because `helper`, which calls mkParentChain,
+              -- always gets called with a list of at least length 1
+              mkParentChain y xs@(x:_) = if x == y then xs else y:xs
+              mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
+              complete lca = getHeader lca >>= \case
+                      Nothing -> return . Left . SingleLine . S8.pack $
+                                    "Could not get ancestor header for SHA " ++ shaToHex lca
+                      Just (ancestor :: RedisHeader) -> do
+                          let number = blockHeaderBlockNumber ancestor
+                          -- todo: build the new chain, figure out what needs to get deleted.
+                          error $ "todo: we did it reddit! LCA num " ++ show number ++ " sha " ++ shaToHex lca
 
 getBestBlockInfo :: Redis (Either Reply (SHA, Integer, Integer))
 getBestBlockInfo = get bestBlockInfoKey >>= \case
