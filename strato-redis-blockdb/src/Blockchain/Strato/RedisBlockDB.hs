@@ -1,9 +1,10 @@
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE LambdaCase             #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
+{-# OPTIONS -fno-warn-unused-matches #-}
 module Blockchain.Strato.RedisBlockDB
     ( getSHAsByNumber
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
@@ -16,17 +17,19 @@ module Blockchain.Strato.RedisBlockDB
     , putHeader, putHeaders, putBlock, putBlocks
     , getBestBlockInfo, putBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
+    , commonAncestorHelper
     ) where
 
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
-import qualified Data.ByteString.Char8                 as S8
-import           Data.Maybe                            (catMaybes, fromJust, isJust, isNothing)
 import           Control.Arrow                         (second)
 import           Control.Monad
 import           Control.Monad.Trans
+import qualified Data.ByteString.Char8                 as S8
+import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
+import qualified Data.Set                              as Set
 import           Database.Redis
 
 zipM' :: (Traversable t, Monad m)
@@ -58,11 +61,14 @@ inNamespace ns k = ns' `S8.append` toKey k
             Parent       -> "p:"
             Children     -> "c:"
             Canonical    -> "q:"
-            BestBlock    -> "_best_"
+
+bestBlockInfoKey :: S8.ByteString
+bestBlockInfoKey = S8.pack "<best>"
+{-# INLINE bestBlockInfoKey #-}
 
 getInNamespace :: (RedisDBKeyable key)
                => BlockDBNamespace
-               -> key 
+               -> key
                -> Redis (Either Reply (Maybe S8.ByteString))
 getInNamespace ns key = get $ inNamespace ns key
 
@@ -149,9 +155,9 @@ getParentChain :: SHA
                -> Redis [SHA]
 getParentChain = getChain getParent
 
-getZippedParentChain :: (SHA -> Redis (Maybe t)) 
-                     -> SHA 
-                     -> Int 
+getZippedParentChain :: (SHA -> Redis (Maybe t))
+                     -> SHA
+                     -> Int
                      -> Redis [(SHA, t)]
 getZippedParentChain mapper start limit = do
     shaChain <- getParentChain start limit
@@ -184,15 +190,15 @@ getCanonicalHeader n = getCanonical n >>= \case
     Nothing  -> return Nothing
     Just sha -> getHeader sha
 
-getCanonicalChain :: Integer 
-                  -> Int 
+getCanonicalChain :: Integer
+                  -> Int
                   -> Redis [SHA]
 getCanonicalChain start limit = do
     let chain = forM (take limit [start..]) getCanonical
     catMaybes <$> chain
 
 getZippedCanonicalChain :: (SHA -> Redis (Maybe t))
-                        -> Integer 
+                        -> Integer
                         -> Int
                         -> Redis [(SHA, t)]
 getZippedCanonicalChain mapper start limit = do
@@ -265,7 +271,7 @@ putHeader h = do
         sadd (inNamespace Numbers number) [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")  
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
 putHeaders :: (Traversable f, BlockHeaderLike h)
@@ -295,8 +301,8 @@ putBlock b = do
         --forM_ uncles -- todo index the uncles' headers/numbers/etc?
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")  
-        TxError e   -> pure . Left $ SingleLine (S8.pack e) 
+        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack e)
 
 putBlocks :: (Traversable f, BlockLike h t b, BlockHeaderLike h, TransactionLike t)
           => f b
@@ -305,15 +311,43 @@ putBlocks = mapM putBlock
 
 putBestBlockInfo :: SHA
                  -> Integer
+                 -> Integer
                  -> Redis (Either Reply Status)
-putBestBlockInfo sha totalDifficulty = do
-    _ <- return ()
-    -- todo traverse canonical chain, remove any larger #s, and update canonical #s down to LCA
-    set (inNamespace BestBlock NullKey) . toValue $ RedisBestBlock (sha, totalDifficulty)
+putBestBlockInfo newSha newNumber newTDiff = do
+    oldBBI' <- getBestBlockInfo
+    case oldBBI' of
+        Left err      -> return (Left err)
+        Right (oldSha, oldNumber, _) -> do
+            helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha (Set.singleton oldSha)
+            case helper' of
+                Left err -> return (Left err)
+                Right (ancestorSha, ancestorNumber, updates, deletions) -> do
+                    res <- multiExec $ do
+                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ toKey num) (toValue sha)
+                        forM_ deletions $ del . pure . inNamespace Canonical . toKey
+                        set bestBlockInfoKey . toValue $ RedisBestBlock (newSha, newNumber, newTDiff)
+                    case res of
+                        TxSuccess _ -> return $ Right Ok
+                        TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
+                        TxError e   -> return . Left $ SingleLine (S8.pack e)
 
-getBestBlockInfo :: Redis (Either Reply (SHA, Integer))
-getBestBlockInfo = get (inNamespace BestBlock NullKey) >>= \case
+commonAncestorHelper :: Integer -> Integer
+                     -> SHA -> SHA
+                     -> Set.Set SHA
+                     -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer]))
+commonAncestorHelper oldNum newNum oldSha newSha seen = do
+    ps@[newParent, oldParent] <- mapM (\x -> fromMaybe x <$> getParent x) [newSha, oldSha]
+    let seen' = Set.union seen (Set.fromList ps) -- todo double Set.insert is probably more optimal
+    if newParent `Set.member` seen'
+        then complete newParent
+        else commonAncestorHelper oldNum newNum oldParent newParent seen'
+
+    where complete ancestor = error "todo: we did it reddit!"
+
+
+getBestBlockInfo :: Redis (Either Reply (SHA, Integer, Integer))
+getBestBlockInfo = get bestBlockInfoKey >>= \case
     Left l  -> return (Left l)
     Right r -> case r of
         Nothing -> return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-        Just bs -> let (RedisBestBlock (sha, totalDiff)) = fromValue bs in return $ Right (sha, totalDiff)
+        Just bs -> let (RedisBestBlock (sha, num, tDiff)) = fromValue bs in return $ Right (sha, num, tDiff)
