@@ -25,7 +25,7 @@ root: ~/
 #attach: false
 
 # Runs after everything. Use it to attach to tmux with custom options etc.
-# post: tmux -CC attach -t strato-dashboard
+# post: tmux -CC attach -t strato
 
 windows:
   - backbone:
@@ -71,7 +71,47 @@ windows:
   - queryStrato:
       layout: even-horizontal 
       panes:
+        - dumpkafkaunminedblocks:
+          - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'
         - dumpkafkablocks:
           - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
         - dumpkafkastatediff:
           - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
+        - dumpkafkaunsequencer:
+          - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunsequencer'
+        - dumpkafkasequencer:
+          - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkasequencer'
+
+  - checkpoints:
+      layout: even-vertical
+      panes:
+        - sequencer get:
+          - watch -n 2 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s sequencer -o get'"
+        - evm get:
+          - watch -n 2 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s evm -o get'"
+        - indexer get:  
+          - watch -n 2 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s indexer -o get'"
+        - sequencer put:
+          - watch -n 2 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s sequencer -o put --offset 0'"
+        - evm put:
+          - watch -n 2 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s evm -o put --offset 0'"
+        - indexer put:  
+          - watch -n 2 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s indexer -o put --offset 0'"
+             
+  - monitor:
+      layout: tiled
+      panes:
+        - htop:
+          - htop
+  
+  - databases:
+      layout: tiled
+      panes:
+        - postgres:
+          - env ETHDB = docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato psql | cut -d \' \' -f2'
+          - docker exec -it silo_postgres_1 pg_top -d $ETHDB
+        - redis:
+          - docker exec -it silo_redis_1 bash -c 'redis-cli info'
+        - postgres-cirrus:
+          - docker exec -it silo_postgres-cirrus_1 bash -c 'su - postgres; pg_top cirrus'
+
