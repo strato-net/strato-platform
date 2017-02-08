@@ -15,6 +15,7 @@ module Blockchain.Strato.RedisBlockDB
     , getChildren
     , putHeader, putHeaders, putBlock, putBlocks
     , putCanonical
+    , getBestBlockInfo, putBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
     ) where
 
@@ -58,6 +59,7 @@ inNamespace ns k = ns' `S8.append` toKey k
             Parent       -> "p:"
             Children     -> "c:"
             Canonical    -> "q:"
+            BestBlock    -> "_best_"
 
 getInNamespace :: (RedisDBKeyable key)
                => BlockDBNamespace
@@ -301,6 +303,22 @@ putBlocks :: (Traversable f, BlockLike h t b, BlockHeaderLike h, TransactionLike
           => f b
           -> Redis (f (Either Reply Status))
 putBlocks = mapM putBlock
+
+putBestBlockInfo :: SHA
+                 -> Integer
+                 -> Redis (Either Reply Status)
+putBestBlockInfo sha totalDifficulty = do
+    _ <- return ()
+    -- todo traverse canonical chain, remove any larger #s, and update canonical #s down to LCA
+    set (inNamespace BestBlock NullKey) . toValue $ RedisBestBlock (sha, totalDifficulty)
+
+getBestBlockInfo :: Redis (Either Reply (SHA, Integer))
+getBestBlockInfo = get (inNamespace BestBlock NullKey) >>= \case
+    Left l  -> return (Left l)
+    Right r -> case r of
+        Nothing -> return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
+        Just bs -> let (RedisBestBlock (sha, totalDiff)) = fromValue bs in return $ Right (sha, totalDiff)
+
 
 ----------------------------------------------------------
 -- TODO: what checks should we have on the input here?

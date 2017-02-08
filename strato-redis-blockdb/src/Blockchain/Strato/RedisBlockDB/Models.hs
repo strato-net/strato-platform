@@ -11,8 +11,13 @@ import qualified Blockchain.Data.Transaction          as TXD
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
-data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Parent | Children | Canonical
+data BlockDBNamespace = Headers | Transactions | Numbers | Uncles | Parent | Children | Canonical | BestBlock
     deriving (Eq, Read, Show)
+
+data NullKey = NullKey deriving (Read, Eq, Show)
+
+instance RedisDBKeyable NullKey where
+    toKey = const S8.empty
 
 class RedisDBKeyable k where
     toKey :: k -> S8.ByteString
@@ -56,3 +61,11 @@ newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show,
 newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
+newtype RedisBestBlock = RedisBestBlock (SHA, Integer) deriving (Eq, Read, Show)
+
+instance RedisDBValuable RedisBestBlock where
+    toValue = rlpSerialize . wrap
+        where wrap (RedisBestBlock (sha, total)) = RLPArray [rlpEncode sha, rlpEncode total]
+    fromValue = unwrap . rlpDeserialize
+        where unwrap (RLPArray [sha, total]) = RedisBestBlock (rlpDecode sha, rlpDecode total)
+              unwrap _ = error "we are clearly incapable of humane exception handling"
