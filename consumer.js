@@ -96,7 +96,7 @@ function startConsumer() {
        }],
        {
          fromOffset: true,
-         fetchMaxBytes: 1024*1024*15
+         fetchMaxBytes: 1024*1024*150
        }
       );
     });
