@@ -14,7 +14,6 @@ module Blockchain.Strato.RedisBlockDB
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
     , getChildren
     , putHeader, putHeaders, putBlock, putBlocks
-    , putCanonical
     , getBestBlockInfo, putBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
     ) where
@@ -318,24 +317,3 @@ getBestBlockInfo = get (inNamespace BestBlock NullKey) >>= \case
     Right r -> case r of
         Nothing -> return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
         Just bs -> let (RedisBestBlock (sha, totalDiff)) = fromValue bs in return $ Right (sha, totalDiff)
-
-
-----------------------------------------------------------
--- TODO: what checks should we have on the input here?
--- Also, once we have a Chain type, we can traverse it and
--- probably get some guarentees on it's integrity
-putCanonical :: (BlockHeaderLike h)
-             => [h]
-             -> Redis (Either Reply Status)
-putCanonical [] = pure $ Right Ok
-putCanonical (b:chain) = do
-    res <- multiExec $ do
-        forM_ chain (\bb -> setnx (inNamespace Canonical $ blockHeaderBlockNumber bb) (toValue $ blockHeaderHash bb))
-        setnx (inNamespace Canonical $ blockHeaderBlockNumber b) (toValue $ blockHeaderHash b)
-    case res of
-        TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted putCanonical")
-        TxError e   -> pure . Left $ SingleLine (S8.pack $ "Error in putCanonical: " ++ e)
-
-
-
