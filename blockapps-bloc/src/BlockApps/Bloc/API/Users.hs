@@ -389,10 +389,10 @@ keyStore (Password pw) = do
   pwHash <- BCrypt.hashPassword 6 pw
   let
     scryptParams = Scrypt.Parameters
-      { Scrypt.n=16384
-      , Scrypt.r=8
-      , Scrypt.p=1
-      , Scrypt.outputLength=Saltine.secretBoxKey
+      { Scrypt.n = 16384
+      , Scrypt.r = 8
+      , Scrypt.p = 1
+      , Scrypt.outputLength = Saltine.secretBoxKey
       }
     err = error "could not decode encryption key"
     encKey = fromMaybe err . Saltine.decode $
