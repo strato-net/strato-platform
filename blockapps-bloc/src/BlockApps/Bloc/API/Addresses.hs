@@ -12,7 +12,6 @@ module BlockApps.Bloc.API.Addresses where
 
 import Control.Monad.Except
 import Control.Monad.Reader
-import Data.Maybe
 import Data.Proxy
 import qualified Hasql.Decoders as Decoders
 import qualified Hasql.Encoders as Encoders
@@ -41,6 +40,6 @@ instance MonadAddresses Bloc where
     addressesEither <- liftIO $ run (query () addressesQuery) conn
     case addressesEither of
       Left err -> throwError $ DBError err
-      Right addresses -> return (catMaybes addresses)
+      Right addresses -> return addresses
 
 type GetAddresses = "addresses" :> Get '[HTMLifiedJSON] [Address]

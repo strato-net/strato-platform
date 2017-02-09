@@ -1,0 +1,16 @@
+module BlockApps.Bloc.API.AddressesSpec where
+
+import Data.Either
+import Network.HTTP.Client
+import Servant.Client
+import Test.Hspec
+
+import BlockApps.Bloc.API.Addresses
+import BlockApps.Bloc.API.Utils
+
+spec :: Spec
+spec = beforeAll (newManager defaultManagerSettings) $
+  describe "getAddresses" $
+    it "gets a list of addresses" $ \ mgr -> do
+      addrsEither <- runClientM getAddresses (ClientEnv mgr urlTesterBloc)
+      addrsEither `shouldSatisfy` isRight

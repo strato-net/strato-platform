@@ -19,7 +19,6 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Functor.Contravariant
 import Data.HashMap.Strict (HashMap)
-import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
@@ -89,7 +88,7 @@ instance MonadUsers Bloc where
     addressesEither <- liftIO $ run (query name sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
-      Right addresses -> return $ catMaybes addresses
+      Right addresses -> return addresses
 
   postUsersUser (UserName name) (PostUsersUserRequest faucet pw) = do
     let
