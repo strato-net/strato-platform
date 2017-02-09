@@ -53,7 +53,7 @@ At the time of writing this the latest version is 1.19.
 ```
 
 ## Kafka
-Currently we're using v0.1.1.1, but this can change in the future. You'll need the Java 8 runtime environment and Zookeeper 3.4.whatever.
+Currently we're using v0.9.1.1, but this can change in the future. You'll need the Java 8 runtime environment and Zookeeper 3.4.whatever.
 
 ### MacOSX
 Again, you can use `brew search *` to figure out if the version you're looking for is currently on tap.
