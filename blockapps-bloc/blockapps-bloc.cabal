@@ -35,7 +35,6 @@ library
     , cryptonite
     , bytestring
     , generic-random
-    , haskoin-core
     , hasql
     , http-api-data
     , http-client
