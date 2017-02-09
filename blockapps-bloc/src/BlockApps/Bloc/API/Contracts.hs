@@ -17,7 +17,6 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
--- import qualified Data.Aeson.Types as JSON (fieldLabelModifier)
 import Data.Functor.Contravariant
 import Data.Int
 import Data.Monoid
@@ -26,7 +25,6 @@ import Data.Text (Text)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
--- import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -42,11 +40,9 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
--- import BlockApps.Strato.API.Client
--- import BlockApps.Strato.Types hiding (Contract)
 
 class Monad m => MonadContracts m where
-  getContracts :: m (Contracts)
+  getContracts :: m GetContractsContractResponse
   getContractsData :: ContractName -> m [Address]
   getContractsContract :: ContractName -> MaybeNamed Address -> m UnstructuredJSON
   getContractsState :: ContractName -> Address -> m UnstructuredJSON -- state-translation
@@ -254,28 +250,30 @@ instance MonadContracts Bloc where
   --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   --       return $ PostCompileResponse contractName _hash
 
-type GetContracts = "contracts" :> Get '[JSON] (Contracts)
-data Contract = Contract
+type GetContracts = "contracts" :> Get '[JSON] (GetContractsContractResponse)
+
+data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64
   , address :: MaybeNamed Address
   } deriving (Eq, Show, Generic)
-instance ToJSON Contract
-instance FromJSON Contract
-instance Arbitrary Contract where arbitrary = genericArbitrary
-newtype Contracts = Contracts
-  { unContracts :: Map Text [Contract] } deriving (Eq, Show, Generic)
-instance ToJSON Contracts where
+instance ToJSON AddressCreatedAt
+instance FromJSON AddressCreatedAt
+instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary
+
+newtype GetContractsContractResponse = GetContractsContractResponse
+  { unContracts :: Map Text [AddressCreatedAt] } deriving (Eq, Show, Generic)
+instance ToJSON GetContractsContractResponse where
   toJSON = toJSON . unContracts
-instance FromJSON Contracts where
-  parseJSON = fmap Contracts . parseJSON
-instance Arbitrary Contracts where arbitrary = genericArbitrary
-instance ToSample Contracts where
-  toSamples _ = singleSample $ Contracts $ Map.singleton "Sample"
-    [ Contract
+instance FromJSON GetContractsContractResponse where
+  parseJSON = fmap GetContractsContractResponse . parseJSON
+instance Arbitrary GetContractsContractResponse where arbitrary = genericArbitrary
+instance ToSample GetContractsContractResponse where
+  toSamples _ = singleSample $ GetContractsContractResponse $ Map.singleton "Sample"
+    [ AddressCreatedAt
       { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
       }
-    , Contract
+    , AddressCreatedAt
       { address = Named "Addressed"
       , createdAt = 101
       }
@@ -385,8 +383,8 @@ instance ToHttpApiData SymbolName where
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
 
-contractDecoder :: Decoders.Row Contract
-contractDecoder = Contract
+contractDecoder :: Decoders.Row AddressCreatedAt
+contractDecoder = AddressCreatedAt
   <$> Decoders.value Decoders.int8
   <*> Decoders.value (Unnamed <$> addressDecoder <|> Named <$> Decoders.text)
 
