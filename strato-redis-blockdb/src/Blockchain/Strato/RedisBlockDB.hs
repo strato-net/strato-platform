@@ -321,7 +321,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> return (Left err)
-                Right (ancestorSha, ancestorNumber, updates, deletions) -> do
+                Right (updates, deletions) -> do
                     res <- multiExec $ do
                         forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ toKey num) (toValue sha)
                         forM_ deletions $ del . pure . inNamespace Canonical . toKey
@@ -333,17 +333,17 @@ putBestBlockInfo newSha newNumber newTDiff = do
 
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
-                     -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer]))
+                     -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.singleton oldSha')
         where helper oldShaChain newShaChain seen = do
                   let oldSha = head oldShaChain
                       newSha = head newShaChain
                   ps@[newParent, oldParent] <- mapM (\x -> fromMaybe x <$> getParent x) [newSha, oldSha]
-                  let seen' = Set.union seen (Set.fromList ps) -- todo double Set.insert is probably more optimal
+                  let seen' = foldl (flip Set.insert) seen ps -- todo double Set.insert is probably more optimal
                   if newParent `Set.member` seen'
-                  then complete newParent
+                  then complete newParent newShaChain
                   else if oldParent `Set.member` seen
-                       then complete oldParent
+                       then complete oldParent newShaChain
                        else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
               -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
@@ -357,14 +357,16 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
-              --complete :: SHA -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer])) 
-              complete lca = getHeader lca >>= \case
+              complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
+              complete lca newShaChain = getHeader lca >>= \case
                       Nothing -> return . Left . SingleLine . S8.pack $
                                     "Could not get ancestor header for SHA " ++ shaToHex lca
-                      Just (ancestor :: RedisHeader) -> do
-                          let number = blockHeaderBlockNumber ancestor
-                          -- todo: build the new chain, figure out what needs to get deleted.
-                          error $ "todo: we did it reddit! LCA num " ++ show number ++ " sha " ++ shaToHex lca
+                      Just (ancestor :: RedisHeader) ->
+                          let ancestorNumber = blockHeaderBlockNumber ancestor
+                              deletions      = [newNum+1..ancestorNumber]
+                              updates        = tail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
+                          in
+                              return $ Right (updates, deletions)
 
 getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 getBestBlockInfo = get bestBlockInfoKey >>= \case
