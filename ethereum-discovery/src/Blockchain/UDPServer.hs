@@ -18,6 +18,7 @@ import qualified Crypto.Types.PubKey.ECC as ECC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
+import           Data.Monoid
 import           Data.Time.Clock.POSIX
 import           Data.Time.Clock
 import qualified Data.Text as T
@@ -122,7 +123,7 @@ udpHandshakeServer prv sock portNum = do
       Nothing -> logInfoN "timeout triggered"
       Just (msg, addr) -> do
         _ <- logInfoN $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
-        catch (handler msg addr) $ \(_ :: SomeException) -> logInfoN "malformed UDP packet"
+        catch (handler msg addr) $ \(e :: SomeException) -> logInfoN $ "malformed UDP packet: " <> (T.pack $ show e)
     udpHandshakeServer prv sock portNum
   where
     handler msg addr = case argValidator msg addr of
