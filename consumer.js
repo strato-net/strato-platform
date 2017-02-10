@@ -32,7 +32,7 @@ function start() {
       }];
       const options = {
         fromOffset: true,
-        fetchMaxBytes: 1024*1024*15,
+        fetchMaxBytes: 1024*1024*150,
       };
       scope.consumer = Promise.promisifyAll(new Consumer(client, payloads, options));
 
@@ -212,6 +212,7 @@ function cleanState(o) {
    ,_.mapValues(v => (typeof v !== 'object' || v === 'null') ? v : (v.key === undefined ? v : v.key)) // reduce enums
   )(o)
 };
+
 
 module.exports = {
   start:start,
