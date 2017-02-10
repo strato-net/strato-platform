@@ -7,13 +7,14 @@ module Main (main) where
 import           Control.Exception (bracket)
 import           Data.Maybe
 import           Data.Tree
+import           Control.Lens hiding (levels)
+import           Control.Lens.Fold
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Test.HUnit as HUnit
 import           Database.Redis
 import           Test.Hspec
 import           Test.QuickCheck
-import           Lens.Family2
 
 import qualified Blockchain.Strato.RedisBlockDB as RDB
 import           Blockchain.Data.BlockDB
@@ -159,6 +160,15 @@ specTest = around withConn $ describe "BlockData" $ do
        liftIO . putStrLn $ showTree $ 
            (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
        liftIO . putStrLn . show $ levels (blockDataNumber <$> tree)
+       -- pick two leaves
+       let l1 = maximumOf (_blockDataDifficulty) tree :: Maybe BlockData
+       -- let berries = head . reverse . levels $ tree :: [BlockData]
+       -- let (l1, l2) = case length berries of 
+       --                   x | x >= 2 -> (head berries, head . reverse $ berries)
+       --                   1          -> (head berries, head . head . reverse . (drop 1) . levels $ tree)
+       --                   _          -> error "1 = 2" 
+       liftIO $ putStrLn $ format l1
+       --liftIO $ putStrLn $ format l2
        HUnit.assertEqual
             "sdfsdf"
             True True
