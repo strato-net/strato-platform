@@ -85,21 +85,3 @@ prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeade
 
 showHash :: SHA -> String
 showHash (SHA h) = take 8 $ showHex h ""
-----------------------------------
--- a tree example
---
--- data Tree a = Node {rootLabel :: a, subForest :: Forest a}
--- type Forest a = [Tree a]
---
-t1 :: Tree Char
-t1 = Node 'A' [Node 'B' (map lf "CDE"), Node 'F' [Node 'G' (map lf "HIJKLM"), Node 'N' (map lf "OPQR")]] 
-  where lf x = Node x []
-
--------------------------------------
--- ugh fix this tomorrow morning
-partitionChain :: [BlockData] -> [[Integer]]
-partitionChain bd = (blockDataNumber <$>) <$> g
-    where g = (groupBy (\x y -> blockDataNumber x == blockDataNumber y)) bd :: [[BlockData]]
-
-showChain :: [BlockData] -> IO ()
-showChain = putStrLn . show . partitionChain 
