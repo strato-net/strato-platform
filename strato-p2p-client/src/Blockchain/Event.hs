@@ -7,6 +7,7 @@ module Blockchain.Event (
   getBestKafkaBlockNumber
   ) where
 
+import Control.Arrow ((&&&))
 import Control.Exception.Lifted
 import Control.Monad
 import Control.Monad.IO.Class
@@ -171,11 +172,29 @@ handleEvents mode peer = awaitForever $ \case
             yield $ GetBlockBodies neededHashes
             stampActionTimestamp
 
-    MsgEvt (GetBlockBodies []) -> yield $ BlockBodies []
-    MsgEvt (GetBlockBodies _) -> do
-        -- blocks :: [(SHA, Maybe Block)] <- RBDB.withRedisBlockDB $ RBDB.getBlocks shas
-        yield $ BlockBodies []
+    -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
+    -- todo: e.g. if they have bodies for SHAs [1, 2, 4, 7, 8, 9] and you request [1..10] you'll get
+    -- todo: bodies [1, 2, 4, 7, 8, 9] and have to correlate the bodies to the headers yourself
+    -- todo: it doesn't seem like we support that behavior very well yet, so we'll just stop sending
+    -- todo: blocks once we can't find one. this way we can always correlate header to body in
+    -- todo: `(MsgEvt (BlockBodies bodies))` with something akin to `zipWith getHeader shas bodies`
+    -- todo: our ideal scenario behavior would be returning something like [1, 2, [], 4, [], [], 7, 8, 9, []]
+    -- todo: but alas, the devs hate us.
+    -- todo: instead, we'd just return [1, 2] in this case, and hope the peer re-requests the missing blocks from
+    -- todo: someone else or us at a later time
+    MsgEvt (GetBlockBodies [])   -> yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
+    MsgEvt (GetBlockBodies shas) -> getUntilMissing shas [] >>=  yield . BlockBodies . Prelude.reverse . fmap toBody
+        where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m) => [SHA] -> [Block] -> m [Block]
+              getUntilMissing []     bodies = return bodies
+              getUntilMissing (h:hs) bodies = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
+                  Nothing   -> return bodies
+                  Just body -> getUntilMissing hs (body:bodies)
 
+              toBody :: Block -> ([Transaction], [BlockHeader])
+              toBody = (blockTransactions &&& fmap morphBlockHeader . blockUncleHeaders)
+
+    -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
+    -- todo:
     MsgEvt (BlockBodies []) -> clearActionTimestamp
     MsgEvt (BlockBodies bodies) -> do
         clearActionTimestamp

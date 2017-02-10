@@ -3,8 +3,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# OPTIONS -fno-warn-redundant-constraints #-}
-{-# OPTIONS -fno-warn-unused-matches #-}
 module Blockchain.Strato.RedisBlockDB
     ( getSHAsByNumber
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
@@ -32,11 +30,12 @@ import           Data.Maybe                            (catMaybes, fromJust, fro
 import qualified Data.Set                              as Set
 import           Database.Redis
 
-zipM' :: (Traversable t, Monad m)
-      => (a -> m b)
-      -> t a
-      -> m (t (a, b))
-zipM' f = mapM (\x -> (,) x <$> f x)
+-- todo: move this somewhere?
+zipMapM :: (Traversable t, Monad m)
+        => (a -> m b)
+        -> t a
+        -> m (t (a, b))
+zipMapM f = mapM (\x -> (,) x <$> f x)
 
 class (Monad m) => HasRedisBlockDB m where
     getRedisBlockDB :: m Connection
@@ -97,7 +96,7 @@ getHeader sha = getInNamespace Headers sha >>= \case
 getHeaders :: BlockHeaderLike h
            => [SHA]
            -> Redis [(SHA, Maybe h)]
-getHeaders = zipM' getHeader
+getHeaders = zipMapM getHeader
 
 getHeadersByNumber :: BlockHeaderLike h
                    => Integer
@@ -109,7 +108,7 @@ getHeadersByNumber n = getMembersInNamespace Numbers n >>= \case
 getHeadersByNumbers :: BlockHeaderLike h
                     => [Integer]
                     -> Redis [(Integer, [(SHA, Maybe h)])]
-getHeadersByNumbers = zipM' getHeadersByNumber
+getHeadersByNumbers = zipMapM getHeadersByNumber
 
 getTransactions :: TransactionLike t
                 => SHA
@@ -139,7 +138,7 @@ getParent sha = getInNamespace Parent sha >>= \case
 getParents :: (Traversable f)
            => f SHA
            -> Redis (f (SHA, Maybe SHA))
-getParents = zipM' getParent
+getParents = zipMapM getParent
 
 getChain :: (a -> Redis (Maybe a))
          -> a
@@ -161,7 +160,7 @@ getZippedParentChain :: (SHA -> Redis (Maybe t))
                      -> Redis [(SHA, t)]
 getZippedParentChain mapper start limit = do
     shaChain <- getParentChain start limit
-    mapChain <- zipM' mapper shaChain
+    mapChain <- zipMapM mapper shaChain
     return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
 getHeaderChain :: (BlockHeaderLike h)
@@ -203,7 +202,7 @@ getZippedCanonicalChain :: (SHA -> Redis (Maybe t))
                         -> Redis [(SHA, t)]
 getZippedCanonicalChain mapper start limit = do
     shaChain <- getCanonicalChain start limit
-    mapChain <- zipM' mapper shaChain
+    mapChain <- zipMapM mapper shaChain
     return $ second fromJust <$> takeWhile (isJust . snd) mapChain
 
 getCanonicalHeaderChain :: (BlockHeaderLike h)
@@ -241,7 +240,7 @@ getBlock sha = do
 getBlocks :: BlockLike h t b
           => [SHA]
           -> Redis [(SHA, Maybe b)]
-getBlocks = zipM' getBlock
+getBlocks = zipMapM getBlock
 
 getBlocksByNumber :: (BlockLike h t b)
                   => Integer
@@ -253,7 +252,7 @@ getBlocksByNumber n = getMembersInNamespace Numbers n >>= \case
 getBlocksByNumbers :: (BlockLike h t b)
                    => [Integer]
                    -> Redis [(Integer, [(SHA, Maybe b)])]
-getBlocksByNumbers = zipM' getBlocksByNumber
+getBlocksByNumbers = zipMapM getBlocksByNumber
 
 putHeader :: (BlockHeaderLike h)
           => h
@@ -321,10 +320,10 @@ putBestBlockInfo newSha newNumber newTDiff = do
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> return (Left err)
-                Right (ancestorSha, ancestorNumber, updates, deletions) -> do
+                Right (updates, deletions) -> do
                     res <- multiExec $ do
                         forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ toKey num) (toValue sha)
-                        forM_ deletions $ del . pure . inNamespace Canonical . toKey
+                        void . del $ inNamespace Canonical . toKey <$> deletions
                         set bestBlockInfoKey . toValue $ RedisBestBlock (newSha, newNumber, newTDiff)
                     case res of
                         TxSuccess _ -> return $ Right Ok
@@ -333,17 +332,17 @@ putBestBlockInfo newSha newNumber newTDiff = do
 
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
-                     -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer]))
+                     -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.singleton oldSha')
         where helper oldShaChain newShaChain seen = do
                   let oldSha = head oldShaChain
                       newSha = head newShaChain
-                  ps@[newParent, oldParent] <- mapM (\x -> fromMaybe x <$> getParent x) [newSha, oldSha]
-                  let seen' = Set.union seen (Set.fromList ps) -- todo double Set.insert is probably more optimal
+                  ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
+                  let seen' = foldl (flip Set.insert) seen ps -- todo double Set.insert is probably more optimal
                   if newParent `Set.member` seen'
-                  then complete newParent
+                  then complete newParent newShaChain
                   else if oldParent `Set.member` seen
-                       then complete oldParent
+                       then complete oldParent newShaChain
                        else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
               -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
@@ -357,18 +356,20 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
-              --complete :: SHA -> Redis (Either Reply (SHA, Integer, [(SHA, Integer)], [Integer])) 
-              complete lca = getHeader lca >>= \case
+              complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
+              complete lca newShaChain = getHeader lca >>= \case
                       Nothing -> return . Left . SingleLine . S8.pack $
                                     "Could not get ancestor header for SHA " ++ shaToHex lca
-                      Just (ancestor :: RedisHeader) -> do
-                          let number = blockHeaderBlockNumber ancestor
-                          -- todo: build the new chain, figure out what needs to get deleted.
-                          error $ "todo: we did it reddit! LCA num " ++ show number ++ " sha " ++ shaToHex lca
+                      Just (ancestor :: RedisHeader) ->
+                          let ancestorNumber = blockHeaderBlockNumber ancestor
+                              deletions      = [newNum+1..oldNum]
+                              updates        = tail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
+                          in
+                              return $ Right (updates, deletions)
 
 getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 getBestBlockInfo = get bestBlockInfoKey >>= \case
-    Left e  -> return Nothing 
+    Left _  -> return Nothing
     Right r -> case r of
         Nothing -> return Nothing --return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
         Just bs -> let (RedisBestBlock (sha, num, tDiff)) = fromValue bs in return $ Just (sha, num, tDiff)
