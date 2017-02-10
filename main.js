@@ -8,7 +8,7 @@ var scope = {};
 
 init(scope)
   .then(expressApp())
-  .then(consumer())
+  .then(consumer.start())
   .catch(err => {
     console.log('Failed to launch cirrus', err)
   })

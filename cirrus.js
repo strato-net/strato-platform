@@ -1,41 +1,28 @@
-var http = require('http');
-var Pool = require('pg-pool')
-var Queue = require('promise-queue');
-var express = require('express');
-var path = require('path');
-var bodyParser = require('body-parser');
-
-var logger = require('morgan');
-
-var debug = require('debug')('myapp:server');
-var cors = require('cors');
-
-var bodyParser = require('body-parser')
-
-var express = require('express');
-
-var bajs = require('blockapps-js');
-
-var util = require('./lib/util');
-
-var toSchemaString = util.toSchemaString;
-
-var router = express.Router();
+var http = require('http'),
+ Pool = require('pg-pool'),
+ Queue = require('promise-queue'),
+ express = require('express'),
+ path = require('path'),
+ bodyParser = require('body-parser'),
+ logger = require('morgan'),
+ debug = require('debug')('myapp:server'),
+ cors = require('cors'),
+ bodyParser = require('body-parser'),
+ express = require('express'),
+ util = require('./lib/util'),
+ consumer = require('./consumer.js'),
+ _ = require('lodash/fp'),
+ __ = require('lodash'),
+ toSchemaString = util.toSchemaString,
+ router = express.Router();
 
 function startCirrus() {
   return function(scope) {
     return new Promise(function(resolve, reject) {
-      // scope.app = express();
-      // var app = scope.app;
-      //app.use(bodyParser.json())
+
       var app = express();
       app.use(bodyParser.json({limit: '500mb'}));
       app.use(bodyParser.urlencoded({limit: '500mb', extended: true }));
-
-
-      var _ = require('lodash/fp');
-      var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
-
 
       // create the pool somewhere globally so its lifetime
       // lasts for as long as your app is running
@@ -51,17 +38,23 @@ function startCirrus() {
       app.post('/', function (req, res, next) {
         var schema = toSchemaString(req.body);
         global.contractMap[req.body.codeHash] = req.body;
-
         console.log("global.contractMap: " + JSON.stringify(global.contractMap));
-
-        pool
-          .query(schema)
-          .then(_ => console.log("done creating new table for contract"))
-
         console.log("Schema: " + schema)
-        res.send(schema)
-        next();
 
+        pool.query(schema)
+          .then(_ => {
+            console.log("done creating new table for contract")
+            console.log('Resetting the offset for kafka');
+            return consumer.resetOffset()(scope);
+          })
+          .then(scope => {
+            res.send(schema)
+            next();
+          })
+          .catch(err => {
+            console.log(err);
+            throw new Error(err);
+          })
       });
 
       app.get('/', function (req, res, next) {

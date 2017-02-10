@@ -1,8 +1,9 @@
-var Pool = require('pg-pool');
-var rp = require("request-promise");
-var util = require('./lib/util');
-var Promise = require('bluebird');
-var toSchemaString = util.toSchemaString;
+var Pool = require('pg-pool'),
+ rp = require('request-promise'),
+ util = require('./lib/util'),
+ Promise = require('bluebird'),
+ consumer = require('./consumer')
+ toSchemaString = util.toSchemaString;
 
 function initCirrus(scope) {
   scope.contractMap = {};
@@ -22,6 +23,7 @@ function initCirrus(scope) {
     .then(getKafkaTopic())
     .catch(err => {
       console.log('Failed to init', err)
+      throw new Error('Failed to init cirrus: ' + err)
     })
 }
 
