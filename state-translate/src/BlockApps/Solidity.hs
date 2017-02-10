@@ -73,7 +73,19 @@ decodeValue storage offset = \case
     where
       bytes = map fromIntegral . ByteString.unpack $ slice n storage
   TypeUInt Nothing -> decodeValue storage offset (TypeUInt (Just 256))
-  TypeInt _ -> undefined
+  TypeInt (Just n) ->
+    let
+      Just (byte,bytes) = ByteString.uncons $ slice n storage
+      (sign, significant) =
+        if byte == 0xff
+          then (negate, ByteString.dropWhile (==0xff) bytes)
+          else (id, ByteString.dropWhile (==0x00) bytes)
+      m = ByteString.length significant
+      significant' = map fromIntegral $ ByteString.unpack significant
+    in
+      ValueInt . sign . sum $
+        zipWith shiftL significant' [8*(m-1),8*(m-2)..0]
+  TypeInt Nothing -> decodeValue storage offset (TypeInt (Just 256))
   TypeFixed (Just (n,m)) -> undefined
   TypeFixed Nothing -> undefined
   TypeBytes (Just n) -> undefined
