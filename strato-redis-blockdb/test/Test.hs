@@ -22,7 +22,7 @@ import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Format
-import           TestChain
+import           Blockchain.Strato.RedisBlockDB.Test.Chain
 
 ------------------------------------------------------------------------------
 -- Main and helpers
