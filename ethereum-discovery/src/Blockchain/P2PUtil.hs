@@ -34,8 +34,9 @@ import           Network.Haskoin.Crypto       (Word256)
 data DiscoverException = AffineException
                        | ByteStringLengthException String
                        | IPFormatException String
-                       | NoPublicKeyException
                        | MalformedUDPException String
+                       | MissingPortException String
+                       | NoPublicKeyException
                          deriving (Show, Typeable)
 
 instance Exception DiscoverException

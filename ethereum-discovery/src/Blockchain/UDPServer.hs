@@ -125,14 +125,17 @@ udpHandshakeServer prv sock portNum = do
         catch (handler msg addr) $ \(_ :: SomeException) -> logInfoN "malformed UDP packet"
     udpHandshakeServer prv sock portNum
   where
-    handler msg addr = case msgValidator msg of
+    handler msg addr = case argValidator msg addr of
       Left msgErr -> logInfoN . T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
-      Right (packet, otherPubKey) -> handleValidPacket prv sock addr packet otherPubKey
-    msgValidator :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point)
-    msgValidator msg = do
+      Right (packet, otherPubKey, otherPort) -> do
+        _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
+        handleValidPacket prv sock addr otherPort packet otherPubKey
+    argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, PortNumber)
+    argValidator msg addr = do
       (packet, otherPubkey) <- dataToPacket msg
       validOtherPubKey <- hPubKeyToPubKey otherPubkey
-      return (packet, validOtherPubKey)
+      otherPort <- getAddrPort addr
+      return (packet, validOtherPubKey, otherPort)
 
 handleValidPacket :: (HasSQLDB m,
                       MonadResource m,
@@ -143,11 +146,11 @@ handleValidPacket :: (HasSQLDB m,
                   => H.PrvKey
                   -> Socket
                   -> SockAddr
+                  -> PortNumber
                   -> NodeDiscoveryPacket
                   -> ECC.Point
                   -> m ()
-handleValidPacket prv sock addr packet otherPubKey = do
-  _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
+handleValidPacket prv sock addr portNum packet otherPubKey =
   case packet of
     Ping{} -> do
                let ip = sockAddrToIP addr
@@ -155,8 +158,8 @@ handleValidPacket prv sock addr packet otherPubKey = do
                let peer = PPeer {
                      pPeerPubkey = Just otherPubKey,
                      pPeerIp = T.pack ip,
-                     pPeerUdpPort = fromIntegral $ getAddrPort addr,
-                     pPeerTcpPort = fromIntegral $ getAddrPort addr, --TODO- put correct TCP port in here
+                     pPeerUdpPort = fromIntegral portNum,
+                     pPeerTcpPort = fromIntegral portNum, --TODO- put correct TCP port in here
                      pPeerNumSessions = 0,
                      pPeerLastTotalDifficulty = 0,
                      pPeerLastMsg  = T.pack "msg",
@@ -174,7 +177,7 @@ handleValidPacket prv sock addr packet otherPubKey = do
                sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
 
     Pong{} ->
-      liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral $ getAddrPort addr) 2
+      liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
 
     FindNeighbors{} -> do
                time <- liftIO $ round `fmap` getPOSIXTime
@@ -202,7 +205,7 @@ handleValidPacket prv sock addr packet otherPubKey = do
 
                               return ()
 
-getAddrPort::SockAddr->PortNumber
-getAddrPort (SockAddrInet portNumber _) = portNumber
-getAddrPort (SockAddrInet6 portNumber _ _ _) = portNumber
-getAddrPort _ = error "getAddrPort called for address that doesn't have a port"
+getAddrPort::SockAddr-> Either DiscoverException PortNumber
+getAddrPort (SockAddrInet portNumber _) = Right portNumber
+getAddrPort (SockAddrInet6 portNumber _ _ _) = Right portNumber
+getAddrPort s = Left $ MissingPortException $ "No port number: " ++ show s
