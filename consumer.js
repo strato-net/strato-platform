@@ -104,7 +104,11 @@ function consumeMessage(m) {
               body: x,
               json: true };
               //console.log("create options: " + JSON.stringify(options));
-              return rp(options).promise();
+              return rp(options).promise()
+                .catch(err => {
+                  console.log('Failed updating contract: ', x);
+                  throw new Error(err);
+                });
             })
           .catch(err => console.log("Warn: " + err))
       }),
@@ -132,10 +136,17 @@ function consumeMessage(m) {
                  'content-type': 'application/json' },
               body: x,
               json: true };
-              //console.log("update options: " + JSON.stringify(options));
-              return rp(options).promise();
+              // console.log("update options: " + JSON.stringify(options));
+              return rp(options).promise()
+                .catch(err => {
+                  console.log('Failed updating contract: ', x);
+                  throw new Error(err);
+                });
           })
-        .catch(err => console.log("Warn: " + err))
+        .catch(err => {
+          console.log('Warn: ' + err,
+                      'Failed on offset: ' + m.offset);
+        });
       }),
 
       deletedAccounts.map(a => {})
