@@ -48,7 +48,7 @@ data Options = State{root::String, db::String}
              | DumpKafkaSequencer{startingBlock::Int}
              | DumpKafkaUnSequencer{startingBlock::Int}
              | DumpKafkaUnminedBlocks{startingBlock::Int}
-             | DumpKafkaRaw{startingBlock::Int}
+             | DumpKafkaRaw{streamName::String, startingBlock::Int}
              | DumpKafkaStateDiff{startingBlock::Int}
              | Psql{}
              | InsertTX{}
@@ -142,7 +142,8 @@ dumpKafkaUnminedBlocksOptions =
 dumpKafkaRawOptions::Annotate Ann
 dumpKafkaRawOptions =
   record DumpKafkaRaw{startingBlock=undefined} [
-    startingBlock := 0 += typ "INT" += argPos 1
+    startingBlock := 0 += typ "INT" += argPos 1,
+    streamName := def += typ "DBSTRING" += argPos 0
     ]
 
 dumpKafkaStateDiffOptions::Annotate Ann
@@ -212,7 +213,7 @@ run DumpKafkaSequencer{..}     = dumpKafkaSequencer (fromIntegral startingBlock)
 run DumpKafkaUnSequencer{..}   = dumpKafkaUnSequencer (fromIntegral startingBlock)
 run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)
-run DumpKafkaRaw{..}           = dumpKafkaRaw (fromIntegral startingBlock)
+run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
 run Psql{}                     = psql
 run InsertTX{}                 = insertTX
