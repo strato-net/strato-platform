@@ -87,6 +87,7 @@ instance ToCapture (Capture "address" Address) where
   toCapture _ = DocCapture "address" "an Ethereum address"
 instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
+
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
 

@@ -1,11 +1,14 @@
 {-# LANGUAGE
     DataKinds
+  , DeriveGeneric
   , TypeOperators
 #-}
 
 module BlockApps.Strato.API (API) where
 
+-- import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
+-- import GHC.Generics
 import Numeric.Natural
 import Servant.API
 
@@ -86,3 +89,22 @@ type API =
   :<|> "extabi"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] Text
+
+-- data SolcResponse = SolcResponse
+--   { solcresponseAbis :: [Abi]
+--   , solcresponseContracts :: [BinContract]
+--   , solcresponseXabis :: HashMap Text Xabi
+--   } deriving (Eq,Show,Generic)
+-- data Abi = Abi
+--   { abiName :: Text
+--   , abiAbi :: [Signature]
+--   } deriving (Eq,Show,Generic)
+-- data Signature = Signature
+--   { signatureInputs :: [Text]
+--   , signatureType :: Text
+--   } deriving (Eq,Show,Generic)
+-- data BinContract = BinContract
+--   { bincontractName :: Text
+--   , binBin :: Text
+--   } deriving (Eq,Show,Generic)
+-- data Xabi = Xabi deriving (Eq,Show,Generic)

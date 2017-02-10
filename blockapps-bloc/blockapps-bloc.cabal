@@ -76,11 +76,16 @@ test-suite blockapps-bloc-test
   main-is: Spec.hs
   other-modules:
     BlockApps.Bloc.APISpec
+    BlockApps.Bloc.API.AddressesSpec
+    BlockApps.Bloc.API.ContractsSpec
   other-modules:
   build-depends: base >=4 && < 5
     , blockapps-bloc
+    , blockapps-data
     , hspec
+    , http-client
     , servant-aeson-specs
+    , servant-client
 
 source-repository head
   type: git
