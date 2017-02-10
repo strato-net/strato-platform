@@ -12,35 +12,25 @@
 
 module Handler.TransactionInfo where
 
-import Import
-import Handler.Common 
-
-import Data.Aeson
+import           System.Clock
+import           Data.Aeson
 import qualified Database.Esqueleto as E
-import Data.List
+import           Data.List
 import qualified Data.Map as Map
 import qualified Prelude as P
 import qualified Data.Text as T 
 
-import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
-
-import Handler.Filters
-
-import System.Clock
-import Control.DeepSeq
-import Control.Monad.Logger
-import Blockchain.DBM
-import Blockchain.Data.Address
-import Blockchain.SHA
-import Blockchain.Format
-import Blockchain.Data.Code
-import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
-import Blockchain.Sequencer.Kafka (writeUnseqEvents)
-
-import Blockchain.EthConf (runKafkaConfigured)
-
-import Blockchain.Util (getCurrentMicrotime)
+import           Import
+import           Handler.Common 
+import           Handler.Filters
+import           Blockchain.Data.TXOrigin
+import           Blockchain.Data.Transaction
+import           Blockchain.DBM
+import           Blockchain.Format
+import           Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
+import           Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import           Blockchain.EthConf (runKafkaConfigured)
+import           Blockchain.Util (getCurrentMicrotime)
 
 instance NFData RawTransaction'
 
@@ -64,7 +54,7 @@ postTransactionR = do
        (Success (RawTransaction' raw "")) -> do
           let tx' = rawTX2TX raw
               h = toJSON $ transactionHash tx'
-          insertTX Log API Nothing [tx']
+          void $ insertTX Log API Nothing [tx']
           emitKafkaTransactions [tx']
           case h of
             (String h') -> do
@@ -99,7 +89,7 @@ postTransactionListR = do
           $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr)) 
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
-          let times = (P.map timeSpecAsNanoSecs $
+          let times = (P.map toNanoSecs $
                 [parserStart - handlerStart, 
                  txHashStart - parserStart,
                  insertTXStart - txHashStart,
@@ -137,6 +127,7 @@ getTransactionR = do
                  let showReject = case showRejectedMaybe of
                                     Just "true"  -> -1
                                     Just "false" -> 0
+                                    Just _       -> 0
                                     Nothing      -> 0
                  $logDebug $ T.pack $ show showReject
 --                 let offset = (fromIntegral $ (maybe 0 id $ extractPage "page" getParameters)  :: Int64)
@@ -171,7 +162,6 @@ getTransactionR = do
                  let extra p = P.zipWith extraFilter p (P.repeat (newindex))
                  -- this should actually use URL encoding code from Yesod
                  let next p = "/eth/v1.2/transaction?" P.++  (P.foldl1 (\a b -> (unpack a) P.++ "&" P.++ (unpack b)) $ P.map (\(k,v) -> (unpack k) P.++ "=" P.++ (unpack v)) (extra p))
-                 let addedParam = appendIndex getParameters
 
                  toRet raw (P.map E.entityVal modTxs) (next $ appendIndex getParameters)
 

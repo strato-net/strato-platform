@@ -254,7 +254,7 @@ fromHexText v = res
   where ((res,_):_) = readHex $ T.unpack $ v :: [(Word256,String)]
 
 extractHash :: String -> [(Text, Text)] ->  Maybe String
-extractHash name ts = Just "" 
+extractHash _ _ = Just "" 
 
 extractPage :: String -> [(Text, Text)] -> Maybe Integer
 extractPage name ts = extractPage' 0 name ts

@@ -4,18 +4,12 @@ module Handler.Peers where
 
 import Import hiding ((</>), readFile)
 
-import Blockchain.EthConf
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import Conduit
-import Data.Aeson
-import Data.Conduit.Network
+import           Data.Aeson
+import           Data.Conduit.Network
 import qualified Data.HashMap.Strict as H
-import Data.Maybe
+import           Data.Maybe
 import qualified Data.Text as T
-import qualified Data.Vector as V
 
 getPeersR :: Handler Value
 getPeersR = do 
