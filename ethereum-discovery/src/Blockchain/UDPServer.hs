@@ -14,6 +14,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
+import qualified Crypto.Types.PubKey.ECC as ECC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
@@ -72,100 +73,134 @@ addPeersIfNeeded prv sock= do
         liftIO $ disableUDPPeerForSeconds thePeer 10
       else logInfoN "no peers available to bootstrap from, will try again soon."
 
-attemptBond::(MonadIO m, MonadLogger m)=>
-                  H.PrvKey->Socket->Int->m ()
+attemptBond :: (MonadIO m, MonadLogger m)
+            => H.PrvKey
+            -> Socket
+            -> Int
+            -> m ()
 attemptBond prv sock portNum = do
   unbondedPeers <- liftIO getUnbondedPeers
   when (length unbondedPeers /= 0) $
     forM_ unbondedPeers $ \p -> do
-      (peeraddr:_) <- liftIO $ getAddrInfo Nothing (Just $ T.unpack $ pPeerIp p) (Just $ show $ pPeerUdpPort p)
+      (peeraddr : _) <- liftIO $ getAddrInfo
+                                   Nothing
+                                   (Just $ T.unpack $ pPeerIp p)
+                                   (Just $ show $ pPeerUdpPort p)
       time <- liftIO $ round `fmap` getPOSIXTime
-      (serveraddr:_) <- liftIO $ getAddrInfo
-                                  (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                  Nothing (Just (show portNum))
-      sendPacket sock prv (addrAddress peeraddr) $
+      (serveraddr : _) <- liftIO $ getAddrInfo
+                                    (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
+                                    Nothing
+                                    (Just (show portNum))
+      ehostAddress <- return $ getHostAddress $ addrAddress serveraddr
+      case ehostAddress of
+        Left err -> logInfoN $ T.pack . show $ err
+        Right hostAddress -> do
+          sendPacket sock prv (addrAddress peeraddr) $
                 Ping 4
-                   (Endpoint (getHostAddress $ addrAddress serveraddr) 30303 30303)
+                   (Endpoint hostAddress 30303 30303)
                    (Endpoint (stringToIAddr $ T.unpack $ pPeerIp p)
                              (fromIntegral $ pPeerUdpPort p)
                              (fromIntegral $ pPeerTcpPort p))
                    (time+50)
-      liftIO $ setPeerBondingState (T.unpack $ pPeerIp p) (pPeerUdpPort p) 1
+          liftIO $ setPeerBondingState (T.unpack $ pPeerIp p) (pPeerUdpPort p) 1
 
-udpHandshakeServer::(HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadCatch m, MonadThrow m, MonadIO m, MonadLogger m)=>
-                    H.PrvKey->Socket->Int->m ()
+udpHandshakeServer :: (HasSQLDB m,
+                       MonadResource m,
+                       MonadBaseControl IO m,
+                       MonadCatch m,
+                       MonadThrow m,
+                       MonadLogger m)
+                   => H.PrvKey
+                   -> Socket
+                   -> Int
+                   -> m ()
 udpHandshakeServer prv sock portNum = do
-    addPeersIfNeeded prv sock
-    attemptBond prv sock portNum
-
-    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280  -- liftIO unavoidable?
-
+    _ <- addPeersIfNeeded prv sock
+    _ <- attemptBond prv sock portNum
+    maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280
     _ <- case maybePacketData of
       Nothing -> logInfoN "timeout triggered"
-      Just (msg,addr) -> do
+      Just (msg, addr) -> do
         _ <- logInfoN $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
-        catch (return (dataToPacket msg) >>= handleValidPacket msg addr) (\(_ :: SomeException) -> logInfoN "malformed UDP packet")
+        catch (handler msg addr) $ \(_ :: SomeException) -> logInfoN "malformed UDP packet"
     udpHandshakeServer prv sock portNum
   where
-    handleValidPacket :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadCatch m, MonadThrow m, MonadIO m, MonadLogger m)
-                      => B.ByteString->SockAddr->(NodeDiscoveryPacket, H.PubKey)->m ()
-    handleValidPacket msg addr (packet, otherPubkey) = do
-      _ <- logInfoN "before the logInfoN line"
-      _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes $ hPubKeyToPubKey otherPubkey) ++ "....) " ++ format (fst $ dataToPacket msg)
-      _ <- logInfoN "after the logInfoN line"
-      case packet of
-            Ping _ _ _ _ -> do
-                       let ip = sockAddrToIP addr
-                       curTime <- liftIO $ getCurrentTime
-                       let peer = PPeer {
-                             pPeerPubkey = Just $ hPubKeyToPubKey $ otherPubkey,
-                             pPeerIp = T.pack ip,
-                             pPeerUdpPort = fromIntegral $ getAddrPort addr,
-                             pPeerTcpPort = fromIntegral $ getAddrPort addr, --TODO- put correct TCP port in here
-                             pPeerNumSessions = 0,
-                             pPeerLastTotalDifficulty = 0,
-                             pPeerLastMsg  = T.pack "msg",
-                             pPeerLastMsgTime = curTime,
-                             pPeerEnableTime = curTime,
-                             pPeerUdpEnableTime = curTime,
-                             pPeerLastBestBlockHash = SHA 0,
-                             pPeerBondState = 0,
-                             pPeerVersion = T.pack "61" -- fix
-                             }
-                       _ <- addPeer peer
+    handler msg addr = case msgValidator msg of
+      Left msgErr -> logInfoN . T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
+      Right (packet, otherPubKey) -> handleValidPacket prv sock addr packet otherPubKey
+    msgValidator :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point)
+    msgValidator msg = do
+      (packet, otherPubkey) <- dataToPacket msg
+      validOtherPubKey <- hPubKeyToPubKey otherPubkey
+      return (packet, validOtherPubKey)
 
-                       time <- liftIO $ round `fmap` getPOSIXTime
-                       peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1"
-                       sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
+handleValidPacket :: (HasSQLDB m,
+                      MonadResource m,
+                      MonadBaseControl IO m,
+                      MonadCatch m,
+                      MonadThrow m,
+                      MonadLogger m)
+                  => H.PrvKey
+                  -> Socket
+                  -> SockAddr
+                  -> NodeDiscoveryPacket
+                  -> ECC.Point
+                  -> m ()
+handleValidPacket prv sock addr packet otherPubKey = do
+  _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes $ otherPubKey) ++ "....) " ++ format packet
+  case packet of
+    Ping _ _ _ _ -> do
+               let ip = sockAddrToIP addr
+               curTime <- liftIO $ getCurrentTime
+               let peer = PPeer {
+                     pPeerPubkey = Just otherPubKey,
+                     pPeerIp = T.pack ip,
+                     pPeerUdpPort = fromIntegral $ getAddrPort addr,
+                     pPeerTcpPort = fromIntegral $ getAddrPort addr, --TODO- put correct TCP port in here
+                     pPeerNumSessions = 0,
+                     pPeerLastTotalDifficulty = 0,
+                     pPeerLastMsg  = T.pack "msg",
+                     pPeerLastMsgTime = curTime,
+                     pPeerEnableTime = curTime,
+                     pPeerUdpEnableTime = curTime,
+                     pPeerLastBestBlockHash = SHA 0,
+                     pPeerBondState = 0,
+                     pPeerVersion = T.pack "61" -- fix
+                     }
+               _ <- addPeer peer
 
-            Pong _ _ _ ->
-              liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral $ getAddrPort addr) 2
+               time <- liftIO $ round `fmap` getPOSIXTime
+               peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1"
+               sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
 
-            FindNeighbors _ _ -> do
-                       time <- liftIO $ round `fmap` getPOSIXTime
-                       sendPacket sock prv addr $ Neighbors [] (time + 50)
+    Pong _ _ _ ->
+      liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral $ getAddrPort addr) 2
 
-            Neighbors neighbors _ -> do
-                       forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
-                                      curTime <- liftIO $ getCurrentTime
-                                      let peer = PPeer {
-                                            pPeerPubkey = Just $ nodeIDToPoint nodeID,
-                                            pPeerIp = T.pack $ format addr',
-                                            pPeerUdpPort = fromIntegral udpPort,
-                                            pPeerTcpPort = fromIntegral tcpPort,
-                                            pPeerNumSessions = 0,
-                                            pPeerLastTotalDifficulty = 0,
-                                            pPeerLastMsg  = T.pack "msg",
-                                            pPeerLastMsgTime = curTime,
-                                            pPeerEnableTime = curTime,
-                                            pPeerUdpEnableTime = curTime,
-                                            pPeerLastBestBlockHash = SHA 0,
-                                            pPeerBondState = 0,
-                                            pPeerVersion = T.pack "61" -- fix
-                                            }
-                                      _ <- addPeer peer
+    FindNeighbors _ _ -> do
+               time <- liftIO $ round `fmap` getPOSIXTime
+               sendPacket sock prv addr $ Neighbors [] (time + 50)
 
-                                      return ()
+    Neighbors neighbors _ -> do
+               forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
+                              curTime <- liftIO $ getCurrentTime
+                              let peer = PPeer {
+                                    pPeerPubkey = Just $ nodeIDToPoint nodeID,
+                                    pPeerIp = T.pack $ format addr',
+                                    pPeerUdpPort = fromIntegral udpPort,
+                                    pPeerTcpPort = fromIntegral tcpPort,
+                                    pPeerNumSessions = 0,
+                                    pPeerLastTotalDifficulty = 0,
+                                    pPeerLastMsg  = T.pack "msg",
+                                    pPeerLastMsgTime = curTime,
+                                    pPeerEnableTime = curTime,
+                                    pPeerUdpEnableTime = curTime,
+                                    pPeerLastBestBlockHash = SHA 0,
+                                    pPeerBondState = 0,
+                                    pPeerVersion = T.pack "61" -- fix
+                                    }
+                              _ <- addPeer peer
+
+                              return ()
 
 getAddrPort::SockAddr->PortNumber
 getAddrPort (SockAddrInet portNumber _) = portNumber
