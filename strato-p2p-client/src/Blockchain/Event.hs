@@ -179,7 +179,9 @@ handleEvents mode peer = awaitForever $ \case
     -- todo: blocks once we can't find one. this way we can always correlate header to body in
     -- todo: `(MsgEvt (BlockBodies bodies))` with something akin to `zipWith getHeader shas bodies`
     -- todo: our ideal scenario behavior would be returning something like [1, 2, [], 4, [], [], 7, 8, 9, []]
-    -- todo: but alas, the devs hate us
+    -- todo: but alas, the devs hate us.
+    -- todo: instead, we'd just return [1, 2] in this case, and hope the peer re-requests the missing blocks from
+    -- todo: someone else or us at a later time
     MsgEvt (GetBlockBodies [])   -> yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
     MsgEvt (GetBlockBodies shas) -> getUntilMissing shas [] >>=  yield . BlockBodies . Prelude.reverse . fmap toBody
         where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m) => [SHA] -> [Block] -> m [Block]
