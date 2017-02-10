@@ -6,6 +6,7 @@ module Main (main) where
 
 import           Control.Exception (bracket)
 import           Data.Maybe
+import           Data.Tree
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Test.HUnit as HUnit
@@ -144,13 +145,23 @@ specTest = around withConn $ describe "BlockData" $ do
         g <- liftIO $ makeGenesisBlock
         chain <- liftIO $ buildChain g n 2
         let bb = chain !! (n `div` 2)
-        liftIO $ showChain chain
+        -- liftIO $ showChain chain
         r <- runRedis conn $ do
             void $ RDB.putBestBlockInfo (blockHeaderHash bb) (blockDataNumber bb) 9999
             RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
         HUnit.assertEqual
             "Couldn't get back best block"
             (Just (blockHeaderHash bb, blockDataNumber bb, 9999)) r
+
+    it "Should generate a tree" $ \_ -> do
+       g <- liftIO $ makeGenesisBlock
+       tree <- buildTree g 20 3
+       liftIO . putStrLn $ showTree $ 
+           (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
+       liftIO . putStrLn . show $ levels (blockDataNumber <$> tree)
+       HUnit.assertEqual
+            "sdfsdf"
+            True True
 
 --     it "Should get a whole chain" $ \conn -> do
 --         let n = 10
