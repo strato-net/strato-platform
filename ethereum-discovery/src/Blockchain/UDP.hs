@@ -70,7 +70,7 @@ instance Format NodeDiscoveryPacket where
   format (Ping _ from to _) = CL.blue "Ping" ++ " " ++ format from ++ " to: " ++ format to
   format (Pong to _ _) = CL.blue "Pong" ++ " to: " ++ format to
   format (FindNeighbors nodeID _) = CL.blue "FindNeighbors " ++ format nodeID
-  format (Neighbors neighbors _) = CL.blue ("Neighbors") ++ ": \n" ++ unlines (map (("    " ++) . format) neighbors)
+  format (Neighbors neighbors _) = CL.blue "Neighbors" ++ ": \n" ++ unlines (map (("    " ++) . format) neighbors)
 
 data IAddr = IPV4Addr HostAddress | IPV6Addr HostAddress6 deriving (Show, Read, Eq)
 
@@ -104,7 +104,7 @@ instance RLPSerializable IAddr where
   rlpDecode o@(RLPString s)
       | B.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o
       --TODO- verify the order of this
-      | B.length s == 16 = IPV6Addr $ (fromIntegral word128, fromIntegral $ word128 `shiftR` 32, fromIntegral $ word128 `shiftR` 64, fromIntegral $ word128 `shiftR` 96)
+      | B.length s == 16 = IPV6Addr (fromIntegral word128, fromIntegral $ word128 `shiftR` 32, fromIntegral $ word128 `shiftR` 64, fromIntegral $ word128 `shiftR` 96)
       --what a mess!  Sometimes address is array of address bytes, sometimes a string representation of the address.  I need to figure this out someday
       | otherwise = stringToIAddr $ BC.unpack s
     where word128 = rlpDecode o::Word128
@@ -199,7 +199,7 @@ showPubKey (H.PubKeyU _) = error "Missing case in showPubKey: PubKeyU"
 
 dataToPacket :: B.ByteString -> Either DiscoverException (NodeDiscoveryPacket, H.PubKey)
 dataToPacket msg = do
-    let r = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 $ msg
+    let r = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 msg
         s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 64 msg
     v <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 96 msg
     let yIsOdd = v == 1
@@ -207,7 +207,7 @@ dataToPacket msg = do
         theRest = B.unpack $ B.drop 98 msg
         (rlp, _) = rlpSplit $ B.pack theRest
     theType <- note (ByteStringLengthException $ show msg) $ listToMaybe . B.unpack $ B.take 1 $ B.drop 97 msg
-    let SHA messageHash = hash $ B.pack $ [theType] ++ B.unpack (rlpSerialize rlp)
+    let SHA messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
     otherPubkey <- note (MalformedUDPException $ "malformed signature in udpHandshakeServer: " ++ show (signature, messageHash))
                         (getPubKeyFromSignature signature messageHash)
     packet <- typeToPacket theType rlp
@@ -230,7 +230,7 @@ sendPacket sock prv addr packet = do
   logInfoN $ T.pack $ CL.green ">>>>" ++ " (" ++ show addr ++ ") " ++ format packet
   let (theType', theRLP) = ndPacketToRLP packet
       theData = B.unpack $ rlpSerialize theRLP
-      SHA theMsgHash = hash $ B.pack $ (theType':theData)
+      SHA theMsgHash = hash $ B.pack $ theType' : theData
 
   ExtendedSignature signature' yIsOdd' <- liftIO $ H.withSource H.devURandom $ extSignMsg theMsgHash prv
 
@@ -264,13 +264,13 @@ processDataStream'
 
   let (rlp, _) = rlpSplit $ B.pack rest
 
-  let SHA messageHash = hash $ B.pack $ [theType] ++ B.unpack (rlpSerialize rlp)
+  let SHA messageHash = hash $ B.pack $ theType : B.unpack (rlpSerialize rlp)
       publicKey = getPubKeyFromSignature signature messageHash
       SHA theHash' = hash $ B.pack $ word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v] ++ [theType] ++ B.unpack (rlpSerialize rlp)
 
   when (theHash /= theHash') $ error "bad UDP data sent from peer, the hash isn't correct"
 
-  return $ fromMaybe (error "malformed signature in call to processDataStream") $ publicKey
+  return $ fromMaybe (error "malformed signature in call to processDataStream") publicKey
 
 processDataStream' _ = error "processDataStream' called with too few bytes"
 
@@ -301,82 +301,72 @@ data UDPException = UDPTimeout deriving (Show)
 
 instance Exception UDPException where
 
+getSocket :: HostName -> PortNumber -> IO Socket
+getSocket domain port = do
+  (serveraddr:_) <- getAddrInfo Nothing (Just domain) (Just $ show port)
+  s <- socket (addrFamily serveraddr) Datagram defaultProtocol
+  _ <- connect s (addrAddress serveraddr)
+  return s
 
-getServerPubKey::H.PrvKey->String->PortNumber->IO (Either SomeException Point)
-getServerPubKey myPriv domain port = do
-  withSocketsDo $ bracket getSocket close (talk myPriv)
-    where
-      getSocket = do
-        (serveraddr:_) <- getAddrInfo Nothing (Just domain) (Just $ show port)
-        s <- socket (addrFamily serveraddr) Datagram defaultProtocol
-        _ <- connect s (addrAddress serveraddr)
-        return s
+getServerPubKey :: H.PrvKey -> String -> PortNumber -> IO (Either SomeException Point)
+getServerPubKey myPriv domain port =
+    withSocketsDo $ bracket (getSocket domain port) close (talk myPriv)
+  where
+    talk :: H.PrvKey -> Socket -> IO (Either SomeException Point)
+    talk prvKey' socket' = do
+      timestamp <- fmap round getPOSIXTime
+      let (theType, theRLP) =
+            ndPacketToRLP $
+            Ping 4 (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral port) 30303) (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral port) 30303) (timestamp + 50)
+          theData = B.unpack $ rlpSerialize theRLP
+          SHA theMsgHash = hash $ B.pack $ theType : theData
 
-      talk::H.PrvKey->Socket->IO (Either SomeException Point)
-      talk prvKey' socket' = do
-        timestamp <- fmap round getPOSIXTime
-        let (theType, theRLP) =
-              ndPacketToRLP $
-              Ping 4 (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral $ port) 30303) (Endpoint (stringToIAddr "127.0.0.1") (fromIntegral $ port) 30303) (timestamp+50)
-            theData = B.unpack $ rlpSerialize theRLP
-            SHA theMsgHash = hash $ B.pack $ (theType:theData)
+      ExtendedSignature signature yIsOdd <- H.withSource H.devURandom $ encrypt prvKey' theMsgHash
 
-        ExtendedSignature signature yIsOdd <-
-          H.withSource H.devURandom $ encrypt prvKey' theMsgHash
+      let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
+          r = H.sigR signature
+          s = H.sigS signature
+          theSignature =
+            word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
+          theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType] ++ theData
 
-        let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
-            r = H.sigR signature
-            s = H.sigS signature
-            theSignature =
-              word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
-            theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType] ++ theData
+      _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
 
-        _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
+      --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
+      --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
+      pubKey <- try (timeout 5000000 (NB.recv socket' 2000 >>= processDataStream' . B.unpack)) :: IO (Either SomeException (Maybe H.PubKey))
 
-        --According to https://groups.google.com/forum/#!topic/haskell-cafe/aqaoEDt7auY, it looks like the only way we can time out UDP recv is to
-        --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
-        pubKey <- try (timeout 5000000 (NB.recv socket' 2000 >>= processDataStream' . B.unpack)) :: IO (Either SomeException (Maybe H.PubKey))
-
-        case pubKey of
-          Right Nothing -> return $ Left $ SomeException UDPTimeout
-          Left x -> return $ Left x
-          Right (Just x) -> return $ fmapL SomeException $ hPubKeyToPubKey x
+      case pubKey of
+        Right Nothing -> return $ Left $ SomeException UDPTimeout
+        Left x -> return $ Left x
+        Right (Just x) -> return $ fmapL SomeException $ hPubKeyToPubKey x
 
 findNeighbors::H.PrvKey -> String -> PortNumber -> IO ()
-findNeighbors myPriv domain port = do
-  withSocketsDo $ bracket getSocket close (talk myPriv)
-    where
-      getSocket = do
-        (serveraddr:_) <- getAddrInfo Nothing (Just domain) (Just $ show port)
-        s <- socket (addrFamily serveraddr) Datagram defaultProtocol
-        _ <- connect s (addrAddress serveraddr)
-        return s
+findNeighbors myPriv domain port =
+    withSocketsDo $ bracket (getSocket domain port) close (talk myPriv)
+  where
+    talk :: H.PrvKey -> Socket -> IO ()
+    talk prvKey' socket' = do
+      let (theType, theRLP) =
+            ndPacketToRLP $
+            FindNeighbors (NodeID $ fst $ B16.decode "eab4e595d178422cb8b31eddde2d6dda74ad16609693614a29a214d2b2f457a7c97a442e74e58afd1b16657c5c5908255a450d8a202e8d3b2b31c9b17e7221f3") 100000000000000000
+          theData = B.unpack $ rlpSerialize theRLP
+          SHA theMsgHash = hash $ B.pack (theType : theData)
 
-      talk::H.PrvKey->Socket->IO ()
-      talk prvKey' socket' = do
-        let (theType, theRLP) =
-              ndPacketToRLP $
-              FindNeighbors (NodeID $ fst $ B16.decode "eab4e595d178422cb8b31eddde2d6dda74ad16609693614a29a214d2b2f457a7c97a442e74e58afd1b16657c5c5908255a450d8a202e8d3b2b31c9b17e7221f3") 100000000000000000
-            theData = B.unpack $ rlpSerialize theRLP
-            SHA theMsgHash = hash $ B.pack $ (theType:theData)
+      ExtendedSignature signature yIsOdd <-
+        H.withSource H.devURandom $ encrypt prvKey' theMsgHash
 
-        ExtendedSignature signature yIsOdd <-
-          H.withSource H.devURandom $ encrypt prvKey' theMsgHash
+      let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
+          r = H.sigR signature
+          s = H.sigS signature
+          theSignature =
+            word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
+          theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType] ++ theData
 
-        let v = if yIsOdd then 1 else 0 -- 0x1c else 0x1b
-            r = H.sigR signature
-            s = H.sigS signature
-            theSignature =
-              word256ToBytes (fromIntegral r) ++ word256ToBytes (fromIntegral s) ++ [v]
-            theHash = B.unpack $ SHA3.hash 256 $ B.pack $ theSignature ++ [theType] ++ theData
+      _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
 
-        _ <- NB.send socket' $ B.pack $ theHash ++ theSignature ++ [theType] ++ theData
-
-        _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
-
-        --return $ hPubKeyToPubKey pubKey
-
-        return ()
+      _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
+      return ()
 
 
 

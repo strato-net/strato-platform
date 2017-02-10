@@ -147,11 +147,11 @@ handleValidPacket :: (HasSQLDB m,
                   -> ECC.Point
                   -> m ()
 handleValidPacket prv sock addr packet otherPubKey = do
-  _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes $ otherPubKey) ++ "....) " ++ format packet
+  _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
   case packet of
-    Ping _ _ _ _ -> do
+    Ping{} -> do
                let ip = sockAddrToIP addr
-               curTime <- liftIO $ getCurrentTime
+               curTime <- liftIO getCurrentTime
                let peer = PPeer {
                      pPeerPubkey = Just otherPubKey,
                      pPeerIp = T.pack ip,
@@ -173,16 +173,16 @@ handleValidPacket prv sock addr packet otherPubKey = do
                peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1"
                sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
 
-    Pong _ _ _ ->
+    Pong{} ->
       liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral $ getAddrPort addr) 2
 
-    FindNeighbors _ _ -> do
+    FindNeighbors{} -> do
                time <- liftIO $ round `fmap` getPOSIXTime
                sendPacket sock prv addr $ Neighbors [] (time + 50)
 
-    Neighbors neighbors _ -> do
+    Neighbors neighbors _ ->
                forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
-                              curTime <- liftIO $ getCurrentTime
+                              curTime <- liftIO getCurrentTime
                               let peer = PPeer {
                                     pPeerPubkey = Just $ nodeIDToPoint nodeID,
                                     pPeerIp = T.pack $ format addr',
@@ -205,4 +205,4 @@ handleValidPacket prv sock addr packet otherPubKey = do
 getAddrPort::SockAddr->PortNumber
 getAddrPort (SockAddrInet portNumber _) = portNumber
 getAddrPort (SockAddrInet6 portNumber _ _ _) = portNumber
-getAddrPort _ = error $ "getAddrPort called for address that doesn't have a port"
+getAddrPort _ = error "getAddrPort called for address that doesn't have a port"

@@ -72,4 +72,4 @@ intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host
 sockAddrToIP (S.SockAddrUnix str) = str
-sockAddrToIP addr' = takeWhile (\t -> t /= ':') (show addr')
+sockAddrToIP addr' = takeWhile (/= ':') (show addr')
