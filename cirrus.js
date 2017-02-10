@@ -11,23 +11,18 @@ var http = require('http'),
  express = require('express'),
  util = require('./lib/util'),
  consumer = require('./consumer.js'),
+ _ = require('lodash/fp'),
+ __ = require('lodash'),
  toSchemaString = util.toSchemaString,
  router = express.Router();
 
 function startCirrus() {
   return function(scope) {
     return new Promise(function(resolve, reject) {
-      // scope.app = express();
-      // var app = scope.app;
-      //app.use(bodyParser.json())
+
       var app = express();
       app.use(bodyParser.json({limit: '500mb'}));
       app.use(bodyParser.urlencoded({limit: '500mb', extended: true }));
-
-
-      var _ = require('lodash/fp');
-      var __ = require('lodash'); // not pretty but how else to use __.map((k,v) => {...}) ?
-
 
       // create the pool somewhere globally so its lifetime
       // lasts for as long as your app is running
@@ -49,6 +44,7 @@ function startCirrus() {
         pool.query(schema)
           .then(_ => {
             console.log("done creating new table for contract")
+            console.log('Resetting the offset for kafka');
             return consumer.resetOffset()(scope);
           })
           .then(scope => {

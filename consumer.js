@@ -85,17 +85,14 @@ function consumeMessage(m) {
   console.log(chalk.red("|\tDeleted accounts: " + deletedAccounts));
 
   var toUpload = _.flatten(
-
     [
       createdAccounts.map(a => {
-
         stateToBody(state.createdAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
           .then(x => {
             x.address = a;
-             // console.log("Body is: " + JSON.stringify(x));
             var options = { method: 'POST',
               url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
               headers:
@@ -103,7 +100,6 @@ function consumeMessage(m) {
                  'content-type': 'application/json' },
               body: x,
               json: true };
-              //console.log("create options: " + JSON.stringify(options));
               return rp(options).promise()
                 .catch(err => {
                   console.log('Failed updating contract: ', x);
@@ -112,17 +108,7 @@ function consumeMessage(m) {
             })
           .catch(err => console.log("Warn: " + err))
       }),
-
       updatedAccounts.map(a => {
-
-        // this was useful when not using blockapps-js
-        // var tKeys = Object.keys(state.updatedAccounts[a].storage)
-        // var val = state.updatedAccounts[a].storage[tKeys[0]];
-        // if(val)
-        //   val = parseInt(val['newValue'], 16);
-        // else
-        //   val = 0;
-
         stateToBody(state.updatedAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
@@ -136,7 +122,6 @@ function consumeMessage(m) {
                  'content-type': 'application/json' },
               body: x,
               json: true };
-              // console.log("update options: " + JSON.stringify(options));
               return rp(options).promise()
                 .catch(err => {
                   console.log('Failed updating contract: ', x);
@@ -148,7 +133,6 @@ function consumeMessage(m) {
                       'Failed on offset: ' + m.offset);
         });
       }),
-
       deletedAccounts.map(a => {})
     ]
   )
@@ -171,21 +155,16 @@ function stateToBody(state, address) {
 
     var parsed = JSON.parse(tmpStr);
 
-    //console.log("Attaching: " + xabi.name);
 
     xabi.address = address;
     parsed.address = address;
 
 
     try {
-      //var o = bajs.Solidity.attach(xabi);
-      //console.log("Calling attach()");
       var o = bajs.Solidity.attach(parsed);
-      //console.log("Done calling attach()")
       var p = Promise.props(o.state).then(function(sVars) {
         var parsed = traverse(sVars).forEach(function (x) {
           if (Buffer.isBuffer(x)) {
-            // console.log("The buffer is " + x.toString('hex'))
             this.update(x.toString('hex'));
           }
         });
@@ -194,12 +173,10 @@ function stateToBody(state, address) {
       return p;
     } catch (error) {
       console.log(chalk.red("Failed to attach solidity object: " + error));
-      //return Promise.props({});
       return Promise.reject("Failed to attach solidity object: " + error);
     }
   } else {
     return Promise.reject("No table found");
-    //throw new Error("No table found for contract");
   }
 }
 

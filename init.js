@@ -23,6 +23,7 @@ function initCirrus(scope) {
     .then(getKafkaTopic())
     .catch(err => {
       console.log('Failed to init', err)
+      throw new Error('Failed to init cirrus: ' + err)
     })
 }
 
