@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude
+import Control.Monad (forM_)
 import Test.Tasty
 import Test.Tasty.Runners
 import Test.Tasty.HUnit
