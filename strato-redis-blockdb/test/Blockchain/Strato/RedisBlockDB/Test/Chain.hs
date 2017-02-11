@@ -2,13 +2,15 @@
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
-module TestChain where
+module Blockchain.Strato.RedisBlockDB.Test.Chain where
 
 import           Control.Monad
 import           Test.QuickCheck
 import           Lens.Family2
 import           Lens.Family2.TH
-import           Data.List
+import           Data.Foldable
+import           Data.Tree
+import           Numeric
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.ArbitraryInstances()
@@ -33,28 +35,41 @@ makeGenesisBlock = do
     return $ startBlock 
 
 buildChain :: BlockData -> Int -> Int -> IO [BlockData]
-buildChain _    0     _           = return []
 buildChain seed depth maxSiblings = do
-    siblingCount    <- generate $ choose (1, maxSiblings)
-    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) -- difficulty bomb
+    tree <- buildTree seed depth maxSiblings
+    return $ toList tree
+
+buildTree :: BlockData -> Int -> Int -> IO (Tree BlockData)
+buildTree seed 0     _           = pure (Node seed []) 
+buildTree seed depth maxSiblings = do
+    siblingCount    <- generate $ invDist maxSiblings 
+    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) 
     nextNumber      <- return $ (blockDataNumber seed) + 1
-    siblings        <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData]
+    siblings        <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData] 
     withUpdates     <- return $ ( (over _blockDataParentHash      (const . blockHeaderHash $ seed))
                                 . (over _blockDataDifficulty      (const nextDifficulty'))
                                 . (over _blockDataNumber          (const nextNumber))
                                 )
                                <$> siblings
-    expanded        <- forM withUpdates $ \sibling -> do
-                           grandchildren <- buildChain sibling (depth - 1) maxSiblings
-                           return $ sibling : grandchildren
-    return $ seed : join expanded
+    expanded        <- forM (zip withUpdates ([1..]::[Int]) ) $ \(sibling, i) -> do
+                           deathRate <- case i == 1 of
+                               True  -> pure 1 :: IO Int
+                               False -> generate $ choose (i, depth) :: IO Int
+                           grandchildren <- buildTree sibling (max (depth - deathRate) 0) maxSiblings
+                           return $ grandchildren
+    return $ Node seed expanded
 
+invDist :: Int -> Gen Int
+invDist n = frequency [(n*n, choose (1, 1)), (1, choose (1, n))]
 
--------------------------------------
--- ugh fix this tomorrow morning
-partitionChain :: [BlockData] -> [[Integer]]
-partitionChain bd = (blockDataNumber <$>) <$> g
-    where g = (groupBy (\x y -> blockDataNumber x == blockDataNumber y)) bd :: [[BlockData]]
+prettyTree :: (Show a) => Tree a -> Tree String
+prettyTree t = show <$> t
 
-showChain :: [BlockData] -> IO ()
-showChain = putStrLn . show . partitionChain 
+showTree :: (Show a) => Tree a -> String
+showTree = drawTree . prettyTree
+
+prettyTree' :: Tree BlockData -> Tree String
+prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
+
+showHash :: SHA -> String
+showHash (SHA h) = take 8 $ showHex h ""

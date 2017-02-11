@@ -13,8 +13,6 @@ module Handler.AccountInfo where
 
 import Import
 
-import Debug.Trace
-
 import Handler.Common 
 import Handler.Filters
 

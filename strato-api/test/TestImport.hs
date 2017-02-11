@@ -1,17 +1,17 @@
 module TestImport
     ( module TestImport
-    , module X
+    , module XX
     ) where
 
 import Application           (makeFoundation)
-import ClassyPrelude         as X
-import Database.Persist      as X hiding (get)
+import ClassyPrelude         as XX
+import Database.Persist      as XX hiding (get)
 import Database.Persist.Sql  (SqlPersistM, SqlBackend, runSqlPersistMPool, rawExecute, rawSql, unSingle, connEscapeName)
-import Foundation            as X
-import Model                 as X
-import Test.Hspec            as X
+import Foundation            as XX
+import Model                 as XX
+import Test.Hspec            as XX
 import Yesod.Default.Config2 (ignoreEnv, loadAppSettings)
-import Yesod.Test            as X
+import Yesod.Test            as XX
 
 runDB :: SqlPersistM a -> YesodExample App a
 runDB query = do
@@ -20,7 +20,6 @@ runDB query = do
 
 runDBWithApp :: App -> SqlPersistM a -> IO a
 runDBWithApp app query = runSqlPersistMPool query (appConnPool app)
-
 
 withApp :: SpecWith App -> Spec
 withApp = before $ do
