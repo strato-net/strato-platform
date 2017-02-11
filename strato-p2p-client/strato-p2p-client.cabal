@@ -83,8 +83,9 @@ library
                    Blockchain.Context
                    Blockchain.Data.Wire
                    Blockchain.Display
-                   Blockchain.Event
                    Blockchain.EventException
+                   Blockchain.Event
+                   Blockchain.NewEvent
                    Blockchain.ExtMergeSources
                    Blockchain.Options
                    Blockchain.RawTXNotify
@@ -106,4 +107,11 @@ test-suite strato-p2p-client-test
     main-is: Spec.hs
     other-modules:
     build-depends: base >=4 && < 5
-      , hspec 
+      , hspec
+      , strato-p2p-client
+      , conduit
+      , strato-model
+      , crypto-pubkey-types
+      , mtl
+      , containers
+      , blockapps-data
