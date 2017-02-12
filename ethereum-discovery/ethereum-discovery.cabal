@@ -19,8 +19,10 @@ library
                      , crypto-pubkey
                      , crypto-pubkey-types
                      , entropy
+                     , errors
                      , ethereum-encryption
                      , ethereum-rlp
+                     , exceptions
                      , haskoin
                      , lifted-base
                      , monad-logger
