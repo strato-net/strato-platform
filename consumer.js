@@ -18,8 +18,7 @@ const zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
 
 
 
-function start()
-  {
+function start() {
   return function(scope) {
     return new Promise((resolve, reject) => {
       console.log("Connections are:\n\tstrato: " + stratoHost + "\n\tpostgrest: " + postgrestHost + "\n\tzookeeper: " + zookeeperHost);
