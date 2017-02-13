@@ -58,6 +58,7 @@ test-suite state-translate-test
                      , state-translate
                      , bytestring
                      , aeson-pretty
+                     , hspec
                      , solidity-abi
                      , tasty
                      , tasty-hunit
