@@ -24,6 +24,7 @@ library
     , binary
     , bytestring
     , cryptonite
+    , hashable
     , http-api-data
     , largeword
     , memory

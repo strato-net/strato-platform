@@ -18,13 +18,14 @@ import Control.Applicative
 -- import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
+import Data.Aeson.Encoding
 -- import Data.Functor.Contravariant
 import Data.Int
 -- import Data.Monoid
 import Data.Proxy
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Text (Text)
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
@@ -41,6 +42,7 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
+-- import qualified BlockApps.Solidity as Solidity
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -49,8 +51,8 @@ class Monad m => MonadContracts m where
   getContractsState :: ContractName -> Address -> m GetContractsStateResponses -- state-translation
   getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
-  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON -- state-translation
-  getContractsStates :: ContractName -> m UnstructuredJSON -- state-translation
+  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m GetContractsStateMappingResponse -- state-translation
+  getContractsStates :: ContractName -> m [GetContractsStatesResponse] -- state-translation
   postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
 instance MonadContracts ClientM where
   getContracts = client (Proxy @ GetContracts)
@@ -263,7 +265,7 @@ instance ToJSON AddressCreatedAt
 instance FromJSON AddressCreatedAt
 instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary
 newtype GetContractsResponse = GetContractsResponse
-  { unContracts :: HashMap Text [AddressCreatedAt] }
+  { unContracts :: Map Text [AddressCreatedAt] }
   deriving (Eq, Show, Generic)
 instance ToJSON GetContractsResponse where
   toJSON = toJSON . unContracts
@@ -271,7 +273,7 @@ instance FromJSON GetContractsResponse where
   parseJSON = fmap GetContractsResponse . parseJSON
 instance Arbitrary GetContractsResponse where arbitrary = genericArbitrary
 instance ToSample GetContractsResponse where
-  toSamples _ = singleSample $ GetContractsResponse $ HashMap.singleton "Sample"
+  toSamples _ = singleSample $ GetContractsResponse $ Map.singleton "Sample"
     [ AddressCreatedAt
       { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
@@ -321,9 +323,9 @@ instance ToSample GetContractsContractResponse where toSamples _ = noSamples
 instance Arbitrary GetContractsContractResponse where
   arbitrary = genericArbitrary
 data Xabi = Xabi
-  { xabiFuncs :: Maybe (HashMap Text Func)
-  , xabiConstr :: Maybe (HashMap Text Arg)
-  , xabiVars :: Maybe (HashMap Text Var)
+  { xabiFuncs :: Maybe (Map Text Func)
+  , xabiConstr :: Maybe (Map Text Arg)
+  , xabiVars :: Maybe (Map Text Var)
   } deriving (Eq,Show,Generic)
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -331,9 +333,9 @@ instance FromJSON Xabi where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Xabi where arbitrary = genericArbitrary
 data Func = Func
-  { funcArgs :: HashMap Text Arg
+  { funcArgs :: Map Text Arg
   , funcSelector :: Text
-  , funcVals :: HashMap Text Val
+  , funcVals :: Map Text Val
   } deriving (Eq,Show,Generic)
 instance ToJSON Func where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -395,16 +397,7 @@ type GetContractsState = "contracts"
   :> Capture "contractAddress" Address
   :> "state"
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
-type GetContractsStateResponses = HashMap Text GetContractsStateResponse
-type GetContractsStateResponse = UnstructuredJSON
--- data GetContractsStateResponse = GetContractsStateResponse
---   deriving (Eq,Show,Generic)
--- instance ToJSON GetContractsStateResponse where
---   toJSON = genericToJSON (aesonPrefix camelCase)
--- instance FromJSON GetContractsStateResponse where
---   parseJSON = genericParseJSON (aesonPrefix camelCase)
--- instance Arbitrary GetContractsStateResponse where
---   arbitrary = genericArbitrary
+type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
 -- GET /contracts/:contractName/:contractAddress/functions
@@ -438,18 +431,33 @@ type GetContractsStateMapping = "contracts"
   :> "state"
   :> Capture "mapping" SymbolName
   :> Capture "key" Text
-  :> Get '[JSON] UnstructuredJSON
+  :> Get '[JSON] GetContractsStateMappingResponse
 instance ToCapture (Capture "key" Text) where
   toCapture _ = DocCapture "key" "a mapping key"
 instance ToCapture (Capture "mapping" SymbolName) where
   toCapture _ = DocCapture "mapping" "the mapping's name"
+type GetContractsStateMappingResponse =
+  Map Text (Map Text SolidityValue)
+instance ToSample GetContractsStateMappingResponse where
+  toSamples _ = noSamples
 
 -- GET /contracts/:contractName/all/states/
 type GetContractsStates = "contracts"
   :> Capture "contractName" ContractName
   :> "all"
   :> "states"
-  :> Get '[JSON] UnstructuredJSON
+  :> Get '[JSON] [GetContractsStatesResponse]
+type GetContractsStatesResponse = Map Address (Map Text SolidityValue)
+instance FromJSONKey Address where
+  fromJSONKey = FromJSONKeyTextParser
+    $ maybe (fail "could not decode address") return
+    . stringAddress . Text.unpack
+instance ToJSONKey Address where
+  toJSONKey = ToJSONKeyText f g
+    where f x = Text.pack $ addressString x
+          g x = text . Text.pack $ addressString x
+instance ToSample GetContractsStatesResponse where
+  toSamples _ = noSamples
 
 -- POST /contracts/compile
 type PostContractsCompile = "contracts"
@@ -514,10 +522,12 @@ instance ToHttpApiData (MaybeNamed Address) where
   toUrlPiece (Named name) = name
   toUrlPiece (Unnamed addr) = Text.pack . addressString $ addr
 instance FromHttpApiData (MaybeNamed Address) where
-  parseUrlPiece text = case stringAddress (Text.unpack text) of
-    Nothing -> Right $ Named text
+  parseUrlPiece txt = case stringAddress (Text.unpack txt) of
+    Nothing -> Right $ Named txt
     Just addr -> Right $ Unnamed addr
 instance ToSample (MaybeNamed Address) where
   toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
+
+type SolidityValue = UnstructuredJSON

@@ -28,6 +28,7 @@ library
   build-depends: base
     , blockapps-data
     , blockapps-strato
+    , state-translate
     , aeson
     , aeson-casing
     , containers
