@@ -9,3 +9,4 @@ sftp-config.json
 .stack-unpack/
 .idea/
 *.iml
+*.swp

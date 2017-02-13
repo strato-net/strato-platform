@@ -94,7 +94,7 @@ terminationReasonToNumber ConnectedToSelf = 0x0a
 terminationReasonToNumber PingTimeout = 0x0b
 terminationReasonToNumber OtherSubprotocolReason = 0x10
   
-data BlockHashOrNumber = BlockHash SHA | BlockNumber Integer deriving (Show)
+data BlockHashOrNumber = BlockHash SHA | BlockNumber Integer deriving (Eq,Show)
 
 instance Format BlockHashOrNumber where
   format (BlockHash x) = format x
@@ -106,7 +106,7 @@ instance RLPSerializable BlockHashOrNumber where
   rlpDecode val@(RLPString s) | B.length s == 32 = BlockHash $ rlpDecode val
   rlpDecode val = BlockNumber $ fromInteger $ rlpDecode val
 
-data Direction = Forward | Reverse deriving (Show)
+data Direction = Forward | Reverse deriving (Eq,Show)
 
 instance RLPSerializable Direction where
   rlpEncode Forward = rlpEncode (0::Integer)
@@ -131,7 +131,7 @@ data Message =
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
 
-  WhisperProtocolVersion Int deriving (Show)
+  WhisperProtocolVersion Int deriving (Eq,Show)
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
