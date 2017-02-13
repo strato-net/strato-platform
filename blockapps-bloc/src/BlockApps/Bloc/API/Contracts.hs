@@ -46,7 +46,7 @@ class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
   getContractsData :: ContractName -> m [MaybeNamed Address]
   getContractsContract :: ContractName -> MaybeNamed Address -> m GetContractsContractResponse
-  getContractsState :: ContractName -> Address -> m UnstructuredJSON -- state-translation
+  getContractsState :: ContractName -> Address -> m GetContractsStateResponses -- state-translation
   getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
   getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON -- state-translation
@@ -394,7 +394,18 @@ type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "state"
-  :> Get '[JSON] UnstructuredJSON -- change to HTML
+  :> Get '[JSON] GetContractsStateResponses -- change to HTML
+type GetContractsStateResponses = HashMap Text GetContractsStateResponse
+type GetContractsStateResponse = UnstructuredJSON
+-- data GetContractsStateResponse = GetContractsStateResponse
+--   deriving (Eq,Show,Generic)
+-- instance ToJSON GetContractsStateResponse where
+--   toJSON = genericToJSON (aesonPrefix camelCase)
+-- instance FromJSON GetContractsStateResponse where
+--   parseJSON = genericParseJSON (aesonPrefix camelCase)
+-- instance Arbitrary GetContractsStateResponse where
+--   arbitrary = genericArbitrary
+instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
 -- GET /contracts/:contractName/:contractAddress/functions
 type GetContractsFunctions = "contracts"
