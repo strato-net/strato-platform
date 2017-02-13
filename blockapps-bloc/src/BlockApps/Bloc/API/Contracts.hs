@@ -293,7 +293,7 @@ type GetContractsContract = "contracts"
   :> Get '[HTMLifiedJSON] GetContractsContractResponse
 data GetContractsContractResponse = GetContractsContractResponse
   { getcontractscontractresponseBin :: Text
-  , getcontractscontractresponseAddress :: Address
+  , getcontractscontractresponseAddress :: Maybe Address
   , getcontractscontractresponseBinRuntime :: Text
   , getcontractscontractresponseCodeHash :: Text
   , getcontractscontractresponseName :: Text
@@ -312,7 +312,7 @@ instance FromJSON GetContractsContractResponse where
   parseJSON = withObject "GetContractsContractResponse" $ \obj ->
     GetContractsContractResponse
       <$> obj .: "bin"
-      <*> obj .: "address"
+      <*> obj .:? "address"
       <*> obj .: "bin-runtime"
       <*> obj .: "codeHash"
       <*> obj .: "name"
@@ -341,7 +341,7 @@ instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary
 data Arg = Arg
-  { argName :: Text
+  { argName :: Maybe Text
   , argType :: Text
   , argBytes :: Maybe Int
   , argIndex :: Int
