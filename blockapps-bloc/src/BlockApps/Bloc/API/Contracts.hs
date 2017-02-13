@@ -14,13 +14,13 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Applicative
-import Control.Monad.Except
-import Control.Monad.Reader
+-- import Control.Monad.Except
+-- import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
-import Data.Functor.Contravariant
+-- import Data.Functor.Contravariant
 import Data.Int
-import Data.Monoid
+-- import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import Data.HashMap.Strict (HashMap)
@@ -29,9 +29,9 @@ import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
-import qualified Hasql.Encoders as Encoders
-import Hasql.Query
-import Hasql.Session
+-- import qualified Hasql.Encoders as Encoders
+-- import Hasql.Query
+-- import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -44,11 +44,11 @@ import BlockApps.Data
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
-  getContractsData :: ContractName -> m [Address]
+  getContractsData :: ContractName -> m [MaybeNamed Address]
   getContractsContract :: ContractName -> MaybeNamed Address -> m GetContractsContractResponse
   getContractsState :: ContractName -> Address -> m UnstructuredJSON -- state-translation
-  getContractsFunctions :: ContractName -> Address -> m [FunctionName]
-  getContractsSymbols :: ContractName -> Address -> m [SymbolName]
+  getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
+  getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
   getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON -- state-translation
   getContractsStates :: ContractName -> m UnstructuredJSON -- state-translation
   postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
@@ -77,24 +77,25 @@ instance MonadContracts Bloc where
   --     Left err -> throwError $ DBError err
   --     Right cons -> return $ Contracts cons
 
-  getContractsData (ContractName contractName) = do
-    conn <- asks dbConnection
-    let
-      encoder = Encoders.value Encoders.text
-      decoder = Decoders.rowsList (Decoders.value addressDecoder)
-      sqlString =
-        "SELECT CI.address\
-        \ FROM contracts C JOIN contracts_metadata CM\
-        \ ON CM.contract_id = C.id\
-        \ JOIN contracts_instance CI\
-        \ ON CI.contract_metadata_id = CM.id\
-        \ WHERE C.name = $1;"
-      sqlStatement = statement sqlString encoder decoder False
-    addressesEither <- liftIO $
-      run (query contractName sqlStatement) conn
-    case addressesEither of
-      Left err -> throwError $ DBError err
-      Right addresses -> return addresses
+  getContractsData = undefined
+  -- getContractsData (ContractName contractName) = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoder = Encoders.value Encoders.text
+  --     decoder = Decoders.rowsList (Decoders.value addressDecoder)
+  --     sqlString =
+  --       "SELECT CI.address\
+  --       \ FROM contracts C JOIN contracts_metadata CM\
+  --       \ ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI\
+  --       \ ON CI.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1;"
+  --     sqlStatement = statement sqlString encoder decoder False
+  --   addressesEither <- liftIO $
+  --     run (query contractName sqlStatement) conn
+  --   case addressesEither of
+  --     Left err -> throwError $ DBError err
+  --     Right addresses -> return addresses
 
   getContractsContract = undefined
   -- getContractsContract (ContractName contractName) addr = do
@@ -173,45 +174,47 @@ instance MonadContracts Bloc where
 
   getContractsState = undefined
 
-  getContractsFunctions (ContractName contractName) addr = do
-    conn <- asks dbConnection
-    let
-      encoder = contramap fst (Encoders.value Encoders.text)
-        <> contramap snd (Encoders.value addressEncoder)
-      decoder =
-        Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
-      sqlString =
-        "SELECT XF.Name FROM contracts C\
-        \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-        \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-        \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
-        \ WHERE C.name = $1 AND CI.address = $2 AND NOT XF.is_constructor"
-      sqlStatement = statement sqlString encoder decoder False
-    functionsEither <- liftIO $
-      run (query (contractName,addr) sqlStatement) conn
-    case functionsEither of
-      Left err -> throwError $ DBError err
-      Right functions -> return functions
+  getContractsFunctions = undefined
+  -- getContractsFunctions (ContractName contractName) addr = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoder = contramap fst (Encoders.value Encoders.text)
+  --       <> contramap snd (Encoders.value addressEncoder)
+  --     decoder =
+  --       Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
+  --     sqlString =
+  --       "SELECT XF.Name FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2 AND NOT XF.is_constructor"
+  --     sqlStatement = statement sqlString encoder decoder False
+  --   functionsEither <- liftIO $
+  --     run (query (contractName,addr) sqlStatement) conn
+  --   case functionsEither of
+  --     Left err -> throwError $ DBError err
+  --     Right functions -> return functions
 
-  getContractsSymbols (ContractName contractName) addr = do
-    conn <- asks dbConnection
-    let
-      encoder = contramap fst (Encoders.value Encoders.text)
-        <> contramap snd (Encoders.value addressEncoder)
-      decoder =
-        Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
-      sqlString =
-        "SELECT XV.Name FROM contracts C\
-        \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-        \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-        \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
-        \ WHERE C.name = $1 AND CI.address = $2"
-      sqlStatement = statement sqlString encoder decoder False
-    symbolsEither <- liftIO $
-      run (query (contractName,addr) sqlStatement) conn
-    case symbolsEither of
-      Left err -> throwError $ DBError err
-      Right symbols -> return symbols
+  getContractsSymbols = undefined
+  -- getContractsSymbols (ContractName contractName) addr = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoder = contramap fst (Encoders.value Encoders.text)
+  --       <> contramap snd (Encoders.value addressEncoder)
+  --     decoder =
+  --       Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
+  --     sqlString =
+  --       "SELECT XV.Name FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2"
+  --     sqlStatement = statement sqlString encoder decoder False
+  --   symbolsEither <- liftIO $
+  --     run (query (contractName,addr) sqlStatement) conn
+  --   case symbolsEither of
+  --     Left err -> throwError $ DBError err
+  --     Right symbols -> return symbols
 
   getContractsStateMapping = undefined
     -- (ContractName contractName) addr (SymbolName mapping) key = do
@@ -281,7 +284,7 @@ instance ToSample GetContractsResponse where
 
 type GetContractsData = "contracts"
   :> Capture "contractName" ContractName
-  :> Get '[OctetStream] [Address]
+  :> Get '[OctetStream] [MaybeNamed Address]
 
 -- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
 type GetContractsContract = "contracts"
@@ -396,7 +399,7 @@ type GetContractsState = "contracts"
 -- GET /contracts/:contractName/:contractAddress/functions
 type GetContractsFunctions = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
+  :> Capture "contractAddress" (MaybeNamed Address)
   :> "functions"
   :> Get '[HTMLifiedJSON] [FunctionName]
 newtype FunctionName = FunctionName Text deriving (Eq,Show,Generic)
@@ -413,9 +416,9 @@ instance Arbitrary FunctionName where
 -- GET /contracts/:contractName/:contractAddress/symbols
 type GetContractsSymbols = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
+  :> Capture "contractAddress" (MaybeNamed Address)
   :> "symbols"
-  :> Get '[JSON] [SymbolName]
+  :> Get '[HTMLifiedJSON] [SymbolName]
 
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
 type GetContractsStateMapping = "contracts"
@@ -503,5 +506,7 @@ instance FromHttpApiData (MaybeNamed Address) where
   parseUrlPiece text = case stringAddress (Text.unpack text) of
     Nothing -> Right $ Named text
     Just addr -> Right $ Unnamed addr
+instance ToSample (MaybeNamed Address) where
+  toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
