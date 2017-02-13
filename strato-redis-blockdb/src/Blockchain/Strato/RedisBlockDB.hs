@@ -13,7 +13,7 @@ module Blockchain.Strato.RedisBlockDB
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
     , getChildren
     , putHeader, putHeaders, putBlock, putBlocks
-    , getBestBlockInfo, putBestBlockInfo
+    , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
     , commonAncestorHelper
     ) where
@@ -366,6 +366,11 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                               updates        = tail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
                           in
                               return $ Right (updates, deletions)
+
+-- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
+forceBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Status)
+forceBestBlockInfo = set bestBlockInfoKey . toValue . RedisBestBlock `totalRecall` (,,)
+    where infixr 3 `totalRecall`; totalRecall = (.).(.).(.)
 
 getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 getBestBlockInfo = get bestBlockInfoKey >>= \case
