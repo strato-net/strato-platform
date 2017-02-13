@@ -43,6 +43,7 @@ library
     , mtl
     , QuickCheck
     , quickcheck-instances
+    , saltine
     , secp256k1
     , servant
     , servant-client

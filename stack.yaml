@@ -15,6 +15,7 @@ packages:
     git: https://github.com/echatav/hasql/
     commit: 1f9ba4b0aa665b06576d7a5be00038b034fc3e9f
   extra-dep: true
-extra-deps: []
+extra-deps:
+  - saltine-0.0.0.4
 flags: {}
 extra-package-dbs: []
