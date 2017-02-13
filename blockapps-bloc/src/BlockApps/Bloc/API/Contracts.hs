@@ -6,6 +6,7 @@
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , RecordWildCards
   , TypeApplications
   , TypeOperators
 #-}
@@ -22,8 +23,8 @@ import Data.Int
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
@@ -42,9 +43,9 @@ import BlockApps.Bloc.Monad
 import BlockApps.Data
 
 class Monad m => MonadContracts m where
-  getContracts :: m GetContractsContractResponse
+  getContracts :: m GetContractsResponse
   getContractsData :: ContractName -> m [Address]
-  getContractsContract :: ContractName -> MaybeNamed Address -> m UnstructuredJSON
+  getContractsContract :: ContractName -> MaybeNamed Address -> m GetContractsContractResponse
   getContractsState :: ContractName -> Address -> m UnstructuredJSON -- state-translation
   getContractsFunctions :: ContractName -> Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> Address -> m [SymbolName]
@@ -250,8 +251,7 @@ instance MonadContracts Bloc where
   --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   --       return $ PostCompileResponse contractName _hash
 
-type GetContracts = "contracts" :> Get '[JSON] (GetContractsContractResponse)
-
+type GetContracts = "contracts" :> Get '[JSON] (GetContractsResponse)
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64
   , address :: MaybeNamed Address
@@ -259,16 +259,16 @@ data AddressCreatedAt = AddressCreatedAt
 instance ToJSON AddressCreatedAt
 instance FromJSON AddressCreatedAt
 instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary
-
-newtype GetContractsContractResponse = GetContractsContractResponse
-  { unContracts :: Map Text [AddressCreatedAt] } deriving (Eq, Show, Generic)
-instance ToJSON GetContractsContractResponse where
+newtype GetContractsResponse = GetContractsResponse
+  { unContracts :: HashMap Text [AddressCreatedAt] }
+  deriving (Eq, Show, Generic)
+instance ToJSON GetContractsResponse where
   toJSON = toJSON . unContracts
-instance FromJSON GetContractsContractResponse where
-  parseJSON = fmap GetContractsContractResponse . parseJSON
-instance Arbitrary GetContractsContractResponse where arbitrary = genericArbitrary
-instance ToSample GetContractsContractResponse where
-  toSamples _ = singleSample $ GetContractsContractResponse $ Map.singleton "Sample"
+instance FromJSON GetContractsResponse where
+  parseJSON = fmap GetContractsResponse . parseJSON
+instance Arbitrary GetContractsResponse where arbitrary = genericArbitrary
+instance ToSample GetContractsResponse where
+  toSamples _ = singleSample $ GetContractsResponse $ HashMap.singleton "Sample"
     [ AddressCreatedAt
       { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
@@ -287,7 +287,105 @@ type GetContractsData = "contracts"
 type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
-  :> Get '[JSON] UnstructuredJSON
+  :> Get '[HTMLifiedJSON] GetContractsContractResponse
+data GetContractsContractResponse = GetContractsContractResponse
+  { getcontractscontractresponseBin :: Text
+  , getcontractscontractresponseAddress :: Address
+  , getcontractscontractresponseBinRuntime :: Text
+  , getcontractscontractresponseCodeHash :: Text
+  , getcontractscontractresponseName :: Text
+  , getcontractscontractresponseXabi :: Xabi
+  } deriving (Show,Eq,Generic)
+instance ToJSON GetContractsContractResponse where
+  toJSON GetContractsContractResponse{..} = object
+    [ "bin" .= getcontractscontractresponseBin
+    , "address" .= getcontractscontractresponseAddress
+    , "bin-runtime" .= getcontractscontractresponseBinRuntime
+    , "codeHash" .= getcontractscontractresponseCodeHash
+    , "name" .= getcontractscontractresponseName
+    , "xabi" .= getcontractscontractresponseXabi
+    ]
+instance FromJSON GetContractsContractResponse where
+  parseJSON = withObject "GetContractsContractResponse" $ \obj ->
+    GetContractsContractResponse
+      <$> obj .: "bin"
+      <*> obj .: "address"
+      <*> obj .: "bin-runtime"
+      <*> obj .: "codeHash"
+      <*> obj .: "name"
+      <*> obj .: "xabi"
+instance ToSample GetContractsContractResponse where toSamples _ = noSamples
+instance Arbitrary GetContractsContractResponse where
+  arbitrary = genericArbitrary
+data Xabi = Xabi
+  { xabiFuncs :: Maybe (HashMap Text Func)
+  , xabiConstr :: Maybe (HashMap Text Arg)
+  , xabiVars :: Maybe (HashMap Text Var)
+  } deriving (Eq,Show,Generic)
+instance ToJSON Xabi where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Xabi where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Xabi where arbitrary = genericArbitrary
+data Func = Func
+  { funcArgs :: HashMap Text Arg
+  , funcSelector :: Text
+  , funcVals :: HashMap Text Val
+  } deriving (Eq,Show,Generic)
+instance ToJSON Func where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Func where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Func where arbitrary = genericArbitrary
+data Arg = Arg
+  { argName :: Text
+  , argType :: Text
+  , argBytes :: Maybe Int
+  , argIndex :: Int
+  , argDynamic :: Maybe Bool
+  , argEntry :: Maybe Entry
+  , argTypedef :: Maybe Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Arg where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Arg where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Arg where arbitrary = genericArbitrary
+data Entry = Entry
+  { entryBytes :: Int
+  , entryType :: Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Entry where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Entry where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Entry where arbitrary = genericArbitrary
+data Val = Val
+  { valType :: Text
+  , valBytes :: Maybe Int
+  , valIndex :: Int
+  , valDynamic :: Maybe Bool
+  , valEntry :: Maybe Entry
+  , valTypedef :: Maybe Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Val where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Val where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Val where arbitrary = genericArbitrary
+data Var = Var
+  { varType :: Text
+  , varBytes :: Maybe Int
+  , varAtBytes :: Int
+  , varDynamic :: Maybe Bool
+  , varEntry :: Maybe Entry
+  , varTypedef :: Maybe Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Var where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Var where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Var where arbitrary = genericArbitrary
 
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
@@ -356,7 +454,6 @@ instance FromJSON PostCompileRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostCompileRequest where
   toSamples _ = noSamples
-
 
 data PostCompileResponse = PostCompileResponse
   { postcompileresponseContractName :: String
