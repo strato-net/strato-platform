@@ -6,6 +6,7 @@
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , RecordWildCards
   , TypeApplications
   , TypeOperators
 #-}
@@ -13,24 +14,24 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Applicative
-import Control.Monad.Except
-import Control.Monad.Reader
+-- import Control.Monad.Except
+-- import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
-import Data.Functor.Contravariant
+-- import Data.Functor.Contravariant
 import Data.Int
-import Data.Monoid
+-- import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
-import qualified Hasql.Encoders as Encoders
-import Hasql.Query
-import Hasql.Session
+-- import qualified Hasql.Encoders as Encoders
+-- import Hasql.Query
+-- import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -42,12 +43,12 @@ import BlockApps.Bloc.Monad
 import BlockApps.Data
 
 class Monad m => MonadContracts m where
-  getContracts :: m GetContractsContractResponse
-  getContractsData :: ContractName -> m [Address]
-  getContractsContract :: ContractName -> MaybeNamed Address -> m UnstructuredJSON
+  getContracts :: m GetContractsResponse
+  getContractsData :: ContractName -> m [MaybeNamed Address]
+  getContractsContract :: ContractName -> MaybeNamed Address -> m GetContractsContractResponse
   getContractsState :: ContractName -> Address -> m UnstructuredJSON -- state-translation
-  getContractsFunctions :: ContractName -> Address -> m [FunctionName]
-  getContractsSymbols :: ContractName -> Address -> m [SymbolName]
+  getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
+  getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
   getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m UnstructuredJSON -- state-translation
   getContractsStates :: ContractName -> m UnstructuredJSON -- state-translation
   postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
@@ -76,24 +77,25 @@ instance MonadContracts Bloc where
   --     Left err -> throwError $ DBError err
   --     Right cons -> return $ Contracts cons
 
-  getContractsData (ContractName contractName) = do
-    conn <- asks dbConnection
-    let
-      encoder = Encoders.value Encoders.text
-      decoder = Decoders.rowsList (Decoders.value addressDecoder)
-      sqlString =
-        "SELECT CI.address\
-        \ FROM contracts C JOIN contracts_metadata CM\
-        \ ON CM.contract_id = C.id\
-        \ JOIN contracts_instance CI\
-        \ ON CI.contract_metadata_id = CM.id\
-        \ WHERE C.name = $1;"
-      sqlStatement = statement sqlString encoder decoder False
-    addressesEither <- liftIO $
-      run (query contractName sqlStatement) conn
-    case addressesEither of
-      Left err -> throwError $ DBError err
-      Right addresses -> return addresses
+  getContractsData = undefined
+  -- getContractsData (ContractName contractName) = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoder = Encoders.value Encoders.text
+  --     decoder = Decoders.rowsList (Decoders.value addressDecoder)
+  --     sqlString =
+  --       "SELECT CI.address\
+  --       \ FROM contracts C JOIN contracts_metadata CM\
+  --       \ ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI\
+  --       \ ON CI.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1;"
+  --     sqlStatement = statement sqlString encoder decoder False
+  --   addressesEither <- liftIO $
+  --     run (query contractName sqlStatement) conn
+  --   case addressesEither of
+  --     Left err -> throwError $ DBError err
+  --     Right addresses -> return addresses
 
   getContractsContract = undefined
   -- getContractsContract (ContractName contractName) addr = do
@@ -172,45 +174,47 @@ instance MonadContracts Bloc where
 
   getContractsState = undefined
 
-  getContractsFunctions (ContractName contractName) addr = do
-    conn <- asks dbConnection
-    let
-      encoder = contramap fst (Encoders.value Encoders.text)
-        <> contramap snd (Encoders.value addressEncoder)
-      decoder =
-        Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
-      sqlString =
-        "SELECT XF.Name FROM contracts C\
-        \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-        \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-        \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
-        \ WHERE C.name = $1 AND CI.address = $2 AND NOT XF.is_constructor"
-      sqlStatement = statement sqlString encoder decoder False
-    functionsEither <- liftIO $
-      run (query (contractName,addr) sqlStatement) conn
-    case functionsEither of
-      Left err -> throwError $ DBError err
-      Right functions -> return functions
+  getContractsFunctions = undefined
+  -- getContractsFunctions (ContractName contractName) addr = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoder = contramap fst (Encoders.value Encoders.text)
+  --       <> contramap snd (Encoders.value addressEncoder)
+  --     decoder =
+  --       Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
+  --     sqlString =
+  --       "SELECT XF.Name FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2 AND NOT XF.is_constructor"
+  --     sqlStatement = statement sqlString encoder decoder False
+  --   functionsEither <- liftIO $
+  --     run (query (contractName,addr) sqlStatement) conn
+  --   case functionsEither of
+  --     Left err -> throwError $ DBError err
+  --     Right functions -> return functions
 
-  getContractsSymbols (ContractName contractName) addr = do
-    conn <- asks dbConnection
-    let
-      encoder = contramap fst (Encoders.value Encoders.text)
-        <> contramap snd (Encoders.value addressEncoder)
-      decoder =
-        Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
-      sqlString =
-        "SELECT XV.Name FROM contracts C\
-        \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-        \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-        \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
-        \ WHERE C.name = $1 AND CI.address = $2"
-      sqlStatement = statement sqlString encoder decoder False
-    symbolsEither <- liftIO $
-      run (query (contractName,addr) sqlStatement) conn
-    case symbolsEither of
-      Left err -> throwError $ DBError err
-      Right symbols -> return symbols
+  getContractsSymbols = undefined
+  -- getContractsSymbols (ContractName contractName) addr = do
+  --   conn <- asks dbConnection
+  --   let
+  --     encoder = contramap fst (Encoders.value Encoders.text)
+  --       <> contramap snd (Encoders.value addressEncoder)
+  --     decoder =
+  --       Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
+  --     sqlString =
+  --       "SELECT XV.Name FROM contracts C\
+  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
+  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
+  --       \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
+  --       \ WHERE C.name = $1 AND CI.address = $2"
+  --     sqlStatement = statement sqlString encoder decoder False
+  --   symbolsEither <- liftIO $
+  --     run (query (contractName,addr) sqlStatement) conn
+  --   case symbolsEither of
+  --     Left err -> throwError $ DBError err
+  --     Right symbols -> return symbols
 
   getContractsStateMapping = undefined
     -- (ContractName contractName) addr (SymbolName mapping) key = do
@@ -250,8 +254,7 @@ instance MonadContracts Bloc where
   --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   --       return $ PostCompileResponse contractName _hash
 
-type GetContracts = "contracts" :> Get '[JSON] (GetContractsContractResponse)
-
+type GetContracts = "contracts" :> Get '[JSON] (GetContractsResponse)
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64
   , address :: MaybeNamed Address
@@ -259,16 +262,16 @@ data AddressCreatedAt = AddressCreatedAt
 instance ToJSON AddressCreatedAt
 instance FromJSON AddressCreatedAt
 instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary
-
-newtype GetContractsContractResponse = GetContractsContractResponse
-  { unContracts :: Map Text [AddressCreatedAt] } deriving (Eq, Show, Generic)
-instance ToJSON GetContractsContractResponse where
+newtype GetContractsResponse = GetContractsResponse
+  { unContracts :: HashMap Text [AddressCreatedAt] }
+  deriving (Eq, Show, Generic)
+instance ToJSON GetContractsResponse where
   toJSON = toJSON . unContracts
-instance FromJSON GetContractsContractResponse where
-  parseJSON = fmap GetContractsContractResponse . parseJSON
-instance Arbitrary GetContractsContractResponse where arbitrary = genericArbitrary
-instance ToSample GetContractsContractResponse where
-  toSamples _ = singleSample $ GetContractsContractResponse $ Map.singleton "Sample"
+instance FromJSON GetContractsResponse where
+  parseJSON = fmap GetContractsResponse . parseJSON
+instance Arbitrary GetContractsResponse where arbitrary = genericArbitrary
+instance ToSample GetContractsResponse where
+  toSamples _ = singleSample $ GetContractsResponse $ HashMap.singleton "Sample"
     [ AddressCreatedAt
       { address = Unnamed $ Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c
       , createdAt = 100
@@ -281,13 +284,111 @@ instance ToSample GetContractsContractResponse where
 
 type GetContractsData = "contracts"
   :> Capture "contractName" ContractName
-  :> Get '[OctetStream] [Address]
+  :> Get '[OctetStream] [MaybeNamed Address]
 
 -- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
 type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
-  :> Get '[JSON] UnstructuredJSON
+  :> Get '[HTMLifiedJSON] GetContractsContractResponse
+data GetContractsContractResponse = GetContractsContractResponse
+  { getcontractscontractresponseBin :: Text
+  , getcontractscontractresponseAddress :: Maybe Address
+  , getcontractscontractresponseBinRuntime :: Text
+  , getcontractscontractresponseCodeHash :: Text
+  , getcontractscontractresponseName :: Text
+  , getcontractscontractresponseXabi :: Xabi
+  } deriving (Show,Eq,Generic)
+instance ToJSON GetContractsContractResponse where
+  toJSON GetContractsContractResponse{..} = object
+    [ "bin" .= getcontractscontractresponseBin
+    , "address" .= getcontractscontractresponseAddress
+    , "bin-runtime" .= getcontractscontractresponseBinRuntime
+    , "codeHash" .= getcontractscontractresponseCodeHash
+    , "name" .= getcontractscontractresponseName
+    , "xabi" .= getcontractscontractresponseXabi
+    ]
+instance FromJSON GetContractsContractResponse where
+  parseJSON = withObject "GetContractsContractResponse" $ \obj ->
+    GetContractsContractResponse
+      <$> obj .: "bin"
+      <*> obj .:? "address"
+      <*> obj .: "bin-runtime"
+      <*> obj .: "codeHash"
+      <*> obj .: "name"
+      <*> obj .: "xabi"
+instance ToSample GetContractsContractResponse where toSamples _ = noSamples
+instance Arbitrary GetContractsContractResponse where
+  arbitrary = genericArbitrary
+data Xabi = Xabi
+  { xabiFuncs :: Maybe (HashMap Text Func)
+  , xabiConstr :: Maybe (HashMap Text Arg)
+  , xabiVars :: Maybe (HashMap Text Var)
+  } deriving (Eq,Show,Generic)
+instance ToJSON Xabi where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Xabi where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Xabi where arbitrary = genericArbitrary
+data Func = Func
+  { funcArgs :: HashMap Text Arg
+  , funcSelector :: Text
+  , funcVals :: HashMap Text Val
+  } deriving (Eq,Show,Generic)
+instance ToJSON Func where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Func where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Func where arbitrary = genericArbitrary
+data Arg = Arg
+  { argName :: Maybe Text
+  , argType :: Text
+  , argBytes :: Maybe Int
+  , argIndex :: Int
+  , argDynamic :: Maybe Bool
+  , argEntry :: Maybe Entry
+  , argTypedef :: Maybe Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Arg where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Arg where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Arg where arbitrary = genericArbitrary
+data Entry = Entry
+  { entryBytes :: Int
+  , entryType :: Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Entry where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Entry where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Entry where arbitrary = genericArbitrary
+data Val = Val
+  { valType :: Text
+  , valBytes :: Maybe Int
+  , valIndex :: Int
+  , valDynamic :: Maybe Bool
+  , valEntry :: Maybe Entry
+  , valTypedef :: Maybe Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Val where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Val where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Val where arbitrary = genericArbitrary
+data Var = Var
+  { varType :: Text
+  , varBytes :: Maybe Int
+  , varAtBytes :: Int
+  , varDynamic :: Maybe Bool
+  , varEntry :: Maybe Entry
+  , varTypedef :: Maybe Text
+  } deriving (Eq,Show,Generic)
+instance ToJSON Var where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON Var where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary Var where arbitrary = genericArbitrary
 
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
@@ -298,7 +399,7 @@ type GetContractsState = "contracts"
 -- GET /contracts/:contractName/:contractAddress/functions
 type GetContractsFunctions = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
+  :> Capture "contractAddress" (MaybeNamed Address)
   :> "functions"
   :> Get '[HTMLifiedJSON] [FunctionName]
 newtype FunctionName = FunctionName Text deriving (Eq,Show,Generic)
@@ -315,9 +416,9 @@ instance Arbitrary FunctionName where
 -- GET /contracts/:contractName/:contractAddress/symbols
 type GetContractsSymbols = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
+  :> Capture "contractAddress" (MaybeNamed Address)
   :> "symbols"
-  :> Get '[JSON] [SymbolName]
+  :> Get '[HTMLifiedJSON] [SymbolName]
 
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
 type GetContractsStateMapping = "contracts"
@@ -356,7 +457,6 @@ instance FromJSON PostCompileRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostCompileRequest where
   toSamples _ = noSamples
-
 
 data PostCompileResponse = PostCompileResponse
   { postcompileresponseContractName :: String
@@ -406,5 +506,7 @@ instance FromHttpApiData (MaybeNamed Address) where
   parseUrlPiece text = case stringAddress (Text.unpack text) of
     Nothing -> Right $ Named text
     Just addr -> Right $ Unnamed addr
+instance ToSample (MaybeNamed Address) where
+  toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
