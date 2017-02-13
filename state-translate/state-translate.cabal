@@ -1,0 +1,73 @@
+name:                state-translate
+version:             0.1.0.0
+synopsis:            tasty-discover based template from stack
+description:         Please see README.md
+homepage:            https://github.com/githubuser/state-translate#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2016 Author name here
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     SolidityStateTypes
+                     , ProcessSimpleTypes
+                     , ProcessComplexTypes
+                     , SolidityStateTranslate
+                     , BlockApps.Solidity
+  build-depends:       base >= 4.7 && < 5
+                     , blockapps-data
+                     , aeson
+                     , bytestring
+                     , solidity-abi
+                     , vector
+                     , containers
+                     , largeword
+                     , binary
+                     , text
+                     , base16-bytestring
+  default-language:    Haskell2010
+
+
+executable state-translate
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=N
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5,
+                       state-translate
+
+test-suite state-translate-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Tasty.hs
+  other-modules:       ArrayDeclarations
+                     , ComplexState
+                     , FunctionDeclarations
+                     , MappingDeclarations
+                     , SimpleDeclarations
+                     , SyntaxFails
+                     , StructEnumDeclarations
+                     , PrimitiveState
+
+  build-depends:       base
+                     , state-translate
+                     , bytestring
+                     , aeson-pretty
+                     , hspec
+                     , solidity-abi
+                     , tasty
+                     , tasty-hunit
+                     , containers
+                     , vector
+                     , binary
+                     , largeword
+                     , aeson
+                     , text
+                     , unordered-containers
+
+  default-language:    Haskell2010
