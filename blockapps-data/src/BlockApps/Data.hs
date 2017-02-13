@@ -60,7 +60,7 @@ import Web.FormUrlEncoded
 
 newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
-addressString (Address address) = padZeros 20 (showHex address "")
+addressString (Address address) = padZeros 40 (showHex address "")
 stringAddress :: String -> Maybe Address
 stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
 instance ToJSON Address where toJSON = toJSON . addressString

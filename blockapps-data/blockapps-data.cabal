@@ -17,13 +17,14 @@ library
   exposed-modules:
     BlockApps.Data
   default-language: Haskell2010
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall
   build-depends: base
     , aeson
     , base16-bytestring
     , binary
     , bytestring
     , cryptonite
+    , hashable
     , http-api-data
     , largeword
     , memory
@@ -38,7 +39,7 @@ test-suite blockapps-data-test
   default-language: Haskell2010
   type: exitcode-stdio-1.0
   hs-source-dirs: test
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall
   main-is: Spec.hs
   other-modules:
     BlockApps.DataSpec

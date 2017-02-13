@@ -1,0 +1,2 @@
+contracted Contract {
+}
