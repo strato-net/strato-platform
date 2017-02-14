@@ -25,7 +25,7 @@ import qualified Blockchain.Sequencer.Event as BSE
 
 import qualified System.IO.Unsafe as YOUR_CODE_IS_SHIT
 import qualified Data.IORef as IORef
-import Blockchain.Format (format)
+--import Blockchain.Format (format)
 
 decodeWithCheck::B.ByteString->B.ByteString
 decodeWithCheck x =
@@ -78,9 +78,9 @@ backupBlocks = do
       return ()
 
 bumpRestoredBlock :: MonadIO m => B.ByteString -> m ()
-bumpRestoredBlock b = liftIO $ do
+bumpRestoredBlock _ = liftIO $ do
     lastCounter <- IORef.readIORef blockCounter
     IORef.writeIORef blockCounter (lastCounter + 1)
-    putStrLn . format $ (Binary.decode (BL.fromStrict b) :: BSE.IngestEvent)
+    --putStrLn . format $ (Binary.decode (BL.fromStrict b) :: BSE.IngestEvent)
     putStrLn $ "Restored " ++ (show lastCounter) ++ " blocks"
 
