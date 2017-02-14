@@ -19,8 +19,8 @@ import LayoutTypes
 import ParserTypes
 import Selector
 
-instance ToJSON SolidityFile where
-  toJSON = jsonABI
+--instance ToJSON SolidityFile where
+--  toJSON = jsonABI
 
 jsonABI :: SolidityFile -> Value
 jsonABI f = toJSON $ Map.mapWithKey (contractABI $ layout f) $ makeContractsDef f
@@ -55,7 +55,7 @@ varsABI layout' objs = object $ catMaybes $ map (\o -> varABI layout' o) objs
 
 funcsABI :: [SolidityObjDef] -> Value
 funcsABI objs = object $ catMaybes $ map funcABI objs
-              
+
 typesABI :: SolidityTypesLayout -> SolidityTypesDef -> Value
 typesABI layout' types =
   object $ catMaybes $ map snd $ Map.toList $

@@ -6,6 +6,7 @@
   , OverloadedStrings
   , TypeApplications
   , TypeOperators
+  , GeneralizedNewtypeDeriving
 #-}
 
 module BlockApps.Bloc.API.Users where
@@ -49,14 +50,18 @@ import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
 -- import BlockApps.Strato.API.Client
 
+-- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
+import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+import qualified Network.HTTP.Media as M
+
 class Monad m => MonadUsers m where
   getUsers :: m [UserName]
   getUsersUser :: UserName -> m [Address]
   postUsersUser :: UserName -> PostUsersUserRequest -> m Address
   postUsersSend :: UserName -> Address -> PostSendParameters -> m PostTransaction
-  postUsersContract :: UserName -> Address -> PostUsersContractRequest -> m Keccak256
+  postUsersContract :: UserName -> Address -> PostUsersContractRequest -> m Address
   postUsersUploadList :: UserName -> Address -> UploadListRequest -> m UnstructuredJSON
-  postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> m NoContent
+  postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> m PostUsersContractMethodResponse
   postUsersSendList :: UserName -> Address -> PostSendListRequest -> m [PostSendListResponse]
   postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> m [PostMethodListResponse]
 instance MonadUsers ClientM where
@@ -76,8 +81,8 @@ instance MonadUsers Bloc where
     let
       encoder = Encoders.unit
       decoder = Decoders.rowsList (Decoders.value (UserName <$> Decoders.text))
-      sqlString = "SELECT name FROM users;"
-      sqlStatement = statement sqlString encoder decoder False
+      sqlText = "SELECT name FROM users;"
+      sqlStatement = statement sqlText encoder decoder False
     usersEither <- liftIO $ run (query () sqlStatement) conn
     case usersEither of
       Left err -> throwError $ DBError err
@@ -88,10 +93,10 @@ instance MonadUsers Bloc where
     let
       encoder = Encoders.value Encoders.text
       decoder = Decoders.rowsList (Decoders.value addressDecoder)
-      sqlString =
+      sqlText =
         "SELECT A.address FROM users U JOIN addresses A\
         \ ON A.user_id = U.id WHERE U.name = $1;"
-      sqlStatement = statement sqlString encoder decoder False
+      sqlStatement = statement sqlText encoder decoder False
     addressesEither <- liftIO $ run (query name sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
@@ -109,7 +114,7 @@ instance MonadUsers Bloc where
   --       <> contramap (\(_,y,_) -> y) (Encoders.value Encoders.bytea)
   --       <> contramap (\(_,_,z) -> z) (Encoders.value addressEncoder)
   --     decoder = Decoders.rowsAffected
-  --     sqlString =
+  --     sqlText =
   --       "WITH userid AS (\
   --       \ SELECT id FROM users WHERE name = $1)\
   --       \ , newUserId AS (\
@@ -117,7 +122,7 @@ instance MonadUsers Bloc where
   --       \ RETURNING id)\
   --       \ INSERT INTO addresses (password_hash, address, user_id)\
   --       \ SELECT $2, $3, uid.id FROM (SELECT id FROM userid UNION SELECT id FROM newUserId) uid;"
-  --     sqlStatement = statement sqlString encoder decoder False
+  --     sqlStatement = statement sqlText encoder decoder False
   --   conn <- asks dbConnection
   --   mgr <- asks httpManager
   --   url <- asks urlStrato
@@ -199,7 +204,7 @@ type PostUsersContract = "users"
   :> Capture "address" Address
   :> "contract"
   :> ReqBody '[FormUrlEncoded] PostUsersContractRequest
-  :> Post '[JSON] Keccak256
+  :> Post '[HTMLifiedAddress] Address
 data PostUsersContractRequest = PostUsersContractRequest
   { src :: Text
   , password :: Text
@@ -255,7 +260,33 @@ type PostUsersContractMethod = "users"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "call"
-  :> Post '[JSON] NoContent
+  :> ReqBody '[JSON] PostUsersContractMethodRequest
+  :> Post '[HTMLifiedPlainText] PostUsersContractMethodResponse
+data PostUsersContractMethodRequest = PostUsersContractMethodRequest
+  { postuserscontractmethodPassword :: Text
+  , postuserscontractmethodMethod :: Text
+  , postuserscontractmethodArgs :: HashMap Text UnstructuredJSON
+  , postuserscontractmethodValue :: Natural
+  } deriving (Eq,Show,Generic)
+
+instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary
+instance ToJSON PostUsersContractMethodRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostUsersContractMethodRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToSample PostUsersContractMethodRequest where
+  toSamples _ = noSamples
+newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse Text deriving (Eq,Read,Show,FromJSON,ToJSON,Arbitrary)
+instance ToSample PostUsersContractMethodResponse where
+  toSamples _ = noSamples
+--hack because endpoints are returning random text
+data HTMLifiedPlainText
+instance Accept HTMLifiedPlainText where
+  contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
+instance MimeUnrender HTMLifiedPlainText PostUsersContractMethodResponse where
+  mimeUnrender _ = read . Lazy.Char8.unpack
+instance MimeRender HTMLifiedPlainText PostUsersContractMethodResponse where
+  mimeRender _ =  Lazy.Char8.pack . show
 
 -- POST /users/:user/:userAddress/sendList
 type PostUsersSendList = "users"
@@ -265,7 +296,7 @@ type PostUsersSendList = "users"
   :> ReqBody '[JSON] PostSendListRequest
   :> Post '[JSON] [PostSendListResponse]
 data PostSendListRequest = PostSendListRequest
-  { postsendlistrequestPassword :: String
+  { postsendlistrequestPassword :: Text
   , postsendlistrequestResolve :: Bool
   , postsendlistrequestTxs :: [SendTransaction]
   } deriving (Eq,Show,Generic)
@@ -287,7 +318,7 @@ instance ToJSON SendTransaction where
 instance FromJSON SendTransaction where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 newtype PostSendListResponse = PostSendListResponse
-  { postsendlistresponseSenderBalance :: String
+  { postsendlistresponseSenderBalance :: Text
   } deriving (Eq,Show,Generic)
 instance ToJSON PostSendListResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -306,7 +337,7 @@ type PostUsersContractMethodList = "users"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [PostMethodListResponse]
 data PostMethodListRequest = PostMethodListRequest
-  { postmethodlistrequestPassword :: String
+  { postmethodlistrequestPassword :: Text
   , postmethodlistrequestResolve :: Bool
   , postmethodlistrequestTxs :: [MethodCall]
   } deriving (Eq,Show,Generic)
@@ -328,9 +359,9 @@ instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
 instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary
 data MethodCall = MethodCall
-  { methodcallContractName :: String
+  { methodcallContractName :: Text
   , methodcallContractAddress :: Address
-  , methodcallMethodName :: String
+  , methodcallMethodName :: Text
   , methodcallArgs :: HashMap Text UnstructuredJSON
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams

@@ -85,5 +85,11 @@ addressDecoder
 addressEncoder :: Encoders.Value Address
 addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
 
-urlTesterBloc :: BaseUrl
-urlTesterBloc = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
+tester7 :: BaseUrl
+tester7 = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
+
+bayar4a :: BaseUrl
+bayar4a = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/bloc"
+
+-- data SolidityValue
+--   = SolidityValueString Text

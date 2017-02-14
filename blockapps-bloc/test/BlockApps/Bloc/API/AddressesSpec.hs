@@ -12,5 +12,5 @@ spec :: Spec
 spec = beforeAll (newManager defaultManagerSettings) $
   describe "getAddresses" $
     it "gets a list of addresses" $ \ mgr -> do
-      addrsEither <- runClientM getAddresses (ClientEnv mgr urlTesterBloc)
+      addrsEither <- runClientM getAddresses (ClientEnv mgr tester7)
       addrsEither `shouldSatisfy` isRight
