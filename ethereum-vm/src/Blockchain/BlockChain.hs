@@ -493,9 +493,15 @@ timeIt f = do
     timeAfter <- liftIO getPOSIXTime
     return (timeAfter - timeBefore, result)
 
+data BoxMode = Pre | Ok | Err deriving (Eq)
 
-logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
-logWithBox source headerSize lines = do
+modeToColor :: BoxMode -> (String -> String)
+modeToColor Pre = CL.blue
+modeToColor Ok  = CL.magenta
+modeToColor Err = CL.red
+
+logWithBox :: MonadLogger m => T.Text -> Int -> BoxMode -> [String] -> m ()
+logWithBox source headerSize mode lines = do
     let headerAndFooter = indent ++ CL.magenta (replicate headerSize '=')
         addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
         indent          = "    "
