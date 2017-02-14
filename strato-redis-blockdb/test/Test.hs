@@ -196,7 +196,7 @@ specTest = around (withConn 1) $ do
 
            r <- runRedis conn $ do
                forM chains $ \chain -> do
-                   forceChain chain 
+                   putChain RDB.forceBestBlockInfo chain 
                    RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 
            let lengths = fromIntegral . length <$> chains
@@ -217,18 +217,18 @@ specTest = around (withConn 1) $ do
 
             liftIO . putStrLn $ showTree $ pb <$> tree
             r <- runRedis conn $ do
-                forceChain (head chains) -- insert shortest best chain
-                forceChain (last chains) -- insert longest best chain
+                putChain RDB.forceBestBlockInfo (head chains) -- insert shortest best chain
+                putChain RDB.putBestBlockInfo (last chains)   -- insert longest best chain
                 RDB.getCanonicalHeaderChain 0 (fromIntegral . blockDataNumber . last . last $ chains) :: Redis [(SHA, BlockData)]
             
             HUnit.assertEqual
                 "Couldn't get the longest best chain"
                 (pb <$> last chains) (pb <$> map snd r) 
 
-forceChain :: [BlockData] -> Redis ()
-forceChain chain = forM_ zC f
+putChain :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
+putChain g chain = forM_ zC f
     where
-        f (b, i) = RDB.forceBestBlockInfo (blockHeaderHash b) (blockDataNumber b) i
+        f (b, i) = g (blockHeaderHash b) (blockDataNumber b) i
         zC       = zip (reverse chain) [1..]
               
 pb :: BlockData -> (Integer, Integer, String, String) 
