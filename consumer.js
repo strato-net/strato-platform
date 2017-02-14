@@ -16,7 +16,10 @@ const stratoHost    = (process.env.STRATO    || 'strato:3000') ;
 const postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
 const zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
 
+const delay = 200;
+const totalAttempts = 5;
 
+var count =  0;
 
 function start() {
   return function(scope) {
@@ -162,6 +165,7 @@ function consume(scope) {
 
     //ignore message if cirrus is inserting
     if(scope.isCirrusInserting) {
+      count++;
       return;
     }
 
@@ -185,7 +189,9 @@ function consume(scope) {
         scope.isCirrusInserting = false;
         const addedTopics = [{topic:scope.kafkaTopic, offset:(scope.offset+1)}]
         scope.consumer.addTopics(addedTopics, _ => {}, true);
+        console.log('ignored ' + count + ' messages while inserting');
         console.log('resuming kafka fetch loop, offset is  ' + scope.offset);
+        count=0;
         return localScope;
       })
       .catch(err => {
@@ -238,6 +244,7 @@ function consume(scope) {
           return scope;
         })
         .catch(err => {
+
           throw new Error(err);
         })
     }
@@ -254,11 +261,10 @@ function consume(scope) {
         .then(x => {
           x.address = addr;
           x.codeHash = accounts[addr].codeHash;
-          console.log('state to be inserted', x);
           return x;
         })
         .catch(err => {
-          if(err.includes('No table found')) {
+          if(err.message.includes('No table found')) {
             return;
           }
           throw new Error(err);
@@ -339,7 +345,7 @@ function consume(scope) {
   function postToPostGrest(options) {
     return scope => {
       return Promise.each(options, (option) => {
-        return rpRetry(option, 200, 5)
+        return rpRetry(option, delay, totalAttempts)
           .then(res => {
             console.log('Successfully inserted ', option.body.address);
             return scope;
@@ -424,10 +430,10 @@ function stateToBody(state, address) {
       return p;
     } catch (error) {
       console.log(chalk.red("Failed to attach solidity object: " + error));
-      return Promise.reject("Failed to attach solidity object: " + error);
+      return Promise.reject(new Error("Failed to attach solidity object: " + error));
     }
   } else {
-    return Promise.reject("No table found");
+    return Promise.reject(new Error("No table found"));
   }
 }
 
