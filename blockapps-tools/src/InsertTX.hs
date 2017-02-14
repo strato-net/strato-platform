@@ -16,6 +16,7 @@ import Blockchain.Data.Code
 import Blockchain.Data.RawTransaction
 import Blockchain.Data.Transaction
 import Blockchain.Data.TXOrigin
+import Blockchain.DB.SQLDB (createPostgresqlPool')
 import Blockchain.EthConf
 
 
@@ -31,7 +32,7 @@ insertTX::IO ()
 insertTX = do
   Just prvKey <- retrievePrvKey $ "config" </> "priv"
   theTime <- getCurrentTime
-  db <- runNoLoggingT $ SQL.createPostgresqlPool connStr' 20
+  db <- runNoLoggingT $ createPostgresqlPool' connStr' 20
   tx <- H.withSource H.devURandom $ createContractCreationTX 0 1 1000000 0 (Code $ B.pack [0x60, 0, 0x56]) prvKey
   --let tx = createMessageTX 0 1 1000000 (Address 0xabcd) 1 "" prvKey
   runResourceT $ flip SQL.runSqlPool db $ do

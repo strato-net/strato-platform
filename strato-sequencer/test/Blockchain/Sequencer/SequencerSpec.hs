@@ -6,6 +6,7 @@ import Data.Time.Clock.POSIX
 import Control.Monad.Logger
 import Control.Exception (finally)
 
+import Blockchain.EthConf (lookupConsumerGroup)
 import Blockchain.Sequencer
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
@@ -35,27 +36,29 @@ withTemporaryDepBlockDB genesisBlock m = do
     cwd          <- getCurrentDirectory
     randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
     timestamp    <- (show . round) <$> getPOSIXTime
-    fullPath     <- return $ "./.ethereumH/dep_block_" ++ timestamp ++ "_" ++ (showHex randomSuffix "") ++ "/"
-    tempKCID     <- return $ "sequencer_" ++ timestamp ++ "_" ++ (showHex randomSuffix "")
+    let fullPath ="./.ethereumH/dep_block_" ++ timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
+        tempKCID ="sequencer_" ++ timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
-    cfg          <- return $ SequencerConfig
-                               { depBlockDBCacheSize   = 0
+    let kcid = KP.KString (C8.pack tempKCID)
+        cfg  = SequencerConfig { depBlockDBCacheSize   = 0
                                , depBlockDBPath        = fullPath
-                               , kafkaClientId         = KP.KString . C8.pack $ tempKCID
+                               , kafkaClientId         = kcid
+                               , kafkaConsumerGroup    = lookupConsumerGroup kcid
                                , seenTransactionDBSize = dedupWindow
                                , syncWrites            = False
                                , bootstrapDoEmit       = True
                                }
 
-    (flip runLoggingT printLogMsg $ runSequencerM cfg ((bootstrap $ ingestBlockToBlock genesisBlock) >> m))
+    runLoggingT (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
         `finally`
-        ((removeDirectoryRecursive fullPath) >> (setCurrentDirectory cwd))-- always clean up
+        (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
 feedBackOutputsToInput :: [OutputEvent] -> [IngestEvent]
 feedBackOutputsToInput = map rebox
-    where rebox (OETx ts t) = (IETx ts $ unboxTx t)
+    where rebox (OETx ts t) = IETx ts $ unboxTx t
           rebox (OEBlock (OutputBlock origin _ header txs uncles)) = IEBlock $ IngestBlock origin header (unboxBlockTx <$> txs) uncles
+          rebox x = error $ "why are we testing against " ++ show x
           unboxTx (OutputTx origin _ _ base) = IngestTx origin base
           unboxBlockTx (OutputTx _ _ _ base) = base
 
@@ -93,25 +96,25 @@ spec = do
         it "should not deduplicate incoming transactions that are unique" $ do
             gb <- makeGenesisBlock
             ts <- generate arbitrary
-            inTxSize <- generate $ choose (10, (dedupWindow - 1))
-            inTxs  <- generate $ vectorOf inTxSize $ arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ transformEvents ((IETx ts) <$> inTxs)
+            inTxSize <- generate $ choose (10, dedupWindow - 1)
+            inTxs  <- generate $ vectorOf inTxSize arbitrary
+            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx ts <$> inTxs)
             -- ^^ in case any arbitrary Txs weren't unique
-            dedupedIn <- return $ feedBackOutputsToInput (snd outTxs)
+            let dedupedIn = feedBackOutputsToInput (snd outTxs)
             dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents dedupedIn
             assertBool ((show . length $ dedupedIn) ++ " /= " ++ (show . length . snd $ dedupedOut)) $
-                (length dedupedIn) == (length . snd $ dedupedOut)
+                length dedupedIn == (length . snd $ dedupedOut)
 
-        it ("should allow duplicate incoming transactions that come in after a specified window (" ++ (show dedupWindow) ++ " txs)") $ do
+        it ("should allow duplicate incoming transactions that come in after a specified window (" ++ show dedupWindow ++ " txs)") $ do
             gb <- makeGenesisBlock
             ts <- generate arbitrary
             inTxSize <- generate $ choose (2 * dedupWindow, (3 * dedupWindow) - 1)
-            inTxs  <- generate $ vectorOf inTxSize $ arbitrary
-            outTxs <- withTemporaryDepBlockDB gb $ transformEvents ((IETx ts) <$> inTxs)
+            inTxs  <- generate $ vectorOf inTxSize arbitrary
+            outTxs <- withTemporaryDepBlockDB gb $ transformEvents (IETx ts <$> inTxs)
             -- ^^ in case any arbitrary Txs weren't unique
-            dedupedIn <- return $ feedBackOutputsToInput (snd outTxs)
-            replicationsNeeded <- return $ (dedupWindow `quot` (length dedupedIn)) + 1
-            replicatedIn <- return . concat $ replicate replicationsNeeded (dedupedIn)
+            let dedupedIn          = feedBackOutputsToInput (snd outTxs)
+                replicationsNeeded = (dedupWindow `quot` length dedupedIn) + 1
+                replicatedIn       = concat $ replicate replicationsNeeded dedupedIn
             dedupedOut <- withTemporaryDepBlockDB gb $ transformEvents replicatedIn
             assertBool ((show . length $ replicatedIn) ++ " /= " ++ (show . length . snd $ dedupedOut)) $
-                (length replicatedIn) == (length . snd $ dedupedOut)
+                length replicatedIn == (length . snd $ dedupedOut)

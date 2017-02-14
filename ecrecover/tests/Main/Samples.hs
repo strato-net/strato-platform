@@ -1,13 +1,15 @@
 module Main.Samples where
 
-import Prelude
+import Data.ByteString hiding (List)
+import Data.Int
 
+type List = []
 
 publicKey :: ByteString
 publicKey =
   "\ETX\237\158\128_P\234/\239\&9\185\CAN\159\DC2P\242x\206\176\239\213}\243}\252\215\ETB\244?\176,\247="
 
-transactions_bytes :: List (ByteString, ByteString, Int32, ByteString)
+transactions_bytes :: [(ByteString, ByteString, Int32, ByteString)]
 transactions_bytes =
   [
     ("p\SUB~\205\r\196l3\157\145q\136\173&a\223\155\233\nP\179\211\133\179-\217\159x0\164K\147","A\134\202\157\166\FS#\253\170\248\138<E\223\232;<7\248\233J/D4n\tg\191\170\250\157\v",0,"OB\146\nu.\245\178J\159T\241\RSx\210\SYN\143ph\217\210eJ3\233\230\159\&0S*\ETB\t"),
@@ -113,7 +115,7 @@ transactions_bytes =
     (" \181V\170\136\196\137,\241\196T\186\251\156\ESC\224\169\165\250[\238b\164\214\253\n\172G\250\164\165\DC2","L \220\SO\223_\STXKpS\DLE\186\194O\134H\190Z\237\ACK\189\250\163\239\169\237\215Eli?\166",1,"\ACK)\EOT\a\US\154\&9\161t\202\188\222Yq\238\"\172W\DC3\f\228\139\215\132\159\143\238}I\207\SI\US")
   ]
 
-transactions_integer :: List (Integer, Integer, Int32, Integer)
+transactions_integer :: [(Integer, Integer, Int32, Integer)]
 transactions_integer =
   [
     (53009061921330807819223009173068573399970314146107959232891770474150029121003,29809615627007940951178093867324997952009474722137805650637399147083218099518,1,35850334881260372387669542451037370183239639056352960888504548051174843619081),

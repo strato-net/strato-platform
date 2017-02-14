@@ -149,7 +149,7 @@ instance Yesod App where
     -- in development, and warnings and errors in production.
 
     --maximumContentLength _ (Just (getAccountInfoR _)) = 2 * 1024 * 1024 -- 2 megabytes 
-    maximumContentLength _ _ = Just $ fromIntegral $ 2 * 1024 * 1024 -- 2M
+    maximumContentLength _ _ = Just (fromIntegral $ 2 * 1024 * 1024 :: Word64) -- 2M
 
     shouldLog app _source level =
         appShouldLogAll (appSettings app)
@@ -159,7 +159,7 @@ instance Yesod App where
     makeLogger = return . appLogger
 
 -- How to run database actions.
-instance HasSQLDB Handler where
+instance HasSQLDB Foundation.Handler where
     getSQLDB = appConnPool <$> getYesod
     
 instance YesodPersist App where
@@ -202,7 +202,7 @@ instance YesodAuthPersist App
 instance RenderMessage App FormMessage where
     renderMessage _ _ = defaultFormMessage
 
-unsafeHandler :: App -> Handler a -> IO a
+unsafeHandler :: App -> Foundation.Handler a -> IO a
 unsafeHandler = Unsafe.fakeHandlerGetLogger appLogger
 
 -- Note: Some functionality previously present in the scaffolding has been

@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase, ScopedTypeVariables #-}
+{-# OPTIONS -fno-warn-orphans                                   #-}
 module Executable.EVMCheckpoint where
 
 import qualified Data.ByteString.Base16 as B16
@@ -11,23 +12,50 @@ import Blockchain.Format
 import qualified Blockchain.Colors as CL
 
 import qualified Network.Kafka.Protocol as KP
+import Blockchain.VMContext (ContextBestBlockInfo(..))
 
 import Control.Arrow ((>>>))
 
 data EVMCheckpoint = EVMCheckpoint {
-    checkpointSHA  :: SHA,
-    checkpointHead :: DD.BlockData,
-    checkpointTXs  :: [SHA]
+    checkpointSHA    :: SHA,
+    checkpointHead   :: DD.BlockData,
+    checkpointTXs    :: [SHA],
+    ctxBestBlockInfo :: ContextBestBlockInfo
 } deriving (Read, Show)
 
 instance RLPSerializable EVMCheckpoint where
-    rlpDecode (RLPArray [sha, header, RLPArray txShas]) =
-        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode <$> txShas)
-    rlpEncode (EVMCheckpoint sha head txShas) =
-        RLPArray [rlpEncode sha, rlpEncode head, RLPArray (rlpEncode <$> txShas)]
+    rlpDecode (RLPArray [sha, header, RLPArray txShas, bbi]) =
+        EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode <$> txShas) (rlpDecode bbi)
+    rlpEncode (EVMCheckpoint sha head txShas bbi) =
+        RLPArray [rlpEncode sha, rlpEncode head, RLPArray (rlpEncode <$> txShas), rlpEncode bbi]
 
-instance Format EVMCheckpoint where
-    format (EVMCheckpoint sha head txhs) =
+instance RLPSerializable ContextBestBlockInfo where
+    rlpDecode (RLPArray [tag, body]) = case rlpDecode tag :: Integer of
+        0 -> Unspecified
+        1 -> case body of
+            RLPArray [sha, header, tdiff, txCount, uncleCount] ->
+                ContextBestBlockInfo (rlpDecode sha,
+                                      rlpDecode header,
+                                      rlpDecode tdiff,
+                                      rlpDecodeInt txCount,
+                                      rlpDecodeInt uncleCount
+                                     )
+                where rlpDecodeInt x = let y :: Integer = rlpDecode x in fromIntegral y
+            x -> error $ "unexpected shape in rlpDecode ContextBestBlockInfo/body :: " ++ show x
+        x -> error $ "Unexpected tag for ContextBestBlockInfo `" ++ show x ++ "`"
+    rlpDecode x = error $ "unexpected shape in rlpDecode ContextBestBlockInfo :: " ++ show x
+    rlpEncode input = case input of
+        Unspecified -> RLPArray [rlpEncodeInt 1, RLPArray []]
+        ContextBestBlockInfo (sha, header, tdiff, txCount, uncleCount) ->
+            RLPArray [rlpEncodeInt 1,
+                  RLPArray [rlpEncode sha, rlpEncode header, rlpEncode tdiff, rlpEncodeInt txCount, rlpEncodeInt uncleCount]]
+
+        where rlpEncodeInt = (rlpEncode :: Integer -> RLPObject) . fromIntegral
+
+
+
+instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
+    format (EVMCheckpoint sha head txhs _) =
         "EVMCheckpoint " ++ CL.red (short sha) ++ (' ':count)
             where short = take 16 . formatSHAWithoutColor
                   count = CL.green $ show (length txhs)

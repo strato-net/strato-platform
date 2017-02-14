@@ -23,14 +23,11 @@ module Blockchain.Data.Address (
 
 import Control.Monad
        
-import qualified Crypto.Hash.SHA3 as C
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.NibbleString as N
-import Data.Maybe
 import Network.Haskoin.Crypto hiding (Address)
-import Network.Haskoin.Internals hiding (Address)
 import Numeric
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
@@ -42,14 +39,13 @@ import qualified Data.Text as T
 import qualified Data.Aeson as AS
 import Data.Aeson.Types
        
-import GHC.Generics
 import qualified Blockchain.Colors as C
 import Blockchain.Format
 import Blockchain.SHA
 import Blockchain.Util
 import Web.PathPieces
 
-newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
+import Blockchain.Strato.Model.Address
 
 {-
  Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
@@ -90,23 +86,6 @@ instance Binary Address where
     return (Address $ fromInteger $ byteString2Integer byteString)
 
 
-prvKey2Address::PrvKey->Address
-prvKey2Address prvKey =
-  Address $ fromInteger $ byteString2Integer $ C.hash 256 $ BL.toStrict $ encode x `BL.append` encode y
-  --B16.encode $ hash 256 $ BL.toStrict $ encode x `BL.append` encode y
-  where
-    point = pubKeyPoint $ derivePubKey prvKey
-    x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
-
-pubKey2Address::PubKey->Address
-pubKey2Address pubKey =
-  Address $ fromInteger $ byteString2Integer $ C.hash 256 $ BL.toStrict $ encode x `BL.append` encode y
-  --B16.encode $ hash 256 $ BL.toStrict $ encode x `BL.append` encode y
-  where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
-    y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
-    point = pubKeyPoint pubKey
 
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a

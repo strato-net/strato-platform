@@ -1,7 +1,6 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -10,7 +9,8 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE DeriveGeneric              #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-} 
+{-# LANGUAGE Rank2Types                 #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds  #-}
     
 module Blockchain.Data.Blockchain
     ( 
@@ -23,10 +23,12 @@ import Database.Persist
 import Database.Persist.TH
 import Database.Persist.Postgresql hiding (get)
 
-import Control.Monad.Logger (runNoLoggingT)
+import Control.Monad.Logger (runNoLoggingT, MonadLogger)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Control
 import Control.Monad.IO.Class
+
+import Blockchain.DB.SQLDB (runPostgresConn)
 
 import qualified Data.Text as T
 
@@ -39,18 +41,17 @@ Blockchain
     deriving Show
 |]
 
+-- instance (IsSqlBackend t) => BaseBackend t ~ SqlBackend
+
 createDB :: ConnectionString -> IO ()
 createDB pgConn = do
     putStrLn $ CL.yellow ">>>> Creating global database"
-    let create = T.pack $ "CREATE DATABASE blockchain;"
+    let create = "CREATE DATABASE blockchain;"
     runNoLoggingT $ withPostgresqlConn pgConn $ runReaderT $ rawExecute create []
 
 migrateDB :: (MonadBaseControl IO m, MonadIO m) => ConnectionString -> m ()
-migrateDB pgConn = runNoLoggingT $ withPostgresqlConn pgConn $ runReaderT $ runMigration migrateAll
+migrateDB pgConn = runNoLoggingT . runPostgresConn pgConn $ runMigration migrateAll
 
-insertBlockchain ::  (MonadBaseControl IO m, MonadIO m) => ConnectionString -> String -> String -> m (Key Blockchain)
-insertBlockchain pgConn path uuid = runNoLoggingT $ withPostgresqlConn pgConn $ runReaderT $ do
-      insert $ Blockchain { 
-                 blockchainPath = path,
-                 blockchainUuid = uuid
-             }      
+insertBlockchain :: (MonadBaseControl IO m, MonadIO m) => ConnectionString -> String -> String -> m (Key Blockchain)
+insertBlockchain pgConn path uuid = runNoLoggingT . runPostgresConn pgConn $
+    insert Blockchain { blockchainPath = path, blockchainUuid = uuid }

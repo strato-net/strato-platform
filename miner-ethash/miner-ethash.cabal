@@ -8,12 +8,12 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Hashimoto
-                     , Cache
-                     , Constants
-                     , Dataset
-                     , TimeIt
-  other-modules:       Util
+  exposed-modules:     Blockchain.Strato.Mining.Ethash.Hashimoto
+                     , Blockchain.Strato.Mining.Ethash.Cache
+                     , Blockchain.Strato.Mining.Ethash.Constants
+                     , Blockchain.Strato.Mining.Ethash.Dataset
+                     , Blockchain.Strato.Mining.Ethash.TimeIt
+  other-modules:       Blockchain.Strato.Mining.Ethash.Util
   build-depends:       base,
                        arithmoi,
                        array,

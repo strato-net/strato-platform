@@ -10,11 +10,9 @@ import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Internal
 import Numeric
 
---import TimeIt
-
-import Cache
-import Constants
-import Dataset
+import Blockchain.Strato.Mining.Ethash.Cache
+import Blockchain.Strato.Mining.Ethash.Constants
+import Blockchain.Strato.Mining.Ethash.Dataset
 
 encodeWord8::Word8->String
 encodeWord8 c | c < 0x20 || c > 0x7e = "\\x" ++ showHex c ""

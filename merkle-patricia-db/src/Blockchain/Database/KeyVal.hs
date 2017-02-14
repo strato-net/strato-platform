@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE AllowAmbiguousTypes #-} -- todo: can a fundep solve this? its for line 33
 
 module Blockchain.Database.KeyVal (
     PointedKeyValDB(..),

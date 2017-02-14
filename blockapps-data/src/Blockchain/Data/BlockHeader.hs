@@ -23,29 +23,30 @@ import Blockchain.Format
 import Blockchain.SHA
 import Blockchain.Util
 
+import Blockchain.Strato.Model.Class
 
 data BlockHeader =
   BlockHeader {
-    parentHash::SHA,
-    ommersHash::SHA,
-    beneficiary::Address,
-    stateRoot::MP.StateRoot,
-    transactionsRoot::MP.StateRoot,
-    receiptsRoot::MP.StateRoot,
-    logsBloom::B.ByteString,
-    difficulty::Integer,
-    number::Integer,
-    gasLimit::Integer,
-    gasUsed::Integer,
-    timestamp::UTCTime,
-    extraData::Integer,
-    mixHash::SHA,
-    nonce::Word64
-    } deriving (Show, Eq)
+    parentHash            :: SHA,
+    ommersHash            :: SHA,
+    beneficiary           :: Address,
+    stateRoot             :: MP.StateRoot,
+    transactionsRoot      :: MP.StateRoot,
+    receiptsRoot          :: MP.StateRoot,
+    logsBloom             :: B.ByteString,
+    difficulty            :: Integer,
+    number                :: Integer,
+    gasLimit              :: Integer,
+    gasUsed               :: Integer,
+    timestamp             :: UTCTime,
+    extraData             :: Integer,
+    mixHash               :: SHA,
+    nonce                 :: Word64
+    } deriving (Eq, Read, Show)
 
 instance Format BlockHeader where
   format header@(BlockHeader ph oh b sr tr rr _ d number' gl gu ts ed _ nonce') =
-    CL.blue ("BlockHeader #" ++ show number') ++ " " ++ (format (headerHash header)) ++
+    CL.blue ("BlockHeader #" ++ show number') ++ " " ++ format (headerHash header) ++
     tab ("\nparentHash: " ++ format ph ++ "\n" ++
          "ommersHash: " ++ format oh ++ 
          (if oh == hash (B.pack [0xc0]) then " (the empty array)\n" else "\n") ++
@@ -58,7 +59,7 @@ instance Format BlockHeader where
          "gasUsed: " ++ show gu ++ "\n" ++
          "timestamp: " ++ show ts ++ "\n" ++
          "extraData: " ++ show ed ++ "\n" ++
-         "nonce: " ++ showHex (nonce') "")
+         "nonce: " ++ showHex nonce' "")
 
 instance RLPSerializable BlockHeader where
   rlpEncode (BlockHeader ph oh b sr tr rr lb d number' gl gu ts ed mh nonce') =
@@ -99,8 +100,42 @@ instance RLPSerializable BlockHeader where
       }
   rlpDecode x = error $ "can not run rlpDecode on BlockHeader for value " ++ show x
 
-headerHash::BlockHeader->SHA
-headerHash header = hash . rlpSerialize . rlpEncode $ header
+instance BlockHeaderLike BlockHeader where
+    blockHeaderBlockNumber      = number
+    blockHeaderParentHash       = parentHash
+    blockHeaderOmmersHash       = ommersHash 
+    blockHeaderBeneficiary      = beneficiary 
+    blockHeaderStateRoot        = MP.unboxStateRoot . stateRoot 
+    blockHeaderTransactionsRoot = MP.unboxStateRoot . transactionsRoot
+    blockHeaderReceiptsRoot     = MP.unboxStateRoot . receiptsRoot
+    blockHeaderLogsBloom        = logsBloom
+    blockHeaderGasLimit         = gasLimit
+    blockHeaderGasUsed          = gasUsed
+    blockHeaderDifficulty       = difficulty
+    blockHeaderNonce            = nonce 
+    blockHeaderExtraData        = extraData
+    blockHeaderTimestamp        = timestamp 
+    blockHeaderMixHash          = mixHash
+
+    morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
+                                              , parentHash       = blockHeaderParentHash b
+                                              , ommersHash       = blockHeaderOmmersHash b
+                                              , beneficiary      = blockHeaderBeneficiary b
+                                              , stateRoot        = MP.StateRoot $ blockHeaderStateRoot b
+                                              , transactionsRoot = MP.StateRoot $ blockHeaderTransactionsRoot b
+                                              , receiptsRoot     = MP.StateRoot $ blockHeaderReceiptsRoot b
+                                              , logsBloom        = blockHeaderLogsBloom b
+                                              , gasLimit         = blockHeaderGasLimit b
+                                              , gasUsed          = blockHeaderGasUsed b
+                                              , difficulty       = blockHeaderDifficulty b
+                                              , nonce            = blockHeaderNonce b
+                                              , extraData        = blockHeaderExtraData b
+                                              , timestamp        = blockHeaderTimestamp b
+                                              , mixHash          = blockHeaderMixHash b
+                                              } 
+
+headerHash :: BlockHeader->SHA
+headerHash = blockHeaderHash
 
 blockToBlockHeader::Block->BlockHeader
 blockToBlockHeader Block{blockBlockData=bd} = blockDataToBlockHeader bd

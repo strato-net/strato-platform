@@ -49,7 +49,7 @@ library
                  , ethereum-discovery
                  , ethereum-encryption
                  , ethereum-rlp
-                 , haskoin
+                 , blockapps-haskoin
                  , hflags
                  , json-rpc-server
                  , lifted-base
@@ -74,14 +74,18 @@ library
                  , ansi-wl-pprint
                  , strato-conf
                  , strato-sequencer
+                 , strato-model
+                 , strato-redis-blockdb
+                 , hedis
 
     exposed-modules:
                    Blockchain.BlockNotify
                    Blockchain.Context
                    Blockchain.Data.Wire
                    Blockchain.Display
-                   Blockchain.Event
                    Blockchain.EventException
+                   Blockchain.Event
+                   Blockchain.NewEvent
                    Blockchain.ExtMergeSources
                    Blockchain.Options
                    Blockchain.RawTXNotify
@@ -93,3 +97,21 @@ library
     ghc-options: -Wall -O2
     buildable: True
     hs-source-dirs: src
+
+
+test-suite strato-p2p-client-test
+    default-language: Haskell2010
+    type: exitcode-stdio-1.0
+    hs-source-dirs: test
+    ghc-options: -Wall -Werror
+    main-is: Spec.hs
+    other-modules:
+    build-depends: base >=4 && < 5
+      , hspec
+      , strato-p2p-client
+      , conduit
+      , strato-model
+      , crypto-pubkey-types
+      , mtl
+      , containers
+      , blockapps-data

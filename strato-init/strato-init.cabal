@@ -19,7 +19,7 @@ source-repository this
 
 executable strato-setup
     default-language: Haskell98
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -O2 -threaded
     build-depends: 
                    base >= 4 && < 5
                  , aeson
@@ -27,6 +27,7 @@ executable strato-setup
                  , blockapps-data
                  , blockapps-util
                  , strato-sequencer
+                 , strato-index
                  , bytestring
                  , containers
                  , cryptohash
@@ -49,8 +50,9 @@ executable strato-setup
                  , time
                  , transformers
                  , yaml
-                 , binary == 0.7.5.0
+                 , binary
                  , stm
+                 , persistent
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
                    Blockchain.Data.GenesisBlock
@@ -63,7 +65,7 @@ executable strato-setup
 
 executable strato-backup
     default-language: Haskell98
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -O2 -threaded
     build-depends: base >= 4 && < 5
                  , base16-bytestring
                  , binary
@@ -85,7 +87,7 @@ executable strato-backup
 
 executable strato-block-backup
     default-language: Haskell98
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -O2 -threaded
     build-depends: base >= 4 && < 5
                  , base16-bytestring
                  , blockapps-data
@@ -100,7 +102,7 @@ executable strato-block-backup
 
 executable genesis-setup
     default-language: Haskell98
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -O2 -threaded
     build-depends: 
                    base >= 4 && < 5
                  , aeson
@@ -111,7 +113,7 @@ executable genesis-setup
                  , bytestring
                  , directory
                  , entropy
-                 , haskoin
+                 , blockapps-haskoin
                  , hflags
                  , merkle-patricia-db
                  , time

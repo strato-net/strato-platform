@@ -17,18 +17,6 @@ import System.Process
 import qualified Data.ByteString.Char8 as BS
 
 import qualified Data.Yaml as Y
---import Stack.Types.Config
-
--- packages:
--- - local-package
--- - location: vendor/binary
---   valid-wanted: false
--- - location:
---     git: git@github.com:yesodweb/wai
---     commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
---   subdirs:
---   - auto-update
---   - wai
 
 data StackRepo = StackRepo { package :: Package } deriving (Show, Generic)
 data Package = Package {location :: String} deriving (Show, Generic)
@@ -76,17 +64,15 @@ getStackInfo = runIO $ do
 -- stdout output. If git isn't available or something goes wrong,
 -- return the second argument.
 -- This function is by Adam C. Foltzer, see https://hackage.haskell.org/package/gitrev
-runGit :: String -> [String] -> String -> Q String
-runGit mydir args def = do
+runGit :: [String] -> String -> Q String
+runGit args def = do
   let oops :: SomeException -> IO (ExitCode, String, String)
       oops _e = return (ExitFailure 1, def, "")
   gitFound <- runIO $ isJust <$> findExecutable "git"
   if gitFound
     then do
       -- a lot of bookkeeping to record the right dependencies
-      pwd' <- runIO getCurrentDirectory
-      runIO $ setCurrentDirectory $ pwd' </> ".." </> mydir
-      let pwd = pwd' </> ".." </> mydir
+      pwd <- runIO getCurrentDirectory
 
       let hd         = pwd </> ".git" </> "HEAD"
           index      = pwd </> ".git" </> "index"
@@ -113,7 +99,6 @@ runGit mydir args def = do
       packedExists <- runIO $ doesFileExist packedRefs
       when packedExists $ addDependentFile packedRefs
       runIO $ do
-        setCurrentDirectory $ pwd' </> ".." </> mydir
         (code, out, _err) <- readProcessWithExitCode "git" args "" `catch` oops
         case code of
           ExitSuccess   -> return (takeWhile (/= '\n') out)
@@ -129,79 +114,8 @@ mkFuncs srt = return decs
 stackYaml :: ExpQ
 stackYaml = stringE =<< (getStackInfo)
 
-gitBranchHServerEth :: ExpQ
-gitBranchHServerEth =
-  stringE =<< runGit "strato-api" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
+gitBranchMonostrato :: ExpQ
+gitBranchMonostrato = stringE =<< runGit ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
 
-gitBranchEthereumVm :: ExpQ
-gitBranchEthereumVm =
-  stringE =<< runGit "ethereum-vm" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumClientHaskell :: ExpQ
-gitBranchEthereumClientHaskell =
-  stringE =<< runGit "strato-p2p-client" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumDataSql :: ExpQ
-gitBranchEthereumDataSql =
-  stringE =<< runGit "blockapps-data" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchHminer :: ExpQ
-gitBranchHminer =
-  stringE =<< runGit "miner-ethash" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchP2pServer :: ExpQ
-gitBranchP2pServer =
-  stringE =<< runGit "strato-p2p-server" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumUtil :: ExpQ
-gitBranchEthereumUtil =
-  stringE =<< runGit "blockapps-util" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumEncryption :: ExpQ
-gitBranchEthereumEncryption =
-  stringE =<< runGit "ethereum-encryption" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumMerklePatriciaDb :: ExpQ
-gitBranchEthereumMerklePatriciaDb =
-  stringE =<< runGit "merkle-patricia-db" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumQuery :: ExpQ
-gitBranchEthereumQuery =
-  stringE =<< runGit "blockapps-tools" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitBranchEthereumRlp :: ExpQ
-gitBranchEthereumRlp =
-  stringE =<< runGit "ethereum-rlp" ["rev-parse", "--abbrev-ref", "HEAD"] "no branch found"
-
-gitHashEthereumClientHaskell :: ExpQ
-gitHashEthereumClientHaskell = stringE =<< runGit "strato-p2p-client" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumDataSql :: ExpQ
-gitHashEthereumDataSql = stringE =<< runGit "blockapps-data" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumEncryption :: ExpQ
-gitHashEthereumEncryption = stringE =<< runGit "ethereum-encryption" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumMerklePatriciaDb :: ExpQ
-gitHashEthereumMerklePatriciaDb = stringE =<< runGit "merkle-patricia-db" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumQuery :: ExpQ
-gitHashEthereumQuery = stringE =<< runGit "blockapps-tools" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumRlp :: ExpQ
-gitHashEthereumRlp = stringE =<< runGit "ethereum-rlp" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumUtil :: ExpQ
-gitHashEthereumUtil = stringE =<< runGit "blockapps-util" ["rev-parse", "HEAD"] "no version found"
-
-gitHashEthereumVm :: ExpQ
-gitHashEthereumVm = stringE =<< runGit "ethereum-vm" ["rev-parse", "HEAD"] "no version found"
-
-gitHashHminer :: ExpQ
-gitHashHminer = stringE =<< runGit "miner-ethash" ["rev-parse", "HEAD"] "no version found"
-
-gitHashHserverEth :: ExpQ
-gitHashHserverEth = stringE =<< runGit "strato-api" ["rev-parse", "HEAD"] "no version found"
-
-gitHashP2pServer :: ExpQ
-gitHashP2pServer = stringE =<< runGit "strato-p2p-server" ["rev-parse", "HEAD"] "no version found"
+gitHashMonostrato :: ExpQ
+gitHashMonostrato = stringE =<< runGit ["rev-parse", "HEAD"] "no version found"

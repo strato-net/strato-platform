@@ -61,10 +61,11 @@ defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "backupmp" False "backup the MP database from STDIN"
 defineFlag "backupblocks" False "backup the block DB from STDIN"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
-defineFlag "stratoBootnode" ("" :: String) "Replaces the default set of public boot nodes with the provided ip address, considered as the address of a strato node" 
-defineFlag "s:superfluous" ("" :: String) "Superfluous parameter"
+defineFlag "stratoBootnode" ("" :: String) "Replaces the default set of public boot nodes with the provided ip address, considered as the address of a strato node"
 defineFlag "blockTime" (13 :: Integer) "Blocktime"
 defineFlag "minBlockDifficulty" (131072 :: Integer) "Minimum block difficulty"
+defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
+defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 
 data SetupDBs =
   SetupDBs {
@@ -164,18 +165,29 @@ defaultDiscoveryConfig =
       minAvailablePeers=100
     }
 
+defaultRedisBlockDBConfig :: RedisBlockDBConf
+defaultRedisBlockDBConfig = RedisBlockDBConf {
+    redisHost           = flags_redisHost,
+    redisPort           = flags_redisPort,
+    redisAuth           = Nothing,
+    redisDBNumber       = 0,
+    redisMaxConnections = 10,
+    redisMaxIdleTime    = 30
+    }
+
 defaultConfig :: EthConf
 defaultConfig = 
     EthConf { 
-      ethUniqueId = defaultEthUniqueId,
-      privKey = defaultPrivKey,
-      sqlConfig = defaultSqlConfig,
-      levelDBConfig = defaultLevelDBConfig,
-      kafkaConfig = defaultKafkaConfig,
-      blockConfig = defaultBlockConfig,  
-      quarryConfig = defaultQuarryConfig,
-      discoveryConfig = defaultDiscoveryConfig,
-      generalConfig = defaultGeneralConfig
+      ethUniqueId        = defaultEthUniqueId,
+      privKey            = defaultPrivKey,
+      sqlConfig          = defaultSqlConfig,
+      redisBlockDBConfig = defaultRedisBlockDBConfig,
+      levelDBConfig      = defaultLevelDBConfig,
+      kafkaConfig        = defaultKafkaConfig,
+      blockConfig        = defaultBlockConfig,
+      quarryConfig       = defaultQuarryConfig,
+      discoveryConfig    = defaultDiscoveryConfig,
+      generalConfig      = defaultGeneralConfig
     }
                    
 defaultPeers::[(String,Int)]
@@ -342,8 +354,7 @@ defaultPeers =
 
 createKafkaTopic :: TopicName -> IO () 
 createKafkaTopic topic = do
-  result <- runKafka (mkKafkaState "strato-setup" (fromString flags_kafkahost, 9092)) $ do
-               updateMetadata topic
+  result <- runKafka (mkKafkaState "strato-setup" (fromString flags_kafkahost, 9092)) $ updateMetadata topic
   case result of
    Left err -> error $ "error connecting to kafka at host '" ++ flags_kafkahost ++ "': " ++ show err
    _ -> return ()
@@ -370,8 +381,7 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
 
   case (exists, maybeContents) of
    (True, _) -> return ()
-   (_, Just contents) -> do
-    B.writeFile genesisFileName contents
+   (_, Just contents) -> B.writeFile genesisFileName contents
    _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
 
 {-
@@ -400,28 +410,24 @@ oneTimeSetup genesisBlockName = do
 
       addStandardGenesisBlockIfNeeded genesisBlockName
     
-      putStrLn $ "writing config"
+      putStrLn "writing config"
 
-      maybePGuser <- do 
-          case flags_pguser of 
-             "" -> do putStrLn $  "using default postgres user: postgres"
-                      return $ (Just "postgres")
-             user' -> return $ (Just user')
+      maybePGuser <- case flags_pguser of
+             "" -> do putStrLn "using default postgres user: postgres"
+                      return (Just "postgres")
+             user' -> return (Just user')
 
-      maybePGhost <- do 
-          case flags_pghost of 
-             "" -> do putStrLn $  "using default postgres host: localhost"
-                      return $ (Just "localhost")
-             host' -> return $ (Just host')
+      maybePGhost <- case flags_pghost of
+             "" -> do putStrLn "using default postgres host: localhost"
+                      return (Just "localhost")
+             host' -> return (Just host')
 
-      maybePGpass <- do
-          case flags_password of 
+      maybePGpass <- case flags_password of
              "" -> error "specify password for postgres user: "
-             pass -> return $ (Just pass)
+             pass -> return (Just pass)
 
-      kafkaHostFlag <- do
-          case flags_kafkahost of 
-             "" -> do putStrLn $ "using default kafka host: localhost" 
+      kafkaHostFlag <- case flags_kafkahost of
+             "" -> do putStrLn "using default kafka host: localhost"
                       return "localhost"
              host' -> return host'
 
@@ -437,17 +443,19 @@ oneTimeSetup genesisBlockName = do
                         Just usr -> usr
 
           cfg = defaultConfig { 
-                  sqlConfig = defaultSqlConfig { 
-                    user = user'',
-                    host = fromMaybe "localhost" maybePGhost,
-                    password = fromMaybe "" maybePGpass
-                  },
-                  blockConfig = defaultBlockConfig{blockTime = flags_blockTime, minBlockDifficulty = flags_minBlockDifficulty},
-                  quarryConfig = defaultQuarryConfig{lazyBlocks = flags_lazyblocks}
+                    sqlConfig = defaultSqlConfig {
+                        user     = user'',
+                        host     = fromMaybe "localhost" maybePGhost,
+                        password = fromMaybe "" maybePGpass
+                    },
+                    blockConfig = defaultBlockConfig {
+                        blockTime          = flags_blockTime,
+                        minBlockDifficulty = flags_minBlockDifficulty
+                    },
+                    quarryConfig = defaultQuarryConfig {
+                        lazyBlocks = flags_lazyblocks
+                    }
                 }
-
-
-
 
      {- CONFIG: create database and write default config files, including strato-api -}
      
@@ -491,9 +499,9 @@ oneTimeSetup genesisBlockName = do
       {- CONFIG: Create the local database -}
 
       liftIO $ putStrLn $ CL.yellow ">>>> Creating Database " ++ db'
-      liftIO $ putStrLn $ CL.blue $ "  connection is " ++ (show pgConn')
+      liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show pgConn'
 
-      let query = T.pack $ "CREATE DATABASE " ++ (show db') ++ ";"
+      let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
 
       runNoLoggingT $ withPostgresqlConn pgConn' $ runReaderT $ rawExecute query []
 
@@ -513,7 +521,7 @@ oneTimeSetup genesisBlockName = do
      
       runNoLoggingT $ withPostgresqlConn connStr $ runReaderT $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
-         liftIO $ putStrLn $ CL.blue $ "  connection is " ++ (show connStr)
+         liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 
          _ <- runMigrationSilent migrateAll
 

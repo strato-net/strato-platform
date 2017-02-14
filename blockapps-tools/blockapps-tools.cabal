@@ -36,7 +36,7 @@ executable queryStrato
                  , ethereum-rlp
                  , ethereum-vm
                  , filepath
-                 , haskoin
+                 , blockapps-haskoin
                  , leveldb-haskell
                  , lens
                  , merkle-patricia-db
@@ -62,6 +62,7 @@ executable queryStrato
                    Block
                    BlockGO
                    Code
+                   Checkpoints
                    DumpKafkaBlocks
                    DumpKafkaUnminedBlocks
                    DumpKafkaSequencer
@@ -71,7 +72,6 @@ executable queryStrato
                    DumpLevelDB
                    FRawMP
                    Hash
-                   Init
                    Raw
                    RawMP
                    RLP
@@ -81,15 +81,3 @@ executable queryStrato
                    InsertTX
     buildable: True
     hs-source-dirs: src
-
-executable restoreStrato
-    default-language: Haskell98
-    build-depends: 
-                   base >= 4 && < 5
-                 , base16-bytestring
-                 , bytestring
-                 , blockapps-milena
-    main-is: Restore.hs
-    buildable: True
-    hs-source-dirs: src
-

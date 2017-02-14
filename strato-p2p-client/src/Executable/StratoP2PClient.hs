@@ -1,8 +1,6 @@
 {-# LANGUAGE FlexibleContexts, ScopedTypeVariables, PatternGuards, OverloadedStrings #-}
 
-module Executable.StratoP2PClient (
-  stratoP2PClient
-  ) where
+module Executable.StratoP2PClient (stratoP2PClient) where
 
 import Control.Concurrent hiding (yield)
 import Control.Concurrent.STM.MonadIO
@@ -27,24 +25,19 @@ import qualified Network.Haskoin.Internals as H
 import System.Random
 
 import Blockchain.Frame
-import Blockchain.UDP
 import Blockchain.RLPx
 
 import Blockchain.BlockNotify
 import qualified Blockchain.Colors as C
---import Blockchain.Communication
 import Blockchain.Constants
 import Blockchain.Context
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
-import Blockchain.Data.Peer
 import Blockchain.Data.RLP
---import Blockchain.Data.SignedTransaction
 import Blockchain.Data.Wire
 import Blockchain.DB.DetailsDB
 import Blockchain.DB.SQLDB
 import Blockchain.DBM
---import Blockchain.DB.ModifyStateDB
 import Blockchain.Display
 import Blockchain.EthConf hiding (genesisHash,port)
 import Blockchain.EthEncryptionException
@@ -55,17 +48,19 @@ import Blockchain.Format
 import Blockchain.Options
 import Blockchain.PeerUrls
 import Blockchain.RawTXNotify
---import Blockchain.SampleTransactions
 import Blockchain.Stream.VMEvent
 import Blockchain.TCPClientWithTimeout
 import Blockchain.TimerSource
 import Blockchain.Util
 import Executable.StratoP2PClientComm
 
---import Debug.Trace
-
 import Data.Maybe
 
+import qualified Database.Redis                 as Redis
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.UDP
 
 awaitMsg::MonadIO m=>
           ConduitM Event Message m (Maybe Message)
@@ -76,16 +71,15 @@ awaitMsg = do
    Nothing -> return Nothing
    _ -> awaitMsg
 
-handleMsg::(MonadIO m, MonadState Context m, HasSQLDB m, MonadLogger m)=>
+handleMsg::(MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)=>
            Point->PPeer->Conduit Event m Message
 handleMsg myId peer = do
-  yield $ Hello {
-              version = 4,
-              clientId = stratoVersionString,
-              capability = [ETH ethVersion], -- , SHH shhVersion],
-              port = 0,
-              nodeId = myId
-            }
+  yield Hello { version = 4
+              , clientId = stratoVersionString
+              , capability = [ETH ethVersion] -- , SHH shhVersion],
+              , port = 0
+              , nodeId = myId
+              }
 
   helloResponse <- awaitMsg
 
@@ -102,8 +96,8 @@ handleMsg myId peer = do
        latestHash=blockHash bestBlock,
        genesisHash=genesisBlockHash
        }
-   Just e -> throwIO $ EventBeforeHandshake e
-   Nothing -> throwIO $ PeerDisconnected
+   Just e -> throwIO (EventBeforeHandshake e)
+   Nothing -> throwIO PeerDisconnected
 
   statusResponse <- awaitMsg
 
@@ -111,68 +105,20 @@ handleMsg myId peer = do
    Just Status{latestHash=_, genesisHash=gh} -> do
      genesisBlockHash <- lift getGenesisHash
      when (gh /= genesisBlockHash) $ throwIO WrongGenesisBlock
---     lastBlockNumber <- liftIO $ fmap (maximum . map (blockDataNumber . blockBlockData)) $ fetchLastBlocks fetchLimit
-
-     lastBlockNumber <- liftIO $ getBestKafkaBlockNumber
+     lastBlockNumber <- liftIO getBestKafkaBlockNumber
 
      Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
 
      yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
      stampActionTimestamp
    Just e -> throwIO $ EventBeforeHandshake e
-   Nothing -> throwIO $ PeerDisconnected
+   Nothing -> throwIO PeerDisconnected
 
   handleEvents (if flags_debugFail then Fail else Log) peer
 
-
-
-
-
-{-
-createTransaction::Transaction->ContextM SignedTransaction
-createTransaction t = do
-    userNonce <- lift $ addressStateNonce <$> getAddressState (prvKey2Address prvKey)
-    liftIO $ withSource devURandom $ signTransaction prvKey t{tNonce=userNonce}
-
-createTransactions::[Transaction]->ContextM [SignedTransaction]
-createTransactions transactions = do
-    userNonce <- lift $ addressStateNonce <$> getAddressState (prvKey2Address prvKey)
-    forM (zip transactions [userNonce..]) $ \(t, n) -> do
-      liftIO $ withSource devURandom $ signTransaction prvKey t{tNonce=n}
-
-doit::Point->ContextM ()
-doit myPublic = do
-    liftIO $ putStrLn "Connected"
-
-    --lift $ addCode B.empty --This is probably a bad place to do this, but I can't think of a more natural place to do it....  Empty code is used all over the place, and it needs to be in the database.
-    --lift (setStateDBStateRoot . blockDataStateRoot . blockBlockData =<< getBestBlock)
-
-  --signedTx <- createTransaction simpleTX
-  --signedTx <- createTransaction outOfGasTX
-  --signedTx <- createTransaction simpleStorageTX
-  --signedTx <- createTransaction createContractTX
-  --signedTx <- createTransaction sendMessageTX
-
-  --signedTx <- createTransaction createContractTX
-  --signedTx <- createTransaction paymentContract
-  --signedTx <- createTransaction sendCoinTX
-  --signedTx <- createTransaction keyValuePublisher
-  --signedTx <- createTransaction sendKeyVal
-
-  --liftIO $ print $ whoSignedThisTransaction signedTx
-
-                
-  --sendMessage socket $ Transactions [signedTx]
-
-  --signedTxs <- createTransactions [createMysteryContract]
-  --liftIO $ sendMessage socket $ Transactions signedTxs
--}
-
-
---cbSafeTake::Monad m=>Int->Consumer B.ByteString m B.ByteString
 cbSafeTake::Monad m=>Int->ConduitM BC.ByteString o m BC.ByteString
 cbSafeTake i = do
-    ret <- fmap BL.toStrict $ CB.take i
+    ret <- BL.toStrict <$> CB.take i
     if B.length ret /= i
        then error "safeTake: not enough data"
        else return ret
@@ -211,71 +157,50 @@ messagesToBytes = do
              
 theCurve::Curve
 theCurve = getCurveByName SEC_p256k1
-
-{-
-hPubKeyToPubKey::H.PubKey->Point
-hPubKeyToPubKey pubKey = Point (fromIntegral x) (fromIntegral y)
-  where
-    x = fromMaybe (error "getX failed in prvKey2Address") $ H.getX hPoint
-    y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY hPoint
-    hPoint = H.pubKeyPoint pubKey
--}
   
 runPeer::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
          TVar (S.Set String)->PPeer->PrivateNumber->m ()
 runPeer connectedPeers peer myPriv = do
-  let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
-  logInfoN $ T.pack $ C.blue "Welcome to strato-p2p-client"
-  logInfoN $ T.pack $ C.blue "============================"
-  logInfoN $ T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
+    logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
+    logInfoN . T.pack $ C.blue "============================"
+    logInfoN . T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
 
-  let myPublic = calculatePublic theCurve myPriv
-  logInfoN $ T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
-  --logInfoN $ T.pack $ "my NodeID is: " ++ (format $ pointToByteString $ hPubKeyToPubKey $ H.derivePubKey $ fromMaybe (error "invalid private number in main") $ H.makePrvKey $ fromIntegral myPriv)
+    let myPublic = calculatePublic theCurve myPriv
+    logInfoN . T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
 
-  logInfoN $ T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+    logInfoN . T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+    redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+    runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server ->
+        runResourceT $ do
+            let peerString = show (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+            void $ modifyTVar connectedPeers $ S.insert peerString
+            pool <- runNoLoggingT $ SQL.createPostgresqlPool
+                    connStr' 20
 
-  --cch <- mkCache 1024 "seed"
+            void $ flip runStateT (Context pool redisBDBPool [] [] Nothing) $ do
+                (_, (outCxt, inCxt)) <- liftIO $
+                    appSource server $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink server
 
-  runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server -> 
-      runResourceT $ do
-      
-        let peerString = show (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+                eventSource <- mergeSourcesCloseForAny [
+                  appSource server =$=
+                  ethDecrypt inCxt =$=
+                  bytesToMessages =$=
+                  tap (displayMessage False "") =$=
+                  CL.map MsgEvt,
+                  txNotificationSource "client_tx" =$= CL.map NewTX,
+                  blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst),
+                  timerSource
+                  ] 2
 
-        _ <- modifyTVar connectedPeers $ S.insert peerString
+                _ <- eventSource =$=
+                      handleMsg myPublic peer =$=
+                      transPipe lift (tap (displayMessage True "")) =$=
+                      messagesToBytes =$=
+                      ethEncrypt outCxt $$
+                      transPipe liftIO (appSink server)
 
-        pool <- runNoLoggingT $ SQL.createPostgresqlPool
-                connStr' 20
-
-        _ <- flip runStateT (Context pool [] [] Nothing) $ do
-          (_, (outCxt, inCxt)) <- liftIO $ 
-            appSource server $$+
-            ethCryptConnect myPriv otherPubKey `fuseUpstream`
-            appSink server
-            
-          eventSource <- mergeSourcesCloseForAny [
-            appSource server =$=
-            ethDecrypt inCxt =$=
-            bytesToMessages =$=
-            tap (displayMessage False "") =$=
-            CL.map MsgEvt,
-            txNotificationSource "client_tx" =$= CL.map NewTX,
-            blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst),
-            timerSource
-            ] 2
-
-          eventSource =$=
-            handleMsg myPublic peer =$=
-            transPipe lift (tap (displayMessage True "")) =$=
-            messagesToBytes =$=
-            ethEncrypt outCxt $$
-            transPipe liftIO (appSink server)
-
-          _ <- modifyTVar connectedPeers $ S.delete peerString
-
-          return ()
-
-        return ()
+                void $ modifyTVar connectedPeers $ S.delete peerString
 
 getPubKeyRunPeer::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
                   TVar (S.Set String)->PPeer->m ()
@@ -311,7 +236,7 @@ stratoP2PClient args = do
         case args of
           [] -> Nothing
           [x] -> return $ read x
-          _ -> error "usage: ethereumH [servernum]"
+          _ -> error "usage: strato-p2p-client [servernum]"
 
 
   connectedPeers <- newTVar S.empty

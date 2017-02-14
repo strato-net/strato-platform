@@ -40,7 +40,6 @@ data SequencerConfig =
                      , kafkaConsumerGroup    :: KP.ConsumerGroup
                      , syncWrites            :: Bool
                      , bootstrapDoEmit       :: Bool
-                     , startOffset           :: Integer
                      }
 
 
@@ -68,7 +67,6 @@ runSequencerM c m = do
         dbCS     <- depBlockDBCacheSize <$> ask
         dbPath   <- depBlockDBPath      <$> ask
         stxSize  <- seenTransactionDBSize <$> ask
-        startOfs <- startOffset <$> ask
         kClId    <- kafkaClientId <$> ask
         depBlock <- LDB.open dbPath LDB.defaultOptions { LDB.createIfMissing = True, LDB.cacheSize=dbCS }
         runStateT m SequencerContext

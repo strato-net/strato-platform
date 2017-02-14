@@ -17,19 +17,17 @@ import qualified Data.NibbleString as N
 
 type HashDB = DB.DB
 
-class MonadResource m=>
-      HasHashDB m where
-  getHashDB::Monad m=>m HashDB
+class MonadResource m => HasHashDB m where
+  getHashDB :: m HashDB
 
-hashDBPut::HasHashDB m=>N.NibbleString->m ()
+hashDBPut::HasHashDB m => N.NibbleString->m ()
 hashDBPut unsafeKey = do
   db <- getHashDB
   DB.put db def
     (nibbleString2ByteString $ MP.keyToSafeKey unsafeKey)
     (nibbleString2ByteString unsafeKey)
 
-hashDBGet::HasHashDB m=>N.NibbleString->m (Maybe N.NibbleString)
+hashDBGet :: HasHashDB m => N.NibbleString -> m (Maybe N.NibbleString)
 hashDBGet key = do
   db <- getHashDB
-  liftM (fmap byteString2NibbleString) $
-    DB.get db def (nibbleString2ByteString key)
+  fmap byteString2NibbleString <$> DB.get db def (nibbleString2ByteString key)

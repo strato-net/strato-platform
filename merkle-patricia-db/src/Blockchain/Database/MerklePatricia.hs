@@ -20,7 +20,7 @@
 
 module Blockchain.Database.MerklePatricia (
   Key, Val, MPDB(..), StateRoot(..),
-  openMPDB, emptyTriePtr, sha2StateRoot,
+  openMPDB, emptyTriePtr, sha2StateRoot, unboxStateRoot,
   putKeyVal, getKeyVal, deleteKey, keyExists,
   initializeBlank, blankStateRoot
   ) where

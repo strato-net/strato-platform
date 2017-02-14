@@ -57,8 +57,6 @@ txNotificationSource name = do
      Nothing -> error "wow, item was removed in notificationSource before I could get it....  This didn't seem like a likely occurence when I was programming, you should probably deal with this possibility now"
      Just tx -> yield tx
 
-getTransaction::(MonadIO m, MonadBaseControl IO m, MonadResource m)=>
+getTransaction::(MonadBaseControl IO m, MonadResource m)=>
                 SQLDB->SQL.Key RawTransaction->m (Maybe RawTransaction)
-getTransaction pool row = do
-    --pool <- getSQLDB      
-    SQL.runSqlPool (SQL.get row) pool
+getTransaction pool row = SQL.runSqlPool (SQL.get row) pool

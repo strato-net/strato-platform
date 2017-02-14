@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.ContextLite (
@@ -22,40 +24,35 @@ import Control.Monad.Trans.Resource
 import Blockchain.Context
 import Blockchain.DBM
 import Blockchain.DB.SQLDB
-import Blockchain.Data.Peer
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.EthConf (lookupRedisBlockDBConfig)
 
 import qualified Database.Persist.Postgresql as SQL
 import qualified Database.PostgreSQL.Simple as PS
-
 import qualified Data.Text as T
 
+import qualified Database.Redis as Redis
 
 instance Show PS.Connection where
   show _ = "Postgres Simple Connection"
 
 type ContextMLite = StateT Context (ResourceT (LoggingT IO))
 
---runEthCryptMLite::Context->ContextMLite a->LoggingT IO ()
-
 runEthCryptMLite :: (MonadBaseControl IO m ) 
                  => s 
                  -> StateT s (ResourceT m) a 
                  -> m ()
-runEthCryptMLite cxt f = do
-  _ <- runResourceT $
-       flip runStateT cxt $
-       f
-  return ()
-
+runEthCryptMLite cxt f = void . runResourceT $ runStateT f cxt
 
 initContextLite :: (MonadResource m, MonadIO m, MonadBaseControl IO m) => SQL.ConnectionString -> m Context
 initContextLite _ = do
   dbs <- openDBs
-  return Context {
-                    actionTimestamp = Nothing,
-                    contextSQLDB = sqlDB' dbs,                    
-                    blockHeaders=[],
-                    vmTrace=[]
+  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  return Context { actionTimestamp = Nothing
+                 , contextRedisBlockDB = redisBDBPool
+                 , contextSQLDB = sqlDB' dbs
+                 , blockHeaders=[]
+                 , vmTrace=[]
                  }
 
 addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>PPeer->m (SQL.Key PPeer)
@@ -65,9 +62,7 @@ addPeer peer = do
   runResourceT $
     SQL.runSqlPool (actions maybePeer) db
   where actions mp = case mp of
-            Nothing -> do
-              peerid <- SQL.insert $ peer        
-              return peerid
+            Nothing -> SQL.insert peer
   
             Just peer'-> do 
               SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]  
@@ -75,14 +70,12 @@ addPeer peer = do
 
 getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>String->m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
-  db <- getSQLDB
-  entPeer <- runResourceT $ SQL.runSqlPool actions db
-  
-  case entPeer of 
-    [] -> return Nothing
-    lst -> return $ Just . head $ lst
+    db <- getSQLDB
+    runResourceT (SQL.runSqlPool actions db) >>= \case
+        [] -> return Nothing
+        lst -> return . Just . head $ lst
 
-  where actions = SQL.selectList [ PPeerIp SQL.==. (T.pack ip) ] []
+    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
   
 

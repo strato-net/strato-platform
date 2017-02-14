@@ -1,17 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE DeriveGeneric              #-}
-
-
+{-# OPTIONS  -fno-warn-orphans          #-}
 module Blockchain.Data.Transaction (
 {-  Transaction(transactionNonce,
               transactionGasPrice,
@@ -62,13 +56,13 @@ import Blockchain.SHA
 import Blockchain.Util
 import Blockchain.DBM
 
---import Debug.Trace
-
-import Network.Haskoin.Internals hiding (Address)
+import Network.Haskoin.Internals hiding (Address, txSignature, txHash)
 import Blockchain.ExtendedECDSA
 
 import Control.DeepSeq
 import System.Clock
+
+import Blockchain.Strato.Model.Class
 
 instance NFData Address
 instance NFData Code
@@ -77,17 +71,54 @@ instance NFData TXOrigin
 instance NFData Transaction
 instance NFData RawTransaction
 
+instance TransactionLike Transaction where
+    txHash        = hash . rlpSerialize . rlpEncode
+    txPartialHash = hash . rlpSerialize . partialRLPEncode
+    txSigner      = whoSignedThisTransaction
+    txNonce       = transactionNonce
+    txSignature t = (transactionR t, transactionS t, transactionV t)
+    txValue       = transactionValue
+    txGasPrice    = transactionGasPrice
+    txGasLimit    = transactionGasLimit
+
+    txType MessageTX{}          = Message
+    txType ContractCreationTX{} = ContractCreation
+
+    txDestination MessageTX{..}        = Just transactionTo
+    txDestination ContractCreationTX{} = Nothing
+
+    txCode MessageTX{}            = Nothing
+    txCode ContractCreationTX{..} = Just transactionInit
+
+    txData MessageTX{..}        = Just transactionData
+    txData ContractCreationTX{} = Nothing
+
+    morphTx t = case type' of
+        Message          -> MessageTX n gp gl dest val dat r s v
+        ContractCreation -> ContractCreationTX n gp gl val code r s v
+        where type'     = txType t
+              n         = txNonce t
+              gp        = txGasPrice t
+              gl        = txGasLimit t
+              val       = txValue t
+              dest      = fromJust (txDestination t)
+              dat       = fromJust (txData t)
+              code      = fromJust (txCode t)
+              (r, s, v) = txSignature t
 
 rawTX2TX :: RawTransaction -> Transaction
-rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = (MessageTX nonce' gp gl to' val dat r s v)
-rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = (ContractCreationTX nonce' gp gl val (Code init') r s v)
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = MessageTX nonce' gp gl to' val dat r s v
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') r s v
 
 txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
 txAndTime2RawTX origin tx blkNum time =
   case tx of
-    (MessageTX nonce' gp gl to' val dat r s v) -> (RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral $ blkNum) (hash $ rlpSerialize $ rlpEncode tx) origin)
-    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) -> error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
-    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->  (RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral $ blkNum) (hash $ rlpSerialize $ rlpEncode tx) origin)
+    (MessageTX nonce' gp gl to' val dat r s v) ->
+        RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) ->
+        error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
+    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->
+        RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral blkNum) (txHash tx) origin
   where
     signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
 
@@ -105,8 +136,8 @@ insertTX mode origin blockNum txs = do
   beforeECRecover <- liftIO $ getTime Realtime
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
-  afterECRecover <- rawTXs `deepseq` (liftIO $ getTime Realtime)
-  insertRawTX mode (map id rawTXs) 
+  afterECRecover <- rawTXs `deepseq` liftIO (getTime Realtime)
+  insertRawTX mode rawTXs
   return $ timeSpecAsNanoSecs $ afterECRecover - beforeECRecover
 
 insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
@@ -119,7 +150,7 @@ insertTX' mode origin blockNum txs = do
   time <- liftIO getCurrentTime
   let rawTXs =
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
-  insertRawTX' mode (map id rawTXs)
+  insertRawTX' mode rawTXs
 
 addLeadingZerosTo64::String->String
 addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
@@ -185,12 +216,11 @@ createContractCreationTX n gp gl val init' prvKey = do
   Switch to Either?
 -}
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction t = 
-    fmap pubKey2Address $ getPubKeyFromSignature' xSignature theHash
+whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature' xSignature theHash
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t
-          getPubKeyFromSignature' = if (fastECRecover $ generalConfig ethConf)
+          getPubKeyFromSignature' = if fastECRecover (generalConfig ethConf)
                                     then getPubKeyFromSignature_fast
                                     else getPubKeyFromSignature
 
@@ -201,7 +231,6 @@ isMessageTX _ = False
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
 isContractCreationTX _ = False
-
 
 transactionHash::Transaction->SHA
 transactionHash = hash . rlpSerialize . rlpEncode

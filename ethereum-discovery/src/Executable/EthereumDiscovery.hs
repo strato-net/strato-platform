@@ -14,23 +14,24 @@ import Data.Maybe
 import qualified Data.Text as T
 import qualified Network.Socket as S
 import qualified Network.Haskoin.Internals as H
-    
+
 import qualified Blockchain.Colors as CL
-import Blockchain.ContextLite
 import Blockchain.Data.PubKey
 import Blockchain.EthConf
-import Blockchain.P2PUtil
-import Blockchain.UDPServer
+
+import Blockchain.Strato.Discovery.ContextLite
+import Blockchain.Strato.Discovery.P2PUtil
+import Blockchain.Strato.Discovery.UDPServer
 
 privateKey :: H.PrvKey
 privateKey = fromMaybe (error "Bad value for hardcoded private key in ethconf.yaml") $ H.makePrvKey $ unPrivKey $ privKey ethConf
 
-ethereumDiscovery::LoggingT IO ()
+ethereumDiscovery :: LoggingT IO ()
 ethereumDiscovery = do
-  logInfoN $ T.pack $ CL.blue "Welcome to ethereum-discovery"
-  logInfoN $ T.pack $ CL.blue "============================="
-  logInfoN $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ B.pack $ pointToBytes $ hPubKeyToPubKey $ H.derivePubKey privateKey)
-  
+  _ <- logInfoN $ T.pack $ CL.blue "Welcome to ethereum-discovery"
+  _ <- logInfoN $ T.pack $ CL.blue "============================="
+  let Right pubKey = hPubKeyToPubKey $ H.derivePubKey privateKey
+  _ <- logInfoN $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ B.pack $ pointToBytes pubKey)
   _ <- runResourceT $ do
     cxt <- initContextLite
 

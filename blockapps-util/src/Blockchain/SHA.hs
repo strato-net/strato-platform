@@ -1,7 +1,7 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module Blockchain.SHA (
-  SHA(..),
+  module Blockchain.Strato.Model.SHA,
   formatSHAWithoutColor,
   hash
   ) where
@@ -17,6 +17,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import Numeric
 import Web.PathPieces
+import Web.HttpApiData
 
 import qualified Blockchain.Colors as CL
 import Blockchain.Data.RLP
@@ -26,7 +27,7 @@ import Blockchain.Util
 
 import GHC.Generics
 
-newtype SHA = SHA Word256 deriving (Show, Eq, Ord, Read, Generic)
+import Blockchain.Strato.Model.SHA
 
 formatSHAWithoutColor :: SHA -> String
 formatSHAWithoutColor s@(SHA x)  
@@ -35,20 +36,6 @@ formatSHAWithoutColor s@(SHA x)
 
 instance Format SHA where
   format = CL.yellow . formatSHAWithoutColor
-
-instance Binary SHA where
-  put (SHA x) = sequence_ $ fmap put $ word256ToBytes $ fromIntegral x
-  get = do
-    bytes <- replicateM 32 get
-    let byteString = B.pack bytes
-    return (SHA $ fromInteger $ byteString2Integer byteString)
-
-instance RLPSerializable SHA where
-  rlpDecode (RLPString s) | B.length s == 32 = SHA $ decode $ BL.fromStrict s
-  rlpDecode (RLPScalar 0) = SHA 0 --special case seems to be allowed, even if length of zeros is wrong
-  rlpDecode x = error ("Missing case in rlpDecode for SHA: " ++ show x)
-  --rlpEncode (SHA 0) = RLPNumber 0
-  rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ BC.pack $ padZeros 64 $ showHex val ""
 
 instance JSON.FromJSON SHA where
 instance JSON.ToJSON SHA where
@@ -70,6 +57,15 @@ instance PathPiece SHA where
       [(x, "")] -> Just $ SHA x
       _ -> Nothing
 
-hash::BC.ByteString->SHA
-hash = SHA . fromIntegral . byteString2Integer . C.hash 256
+instance ToHttpApiData SHA where
+    toUrlPiece = toPathPiece
+
+instance FromHttpApiData SHA where
+    parseUrlPiece = unmaybe . fromPathPiece
+        where unmaybe = \case
+                Nothing -> Left "couldn't parse SHA"
+                Just x  -> Right x
+
+hash :: BC.ByteString -> SHA
+hash = superProprietaryStratoSHAHash
 

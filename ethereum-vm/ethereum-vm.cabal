@@ -35,7 +35,7 @@ library
                  , ethereum-encryption
                  , ethereum-rlp
                  , filepath
-                 , haskoin
+                 , blockapps-haskoin
                  , hflags
                  , leveldb-haskell
                  , lens
@@ -59,7 +59,8 @@ library
                  , vector
                  , ansi-wl-pprint
                  , nibblestring
-                 , extra == 1.4.1
+                 , extra >=1.4.1 && <1.5
+                 , strato-model
     exposed-modules: 
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults
@@ -101,7 +102,7 @@ executable ethereum-vm
                  , ethereum-rlp
                  , ethereum-vm
                  , filepath
-                 , haskoin
+                 , blockapps-haskoin
                  , hflags
                  , lens
                  , leveldb-haskell

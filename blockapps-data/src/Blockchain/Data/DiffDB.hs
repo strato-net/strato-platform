@@ -20,8 +20,6 @@ import Blockchain.Util
 import Blockchain.SHA
 
 import Control.Monad.Trans.Resource
-
-import Data.Map (Map)
 import qualified Data.Map as Map
 
 type SqlDbM m = SQL.SqlPersistT m
@@ -82,8 +80,8 @@ updateAccount blockNumber address diff = do
   addrID <- getAddressStateSQL address "update"
   SQL.update addrID $ 
     setField nonce AddressStateRefNonce $
-    setField balance AddressStateRefBalance $
-    [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
+    setField balance AddressStateRefBalance
+        [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
 
   where

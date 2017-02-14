@@ -727,6 +727,7 @@ stateTests =
     "./tests/StateTests/RandomTests/st201507030359GO.json"
   ]
 
+homesteadFiles :: [String]
 homesteadFiles = [
     "./tests/StateTests/Homestead/stCallCodes.json",
     "./tests/StateTests/Homestead/stCallCreateCallCodeTest.json",

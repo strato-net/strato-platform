@@ -9,8 +9,6 @@ module Blockchain.Sequencer.Kafka (
     writeSeqEvents
 ) where
 
-import Control.Lens
-
 import Data.Binary (decode, encode)
 
 import Blockchain.Sequencer.Event

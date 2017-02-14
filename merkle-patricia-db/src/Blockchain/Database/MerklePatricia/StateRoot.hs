@@ -5,7 +5,8 @@
 module Blockchain.Database.MerklePatricia.StateRoot (
   StateRoot(..),
   emptyTriePtr,
-  sha2StateRoot
+  sha2StateRoot,
+  unboxStateRoot
   ) where
 
 import Control.Monad
@@ -57,3 +58,5 @@ emptyTriePtr = StateRoot $ C.hash 256 $ rlpSerialize $ rlpEncode (0::Integer)
 sha2StateRoot::SHA->StateRoot
 sha2StateRoot (SHA x) = StateRoot $ B.pack $ word256ToBytes x
 
+unboxStateRoot :: StateRoot -> B.ByteString
+unboxStateRoot (StateRoot b) = b

@@ -151,11 +151,10 @@ mkKafkaState cid addy =
                M.empty
                (addy :| [])
 
-addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState
-addKafkaAddress = over stateAddresses . NE.nub .: cons
-  where infixr 9 .:
-        (.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
-        (.:) = (.).(.)
+addKafkaAddress :: KafkaAddress -> KafkaState -> KafkaState -- todo: lensify this
+addKafkaAddress a s = s {_stateAddresses = consed}
+  where consed = NE.nub (a NE.<| addrs)
+        addrs  = _stateAddresses s
 
 -- | Run the underlying Kafka monad.
 runKafka :: KafkaState -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)

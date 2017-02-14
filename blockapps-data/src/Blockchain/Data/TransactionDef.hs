@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric, OverloadedStrings, RecordWildCards #-}
 
 module Blockchain.Data.TransactionDef (
   Transaction(..),
@@ -46,8 +46,6 @@ data Transaction =
     transactionV::Word8
     } deriving (Show, Read, Eq, Ord, Generic)
 
-
-
 instance Format Transaction where
   format t@MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
     CL.blue "Message Transaction" ++
@@ -68,7 +66,7 @@ instance Format Transaction where
       "gasPrice: " ++ show gp ++ "\n" ++
       "tGasLimit: " ++ show gl ++ "\n" ++
       "value: " ++ show v ++ "\n" ++
-      "tInit: " ++ (codeToString theCode) ++ "\n" ++
+      "tInit: " ++ codeToString theCode ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
       codeToString (Code init') = format init'

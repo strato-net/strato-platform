@@ -16,12 +16,12 @@ import Blockchain.Stream.Raw
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 
-dumpKafkaRaw::Offset->IO ()
-dumpKafkaRaw startingBlock = do
+dumpKafkaRaw::String->Offset->IO ()
+dumpKafkaRaw streamName startingBlock = do
   doConsume' startingBlock
   where
     doConsume' offset = do
-      result <- fmap (fromMaybe (error "offset out of range")) $ fetchBytesIO (lookupTopic "block") offset
+      result <- fmap (fromMaybe (error "offset out of range")) $ fetchBytesIO (lookupTopic streamName) offset
 
       liftIO $ putStrLn $ unlines $ map (BC.unpack . B16.encode) result
 

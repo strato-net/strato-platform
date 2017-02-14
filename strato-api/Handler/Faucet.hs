@@ -3,30 +3,22 @@
 module Handler.Faucet where
 
 import qualified Data.Text as T
-
 import qualified Network.Haskoin.Crypto as H
-
-import Import
-import Handler.Filters
-import Handler.Common
-
 import qualified Data.Binary as BN
-
-import qualified Database.Esqueleto as E
-import Blockchain.Data.Address
-import Blockchain.Constants
-import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction
-
-import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
-import Blockchain.Sequencer.Kafka (writeUnseqEvents)
-
-import Blockchain.EthConf (runKafkaConfigured)
-import Control.Monad.Logger
-
-import Blockchain.Util (getCurrentMicrotime)
-
 import qualified Prelude as P
+import qualified Database.Esqueleto as E
+
+import           Import
+import           Handler.Filters
+import           Handler.Common
+import           Blockchain.Data.Address
+import           Blockchain.Constants
+import           Blockchain.Data.TXOrigin
+import           Blockchain.Data.Transaction
+import           Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
+import           Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import           Blockchain.EthConf (runKafkaConfigured)
+import           Blockchain.Util (getCurrentMicrotime)
 
 retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
 retrievePrvKey path = do

@@ -23,48 +23,23 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.ExtWord
   
-class MonadResource m=>
-      HasStorageDB m where
-  getStorageDB::Monad m=>m (DB.DB, M.Map (Address, Word256) Word256)
-  putStorageMap::Monad m=>M.Map (Address, Word256) Word256->m ()
+class MonadResource m => HasStorageDB m where
+  getStorageDB  :: m (DB.DB, M.Map (Address, Word256) Word256)
+  putStorageMap :: M.Map (Address, Word256) Word256->m ()
 
 
 
 putStorageKeyVal'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                   Address->Word256->Word256->m ()
-putStorageKeyVal' owner key val = putStorageKeyValMC owner key val
+putStorageKeyVal' = putStorageKeyValMC
 
 getStorageKeyVal'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                    Address->Word256->m Word256
-getStorageKeyVal' owner key = getStorageKeyValMC owner key
+getStorageKeyVal' = getStorageKeyValMC
 
 getAllStorageKeyVals'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                        Address->m [(MP.Key, Word256)]
-getAllStorageKeyVals' owner = getAllStorageKeyValsMC owner
-
-
-
-{-
-putStorageKeyVal'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                  Address->Word256->Word256->m ()
-putStorageKeyVal' owner key val = putStorageKeyValDB owner key val
-
-getStorageKeyVal'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                   Address->Word256->m Word256
-getStorageKeyVal' owner key = getStorageKeyValDB owner key
-
-getAllStorageKeyVals'::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
-                       Address->m [(MP.Key, Word256)]
-getAllStorageKeyVals' owner = getAllStorageKeyValsDB owner
--}
-
-
-
-
-
-
-
-
+getAllStorageKeyVals' = getAllStorageKeyValsMC
 
 --The following are the memory cache versions of the functions
 
@@ -84,13 +59,13 @@ getStorageKeyValMC owner key = do
     
 getAllStorageKeyValsMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                        Address->m [(MP.Key, Word256)]
-getAllStorageKeyValsMC owner = getAllStorageKeyValsDB owner
+getAllStorageKeyValsMC = getAllStorageKeyValsDB
 
 flushMemStorageDB::(HasMemAddressStateDB m, HasStateDB m, HasStorageDB m, HasHashDB m)=>
                    m ()
 flushMemStorageDB = do
   theMap <- fmap snd getStorageDB
-  forM_ (M.toList theMap) $ \((address, key), val) -> do
+  forM_ (M.toList theMap) $ \((address, key), val) ->
      putStorageKeyValDB address key val
   putStorageMap M.empty
 

@@ -2,13 +2,16 @@
 
 module Blockchain.VMContext (
   Context(..),
+  ContextBestBlockInfo(..),
   ContextM,
   runContextM,
   evalContextM,
   execContextM,
   incrementNonce,
   getNewAddress,
-  purgeStorageMap
+  purgeStorageMap,
+  getContextBestBlockInfo,
+  putContextBestBlockInfo
   ) where
 
 
@@ -42,24 +45,29 @@ import Blockchain.VMOptions
 import Blockchain.Bagger
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
 
+import Blockchain.Strato.Model.SHA
+
 import qualified Network.Kafka as K
 
 --import Debug.Trace
 
-data Context =
-  Context {
-    contextStateDB::MP.MPDB,
-    contextHashDB::HashDB,
-    contextCodeDB::CodeDB,
-    contextBlockSummaryDB::BlockSummaryDB,
-    contextSQLDB::SQLDB,
-    contextAddressStateDBMap::M.Map Address AddressStateModification,
-    contextStorageMap::M.Map (Address, Word256) Word256,
-    contextBaggerState :: !BaggerState,
-    contextKafkaState :: K.KafkaState
-    }
+data Context = Context {
+    contextStateDB           :: MP.MPDB,
+    contextHashDB            :: HashDB,
+    contextCodeDB            :: CodeDB,
+    contextBlockSummaryDB    :: BlockSummaryDB,
+    contextSQLDB             :: SQLDB,
+    contextAddressStateDBMap :: M.Map Address AddressStateModification,
+    contextStorageMap        :: M.Map (Address, Word256) Word256,
+    contextBaggerState       :: !BaggerState,
+    contextKafkaState        :: K.KafkaState,
+    contextBestBlockInfo     :: ContextBestBlockInfo
+}
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
+
+data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
+    deriving (Eq, Read, Show)
 
 instance HasStateDB ContextM where
   getStateDB = do
@@ -115,46 +123,43 @@ connStr' = BC.pack $ "host=localhost dbname=eth user=postgres password=api port=
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ResourceT m) a -> m (a, Context)
 runContextM f = do
-  liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  runResourceT $ do
-    sdb <- DB.open (dbDir "h" ++ stateDBPath)
-             DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-    hdb <- DB.open (dbDir "h" ++ hashDBPath)
-             DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-    cdb <- DB.open (dbDir "h" ++ codeDBPath)
-             DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-    blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
-             DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-    conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
-    let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
-    runStateT f (Context
-                    MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
-                    hdb
-                    cdb
-                    blksumdb
-                    conn
-                    M.empty
-                    M.empty
-                    defaultBaggerState
-                    initialKafkaState)
+    liftIO $ createDirectoryIfMissing False $ dbDir "h"
+    runResourceT $ do
+        sdb <- DB.open (dbDir "h" ++ stateDBPath)
+                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+        hdb <- DB.open (dbDir "h" ++ hashDBPath)
+                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+        cdb <- DB.open (dbDir "h" ++ codeDBPath)
+                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
+                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+        conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
+        let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
+        runStateT f (Context
+                        MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
+                        hdb
+                        cdb
+                        blksumdb
+                        conn
+                        M.empty
+                        M.empty
+                        defaultBaggerState
+                        initialKafkaState
+                        Unspecified)
 
 
-evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m a
+evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m a
 evalContextM f = fst <$> runContextM f
 
-execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
-                 StateT Context (ResourceT m) a -> m Context
+execContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m Context
 execContextM f = snd <$> runContextM f
 
-incrementNonce::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
-                Address->m ()
+incrementNonce :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m ()
 incrementNonce address = do
   addressState <- getAddressState address
   putAddressState address addressState{ addressStateNonce = addressStateNonce addressState + 1 }
 
-getNewAddress::(HasMemAddressStateDB m, HasStateDB m, HasHashDB m)=>
-               Address->m Address
+getNewAddress :: (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) => Address -> m Address
 getNewAddress address = do
   addressState <- getAddressState address
   when flags_debug $ liftIO $ putStrLn $ "Creating new account: owner=" ++ show (pretty address) ++ ", nonce=" ++ show (addressStateNonce addressState)
@@ -162,17 +167,15 @@ getNewAddress address = do
   incrementNonce address
   return newAddress
 
-purgeStorageMap::HasStorageDB m=>Address->m ()
+purgeStorageMap :: HasStorageDB m => Address -> m ()
 purgeStorageMap address = do
   (_, storageMap) <- getStorageDB
   putStorageMap $ M.filterWithKey (\key _ -> fst key /= address) storageMap
 
+getContextBestBlockInfo :: ContextM ContextBestBlockInfo
+getContextBestBlockInfo = contextBestBlockInfo <$> get
 
-
-
-
-
-
-
-
-
+putContextBestBlockInfo :: ContextBestBlockInfo -> ContextM ()
+putContextBestBlockInfo new = do
+    ctx <- get
+    put ctx { contextBestBlockInfo = new }

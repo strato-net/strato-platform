@@ -26,16 +26,17 @@ import Blockchain.Format
 import Blockchain.SHA
 import Blockchain.Util
 
-
---import Debug.Trace
-
-data Capability = ETH Integer | SHH Integer | PAR Integer | UNKNOWNCAP String Integer deriving (Show)
+data Capability = ETH Integer               -- | Base Ethereum P2P protocol
+                | SHH Integer               -- | Whisper support
+                | PAR Integer               -- | Parity client
+                | UNKNOWNCAP String Integer -- | ¯\_(ツ)_/¯
+                deriving (Eq, Read, Show)
 
 name2Cap::Integer->String->Capability
 name2Cap ver "eth" = ETH ver
 name2Cap ver "shh" = SHH ver
 name2Cap ver "par" = PAR ver
-name2Cap ver name = UNKNOWNCAP name ver
+name2Cap ver name  = UNKNOWNCAP name ver
 
 instance RLPSerializable Capability where
     rlpEncode (ETH ver) = RLPArray [rlpEncode ("eth"::B.ByteString), rlpEncode ver]
@@ -46,20 +47,20 @@ instance RLPSerializable Capability where
     rlpDecode (RLPArray [name, ver]) = name2Cap (rlpDecode ver) $ rlpDecode name
     rlpDecode x = error $ "wrong format given to rlpDecode for Capability: " ++ show (pretty x)
 
-data TerminationReason =
-  DisconnectRequested
-  | TCPSubSystemError
-  | BreachOfProtocol
-  | UselessPeer
-  | TooManyPeers
-  | AlreadyConnected
-  | IncompatibleP2PProtocolVersion
-  | NullNodeIdentityReceived
-  | ClientQuitting
-  | UnexpectedIdentity
-  | ConnectedToSelf
-  | PingTimeout
-  | OtherSubprotocolReason deriving (Show)
+data TerminationReason = DisconnectRequested
+                       | TCPSubSystemError
+                       | BreachOfProtocol
+                       | UselessPeer
+                       | TooManyPeers
+                       | AlreadyConnected
+                       | IncompatibleP2PProtocolVersion
+                       | NullNodeIdentityReceived
+                       | ClientQuitting
+                       | UnexpectedIdentity
+                       | ConnectedToSelf
+                       | PingTimeout
+                       | OtherSubprotocolReason
+                       deriving (Eq, Read, Show)
 
 numberToTerminationReason::Integer->TerminationReason
 numberToTerminationReason 0x00 = DisconnectRequested
@@ -93,7 +94,7 @@ terminationReasonToNumber ConnectedToSelf = 0x0a
 terminationReasonToNumber PingTimeout = 0x0b
 terminationReasonToNumber OtherSubprotocolReason = 0x10
   
-data BlockHashOrNumber = BlockHash SHA | BlockNumber Integer deriving (Show)
+data BlockHashOrNumber = BlockHash SHA | BlockNumber Integer deriving (Eq,Show)
 
 instance Format BlockHashOrNumber where
   format (BlockHash x) = format x
@@ -105,7 +106,7 @@ instance RLPSerializable BlockHashOrNumber where
   rlpDecode val@(RLPString s) | B.length s == 32 = BlockHash $ rlpDecode val
   rlpDecode val = BlockNumber $ fromInteger $ rlpDecode val
 
-data Direction = Forward | Reverse deriving (Show)
+data Direction = Forward | Reverse deriving (Eq,Show)
 
 instance RLPSerializable Direction where
   rlpEncode Forward = rlpEncode (0::Integer)
@@ -130,7 +131,7 @@ data Message =
   BlockBodies [([Transaction], [BlockHeader])] |
   NewBlock Block Integer |
 
-  WhisperProtocolVersion Int deriving (Show)
+  WhisperProtocolVersion Int deriving (Eq,Show)
 
 instance Format Message where
   format Hello{version=ver, clientId=c, capability=cap, port=p, nodeId=n} =
@@ -196,7 +197,7 @@ obj2WireMessage 0x10 (RLPArray [ver, nID, d, lh, gh]) =
 }
 
 obj2WireMessage 0x11 (RLPArray items) =
-  NewBlockHashes $ map (\(RLPArray [hash', number']) -> (rlpDecode hash', fromInteger $ rlpDecode number')) $ items
+  NewBlockHashes $ (\(RLPArray [hash', number']) -> (rlpDecode hash', fromInteger $ rlpDecode number')) <$> items
 obj2WireMessage 0x12 (RLPArray transactions) =
   Transactions $ rlpDecode <$> transactions
 

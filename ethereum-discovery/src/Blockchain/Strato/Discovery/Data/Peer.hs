@@ -1,0 +1,149 @@
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+    
+module Blockchain.Strato.Discovery.Data.Peer where
+
+import Control.Monad.Logger
+import Crypto.Types.PubKey.ECC
+import qualified Data.Text as T
+import Data.Time
+import Data.Time.Clock.POSIX
+import qualified Database.Persist.Postgresql as SQL
+import Database.Persist.TH
+import Text.Regex.PCRE
+
+
+import Blockchain.Data.PersistTypes ()
+import Blockchain.Data.PubKey
+import Blockchain.EthConf
+import Blockchain.MiscJSON ()
+import Blockchain.DB.SQLDB (createPostgresqlPool')
+import Blockchain.SHA
+
+share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
+PPeer 
+    pubkey Point Maybe
+    ip T.Text
+    tcpPort Int
+    udpPort Int
+    numSessions Int
+    lastMsg T.Text
+    lastMsgTime UTCTime
+    enableTime UTCTime
+    udpEnableTime UTCTime
+    lastTotalDifficulty Integer
+    lastBestBlockHash SHA
+    bondState Int
+    version T.Text
+    deriving Show Read Eq
+|]
+
+jamshidBirth::UTCTime
+jamshidBirth = posixSecondsToUTCTime 0
+
+createPeer::String->PPeer
+createPeer peerString = 
+  PPeer {
+    pPeerPubkey = stringToPoint <$> pubKeyMaybe,
+    pPeerIp = T.pack ip,
+    pPeerUdpPort = port', --TODO think about this....  Should the UDP port be the same as the TCP port by default?
+    pPeerTcpPort = port',
+    pPeerNumSessions = 0,
+    pPeerLastTotalDifficulty = 0,
+    pPeerLastMsg  = T.pack "msg",
+    pPeerLastMsgTime = jamshidBirth,
+    pPeerEnableTime = jamshidBirth,
+    pPeerUdpEnableTime = jamshidBirth,
+    pPeerLastBestBlockHash = SHA 0,
+    pPeerBondState=0,
+    pPeerVersion = T.pack "61" -- fix
+    }
+  where
+    (pubKeyMaybe, ip, port') = parseEnode peerString
+
+-- http://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address
+validIpAddressRegex :: String
+validIpAddressRegex = "(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])"
+
+validHostnameRegex :: String
+validHostnameRegex = "(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])"
+
+parseEnode::String->(Maybe String, String, Int)
+parseEnode enode =
+  case (enode =~ ("enode://([a-f0-9]{128}@)?("++validIpAddressRegex++"|"++validHostnameRegex++"):(\\d+)"::String))::(String, String, String, [String]) of
+    ("", _, "", [pubKeyAt, ip, port']) -> (case pubKeyAt of {"" -> Nothing; x -> Just $ init x} , ip, read port')
+    _ -> error $ "malformed enode: " ++ enode
+
+getAvailablePeers::IO [PPeer]
+getAvailablePeers = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+    SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
+
+setPeerBondingState::String->Int->Int->IO ()
+setPeerBondingState ip port' state = do
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  flip SQL.runSqlPool sqldb $ 
+    SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
+  return ()
+  
+getBondedPeers::IO [PPeer]
+getBondedPeers = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+    SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
+
+getBondedPeersForUDP::IO [PPeer]
+getBondedPeersForUDP = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+    SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
+
+getUnbondedPeers::IO [PPeer]
+getUnbondedPeers = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+    SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
+
+defaultPeer::PPeer
+defaultPeer = PPeer{
+  pPeerPubkey=Nothing,
+  pPeerIp="",
+  pPeerUdpPort=30303,
+  pPeerTcpPort=30303,
+  pPeerNumSessions=0,
+  pPeerLastMsg="",
+  pPeerLastMsgTime=posixSecondsToUTCTime 0,
+  pPeerEnableTime=posixSecondsToUTCTime 0,
+  pPeerUdpEnableTime=posixSecondsToUTCTime 0,
+  pPeerLastTotalDifficulty=0,
+  pPeerLastBestBlockHash=SHA 0,
+  pPeerBondState=0,
+  pPeerVersion=""
+  }
+
+disablePeerForSeconds::PPeer->Int->IO ()
+disablePeerForSeconds peer seconds = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  flip SQL.runSqlPool sqldb $ 
+    SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
+  return ()
+  
+disableUDPPeerForSeconds::PPeer->Int->IO ()
+disableUDPPeerForSeconds peer seconds = do
+  currentTime <- getCurrentTime
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  flip SQL.runSqlPool sqldb $ 
+    SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
+  return ()
+  

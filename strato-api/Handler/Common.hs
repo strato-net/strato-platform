@@ -12,9 +12,6 @@ import Data.FileEmbed (embedFile)
 import Import
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Json
-import System.Environment
-import Yesod
-import qualified Prelude as P
 
 -- These handlers embed files in the executable at compile time to avoid a
 -- runtime dependency, and for efficiency.
@@ -38,5 +35,5 @@ fetchLimit = 100
 
 myFetchLimit :: IO (Int64)
 myFetchLimit = do
-	settings <- loadAppSettings [configSettingsYml] [] useEnv
-	return (fromInteger $ appFetchLimit settings :: Int64)
+    settings <- loadYamlSettings [configSettingsYml] [] useEnv
+    return (fromInteger $ appFetchLimit settings :: Int64)

@@ -1,4 +1,4 @@
-export fqdn="${stratoHost:-$(curl ident.me 2>/dev/null)}"
+export fqdn="${stratoHost:-$(curl -s ident.me 2>/dev/null)}"
 export registry="${stratoRegistry:-auth.blockapps.net:5000}/"
 export repository="${stratoRepository:-blockapps}/"
 export version=":${stratoVersion:-latest}"

@@ -28,7 +28,6 @@ import Blockchain.SHA
 import Control.Monad.Trans.Resource
 
 import Data.Aeson
-import Data.Aeson.Types
 import Data.Function
 import Data.Maybe
 import Data.String
@@ -249,7 +248,6 @@ incrementalAccountState oldState newState = do
   where
     diff :: (Eq a) => a -> a -> Maybe (Diff a 'Incremental)
     diff x y = if x == y then Nothing else Just $ Update{oldValue = x, newValue = y}
-    diff' x y = Update{oldValue = x, newValue = y}
 
 eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                    StateRoot -> m (Map Word256 (Diff Word256 'Eventual))
