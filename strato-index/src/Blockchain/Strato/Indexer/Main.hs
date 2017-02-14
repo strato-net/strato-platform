@@ -2,12 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Blockchain.Strato.Indexer.Main (
-    stratoIndex
-) where
+module Blockchain.Strato.Indexer.Main
+    ( stratoIndex
+    ) where
 
 import           Control.Monad
 import           Control.Monad.Logger
+import qualified Data.ByteString.Char8              as S8
 import           Data.List                          hiding (group)
 import qualified Data.Text                          as T
 import           Network.Kafka
@@ -15,26 +16,24 @@ import           Network.Kafka.Consumer
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.Extra
 import           Blockchain.DB.SQLDB
-import           Blockchain.EthConf
+import           Blockchain.Format
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.SHA
-import           Blockchain.Format
 
 import           Blockchain.Strato.Indexer.IContext
 
 import           Data.Ord
 import           Database.Persist.Sql
 
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-
+import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 
 stratoIndex :: LoggingT IO ()
 stratoIndex = runIContextM (fst kafkaClientIds) . forever $ do
     $logInfoS "stratoIndex" "About to fetch blocks"
-    (offset, seqEvents) <- getUnprocessedSeqEvents
+    (offset, seqEvents, bbi) <- getUnprocessedSeqEvents
+    putIndexerBestBlockInfo bbi
     $logInfoS "stratoIndex" . T.pack $ "Fetched " ++ show (length seqEvents) ++ " events starting from " ++ show offset
     let blocks = [b | OEBlock b <- seqEvents]
     let nums = map (blockDataNumber . obBlockData) blocks
@@ -45,22 +44,16 @@ stratoIndex = runIContextM (fst kafkaClientIds) . forever $ do
         $logInfoS "stratoIndex" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
         results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
         let bids = fst <$> results
-        bestBid <- getBestIndexBlockInfo
+        bestBid <- getIndexerBestBlockInfo
         num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
         let (num', bid) = maximumBy (comparing fst) $ zip nums bids
-        when (num' > num || num' == 0) $ putBestIndexBlockInfo bid
+        when (num' > num || num' == 0) $ putIndexerBestBlockInfo bid
         forM_ blocks $ \b -> do
             $logInfoS "stratoIndex/redis" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-            RBDB.withRedisBlockDB $ RBDB.putBlock b
+            RBDB.withRedisBlockDB (RBDB.putBlock b)
     setKafkaCheckpoint nextOffset'
 
-targetTopicName :: TopicName
-targetTopicName = seqEventsTopicName
-
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
-
-getUnprocessedSeqEvents :: IContextM (Offset, [OutputEvent])
+getUnprocessedSeqEvents :: IContextM (Offset, [OutputEvent], IndexerBestBlockInfo)
 getUnprocessedSeqEvents = do
   let group = snd kafkaClientIds
   withKafkaViolently (fetchSingleOffset group targetTopicName 0) >>= \case
@@ -69,10 +62,12 @@ getUnprocessedSeqEvents = do
             Left err -> error $ "Unexpected response when bootstrapping the offset of 0: " ++ show err
             Right () -> getUnprocessedSeqEvents
     Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, _) -> withKafkaViolently (readSeqEvents ofs) >>= \evs -> return (ofs, evs)
+    Right (ofs, md) -> withKafkaViolently (readSeqEvents ofs) >>= \evs -> return (ofs, evs, readMetadata md)
+        where readMetadata (Metadata (KString md')) = read (S8.unpack md')
 
 setKafkaCheckpoint :: Offset -> IContextM (Either KafkaError ())
 setKafkaCheckpoint ofs = do
     let group = snd kafkaClientIds
+    bestBlock <- Metadata . KString . S8.pack . show <$> getIndexerBestBlockInfo
     $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
-    withKafkaViolently $ commitSingleOffset group targetTopicName 0 ofs ""
+    withKafkaViolently $ commitSingleOffset group targetTopicName 0 ofs bestBlock

@@ -44,7 +44,8 @@ ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffset, EVMCheckpoint cpHash cpHead cpShas) <- getCheckpoint
+    (cpOffset, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
+    putContextBestBlockInfo cpBBI
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
     $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffset
@@ -80,7 +81,8 @@ ethereumVM = void . execContextM $ do
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
-        checkpointData <- uncurry3 EVMCheckpoint <$> Bagger.getCheckpointableState
+        baggerData <- uncurry3 EVMCheckpoint <$> Bagger.getCheckpointableState
+        checkpointData <- baggerData <$> getContextBestBlockInfo
         setCheckpoint newOffset checkpointData
 
 clientId :: K.KafkaClientId
@@ -103,8 +105,13 @@ initializeCheckpointAndBlockSummary = do
     initBlockSummary block
     let sha  = outputBlockHash block
         head = obBlockData block
-        txHs = otHash <$> obReceiptTransactions block
-    setCheckpoint 1 (EVMCheckpoint sha head txHs)
+        txs  = obReceiptTransactions block
+        td   = obTotalDifficulty block
+        txHs = otHash <$> txs
+        txL  = length txs
+        uncL = length (obBlockUncles block)
+        cbbi = ContextBestBlockInfo (sha, head, td, txL, uncL)
+    setCheckpoint 1 (EVMCheckpoint sha head txHs cbbi)
 
 
 initBlockSummary :: OutputBlock -> ContextM ()
@@ -113,8 +120,8 @@ initBlockSummary block =
         head  = obBlockData block
         td    = obTotalDifficulty block
         txCnt = fromIntegral $ length (obReceiptTransactions block)
-        in
-            putBSum sha (blockHeaderToBSum head td txCnt)
+    in
+        putBSum sha (blockHeaderToBSum head td txCnt)
 
 getCheckpoint :: ContextM (KP.Offset, EVMCheckpoint)
 getCheckpoint = do

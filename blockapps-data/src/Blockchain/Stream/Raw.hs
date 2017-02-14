@@ -2,6 +2,7 @@
 
 module Blockchain.Stream.Raw (
   produceBytes,
+  produceBytes',
   fetchBytes,
   fetchBytesIO,
   fetchBytesOneIO,
@@ -10,6 +11,7 @@ module Blockchain.Stream.Raw (
 
 import Control.Lens
 import Control.Monad.IO.Class
+import Control.Monad (void)
 import qualified Data.ByteString as B
 
 import Network.Kafka
@@ -21,11 +23,11 @@ import Blockchain.EthConf
 import Blockchain.KafkaTopics
 
 
-produceBytes::MonadIO m=>String->[B.ByteString]->m ()
-produceBytes topic items = do
-  _ <- liftIO $ runKafkaConfigured "blockapps-data" $
-    produceMessages $ map (TopicAndMessage (lookupTopic topic) . makeMessage) items
-  return ()
+produceBytes :: MonadIO m => String -> [B.ByteString] -> m ()
+produceBytes topic items = void . liftIO . runKafkaConfigured "blockapps-data" $ produceBytes' topic items
+
+produceBytes' :: (Kafka k) => String -> [B.ByteString] -> k [ProduceResponse]
+produceBytes' topic = produceMessages . fmap (TopicAndMessage (lookupTopic topic) . makeMessage)
 
 fetchBytes :: Kafka k => TopicName -> Offset -> k [B.ByteString]
 fetchBytes topic offset = fetchBytes' topic offset >>= (\ts -> return $ snd <$> ts)

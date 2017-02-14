@@ -23,6 +23,7 @@ import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Ord (comparing)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -75,8 +76,13 @@ import Blockchain.Output (rightPad)
 import qualified Control.Monad.State as State
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.BaggerState as BaggerState
+import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.SHA
+import Blockchain.SHA (formatSHAWithoutColor)
 
-import Blockchain.SHA
+import Network.Kafka (withKafkaViolently)
+
+import Executable.EVMFlags
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer -- txCost, accountBalance
                              | TFIntrinsicGasExceedsTxLimit Integer Integer -- intrinsicGas, txGasLimit
@@ -170,15 +176,39 @@ timeit message f = do
     $logInfoS "timeit" . T.pack $ "#### " ++ message ++ " time = " ++ printf "%.4f" (realToFrac $ after - before::Double) ++ "s"
     return ret
 
-addBlocks::Bool->[OutputBlock]->ContextM ()
+addBlocks :: Bool -> [OutputBlock] -> ContextM ()
 addBlocks _ [] = return ()
-addBlocks isUnmined blocks = do
-    let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
-    lift $ $logInfoS "addBlocks" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
-                                           (show . blockDataNumber . obBlockData $ head blocks))
-    forM_ blocks' $ timeit "Block insertion" . addBlock isUnmined
-    $logInfoS "addBlocks" "done inserting, now will replace best if best is among the list"
-    unless isUnmined . replaceBestIfBetter $ maximumBy (comparing obTotalDifficulty) blocks'
+addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else addBlocks_old
+    where addBlocks_old, addBlocks_new :: ContextM ()
+          addBlocks_old = do
+              let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
+              lift $ $logInfoS "addBlocks_old" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
+                                                     (show . blockDataNumber . obBlockData $ head blocks))
+              forM_ blocks' $ timeit "Block insertion" . addBlock isUnmined
+              $logInfoS "addBlocks_old" "done inserting, now will replace best if best is among the list"
+              let bestIfBetterCandidate = maximumBy (comparing obTotalDifficulty) blocks'
+              unless isUnmined . void $ replaceBestIfBetter bestIfBetterCandidate True
+
+          addBlocks_new = do
+              let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
+              lift $ $logInfoS "addBlocks_new" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
+                                                     (show . blockDataNumber . obBlockData $ head blocks))
+              ContextBestBlockInfo (_, oldHeader, _, _, _) <- getContextBestBlockInfo
+              let oldStateRoot = blockDataStateRoot oldHeader
+              didReplaceBest <- liftIO (newIORef False)
+              replacedBest   <- liftIO (newIORef undefined)
+              forM_ blocks' $ \block -> timeit "Block insertion" $ do
+                  addBlock isUnmined block
+                  unless isUnmined $ do
+                      didReplaceThisTime <- replaceBestIfBetter block False
+                      when didReplaceThisTime . liftIO $ do
+                          writeIORef didReplaceBest True
+                          writeIORef replacedBest block
+              didReplaceBest' <- liftIO (readIORef didReplaceBest)
+              when (not isUnmined && didReplaceBest') $ do
+                  $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
+                  newBestBlock <- liftIO (readIORef replacedBest)
+                  calculateAndEmitStateDiffs newBestBlock oldStateRoot
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
@@ -456,15 +486,12 @@ outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} re
       return ()
 
 
-timeIt::MonadIO m=>m a->m (NominalDiffTime, a)
+timeIt :: MonadIO m => m a -> m (NominalDiffTime, a)
 timeIt f = do
-  timeBefore <- liftIO getPOSIXTime
-
-  result <- f
-
-  timeAfter <- liftIO getPOSIXTime
-
-  return (timeAfter - timeBefore, result)
+    timeBefore <- liftIO getPOSIXTime
+    result <- f
+    timeAfter <- liftIO getPOSIXTime
+    return (timeAfter - timeBefore, result)
 
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
@@ -479,72 +506,82 @@ logWithBox source headerSize lines = do
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
 printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=txHash} (Left errMsg) deltaT = do
-  let tNonce = transactionNonce baseTx
-  logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                              , "Tx hash:  " ++ format txHash
-                              , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
-                              , CL.red "Transaction failure: " ++ CL.red (show errMsg)
-                              , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
-                              ]
+    let tNonce = transactionNonce baseTx
+    logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
+                                , "Tx hash:  " ++ format txHash
+                                , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                                , CL.red "Transaction failure: " ++ CL.red (show errMsg)
+                                , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
+                                ]
 
 printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=txHash} (Right results) deltaT = do
-  let tNonce = transactionNonce t
-      txPretty = if isMessageTX t
-        then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
-        else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results) ++ "                  "
-  logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                             , "Tx hash:  " ++ format txHash
-                             , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
-                             , txPretty
-                             , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
-                             ]
+    let tNonce = transactionNonce t
+        txPretty = if isMessageTX t
+          then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
+          else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results) ++ "                  "
+    logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
+                               , "Tx hash:  " ++ format txHash
+                               , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
+                               , txPretty
+                               , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
+                               ]
 
-indexMaybe::[a]->Int->Maybe a
+indexMaybe :: [a] -> Int -> Maybe a
 indexMaybe _ i | i < 0 = error "indexMaybe called for i < 0"
-indexMaybe [] _ = Nothing
-indexMaybe (x:_) 0 = Just x
-indexMaybe (_:rest) i = indexMaybe rest (i-1)
+indexMaybe [] _        = Nothing
+indexMaybe (x:_) 0     = Just x
+indexMaybe (_:rest) i  = indexMaybe rest (i-1)
 
-
-
-formatAddress::Address->String
+formatAddress :: Address->String
 formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter::OutputBlock->ContextM ()
-replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
-  (_, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getBestBlockInfo
+replaceBestIfBetter :: OutputBlock -> Bool -> ContextM Bool
+replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} emitStateDiff = do
+    ContextBestBlockInfo(_, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getContextBestBlockInfo
 
-  let newNumber     = blockDataNumber bd
-      newStateRoot  = blockDataStateRoot bd
-      newTxCount    = fromIntegral $ length txs
-      newUncleCount = fromIntegral $ length uncles
-      oldNumber     = blockDataNumber oldBestBlock
-      oldStateRoot  = blockDataStateRoot oldBestBlock
-      bH            = outputBlockHash b
-      bTHs          = otHash <$> txs
+    let newNumber     = blockDataNumber bd
+        newStateRoot  = blockDataStateRoot bd
+        newTxCount    = fromIntegral $ length txs
+        newUncleCount = fromIntegral $ length uncles
+        oldNumber     = blockDataNumber oldBestBlock
+        oldStateRoot  = blockDataStateRoot oldBestBlock
+        bH            = outputBlockHash b
+        bTHs          = otHash <$> txs
 
-  let shouldReplace =     newNumber == 0
-                      || (newNumber > oldNumber)
-                      || ((newNumber == oldNumber) && (td > oldBestDifficulty))
-                      || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+    let shouldReplace =     newNumber == 0
+                        || (newNumber > oldNumber)
+                        || ((newNumber == oldNumber) && (td > oldBestDifficulty))
+                        || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
 
-  $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
+    $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
-  when shouldReplace $ do
-    Bagger.processNewBestBlock bH bd bTHs
-    diffs <- stateDiff newNumber bH oldStateRoot newStateRoot
+    when shouldReplace $ do
+        Bagger.processNewBestBlock bH bd bTHs
+        putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
+        when emitStateDiff $ do
+            $logInfoS "replaceBestIfBetter/emitStateDiff" "emitStateDiff = true, emitting StateDiff"
+            calculateAndEmitStateDiffs b oldStateRoot
 
-    when flags_sqlDiff $ do
-      commitSqlDiffs diffs
-      putBestBlockInfo bH (obBlockData b) td newTxCount newUncleCount
+    -- we're replaying SeqEvents, and need to notify the mempool
+    when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
+        Bagger.processNewBestBlock bH bd bTHs
 
-    when flags_diffPublish $ do
-      let diffBS = BL.toStrict $ Aeson.encode diffs
-      --logInfoN $ T.decodeUtf8 diffBS
-      produceBytes "statediff" [diffBS]
+    return shouldReplace
 
-  -- we're replaying SeqEvents, and need to notify the mempool
-  when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
-    Bagger.processNewBestBlock bH bd bTHs
+calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
+                           => b
+                           -> MP.StateRoot
+                           -> ContextM ()
+calculateAndEmitStateDiffs newBlock oldStateRoot = when (flags_sqlDiff || flags_diffPublish) $ do
+    let newHeader    = blockHeader newBlock
+        newHash      = blockHash newBlock
+        newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
+        newNumber    = blockHeaderBlockNumber newHeader
+    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newBlock
+    diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
+    when flags_sqlDiff $ commitSqlDiffs diffs
+    when flags_diffPublish $
+        let diffBS = BL.toStrict $ Aeson.encode diffs
+         in void . withKafkaViolently $ produceBytes' "statediff" [diffBS]

@@ -60,6 +60,7 @@ library
                  , ansi-wl-pprint
                  , nibblestring
                  , extra >=1.4.1 && <1.5
+                 , strato-model
     exposed-modules: 
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults

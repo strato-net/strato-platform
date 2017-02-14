@@ -27,6 +27,7 @@ executable strato-setup
                  , blockapps-data
                  , blockapps-util
                  , strato-sequencer
+                 , strato-index
                  , bytestring
                  , containers
                  , cryptohash
@@ -51,6 +52,7 @@ executable strato-setup
                  , yaml
                  , binary
                  , stm
+                 , persistent
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
                    Blockchain.Data.GenesisBlock

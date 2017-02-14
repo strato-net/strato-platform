@@ -80,8 +80,8 @@ updateAccount blockNumber address diff = do
   addrID <- getAddressStateSQL address "update"
   SQL.update addrID $ 
     setField nonce AddressStateRefNonce $
-    setField balance AddressStateRefBalance $
-    [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
+    setField balance AddressStateRefBalance
+        [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
 
   where
