@@ -32,6 +32,7 @@ executable strato-redis-viz
   other-modules:       Blockchain.Strato.RedisBlockDB.Test.Chain
   hs-source-dirs:      exec_src, test
   build-depends:
+        ansi-wl-pprint,
         optparse-applicative,
         blockapps-data,
         blockapps-util,
@@ -63,6 +64,7 @@ test-suite strato-redis-blockdb-test
     main-is: Test.hs
     other-modules: Blockchain.Strato.RedisBlockDB.Test.Chain
     build-depends:
+        ansi-wl-pprint,
         blockapps-data,
         blockapps-util,
         async,

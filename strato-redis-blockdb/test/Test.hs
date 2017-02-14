@@ -10,6 +10,7 @@ import           Data.Either
 import           Data.Tree
 import           Data.Ord
 import           Data.List
+import           Data.Foldable
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Test.HUnit as HUnit
@@ -167,20 +168,22 @@ specTest = around (withConn 1) $ do
         flushDB
 
         it "Should get back best block after putting it" $ \conn -> do
-            let n = 10
             g <- liftIO $ makeGenesisBlock
-            chain <- liftIO $ buildChain g n 2
-            let bb = chain !! (n `div` 2)
+            chain <- liftIO $ buildChain g 10 2
+            let bb = last chain
             -- liftIO $ showChain chain
             r <- runRedis conn $ do
                 void $ RDB.forceBestBlockInfo (blockHeaderHash bb) (blockDataNumber bb) 9999
-                --void $ RDB.putBestBlockInfo (blockHeaderHash bb) (blockDataNumber bb) 9999
                 RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
             HUnit.assertEqual
                 "Couldn't get back best block"
                 (Just (blockHeaderHash bb, blockDataNumber bb, 9999)) r
 
-        it "Should generate a tree" $ \_ -> do
+    describe "ReplaceBestBlock" $ do
+        
+        flushDB
+
+        it "Should generate a tree" $ \conn -> do
            g <- liftIO $ makeGenesisBlock
            tree <- bush g 20 3 :: IO (Tree BlockData)
            liftIO . putStrLn $ showTree $ pb <$> tree
@@ -188,32 +191,22 @@ specTest = around (withConn 1) $ do
            let (l1, l2) = (\x -> (head x, last x)) (sortBy (comparing blockDataNumber) (leaves tree))
            liftIO . putStrLn . show $ pb l1
            liftIO . putStrLn . show $ pb l2
-           HUnit.assertBool
-               "sdfsdf"
-               True
 
-bush :: BlockData -> Int -> Int -> IO (Tree BlockData)
-bush g n m = do
-    tree <- buildTree g n m
-    if (length . leaves $ tree) < 2
-    then bush g n m
-    else return tree
+           let bchain = stem' l1 (toList tree)
+           liftIO . putStrLn . show $ pb <$> bchain
 
-pb :: BlockData -> (Integer, Integer, String) 
-pb x = (blockDataNumber x, blockDataDifficulty x, showHash . blockHeaderHash $ x)
+           r <- runRedis conn $ do
+                forM_ (zip (reverse bchain) [1..]) (\(b, i) -> RDB.forceBestBlockInfo (blockHeaderHash b) (blockDataNumber b) i)
+                RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
+           HUnit.assertEqual
+               "Couldn't get best block from chain"
+               (Just (blockHeaderHash l1, blockDataNumber l1, fromIntegral $ length bchain)) r
 
-leaves :: Tree a -> [a]
-leaves (Node n []) = [n]
-leaves (Node _ f) = concat $ map leaves f
+pb :: BlockData -> (Integer, Integer, String, String) 
+pb x = ( blockDataNumber x
+       , blockDataDifficulty x
+       , showHash . blockHeaderHash $ x
+       , showHash . blockDataParentHash $ x
+       )
 
---         it "Should get a whole chain" $ \conn -> do
---             let n = 10
---             g <- liftIO $ makeGenesisBlock
---             chain <- liftIO $ buildChain g n 0
---             r <- runRedis conn $ do
---                 void $ RDB.putCanonical chain
---                 chainHashes <- RDB.getCanonicalChain 1 n :: Redis [SHA]
---                 RDB.getHeaders chainHashes :: Redis [(SHA, Maybe BlockData)]
---             HUnit.assertEqual
---                 "Couldn't fetch canonical chain"
---                 (length r) n
+
