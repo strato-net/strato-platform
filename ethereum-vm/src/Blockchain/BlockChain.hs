@@ -500,8 +500,8 @@ modeToColor Pre = CL.blue
 modeToColor Ok  = CL.magenta
 modeToColor Err = CL.red
 
-logWithBox :: MonadLogger m => T.Text -> Int -> BoxMode -> [String] -> m ()
-logWithBox source headerSize mode lines = do
+logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
+logWithBox source headerSize lines = do
     let headerAndFooter = indent ++ CL.magenta (replicate headerSize '=')
         addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
         indent          = "    "
