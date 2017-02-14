@@ -213,7 +213,7 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
     b' <- if isUnmined then do
             let newBlockData = (obBlockData b){blockDataStateRoot=MP.stateRoot db}
                 newBlock = b{obBlockData = newBlockData}
-            $logInfoS "addBlock/unmimed" "Note: block is partial, instead of doing a stateRoot check, I will fill in the stateroot"
+            $logInfoS "addBlock/unmined" "Note: block is partial, instead of doing a stateRoot check, I will fill in the stateroot"
             produceUnminedBlocks [outputBlockToBlock newBlock]
             $logInfoS "addBlock/unmined" "stateRoot has been filled in"
             return newBlock

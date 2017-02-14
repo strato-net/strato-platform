@@ -75,6 +75,7 @@ test-suite strato-redis-blockdb-test
         HUnit,
         hspec-contrib,
         hspec,
+        hspec-core,
         QuickCheck,
         stm,
         ethereum-rlp,
