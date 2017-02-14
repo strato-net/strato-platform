@@ -3,17 +3,20 @@
              OverloadedStrings, 
              LambdaCase, 
              ScopedTypeVariables, 
-             GeneralizedNewtypeDeriving,
-             DeriveFunctor,
-             DeriveAnyClass
+             GeneralizedNewtypeDeriving -- ,
+             -- DeriveFunctor,
+             -- DeriveAnyClass
 #-}
              
 module Blockchain.NewEvent (
   handleEvents'
 , Event(..)
-, InMemory
-, runInMemory
-, evalInMemory
+, InMemoryServer
+, InMemoryClient
+, runInMemoryServer
+, evalInMemoryServer
+, runInMemoryClient
+, evalInMemoryClient
 ) where
 
 
@@ -39,9 +42,11 @@ class Monad m => PeerMonad m where
   peerLatestHash :: m SHA
   peerBestBlock :: m Block
 
-type InMemory k v m = StateT (Map.Map k v) m
 
-instance PeerMonad (InMemory SHA Block IO) where
+newtype InMemoryServer k v a = InMemoryServer { unInMemoryServer :: StateT (Map.Map k v) IO a } 
+  deriving (Functor, Applicative, Monad)
+
+instance PeerMonad (InMemoryServer SHA Block)  where
   peerRole = return Server 
   peerNetworkID = return 0 
   peerGenesisHash = return (SHA 0) 
@@ -49,11 +54,29 @@ instance PeerMonad (InMemory SHA Block IO) where
   peerLatestHash = return (SHA 0)
   peerBestBlock = undefined 
 
-runInMemory :: InMemory k v m a -> Map.Map k v -> m (a, Map.Map k v) 
-runInMemory action s = runStateT action s 
+runInMemoryServer :: InMemoryServer k v a -> Map.Map k v ->  IO (a, Map.Map k v) 
+runInMemoryServer action s = runStateT ( unInMemoryServer action ) s 
 
-evalInMemory :: (Monad m) => InMemory k v m a -> Map.Map k v -> m a 
-evalInMemory action s = evalStateT action s 
+evalInMemoryServer :: InMemoryServer k v a -> Map.Map k v -> IO a 
+evalInMemoryServer action s = evalStateT ( unInMemoryServer action ) s 
+
+newtype InMemoryClient k v a = InMemoryClient { unInMemoryClient :: StateT (Map.Map k v) IO a }
+  deriving (Functor, Applicative, Monad)
+
+
+instance PeerMonad (InMemoryClient SHA Block) where
+  peerRole = return Client
+  peerNetworkID = return 0 
+  peerGenesisHash = return (SHA 0) 
+  peerEthVersion = return 0
+  peerLatestHash = return (SHA 0)
+  peerBestBlock = undefined 
+
+runInMemoryClient :: InMemoryClient k v a -> Map.Map k v -> IO (a, Map.Map k v) 
+runInMemoryClient action s = runStateT ( unInMemoryClient action ) s 
+
+evalInMemoryClient :: InMemoryClient k v a -> Map.Map k v -> IO a 
+evalInMemoryClient action s = evalStateT ( unInMemoryClient action ) s 
 
 handleEvents' :: (PeerMonad m) => t -> ConduitM Event Message m ()
 handleEvents' _ = awaitForever $ \case
@@ -75,10 +98,11 @@ handleEvents' _ = awaitForever $ \case
                  latestHash=theLatest,
                  genesisHash=theGenesisBlockHash
                }
-        Client -> error "client role not implemented yet" 
+        Client ->
+         yield (Disconnect BreachOfProtocol)
 
     MsgEvt Status{} -> error "status handler unimplemented"
-    MsgEvt Ping     -> error "ping handler unimplemented" 
+    MsgEvt Ping     -> yield Pong 
     MsgEvt (Transactions _) -> error "transaction handler unimplemented" 
     MsgEvt (NewBlock _  _) -> error "NewBlock handler unimplemented" 
     MsgEvt (NewBlockHashes _) -> error "NewBlockHashes handler unimplemented" 

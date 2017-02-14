@@ -45,11 +45,17 @@ dummyServerStatusMsg =
          , genesisHash = SHA 0
          }
 
+disconnectProtocolBreach :: Message
+disconnectProtocolBreach = Disconnect BreachOfProtocol
+
 helloConduit :: (Monad m) => ConduitM () Message m ()
 helloConduit = yield helloMsg
 
 helloEventConduit :: (Monad m) => ConduitM () Event m ()
 helloEventConduit = yield (MsgEvt helloMsg) 
+
+pingEventConduit :: (Monad m) => ConduitM () Event m ()
+pingEventConduit = yield (MsgEvt Ping) 
 
 statusConduit :: (Monad m) => ConduitM () Message m ()
 statusConduit = yield statusMsg
@@ -62,8 +68,14 @@ getPutAction =  do
   let theVal = Map.lookup 10 theMapAfter  
   return (theVal == Just 12)
 
-upstreamStatusChecker :: ConduitM Message o (InMemory SHA Block IO) Expectation 
+upstreamStatusChecker :: ConduitM Message o (InMemoryServer SHA Block) Expectation 
 upstreamStatusChecker = upstreamShouldImmediatelyEmit (Just dummyServerStatusMsg)
+
+upstreamDisconnectChecker :: ConduitM Message o (InMemoryClient SHA Block) Expectation 
+upstreamDisconnectChecker = upstreamShouldImmediatelyEmit (Just disconnectProtocolBreach)
+
+upstreamPingPong :: ConduitM Message o (InMemoryClient SHA Block) Expectation 
+upstreamPingPong = upstreamShouldImmediatelyEmit (Just Pong)
 
 spec :: Spec
 spec = do
@@ -89,7 +101,19 @@ spec = do
       let handleEventsEmitsStatusSink = handleEvents' Nothing =$= upstreamStatusChecker          
           conduitStartAction = helloEventConduit $$ handleEventsEmitsStatusSink 
       
-      helloGetsStatus <- evalInMemory conduitStartAction (Map.empty :: Map.Map SHA Block) 
+      helloGetsStatus <- evalInMemoryServer conduitStartAction (Map.empty :: Map.Map SHA Block) 
       helloGetsStatus      
+    
+    it "hello gets a disconnect when we are the client" $ do
+       let handleEventsEmitsDisconnectSink = handleEvents' Nothing =$= upstreamDisconnectChecker          
+           conduitStartAction' = helloEventConduit $$ handleEventsEmitsDisconnectSink 
       
-      -- False `shouldBe` True
+       helloGetsDisconnect <- evalInMemoryClient conduitStartAction' (Map.empty :: Map.Map SHA Block) 
+       helloGetsDisconnect      
+    
+    it "ping gets pong" $ do
+       let handleEventsEmitsPongSink = handleEvents' Nothing =$= upstreamPingPong
+           conduitStartAction'' = pingEventConduit $$ handleEventsEmitsPongSink
+
+       pingGetsPong <- evalInMemoryClient conduitStartAction'' (Map.empty :: Map.Map SHA Block)
+       pingGetsPong
