@@ -744,8 +744,41 @@ This end point blocks on the `strato-api/eth/v1.2/transaction` call.
 - Response body as below.
 
 ```javascript
-transaction returned: 1
+//getAddress
+transaction returned: 0000000000000000000000000000000000000123
+
+//getUInt
+transaction returned: 20
+
+//getTInt
+transaction returned: 40
+
+//getBool
+transaction returned: true
+
+//getInt256
+transaction returned: 2173456789
+
+//getUIntArray
+transaction returned: 0,1,2,3,4,5,6,7,8,9
+
+//getString
+transaction returned: Hello World
+
+//getByteArray
+transaction returned: ,,,,,,,,,
+
+//getBytes32
+transaction returned: 7465737400000000000000000000000000000000000000000000000000000000
+
+//getByte
+transaction returned: 02
+
+//getMultipleValues
+transaction returned: Hello World,20
+
 ```
+
 ## POST /users/:user/:address/callList
 This end point is used to batch multiple calls to Solidity functions against deployed contracts.
 
