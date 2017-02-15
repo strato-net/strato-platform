@@ -2,8 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Blockchain.Strato.Indexer.Main
-    ( stratoIndex
+module Blockchain.Strato.Indexer.ApiIndexer
+    ( apiIndexer
     ) where
 
 import           Control.Monad
@@ -27,8 +27,8 @@ import           Database.Persist.Sql
 
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 
-stratoIndex :: LoggingT IO ()
-stratoIndex = runIContextM (fst kafkaClientIds) . forever $ do
+apiIndexer :: LoggingT IO ()
+apiIndexer = runIContextM (fst kafkaClientIds) . forever $ do
     $logInfoS "stratoIndex" "About to fetch blocks"
     (offset, seqEvents, bbi) <- getUnprocessedSeqEvents
     putIndexerBestBlockInfo bbi
@@ -54,5 +54,5 @@ stratoIndex = runIContextM (fst kafkaClientIds) . forever $ do
 getUnprocessedSeqEvents :: IContextM (Offset, [OutputEvent], IndexerBestBlockInfo)
 getUnprocessedSeqEvents = do
     (ofs, md) <- getKafkaCheckpoint
-    evs       <- withKafkaViolently (readSeqEvents ofs)
+    evs       <- withKafkaViolently (readSeqEventsFromTopic targetTopicName ofs)
     return (ofs, evs, md)

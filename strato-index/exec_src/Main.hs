@@ -1,7 +1,7 @@
 import Control.Monad.Logger
 
 import Blockchain.Output
-import Blockchain.Strato.Indexer.Main
+import Blockchain.Strato.Indexer.ApiIndexer
 
 main :: IO ()
-main = runLoggingT stratoIndex (printLogMsg' True True)
+main = runLoggingT apiIndexer (printLogMsg' True True)

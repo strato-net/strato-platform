@@ -47,5 +47,5 @@ library
                , strato-sequencer
                , hedis
                , strato-redis-blockdb
-  exposed-modules: Blockchain.Strato.Indexer.Main
+  exposed-modules: Blockchain.Strato.Indexer.ApiIndexer
                  , Blockchain.Strato.Indexer.IContext
