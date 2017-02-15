@@ -81,7 +81,8 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                     return [] -- ignore transactions we cant ECrecover
                 Just tx -> do
                     let witnessHash = witnessableHash tx
-                    txWasWitnessed <- wasTransactionHashWitnessed witnessHash
+                    -- txWasWitnessed <- wasTransactionHashWitnessed witnessHash
+                    let txWasWitnessed = False -- we have a mempool now, now need for tx dedup. todo: remove SeenTxDB completely
                     if txWasWitnessed
                       then do
                         $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx inTx ++ "; not emitting"
