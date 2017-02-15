@@ -33,8 +33,8 @@ function newnode {
   echo "Starting strato-sequencer"
   runForever strato-sequencer >> logs/strato-sequencer 2>&1
 
-  echo "Starting strato-index"
-  runForever strato-index >> logs/strato-index 2>&1
+  echo "Starting strato-api-indexer"
+  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
 
   echo "Starting ethereum-vm"
   runForever ethereum-vm --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1

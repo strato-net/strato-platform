@@ -34,8 +34,7 @@ assertTopicCreation = do
     K.updateMetadata seqEventsTopicName
 
 readUnseqEvents :: K.Kafka k => KP.Offset -> k [IngestEvent]
-readUnseqEvents offset = setDefaultKafkaState >>
-    map (decode . BL.fromStrict) <$> fetchBytes unseqEventsTopicName offset
+readUnseqEvents = readUnseqEventsFromTopic unseqEventsTopicName
 
 readUnseqEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [IngestEvent]
 readUnseqEventsFromTopic = readFromTopic'

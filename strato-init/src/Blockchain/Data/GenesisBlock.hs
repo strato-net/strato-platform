@@ -153,9 +153,12 @@ bootstrapIndexer key =
             runKafkaConfigured clientId $
                 commitSingleOffset consumer topic 0 0 mkMeta
         runner = commit >>= \case
-            Right _ -> putStrLn "bootstrapIndex successful!" >> return ()
+            Right (Right _) -> putStrLn "bootstrapIndex successful!"
+            Right (Left l) -> do
+                putStrLn $ "will retry bootstrapIndex as I got a broker error: " ++ show l
+                runner
             l -> do
-                putStrLn $ "will retry bootstrapIndexer as I got: " ++ show l
+                putStrLn $ "will retry bootstrapIndexer as I got a client error: " ++ show l
                 runner
     in runner
 
