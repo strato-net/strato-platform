@@ -61,6 +61,7 @@ library
                  , nibblestring
                  , extra >=1.4.1 && <1.5
                  , strato-model
+                 , strato-index
     exposed-modules: 
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults

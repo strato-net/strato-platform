@@ -80,6 +80,9 @@ import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.SHA
 import Blockchain.SHA (formatSHAWithoutColor)
 
+import Blockchain.Strato.Indexer.Kafka (writeIndexEvents)
+import Blockchain.Strato.Indexer.Model (IndexEvent(..))
+
 import Network.Kafka (withKafkaViolently)
 
 import Executable.EVMFlags
@@ -187,7 +190,11 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               forM_ blocks' $ timeit "Block insertion" . addBlock isUnmined
               $logInfoS "addBlocks_old" "done inserting, now will replace best if best is among the list"
               let bestIfBetterCandidate = maximumBy (comparing obTotalDifficulty) blocks'
-              unless isUnmined . void $ replaceBestIfBetter bestIfBetterCandidate True
+              unless isUnmined $ do
+                  void $ withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+                  (_, nbb) <- replaceBestIfBetter bestIfBetterCandidate True
+                  void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+
 
           addBlocks_new = do
               let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
@@ -197,18 +204,22 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               let oldStateRoot = blockDataStateRoot oldHeader
               didReplaceBest <- liftIO (newIORef False)
               replacedBest   <- liftIO (newIORef undefined)
+              replacedBBI    <- liftIO (newIORef undefined)
               forM_ blocks' $ \block -> timeit "Block insertion" $ do
                   addBlock isUnmined block
                   unless isUnmined $ do
-                      didReplaceThisTime <- replaceBestIfBetter block False
+                      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
                       when didReplaceThisTime . liftIO $ do
                           writeIORef didReplaceBest True
-                          writeIORef replacedBest block
+                          writeIORef replacedBest (block, replacedBits)
               didReplaceBest' <- liftIO (readIORef didReplaceBest)
-              when (not isUnmined && didReplaceBest') $ do
-                  $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
-                  newBestBlock <- liftIO (readIORef replacedBest)
-                  calculateAndEmitStateDiffs newBestBlock oldStateRoot
+              unless isUnmined $ do
+                  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+                  when didReplaceBest' $ do
+                      $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
+                      (theBlock, nbb) <- liftIO (readIORef replacedBest)
+                      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+                      calculateAndEmitStateDiffs theBlock oldStateRoot
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
@@ -543,9 +554,9 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> Bool -> ContextM Bool
+replaceBestIfBetter :: OutputBlock -> Bool -> ContextM (Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} emitStateDiff = do
-    ContextBestBlockInfo(_, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getContextBestBlockInfo
+    ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getContextBestBlockInfo
 
     let newNumber     = blockDataNumber bd
         newStateRoot  = blockDataStateRoot bd
@@ -574,7 +585,12 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
     when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
         Bagger.processNewBestBlock bH bd bTHs
 
-    return shouldReplace
+    let bestBlockInfo = (bestSha, bestNum, bestTdiff)
+        bestSha       = if shouldReplace then bH        else oldBestSha
+        bestNum       = if shouldReplace then newNumber else oldNumber
+        bestTdiff     = if shouldReplace then td        else oldBestDifficulty
+
+    return (shouldReplace, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b

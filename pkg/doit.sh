@@ -36,6 +36,9 @@ function newnode {
   echo "Starting strato-api-indexer"
   runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
 
+  echo "Starting strato-p2p-indexer"
+  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
+
   echo "Starting ethereum-vm"
   runForever ethereum-vm --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1
 

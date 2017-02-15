@@ -365,7 +365,7 @@ topics = [ "unminedblock"
          , "seqevents"
          , "unseqevents"
          , "jsonrpcresponse"
-         , "ranblocks"
+         , "indexevents"
          ]
 
 genesisFiles::[(FilePath, B.ByteString)]
