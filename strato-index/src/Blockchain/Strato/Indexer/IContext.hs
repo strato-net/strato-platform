@@ -13,34 +13,28 @@ module Blockchain.Strato.Indexer.IContext
     , getIndexerBestBlockInfo
     , putIndexerBestBlockInfo
     , targetTopicName
-    , kafkaClientIds
     , unIBBI
     , reIBBI
-    , getKafkaCheckpoint
-    , setKafkaCheckpoint
-    , setKafkaCheckpoint'
     ) where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
-import qualified Data.ByteString.Char8          as S8
-import           Data.Int                       (Int64)
-import qualified Data.Text                      as T
-import qualified Database.Persist.Postgresql    as SQL
+import           Data.Int                        (Int64)
+import qualified Data.Text                       as T
+import qualified Database.Persist.Postgresql     as SQL
 
-import           Blockchain.Data.DataDefs       (Block, Key (BlockKey))
+import           Blockchain.Data.DataDefs        (Block, Key (BlockKey))
 import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
-import           Blockchain.Sequencer.Kafka     (seqEventsTopicName)
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import qualified Database.Redis                 as Redis
+import qualified Blockchain.Strato.RedisBlockDB  as RBDB
+import qualified Database.Redis                  as Redis
 
 import           Network.Kafka
-import           Network.Kafka.Consumer         (commitSingleOffset,
-                                                 fetchSingleOffset)
 import           Network.Kafka.Protocol
+
+import           Blockchain.Strato.Indexer.Kafka
 
 data IContext = IContext {
     contextSQLDB        :: SQLDB,
@@ -78,10 +72,7 @@ pgPoolSize :: Int
 pgPoolSize = 20
 
 targetTopicName :: TopicName
-targetTopicName = seqEventsTopicName
-
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
+targetTopicName = indexEventsTopicName
 
 -- todo: Database.Persist.Postgresql.SqlBackendKey appears to be an Int64 under the hood. Need to verify.
 unIBBI :: IndexerBestBlockInfo -> Int64
@@ -89,24 +80,6 @@ unIBBI (IndexerBestBlockInfo (BlockKey k)) = fromIntegral k
 
 reIBBI :: Int64 -> IndexerBestBlockInfo
 reIBBI = IndexerBestBlockInfo . BlockKey . fromIntegral
-
-getKafkaCheckpoint :: IContextM (Offset, IndexerBestBlockInfo)
-getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
-    Left UnknownTopicOrPartition -> error "IndexerBestBlock was never initialized in strato-setup!"
-    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
-    Right (ofs, Metadata (KString md'))  -> return (ofs, reIBBI . read $ S8.unpack md')
-
-setKafkaCheckpoint :: Offset -> IndexerBestBlockInfo -> IContextM (Either KafkaError ())
-setKafkaCheckpoint ofs md = do
-    $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ show md
-    withKafkaViolently (setKafkaCheckpoint' ofs md)
-
-setKafkaCheckpoint' :: (Kafka k) => Offset -> IndexerBestBlockInfo -> k (Either KafkaError ())
-setKafkaCheckpoint' ofs md =
-    let group     = snd kafkaClientIds
-        bestBlock = Metadata . KString . S8.pack . show $ unIBBI md
-    in
-        commitSingleOffset group targetTopicName 0 ofs bestBlock
 
 runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
 runIContextM cid f = do

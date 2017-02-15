@@ -1,58 +1,82 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
+    , kafkaClientIds
     ) where
 
 import           Control.Monad
 import           Control.Monad.Logger
+import qualified Data.ByteString.Char8              as S8
 import           Data.List                          hiding (group)
 import qualified Data.Text                          as T
 import           Network.Kafka
+import           Network.Kafka.Consumer
 import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.DB.SQLDB
-import           Blockchain.Format
-import           Blockchain.Sequencer.Event
-import           Blockchain.Sequencer.Kafka
-import           Blockchain.SHA
-
+import           Blockchain.EthConf (lookupConsumerGroup)
+import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.Indexer.IContext
+import           Blockchain.Strato.Indexer.Kafka
+import           Blockchain.Strato.Indexer.Model
+
+import           Blockchain.Sequencer.Event
 
 import           Data.Ord
 import           Database.Persist.Sql
 
-import qualified Blockchain.Strato.RedisBlockDB     as RBDB
-
 apiIndexer :: LoggingT IO ()
-apiIndexer = runIContextM (fst kafkaClientIds) . forever $ do
-    $logInfoS "stratoIndex" "About to fetch blocks"
-    (offset, seqEvents, bbi) <- getUnprocessedSeqEvents
+apiIndexer = runIContextM "strato-api-indexer" . forever $ do
+    $logInfoS "apiIndexer" "About to fetch blocks"
+    (offset, idxEvents, bbi) <- getUnprocessedIndexEvents
     putIndexerBestBlockInfo bbi
-    $logInfoS "stratoIndex" . T.pack $ "Fetched " ++ show (length seqEvents) ++ " events starting from " ++ show offset
-    let blocks = [b | OEBlock b <- seqEvents]
+    $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+    let blocks = [b | RanBlock b <- idxEvents]
     let nums = map (blockDataNumber . obBlockData) blocks
-        nextOffset' = offset + fromIntegral (length seqEvents)
+        nextOffset' = offset + fromIntegral (length idxEvents)
         insertCount = length blocks
-    $logInfoS "stratoIndex" . T.pack $ show insertCount ++ " of them are blocks"
+    $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
     when (insertCount > 0) $ do
-        $logInfoS "stratoIndex" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
+        $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
         results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
         let bids = fst <$> results
         IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
         num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
         let (num', bid) = maximumBy (comparing fst) $ zip nums bids
         when (num' > num || num' == 0) $ putIndexerBestBlockInfo (IndexerBestBlockInfo bid)
-        forM_ blocks $ \b -> do
-            $logInfoS "stratoIndex/redis" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-            RBDB.withRedisBlockDB (RBDB.putBlock b)
     setKafkaCheckpoint nextOffset' =<< getIndexerBestBlockInfo
 
-getUnprocessedSeqEvents :: IContextM (Offset, [OutputEvent], IndexerBestBlockInfo)
-getUnprocessedSeqEvents = do
+kafkaClientIds :: (KafkaClientId, ConsumerGroup)
+kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")
+
+getKafkaCheckpoint :: IContextM (Offset, IndexerBestBlockInfo)
+getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case
+    Left UnknownTopicOrPartition -> error "ApiIndexerBestBlock was never initialized in strato-setup!"
+    Left err -> error $ "Unexpected response when fetching offset for " ++ show targetTopicName ++ ": " ++ show err
+    Right (ofs, Metadata (KString md'))  -> return (ofs, reIBBI . read $ S8.unpack md')
+
+setKafkaCheckpoint :: Offset -> IndexerBestBlockInfo -> IContextM ()
+setKafkaCheckpoint ofs md = do
+    $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs ++ " / " ++ show md
+    op <- withKafkaViolently (setKafkaCheckpoint' ofs md)
+    case op of
+        Left err -> error $ "Client error: " ++ show err
+        Right _  -> return ()
+
+setKafkaCheckpoint' :: (Kafka k) => Offset -> IndexerBestBlockInfo -> k (Either KafkaError ())
+setKafkaCheckpoint' ofs md =
+    let group     = snd kafkaClientIds
+        bestBlock = Metadata . KString . S8.pack . show $ unIBBI md
+    in
+        commitSingleOffset group targetTopicName 0 ofs bestBlock
+
+getUnprocessedIndexEvents :: IContextM (Offset, [IndexEvent], IndexerBestBlockInfo)
+getUnprocessedIndexEvents = do
     (ofs, md) <- getKafkaCheckpoint
-    evs       <- withKafkaViolently (readSeqEventsFromTopic targetTopicName ofs)
+    evs       <- withKafkaViolently (readIndexEvents ofs)
     return (ofs, evs, md)
