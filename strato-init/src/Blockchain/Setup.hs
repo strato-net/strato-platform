@@ -360,12 +360,12 @@ createKafkaTopic topic = do
    _ -> return ()
   
 topics :: [String]
-topics = [ "block",
-           "unminedblock",
-           "statediff",
-           "seqevents",
-           "unseqevents",
-           "jsonrpcresponse"
+topics = [ "unminedblock"
+         , "statediff"
+         , "seqevents"
+         , "unseqevents"
+         , "jsonrpcresponse"
+         , "ranblocks"
          ]
 
 genesisFiles::[(FilePath, B.ByteString)]

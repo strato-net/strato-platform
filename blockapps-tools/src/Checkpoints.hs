@@ -67,8 +67,9 @@ kafkaBitsForService = \case
         (clientId, lookupConsumerGroup clientId, SeqKafka.seqEventsTopicName)
 
 hasCheckpointData :: CheckpointService -> Bool
-hasCheckpointData EVM = True
-hasCheckpointData _   = False
+hasCheckpointData EVM     = True
+hasCheckpointData Indexer = True
+hasCheckpointData _       = False
 
 makeCheckpointData :: CheckpointService -> KP.Metadata -> String -> KP.Metadata
 makeCheckpointData EVM _ arg = KP.Metadata . KP.KString $ S8.pack arg
@@ -88,8 +89,9 @@ showOffset = putStrLn . ("Offset is " ++) . show . fst
 
 -- todo:
 showCheckpointData :: CheckpointService -> CPTuple -> IO ()
-showCheckpointData EVM = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
-showCheckpointData svc = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
+showCheckpointData EVM     = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
+showCheckpointData Indexer = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
+showCheckpointData svc     = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
 
 getAndDisplayExistingData :: CheckpointService -> IO CPTuple
 getAndDisplayExistingData service = do

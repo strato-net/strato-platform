@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
@@ -141,13 +142,23 @@ initializeGenesisBlock backupType genesisBlockName = do
     liftIO (bootstrapIndexer genBId)
 
 bootstrapIndexer :: SQL.Key Block -> IO ()
-bootstrapIndexer =
+bootstrapIndexer key =
     let clientId = fst Indexer.kafkaClientIds
         consumer = snd Indexer.kafkaClientIds
         topic    = Indexer.targetTopicName
-        mkMeta   = KP.Metadata . KP.KString . C8.pack . show
-    in
-        void . runKafkaConfigured clientId . commitSingleOffset consumer topic 0 0 . mkMeta
+        ibbi     = Indexer.IndexerBestBlockInfo key
+        mkMeta   = KP.Metadata . KP.KString . C8.pack . show $ Indexer.unIBBI ibbi
+        commit   = do
+            putStrLn $ "Bootstrapping indexer with " ++ show ibbi
+            runKafkaConfigured clientId $
+                commitSingleOffset consumer topic 0 0 mkMeta
+        runner = commit >>= \case
+            Right _ -> putStrLn "bootstrapIndex successful!" >> return ()
+            l -> do
+                putStrLn $ "will retry bootstrapIndexer as I got: " ++ show l
+                runner
+    in runner
+
 
 bootstrapSequencer :: Block -> IO ()
 bootstrapSequencer gb = do
