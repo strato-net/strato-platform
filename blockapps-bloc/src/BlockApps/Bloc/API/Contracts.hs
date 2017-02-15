@@ -27,6 +27,10 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Foldable
+import Data.Traversable
+import qualified Data.ByteString as ByteString
+import Data.ByteString (ByteString)
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -48,10 +52,10 @@ class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
   getContractsData :: ContractName -> m [MaybeNamed Address]
   getContractsContract :: ContractName -> MaybeNamed Address -> m GetContractsContractResponse
-  getContractsState :: ContractName -> Address -> m GetContractsStateResponses -- state-translation
+  getContractsState :: ContractName -> MaybeNamed Address -> m GetContractsStateResponses -- state-translation
   getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
-  getContractsStateMapping :: ContractName -> Address -> SymbolName -> Text -> m GetContractsStateMappingResponse -- state-translation
+  getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> m GetContractsStateMappingResponse -- state-translation
   getContractsStates :: ContractName -> m [GetContractsStatesResponse] -- state-translation
   postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
 instance MonadContracts ClientM where
@@ -394,7 +398,7 @@ instance Arbitrary Var where arbitrary = genericArbitrary
 
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
+  :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
 type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
@@ -427,7 +431,7 @@ type GetContractsSymbols = "contracts"
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
 type GetContractsStateMapping = "contracts"
   :> Capture "contractName" ContractName
-  :> Capture "contractAddress" Address
+  :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
   :> Capture "mapping" SymbolName
   :> Capture "key" Text
@@ -530,4 +534,32 @@ instance ToSample (MaybeNamed Address) where
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
 
-type SolidityValue = UnstructuredJSON
+data SolidityValue
+  = SolidityValueAsString Text
+  | SolidityBool Bool
+  | SolidityArray [SolidityValue]
+  | SolidityBytes  ByteString
+  deriving (Eq,Show,Generic)
+instance ToJSON SolidityValue where
+  toJSON (SolidityValueAsString str) = toJSON str
+  toJSON (SolidityBool bool) = toJSON bool
+  toJSON (SolidityArray array) = toJSON array
+  toJSON (SolidityBytes bytes) = object
+    [ "type" .= ("Buffer" :: Text)
+    , "data" .= ByteString.unpack bytes
+    ]
+instance FromJSON SolidityValue where
+  parseJSON (String str) = return $ SolidityValueAsString str
+  parseJSON (Bool bool) = return $ SolidityBool bool
+  parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
+  parseJSON (Object obj) = do
+    ty <- obj .: "type"
+    if ty == ("Buffer" :: Text)
+    then do
+      bytes <- obj .: "data"
+      return $ SolidityBytes (ByteString.pack bytes)
+    else
+      fail "Failed to parse SolidityBytes"
+  parseJSON _ = fail "Failed to parse solidity value"
+instance Arbitrary SolidityValue where
+  arbitrary = genericArbitrary

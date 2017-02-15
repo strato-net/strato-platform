@@ -13,6 +13,8 @@ import BlockApps.Bloc.API.Users
 import BlockApps.Bloc.API.Utils
 import BlockApps.Data
 
+-- TODO: user/contract methods Addresses may need to be MayBe Named Address
+
 spec :: Spec
 spec
   = beforeAll (newManager defaultManagerSettings) $ do
@@ -97,5 +99,46 @@ spec
         postUsersContractMethodEither <- runClientM
           (postUsersContractMethod username userAddress contractName contractAddress postUsersContractMethodRequest)
           (ClientEnv mgr bayar4a)
-        print postUsersContractMethodEither
         postUsersContractMethodEither `shouldSatisfy` isRight
+    describe "postUsersSendList" $
+      it "should post a list of send transactions" $ \ mgr -> do
+        let
+          username = UserName "blockapps"
+          userAddress = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
+          postSendListRequest = PostSendListRequest
+            { postsendlistrequestPassword  = "1234"
+            , postsendlistrequestResolve = True
+            , postsendlistrequestTxs = replicate 3
+                SendTransaction
+                { sendtransactionToAddress = Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370
+                , sendtransactionValue = 100
+                , sendtransactionTxParams = Just $ TxParams 1000000000 1
+                }
+            }
+        postSendListEither <- runClientM
+          (postUsersSendList username userAddress postSendListRequest)
+          (ClientEnv mgr bayar4a)
+        postSendListEither `shouldSatisfy` isRight
+    describe "postUsersContractMethodList" $
+      it "should call a list of methods" $ \ mgr -> do
+        let
+          username = UserName "blockapps"
+          userAddress = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
+          postMethodListRequest = PostMethodListRequest
+            { postmethodlistrequestPassword = "1234"
+            , postmethodlistrequestResolve = True
+            , postmethodlistrequestTxs = replicate 3
+                MethodCall
+                { methodcallContractName = "SimpleStorage"
+                , methodcallContractAddress = Address 0xd83ee2385c97cae03a17ace7d17fe41963177ae5
+                , methodcallMethodName = "get"
+                , methodcallArgs = HashMap.empty
+                , methodcallValue = 0
+                , methodcallTxParams = TxParams 1000000000 1
+                }
+            }
+        postCallMethodListEither <- runClientM
+          (postUsersContractMethodList username userAddress postMethodListRequest)
+          (ClientEnv mgr bayar4a)
+        print postCallMethodListEither
+        postCallMethodListEither `shouldSatisfy` isRight

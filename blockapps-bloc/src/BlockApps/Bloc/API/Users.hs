@@ -30,6 +30,7 @@ import Data.Maybe
 -- import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
+import qualified Data.Text as Text
 -- import qualified Data.Text.Encoding as Encoding
 import Generic.Random.Generic
 import GHC.Generics
@@ -276,7 +277,7 @@ instance FromJSON PostUsersContractMethodRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostUsersContractMethodRequest where
   toSamples _ = noSamples
-newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse Text deriving (Eq,Read,Show,FromJSON,ToJSON,Arbitrary)
+newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse Text deriving (Eq,Show,FromJSON,ToJSON,Arbitrary)
 instance ToSample PostUsersContractMethodResponse where
   toSamples _ = noSamples
 --hack because endpoints are returning random text
@@ -284,9 +285,9 @@ data HTMLifiedPlainText
 instance Accept HTMLifiedPlainText where
   contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
 instance MimeUnrender HTMLifiedPlainText PostUsersContractMethodResponse where
-  mimeUnrender _ = read . Lazy.Char8.unpack
+  mimeUnrender _ = return . PostUsersContractMethodResponse . Text.pack . Lazy.Char8.unpack
 instance MimeRender HTMLifiedPlainText PostUsersContractMethodResponse where
-  mimeRender _ =  Lazy.Char8.pack . show
+  mimeRender _ (PostUsersContractMethodResponse resp) =  Lazy.Char8.pack $ Text.unpack resp
 
 -- POST /users/:user/:userAddress/sendList
 type PostUsersSendList = "users"
@@ -364,7 +365,7 @@ data MethodCall = MethodCall
   , methodcallMethodName :: Text
   , methodcallArgs :: HashMap Text UnstructuredJSON
   , methodcallValue :: Natural
-  , methodcallTxParams :: TxParams
+  , methodcallTxParams :: TxParams --TODO: Params maybe optional
   } deriving (Eq,Show,Generic)
 instance Arbitrary MethodCall where arbitrary = genericArbitrary
 instance ToJSON MethodCall where
