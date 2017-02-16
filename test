@@ -44,6 +44,8 @@ then
 fi
 
 # Install npm packages for testing
+echo "Removing old test dependencies..."
+rm -rf $testDir/node_modules/blockapps-rest
 echo "Installing test dependencies..."
 cd $testDir
 npm install
