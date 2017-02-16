@@ -587,6 +587,7 @@ calculateAndEmitStateDiffs newBlock oldStateRoot = when (flags_sqlDiff || flags_
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newBlock
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
+    $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Here are StateDiffs " ++ show diffs 
     when flags_sqlDiff $ commitSqlDiffs diffs
     when flags_diffPublish $
         let diffBS = BL.toStrict $ Aeson.encode diffs
