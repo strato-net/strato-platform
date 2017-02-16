@@ -75,3 +75,4 @@ ghc-options:
   strato-redis-blockdb:    -Wall -Werror -fno-warn-warnings-deprecations
   ethereum-test:           -Wall -Werror -fno-warn-warnings-deprecations
   strato-index:            -Wall -Werror
+  strato-api:              -fno-warn-orphans

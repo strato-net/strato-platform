@@ -4,13 +4,12 @@ module TestImport
     ) where
 
 import Application           (makeFoundation)
-import ClassyPrelude         as XX
+import ClassyPrelude         as XX hiding (delete, deleteBy)
 import Database.Persist      as XX hiding (get)
 import Database.Persist.Sql  (SqlPersistM, SqlBackend, runSqlPersistMPool, rawExecute, rawSql, unSingle, connEscapeName)
-import Foundation            as XX
-import Model                 as XX
+import Foundation            as XX hiding (Handler)
 import Test.Hspec            as XX
-import Yesod.Default.Config2 (ignoreEnv, loadAppSettings)
+import Yesod.Default.Config2 (ignoreEnv, loadYamlSettings)
 import Yesod.Test            as XX
 
 runDB :: SqlPersistM a -> YesodExample App a
@@ -23,7 +22,7 @@ runDBWithApp app query = runSqlPersistMPool query (appConnPool app)
 
 withApp :: SpecWith App -> Spec
 withApp = before $ do
-    settings <- loadAppSettings
+    settings <- loadYamlSettings
         ["config/test-settings.yml", "config/settings.yml"]
         []
         ignoreEnv

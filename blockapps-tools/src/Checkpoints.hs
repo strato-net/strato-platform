@@ -20,7 +20,9 @@ import qualified Network.Kafka.Protocol as KP
 import qualified Blockchain.Sequencer.Kafka as SeqKafka
 import qualified Blockchain.Sequencer.Constants as SeqConst
 
-data CheckpointService   = Sequencer | EVM | Indexer | NullService deriving (Eq, Ord, Enum, Data)
+import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
+
+data CheckpointService   = Sequencer | EVM | ApiIndexer | P2PIndexer | NullService deriving (Eq, Ord, Enum, Data)
 data CheckpointOperation = Get | Put | NullOperation deriving (Eq, Ord, Enum, Data)
 
 -- have to manually do these cause theres no way to lowercase them for glorious lowercase cli
@@ -43,14 +45,16 @@ instance Read CheckpointService where
         case s of
             "sequencer"   -> return Sequencer
             "evm"         -> return EVM
-            "indexer"     -> return Indexer
+            "apiindexer"  -> return ApiIndexer
+            "p2pindexer"  -> return P2PIndexer
             "NullService" -> return NullService
             _             -> P.pfail
 
 instance Show CheckpointService where
     show Sequencer   = "sequencer"
     show EVM         = "evm"
-    show Indexer     = "indexer"
+    show ApiIndexer  = "apiindexer"
+    show P2PIndexer  = "p2pindexer"
     show NullService = "NullService"
 
 type KafkaBits = (K.KafkaClientId, KP.ConsumerGroup, KP.TopicName)
@@ -63,12 +67,15 @@ kafkaBitsForService = \case
         (clientId, lookupConsumerGroup clientId, SeqKafka.unseqEventsTopicName)
     EVM -> let clientId = "ethereum-vm" in
         (clientId, lookupConsumerGroup clientId, SeqKafka.seqEventsTopicName)
-    Indexer     -> let clientId = "strato-index" in
-        (clientId, lookupConsumerGroup clientId, SeqKafka.seqEventsTopicName)
+    ApiIndexer -> let clientId = "strato-api-indexer" in
+        (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
+    P2PIndexer -> let clientId = "strato-p2p-indexer" in
+            (clientId, lookupConsumerGroup clientId, IdxKafka.indexEventsTopicName)
 
 hasCheckpointData :: CheckpointService -> Bool
-hasCheckpointData EVM = True
-hasCheckpointData _   = False
+hasCheckpointData EVM        = True
+hasCheckpointData ApiIndexer = True
+hasCheckpointData _          = False
 
 makeCheckpointData :: CheckpointService -> KP.Metadata -> String -> KP.Metadata
 makeCheckpointData EVM _ arg = KP.Metadata . KP.KString $ S8.pack arg
@@ -88,8 +95,9 @@ showOffset = putStrLn . ("Offset is " ++) . show . fst
 
 -- todo:
 showCheckpointData :: CheckpointService -> CPTuple -> IO ()
-showCheckpointData EVM = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
-showCheckpointData svc = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
+showCheckpointData EVM        = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
+showCheckpointData ApiIndexer = putStrLn . (++ "\n") . ("Metadata is:\n" ++) . S8.unpack . KP._kString . KP._kMetadata . snd
+showCheckpointData svc        = error $ "showCheckpointData called for service `" ++ show svc ++ "` which is unsupported"
 
 getAndDisplayExistingData :: CheckpointService -> IO CPTuple
 getAndDisplayExistingData service = do
@@ -146,7 +154,7 @@ checkpointUsage =
     , "   * " ++ errPutFlagRequirement
     , ""
     , "Flags:"
-    , "  -s --service=SERVICE  The service whose metadata to operate against. One of: sequencer evm indexer"
+    , "  -s --service=SERVICE  The service whose metadata to operate against. One of: sequencer evm apiidx p2pidx"
     , "  -o --op=OP            The operation to perform. One of: get put"
     , "  -i --offset=INT       If -o PUT is specified, set the service's checkpointed Kafka offset"
     , "  -m --metadata=DATA    If -o PUT is specified, set the service-specific metadata in the checkpoint to DATA"
