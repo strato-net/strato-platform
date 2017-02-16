@@ -167,7 +167,7 @@ specTest = around (withConn 1) $ do
 
     describe "ChainTest" $ do
         
---        flushDB
+        flushDB
 
         it "Should get back best block after putting it" $ \conn -> do
             g <- liftIO $ makeGenesisBlock
@@ -183,32 +183,11 @@ specTest = around (withConn 1) $ do
 
     describe "ReplaceBestBlock" $ do
         
-  --      flushDB
+        flushDB
 
-        it "Should generate a tree" $ \conn -> do
-            g <- liftIO $ makeGenesisBlock
-            tree <- bush g 20 3 :: IO (Tree BlockData)
-            -- liftIO . putStrLn $ showTree $ pb <$> tree
-            -- pick two leaves
-            let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
-            -- forM_ bestBlocks $ \bb -> do
-            --     liftIO . putStrLn . show $ pb bb
-            let chains = flip stem' (toList tree) <$> bestBlocks
+        void $ putTreeTest "Should generate a tree (force)" forceChain
 
-            r <- runRedis conn $ do
-                forM chains $ \chain -> do
-                    putChain chain 
-                    RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
-
-            let lengths = fromIntegral . length <$> chains
-            let mix = zip3 r lengths bestBlocks 
-            results <- forM mix $ \(b, l, a) -> do
-                let ls = Just (blockHeaderHash a, blockDataNumber a, l)
-                return $ ls == b
-
-            HUnit.assertBool
-                "Couldn't get best block iterated from chain"
-                (and results)
+        void $ putTreeTest "Should generate a tree (put)" putChain
 
         it "Should fetch the canonical chain" $ \conn -> do
             g <- liftIO $ makeGenesisBlock
@@ -229,12 +208,41 @@ specTest = around (withConn 1) $ do
                 "Couldn't get the longest best chain"
                 (pb <$> last chains) (pb <$> map snd r) 
 
-putChain :: [BlockData] -> Redis ()
-putChain chain = forM_ zC f
+putTreeTest :: String -> ([BlockData] -> Redis ()) -> SpecWith Connection 
+putTreeTest msg insertChain = it msg $ \conn -> do
+            g <- liftIO $ makeGenesisBlock
+            tree <- bush g 20 3 :: IO (Tree BlockData)
+            let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
+            let chains = flip stem' (toList tree) <$> bestBlocks
+
+            r <- runRedis conn $ do
+                void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
+                forM chains $ \chain -> do
+                    insertChain chain 
+                    RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
+
+            let lengths = fromIntegral . length <$> chains
+            let mix = zip3 r lengths bestBlocks 
+            results <- forM mix $ \(b, l, a) -> do
+                let ls = Just (blockHeaderHash a, blockDataNumber a, l)
+                return $ ls == b
+
+            HUnit.assertBool
+                "Couldn't get best block iterated from chain"
+                (and results)
+
+workChain :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
+workChain g chain = forM_ zC f
     where
-        f (b, i) = RDB.putBestBlockInfo (blockHeaderHash b) (blockDataNumber b) i
+        f (b, i) = g (blockHeaderHash b) (blockDataNumber b) i
         zC       = zip (reverse chain) [1..]
-              
+
+putChain :: [BlockData] -> Redis ()
+putChain = workChain RDB.putBestBlockInfo
+
+forceChain :: [BlockData] -> Redis ()
+forceChain = workChain RDB.forceBestBlockInfo
+
 pb :: BlockData -> (Integer, Integer, String, String) 
 pb x = ( blockDataNumber x
        , blockDataDifficulty x
