@@ -25,6 +25,7 @@ keyStoreTable =
     \password_hash bytea NOT NULL,\
     \nonce bytea NOT NULL,\
     \enc_sec_key bytea NOT NULL,\
+    \pub_key bytea NOT NULL,\
     \address bytea NOT NULL UNIQUE,\
     \user_id int NOT NULL REFERENCES users(id),\
     \FOREIGN KEY (user_id) REFERENCES users(id)\
