@@ -36,6 +36,7 @@ services:
       - zookeeper
       - kafka
       - postgres
+      - redis
     depends_on:
       - zookeeper
       - kafka
@@ -65,6 +66,8 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - /tmp/backup/redis:/data
+    ports:
+      - "6379:6379" 
   bloc:
     image: %REPO%bloc
     restart: always
