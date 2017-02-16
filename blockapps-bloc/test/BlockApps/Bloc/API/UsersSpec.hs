@@ -68,12 +68,12 @@ spec
             [ UploadListContract
               { uploadlistcontractContractName = "SimpleStorage"
               , uploadlistcontractArgs = HashMap.empty
-              , uploadlistcontractTxParams = TxParams 1000000000 1
+              , uploadlistcontractTxParams = TxParams 100000000 1
               }
             , UploadListContract
               { uploadlistcontractContractName = "Test"
               , uploadlistcontractArgs = HashMap.empty
-              , uploadlistcontractTxParams = TxParams 1000000000 1
+              , uploadlistcontractTxParams = TxParams 100000000 1
               }
             ]
           uploadListRequest = UploadListRequest
@@ -114,7 +114,7 @@ spec
                 SendTransaction
                 { sendtransactionToAddress = Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370
                 , sendtransactionValue = 100
-                , sendtransactionTxParams = Just $ TxParams 1000000000 1
+                , sendtransactionTxParams = Just $ TxParams 100000000 1
                 }
             }
         postSendListEither <- runClientM
@@ -136,7 +136,7 @@ spec
                 , methodcallMethodName = "get"
                 , methodcallArgs = HashMap.empty
                 , methodcallValue = 0
-                , methodcallTxParams = TxParams 1000000000 1
+                , methodcallTxParams = TxParams 100000000 1
                 }
             }
         postCallMethodListEither <- runClientM
