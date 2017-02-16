@@ -18,7 +18,7 @@ import qualified Data.ByteString.Lazy.Char8           as BLC
 import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.BackupBlocks
-import           Blockchain.BackupMP
+--import           Blockchain.BackupMP
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -53,6 +53,7 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
 import           Network.Kafka.Consumer               (commitSingleOffset)
 
@@ -108,7 +109,13 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
 
 data BackupType = NoBackup | BlockBackup | MPBackup
 
-initializeGenesisBlock :: (MonadResource m, HasStateDB m, HasCodeDB m, HasSQLDB m, HasHashDB m)
+initializeGenesisBlock :: ( MonadResource m
+                          , HasStateDB m
+                          , HasCodeDB m
+                          , HasSQLDB m
+                          , HasHashDB m
+                          , RBDB.HasRedisBlockDB m
+                          )
                        => BackupType
                        -> String
                        -> m ()
@@ -128,10 +135,10 @@ initializeGenesisBlock backupType genesisBlockName = do
                 backupBlocks
                 putGenesisHash $ blockHash gb
                 return (gb, obGB)
-            MPBackup -> do
-                gb <- backupMP
-                setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
-                return (gb, undefined)
+            MPBackup -> error "MPBackup called" 
+            --    gb <- backupMP
+            --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
+            --    return (gb, undefined)
     [(genBId, _)] <- putBlocks [(SHA 0, 0)] [genesisBlock] False
     genAddrStates <- getAllAddressStates
     accountDiffs <- mapM eventualAccountState $ Map.fromList genAddrStates
@@ -143,6 +150,11 @@ initializeGenesisBlock backupType genesisBlockName = do
         updatedAccounts     = Map.empty
     }
     commitSqlDiffs diff
+    -- $logInfoS "Inserting genesis block into RedisDB"
+    void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo 
+        (blockHash genesisBlock)
+        (blockDataNumber . blockBlockData $ genesisBlock)
+        (blockDataDifficulty . blockBlockData $ genesisBlock)
     liftIO (bootstrapIndexer genBId obGB)
 
 bootstrapIndexer :: SQL.Key Block -> OutputBlock -> IO ()
