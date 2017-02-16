@@ -17,11 +17,14 @@ usersTable =
     \name varchar(512) NOT NULL UNIQUE\
   \);"
 
-addressesTable :: ByteString
-addressesTable =
-  "CREATE TABLE IF NOT EXISTS addresses(\
+keyStoreTable :: ByteString
+keyStoreTable =
+  "CREATE TABLE IF NOT EXISTS keystore(\
     \id serial PRIMARY KEY,\
+    \salt bytea NOT NULL,\
     \password_hash bytea NOT NULL,\
+    \nonce bytea NOT NULL,\
+    \enc_sec_key bytea NOT NULL,\
     \address bytea NOT NULL UNIQUE,\
     \user_id int NOT NULL REFERENCES users(id),\
     \FOREIGN KEY (user_id) REFERENCES users(id)\
@@ -135,7 +138,7 @@ createTables :: ByteString
 createTables =
   mconcat
     [ usersTable
-    , addressesTable
+    , keyStoreTable
     , contractsTable
     , contractsMetaDataTable
     , contractsInstanceTable
