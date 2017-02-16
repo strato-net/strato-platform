@@ -257,10 +257,6 @@ data PostUsersUploadListResponse = PostUsersUploadListResponse
   { contractJSON :: ContractDetails } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersUploadListResponse where
   arbitrary = genericArbitrary
--- instance ToJSON PostUsersUploadListResponse where
---   toJSON = genericToJSON defaultOptions
--- instance FromJSON PostUsersUploadListResponse where
---   parseJSON = genericParseJSON defaultOptions
 instance ToJSON PostUsersUploadListResponse where
   toJSON (PostUsersUploadListResponse contractDetails) = object
     [ "contractJSON" .= Text.decodeUtf8 (ByteString.Lazy.toStrict (encode contractDetails)) ]

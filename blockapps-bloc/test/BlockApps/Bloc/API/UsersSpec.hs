@@ -2,7 +2,7 @@
 
 module BlockApps.Bloc.API.UsersSpec where
 
-
+import Control.Concurrent
 import qualified Data.HashMap.Strict as HashMap
 import Data.Either
 import Network.HTTP.Client
@@ -20,20 +20,20 @@ spec
   = beforeAll (newManager defaultManagerSettings) $ do
     describe "getUsers" $
       it "should get a list of users" $ \ mgr -> do
-        usersEither <- runClientM getUsers (ClientEnv mgr tester7)
+        usersEither <- runClientM getUsers (ClientEnv mgr bayar4a)
         usersEither `shouldSatisfy` isRight
     describe "getUsersUser" $
       it "should get a list of user's addresses" $ \ mgr -> do
         let
           username = UserName "admin"
-        userAddressesEither <- runClientM (getUsersUser username) (ClientEnv mgr tester7)
+        userAddressesEither <- runClientM (getUsersUser username) (ClientEnv mgr bayar4a)
         userAddressesEither `shouldSatisfy` isRight
     describe "postUsersUser" $
       it "should create and faucet a user address" $ \ mgr -> do
         let
           username = UserName "blockapps"
           postUsersUserRequest = PostUsersUserRequest 1 "1234"
-        postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr tester7)
+        postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr bayar4a)
         postUsersEither `shouldSatisfy` isRight
     describe "postUsersSend" $
       it "should send ethers to another address" $ \ mgr -> do
@@ -42,12 +42,13 @@ spec
           address = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
           postSendParameters = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "1234"
           postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345"
-        postSendEither <- runClientM (postUsersSend username address postSendParameters) (ClientEnv mgr tester7)
+        postSendEither <- runClientM (postUsersSend username address postSendParameters) (ClientEnv mgr bayar4a)
         postSendEither `shouldSatisfy` isRight
-        postSendEitherBad <- runClientM (postUsersSend username address postSendParametersBad) (ClientEnv mgr tester7)
+        postSendEitherBad <- runClientM (postUsersSend username address postSendParametersBad) (ClientEnv mgr bayar4a)
         postSendEitherBad `shouldSatisfy` isLeft
     describe "postUsersContract" $
       it "should upload a contract" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           address = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -57,10 +58,11 @@ spec
               \{ return storedData; } }"
             , password = "1234"
             }
-        postUsersContractEither <- runClientM (postUsersContract username address postUsersContractRequest) (ClientEnv mgr tester7)
+        postUsersContractEither <- runClientM (postUsersContract username address postUsersContractRequest) (ClientEnv mgr bayar4a)
         postUsersContractEither `shouldSatisfy` isRight
     describe "postUsersUploadList" $
       it "should upload a list of contracts" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           address = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -81,12 +83,11 @@ spec
             , uploadlistContracts = uploadListContracts
             , uploadlistResolve = True
             }
-        postUsersUploadEither <- runClientM
-          (postUsersUploadList username address uploadListRequest)
-          (ClientEnv mgr tester7)
+        postUsersUploadEither <- runClientM (postUsersUploadList username address uploadListRequest) (ClientEnv mgr bayar4a)
         postUsersUploadEither `shouldSatisfy` isRight
     describe "postUsersContractMethod" $
       it "should call a contract method" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           userAddress = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -100,7 +101,7 @@ spec
             }
         postUsersContractMethodEither <- runClientM
           (postUsersContractMethod username userAddress contractName contractAddress postUsersContractMethodRequest)
-          (ClientEnv mgr tester7)
+          (ClientEnv mgr bayar4a)
         postUsersContractMethodEither `shouldSatisfy` isRight
     describe "postUsersSendList" $
       it "should post a list of send transactions" $ \ mgr -> do
@@ -119,10 +120,11 @@ spec
             }
         postSendListEither <- runClientM
           (postUsersSendList username userAddress postSendListRequest)
-          (ClientEnv mgr tester7)
+          (ClientEnv mgr bayar4a)
         postSendListEither `shouldSatisfy` isRight
     describe "postUsersContractMethodList" $
       it "should call a list of methods" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           userAddress = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -141,5 +143,5 @@ spec
             }
         postCallMethodListEither <- runClientM
           (postUsersContractMethodList username userAddress postMethodListRequest)
-          (ClientEnv mgr tester7)
+          (ClientEnv mgr bayar4a)
         postCallMethodListEither `shouldSatisfy` isRight
