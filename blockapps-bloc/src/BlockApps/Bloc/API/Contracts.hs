@@ -28,7 +28,6 @@ import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Foldable
-import Data.Traversable
 import qualified Data.ByteString as ByteString
 import Data.ByteString (ByteString)
 import Generic.Random.Generic
@@ -260,7 +259,7 @@ instance MonadContracts Bloc where
   --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   --       return $ PostCompileResponse contractName _hash
 
-type GetContracts = "contracts" :> Get '[JSON] (GetContractsResponse)
+type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64
   , address :: MaybeNamed Address
@@ -542,7 +541,7 @@ data SolidityValue
   deriving (Eq,Show,Generic)
 instance ToJSON SolidityValue where
   toJSON (SolidityValueAsString str) = toJSON str
-  toJSON (SolidityBool bool) = toJSON bool
+  toJSON (SolidityBool boolean) = toJSON boolean
   toJSON (SolidityArray array) = toJSON array
   toJSON (SolidityBytes bytes) = object
     [ "type" .= ("Buffer" :: Text)
@@ -550,7 +549,7 @@ instance ToJSON SolidityValue where
     ]
 instance FromJSON SolidityValue where
   parseJSON (String str) = return $ SolidityValueAsString str
-  parseJSON (Bool bool) = return $ SolidityBool bool
+  parseJSON (Bool boolean) = return $ SolidityBool boolean
   parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
   parseJSON (Object obj) = do
     ty <- obj .: "type"

@@ -80,6 +80,7 @@ test-suite blockapps-bloc-test
     BlockApps.Bloc.APISpec
     BlockApps.Bloc.API.AddressesSpec
     BlockApps.Bloc.API.ContractsSpec
+    BlockApps.Bloc.API.SearchSpec
     BlockApps.Bloc.API.UsersSpec
   other-modules:
   build-depends: base >=4 && < 5

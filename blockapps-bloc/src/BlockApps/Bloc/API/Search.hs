@@ -31,12 +31,13 @@ import Servant.Docs
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
+import BlockApps.Bloc.API.Contracts
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
 
 class Monad m => MonadSearchContract m where
-  getSearchContract :: ContractName -> m [Address]
+  getSearchContract :: ContractName -> m [MaybeNamed Address]
   getSearchContractState :: ContractName -> m [SearchContractState]
   getSearchContractStateReduced :: ContractName -> [Text] -> m [SearchContractState]
 instance MonadSearchContract ClientM where
@@ -59,7 +60,7 @@ instance MonadSearchContract Bloc where
     addressesEither <- liftIO $ run (query contractName sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
-      Right addresses -> return addresses
+      Right addresses -> return (map Unnamed addresses)
 
   getSearchContractState = undefined
   getSearchContractStateReduced = undefined
@@ -67,7 +68,7 @@ instance MonadSearchContract Bloc where
 -- GET /search/:contractName
 type GetSearchContract = "search"
   :> Capture "contractName" ContractName
-  :> Get '[OctetStream] [Address]
+  :> Get '[OctetStream] [MaybeNamed Address]
 
 -- GET /search/:contractName/state
 type GetSearchContractState = "search"
@@ -87,7 +88,7 @@ instance ToParam (QueryParams "props" Text) where
 
 data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
-  , searchcontractstateState :: HashMap Text UnstructuredJSON
+  , searchcontractstateState :: HashMap Text SolidityValue
   } deriving (Eq, Show, Generic)
 instance ToJSON SearchContractState where
   toJSON = genericToJSON (aesonPrefix camelCase)
