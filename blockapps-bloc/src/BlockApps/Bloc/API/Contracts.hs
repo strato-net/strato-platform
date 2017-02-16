@@ -27,9 +27,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Foldable
-import qualified Data.ByteString as ByteString
-import Data.ByteString (ByteString)
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -50,7 +47,7 @@ import BlockApps.Data
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
   getContractsData :: ContractName -> m [MaybeNamed Address]
-  getContractsContract :: ContractName -> MaybeNamed Address -> m GetContractsContractResponse
+  getContractsContract :: ContractName -> MaybeNamed Address -> m ContractDetails
   getContractsState :: ContractName -> MaybeNamed Address -> m GetContractsStateResponses -- state-translation
   getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
@@ -295,105 +292,7 @@ type GetContractsData = "contracts"
 type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
-  :> Get '[HTMLifiedJSON] GetContractsContractResponse
-data GetContractsContractResponse = GetContractsContractResponse
-  { getcontractscontractresponseBin :: Text
-  , getcontractscontractresponseAddress :: Maybe Address
-  , getcontractscontractresponseBinRuntime :: Text
-  , getcontractscontractresponseCodeHash :: Text
-  , getcontractscontractresponseName :: Text
-  , getcontractscontractresponseXabi :: Xabi
-  } deriving (Show,Eq,Generic)
-instance ToJSON GetContractsContractResponse where
-  toJSON GetContractsContractResponse{..} = object
-    [ "bin" .= getcontractscontractresponseBin
-    , "address" .= getcontractscontractresponseAddress
-    , "bin-runtime" .= getcontractscontractresponseBinRuntime
-    , "codeHash" .= getcontractscontractresponseCodeHash
-    , "name" .= getcontractscontractresponseName
-    , "xabi" .= getcontractscontractresponseXabi
-    ]
-instance FromJSON GetContractsContractResponse where
-  parseJSON = withObject "GetContractsContractResponse" $ \obj ->
-    GetContractsContractResponse
-      <$> obj .: "bin"
-      <*> obj .:? "address"
-      <*> obj .: "bin-runtime"
-      <*> obj .: "codeHash"
-      <*> obj .: "name"
-      <*> obj .: "xabi"
-instance ToSample GetContractsContractResponse where toSamples _ = noSamples
-instance Arbitrary GetContractsContractResponse where
-  arbitrary = genericArbitrary
-data Xabi = Xabi
-  { xabiFuncs :: Maybe (Map Text Func)
-  , xabiConstr :: Maybe (Map Text Arg)
-  , xabiVars :: Maybe (Map Text Var)
-  } deriving (Eq,Show,Generic)
-instance ToJSON Xabi where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Xabi where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Xabi where arbitrary = genericArbitrary
-data Func = Func
-  { funcArgs :: Map Text Arg
-  , funcSelector :: Text
-  , funcVals :: Map Text Val
-  } deriving (Eq,Show,Generic)
-instance ToJSON Func where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Func where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Func where arbitrary = genericArbitrary
-data Arg = Arg
-  { argName :: Maybe Text
-  , argType :: Text
-  , argBytes :: Maybe Int
-  , argIndex :: Int
-  , argDynamic :: Maybe Bool
-  , argEntry :: Maybe Entry
-  , argTypedef :: Maybe Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON Arg where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Arg where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Arg where arbitrary = genericArbitrary
-data Entry = Entry
-  { entryBytes :: Int
-  , entryType :: Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON Entry where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Entry where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Entry where arbitrary = genericArbitrary
-data Val = Val
-  { valType :: Text
-  , valBytes :: Maybe Int
-  , valIndex :: Int
-  , valDynamic :: Maybe Bool
-  , valEntry :: Maybe Entry
-  , valTypedef :: Maybe Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON Val where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Val where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Val where arbitrary = genericArbitrary
-data Var = Var
-  { varType :: Text
-  , varBytes :: Maybe Int
-  , varAtBytes :: Int
-  , varDynamic :: Maybe Bool
-  , varEntry :: Maybe Entry
-  , varTypedef :: Maybe Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON Var where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Var where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Var where arbitrary = genericArbitrary
+  :> Get '[HTMLifiedJSON] ContractDetails
 
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
@@ -532,33 +431,3 @@ instance ToSample (MaybeNamed Address) where
   toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
-
-data SolidityValue
-  = SolidityValueAsString Text
-  | SolidityBool Bool
-  | SolidityArray [SolidityValue]
-  | SolidityBytes  ByteString
-  deriving (Eq,Show,Generic)
-instance ToJSON SolidityValue where
-  toJSON (SolidityValueAsString str) = toJSON str
-  toJSON (SolidityBool boolean) = toJSON boolean
-  toJSON (SolidityArray array) = toJSON array
-  toJSON (SolidityBytes bytes) = object
-    [ "type" .= ("Buffer" :: Text)
-    , "data" .= ByteString.unpack bytes
-    ]
-instance FromJSON SolidityValue where
-  parseJSON (String str) = return $ SolidityValueAsString str
-  parseJSON (Bool boolean) = return $ SolidityBool boolean
-  parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
-  parseJSON (Object obj) = do
-    ty <- obj .: "type"
-    if ty == ("Buffer" :: Text)
-    then do
-      bytes <- obj .: "data"
-      return $ SolidityBytes (ByteString.pack bytes)
-    else
-      fail "Failed to parse SolidityBytes"
-  parseJSON _ = fail "Failed to parse solidity value"
-instance Arbitrary SolidityValue where
-  arbitrary = genericArbitrary

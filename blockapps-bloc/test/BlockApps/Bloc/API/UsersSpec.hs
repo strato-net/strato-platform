@@ -2,7 +2,7 @@
 
 module BlockApps.Bloc.API.UsersSpec where
 
-
+import Control.Concurrent
 import qualified Data.HashMap.Strict as HashMap
 import Data.Either
 import Network.HTTP.Client
@@ -48,6 +48,7 @@ spec
         postSendEitherBad `shouldSatisfy` isLeft
     describe "postUsersContract" $
       it "should upload a contract" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           address = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -61,6 +62,7 @@ spec
         postUsersContractEither `shouldSatisfy` isRight
     describe "postUsersUploadList" $
       it "should upload a list of contracts" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           address = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -85,6 +87,7 @@ spec
         postUsersUploadEither `shouldSatisfy` isRight
     describe "postUsersContractMethod" $
       it "should call a contract method" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           userAddress = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -121,6 +124,7 @@ spec
         postSendListEither `shouldSatisfy` isRight
     describe "postUsersContractMethodList" $
       it "should call a list of methods" $ \ mgr -> do
+        threadDelay 4000000
         let
           username = UserName "blockapps"
           userAddress = Address 0x1d00ecbe4a4f1c12967b0ad31e396335653f8f78
@@ -140,5 +144,4 @@ spec
         postCallMethodListEither <- runClientM
           (postUsersContractMethodList username userAddress postMethodListRequest)
           (ClientEnv mgr bayar4a)
-        print postCallMethodListEither
         postCallMethodListEither `shouldSatisfy` isRight

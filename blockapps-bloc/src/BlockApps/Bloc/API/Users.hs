@@ -24,6 +24,7 @@ import qualified Crypto.Saltine.Class as Saltine
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as ByteString.Lazy
 -- import Data.Functor.Contravariant
 import Data.HashMap.Strict (HashMap)
 import Data.Maybe
@@ -31,7 +32,7 @@ import Data.Maybe
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
--- import qualified Data.Text.Encoding as Encoding
+import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
@@ -61,7 +62,7 @@ class Monad m => MonadUsers m where
   postUsersUser :: UserName -> PostUsersUserRequest -> m Address
   postUsersSend :: UserName -> Address -> PostSendParameters -> m PostTransaction
   postUsersContract :: UserName -> Address -> PostUsersContractRequest -> m Address
-  postUsersUploadList :: UserName -> Address -> UploadListRequest -> m UnstructuredJSON
+  postUsersUploadList :: UserName -> Address -> UploadListRequest -> m [PostUsersUploadListResponse]
   postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> m PostUsersContractMethodResponse
   postUsersSendList :: UserName -> Address -> PostSendListRequest -> m [PostSendListResponse]
   postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> m [PostMethodListResponse]
@@ -229,7 +230,7 @@ type PostUsersUploadList = "users"
   :> Capture "address" Address
   :> "uploadList"
   :> ReqBody '[JSON] UploadListRequest
-  :> Post '[JSON] UnstructuredJSON
+  :> Post '[JSON] [PostUsersUploadListResponse]
 data UploadListRequest = UploadListRequest
   { uploadlistPassword :: Text
   , uploadlistContracts :: [UploadListContract]
@@ -252,6 +253,21 @@ instance ToJSON UploadListContract where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadListContract where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+data PostUsersUploadListResponse = PostUsersUploadListResponse
+  { contractJSON :: ContractDetails } deriving (Eq,Show,Generic)
+instance Arbitrary PostUsersUploadListResponse where
+  arbitrary = genericArbitrary
+instance ToJSON PostUsersUploadListResponse where
+  toJSON (PostUsersUploadListResponse contractDetails) = object
+    [ "contractJSON" .= Text.decodeUtf8 (ByteString.Lazy.toStrict (encode contractDetails)) ]
+instance FromJSON PostUsersUploadListResponse where
+  parseJSON = withObject "PostUsersUploadListResponse" $ \obj -> do
+    str <- obj .: "contractJSON"
+    case eitherDecode (ByteString.Lazy.fromStrict (Text.encodeUtf8 str)) of
+      Left err -> fail err
+      Right details -> return $ PostUsersUploadListResponse details
+instance ToSample PostUsersUploadListResponse where
+  toSamples _ = noSamples
 
 -- This should return the return value from the method call
 type PostUsersContractMethod = "users"
@@ -266,7 +282,7 @@ type PostUsersContractMethod = "users"
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Text
   , postuserscontractmethodMethod :: Text
-  , postuserscontractmethodArgs :: HashMap Text UnstructuredJSON
+  , postuserscontractmethodArgs :: HashMap Text SolidityValue
   , postuserscontractmethodValue :: Natural
   } deriving (Eq,Show,Generic)
 
@@ -363,7 +379,7 @@ data MethodCall = MethodCall
   { methodcallContractName :: Text
   , methodcallContractAddress :: Address
   , methodcallMethodName :: Text
-  , methodcallArgs :: HashMap Text UnstructuredJSON
+  , methodcallArgs :: HashMap Text SolidityValue
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams --TODO: Params maybe optional
   } deriving (Eq,Show,Generic)
