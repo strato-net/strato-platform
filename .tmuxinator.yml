@@ -53,6 +53,8 @@ windows:
         panes:
             - ethereum-discover:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover
+            - filler:
+                - bash
             - p2p-client:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-client
             - p2p-server:
@@ -104,7 +106,7 @@ windows:
             - htop:
                 - htop
             - iftop:
-                - iftop
+                - sudo iftop
             - iostat:
                 - iostat -N 1 
 
