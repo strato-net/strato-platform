@@ -11,8 +11,8 @@ import Test.Hspec
 import BlockApps.Bloc.API.Search
 import BlockApps.Bloc.API.Utils
 
-spec :: Spec
-spec = beforeAll (newManager defaultManagerSettings) $ do
+spec :: SpecWith Manager
+spec = do
 
   describe "getSearchContract" $
     it "gets a list of addresses in a contract" $ \ mgr -> do

@@ -8,8 +8,8 @@ import Test.Hspec
 import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
 
-spec :: Spec
-spec = beforeAll (newManager defaultManagerSettings) $
+spec :: SpecWith Manager
+spec =
   describe "getAddresses" $
     it "gets a list of addresses" $ \ mgr -> do
       addrsEither <- runClientM getAddresses (ClientEnv mgr bayar4a)
