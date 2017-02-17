@@ -106,7 +106,7 @@ windows:
             - iftop:
                 - iftop
             - iostat:
-                - iostat -N 1 -H
+                - iostat -N 1 
 
     - databases:
         layout: tiled
