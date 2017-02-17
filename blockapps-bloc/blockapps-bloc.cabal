@@ -41,6 +41,7 @@ library
     , http-client
     , http-media
     , logging-effect
+    , monad-loops
     , mtl
     , QuickCheck
     , quickcheck-instances
