@@ -76,9 +76,9 @@ windows:
         layout: tiled
         panes:
             - bestblock:
-                - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq '.'"
+                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq '.'"
             - lasttx:
-                - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq '.'"
+                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq '.'"
 
     - stream_dumps:
         layout: even-horizontal
