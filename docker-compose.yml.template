@@ -1,10 +1,6 @@
 version: '2'
 
 services:
-  dashboard:
-    image: %REPO%dashboard
-    tty: true
-    restart: always
   zookeeper:
     image: %REPO%zookeeper-packager
     restart: always
