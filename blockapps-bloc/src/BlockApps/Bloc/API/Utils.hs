@@ -230,9 +230,14 @@ instance Arbitrary Var where arbitrary = genericArbitrary
 waitNewBlock :: ClientM ()
 waitNewBlock = do
   blockNum <- lastBlockNum
+  liftIO $ print blockNum
   untilM_
-    (liftIO (threadDelay 1000000))
-    ((/= blockNum) <$> lastBlockNum)
+    (liftIO (putStrLn "checking condition" >> (threadDelay 1000000)))
+    (do
+      liftIO $ putStrLn "getting last block number"
+      blockNum' <- lastBlockNum
+      liftIO $ print blockNum'
+      return $ blockNum' /= blockNum)
   where
     lastBlockNum
       = blockdataNumber
