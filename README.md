@@ -290,4 +290,11 @@ docker exec -it strato /bin/bash
 4. Wait a couple minutes (for any transactions submitted to the API before killing it are propagated to the network).
 5. Exit the server, and use Azure (or whatever you are deployed on) to shut down and delete the node.
 
+## Dashboard
 
+If you have `tmux` and `tmuxinator` installed, run `tmuxinator start strato` and
+you will get a dashboard showing detailed information about your running
+instance.
+
++ Enable mouse-mode by typing `ctrl+b :set -g mouse`
++ Quit `tmux` by typing `ctrl+b :kill-session -t strato`
