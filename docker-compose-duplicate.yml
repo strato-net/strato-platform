@@ -2,9 +2,9 @@ version: '2'
 
 services:
   dashboard:
-    image: razic/mux
+    image: dashboard
     tty: true
-  
+    restart: always
   zookeeper:
     image: zookeeper-packager
     restart: always
@@ -27,6 +27,7 @@ services:
   postgres:
     image: postgres-packager
     restart: always
+
   strato:
     image: monstrato
     volumes:
@@ -35,6 +36,7 @@ services:
       - zookeeper
       - kafka
       - postgres
+      - redis
     depends_on:
       - zookeeper
       - kafka
@@ -57,7 +59,8 @@ services:
       minBlockDifficulty: "${minBlockDifficulty}"
       debugFail: "${debugFail}"
       backupblocks: "${backupblocks}"
-  strato-duplicate:
+
+  strato-2:
     image: monstrato
     volumes:
       - /tmp/backup:/tmp/backup
@@ -65,6 +68,7 @@ services:
       - zookeeper
       - kafka
       - postgres
+      - redis
     depends_on:
       - zookeeper
       - kafka
@@ -72,14 +76,13 @@ services:
       - redis
     restart: always
     ports:
-      - "3000:3000"
-      - "30304:30303"
-      - "30304:30303/udp"
+      - "30303:30303"
+      - "30303:30303/udp"
     environment:
       networkID : "${networkID}"
       genesis: "${genesis}"
       genesisBlock: "${genesisBlock}"
-      bootnode: 172.18.0.9
+      bootnode: "172.18.0.10"
       addBootnodes: "${addBootnodes}"
       lazyBlocks: "${lazyBlocks}"
       miningAlgorithm: "${miningAlgorithm}"
@@ -88,6 +91,7 @@ services:
       minBlockDifficulty: "${minBlockDifficulty}"
       debugFail: "${debugFail}"
       backupblocks: "${backupblocks}"
+
   redis:
     image: redis:3.2
     restart: always
@@ -95,7 +99,7 @@ services:
     volumes:
       - /tmp/backup/redis:/data
     ports:
-      - '6379:6379'
+      - "6379:6379" 
   bloc:
     image: bloc
     restart: always

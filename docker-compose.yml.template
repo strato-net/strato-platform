@@ -55,6 +55,7 @@ services:
       minBlockDifficulty: "${minBlockDifficulty}"
       debugFail: "${debugFail}"
       backupblocks: "${backupblocks}"
+      redisBDBNumber: "${redisBDBNumber}"
 
   redis:
     image: redis:3.2
