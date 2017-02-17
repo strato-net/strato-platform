@@ -1,4 +1,4 @@
-name:                strato-model
+name:                strato-statediff
 version:             0.1.0.0
 author:              BlockApps
 maintainer:          blockapps
@@ -7,21 +7,21 @@ cabal-version:       >=1.10
 license:             Apache-2.0
 
 library
-  exposed-modules:      Blockchain.Strato.Model.Class
-                      , Blockchain.Strato.Model.ExtendedWord
-                      , Blockchain.Strato.Model.SHA
-                      , Blockchain.Strato.Model.Address
-                      , Blockchain.Strato.Model.Code
-  other-modules:        Blockchain.Strato.Model.Util
+  exposed-modules:      Blockchain.Strato.StateDiff
+                      , Blockchain.Strato.StateDiff.Database
   build-depends:        base
-                      , base16-bytestring
-                      , ethereum-rlp
-                      , binary
                       , bytestring
                       , nibblestring
-                      , cryptohash
-                      , blockapps-haskoin
-                      , time
+                      , containers
+                      , resourcet
+                      , aeson
+                      , strato-model
+                      , blockapps-data
+                      , blockapps-util
+                      , ethereum-rlp
+                      , merkle-patricia-db
+                      , persistent
+                      , persistent-postgresql
   hs-source-dirs:       src
   default-language:     Haskell2010
   default-extensions:   MultiParamTypeClasses

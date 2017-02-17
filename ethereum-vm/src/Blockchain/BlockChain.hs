@@ -42,12 +42,10 @@ import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.Code
 import Blockchain.Data.DataDefs
-import Blockchain.Data.DiffDB
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Extra
 import Blockchain.Data.Log
 import Blockchain.Data.LogDB
-import Blockchain.Data.StateDiff hiding (StateDiff(blockHash))
 import Blockchain.Data.Transaction
 import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -70,6 +68,9 @@ import Blockchain.VM
 import Blockchain.VM.Code
 import Blockchain.VM.OpcodePrices
 import Blockchain.VM.VMState
+
+import Blockchain.Strato.StateDiff hiding (StateDiff(blockHash))
+import Blockchain.Strato.StateDiff.Database
 
 import Blockchain.Output (rightPad)
 
