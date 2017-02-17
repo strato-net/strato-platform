@@ -246,6 +246,6 @@ forceChain = workChain RDB.forceBestBlockInfo
 pb :: BlockData -> (Integer, Integer, String, String) 
 pb x = ( blockDataNumber x
        , blockDataDifficulty x
-       , showHash . blockHeaderHash $ x
-       , showHash . blockDataParentHash $ x
+       , "h:" ++ (showHash . blockHeaderHash $ x)
+       , "p:" ++ (showHash . blockDataParentHash $ x)
        )
