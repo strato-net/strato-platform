@@ -1,3 +1,7 @@
+{-# LANGUAGE
+    RecordWildCards
+#-}
+
 module BlockApps.Bloc.API.AddressesSpec where
 
 import Data.Either
@@ -8,9 +12,9 @@ import Test.Hspec
 import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
 
-spec :: SpecWith Manager
+spec :: SpecWith TestConfig
 spec =
   describe "getAddresses" $
-    it "gets a list of addresses" $ \ mgr -> do
+    it "gets a list of addresses" $ \ TestConfig {..} -> do
       addrsEither <- runClientM getAddresses (ClientEnv mgr bayar4a)
       addrsEither `shouldSatisfy` isRight
