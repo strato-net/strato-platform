@@ -60,6 +60,20 @@ data StateDiff =
     }
     deriving (Generic)
 
+data StateDiffLight =
+     StateDiffLight { newBlockInfo    :: (Integer, SHA)
+                    , deletedAccounts :: [Address]
+                    , createdAccounts :: [(Address, AccountDiff 'Eventual)]
+                    , updatedAccounts :: [(Address, AccountDiff 'Incremental)]
+                    } deriving (Eq, Show, Read)
+
+stateDiffToLight :: StateDiff -> StateDiffLight
+stateDiffToLight StateDiff{..} = StateDiffLight { newBlockInfo = (blockNumber, blockHash)
+                                                , deletedAccounts = Map.keys deletedAccounts
+                                                , createdAccounts = Map.toList createdAccounts
+                                                , updatedAccounts = Map.toList updatedAccounts
+                                                }
+
 instance (ToJSON a) => ToJSON (Map Address a) where
   toJSON = toJSON . Map.mapKeys formatAddressWithoutColor
 
