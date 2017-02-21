@@ -363,9 +363,13 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                       Just (ancestor :: RedisHeader) ->
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
-                              updates        = tail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
+                              updates        = safeTail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
                           in
                               return $ Right (updates, deletions)
+
+              safeTail :: [a] -> [a]
+              safeTail [] = []
+              safeTail xs = tail xs
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Status)
