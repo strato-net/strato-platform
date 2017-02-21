@@ -2,6 +2,7 @@ module Blockchain.Strato.StateDiff.Kafka
     ( stateDiffTopicName
     , assertTopicCreation
     , readStateDiffEvents
+    , readStateDiffEventsFromTopic
     , writeStateDiffEvents
     , writeStateDiffs
     ) where
@@ -25,11 +26,11 @@ assertTopicCreation :: K.Kafka k => k ()
 assertTopicCreation = K.updateMetadata stateDiffTopicName
 
 readStateDiffEvents :: K.Kafka k => KP.Offset -> k [StateDiffKafkaEvent]
--- readStateDiffEvents = readStateDiffEventsFromTopic stateDiffTopicName
-readStateDiffEvents = undefined
+readStateDiffEvents = readStateDiffEventsFromTopic stateDiffTopicName
 
--- readStateDiffEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [StateDiffKafkaEvent]
--- readStateDiffEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.fromStrict) <$> fetchBytes topic offset
+readStateDiffEventsFromTopic :: K.Kafka k => KP.TopicName -> KP.Offset -> k [StateDiffKafkaEvent]
+--readStateDiffEventsFromTopic topic offset = setDefaultKafkaState >> map (decode . L.fromStrict) <$> fetchBytes topic offset
+readStateDiffEventsFromTopic = undefined
 
 writeStateDiffEvents :: K.Kafka k => [StateDiffEvent] -> k [KP.ProduceResponse]
 writeStateDiffEvents events = KW.produceMessages $
