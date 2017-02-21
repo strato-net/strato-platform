@@ -10,6 +10,9 @@
 
 module BlockApps.Bloc.API.Utils where
 
+import Control.Concurrent
+import Control.Monad.Loops
+import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
@@ -34,6 +37,8 @@ import Test.QuickCheck.Instances ()
 import Numeric.Natural
 
 import BlockApps.Data
+import BlockApps.Strato.API.Client
+import BlockApps.Strato.Types
 import Network.HTTP.Client
 
 -- hack because endpoints are returning stringified json as text/html
@@ -88,6 +93,9 @@ tester7 = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
 
 bayar4a :: BaseUrl
 bayar4a = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/bloc"
+
+strato :: BaseUrl
+strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
 
 -- data SolidityValue
 --   = SolidityValueString Text
@@ -220,6 +228,25 @@ instance ToJSON Var where
 instance FromJSON Var where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Var where arbitrary = genericArbitrary
+
+
+waitNewBlock :: ClientM ()
+waitNewBlock = do
+  blockNum <- lastBlockNum
+  liftIO $ print blockNum
+  untilM_
+    (liftIO (putStrLn "checking condition" >> (threadDelay 1000000)))
+    (do
+      liftIO $ putStrLn "getting last block number"
+      blockNum' <- lastBlockNum
+      liftIO $ print blockNum'
+      return $ blockNum' /= blockNum)
+  where
+    lastBlockNum
+      = blockdataNumber
+      . blockBlockData
+      . withoutNext
+      . head <$> getBlocksLast 0
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance ToHttpApiData UserName where

@@ -25,10 +25,10 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as ByteString.Lazy
--- import Data.Functor.Contravariant
+import Data.Functor.Contravariant
 import Data.HashMap.Strict (HashMap)
 import Data.Maybe
--- import Data.Monoid
+import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -50,7 +50,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
--- import BlockApps.Strato.API.Client
+import BlockApps.Strato.API.Client
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
@@ -96,47 +96,42 @@ instance MonadUsers Bloc where
       encoder = Encoders.value Encoders.text
       decoder = Decoders.rowsList (Decoders.value addressDecoder)
       sqlText =
-        "SELECT A.address FROM users U JOIN addresses A\
-        \ ON A.user_id = U.id WHERE U.name = $1;"
+        "SELECT K.address FROM users U JOIN keystore K\
+        \ ON K.user_id = U.id WHERE U.name = $1;"
       sqlStatement = statement sqlText encoder decoder False
     addressesEither <- liftIO $ run (query name sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
       Right addresses -> return addresses
 
-  postUsersUser = undefined
-
-  -- postUsersUser (UserName name) (PostUsersUserRequest faucet pw) = do
-  --   let
-  --     pwBytes = Encoding.encodeUtf8 pw
-  --     sk = newSecKey pwBytes
-  --     pk = derivePubKey sk
-  --     addr = deriveAddress pk
-  --     encoder = contramap (\(x,_,_) -> x) (Encoders.value Encoders.text)
-  --       <> contramap (\(_,y,_) -> y) (Encoders.value Encoders.bytea)
-  --       <> contramap (\(_,_,z) -> z) (Encoders.value addressEncoder)
-  --     decoder = Decoders.rowsAffected
-  --     sqlText =
-  --       "WITH userid AS (\
-  --       \ SELECT id FROM users WHERE name = $1)\
-  --       \ , newUserId AS (\
-  --       \ INSERT INTO users (name) SELECT $1 WHERE NOT EXISTS (SELECT id FROM users WHERE name = $1)\
-  --       \ RETURNING id)\
-  --       \ INSERT INTO addresses (password_hash, address, user_id)\
-  --       \ SELECT $2, $3, uid.id FROM (SELECT id FROM userid UNION SELECT id FROM newUserId) uid;"
-  --     sqlStatement = statement sqlText encoder decoder False
-  --   conn <- asks dbConnection
-  --   mgr <- asks httpManager
-  --   url <- asks urlStrato
-  --   pwHash <- liftIO $ BCrypt.hashPassword 15 pwBytes
-  --   resultEither <- liftIO $
-  --     run (query (name, pwHash, addr) sqlStatement) conn
-  --   case resultEither of
-  --     Left err -> throwError $ DBError err
-  --     Right _ -> do
-  --       liftIO . when (faucet == 1) $
-  --         void $ runClientM (postFaucet addr) (ClientEnv mgr url)
-  --       return addr
+  postUsersUser (UserName name) (PostUsersUserRequest faucet pw) = do
+    let
+      encoder = contramap fst (Encoders.value Encoders.text)
+        <> contramap snd paramsKeyStore
+      decoder = Decoders.rowsAffected
+      sqlText =
+        "WITH userid AS (\
+        \ SELECT id FROM users WHERE name = $1)\
+        \ , newUserId AS (\
+        \ INSERT INTO users (name) SELECT $1 WHERE NOT EXISTS (SELECT id FROM users WHERE name = $1)\
+        \ RETURNING id)\
+        \ INSERT INTO keystore (salt,password_hash,nonce,enc_sec_key,pub_key,address,user_id)\
+        \ SELECT $2, $3, $4, $5, $6, $7, uid.id FROM (SELECT id FROM userid UNION SELECT id FROM newUserId) uid;"
+      sqlStatement = statement sqlText encoder decoder False
+    conn <- asks dbConnection
+    keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pw
+    mgr <- asks httpManager
+    url <- asks urlStrato
+    resultEither <- liftIO $
+      run (query (name, keyStore) sqlStatement) conn
+    case resultEither of
+      Left err -> throwError $ DBError err
+      Right _ -> do
+        let
+          addr = keystoreAcctAddress keyStore
+        liftIO . when (faucet == 1) $
+          void $ runClientM (postFaucet addr) (ClientEnv mgr url)
+        return addr
 
   postUsersSend = undefined
   postUsersContract = undefined
@@ -396,11 +391,12 @@ data KeyStore = KeyStore
   , keystorePasswordHash :: ByteString
   , keystoreAcctNonce :: ByteString
   , keystoreAcctEncSecKey :: ByteString
+  , keystorePubKey :: ByteString
   , keystoreAcctAddress :: Address
   } deriving (Eq,Show,Generic)
 
-keyStore :: Password -> IO KeyStore
-keyStore (Password pw) = do
+newKeyStore :: Password -> IO KeyStore
+newKeyStore (Password pw) = do
   -- BCrypt for password validation
   -- Scrypt for password derived encryption key
   -- NaCl SecretBox (XSalsa20 Poly1305) for encryption
@@ -427,5 +423,15 @@ keyStore (Password pw) = do
     , keystorePasswordHash = pwHash
     , keystoreAcctNonce = Saltine.encode acctNonce
     , keystoreAcctEncSecKey = encAcctSk
+    , keystorePubKey = exportPubKey False acctPk
     , keystoreAcctAddress = acctAddr
     }
+paramsKeyStore :: Encoders.Params KeyStore
+paramsKeyStore = mconcat
+  [ contramap keystoreSalt (Encoders.value Encoders.bytea)
+  , contramap keystorePasswordHash (Encoders.value Encoders.bytea)
+  , contramap keystoreAcctNonce (Encoders.value Encoders.bytea)
+  , contramap keystoreAcctEncSecKey (Encoders.value Encoders.bytea)
+  , contramap keystorePubKey (Encoders.value Encoders.bytea)
+  , contramap keystoreAcctAddress (Encoders.value addressEncoder)
+  ]
