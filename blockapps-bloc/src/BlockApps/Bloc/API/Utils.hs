@@ -10,6 +10,9 @@
 
 module BlockApps.Bloc.API.Utils where
 
+import Control.Concurrent
+import Control.Monad.Loops
+import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
@@ -31,8 +34,12 @@ import Servant.Docs
 import qualified Network.HTTP.Media as M
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
+import Numeric.Natural
 
 import BlockApps.Data
+import BlockApps.Strato.API.Client
+import BlockApps.Strato.Types
+import Network.HTTP.Client
 
 -- hack because endpoints are returning stringified json as text/html
 data HTMLifiedJSON
@@ -86,6 +93,9 @@ tester7 = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
 
 bayar4a :: BaseUrl
 bayar4a = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/bloc"
+
+strato :: BaseUrl
+strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
 
 -- data SolidityValue
 --   = SolidityValueString Text
@@ -218,3 +228,68 @@ instance ToJSON Var where
 instance FromJSON Var where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Var where arbitrary = genericArbitrary
+
+
+waitNewBlock :: ClientM ()
+waitNewBlock = do
+  blockNum <- lastBlockNum
+  liftIO $ print blockNum
+  untilM_
+    (liftIO (putStrLn "checking condition" >> (threadDelay 1000000)))
+    (do
+      liftIO $ putStrLn "getting last block number"
+      blockNum' <- lastBlockNum
+      liftIO $ print blockNum'
+      return $ blockNum' /= blockNum)
+  where
+    lastBlockNum
+      = blockdataNumber
+      . blockBlockData
+      . withoutNext
+      . head <$> getBlocksLast 0
+
+newtype UserName = UserName Text deriving (Eq,Show,Generic)
+instance ToHttpApiData UserName where
+  toUrlPiece (UserName name) = name
+instance FromHttpApiData UserName where
+  parseUrlPiece = Right . UserName
+instance ToJSON UserName where
+  toJSON (UserName name) = toJSON name
+instance FromJSON UserName where
+  parseJSON = fmap UserName . parseJSON
+instance ToSample UserName where
+  toSamples _ = samples
+    [ UserName name | name <- ["samrit", "eitan", "ilya", "ilir"]]
+instance ToCapture (Capture "user" UserName) where
+  toCapture _ = DocCapture "user" "a user name"
+instance Arbitrary UserName where arbitrary = genericArbitrary
+
+data TxParams = TxParams
+  { txparamsGasLimit :: Natural
+  , txparamsGasPrice :: Natural
+  } deriving (Eq,Show,Generic)
+instance Arbitrary TxParams where arbitrary = genericArbitrary
+instance ToJSON TxParams where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON TxParams where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data TestConfig = TestConfig
+  { mgr :: Manager
+  , userName :: UserName
+  , userAddress :: Address
+  , toUserName :: UserName
+  , toUserAddress :: Address
+  , pw :: Text
+  , simpleStorageContractName :: Text
+  , simpleStorageContractAddress :: Address
+  , testContractName :: Text
+  , testContractAddress :: Address
+  , simpleMappingContractName :: Text
+  , simpleMappingContractAddress :: Address
+  , txParams :: TxParams
+  , simpleStorageSrc :: Text
+  , testSrc :: Text
+  , simpleMappingSrc :: Text
+  , delay :: Int --microsecond
+  } deriving (Generic)
