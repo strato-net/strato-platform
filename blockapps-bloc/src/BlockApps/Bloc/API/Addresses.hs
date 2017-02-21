@@ -22,6 +22,7 @@ import Servant.Client
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
+import BlockApps.Bloc.Queries
 import BlockApps.Data
 
 class Monad m => MonadAddresses m where
@@ -33,7 +34,7 @@ instance MonadAddresses Bloc where
     conn <- asks dbConnection
     let
       addressesQuery = statement
-        "SELECT address from addresses;"
+        getAddressesQuery
         Encoders.unit
         (Decoders.rowsList (Decoders.value addressDecoder))
         False

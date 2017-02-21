@@ -48,6 +48,7 @@ import Web.FormUrlEncoded
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
+import BlockApps.Bloc.Queries
 import BlockApps.Data
 import BlockApps.Strato.Types (PostTransaction)
 import BlockApps.Strato.API.Client
@@ -83,8 +84,7 @@ instance MonadUsers Bloc where
     let
       encoder = Encoders.unit
       decoder = Decoders.rowsList (Decoders.value (UserName <$> Decoders.text))
-      sqlText = "SELECT name FROM users;"
-      sqlStatement = statement sqlText encoder decoder False
+      sqlStatement = statement getUsersQuery encoder decoder False
     usersEither <- liftIO $ run (query () sqlStatement) conn
     case usersEither of
       Left err -> throwError $ DBError err
@@ -95,10 +95,7 @@ instance MonadUsers Bloc where
     let
       encoder = Encoders.value Encoders.text
       decoder = Decoders.rowsList (Decoders.value addressDecoder)
-      sqlText =
-        "SELECT K.address FROM users U JOIN keystore K\
-        \ ON K.user_id = U.id WHERE U.name = $1;"
-      sqlStatement = statement sqlText encoder decoder False
+      sqlStatement = statement getUsersUserQuery encoder decoder False
     addressesEither <- liftIO $ run (query name sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
@@ -109,15 +106,7 @@ instance MonadUsers Bloc where
       encoder = contramap fst (Encoders.value Encoders.text)
         <> contramap snd paramsKeyStore
       decoder = Decoders.rowsAffected
-      sqlText =
-        "WITH userid AS (\
-        \ SELECT id FROM users WHERE name = $1)\
-        \ , newUserId AS (\
-        \ INSERT INTO users (name) SELECT $1 WHERE NOT EXISTS (SELECT id FROM users WHERE name = $1)\
-        \ RETURNING id)\
-        \ INSERT INTO keystore (salt,password_hash,nonce,enc_sec_key,pub_key,address,user_id)\
-        \ SELECT $2, $3, $4, $5, $6, $7, uid.id FROM (SELECT id FROM userid UNION SELECT id FROM newUserId) uid;"
-      sqlStatement = statement sqlText encoder decoder False
+      sqlStatement = statement postUsersUserQuery encoder decoder False
     conn <- asks dbConnection
     keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pw
     mgr <- asks httpManager

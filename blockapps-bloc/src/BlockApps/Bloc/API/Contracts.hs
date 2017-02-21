@@ -43,8 +43,9 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Data
 import BlockApps.Bloc.Queries
+import BlockApps.Data
+
 -- import qualified BlockApps.Solidity as Solidity
 
 class Monad m => MonadContracts m where
@@ -73,6 +74,7 @@ instance MonadContracts Bloc where
     conn <- asks dbConnection
     let
       encoder = Encoders.unit
+      -- current bloc returns milliseconds
       toMilliSec utc = truncate (utcTimeToPOSIXSeconds utc) * 1000
       decoderAddress contractName addr utc = (contractName, AddressCreatedAt (toMilliSec utc) (Unnamed addr) )
       decoderNameAsAddress contractName name utc = (contractName, AddressCreatedAt (toMilliSec utc) (Named name) )
@@ -92,25 +94,20 @@ instance MonadContracts Bloc where
           `Map.union`
           listToMap contractsNamesAsAddresses
 
-  getContractsData = undefined
-  -- getContractsData (ContractName contractName) = do
-  --   conn <- asks dbConnection
-  --   let
-  --     encoder = Encoders.value Encoders.text
-  --     decoder = Decoders.rowsList (Decoders.value addressDecoder)
-  --     sqlString =
-  --       "SELECT CI.address\
-  --       \ FROM contracts C JOIN contracts_metadata CM\
-  --       \ ON CM.contract_id = C.id\
-  --       \ JOIN contracts_instance CI\
-  --       \ ON CI.contract_metadata_id = CM.id\
-  --       \ WHERE C.name = $1;"
-  --     sqlStatement = statement sqlString encoder decoder False
-  --   addressesEither <- liftIO $
-  --     run (query contractName sqlStatement) conn
-  --   case addressesEither of
-  --     Left err -> throwError $ DBError err
-  --     Right addresses -> return addresses
+  getContractsData (ContractName contractName) = do
+    conn <- asks dbConnection
+    let
+      encoder = Encoders.value Encoders.text
+      decoderAddresses = Decoders.rowsList (Decoders.value addressDecoder)
+      decoderNames = Decoders.rowsList (Decoders.value Decoders.text)
+      sqlStatementAddresses = statement getContractsDataAddressesQuery encoder decoderAddresses False
+      sqlStatementNames = statement getContractsDataNamesQuery encoder decoderNames False
+    addressesEither <- liftIO $ run (query contractName sqlStatementAddresses) conn
+    namesEither <- liftIO $ run (query contractName sqlStatementNames) conn
+    case (,) <$> addressesEither <*> namesEither  of
+      Left err -> throwError $ DBError err
+      Right (addresses, names) -> do
+        return $ map Unnamed addresses ++ map Named names
 
   getContractsContract = undefined
   -- getContractsContract (ContractName contractName) addr = do

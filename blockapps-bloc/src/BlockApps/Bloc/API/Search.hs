@@ -34,6 +34,7 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Contracts
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
+import BlockApps.Bloc.Queries
 import BlockApps.Data
 
 class Monad m => MonadSearchContract m where
@@ -51,12 +52,7 @@ instance MonadSearchContract Bloc where
     let
       encoder = Encoders.value Encoders.text
       decoder = Decoders.rowsList (Decoders.value addressDecoder)
-      sqlString =
-        "SELECT CI.address FROM contracts_instance CI\
-        \ JOIN contracts_metadata CM ON CM.id = CI.contracts_metadata_id\
-        \ JOIN contracts C ON C.id = CM.contract_id\
-        \ WHERE C.name = $1 ORDER BY timestamp DESC"
-      sqlStatement = statement sqlString encoder decoder False
+      sqlStatement = statement getSearchContractQuery encoder decoder False
     addressesEither <- liftIO $ run (query contractName sqlStatement) conn
     case addressesEither of
       Left err -> throwError $ DBError err
