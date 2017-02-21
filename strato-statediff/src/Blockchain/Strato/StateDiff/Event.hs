@@ -28,9 +28,9 @@ instance Binary StateDiffEvent where
     put = putLazyByteString . Data.Aeson.encode
 
 instance ToJSON StateDiffEvent where
-    toJSON (DeletionEvent address diff) = object [ T.pack (format address) .= toJSON diff ]
-    toJSON (CreationEvent address diff) = object [ T.pack (format address) .= toJSON diff ]
-    toJSON (UpdateEvent   address diff) = object [ T.pack (format address) .= toJSON diff ]
+    toJSON (DeletionEvent address diff) = object [ "deletedAccounts" .= object [ T.pack (format address) .= toJSON diff ] ]
+    toJSON (CreationEvent address diff) = object [ "createdAccounts" .= object [ T.pack (format address) .= toJSON diff ] ]
+    toJSON (UpdateEvent   address diff) = object [ "updatedAccounts" .= object [ T.pack (format address) .= toJSON diff ] ]
 
 instance ToJSON StateDiffKafkaEvent where
     toJSON (Bulk sd)      = toJSON sd
