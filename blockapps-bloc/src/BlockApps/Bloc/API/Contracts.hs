@@ -14,15 +14,17 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Applicative
--- import Control.Monad.Except
--- import Control.Monad.Reader
+import Control.Monad.Except
+import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
 -- import Data.Functor.Contravariant
 import Data.Int
 -- import Data.Monoid
+import Data.Foldable
 import Data.Proxy
+import Data.Time.Clock.POSIX
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
@@ -30,9 +32,9 @@ import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
 import qualified Hasql.Decoders as Decoders
--- import qualified Hasql.Encoders as Encoders
--- import Hasql.Query
--- import Hasql.Session
+import qualified Hasql.Encoders as Encoders
+import Hasql.Query
+import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -42,6 +44,7 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Data
+import BlockApps.Bloc.Queries
 -- import qualified BlockApps.Solidity as Solidity
 
 class Monad m => MonadContracts m where
@@ -64,20 +67,29 @@ instance MonadContracts ClientM where
   getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
   getContractsStates = client (Proxy @ GetContractsStates)
   postContractsCompile = client (Proxy @ PostContractsCompile)
-instance MonadContracts Bloc where
 
-  getContracts = undefined
-  -- getContracts = do
-  --   conn <- asks dbConnection
-  --   let
-  --     encoder = Encoders.unit
-  --     decoder = Decoders.rowsList contractDecoder
-  --     sqlString = "SELECT address, timestamp FROM contracts_instance;"
-  --     sqlStatement = statement sqlString encoder decoder False
-  --   contractsEither <- liftIO $ run (query () sqlStatement) conn
-  --   case contractsEither of
-  --     Left err -> throwError $ DBError err
-  --     Right cons -> return $ Contracts cons
+instance MonadContracts Bloc where
+  getContracts = do
+    conn <- asks dbConnection
+    let
+      encoder = Encoders.unit
+      decoderAddress contractName addr utc = (contractName, AddressCreatedAt ((truncate (utcTimeToPOSIXSeconds utc)) * 1000) (Unnamed addr) )
+      decoderNameAsAddress contractName name utc = (contractName, AddressCreatedAt ((truncate (utcTimeToPOSIXSeconds utc)) * 1000) (Named name) )
+      decoderAddresses = Decoders.rowsList (decoderAddress <$> Decoders.value Decoders.text <*> Decoders.value addressDecoder <*> Decoders.value Decoders.timestamptz)
+      decoderNamesAsAddresses = Decoders.rowsList (decoderNameAsAddress <$> Decoders.value Decoders.text <*> Decoders.value Decoders.text <*> Decoders.value Decoders.timestamptz)
+      sqlStatementAddresses = statement getContractsAddressesQuery encoder decoderAddresses False
+      sqlStatementNamesAsAddresses = statement getContractsNamesAsAddressesQuery encoder decoderNamesAsAddresses False
+    contractsAddressesEither <- liftIO $ run (query () sqlStatementAddresses) conn
+    contractsNamesAsAddressesEither <- liftIO $ run (query () sqlStatementNamesAsAddresses) conn
+    case (,) <$> contractsAddressesEither <*> contractsNamesAsAddressesEither of
+      Left err -> throwError $ DBError err
+      Right (contractsAddresses, contractsNamesAsAddresses) -> do
+        let
+          listToMap = foldr' (\ (key,val) -> Map.insertWith (++) key [val] ) Map.empty
+        return $ GetContractsResponse $
+          listToMap contractsAddresses
+          `Map.union`
+          listToMap contractsNamesAsAddresses
 
   getContractsData = undefined
   -- getContractsData (ContractName contractName) = do
@@ -404,10 +416,10 @@ instance ToHttpApiData SymbolName where
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
 
-contractDecoder :: Decoders.Row AddressCreatedAt
-contractDecoder = AddressCreatedAt
-  <$> Decoders.value Decoders.int8
-  <*> Decoders.value (Unnamed <$> addressDecoder <|> Named <$> Decoders.text)
+-- contractDecoder :: Decoders.Row AddressCreatedAt
+-- contractDecoder = AddressCreatedAt
+--   <$> Decoders.value Decoders.int8
+--   <*> Decoders.value (Unnamed <$> addressDecoder <|> Named <$> Decoders.text)
 
 data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
 instance ToJSON a => ToJSON (MaybeNamed a) where
