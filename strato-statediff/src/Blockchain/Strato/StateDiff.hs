@@ -1,11 +1,3 @@
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE ExplicitForAll         #-}
-{-# LANGUAGE NamedFieldPuns         #-}
-{-# LANGUAGE OverloadedStrings      #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE ViewPatterns           #-}
-{-# LANGUAGE OverloadedLabels       #-}
 {-# OPTIONS_GHC -fno-warn-orphans   #-}
 module Blockchain.Strato.StateDiff
     ( StateDiff(..)
@@ -16,8 +8,6 @@ module Blockchain.Strato.StateDiff
     , stateDiff
     , eventualAccountState
     , incrementalAccountState
-    , StateDiffLight(..)
-    , stateDiffToLight
     ) where
 
 import           Blockchain.Data.Address
@@ -62,20 +52,6 @@ data StateDiff =
     updatedAccounts :: Map Address (AccountDiff 'Incremental)
     }
     deriving (Generic)
-
-data StateDiffLight =
-     StateDiffLight { newBlockInfo     :: (Integer, SHA)
-                    , deletedAccounts' :: [Address]
-                    , createdAccounts' :: [(Address, AccountDiff 'Eventual)]
-                    , updatedAccounts' :: [(Address, AccountDiff 'Incremental)]
-                    } deriving (Generic)
-
-stateDiffToLight :: StateDiff -> StateDiffLight
-stateDiffToLight StateDiff{..} = StateDiffLight { newBlockInfo     = (blockNumber, blockHash)
-                                                , deletedAccounts' = Map.keys deletedAccounts
-                                                , createdAccounts' = Map.toList createdAccounts
-                                                , updatedAccounts' = Map.toList updatedAccounts
-                                                }
 
 instance (ToJSON a) => ToJSON (Map Address a) where
   toJSON = toJSON . Map.mapKeys formatAddressWithoutColor
