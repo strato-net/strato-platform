@@ -71,6 +71,8 @@ import Blockchain.VM.VMState
 
 import Blockchain.Strato.StateDiff hiding (StateDiff(blockHash))
 import Blockchain.Strato.StateDiff.Database
+import Blockchain.Strato.StateDiff.Event
+import Blockchain.Strato.StateDiff.Kafka
 
 import Blockchain.Output (rightPad)
 
@@ -604,8 +606,11 @@ calculateAndEmitStateDiffs newBlock oldStateRoot = when (flags_sqlDiff || flags_
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newBlock
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
-    -- $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Here are StateDiffs " ++ show diffs 
     when flags_sqlDiff $ commitSqlDiffs diffs
     when flags_diffPublish $
-        let diffBS = BL.toStrict $ Aeson.encode diffs
-         in void . withKafkaViolently $ produceBytes' "statediff" [diffBS]
+        let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
+         in withKafkaViolently $ do
+             void $ writeStateDiffEvents deletionEvents
+             void $ writeStateDiffEvents creationEvents
+             void $ writeStateDiffEvents updateEvents
+

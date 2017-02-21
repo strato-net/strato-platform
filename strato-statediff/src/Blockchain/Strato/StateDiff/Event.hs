@@ -28,15 +28,21 @@ instance Binary StateDiffEvent where
     put = putLazyByteString . Data.Aeson.encode
 
 instance ToJSON StateDiffEvent where
-    toJSON (DeletionEvent address diff) = object [ "deletedAccounts" .= object [ T.pack (format address) .= toJSON diff ] ]
-    toJSON (CreationEvent address diff) = object [ "createdAccounts" .= object [ T.pack (format address) .= toJSON diff ] ]
-    toJSON (UpdateEvent   address diff) = object [ "updatedAccounts" .= object [ T.pack (format address) .= toJSON diff ] ]
+    toJSON = \case
+            DeletionEvent a d -> mkObject "deletedAccounts" a d
+            CreationEvent a d -> mkObject "createdAccounts" a d
+            UpdateEvent   a d -> mkObject "updatedAccounts" a d
+        where mkObject :: (ToJSON (AccountDiff a)) => T.Text -> Address -> AccountDiff a -> Value
+              mkObject key address diff = object [ key .= object [ address2String address .= toJSON diff ] ]
+
+              address2String :: Address -> T.Text
+              address2String address = let (String t) = toJSON address in t
 
 instance ToJSON StateDiffKafkaEvent where
     toJSON (Bulk sd)      = toJSON sd
     toJSON (Singleton de) = toJSON de
 
--- order is (deleted, updated, created)
+-- order is (deleted, created, updated)
 destructStateDiff :: StateDiff -> ([StateDiffEvent], [StateDiffEvent], [StateDiffEvent])
 destructStateDiff StateDiff{..} = (deletedAccounts', createdAccounts', updatedAccounts')
     where deletedAccounts' = transform DeletionEvent deletedAccounts
