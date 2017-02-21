@@ -31,8 +31,10 @@ import Servant.Docs
 import qualified Network.HTTP.Media as M
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
+import Numeric.Natural
 
 import BlockApps.Data
+import Network.HTTP.Client
 
 -- hack because endpoints are returning stringified json as text/html
 data HTMLifiedJSON
@@ -218,3 +220,49 @@ instance ToJSON Var where
 instance FromJSON Var where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Var where arbitrary = genericArbitrary
+
+newtype UserName = UserName Text deriving (Eq,Show,Generic)
+instance ToHttpApiData UserName where
+  toUrlPiece (UserName name) = name
+instance FromHttpApiData UserName where
+  parseUrlPiece = Right . UserName
+instance ToJSON UserName where
+  toJSON (UserName name) = toJSON name
+instance FromJSON UserName where
+  parseJSON = fmap UserName . parseJSON
+instance ToSample UserName where
+  toSamples _ = samples
+    [ UserName name | name <- ["samrit", "eitan", "ilya", "ilir"]]
+instance ToCapture (Capture "user" UserName) where
+  toCapture _ = DocCapture "user" "a user name"
+instance Arbitrary UserName where arbitrary = genericArbitrary
+
+data TxParams = TxParams
+  { txparamsGasLimit :: Natural
+  , txparamsGasPrice :: Natural
+  } deriving (Eq,Show,Generic)
+instance Arbitrary TxParams where arbitrary = genericArbitrary
+instance ToJSON TxParams where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON TxParams where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+data TestConfig = TestConfig
+  { mgr :: Manager
+  , userName :: UserName
+  , userAddress :: Address
+  , toUserName :: UserName
+  , toUserAddress :: Address
+  , pw :: Text
+  , simpleStorageContractName :: Text
+  , simpleStorageContractAddress :: Address
+  , testContractName :: Text
+  , testContractAddress :: Address
+  , simpleMappingContractName :: Text
+  , simpleMappingContractAddress :: Address
+  , txParams :: TxParams
+  , simpleStorageSrc :: Text
+  , testSrc :: Text
+  , simpleMappingSrc :: Text
+  , delay :: Int --microsecond
+  } deriving (Generic)
