@@ -73,8 +73,9 @@ instance MonadContracts Bloc where
     conn <- asks dbConnection
     let
       encoder = Encoders.unit
-      decoderAddress contractName addr utc = (contractName, AddressCreatedAt ((truncate (utcTimeToPOSIXSeconds utc)) * 1000) (Unnamed addr) )
-      decoderNameAsAddress contractName name utc = (contractName, AddressCreatedAt ((truncate (utcTimeToPOSIXSeconds utc)) * 1000) (Named name) )
+      toMilliSec utc = truncate (utcTimeToPOSIXSeconds utc) * 1000
+      decoderAddress contractName addr utc = (contractName, AddressCreatedAt (toMilliSec utc) (Unnamed addr) )
+      decoderNameAsAddress contractName name utc = (contractName, AddressCreatedAt (toMilliSec utc) (Named name) )
       decoderAddresses = Decoders.rowsList (decoderAddress <$> Decoders.value Decoders.text <*> Decoders.value addressDecoder <*> Decoders.value Decoders.timestamptz)
       decoderNamesAsAddresses = Decoders.rowsList (decoderNameAsAddress <$> Decoders.value Decoders.text <*> Decoders.value Decoders.text <*> Decoders.value Decoders.timestamptz)
       sqlStatementAddresses = statement getContractsAddressesQuery encoder decoderAddresses False
