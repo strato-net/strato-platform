@@ -26,9 +26,7 @@ spec = do
       usersEither `shouldSatisfy` isRight
   describe "getUsersUser" $
     it "should get a list of user's addresses" $ \ TestConfig {..} -> do
-      let
-        username = userName
-      userAddressesEither <- runClientM (getUsersUser username) (ClientEnv mgr bayar4a)
+      userAddressesEither <- runClientM (getUsersUser userName) (ClientEnv mgr bayar4a)
       userAddressesEither `shouldSatisfy` isRight
   describe "postUsersUser" $
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
@@ -40,34 +38,26 @@ spec = do
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
       let
-        username = userName
-        address = userAddress
         postSendParameters = PostSendParameters (toUserAddress) 100 pw
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345"
-      postSendEither <- runClientM (postUsersSend username address postSendParameters) (ClientEnv mgr bayar4a)
+      postSendEither <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr bayar4a)
       postSendEither `shouldSatisfy` isRight
-      postSendEitherBad <- runClientM (postUsersSend username address postSendParametersBad) (ClientEnv mgr bayar4a)
+      postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr bayar4a)
       postSendEitherBad `shouldSatisfy` isLeft
   describe "postUsersContract" $
     it "should upload a contract" $ \ TestConfig {..} -> do
-      threadDelay 4000000
+      threadDelay delay
       let
-        username = userName
-        address = userAddress
         postUsersContractRequest = PostUsersContractRequest
-          { src = "contract SimpleStorage { uint storedData; function set(uint x) \
-            \{ storedData = x; } function get() returns (uint retVal) \
-            \{ return storedData; } }"
+          { src = simpleStorageSrc
           , password = pw
           }
-      postUsersContractEither <- runClientM (postUsersContract username address postUsersContractRequest) (ClientEnv mgr bayar4a)
+      postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr bayar4a)
       postUsersContractEither `shouldSatisfy` isRight
   describe "postUsersUploadList" $
     it "should upload a list of contracts" $ \ TestConfig {..} -> do
-      threadDelay 4000000
+      threadDelay delay
       let
-        username = userName
-        address = userAddress
         uploadListContracts =
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
@@ -85,14 +75,12 @@ spec = do
           , uploadlistContracts = uploadListContracts
           , uploadlistResolve = True
           }
-      postUsersUploadEither <- runClientM (postUsersUploadList username address uploadListRequest) (ClientEnv mgr bayar4a)
+      postUsersUploadEither <- runClientM (postUsersUploadList userName userAddress uploadListRequest) (ClientEnv mgr bayar4a)
       postUsersUploadEither `shouldSatisfy` isRight
   describe "postUsersContractMethod" $
     it "should call a contract method" $ \ TestConfig {..} -> do
-      threadDelay 4000000
+      threadDelay delay
       let
-        username = userName
-        userAddress = userAddress
         contractName = ContractName simpleStorageContractName
         contractAddress = simpleStorageContractAddress
         postUsersContractMethodRequest = PostUsersContractMethodRequest
@@ -102,14 +90,13 @@ spec = do
           , postuserscontractmethodValue = 0
           }
       postUsersContractMethodEither <- runClientM
-        (postUsersContractMethod username userAddress contractName contractAddress postUsersContractMethodRequest)
+        (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
         (ClientEnv mgr bayar4a)
       postUsersContractMethodEither `shouldSatisfy` isRight
   describe "postUsersSendList" $
     it "should post a list of send transactions" $ \ TestConfig {..} -> do
+      threadDelay delay
       let
-        username = userName
-        userAddress = userAddress
         postSendListRequest = PostSendListRequest
           { postsendlistrequestPassword  = pw
           , postsendlistrequestResolve = True
@@ -121,15 +108,13 @@ spec = do
               }
           }
       postSendListEither <- runClientM
-        (postUsersSendList username userAddress postSendListRequest)
+        (postUsersSendList userName userAddress postSendListRequest)
         (ClientEnv mgr bayar4a)
       postSendListEither `shouldSatisfy` isRight
   describe "postUsersContractMethodList" $
     it "should call a list of methods" $ \ TestConfig {..} -> do
-      threadDelay 4000000
+      threadDelay delay
       let
-        username = userName
-        userAddress = userAddress
         postMethodListRequest = PostMethodListRequest
           { postmethodlistrequestPassword = pw
           , postmethodlistrequestResolve = True
@@ -144,6 +129,6 @@ spec = do
               }
           }
       postCallMethodListEither <- runClientM
-        (postUsersContractMethodList username userAddress postMethodListRequest)
+        (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr bayar4a)
       postCallMethodListEither `shouldSatisfy` isRight

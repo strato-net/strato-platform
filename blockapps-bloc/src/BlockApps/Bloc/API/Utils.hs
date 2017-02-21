@@ -264,4 +264,5 @@ data TestConfig = TestConfig
   , simpleStorageSrc :: Text
   , testSrc :: Text
   , simpleMappingSrc :: Text
+  , delay :: Int --microsecond
   } deriving (Generic)

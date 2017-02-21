@@ -174,6 +174,9 @@ setup = do
           \    m2[1] = true;\
           \  }\
           \}"
+      , delay =
+          let second = 1000000
+          in 6 * second
       }
 
     postCompileRequest1 = PostCompileRequest [] (simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
