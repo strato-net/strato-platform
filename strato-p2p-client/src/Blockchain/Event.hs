@@ -17,7 +17,6 @@ import Data.Conduit
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time.Clock
-import Network.Kafka.Protocol (Offset)
 
 import Blockchain.Colors
 import Blockchain.Context
@@ -47,7 +46,7 @@ import Blockchain.Util (getCurrentMicrotime)
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
-import Debug.Trace (trace)
+import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thing that ill really want to know one day
 
 data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | TimerEvt deriving (Show)
 
@@ -73,12 +72,8 @@ skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
                            [] -> []
 
 -- todo: seriously???
-fetchLimit :: Offset
-fetchLimit = 50
-
--- todo: seriously???
 maxReturnedHeaders :: Int
-maxReturnedHeaders=1000
+maxReturnedHeaders = 1000
 
 peerString :: PPeer -> String
 peerString peer = show (pPeerPubkey peer) ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
@@ -115,15 +110,20 @@ handleEvents mode peer = awaitForever $ \case
         emitKafkaTransactions txo txs
         return ()
 
-    MsgEvt (NewBlock block' _) -> do
+    MsgEvt (NewBlock block' tdiff) -> do
+        liftIO . putStrLn $ "newBlock with tdiff " ++ show tdiff
         lift $ putNewBlk $ blockToNewBlk block' -- todo delete this?
-        let parentHash' = blockDataParentHash $ blockBlockData block'
-        blockOffsets <- lift $ getBlockOffsetsForHashes [parentHash']
-        case blockOffsets of
-            [x] | blockOffsetHash x == parentHash' -> do
+        let sha         = blockHash block'
+        let header      = blockHeader block'
+        let num         = blockHeaderBlockNumber header
+        let parentHash' = blockHeaderParentHash header
+        (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
+        case redisParentHeader of
+            Nothing -> logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch
+            Just _  -> do
+                void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                 lift . void $ setTitleAndProduceBlocks [block']
                 void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
-            _ -> logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch
 
     MsgEvt (NewBlockHashes _) -> syncFetch
 
@@ -242,15 +242,13 @@ handleEvents mode peer = awaitForever $ \case
 
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
-syncFetch :: (MonadIO m, MonadState Context m) => Conduit Event m Message
+syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m) => Conduit Event m Message
 syncFetch = do
     blockHeaders' <- lift getBlockHeaders
     when (null blockHeaders') $ do
-        lastVMEvents <- liftIO $ fetchLastVMEvents fetchLimit
-        let lastBlocks = [b | ChainBlock b <- lastVMEvents]
-        if null lastBlocks
-            then error "overflow in syncFetch"
-            else do
-                let lastBlockNumber = blockDataNumber . blockBlockData . last $ lastBlocks
-                yield $ GetBlockHeaders (BlockNumber lastBlockNumber) maxReturnedHeaders 0 Forward
-                stampActionTimestamp
+        bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+        let fetchNumber = case bestBlock of
+                              Nothing          -> 0
+                              Just (_, num, _) -> num
+        yield $ GetBlockHeaders (BlockNumber fetchNumber) maxReturnedHeaders 0 Forward
+        stampActionTimestamp

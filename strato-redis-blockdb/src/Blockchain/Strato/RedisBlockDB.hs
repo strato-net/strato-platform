@@ -16,7 +16,7 @@ module Blockchain.Strato.RedisBlockDB
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
     , commonAncestorHelper
-    , getWorldBestBlockInfo, setWorldBestBlockInfo
+    , getWorldBestBlockInfo, updateWorldBestBlockInfo
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     ) where
 
@@ -453,14 +453,14 @@ worldBestBlockKey = "<worldbest>"
 getWorldBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
-setWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
-setWorldBestBlockInfo sha num tdiff = do
+updateWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
+updateWorldBestBlockInfo sha num tdiff = do
     maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
     case maybeLockID of
         Left err -> do
             liftIO . putStrLn $ "Could not acquire redlock, will retry; " ++ show err
             liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
-            setWorldBestBlockInfo sha num tdiff
+            updateWorldBestBlockInfo sha num tdiff
         Right lockID -> do
             liftIO (putStrLn "Acquired ")
             maybeExistingWBBI <- getWorldBestBlockInfo
