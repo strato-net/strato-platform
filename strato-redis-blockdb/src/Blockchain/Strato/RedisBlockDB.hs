@@ -449,7 +449,7 @@ setWorldBestBlockInfo sha num tdiff = do
     case maybeLockID of
         Left err -> do
             liftIO . putStrLn $ "Could not acquire redlock, will retry; " ++ show err
-            liftIO $ threadDelay defaultRedlockBackoff
+            liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
             setWorldBestBlockInfo sha num tdiff
         Right lockID -> do
             liftIO (putStrLn "Acquired ")
@@ -458,13 +458,20 @@ setWorldBestBlockInfo sha num tdiff = do
                 Nothing -> do
                     liftIO $ putStrLn "No WorldBestBlock in Redis, will force"
                     void $ forceBestBlockInfo' worldBestBlockKey (sha, num, tdiff)
-                    releaseWorldBestBlockRedlock lockID
+                    releaseAndFinalize lockID True
                 Just (_, _, oldTDiff) -> do
                     liftIO . putStr $ "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff
-                    if oldTDiff <= tdiff
+                    let willUpdate = oldTDiff <= tdiff
+                    if willUpdate
                         then do
                             liftIO (putStrLn " updating")
                             void $ forceBestBlockInfo' worldBestBlockKey (sha, num, tdiff)
                         else
                             liftIO (putStrLn " not updating")
-                    releaseWorldBestBlockRedlock lockID
+                    releaseAndFinalize lockID willUpdate
+    where releaseAndFinalize lockID didUpdate = do
+              didRelease <- releaseWorldBestBlockRedlock lockID
+              return $ case didRelease of
+                  Right True  -> Right didUpdate
+                  Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
+                  err         -> err
