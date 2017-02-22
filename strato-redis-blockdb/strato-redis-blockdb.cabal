@@ -19,6 +19,7 @@ library
                      , blockapps-data
                      , hedis
                      , base16-bytestring
+                     , random
                      -- solely for REPL
                      , strato-conf
                      , blockapps-data
