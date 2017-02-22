@@ -21,6 +21,7 @@ library
     BlockApps.Bloc.API.Search
     BlockApps.Bloc.API.Users
     BlockApps.Bloc.API.Utils
+    BlockApps.Bloc.Crypto
     BlockApps.Bloc.Database
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Queries

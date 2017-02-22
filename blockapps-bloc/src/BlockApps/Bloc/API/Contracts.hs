@@ -13,15 +13,11 @@
 
 module BlockApps.Bloc.API.Contracts where
 
-import Control.Applicative
-import Control.Monad.Except
-import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
--- import Data.Functor.Contravariant
 import Data.Int
--- import Data.Monoid
+import Data.Monoid
 import Data.Foldable
 import Data.Proxy
 import Data.Time.Clock.POSIX
@@ -31,9 +27,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
-import qualified Hasql.Decoders as Decoders
-import qualified Hasql.Encoders as Encoders
-import Hasql.Query
 import Hasql.Session
 import Servant.API
 import Servant.Client
@@ -70,119 +63,91 @@ instance MonadContracts ClientM where
   postContractsCompile = client (Proxy @ PostContractsCompile)
 
 instance MonadContracts Bloc where
-  getContracts = do
-    conn <- asks dbConnection
+  getContracts = runHasql $ do
     let
-      encoder = Encoders.unit
       -- current bloc returns milliseconds
+      -- TODO: get those extra 3 significant figures of accuracy
       toMilliSec utc = truncate (utcTimeToPOSIXSeconds utc) * 1000
-      decoderAddress contractName addr utc = (contractName, AddressCreatedAt (toMilliSec utc) (Unnamed addr) )
-      decoderNameAsAddress contractName name utc = (contractName, AddressCreatedAt (toMilliSec utc) (Named name) )
-      decoderAddresses = Decoders.rowsList (decoderAddress <$> Decoders.value Decoders.text <*> Decoders.value addressDecoder <*> Decoders.value Decoders.timestamptz)
-      decoderNamesAsAddresses = Decoders.rowsList (decoderNameAsAddress <$> Decoders.value Decoders.text <*> Decoders.value Decoders.text <*> Decoders.value Decoders.timestamptz)
-      sqlStatementAddresses = statement getContractsAddressesQuery encoder decoderAddresses False
-      sqlStatementNamesAsAddresses = statement getContractsNamesAsAddressesQuery encoder decoderNamesAsAddresses False
-    contractsAddressesEither <- liftIO $ run (query () sqlStatementAddresses) conn
-    contractsNamesAsAddressesEither <- liftIO $ run (query () sqlStatementNamesAsAddresses) conn
-    case (,) <$> contractsAddressesEither <*> contractsNamesAsAddressesEither of
-      Left err -> throwError $ DBError err
-      Right (contractsAddresses, contractsNamesAsAddresses) -> do
-        let
-          listToMap = foldr' (\ (key,val) -> Map.insertWith (++) key [val] ) Map.empty
-        return $ GetContractsResponse $
-          listToMap contractsAddresses
-          `Map.union`
-          listToMap contractsNamesAsAddresses
+      addressToVal addr utc = AddressCreatedAt (toMilliSec utc) (Unnamed addr)
+      addressesToMap = foldr'
+        (\ (key,addr,utc) -> Map.insertWith (++) key [addressToVal addr utc])
+        Map.empty
+      nameToVal name utc = AddressCreatedAt (toMilliSec utc) (Named name)
+      namesToMap = foldr'
+        (\ (key,name,utc) -> Map.insertWith (++) key [nameToVal name utc])
+        Map.empty
+    contractsAddresses <- query () getContractsAddressesQuery
+    contractsNamesAsAddresses <- query () getContractsNamesAsAddressesQuery
+    return . GetContractsResponse $
+      addressesToMap contractsAddresses
+      `Map.union`
+      namesToMap contractsNamesAsAddresses
 
-  getContractsData (ContractName contractName) = do
-    conn <- asks dbConnection
-    let
-      encoder = Encoders.value Encoders.text
-      decoderAddresses = Decoders.rowsList (Decoders.value addressDecoder)
-      decoderNames = Decoders.rowsList (Decoders.value Decoders.text)
-      sqlStatementAddresses = statement getContractsDataAddressesQuery encoder decoderAddresses False
-      sqlStatementNames = statement getContractsDataNamesQuery encoder decoderNames False
-    addressesEither <- liftIO $ run (query contractName sqlStatementAddresses) conn
-    namesEither <- liftIO $ run (query contractName sqlStatementNames) conn
-    case (,) <$> addressesEither <*> namesEither  of
-      Left err -> throwError $ DBError err
-      Right (addresses, names) -> do
-        return $ map Unnamed addresses ++ map Named names
+  getContractsData (ContractName contractName) = runHasql $ do
+    addresses <- query contractName getContractsDataAddressesQuery
+    names <- query contractName getContractsDataNamesQuery
+    return $ map Unnamed addresses ++ map Named names
 
   getContractsContract = undefined
-  -- getContractsContract (ContractName contractName) addr = do
-  --   conn <- asks dbConnection
-  --   let
-  --     encoderContAddr = contramap fst (Encoders.value Encoders.text)
-  --       <> contramap snd (Encoders.value addressEncoder)
-  --     encoderId = Encoders.value Encoders.int2
-  --     decoderCont = undefined
-  --     decoderArgs = undefined
-  --     decoderRet = undefined
-  --     decoderConstr = undefined
-  --     decoderVars = undefined
-  --     decoderVarEnt = undefined
-  --     -- GET Contract Info
-  --     sqlStringCont =
-  --       "SELECT CM.bin, CM.bin_runtime, CM.code_hash, C.name, CI.address\
-  --       \ FROM contracts C\
-  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-  --       \ WHERE C.name = $1 AND CI.address = $2"
-  --     -- GET Functions
-  --     sqlStringCont =
-  --       "SELECT id, name, selector, is_constructor FROM xabi_functions\
-  --       \ WHERE contract_metadata_id = $1\
-  --     -- GET function arguments
-  --     sqlStringArgs =
-  --       "SELECT XFA.name, XFA.index, XT.type, XT.typedef, \
-  --       \ XT.is_dynamic, XT.is_signed, XT.is_public, XT.bytes, \
-  --       \ EXT.type [entry_type], EXT.bytes [entry_bytes], EXT.typedef [entry_typedef]\
-  --       \ FROM xabi_functions XF\
-  --       \ LEFT OUTER JOIN xabi_function_arguments XFA\
-  --       \ ON XFA.function_id = XF.id\
-  --       \ LEFT OUTER JOIN xabi_types XT\
-  --       \ ON XT.id = XF.type_id\
-  --       \ LEFT OUTER JOIN xabi_types EXT\
-  --       \ ON EXT.id = XT.entry_type_id\
-  --       \ WHERE XFA.function_id = $1 "
-  --     -- GET function variables
-  --     sqlStringArgs =
-  --       "SELECT XFV.name, XFV.at_bytes, XFV.index, XT.type, XT.typedef, \
-  --       \ XT.is_dynamic, XT.is_signed, XT.is_public, XT.bytes, \
-  --       \ EXT.type [entry_type], EXT.bytes [entry_bytes], EXT.typedef [entry_typedef]\
-  --       \ VXT.type [value_type], VXT.bytes [value_bytes], VXT.typedef [value_typedef]\
-  --       \ KXT.type [key_type], KXT.bytes [key_bytes], KXT.typedef [key_typedef]\
-  --       \ FROM xabi_functions XF\
-  --       \ LEFT OUTER JOIN xabi_function_variables XFV\
-  --       \ ON XFA.function_id = XF.id\
-  --       \ LEFT OUTER JOIN xabi_types XT\
-  --       \ ON XT.id = XF.type_id\
-  --       \ LEFT OUTER JOIN xabi_types EXT\
-  --       \ ON EXT.id = XT.entry_type_id\
-  --       \ LEFT OUTER JOIN xabi_types VXT\
-  --       \ ON VXT.id = XT.entry_type_id\
-  --       \ LEFT OUTER JOIN xabi_types KXT\
-  --       \ ON KXT.id = XT.entry_type_id\
-  --       \ WHERE XFV.contract_metadata_id = $1 "
-  --     sqlStatementCont =
-  --       statement sqlStringCont encoderContAddr decoderCont False
-  --     sqlStatementArgs =
-  --       statement sqlStringArgs encoderId decoderArgs False
-  --     sqlStatementRet =
-  --       statement sqlStringRet encoderId decoderRet False
-  --     sqlStatementConstr =
-  --       statement sqlStringCont encoderContAddr decoderConstr False
-  --     sqlStatementVars =
-  --       statement sqlStringVars encoderContAddr decoderVars False
-  --     sqlStatementVarEnt =
-  --       statement sqlStringVars encoderId decoderVarEnt False
-  --   undefined
-  --   -- contractEither <- liftIO $
-  --   --   run (query (contractName,addr) sqlStatementContract) conn
-  --   -- case contractEither of
-  --   --   Left err -> throwError $ DBError err
-  --   --   Right contract -> return contract
+{-
+  getContractsContract (ContractName contractName) contractId = runHasql $ do
+    let
+      encoderByAddress = contramap fst (Encoders.value Encoders.text)
+        <> contramap snd (Encoders.value addressEncoder)
+      encoderOneName = Encoders.value Encoders.text
+      encoderByName = contramap fst (Encoders.value Encoders.text)
+        <> contramap snd (Encoders.value Encoders.text)
+      decoderDetailsAddress = ContractDetails
+        <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+        <*> Decoders.nullableValue (Unnamed <$> addressDecoder)
+        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+        <*> Decoders.value Decoders.text
+        <*> pure (Xabi Nothing Nothing Nothing)
+      decoderDetailsLatest = ContractDetails
+        <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+        <*> pure (Just (Named "Latest"))
+        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+        <*> Decoders.value Decoders.text
+        <*> pure (Xabi Nothing Nothing Nothing)
+      decoderAddress = Decoders.singleRow $ (,)
+        <$> decoderDetailsAddress
+        <*> Decoders.value Decoders.int4
+      decoderLatest = Decoders.singleRow $ (,)
+        <$> decoderDetailsLatest
+        <*> Decoders.value Decoders.int4
+      sqlStatementByAddress = statement
+        getContractsContractByAddressQuery encoderByAddress decoderAddress False
+      sqlStatementByName = statement
+        getContractsContractByNameQuery encoderByName decoderAddress False
+      sqlStatementBySameName = statement
+        getContractsContractBySameNameQuery encoderOneName decoderAddress False
+      sqlStatementLatest = statement
+        getContractsContractLatestQuery encoderOneName decoderLatest False
+    (contractDetails,metadataId) <- case contractId of
+      Named "Latest" -> query contractName sqlStatementLatest
+      Unnamed addr -> query (contractName,addr) sqlStatementByAddress
+      Named name ->
+        if contractName == name
+          then query name sqlStatementBySameName
+          else query (contractName,name) sqlStatementByName
+    return undefined
+-}
+{-
+    let
+      encoderFunc = Encoders.value Encoders.int4
+        <> Encoders.value Encoders.bool
+      decoderFunc = rowsList $ (,,)
+        <$> Decoders.Value Decoders.int4
+        <*> Decoders.Value Decoders.text
+        <*> Decoders.Value Decoders.bytea
+      sqlStatementFunc = statement
+        getXabiFunctionsQuery encoderFunc decoderFunc False
+      sqlStatementArgs = statement
+        getXabiFunctionsArgsQuery
+-}
+
 
   getContractsState = undefined
 
@@ -413,31 +378,3 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
-
--- contractDecoder :: Decoders.Row AddressCreatedAt
--- contractDecoder = AddressCreatedAt
---   <$> Decoders.value Decoders.int8
---   <*> Decoders.value (Unnamed <$> addressDecoder <|> Named <$> Decoders.text)
-
-data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
-instance ToJSON a => ToJSON (MaybeNamed a) where
-  toJSON (Named name) = toJSON name
-  toJSON (Unnamed a) = toJSON a
-instance FromJSON a => FromJSON (MaybeNamed a) where
-  parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
-instance Arbitrary a => Arbitrary (MaybeNamed a) where
-  arbitrary = oneof
-    [ elements [Named "name1", Named "name2", Named "name3"]
-    , Unnamed <$> arbitrary
-    ]
-instance ToHttpApiData (MaybeNamed Address) where
-  toUrlPiece (Named name) = name
-  toUrlPiece (Unnamed addr) = Text.pack . addressString $ addr
-instance FromHttpApiData (MaybeNamed Address) where
-  parseUrlPiece txt = case stringAddress (Text.unpack txt) of
-    Nothing -> Right $ Named txt
-    Just addr -> Right $ Unnamed addr
-instance ToSample (MaybeNamed Address) where
-  toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
-instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
-  toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"

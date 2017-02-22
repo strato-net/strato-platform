@@ -10,12 +10,7 @@
 
 module BlockApps.Bloc.API.Addresses where
 
-import Control.Monad.Except
-import Control.Monad.Reader
 import Data.Proxy
-import qualified Hasql.Decoders as Decoders
-import qualified Hasql.Encoders as Encoders
-import Hasql.Query
 import Hasql.Session
 import Servant.API
 import Servant.Client
@@ -30,17 +25,6 @@ class Monad m => MonadAddresses m where
 instance MonadAddresses ClientM where
   getAddresses = client (Proxy @ GetAddresses)
 instance MonadAddresses Bloc where
-  getAddresses = do
-    conn <- asks dbConnection
-    let
-      addressesQuery = statement
-        getAddressesQuery
-        Encoders.unit
-        (Decoders.rowsList (Decoders.value addressDecoder))
-        False
-    addressesEither <- liftIO $ run (query () addressesQuery) conn
-    case addressesEither of
-      Left err -> throwError $ DBError err
-      Right addresses -> return addresses
+  getAddresses = runHasql $ query () getAddressesQuery
 
 type GetAddresses = "addresses" :> Get '[HTMLifiedJSON] [Address]

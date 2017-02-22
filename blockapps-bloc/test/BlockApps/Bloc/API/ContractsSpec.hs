@@ -32,12 +32,20 @@ spec = do
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
       contractsEither <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr bayar4a)
       contractsEither `shouldSatisfy` isRight
-  describe "getContractsContract" $
+  describe "getContractsContract" $ do
     it "get xabi data for an uploaded contracted at a specific address" $ \ TestConfig {..} -> do
       contractsEither <- runClientM
         (getContractsContract
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
+        )
+        (ClientEnv mgr bayar4a)
+      contractsEither `shouldSatisfy` isRight
+    it "should also work when mappings are involved" $ \ TestConfig {..} -> do
+      contractsEither <- runClientM
+        (getContractsContract
+          (ContractName testContractName)
+          (Unnamed testContractAddress)
         )
         (ClientEnv mgr bayar4a)
       contractsEither `shouldSatisfy` isRight
