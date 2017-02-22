@@ -54,33 +54,33 @@ executable strato-redis-viz
   default-language:    Haskell2010
   ghc-options: -threaded -Wall -Werror
 
-test-suite strato-redis-blockdb-style
-    type: exitcode-stdio-1.0
-    hs-source-dirs: test
-    main-is: HLint.hs
-    other-modules: Blockchain.Strato.RedisBlockDB.Test.Chain
-    build-depends:
-        hlint,
-        ansi-wl-pprint,
-        blockapps-data,
-        blockapps-util,
-        base,
-        containers,
-        lens-family,
-        lens-family-th,
-        bytestring,
-        hedis,
-        HUnit,
-        hspec-contrib,
-        hspec,
-        hspec-core,
-        QuickCheck,
-        text,
-        strato-redis-blockdb,
-        strato-model
-    -- We use -O0 here, since GHC takes *very* long to compile so many constants
-    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind
-    default-language: Haskell2010
+-- test-suite strato-redis-blockdb-style
+--     type: exitcode-stdio-1.0
+--     hs-source-dirs: test
+--     main-is: HLint.hs
+--     other-modules: Blockchain.Strato.RedisBlockDB.Test.Chain
+--     build-depends:
+--         hlint,
+--         ansi-wl-pprint,
+--         blockapps-data,
+--         blockapps-util,
+--         base,
+--         containers,
+--         lens-family,
+--         lens-family-th,
+--         bytestring,
+--         hedis,
+--         HUnit,
+--         hspec-contrib,
+--         hspec,
+--         hspec-core,
+--         QuickCheck,
+--         text,
+--         strato-redis-blockdb,
+--         strato-model
+--     -- We use -O0 here, since GHC takes *very* long to compile so many constants
+--     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind
+--     default-language: Haskell2010
 test-suite strato-redis-blockdb-test
     type: exitcode-stdio-1.0
     hs-source-dirs: test

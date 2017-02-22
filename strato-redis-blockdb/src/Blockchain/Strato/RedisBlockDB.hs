@@ -29,6 +29,7 @@ import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
+import qualified Data.ByteString.Base16                as BS16
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as Set
 import           System.Random                         (randomIO)
@@ -270,6 +271,7 @@ putHeader h = do
         inNS'     = flip inNamespace sha
     
     res <- multiExec $ do
+        liftIO . putStrLn $ ("\nputHeader h:"++ shaToHex sha ++ "\n")  ++ (show $ BS16.encode (toValue storeHead))
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
         void $ sadd (inNamespace Children parent) [toValue sha]
@@ -378,11 +380,12 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               safeTail xs = tail xs
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: (RedisCtx m f) => SHA -> Integer -> Integer -> m (f Status)
-forceBestBlockInfo = forceBestBlockInfo' bestBlockInfoKey `totalRecall` (,,)
-    where infixr 3 `totalRecall`; totalRecall = (.).(.).(.)
+forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
+forceBestBlockInfo sha i j = do
+        liftIO . putStrLn $ "\nForcing " ++ shaToHex sha
+        forceBestBlockInfo' bestBlockInfoKey (sha, i, j) --`totalRecall` (,,) 
 
-forceBestBlockInfo' :: (RedisCtx m f) => S8.ByteString -> (SHA, Integer, Integer) -> m (f Status)
+forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> (SHA, Integer, Integer) -> m (f Status)
 forceBestBlockInfo' key = set key . toValue . RedisBestBlock
 
 getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))

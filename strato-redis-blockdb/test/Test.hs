@@ -184,11 +184,13 @@ specTest = around (withConn 1) $ do
     describe "ReplaceBestBlock" $ do
         
         flushDB
-
+        void $ putTreeTest "Should generate a tree (force)" (workChain RDB.forceBestBlockInfo)
+        
+        flushDB
         void $ putTreeTest "Should generate a tree (force)" (workChain RDB.forceBestBlockInfo)
 
-        flushDB
 
+        flushDB
         it "should ping" $ \conn -> do
             r <- runRedis conn (ping)
             HUnit.assertBool
@@ -196,9 +198,9 @@ specTest = around (withConn 1) $ do
                 (isRight r) 
 
         flushDB
-
-        -- void $ putTreeTest "Should generate a tree (put)" (workChain' RDB.putBestBlockInfo)
-
+        --void $ putTreeTest "Should generate a tree (put)" (workChain' RDB.putBestBlockInfo)
+        
+        -- flushDB
         -- it "Should fetch the canonical chain" $ \conn -> do
         --     g <- liftIO $ makeGenesisBlock
         --     tree <- bush g 6 3 :: IO (Tree BlockData)
