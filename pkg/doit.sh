@@ -55,7 +55,7 @@ function doInit {
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort \
+                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
                     --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
@@ -63,7 +63,7 @@ function doInit {
   if [[ ${backupblocks} ]] ; then
      cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                       --redisHost=$redisBDBHost --redisPort=$redisBDBPort \
+                       --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                        --addBootnodes=$addBootnodes $stratoBootnode \
                        --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
      echo $cmd
@@ -120,6 +120,7 @@ setEnv zkHost zookeeper
 
 setEnv redisBDBHost redis
 setEnv redisBDBPort 6379
+setEnv redisBDBNumber 0
 
 setEnv explorerHost explorer
 
