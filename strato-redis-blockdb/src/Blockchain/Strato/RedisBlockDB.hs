@@ -263,6 +263,7 @@ putHeader h = do
         number    = blockHeaderBlockNumber h
         storeHead = morphBlockHeader h :: RedisHeader
         inNS'     = flip inNamespace sha
+    
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
@@ -270,9 +271,9 @@ putHeader h = do
         sadd (inNamespace Numbers number) [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack e)
-
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Error" ++ e)
+    
 putHeaders :: (Traversable f, BlockHeaderLike h)
            => f h
            -> Redis (f (Either Reply Status))
