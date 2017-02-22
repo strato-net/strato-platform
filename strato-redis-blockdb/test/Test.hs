@@ -185,20 +185,20 @@ specTest = around (withConn 1) $ do
         
         flushDB
         void $ putTreeTest "Should generate a tree (force)" (workChain RDB.forceBestBlockInfo)
-        
-        flushDB
-        void $ putTreeTest "Should generate a tree (force)" (workChain RDB.forceBestBlockInfo)
+        -- 
+        -- flushDB
+        -- void $ putTreeTest "Should generate a tree (force)" (workChain RDB.forceBestBlockInfo)
 
 
-        flushDB
-        it "should ping" $ \conn -> do
-            r <- runRedis conn (ping)
-            HUnit.assertBool
-                "ping"
-                (isRight r) 
+        -- flushDB
+        -- it "should ping" $ \conn -> do
+        --     r <- runRedis conn (ping)
+        --     HUnit.assertBool
+        --         "ping"
+        --         (isRight r) 
 
         flushDB
-        --void $ putTreeTest "Should generate a tree (put)" (workChain' RDB.putBestBlockInfo)
+        void $ putTreeTest "Should generate a tree (put)" (workChain' RDB.putBestBlockInfo)
         
         -- flushDB
         -- it "Should fetch the canonical chain" $ \conn -> do
@@ -221,7 +221,7 @@ specTest = around (withConn 1) $ do
         --         (pb <$> last chains) (pb <$> map snd r) 
 
 putTreeTest :: String -> ([BlockData] -> Redis ()) -> SpecWith Connection 
-putTreeTest msg insertChain = it msg $ \conn -> do
+putTreeTest msg putter = it msg $ \conn -> do
             g <- liftIO $ makeGenesisBlock
             tree <- bush g 6 3 :: IO (Tree BlockData)
             let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
@@ -233,11 +233,10 @@ putTreeTest msg insertChain = it msg $ \conn -> do
 
             r <- runRedis conn $ do
                 void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
-                
                 forM_ allblocks RDB.putHeader
-                
                 forM chains $ \chain -> do
-                    insertChain $ chain
+                    liftIO . putStrLn . show $ pb <$> chain
+                    putter $ chain
                     RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 
             let lengths = fromIntegral . length <$> chains
@@ -257,10 +256,10 @@ workChain g chain = forM_ zC f
         zC       = zip (reverse chain) [1..]
 
 workChain' :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis () 
-workChain' _ chain = foldM_ f 0 chain
+workChain' g chain = foldM_ f 0 chain
     where
         f d b = do
-            void $ RDB.putBestBlockInfo (blockHeaderHash b) (blockDataNumber b) d
+            void $ g (blockHeaderHash b) (blockDataNumber b) d
             pure $ d + (blockDataDifficulty b)
 
 pb :: BlockData -> (Integer, Integer, String, String) 

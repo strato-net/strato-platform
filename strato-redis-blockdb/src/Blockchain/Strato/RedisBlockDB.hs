@@ -29,7 +29,6 @@ import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
-import qualified Data.ByteString.Base16                as BS16
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as Set
 import           System.Random                         (randomIO)
@@ -271,7 +270,6 @@ putHeader h = do
         inNS'     = flip inNamespace sha
     
     res <- multiExec $ do
-        liftIO . putStrLn $ ("\nputHeader h:"++ shaToHex sha ++ "\n")  ++ (show $ BS16.encode (toValue storeHead))
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
         void $ sadd (inNamespace Children parent) [toValue sha]
@@ -321,18 +319,22 @@ putBestBlockInfo :: SHA
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
+    liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-        Just (oldSha, oldNumber, _) -> do
+        Just (oldSha, oldNumber, oldTDiff) -> do
+            liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
-                Left err -> return (Left err)
+                Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
+                    liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates) 
+                    liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                     res <- multiExec $ do
                         forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ toKey num) (toValue sha)
-                        void . del $ inNamespace Canonical . toKey <$> deletions
-                        forceBestBlockInfo' bestBlockInfoKey (newSha, newNumber, newTDiff)
+                        unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
+                        forceBestBlockInfo newSha newNumber newTDiff
                     case res of
                         TxSuccess _ -> return $ Right Ok
                         TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
@@ -341,16 +343,17 @@ putBestBlockInfo newSha newNumber newTDiff = do
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
                      -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
-commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.singleton oldSha')
-        where helper oldShaChain newShaChain seen = do
+commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
+        where helper (x:[]) (y:[]) _ | x == y = return $ Right ([], []) 
+              helper oldShaChain newShaChain seen = do
                   let oldSha = head oldShaChain
                       newSha = head newShaChain
                   ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                  let seen' = foldl (flip Set.insert) seen ps -- todo double Set.insert is probably more optimal
-                  if newParent `Set.member` seen'
-                  then complete newParent newShaChain
+                  let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
+                  if newParent `Set.member` seen
+                  then complete newParent (mkParentChain newParent newShaChain)
                   else if oldParent `Set.member` seen
-                       then complete oldParent newShaChain
+                       then complete oldParent (mkParentChain oldParent newShaChain)
                        else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
               -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
@@ -361,23 +364,26 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- the second case is impossible because `helper`, which calls mkParentChain,
               -- always gets called with a list of at least length 1
               mkParentChain :: SHA -> [SHA] -> [SHA]
+              mkParentChain (SHA 0) xs = xs
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
               complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> return . Left . SingleLine . S8.pack $
-                                    "Could not get ancestor header for SHA " ++ shaToHex lca
-                      Just (ancestor :: RedisHeader) ->
+                      Nothing -> if lca /= (SHA 0) -- genesis block is sha 0 
+                                     then return . Left . SingleLine . S8.pack $
+                                              "Could not get ancestor header for SHA " ++ shaToHex lca
+                                     else complete (head newShaChain) newShaChain 
+                      Just (ancestor :: RedisHeader) -> do
+                          liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
-                              updates        = safeTail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
-                          in
-                              return $ Right (updates, deletions)
+                              updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
+                          return $ Right (updates, deletions)
 
-              safeTail :: [a] -> [a]
-              safeTail [] = []
-              safeTail xs = tail xs
+              -- safeTail :: [a] -> [a]
+              -- safeTail [] = []
+              -- safeTail xs = tail xs
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
