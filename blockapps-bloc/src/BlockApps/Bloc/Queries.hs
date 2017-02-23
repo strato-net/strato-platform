@@ -5,9 +5,12 @@
 module BlockApps.Bloc.Queries where
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as Char8
 import Data.Functor.Contravariant
 import Data.Int (Int32)
+import Data.Maybe
 import Data.Text (Text)
+import qualified Data.Text.Encoding as Text
 import Data.Time (UTCTime)
 import qualified Hasql.Decoders as Decoders
 import qualified Hasql.Encoders as Encoders
@@ -174,7 +177,7 @@ getContractsDataNamesQuery = statement
   False
 
 getContractsContractByAddressQuery
-  :: Query (Text,Address) (ByteString,Address,ByteString,ByteString,Text,Int32)
+  :: Query (Text,Address) (ContractDetails,Int32)
 getContractsContractByAddressQuery = statement
   "SELECT \
   \   CM.bin \
@@ -198,16 +201,19 @@ getContractsContractByAddressQuery = statement
       [ contramap fst (Encoders.value Encoders.text)
       , contramap snd (Encoders.value addressEncoder)
       ]
-    decoder = Decoders.singleRow $ (,,,,,)
-      <$> Decoders.value Decoders.bytea
-      <*> Decoders.value addressDecoder
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.text
+    decoder = Decoders.singleRow $ (,)
+      <$> decoderContractDetails
       <*> Decoders.value Decoders.int4
+    decoderContractDetails = ContractDetails
+      <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> (Just . Unnamed <$> Decoders.value addressDecoder)
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> Decoders.value Decoders.text
+      <*> pure (Xabi Nothing Nothing Nothing)
 
 getContractsContractByNameQuery
-  :: Query (Text,Text) (ByteString,ByteString,ByteString,Text,Int32)
+  :: Query (Text,Text) (ContractDetails,Int32)
 getContractsContractByNameQuery = statement
   "SELECT \
   \   CM2.bin \
@@ -234,19 +240,22 @@ getContractsContractByNameQuery = statement
       [ contramap fst (Encoders.value Encoders.text)
       , contramap snd (Encoders.value Encoders.text)
       ]
-    decoder = Decoders.singleRow $ (,,,,)
-      <$> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.text
+    decoder = Decoders.singleRow $ (,)
+      <$> decoderContractDetails
       <*> Decoders.value Decoders.int4
+    decoderContractDetails = ContractDetails
+      <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> pure Nothing
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> Decoders.value Decoders.text
+      <*> pure (Xabi Nothing Nothing Nothing)
 
 getContractsContractBySameNameQuery
-  :: Query Text (ByteString,Address,ByteString,ByteString,Text,Int32)
+  :: Query Text (ContractDetails,Int32)
 getContractsContractBySameNameQuery = statement
   "SELECT \
   \   CM.bin \
-  \ , NULL as address \
   \ , CM.bin_runtime \
   \ , CM.code_hash \
   \ , C.name \
@@ -260,16 +269,19 @@ getContractsContractBySameNameQuery = statement
   decoder
   False
   where
-    decoder = Decoders.singleRow $ (,,,,,)
-      <$> Decoders.value Decoders.bytea
-      <*> Decoders.value addressDecoder
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.text
+    decoder = Decoders.singleRow $ (,)
+      <$> decoderContractDetails
       <*> Decoders.value Decoders.int4
+    decoderContractDetails = ContractDetails
+      <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> pure Nothing
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> Decoders.value Decoders.text
+      <*> pure (Xabi Nothing Nothing Nothing)
 
 getContractsContractLatestQuery
-  :: Query Text (ByteString,ByteString,ByteString,Text,Int32)
+  :: Query Text (ContractDetails,Int32)
 getContractsContractLatestQuery = statement
   "SELECT \
   \   CM.bin \
@@ -288,14 +300,18 @@ getContractsContractLatestQuery = statement
   decoder
   False
   where
-    decoder = Decoders.singleRow $ (,,,,)
-      <$> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.bytea
-      <*> Decoders.value Decoders.text
+    decoder = Decoders.singleRow $ (,)
+      <$> decoderContractDetails
       <*> Decoders.value Decoders.int4
+    decoderContractDetails = ContractDetails
+      <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> pure Nothing
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
+      <*> Decoders.value Decoders.text
+      <*> pure (Xabi Nothing Nothing Nothing)
 
-getXabiFunctionsQuery :: Query (Int32,Bool) [(Int32,Text,ByteString)]
+getXabiFunctionsQuery :: Query Int32 [(Int32,Text,ByteString)]
 getXabiFunctionsQuery = statement
   "SELECT \
   \  XF.id \
@@ -304,25 +320,34 @@ getXabiFunctionsQuery = statement
   \FROM \
   \ xabi_functions XF \
   \WHERE \
-  \  XF.is_constructor = $2 \
+  \  XF.is_constructor = false \
   \  AND XF.contract_metadata_id = $1;"
-  encoder
+  (Encoders.value Encoders.int4)
   decoder
   False
   where
-    encoder = mconcat
-      [ contramap fst (Encoders.value Encoders.int4)
-      , contramap snd (Encoders.value Encoders.bool)
-      ]
     decoder = Decoders.rowsList $ (,,)
       <$> Decoders.value Decoders.int4
       <*> Decoders.value Decoders.text
       <*> Decoders.value Decoders.bytea
 
+getXabiConstrQuery :: Query Int32 Int32
+getXabiConstrQuery = statement
+  "SELECT \
+  \  XF.id \
+  \FROM \
+  \ xabi_functions XF \
+  \WHERE \
+  \  XF.is_constructor = true \
+  \  AND XF.contract_metadata_id = $1;"
+  (Encoders.value Encoders.int4)
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
+
 getXabiFunctionsArgsQuery :: Query Int32 [Arg]
 getXabiFunctionsArgsQuery = statement
   "SELECT \
-  \   XFA.name \
+  \  ,XFA.name \
   \  ,XFA.index \
   \  ,XT.type \
   \  ,XT.typedef \
@@ -345,18 +370,13 @@ getXabiFunctionsArgsQuery = statement
     decoder = Decoders.rowsList $ Arg
       <$> Decoders.nullableValue Decoders.text
       <*> Decoders.value Decoders.int4
-      <*> Decoders.value Decoders.text
+      <*> Decoders.nullableValue Decoders.text
       <*> Decoders.nullableValue Decoders.text
       <*> Decoders.nullableValue Decoders.bool
       <*> Decoders.nullableValue Decoders.int4
       <*> entryDecoder
-    entryDecoder = do
-      ty <- Decoders.value Decoders.text
-      by <- Decoders.nullableValue Decoders.int4
-      return $ Entry <$> by <*> Just ty
 
-getXabiFunctionsReturnValuesQuery
-  :: Query Int32 [(Text,Val)]
+getXabiFunctionsReturnValuesQuery :: Query Int32 [(Text,Val)]
 getXabiFunctionsReturnValuesQuery = statement
   "SELECT \
   \  (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name\
@@ -384,18 +404,14 @@ getXabiFunctionsReturnValuesQuery = statement
       <*> valDecoder
     valDecoder = Val
       <$> Decoders.value Decoders.int4
-      <*> Decoders.value Decoders.text
+      <*> Decoders.nullableValue Decoders.text
       <*> Decoders.nullableValue Decoders.text
       <*> Decoders.nullableValue Decoders.bool
       <*> Decoders.nullableValue Decoders.int4
       <*> entryDecoder
-    entryDecoder = do
-      ty <- Decoders.value Decoders.text
-      by <- Decoders.nullableValue Decoders.int4
-      return $ Entry <$> by <*> Just ty
 
-getXabiVariablesQuery :: ByteString
-getXabiVariablesQuery =
+getXabiVariablesQuery :: Query Int32 [(Text,Var)]
+getXabiVariablesQuery = statement
   "SELECT \
   \   XV.name \
   \  ,XV.at_bytes \
@@ -409,11 +425,13 @@ getXabiVariablesQuery =
   \  ,XTV.type as value_type \
   \  ,XTV.bytes as values_bytes \
   \  ,XTV.is_dynamic as value_is_dynamic \
+  \  ,XTV.is_signed as value_is_signed \
   \  ,XTVE.type as value_entry_type \
   \  ,XTVE.bytes as value_entry_bytes \
   \  ,XTK.type as key_type \
   \  ,XTK.bytes as key_bytes \
   \  ,XTK.is_dynamic as key_is_dynamic \
+  \  ,XTK.is_signed as key_is_signed \
   \  ,XTVK.type as key_entry_type \
   \  ,XTVK.bytes as key_entry_bytes \
   \FROM \
@@ -431,3 +449,45 @@ getXabiVariablesQuery =
   \LEFT OUTER JOIN \
   \  xabi_types XTKE ON XTKE.id = XT.entry_type_id \
   \WHERE XV.contract_metadata_id = $1;"
+  (Encoders.value Encoders.int4)
+  decoder
+  False
+  where
+    decoder = Decoders.rowsList $ (,)
+      <$> Decoders.value Decoders.text
+      <*> varDecoder
+    varDecoder = Var
+      <$> Decoders.value Decoders.int4
+      <*> Decoders.nullableValue Decoders.text
+      <*> Decoders.nullableValue Decoders.text
+      <*> Decoders.nullableValue Decoders.bool
+      <*> Decoders.nullableValue Decoders.bool
+      <*> Decoders.nullableValue Decoders.int4
+      <*> entryDecoder
+      <*> simpleVarDecoder
+      <*> simpleVarDecoder
+    simpleVarDecoder = do
+      tyMaybe <- Decoders.nullableValue Decoders.text
+      byMaybe <- Decoders.nullableValue Decoders.int4
+      dyMaybe <- Decoders.nullableValue Decoders.bool
+      siMaybe <- Decoders.nullableValue Decoders.bool
+      enMaybe <- entryDecoder
+      case tyMaybe of
+        Nothing -> return Nothing
+        Just ty -> return . Just $
+          SimpleVar ty byMaybe dyMaybe siMaybe enMaybe
+
+addressDecoder :: Decoders.Value Address
+addressDecoder
+  = fromMaybe (error "cannot decode address")
+  . stringAddress
+  . Char8.unpack <$> Decoders.bytea
+
+addressEncoder :: Encoders.Value Address
+addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
+
+entryDecoder :: Decoders.Row (Maybe Entry)
+entryDecoder = do
+  ty <- Decoders.value Decoders.text
+  by <- Decoders.nullableValue Decoders.int4
+  return $ Entry <$> by <*> Just ty

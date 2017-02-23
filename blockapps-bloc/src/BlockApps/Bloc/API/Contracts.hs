@@ -17,14 +17,16 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
 import Data.Int
-import Data.Monoid
 import Data.Foldable
+import Data.Traversable
 import Data.Proxy
 import Data.Time.Clock.POSIX
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
 import Hasql.Session
@@ -88,66 +90,37 @@ instance MonadContracts Bloc where
     names <- query contractName getContractsDataNamesQuery
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract = undefined
-{-
   getContractsContract (ContractName contractName) contractId = runHasql $ do
-    let
-      encoderByAddress = contramap fst (Encoders.value Encoders.text)
-        <> contramap snd (Encoders.value addressEncoder)
-      encoderOneName = Encoders.value Encoders.text
-      encoderByName = contramap fst (Encoders.value Encoders.text)
-        <> contramap snd (Encoders.value Encoders.text)
-      decoderDetailsAddress = ContractDetails
-        <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
-        <*> Decoders.nullableValue (Unnamed <$> addressDecoder)
-        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
-        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
-        <*> Decoders.value Decoders.text
-        <*> pure (Xabi Nothing Nothing Nothing)
-      decoderDetailsLatest = ContractDetails
-        <$> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
-        <*> pure (Just (Named "Latest"))
-        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
-        <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
-        <*> Decoders.value Decoders.text
-        <*> pure (Xabi Nothing Nothing Nothing)
-      decoderAddress = Decoders.singleRow $ (,)
-        <$> decoderDetailsAddress
-        <*> Decoders.value Decoders.int4
-      decoderLatest = Decoders.singleRow $ (,)
-        <$> decoderDetailsLatest
-        <*> Decoders.value Decoders.int4
-      sqlStatementByAddress = statement
-        getContractsContractByAddressQuery encoderByAddress decoderAddress False
-      sqlStatementByName = statement
-        getContractsContractByNameQuery encoderByName decoderAddress False
-      sqlStatementBySameName = statement
-        getContractsContractBySameNameQuery encoderOneName decoderAddress False
-      sqlStatementLatest = statement
-        getContractsContractLatestQuery encoderOneName decoderLatest False
     (contractDetails,metadataId) <- case contractId of
-      Named "Latest" -> query contractName sqlStatementLatest
-      Unnamed addr -> query (contractName,addr) sqlStatementByAddress
+      Named "Latest" ->
+        query contractName getContractsContractLatestQuery
+      Unnamed addr ->
+        query (contractName,addr) getContractsContractByAddressQuery
       Named name ->
         if contractName == name
-          then query name sqlStatementBySameName
-          else query (contractName,name) sqlStatementByName
-    return undefined
--}
-{-
+          then query name getContractsContractBySameNameQuery
+          else query (contractName,name) getContractsContractByNameQuery
+    funcIdNameSels <- query metadataId getXabiFunctionsQuery
     let
-      encoderFunc = Encoders.value Encoders.int4
-        <> Encoders.value Encoders.bool
-      decoderFunc = rowsList $ (,,)
-        <$> Decoders.Value Decoders.int4
-        <*> Decoders.Value Decoders.text
-        <*> Decoders.Value Decoders.bytea
-      sqlStatementFunc = statement
-        getXabiFunctionsQuery encoderFunc decoderFunc False
-      sqlStatementArgs = statement
-        getXabiFunctionsArgsQuery
--}
-
+      -- TODO: fix this in next API iteration
+      argsToPairs = map (\ arg -> (fromMaybe "arggg" (argName arg), arg))
+    funcs <- fmap Map.fromList $
+      for funcIdNameSels $ \ (funcId,funcName,sel) -> do
+        args <- query funcId getXabiFunctionsArgsQuery
+        vals <- query funcId getXabiFunctionsReturnValuesQuery
+        let
+          func = Func
+            { funcArgs = Map.fromList (argsToPairs args)
+            , funcSelector = Text.decodeUtf8 sel
+            , funcVals = Map.fromList vals
+            }
+        return $ (funcName,func)
+    constrId <- query metadataId getXabiConstrQuery
+    constr <- Map.fromList . argsToPairs <$>
+      query constrId getXabiFunctionsArgsQuery
+    vars <- Map.fromList <$> query metadataId getXabiVariablesQuery
+    return $ contractDetails
+      { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
   getContractsState = undefined
 
