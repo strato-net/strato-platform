@@ -20,8 +20,12 @@ library
   ghc-options: -Wall
   build-depends: base
     , aeson
+    , aeson-casing
     , bytestring
+    , containers
+    , generic-random
     , QuickCheck
+    , quickcheck-instances
     , text
 
 test-suite blockapps-solidity-test

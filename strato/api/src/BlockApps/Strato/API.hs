@@ -4,14 +4,16 @@
   , TypeOperators
 #-}
 
-module BlockApps.Strato.API (API) where
+module BlockApps.Strato.API where
 
--- import Data.HashMap.Strict (HashMap)
+import Data.HashMap.Strict (HashMap)
+import Data.Map.Strict (Map)
 import Data.Text (Text)
--- import GHC.Generics
+import GHC.Generics
 import Numeric.Natural
 import Servant.API
 
+import BlockApps.Solidity
 import BlockApps.Strato.Types
 
 type API =
@@ -85,26 +87,7 @@ type API =
     :> Post '[PlainText] Text
   :<|> "solc"
     :> ReqBody '[FormUrlEncoded] Src
-    :> Post '[PlainText] Text
+    :> Post '[PlainText] SolcResponse
   :<|> "extabi"
     :> ReqBody '[FormUrlEncoded] Src
-    :> Post '[PlainText] Text
-
--- data SolcResponse = SolcResponse
---   { solcresponseAbis :: [Abi]
---   , solcresponseContracts :: [BinContract]
---   , solcresponseXabis :: HashMap Text Xabi
---   } deriving (Eq,Show,Generic)
--- data Abi = Abi
---   { abiName :: Text
---   , abiAbi :: [Signature]
---   } deriving (Eq,Show,Generic)
--- data Signature = Signature
---   { signatureInputs :: [Text]
---   , signatureType :: Text
---   } deriving (Eq,Show,Generic)
--- data BinContract = BinContract
---   { bincontractName :: Text
---   , binBin :: Text
---   } deriving (Eq,Show,Generic)
--- data Xabi = Xabi deriving (Eq,Show,Generic)
+    :> Post '[PlainText] ExtabiResponse

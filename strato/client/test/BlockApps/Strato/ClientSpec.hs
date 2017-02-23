@@ -4,6 +4,7 @@
 module BlockApps.Strato.ClientSpec where
 
 import Data.Either
+import Data.LargeWord
 import Generic.Random.Generic
 import Network.HTTP.Client
 import Servant.Client
@@ -13,7 +14,6 @@ import Test.QuickCheck
 
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
-import BlockApps.Strato.TypesSpec ()
 
 spec :: Spec
 spec
@@ -100,3 +100,23 @@ spec
     it "works" $ \ mgr -> do
       resp <- runClientM (postSolc src) (ClientEnv mgr stratoDev)
       resp `shouldSatisfy` isRight
+  describe "postExtabi" $
+    it "works" $ \ mgr -> do
+      resp <- runClientM (postExtabi src) (ClientEnv mgr stratoDev)
+      resp `shouldSatisfy` isRight
+
+-- orphans
+
+instance Arbitrary TransactionType where arbitrary = genericArbitrary uniform
+instance Arbitrary Addresses where arbitrary = genericArbitrary uniform
+instance (Arbitrary x, Arbitrary y) => Arbitrary (LargeKey x y) where
+  arbitrary = LargeKey <$> arbitrary <*> arbitrary
+instance Arbitrary Transaction where arbitrary = genericArbitrary uniform
+instance Arbitrary x => Arbitrary (WithNext x) where
+  arbitrary = genericArbitrary uniform
+instance Arbitrary BlockData where arbitrary = genericArbitrary uniform
+instance Arbitrary Block where arbitrary = genericArbitrary uniform
+instance Arbitrary Account where arbitrary = genericArbitrary uniform
+instance Arbitrary Difficulty where arbitrary = genericArbitrary uniform
+instance Arbitrary TxCount where arbitrary = genericArbitrary uniform
+instance Arbitrary Storage where arbitrary = genericArbitrary uniform

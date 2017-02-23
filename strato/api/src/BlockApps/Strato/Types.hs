@@ -2,6 +2,7 @@
     DataKinds
   , DeriveAnyClass
   , DeriveGeneric
+  , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
   , TypeApplications
@@ -27,6 +28,8 @@ module BlockApps.Strato.Types
   , TxCount (..)
   , Storage (..)
   , Src (..)
+  , ExtabiResponse (..)
+  , SolcResponse (..)
   ) where
 
 import Control.Applicative
@@ -37,6 +40,7 @@ import Data.Foldable
 import qualified Data.HashMap.Strict as HashMap
 import Data.LargeWord
 import Data.List.NonEmpty (NonEmpty)
+import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -46,6 +50,7 @@ import Generic.Random.Generic
 import GHC.Generics
 import Numeric
 import Numeric.Natural
+import Servant.API
 import Servant.Docs
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -61,6 +66,7 @@ import BlockApps.Ethereum
   , Keccak256 (..)
   , keccak256lazy
   )
+import BlockApps.Solidity
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 instance (Integral n, Show n) => Show (Hex n) where
@@ -267,3 +273,42 @@ instance ToJSON Storage where
 newtype Src = Src { unSrc :: Text } deriving (Eq, Show)
 instance ToForm Src where
   toForm (Src src) = Form $ HashMap.singleton "src" [src]
+
+newtype ExtabiResponse = ExtabiResponse { extabiresponseSrc :: Map Text Xabi }
+  deriving (Eq,Show,Generic)
+instance FromJSON ExtabiResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToJSON ExtabiResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance MimeUnrender PlainText ExtabiResponse where
+  mimeUnrender _ = eitherDecode
+instance MimeRender PlainText ExtabiResponse where
+  mimeRender _ = encode
+
+data SolcResponse = SolcResponse
+  { solcresponseSrc :: Map Text AbiBin }
+  deriving (Eq,Show,Generic)
+instance FromJSON SolcResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToJSON SolcResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+data AbiBin = AbiBin
+  { abi :: Text
+  , bin :: Text
+  , binRuntime :: Text
+  } deriving (Eq,Show,Generic)
+instance FromJSON AbiBin where
+  parseJSON = withObject "AbiBin" $ \obj -> AbiBin
+    <$> obj .: "abi"
+    <*> obj .: "bin"
+    <*> obj .: "bin-runtime"
+instance ToJSON AbiBin where
+  toJSON AbiBin{..} = object
+    [ "abi" .= abi
+    , "bin" .= bin
+    , "bin-runtime" .= binRuntime
+    ]
+instance MimeUnrender PlainText SolcResponse where
+  mimeUnrender _ = eitherDecode
+instance MimeRender PlainText SolcResponse where
+  mimeRender _ = encode

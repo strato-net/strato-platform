@@ -107,8 +107,8 @@ getTotalTx :: ClientM TxCount
 getStorage :: Maybe Address -> ClientM [Storage]
 postFaucet :: Address -> ClientM Text
 postFaucets :: Addresses -> ClientM Text
-postSolc :: Src -> ClientM Text
-postExtabi :: Src -> ClientM Text
+postSolc :: Src -> ClientM SolcResponse
+postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx
@@ -163,4 +163,4 @@ getTxsFilter
       qaNonce qaMinNonce qaMaxNonce
 
 stratoDev :: BaseUrl
-stratoDev = BaseUrl Http "strato-dev4.blockapps.net" 80 "/eth/v1.2"
+stratoDev = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"

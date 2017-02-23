@@ -180,8 +180,26 @@ instance MonadContracts Bloc where
   --     , postcompilerequestContractName = contractName
   --     , postcompilerequestSource = source
   --     } -> do
-  --       (xabi,comp) <- liftIO $ flip runClientM (ClientEnv mgr url) $
-  --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  --       (ExtabiResponse xabis,SolcResponse abiBins) <-
+  --         liftIO $ flip runClientM (ClientEnv mgr url) $
+  --           (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  --       let
+  --         contracts = Map.intersectionWith (,) xabis abiBins
+  --         forMap = void . flip traverseWithKey
+  --       forMap contracts $ \ contrName (xabi,AbiBin{..}) -> do
+  --         let
+  --           details = ContractDetails
+  --             { contractdetailsBin = bin
+  --             , contractdetailsAddress = Nothing
+  --             , contractdetailsBinRuntime = binRuntime
+  --             , contractdetailsCodeHash = undefined
+  --             , contractdetailsName = contrName
+  --             , contractdetailsXabi = xabi
+  --             }
+  --           binRuntimeHash = undefined
+  --         runHasql $ do
+  --           contrId <- query contractName createContractQuery
+  --           query (contrId,_,_) upsertContractMetaDataQuery
   --
   --       return $ PostCompileResponse contractName _hash
 
