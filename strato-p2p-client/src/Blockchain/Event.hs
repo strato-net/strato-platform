@@ -118,6 +118,7 @@ handleEvents mode peer = awaitForever $ \case
         let num         = blockHeaderBlockNumber header
         let parentHash' = blockHeaderParentHash header
         (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
+        void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff) -- todo handle the result
         case redisParentHeader of
             Nothing -> logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch
             Just _  -> do
