@@ -38,7 +38,7 @@ import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Types (PostTransaction)
-import BlockApps.Strato.API.Client
+import BlockApps.Strato.Client
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8

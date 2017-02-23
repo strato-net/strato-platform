@@ -13,7 +13,6 @@ import Hasql.Session
 import Network.HTTP.Client
 import Servant
 import Servant.Client
-import Servant.Server
 import Text.PrettyPrint.Leijen.Text
 
 newtype Bloc x = Bloc

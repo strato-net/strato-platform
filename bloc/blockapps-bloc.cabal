@@ -30,7 +30,8 @@ library
   build-depends: base
     , blockapps-ethereum
     , blockapps-solidity
-    , blockapps-strato
+    , blockapps-strato-api
+    , blockapps-strato-client
     , aeson
     , aeson-casing
     , containers
@@ -67,7 +68,8 @@ executable blockapps-bloc
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends: base
     , blockapps-bloc
-    , blockapps-strato
+    , blockapps-strato-api
+    , blockapps-strato-client
     , hasql
     , http-client
     , warp

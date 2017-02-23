@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings, TypeApplications #-}
 
-module BlockApps.Strato.API.ClientSpec where
+module BlockApps.Strato.ClientSpec where
 
 import Data.Either
 import Generic.Random.Generic
@@ -11,7 +11,7 @@ import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
 
-import BlockApps.Strato.API.Client
+import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.Strato.TypesSpec ()
 

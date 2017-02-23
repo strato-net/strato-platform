@@ -4,7 +4,7 @@
   , TypeApplications
 #-}
 
-module BlockApps.Strato.API.Client
+module BlockApps.Strato.Client
   ( TxsFilterParams (..)
   , txsFilterParams
   , BlocksFilterParams (..)
