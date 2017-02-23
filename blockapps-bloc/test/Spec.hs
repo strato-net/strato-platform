@@ -9,7 +9,6 @@ import qualified Data.HashMap.Strict as HashMap
 import Network.HTTP.Client
 import Servant.Client
 import Test.Hspec
-import Data.Maybe
 
 import qualified BlockApps.Bloc.API.AddressesSpec as Addresses
 import BlockApps.Bloc.API.Contracts
@@ -212,15 +211,18 @@ setup = do
         : PostUsersUploadListResponse simpleMappingDetails
         : _ <- postUsersUploadList (userName testConfig) addr1 uploadListRequest
       let
+        Just (Unnamed sscAddr) = contractdetailsAddress simpleStorageDetails
+        Just (Unnamed tcAddr) = contractdetailsAddress testDetails
+        Just (Unnamed smcAddr) = contractdetailsAddress simpleMappingDetails
         config = testConfig
           { userAddress = addr1
           , toUserAddress = addr2
-          , simpleStorageContractAddress = fromMaybe (Address 0x0) (contractdetailsAddress simpleStorageDetails)
-          , testContractAddress = fromMaybe (Address 0x0) (contractdetailsAddress testDetails)
-          , simpleMappingContractAddress = fromMaybe (Address 0x0) (contractdetailsAddress simpleMappingDetails)
+          , simpleStorageContractAddress = sscAddr
+          , testContractAddress = tcAddr
+          , simpleMappingContractAddress = smcAddr
           }
       return config
   cfgEither <- runClientM clients (ClientEnv mgr' bayar4a)
   case cfgEither of
-    Left _ -> fail "Failed to bootstrap tests"
+    Left err -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg

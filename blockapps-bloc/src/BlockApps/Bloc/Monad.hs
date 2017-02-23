@@ -47,3 +47,9 @@ enterBloc env x
   = withExceptT (\err -> err500{errBody = Lazy.Char8.pack (show err)})
   $ flip runLoggingT (liftIO . print)
   $ flip runReaderT env $ runBloc x
+
+runHasql :: Session x -> Bloc x
+runHasql session = do
+  conn <- asks dbConnection
+  resultEither <- liftIO $ run session conn
+  either (throwError . DBError) return resultEither

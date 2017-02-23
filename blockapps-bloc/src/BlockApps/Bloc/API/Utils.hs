@@ -10,6 +10,7 @@
 
 module BlockApps.Bloc.API.Utils where
 
+import Control.Applicative
 import Control.Concurrent
 import Control.Monad.Loops
 import Control.Monad.IO.Class
@@ -20,14 +21,13 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Foldable
-import Data.Functor.Contravariant
+import Data.Int (Int32)
 import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Generic.Random.Generic
 import GHC.Generics
-import qualified Hasql.Decoders as Decoders
-import qualified Hasql.Encoders as Encoders
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -79,15 +79,6 @@ instance FromJSON x => MimeUnrender OctetStream x where
 instance ToJSON x => MimeRender OctetStream x where
   mimeRender _ = encode
 
-addressDecoder :: Decoders.Value Address
-addressDecoder
-  = fromMaybe (error "cannot decode address")
-  . stringAddress
-  . Char8.unpack <$> Decoders.bytea
-
-addressEncoder :: Encoders.Value Address
-addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
-
 tester7 :: BaseUrl
 tester7 = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
 
@@ -132,7 +123,7 @@ instance Arbitrary SolidityValue where
 
 data ContractDetails = ContractDetails
   { contractdetailsBin :: Text
-  , contractdetailsAddress :: Maybe Address
+  , contractdetailsAddress :: Maybe (MaybeNamed Address)
   , contractdetailsBinRuntime :: Text
   , contractdetailsCodeHash :: Text
   , contractdetailsName :: Text
@@ -181,12 +172,12 @@ instance FromJSON Func where
 instance Arbitrary Func where arbitrary = genericArbitrary
 data Arg = Arg
   { argName :: Maybe Text
-  , argType :: Text
-  , argBytes :: Maybe Int
-  , argIndex :: Int
-  , argDynamic :: Maybe Bool
-  , argEntry :: Maybe Entry
+  , argIndex :: Int32
+  , argType :: Maybe Text
   , argTypedef :: Maybe Text
+  , argDynamic :: Maybe Bool
+  , argBytes :: Maybe Int32
+  , argEntry :: Maybe Entry
   } deriving (Eq,Show,Generic)
 instance ToJSON Arg where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -194,7 +185,7 @@ instance FromJSON Arg where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Arg where arbitrary = genericArbitrary
 data Entry = Entry
-  { entryBytes :: Int
+  { entryBytes :: Int32
   , entryType :: Text
   } deriving (Eq,Show,Generic)
 instance ToJSON Entry where
@@ -203,12 +194,12 @@ instance FromJSON Entry where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Entry where arbitrary = genericArbitrary
 data Val = Val
-  { valType :: Text
-  , valBytes :: Maybe Int
-  , valIndex :: Int
-  , valDynamic :: Maybe Bool
-  , valEntry :: Maybe Entry
+  { valIndex :: Int32
+  , valType :: Maybe Text
   , valTypedef :: Maybe Text
+  , valDynamic :: Maybe Bool
+  , valBytes :: Maybe Int32
+  , valEntry :: Maybe Entry
   } deriving (Eq,Show,Generic)
 instance ToJSON Val where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -216,19 +207,34 @@ instance FromJSON Val where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Val where arbitrary = genericArbitrary
 data Var = Var
-  { varType :: Text
-  , varBytes :: Maybe Int
-  , varAtBytes :: Int
-  , varDynamic :: Maybe Bool
-  , varEntry :: Maybe Entry
+  { varAtBytes :: Int32
+  , varType :: Maybe Text
   , varTypedef :: Maybe Text
+  , varDynamic :: Maybe Bool
+  , varSigned :: Maybe Bool
+  , varBytes :: Maybe Int32
+  , varEntry :: Maybe Entry
+  , varVal :: Maybe SimpleVar
+  , varKey :: Maybe SimpleVar
   } deriving (Eq,Show,Generic)
 instance ToJSON Var where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Var where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Var where arbitrary = genericArbitrary
-
+data SimpleVar = SimpleVar
+  { simplevarType :: Text
+  , simplevarBytes :: Maybe Int32
+  -- , simplevarTypedef :: Maybe Text -- TODO: Do we need this?
+  , simplevarDynamic :: Maybe Bool
+  , simplevarSigned :: Maybe Bool
+  , simplevarEntry :: Maybe Entry
+  } deriving (Eq,Show,Generic)
+instance ToJSON SimpleVar where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON SimpleVar where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance Arbitrary SimpleVar where arbitrary = genericArbitrary
 
 waitNewBlock :: ClientM ()
 waitNewBlock = do
@@ -293,3 +299,26 @@ data TestConfig = TestConfig
   , simpleMappingSrc :: Text
   , delay :: Int --microsecond
   } deriving (Generic)
+
+data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
+instance ToJSON a => ToJSON (MaybeNamed a) where
+  toJSON (Named name) = toJSON name
+  toJSON (Unnamed a) = toJSON a
+instance FromJSON a => FromJSON (MaybeNamed a) where
+  parseJSON x = Unnamed <$> parseJSON x <|> Named <$> parseJSON x
+instance Arbitrary a => Arbitrary (MaybeNamed a) where
+  arbitrary = oneof
+    [ elements [Named "name1", Named "name2", Named "name3"]
+    , Unnamed <$> arbitrary
+    ]
+instance ToHttpApiData (MaybeNamed Address) where
+  toUrlPiece (Named name) = name
+  toUrlPiece (Unnamed addr) = Text.pack . addressString $ addr
+instance FromHttpApiData (MaybeNamed Address) where
+  parseUrlPiece txt = case stringAddress (Text.unpack txt) of
+    Nothing -> Right $ Named txt
+    Just addr -> Right $ Unnamed addr
+instance ToSample (MaybeNamed Address) where
+  toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
+instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
+  toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
