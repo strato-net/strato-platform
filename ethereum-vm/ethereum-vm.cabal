@@ -62,6 +62,8 @@ library
                  , extra >=1.4.1 && <1.5
                  , strato-model
                  , strato-index
+                 , strato-redis-blockdb
+                 , hedis
     exposed-modules: 
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults
