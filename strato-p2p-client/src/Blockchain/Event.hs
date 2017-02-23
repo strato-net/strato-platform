@@ -44,6 +44,7 @@ import Blockchain.EthConf (runKafkaConfigured)
 import Blockchain.Util (getCurrentMicrotime)
 
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thing that ill really want to know one day
@@ -249,6 +250,6 @@ syncFetch = do
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
         let fetchNumber = case bestBlock of
                               Nothing          -> 0
-                              Just (_, num, _) -> num
+                              Just (RedisBestBlock _ num _) -> num
         yield $ GetBlockHeaders (BlockNumber fetchNumber) maxReturnedHeaders 0 Forward
         stampActionTimestamp

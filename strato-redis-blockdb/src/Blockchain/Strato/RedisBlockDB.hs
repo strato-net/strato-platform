@@ -34,7 +34,6 @@ import qualified Data.Set                              as Set
 import           System.Random                         (randomIO)
 import           Database.Redis
 
-
 -- todo: move this somewhere?
 zipMapM :: (Traversable t, Monad m)
         => (a -> m b)
@@ -198,7 +197,7 @@ getCanonicalChain :: Integer
                   -> Int
                   -> Redis [SHA]
 getCanonicalChain start limit = do
-    let chain = forM (take limit [start..]) getCanonical
+    let chain = forM (take (limit+1) [start..]) getCanonical
     catMaybes <$> chain
 
 getZippedCanonicalChain :: (SHA -> Redis (Maybe t))
@@ -319,20 +318,20 @@ putBestBlockInfo :: SHA
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
-    liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
+    --liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-        Just (oldSha, oldNumber, oldTDiff) -> do
-            liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
+        Just (RedisBestBlock oldSha oldNumber _) -> do
+            --liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
-                    liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates) 
-                    liftIO . putStrLn $ "Deletions: \n" ++ show deletions
+                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates) 
+                    --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                     res <- multiExec $ do
-                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ toKey num) (toValue sha)
+                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                         unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                         forceBestBlockInfo newSha newNumber newTDiff
                     case res of
@@ -375,7 +374,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain 
                       Just (ancestor :: RedisHeader) -> do
-                          liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
@@ -388,21 +387,22 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
-        liftIO . putStrLn $ "\nForcing " ++ shaToHex sha
-        forceBestBlockInfo' bestBlockInfoKey (sha, i, j) --`totalRecall` (,,) 
+        forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,) 
 
-forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> (SHA, Integer, Integer) -> m (f Status)
-forceBestBlockInfo' key = set key . toValue . RedisBestBlock
+forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
+forceBestBlockInfo' key = set key . toValue
 
-getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
+getBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 
-getBestBlockInfo' :: S8.ByteString -> Redis (Maybe (SHA, Integer, Integer))
+getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
 getBestBlockInfo' key = get key >>= \case
     Left _  -> return Nothing
     Right r -> case r of
-        Nothing -> return Nothing --return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-        Just bs -> let (RedisBestBlock (sha, num, tDiff)) = fromValue bs in return $ Just (sha, num, tDiff)
+        Nothing -> return Nothing -- return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
+        Just bs -> return . Just $ RedisBestBlock sha num tdiff
+            where
+              RedisBestBlock sha num tdiff = fromValue bs
 
 releaseRedlockScript :: S8.ByteString
 releaseRedlockScript = S8.pack . unlines $
@@ -450,7 +450,7 @@ worldBestBlockKey :: S8.ByteString
 worldBestBlockKey = "<worldbest>"
 {-# INLINE worldBestBlockKey #-}
 
-getWorldBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
+getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
 updateWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
@@ -467,15 +467,15 @@ updateWorldBestBlockInfo sha num tdiff = do
             case maybeExistingWBBI of
                 Nothing -> do
                     liftIO $ putStrLn "No WorldBestBlock in Redis, will force"
-                    void $ forceBestBlockInfo' worldBestBlockKey (sha, num, tdiff)
+                    void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
                     releaseAndFinalize lockID True
-                Just (_, _, oldTDiff) -> do
+                Just (RedisBestBlock _ _ oldTDiff) -> do
                     liftIO . putStr $ "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff
                     let willUpdate = oldTDiff <= tdiff
                     if willUpdate
                         then do
                             liftIO (putStrLn " updating")
-                            void $ forceBestBlockInfo' worldBestBlockKey (sha, num, tdiff)
+                            void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
                         else
                             liftIO (putStrLn " not updating")
                     releaseAndFinalize lockID willUpdate

@@ -23,6 +23,7 @@ import Blockchain.Event
 import Blockchain.ServOptions
 import Blockchain.Options
 
+import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 ethVersion :: Int
@@ -55,7 +56,7 @@ handleMsgConduit myPubkey peer = do
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} ->
             RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
                 Nothing -> error "we don't have a local BestBlock!"
-                Just (hash, _, tdiff) -> do
+                Just (RedisBestBlock hash _ tdiff) -> do
                     genHash <- lift getGenesisBlockHash
                     when (genHash /= peerGH) $ error "peer has a different genesis block than we do!"
                     void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet

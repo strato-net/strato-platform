@@ -62,6 +62,7 @@ import           Executable.StratoP2PClientComm
 
 import           Data.Maybe
 
+import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import qualified Database.Redis                        as Redis
 
@@ -90,7 +91,7 @@ handleMsg myId peer = do
         Just Hello{} ->
             RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
                 Nothing -> error "we don't have a local BestBlock!"
-                Just (hash, _, tdiff) -> do
+                Just (RedisBestBlock hash _ tdiff) -> do
                     genHash <- lift getGenesisBlockHash
                     yield Status {
                         protocolVersion = fromIntegral ethVersion,
