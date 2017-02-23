@@ -176,6 +176,27 @@ getContractsDataNamesQuery = statement
   (Decoders.rowsList (Decoders.value Decoders.text))
   False
 
+getContractsMetaDataIdByAddressQuery
+  :: Query (Text,Address) Int32
+getContractsMetaDataIdByAddressQuery = statement
+  "SELECT \
+  \  CM.id \
+  \FROM \
+  \  contracts_metadata CM \
+  \JOIN contracts C ON \
+  \  C.id = CM.contract_id \
+  \JOIN contracts_instance CI ON \
+  \  CI.contract_metadata_id = CM.id \
+  \WHERE C.name=$1 AND CI.address=$2;"
+  encoder
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
+  where
+    encoder = mconcat
+      [ contramap fst (Encoders.value Encoders.text)
+      , contramap snd (Encoders.value addressEncoder)
+      ]
+
 getContractsContractByAddressQuery
   :: Query (Text,Address) (ContractDetails,Int32)
 getContractsContractByAddressQuery = statement
@@ -211,6 +232,31 @@ getContractsContractByAddressQuery = statement
       <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
       <*> Decoders.value Decoders.text
       <*> pure (Xabi Nothing Nothing Nothing)
+
+getContractsMetaDataIdByNameQuery
+  :: Query (Text,Text) Int32
+getContractsMetaDataIdByNameQuery = statement
+  "SELECT \
+  \ CM2.id \
+  \FROM \
+  \  contracts_metadata CM \
+  \JOIN contracts C ON \
+  \  C.id = CM.contract_id \
+  \JOIN contracts_lookup CL ON \
+  \  CL.contract_metadata_id = CM.id \
+  \JOIN contracts_metadata CM2 ON \
+  \  CM2.id = CL.linked_metadata_id \
+  \JOIN contracts C2 ON \
+  \  C2.id = CM2.contract_id \
+  \WHERE C.name = $1 AND C2.name=$2 ORDER BY CM2.id DESC LIMIT 1;"
+  encoder
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
+  where
+    encoder = mconcat
+      [ contramap fst (Encoders.value Encoders.text)
+      , contramap snd (Encoders.value Encoders.text)
+      ]
 
 getContractsContractByNameQuery
   :: Query (Text,Text) (ContractDetails,Int32)
@@ -251,6 +297,20 @@ getContractsContractByNameQuery = statement
       <*> Decoders.value Decoders.text
       <*> pure (Xabi Nothing Nothing Nothing)
 
+getContractMetaDataIdBySameNameQuery
+  :: Query Text Int32
+getContractMetaDataIdBySameNameQuery = statement
+  "SELECT \
+  \ CM.id \
+  \FROM \
+  \  contracts_metadata CM \
+  \JOIN contracts C ON \
+  \  C.id = CM.contract_id \
+  \WHERE C.name = $1 ORDER BY CM.id DESC LIMIT 1"
+  (Encoders.value Encoders.text)
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
+
 getContractsContractBySameNameQuery
   :: Query Text (ContractDetails,Int32)
 getContractsContractBySameNameQuery = statement
@@ -279,6 +339,22 @@ getContractsContractBySameNameQuery = statement
       <*> (Text.decodeUtf8 <$> Decoders.value Decoders.bytea)
       <*> Decoders.value Decoders.text
       <*> pure (Xabi Nothing Nothing Nothing)
+
+getContractMetaDataIdByLatestQuery
+  :: Query Text Int32
+getContractMetaDataIdByLatestQuery = statement
+  "SELECT \
+  \ CM.id \
+  \FROM \
+  \  contracts_metadata CM \
+  \JOIN contracts C ON \
+  \  C.id = CM.contract_id \
+  \JOIN contracts_instance CI ON \
+  \  CI.contract_metadata_id = CM.id \
+  \WHERE C.name = $1 ORDER BY CI.timestamp DESC LIMIT 1;"
+  (Encoders.value Encoders.text)
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
 
 getContractsContractLatestQuery
   :: Query Text (ContractDetails,Int32)
@@ -476,6 +552,57 @@ getXabiVariablesQuery = statement
         Nothing -> return Nothing
         Just ty -> return . Just $
           SimpleVar ty byMaybe dyMaybe siMaybe enMaybe
+
+
+createContractQuery :: Query Text Int32
+createContractQuery = statement
+  "WITH contract_id AS (\
+  \ SELECT id FROM contracts WHERE name = $1)\
+  \ , new_contract_id AS \
+  \ (\
+  \   INSERT INTO contracts (name) \
+  \   SELECT $1 WHERE NOT EXISTS (SELECT id FROM contracts WHERE name = $1)\
+  \   RETURNING id \
+  \ )\
+  \SELECT id FROM contract_id UNION SELECT id FROM new_contract_id;"
+  (Encoders.value Encoders.text)
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
+
+upsertContractMetaDataQuery
+  :: Query (Int32,ContractDetails,ByteString) (Text,ByteString)
+upsertContractMetaDataQuery = statement
+  "WITH upsert AS (UPDATE contracts_metadata SET \
+  \  bin = $2\
+  \ ,bin_runtime = $3\
+  \ ,code_hash = $4\
+  \ ,bin_runtime_hash = $5 \
+  \WHERE contract_id = $1 \
+  \  AND NOT EXISTS ( \
+  \      SELECT CI.id \
+  \      FROM contracts_instance CI \
+  \      WHERE contract_metadata_id = id\
+  \      ) \
+  \) \
+  \INSERT INTO contracts_metadata (contract_id, bin, bin_runtime, code_hash, bin_runtime_hash) \
+  \SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT * FROM upsert);"
+  encoder
+  decoder
+  False
+  where
+    encoder = mconcat
+      [ contramap (\ (x,_,_) -> x) (Encoders.value Encoders.int4)
+      , contramap (\ (_,y,_) -> y) encoderContractDetails
+      , contramap (\ (_,_,z) -> z) (Encoders.value Encoders.bytea)
+      ]
+    encoderContractDetails = mconcat
+      [ contramap (Text.encodeUtf8 . contractdetailsBin) (Encoders.value Encoders.bytea)
+      , contramap (Text.encodeUtf8 . contractdetailsBinRuntime) (Encoders.value Encoders.bytea)
+      , contramap (Text.encodeUtf8 . contractdetailsCodeHash) (Encoders.value Encoders.bytea)
+      ]
+    decoder = Decoders.singleRow $ (,)
+      <$> Decoders.value Decoders.text
+      <*> Decoders.value Decoders.bytea
 
 addressDecoder :: Decoders.Value Address
 addressDecoder

@@ -124,47 +124,33 @@ instance MonadContracts Bloc where
 
   getContractsState = undefined
 
-  getContractsFunctions = undefined
-  -- getContractsFunctions (ContractName contractName) addr = do
-  --   conn <- asks dbConnection
-  --   let
-  --     encoder = contramap fst (Encoders.value Encoders.text)
-  --       <> contramap snd (Encoders.value addressEncoder)
-  --     decoder =
-  --       Decoders.rowsList . Decoders.value $ FunctionName <$> Decoders.text
-  --     sqlString =
-  --       "SELECT XF.Name FROM contracts C\
-  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-  --       \ JOIN xabi_functions XF ON XF.contract_metadata_id = CM.id\
-  --       \ WHERE C.name = $1 AND CI.address = $2 AND NOT XF.is_constructor"
-  --     sqlStatement = statement sqlString encoder decoder False
-  --   functionsEither <- liftIO $
-  --     run (query (contractName,addr) sqlStatement) conn
-  --   case functionsEither of
-  --     Left err -> throwError $ DBError err
-  --     Right functions -> return functions
+  getContractsFunctions (ContractName contractName) contractId = runHasql $ do
+    metadataId <- case contractId of
+      Named "Latest" ->
+        query contractName getContractMetaDataIdByLatestQuery
+      Unnamed addr ->
+        query (contractName,addr) getContractsMetaDataIdByAddressQuery
+      Named name ->
+        if contractName == name
+          then query name getContractMetaDataIdBySameNameQuery
+          else query (contractName,name) getContractsMetaDataIdByNameQuery
+    funcIdNameSels <- query metadataId getXabiFunctionsQuery
+    return $ map (\ (_, funcName, _) -> FunctionName funcName) funcIdNameSels
 
-  getContractsSymbols = undefined
-  -- getContractsSymbols (ContractName contractName) addr = do
-  --   conn <- asks dbConnection
-  --   let
-  --     encoder = contramap fst (Encoders.value Encoders.text)
-  --       <> contramap snd (Encoders.value addressEncoder)
-  --     decoder =
-  --       Decoders.rowsList . Decoders.value $ SymbolName <$> Decoders.text
-  --     sqlString =
-  --       "SELECT XV.Name FROM contracts C\
-  --       \ JOIN contracts_metadata CM ON CM.contract_id = C.id\
-  --       \ JOIN contracts_instance CI ON CI.contract_metadata_id = CM.id\
-  --       \ JOIN xabi_variables XV ON XV.contract_metadata_id = CM.id\
-  --       \ WHERE C.name = $1 AND CI.address = $2"
-  --     sqlStatement = statement sqlString encoder decoder False
-  --   symbolsEither <- liftIO $
-  --     run (query (contractName,addr) sqlStatement) conn
-  --   case symbolsEither of
-  --     Left err -> throwError $ DBError err
-  --     Right symbols -> return symbols
+
+
+  getContractsSymbols (ContractName contractName) contractId = runHasql $ do
+    metadataId <- case contractId of
+      Named "Latest" ->
+        query contractName getContractMetaDataIdByLatestQuery
+      Unnamed addr ->
+        query (contractName,addr) getContractsMetaDataIdByAddressQuery
+      Named name ->
+        if contractName == name
+          then query name getContractMetaDataIdBySameNameQuery
+          else query (contractName,name) getContractsMetaDataIdByNameQuery
+    vars <- query metadataId getXabiVariablesQuery
+    return $ map (\ (varName, _) -> SymbolName varName) vars
 
   getContractsStateMapping = undefined
     -- (ContractName contractName) addr (SymbolName mapping) key = do
@@ -184,25 +170,19 @@ instance MonadContracts Bloc where
     --     Right stateMappingResponse -> return stateMappingResponse
 
   getContractsStates = undefined
-  postContractsCompile = undefined
-  -- postContractsCompile reqs = do
-  --   conn <- asks dbConnection
-  --   url <- asks urlStrato
-  --   mgr <- asks httpManager
-  --   let
-  --     encoder = _
-  --     decoder = _
-  --     sqlString =
-  --       ""
-  --     sqlStatement = statement sqlString encoder decoder True
-  --   for reqs $ \ PostCompileRequest
-  --     { postcompilerequestSearchable = searchable
-  --     , postcompilerequestContractName = contractName
-  --     , postcompilerequestSource = source
-  --     } -> do
-  --       (xabi,comp) <- liftIO $ flip runClientM (ClientEnv mgr url) $
-  --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-  --       return $ PostCompileResponse contractName _hash
+
+  postContractsCompile reqs = do
+    mngr <- asks httpManager
+    url <- asks urlStrato
+    for reqs $ \ PostCompileRequest
+      { postcompilerequestSearchable = searchable
+      , postcompilerequestContractName = contractName
+      , postcompilerequestSource = source
+      } -> do
+        (xabi,comp) <- liftIO $ flip runClientM (ClientEnv mgr url) $
+          (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+        return $ PostCompileResponse contractName _hash
+
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
