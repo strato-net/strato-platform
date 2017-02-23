@@ -51,16 +51,16 @@ readShowProp = liftA2 (===) (readMaybe . show) Just
 
 -- orphans
 
-instance Arbitrary TransactionType where arbitrary = genericArbitrary
-instance Arbitrary Addresses where arbitrary = genericArbitrary
+instance Arbitrary TransactionType where arbitrary = genericArbitrary uniform
+instance Arbitrary Addresses where arbitrary = genericArbitrary uniform
 instance (Arbitrary x, Arbitrary y) => Arbitrary (LargeKey x y) where
   arbitrary = LargeKey <$> arbitrary <*> arbitrary
-instance Arbitrary Transaction where arbitrary = genericArbitrary
+instance Arbitrary Transaction where arbitrary = genericArbitrary uniform
 instance Arbitrary x => Arbitrary (WithNext x) where
-  arbitrary = genericArbitrary
-instance Arbitrary BlockData where arbitrary = genericArbitrary
-instance Arbitrary Block where arbitrary = genericArbitrary
-instance Arbitrary Account where arbitrary = genericArbitrary
-instance Arbitrary Difficulty where arbitrary = genericArbitrary
-instance Arbitrary TxCount where arbitrary = genericArbitrary
-instance Arbitrary Storage where arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform
+instance Arbitrary BlockData where arbitrary = genericArbitrary uniform
+instance Arbitrary Block where arbitrary = genericArbitrary uniform
+instance Arbitrary Account where arbitrary = genericArbitrary uniform
+instance Arbitrary Difficulty where arbitrary = genericArbitrary uniform
+instance Arbitrary TxCount where arbitrary = genericArbitrary uniform
+instance Arbitrary Storage where arbitrary = genericArbitrary uniform

@@ -30,6 +30,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
+import BlockApps.Solidity
 
 class Monad m => MonadSearchContract m where
   getSearchContract :: ContractName -> m [MaybeNamed Address]
@@ -79,4 +80,4 @@ instance FromJSON SearchContractState where
 instance ToSample SearchContractState where
   toSamples _ = noSamples
 instance Arbitrary SearchContractState where
-  arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform

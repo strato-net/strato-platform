@@ -78,7 +78,8 @@ instance (Integral n, Show n) => ToJSON (Hex n) where
   toJSON = toJSON . show
 instance (Integral n, Show n) => ToHttpApiData (Hex n) where
   toUrlPiece = Text.pack . show
-instance Arbitrary x => Arbitrary (Hex x) where arbitrary = genericArbitrary
+instance Arbitrary x => Arbitrary (Hex x) where
+  arbitrary = genericArbitrary uniform
 
 -- hack to deal with weird `ToJSON`s
 newtype Strung x = Strung { unStrung :: x } deriving (Eq, Show, Generic)
@@ -90,7 +91,8 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
       Just y -> return $ Strung y
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
-instance Arbitrary x => Arbitrary (Strung x) where arbitrary = genericArbitrary
+instance Arbitrary x => Arbitrary (Strung x) where
+  arbitrary = genericArbitrary uniform
 
 newtype Addresses = Addresses { unAddresses :: NonEmpty (Hex Word160) }
   deriving (Eq, Show, Generic)
@@ -158,7 +160,8 @@ instance FromJSON PostTransaction where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToJSON PostTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
-instance Arbitrary PostTransaction where arbitrary = genericArbitrary
+instance Arbitrary PostTransaction where
+  arbitrary = genericArbitrary uniform
 instance ToSample PostTransaction where
   toSamples _ = singleSample PostTransaction
     { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)

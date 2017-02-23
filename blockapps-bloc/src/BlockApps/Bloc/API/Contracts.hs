@@ -40,8 +40,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
-
--- import qualified BlockApps.Solidity as Solidity
+import BlockApps.Solidity
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -194,7 +193,7 @@ data AddressCreatedAt = AddressCreatedAt
   } deriving (Eq, Show, Generic)
 instance ToJSON AddressCreatedAt
 instance FromJSON AddressCreatedAt
-instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary
+instance Arbitrary AddressCreatedAt where arbitrary = genericArbitrary uniform
 newtype GetContractsResponse = GetContractsResponse
   { unContracts :: Map Text [AddressCreatedAt] }
   deriving (Eq, Show, Generic)
@@ -202,7 +201,7 @@ instance ToJSON GetContractsResponse where
   toJSON = toJSON . unContracts
 instance FromJSON GetContractsResponse where
   parseJSON = fmap GetContractsResponse . parseJSON
-instance Arbitrary GetContractsResponse where arbitrary = genericArbitrary
+instance Arbitrary GetContractsResponse where arbitrary = genericArbitrary uniform
 instance ToSample GetContractsResponse where
   toSamples _ = singleSample $ GetContractsResponse $ Map.singleton "Sample"
     [ AddressCreatedAt
@@ -248,7 +247,7 @@ instance FromJSON FunctionName where
 instance ToJSON FunctionName where
   toJSON (FunctionName name) = toJSON name
 instance Arbitrary FunctionName where
-  arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform
 
 -- GET /contracts/:contractName/:contractAddress/symbols
 type GetContractsSymbols = "contracts"
@@ -302,7 +301,7 @@ data PostCompileRequest = PostCompileRequest
   , postcompilerequestContractName :: Text
   , postcompilerequestSource :: Text
   } deriving (Eq,Show,Generic)
-instance Arbitrary PostCompileRequest where arbitrary = genericArbitrary
+instance Arbitrary PostCompileRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostCompileRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostCompileRequest where
@@ -321,7 +320,7 @@ instance FromJSON PostCompileResponse where
 instance ToSample PostCompileResponse where
   toSamples _ = noSamples
 instance Arbitrary PostCompileResponse where
-  arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform
 
 newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
 instance ToSample SymbolName where
@@ -329,7 +328,7 @@ instance ToSample SymbolName where
     [ SymbolName name | name <- ["variable1","variable2"]]
 instance FromJSON SymbolName where parseJSON = fmap SymbolName . parseJSON
 instance ToJSON SymbolName where toJSON (SymbolName name) = toJSON name
-instance Arbitrary SymbolName where arbitrary = genericArbitrary
+instance Arbitrary SymbolName where arbitrary = genericArbitrary uniform
 instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where

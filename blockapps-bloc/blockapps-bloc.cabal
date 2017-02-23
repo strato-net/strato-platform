@@ -29,8 +29,8 @@ library
   ghc-options: -Wall
   build-depends: base
     , blockapps-ethereum
+    , blockapps-solidity
     , blockapps-strato
-    , state-translate
     , aeson
     , aeson-casing
     , containers
@@ -88,10 +88,10 @@ test-suite blockapps-bloc-test
   other-modules:
   build-depends: base >=4 && < 5
     , blockapps-bloc
-    , blockapps-data
+    , blockapps-ethereum
     , hspec
     , http-client
-    , servant-aeson-specs
+    -- , servant-aeson-specs
     , servant-client
     , unordered-containers
 

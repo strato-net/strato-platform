@@ -1,10 +1,9 @@
-resolver: nightly-2017-01-17
+resolver: nightly-2017-02-23
 packages:
 - blockapps-bloc
 - blockapps-ethereum
+- blockapps-solidity
 - blockapps-strato
-- solidity-abi
-- state-translate
 - location:
     git: https://github.com/blockapps/secp256k1-haskell/
     commit: 0a6db54f31defdd7a5edecdf6932af3deea6ca57
@@ -15,5 +14,12 @@ packages:
   extra-dep: true
 extra-deps:
   - saltine-0.0.0.4
+  - hasql-0.19.16
+  - bytestring-tree-builder-0.2.7.1
+  - contravariant-extras-0.3.3.1
+  - hashtables-1.2.1.0
+  - tuple-th-0.2.5
+  - vector-0.11.0.0
+  - primitive-0.6.1.0
 flags: {}
 extra-package-dbs: []

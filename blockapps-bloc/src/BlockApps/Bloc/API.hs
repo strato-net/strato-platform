@@ -94,7 +94,7 @@ bloc =
   :<|> getSearchContractStateReduced
 
 serveBloc :: BlocEnv -> Server BlocAPI
-serveBloc env = enter (Nat (enterBloc env)) bloc
+serveBloc env = enter (NT (enterBloc env)) bloc
 
 appBloc :: BlocEnv -> Application
 appBloc = serve (Proxy @ BlocAPI) . serveBloc

@@ -25,7 +25,7 @@ spec
       txs `shouldSatisfy` isRight
   describe "getTxsFilter" $ do
     it "works with a nonempty filter" $ \ mgr -> do
-      let nonEmptyParams = genericArbitrary `suchThat` (/= txsFilterParams)
+      let nonEmptyParams = genericArbitrary uniform `suchThat` (/= txsFilterParams)
       forAll nonEmptyParams $ \ params -> do
           txs <- runClientM (getTxsFilter params) (ClientEnv mgr stratoDev)
           txs `shouldSatisfy` isRight
@@ -41,7 +41,7 @@ spec
   describe "getBlocksFilter" $ do
     it "works with a nonempty filter" $ \ mgr -> do
       let
-        nonEmptyParams = genericArbitrary `suchThat` (/= blocksFilterParams)
+        nonEmptyParams = genericArbitrary uniform `suchThat` (/= blocksFilterParams)
       forAll nonEmptyParams $ \ params -> do
           blocks <- runClientM
             (getBlocksFilter params)
@@ -56,7 +56,7 @@ spec
     it "works with a nonempty filter" $ \ mgr -> do
       let
         nonEmptyParams =
-          genericArbitrary `suchThat` (/= accountsFilterParams)
+          genericArbitrary uniform `suchThat` (/= accountsFilterParams)
       forAll nonEmptyParams $ \ params -> do
           accts <- runClientM
             (getAccountsFilter params)

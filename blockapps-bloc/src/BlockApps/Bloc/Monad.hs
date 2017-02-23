@@ -5,7 +5,7 @@
 module BlockApps.Bloc.Monad where
 
 import Control.Monad.Except
-import Control.Monad.Log
+import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Hasql.Connection
@@ -13,6 +13,7 @@ import Hasql.Session
 import Network.HTTP.Client
 import Servant
 import Servant.Client
+import Servant.Server
 import Text.PrettyPrint.Leijen.Text
 
 newtype Bloc x = Bloc
@@ -42,9 +43,10 @@ data BlocError
   | StratoError ServantError
   deriving Show
 
-enterBloc :: BlocEnv -> Bloc x -> ExceptT ServantErr IO x
+enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
-  = withExceptT (\err -> err500{errBody = Lazy.Char8.pack (show err)})
+  = Handler
+  $ withExceptT (\err -> err500{errBody = Lazy.Char8.pack (show err)})
   $ flip runLoggingT (liftIO . print)
   $ flip runReaderT env $ runBloc x
 

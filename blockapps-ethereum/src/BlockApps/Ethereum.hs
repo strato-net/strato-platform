@@ -61,6 +61,8 @@ import Web.FormUrlEncoded
 newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
 addressString (Address address) = padZeros 40 (showHex address "")
+  where
+    padZeros n string = replicate (n - length string) '0' ++ string
 stringAddress :: String -> Maybe Address
 stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
 instance ToJSON Address where toJSON = toJSON . addressString
@@ -195,7 +197,3 @@ newtype BloomFilter = BloomFilter
     (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
     (LargeKey (LargeKey Word256 Word256) (LargeKey Word256 Word256))
   ) deriving (Eq,Show,Generic)
-
--- helpers
-padZeros :: Int -> String -> String
-padZeros n string = replicate (n - length string) '0' ++ string

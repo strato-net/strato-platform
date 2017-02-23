@@ -16,14 +16,9 @@ import Control.Monad.Loops
 import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Data.Foldable
 import Data.Int (Int32)
 import Data.Map.Strict (Map)
-import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Generic.Random.Generic
@@ -88,39 +83,6 @@ bayar4a = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/bloc"
 strato :: BaseUrl
 strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
 
--- data SolidityValue
---   = SolidityValueString Text
-
-data SolidityValue
-  = SolidityValueAsString Text
-  | SolidityBool Bool
-  | SolidityArray [SolidityValue]
-  | SolidityBytes  ByteString
-  deriving (Eq,Show,Generic)
-instance ToJSON SolidityValue where
-  toJSON (SolidityValueAsString str) = toJSON str
-  toJSON (SolidityBool boolean) = toJSON boolean
-  toJSON (SolidityArray array) = toJSON array
-  toJSON (SolidityBytes bytes) = object
-    [ "type" .= ("Buffer" :: Text)
-    , "data" .= ByteString.unpack bytes
-    ]
-instance FromJSON SolidityValue where
-  parseJSON (String str) = return $ SolidityValueAsString str
-  parseJSON (Bool boolean) = return $ SolidityBool boolean
-  parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
-  parseJSON (Object obj) = do
-    ty <- obj .: "type"
-    if ty == ("Buffer" :: Text)
-    then do
-      bytes <- obj .: "data"
-      return $ SolidityBytes (ByteString.pack bytes)
-    else
-      fail "Failed to parse SolidityBytes"
-  parseJSON _ = fail "Failed to parse solidity value"
-instance Arbitrary SolidityValue where
-  arbitrary = return (SolidityBool True)
-
 data ContractDetails = ContractDetails
   { contractdetailsBin :: Text
   , contractdetailsAddress :: Maybe (MaybeNamed Address)
@@ -149,7 +111,7 @@ instance FromJSON ContractDetails where
       <*> obj .: "xabi"
 instance ToSample ContractDetails where toSamples _ = noSamples
 instance Arbitrary ContractDetails where
-  arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform
 data Xabi = Xabi
   { xabiFuncs :: Maybe (Map Text Func)
   , xabiConstr :: Maybe (Map Text Arg)
@@ -159,7 +121,7 @@ instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Xabi where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Xabi where arbitrary = genericArbitrary
+instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 data Func = Func
   { funcArgs :: Map Text Arg
   , funcSelector :: Text
@@ -169,7 +131,7 @@ instance ToJSON Func where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Func where arbitrary = genericArbitrary
+instance Arbitrary Func where arbitrary = genericArbitrary uniform
 data Arg = Arg
   { argName :: Maybe Text
   , argIndex :: Int32
@@ -183,7 +145,7 @@ instance ToJSON Arg where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Arg where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Arg where arbitrary = genericArbitrary
+instance Arbitrary Arg where arbitrary = genericArbitrary uniform
 data Entry = Entry
   { entryBytes :: Int32
   , entryType :: Text
@@ -192,7 +154,7 @@ instance ToJSON Entry where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Entry where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Entry where arbitrary = genericArbitrary
+instance Arbitrary Entry where arbitrary = genericArbitrary uniform
 data Val = Val
   { valIndex :: Int32
   , valType :: Maybe Text
@@ -205,7 +167,7 @@ instance ToJSON Val where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Val where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Val where arbitrary = genericArbitrary
+instance Arbitrary Val where arbitrary = genericArbitrary uniform
 data Var = Var
   { varAtBytes :: Int32
   , varType :: Maybe Text
@@ -221,7 +183,7 @@ instance ToJSON Var where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Var where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Var where arbitrary = genericArbitrary
+instance Arbitrary Var where arbitrary = genericArbitrary uniform
 data SimpleVar = SimpleVar
   { simplevarType :: Text
   , simplevarBytes :: Maybe Int32
@@ -234,7 +196,7 @@ instance ToJSON SimpleVar where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON SimpleVar where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary SimpleVar where arbitrary = genericArbitrary
+instance Arbitrary SimpleVar where arbitrary = genericArbitrary uniform
 
 waitNewBlock :: ClientM ()
 waitNewBlock = do
@@ -268,13 +230,13 @@ instance ToSample UserName where
     [ UserName name | name <- ["samrit", "eitan", "ilya", "ilir"]]
 instance ToCapture (Capture "user" UserName) where
   toCapture _ = DocCapture "user" "a user name"
-instance Arbitrary UserName where arbitrary = genericArbitrary
+instance Arbitrary UserName where arbitrary = genericArbitrary uniform
 
 data TxParams = TxParams
   { txparamsGasLimit :: Natural
   , txparamsGasPrice :: Natural
   } deriving (Eq,Show,Generic)
-instance Arbitrary TxParams where arbitrary = genericArbitrary
+instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
 instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where

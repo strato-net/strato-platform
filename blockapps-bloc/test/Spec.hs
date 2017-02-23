@@ -17,13 +17,13 @@ import qualified BlockApps.Bloc.API.SearchSpec as Search
 import BlockApps.Bloc.API.Users
 import qualified BlockApps.Bloc.API.UsersSpec as Users
 import BlockApps.Bloc.API.Utils
-import qualified BlockApps.Bloc.APISpec as API
+-- import qualified BlockApps.Bloc.APISpec as API
 
 import BlockApps.Ethereum
 
 main :: IO ()
 main = hspec $ do
-  API.spec
+  -- API.spec
   beforeAll setup $ do
     Addresses.spec
     Contracts.spec

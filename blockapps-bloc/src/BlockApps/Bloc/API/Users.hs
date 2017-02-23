@@ -36,6 +36,7 @@ import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
+import BlockApps.Solidity
 import BlockApps.Strato.Types (PostTransaction)
 import BlockApps.Strato.API.Client
 
@@ -101,7 +102,7 @@ data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
   , userPassword :: Text
   } deriving (Eq, Show, Generic)
-instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary
+instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersUserRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostUsersUserRequest where
@@ -127,7 +128,7 @@ data PostSendParameters = PostSendParameters
   , sendValue :: Natural
   , sendPassword :: Text
   } deriving (Eq, Show, Generic)
-instance Arbitrary PostSendParameters where arbitrary = genericArbitrary
+instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendParameters where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostSendParameters where
@@ -153,7 +154,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   { src :: Text
   , password :: Text
   } deriving (Eq,Show,Generic)
-instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary
+instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersContractRequest
 instance FromJSON PostUsersContractRequest
 instance ToForm PostUsersContractRequest
@@ -182,7 +183,7 @@ instance ToJSON UploadListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary UploadListRequest where arbitrary = genericArbitrary
+instance Arbitrary UploadListRequest where arbitrary = genericArbitrary uniform
 instance ToSample UploadListRequest where
   toSamples _ = noSamples
 data UploadListContract = UploadListContract
@@ -190,7 +191,7 @@ data UploadListContract = UploadListContract
   , uploadlistcontractArgs :: HashMap Text Text
   , uploadlistcontractTxParams :: TxParams
   } deriving (Eq,Show,Generic)
-instance Arbitrary UploadListContract where arbitrary = genericArbitrary
+instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
 instance ToJSON UploadListContract where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON UploadListContract where
@@ -198,7 +199,7 @@ instance FromJSON UploadListContract where
 newtype PostUsersUploadListResponse = PostUsersUploadListResponse
   { contractJSON :: ContractDetails } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersUploadListResponse where
-  arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersUploadListResponse where
   toJSON (PostUsersUploadListResponse contractDetails) = object
     [ "contractJSON" .= Text.decodeUtf8 (ByteString.Lazy.toStrict (encode contractDetails)) ]
@@ -228,7 +229,7 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   , postuserscontractmethodValue :: Natural
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary
+instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersContractMethodRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostUsersContractMethodRequest where
@@ -259,7 +260,7 @@ data PostSendListRequest = PostSendListRequest
   , postsendlistrequestResolve :: Bool
   , postsendlistrequestTxs :: [SendTransaction]
   } deriving (Eq,Show,Generic)
-instance Arbitrary PostSendListRequest where arbitrary = genericArbitrary
+instance Arbitrary PostSendListRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostSendListRequest where
@@ -271,7 +272,7 @@ data SendTransaction = SendTransaction
   , sendtransactionValue :: Natural
   , sendtransactionTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
-instance Arbitrary SendTransaction where arbitrary = genericArbitrary
+instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
 instance ToJSON SendTransaction where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON SendTransaction where
@@ -286,7 +287,7 @@ instance FromJSON PostSendListResponse where
 instance ToSample PostSendListResponse where
   toSamples _ = noSamples
 instance Arbitrary PostSendListResponse where
-  arbitrary = genericArbitrary
+  arbitrary = genericArbitrary uniform
 
 --POST /users/:user/:address/callList
 type PostUsersContractMethodList = "users"
@@ -300,7 +301,7 @@ data PostMethodListRequest = PostMethodListRequest
   , postmethodlistrequestResolve :: Bool
   , postmethodlistrequestTxs :: [MethodCall]
   } deriving (Eq,Show,Generic)
-instance Arbitrary PostMethodListRequest where arbitrary = genericArbitrary
+instance Arbitrary PostMethodListRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostMethodListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostMethodListRequest where
@@ -316,7 +317,7 @@ instance FromJSON PostMethodListResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
-instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary
+instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary uniform
 data MethodCall = MethodCall
   { methodcallContractName :: Text
   , methodcallContractAddress :: Address
@@ -325,7 +326,7 @@ data MethodCall = MethodCall
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams --TODO: Params maybe optional
   } deriving (Eq,Show,Generic)
-instance Arbitrary MethodCall where arbitrary = genericArbitrary
+instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
 instance ToJSON MethodCall where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON MethodCall where
