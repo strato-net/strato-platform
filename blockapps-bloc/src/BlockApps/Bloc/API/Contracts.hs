@@ -39,7 +39,7 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
-import BlockApps.Data
+import BlockApps.Ethereum
 
 -- import qualified BlockApps.Solidity as Solidity
 

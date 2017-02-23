@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings, TypeApplications #-}
 
-module BlockApps.DataSpec where
+module BlockApps.EthereumSpec where
 
 import Data.Aeson
 import Test.Hspec
@@ -10,7 +10,7 @@ import Test.QuickCheck
 import Web.FormUrlEncoded
 import Web.HttpApiData
 
-import BlockApps.Data
+import BlockApps.Ethereum
 
 spec :: Spec
 spec = modifyMaxSuccess (const 10) $ do

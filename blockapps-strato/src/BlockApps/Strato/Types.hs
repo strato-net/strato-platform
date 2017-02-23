@@ -54,7 +54,7 @@ import Text.Read.Lex
 import Web.HttpApiData
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 
-import BlockApps.Data
+import BlockApps.Ethereum
   ( Address (..)
   , addressString
   , stringAddress

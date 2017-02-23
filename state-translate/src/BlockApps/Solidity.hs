@@ -15,7 +15,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Numeric.Natural
 
-import BlockApps.Data (Address(..))
+import BlockApps.Ethereum (Address(..))
 
 data Type
   = TypeBool

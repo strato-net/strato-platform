@@ -16,7 +16,7 @@ import qualified Hasql.Decoders as Decoders
 import qualified Hasql.Encoders as Encoders
 import Hasql.Query
 
-import BlockApps.Data
+import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 

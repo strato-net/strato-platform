@@ -35,7 +35,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
-import BlockApps.Data
+import BlockApps.Ethereum
 import BlockApps.Strato.Types (PostTransaction)
 import BlockApps.Strato.API.Client
 

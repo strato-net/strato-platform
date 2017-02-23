@@ -21,7 +21,7 @@ library
   ghc-options: -Wall
   build-depends: base
     , binary
-    , blockapps-data
+    , blockapps-ethereum
     , aeson
     , aeson-casing
     , generic-random

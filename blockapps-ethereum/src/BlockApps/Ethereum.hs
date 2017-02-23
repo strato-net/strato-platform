@@ -7,7 +7,7 @@
   , TypeApplications
 #-}
 
-module BlockApps.Data
+module BlockApps.Ethereum
   ( -- * Addresses
     Address (..)
   , deriveAddress

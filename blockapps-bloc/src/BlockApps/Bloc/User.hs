@@ -2,7 +2,7 @@ module BlockApps.Bloc.User where
 
 import Data.Text (Text)
 
-import BlockApps.Data
+import BlockApps.Ethereum
 
 data User = User
   { userName :: Text

@@ -29,7 +29,7 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
-import BlockApps.Data
+import BlockApps.Ethereum
 
 class Monad m => MonadSearchContract m where
   getSearchContract :: ContractName -> m [MaybeNamed Address]

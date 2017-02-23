@@ -14,7 +14,7 @@ import Test.Hspec
 
 import BlockApps.Bloc.API.Users
 import BlockApps.Bloc.API.Utils
-import BlockApps.Data
+import BlockApps.Ethereum
 
 -- TODO: user/contract methods Addresses may need to be MayBe Named Address
 

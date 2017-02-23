@@ -36,7 +36,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Numeric.Natural
 
-import BlockApps.Data
+import BlockApps.Ethereum
 import BlockApps.Strato.API.Client
 import BlockApps.Strato.Types
 import Network.HTTP.Client

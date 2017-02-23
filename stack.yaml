@@ -1,7 +1,7 @@
 resolver: nightly-2017-01-17
 packages:
 - blockapps-bloc
-- blockapps-data
+- blockapps-ethereum
 - blockapps-strato
 - solidity-abi
 - state-translate
@@ -12,10 +12,6 @@ packages:
 - location:
     git: https://github.com/echatav/servant-aeson-specs/
     commit: cedbf002b0d5855c17dc91de97e966ee339604fa
-  extra-dep: true
-- location:
-    git: https://github.com/echatav/hasql/
-    commit: 1f9ba4b0aa665b06576d7a5be00038b034fc3e9f
   extra-dep: true
 extra-deps:
   - saltine-0.0.0.4

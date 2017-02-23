@@ -15,7 +15,7 @@ import Data.ByteString (ByteString)
 import Data.Maybe
 import GHC.Generics
 
-import BlockApps.Data
+import BlockApps.Ethereum
 
 newtype Password = Password ByteString
 

@@ -18,7 +18,7 @@ import Servant.Client
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
-import BlockApps.Data
+import BlockApps.Ethereum
 
 class Monad m => MonadAddresses m where
   getAddresses :: m [Address]
