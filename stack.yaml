@@ -1,9 +1,9 @@
 resolver: nightly-2017-02-23
 packages:
-- blockapps-bloc
-- blockapps-ethereum
-- blockapps-solidity
-- blockapps-strato
+- bloc
+- ethereum
+- solidity
+- strato
 - location:
     git: https://github.com/blockapps/secp256k1-haskell/
     commit: 0a6db54f31defdd7a5edecdf6932af3deea6ca57
