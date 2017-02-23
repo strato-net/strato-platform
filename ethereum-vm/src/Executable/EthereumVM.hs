@@ -35,6 +35,7 @@ import Executable.EVMCheckpoint
 
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models
 
 import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
 
@@ -165,7 +166,7 @@ shouldProcessNewTransactions =
             Nothing -> do
                 $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"
                 return False -- we either had no peers or some other error, lets play it safe
-            Just (worldBestSha, _, _) -> do
+            Just (RedisBestBlock worldBestSha _ _) -> do
                 didRunBest <- hasBSum worldBestSha
                 let msg = if didRunBest
                             then "don't have a block summary for worldBestSha " ++ format worldBestSha ++ ", not mining"
