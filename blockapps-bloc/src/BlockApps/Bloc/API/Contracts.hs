@@ -171,17 +171,20 @@ instance MonadContracts Bloc where
 
   getContractsStates = undefined
 
-  postContractsCompile reqs = do
-    mngr <- asks httpManager
-    url <- asks urlStrato
-    for reqs $ \ PostCompileRequest
-      { postcompilerequestSearchable = searchable
-      , postcompilerequestContractName = contractName
-      , postcompilerequestSource = source
-      } -> do
-        (xabi,comp) <- liftIO $ flip runClientM (ClientEnv mgr url) $
-          (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-        return $ PostCompileResponse contractName _hash
+  postContractsCompile = undefined
+
+  -- postContractsCompile reqs = do
+  --   mngr <- asks httpManager
+  --   url <- asks urlStrato
+  --   for reqs $ \ PostCompileRequest
+  --     { postcompilerequestSearchable = searchable
+  --     , postcompilerequestContractName = contractName
+  --     , postcompilerequestSource = source
+  --     } -> do
+  --       (xabi,comp) <- liftIO $ flip runClientM (ClientEnv mgr url) $
+  --         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  --
+  --       return $ PostCompileResponse contractName _hash
 
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
