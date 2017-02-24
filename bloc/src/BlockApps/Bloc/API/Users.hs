@@ -66,15 +66,15 @@ instance MonadUsers ClientM where
   postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 instance MonadUsers Bloc where
 
-  getUsers = runHasql $ map UserName <$> query () getUsersQuery
+  getUsers = blocSql $ map UserName <$> query () getUsersQuery
 
-  getUsersUser (UserName name) = runHasql $ query name getUsersUserQuery
+  getUsersUser (UserName name) = blocSql $ query name getUsersUserQuery
 
   postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
     keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pass
     mngr <- asks httpManager
     url <- asks urlStrato
-    runHasql $ query (name,keyStore) postUsersUserQuery
+    blocSql $ query (name,keyStore) postUsersUserQuery
     let
       addr = keystoreAcctAddress keyStore
     liftIO . when (faucet == 1) $

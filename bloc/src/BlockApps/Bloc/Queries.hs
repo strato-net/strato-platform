@@ -17,6 +17,7 @@ import qualified Hasql.Encoders as Encoders
 import Hasql.Query
 
 import BlockApps.Ethereum
+import BlockApps.Solidity
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 
@@ -570,7 +571,7 @@ createContractQuery = statement
   False
 
 upsertContractMetaDataQuery
-  :: Query (Int32,ContractDetails,ByteString) Int32
+  :: Query (Int32,Text,Text,ByteString,ByteString) Int32
 upsertContractMetaDataQuery = statement
   "WITH upsert AS (UPDATE contracts_metadata SET \
   \  bin = $2\
@@ -589,22 +590,16 @@ upsertContractMetaDataQuery = statement
   \RETURNING id) \
   \SELECT id from upsert UNION SELECT id from ins;"
   encoder
-  decoder
+  (Decoders.singleRow (Decoders.value Decoders.int4))
   False
   where
     encoder = mconcat
-      [ contramap (\ (x,_,_) -> x) (Encoders.value Encoders.int4)
-      , contramap (\ (_,y,_) -> y) encoderContractDetails
-      , contramap (\ (_,_,z) -> z) (Encoders.value Encoders.bytea)
+      [ contramap (\ (contractId,_,_,_,_) -> contractId) (Encoders.value Encoders.int4)
+      , contramap (\ (_,bin,_,_,_) -> Text.encodeUtf8 bin) (Encoders.value Encoders.bytea)
+      , contramap (\ (_,_,binRuntime,_,_) -> Text.encodeUtf8 binRuntime) (Encoders.value Encoders.bytea)
+      , contramap (\ (_,_,_,codeHash,_) -> codeHash) (Encoders.value Encoders.bytea)
+      , contramap (\ (_,_,_,_,binRuntimeHash) -> binRuntimeHash) (Encoders.value Encoders.bytea)
       ]
-    encoderContractDetails = mconcat
-      [ contramap (Text.encodeUtf8 . contractdetailsBin) (Encoders.value Encoders.bytea)
-      , contramap (Text.encodeUtf8 . contractdetailsBinRuntime) (Encoders.value Encoders.bytea)
-      , contramap (Text.encodeUtf8 . contractdetailsCodeHash) (Encoders.value Encoders.bytea)
-      ]
-    decoder = Decoders.singleRow $ (,)
-      <$> Decoders.value Decoders.text
-      <*> Decoders.value Decoders.bytea
 
 insertContractLookup :: Query (Int32,Int32) ()
 insertContractLookup = statement
@@ -620,6 +615,22 @@ insertContractLookup = statement
       [ contramap fst (Encoders.value Encoders.int4)
       , contramap snd (Encoders.value Encoders.int4)
       ]
+
+insertXabiFunctions :: Query (Int32,Text,Text,Bool) Int32
+insertXabiFunctions = statement
+  "INSERT INTO xabi_functions \
+  \  (contract_metadata_id,name,selector,is_constructor)\
+  \  VALUES ($1,$2,$3,$4) RETURNING id;"
+  encoder
+  (Decoders.singleRow (Decoders.value Decoders.int4))
+  False
+  where
+    encoder = mconcat
+     [ contramap (\ (metadataId,_,_,_) -> metadataId) (Encoders.value Encoders.int4)
+     , contramap (\ (_,name,_,_) -> name) (Encoders.value Encoders.text)
+     , contramap (\ (_,_,selector,_) -> (Text.encodeUtf8 selector)) (Encoders.value Encoders.bytea)
+     , contramap (\ (_,_,_,isConstr) -> isConstr) (Encoders.value Encoders.bool)
+     ]
 
 addressDecoder :: Decoders.Value Address
 addressDecoder

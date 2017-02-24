@@ -30,6 +30,7 @@ module BlockApps.Strato.Types
   , Src (..)
   , ExtabiResponse (..)
   , SolcResponse (..)
+  , AbiBin (..)
   ) where
 
 import Control.Applicative

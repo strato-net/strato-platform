@@ -43,7 +43,7 @@ instance MonadSearchContract ClientM where
 instance MonadSearchContract Bloc where
 
   getSearchContract (ContractName contractName) =
-    runHasql $ map Unnamed <$> query contractName getSearchContractQuery
+    blocSql $ map Unnamed <$> query contractName getSearchContractQuery
 
   getSearchContractState = undefined
   getSearchContractStateReduced = undefined

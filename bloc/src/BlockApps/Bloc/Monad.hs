@@ -49,8 +49,15 @@ enterBloc env x
   $ flip runLoggingT (liftIO . print)
   $ flip runReaderT env $ runBloc x
 
-runHasql :: Session x -> Bloc x
-runHasql session = do
+blocSql :: Session x -> Bloc x
+blocSql session = do
   conn <- asks dbConnection
   resultEither <- liftIO $ run session conn
   either (throwError . DBError) return resultEither
+
+blocStrato :: ClientM x -> Bloc x
+blocStrato client = do
+  url <- asks urlStrato
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client (ClientEnv mngr url)
+  either (throwError . StratoError) return resultEither

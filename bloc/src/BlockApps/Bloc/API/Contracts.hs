@@ -13,6 +13,7 @@
 
 module BlockApps.Bloc.API.Contracts where
 
+import Control.Monad
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -41,6 +42,8 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
+import BlockApps.Strato.Client
+import BlockApps.Strato.Types
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -64,7 +67,7 @@ instance MonadContracts ClientM where
   postContractsCompile = client (Proxy @ PostContractsCompile)
 
 instance MonadContracts Bloc where
-  getContracts = runHasql $ do
+  getContracts = blocSql $ do
     let
       -- current bloc returns milliseconds
       -- TODO: get those extra 3 significant figures of accuracy
@@ -84,12 +87,12 @@ instance MonadContracts Bloc where
       `Map.union`
       namesToMap contractsNamesAsAddresses
 
-  getContractsData (ContractName contractName) = runHasql $ do
+  getContractsData (ContractName contractName) = blocSql $ do
     addresses <- query contractName getContractsDataAddressesQuery
     names <- query contractName getContractsDataNamesQuery
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract (ContractName contractName) contractId = runHasql $ do
+  getContractsContract (ContractName contractName) contractId = blocSql $ do
     (contractDetails,metadataId) <- case contractId of
       Named "Latest" ->
         query contractName getContractsContractLatestQuery
@@ -123,7 +126,7 @@ instance MonadContracts Bloc where
 
   getContractsState = undefined
 
-  getContractsFunctions (ContractName contractName) contractId = runHasql $ do
+  getContractsFunctions (ContractName contractName) contractId = blocSql $ do
     metadataId <- case contractId of
       Named "Latest" ->
         query contractName getContractMetaDataIdByLatestQuery
@@ -138,7 +141,7 @@ instance MonadContracts Bloc where
 
 
 
-  getContractsSymbols (ContractName contractName) contractId = runHasql $ do
+  getContractsSymbols (ContractName contractName) contractId = blocSql $ do
     metadataId <- case contractId of
       Named "Latest" ->
         query contractName getContractMetaDataIdByLatestQuery
@@ -172,37 +175,33 @@ instance MonadContracts Bloc where
 
   -- postContractsCompile = undefined
 
-  postContractsCompile reqs = do
-    mngr <- asks httpManager
-    url <- asks urlStrato
-    for reqs $ \ PostCompileRequest
-      { postcompilerequestSearchable = searchable
-      , postcompilerequestContractName = contractName
-      , postcompilerequestSource = source
-      } -> do
-        (ExtabiResponse xabis,SolcResponse abiBins) <-
-          liftIO $ flip runClientM (ClientEnv mgr url) $
-            (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  postContractsCompile = traverse $ \ PostCompileRequest
+    { postcompilerequestSearchable = searchable -- TODO: Support Cirrus here
+    , postcompilerequestContractName = contractName
+    , postcompilerequestSource = source
+    } -> do
+      (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+        (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+      let
+        forContracts act = Map.traverseWithKey act $
+          Map.intersectionWith (,) xabis abiBins
+      metaDataIds <- forContracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
         let
-          contracts = Map.intersectionWith (,) xabis abiBins
-          forMap = void . flip traverseWithKey
-        forMap contracts $ \ contrName (xabi,AbiBin{..}) -> do
-          let
-            details = ContractDetails
-              { contractdetailsBin = bin
-              , contractdetailsAddress = Nothing
-              , contractdetailsBinRuntime = binRuntime
-              , contractdetailsCodeHash = undefined
-              , contractdetailsName = contrName
-              , contractdetailsXabi = xabi
-              }
-            binRuntimeHash = undefined
-          runHasql $ do
-            contrId <- query contractName createContractQuery
-            metaDataId <- query (contrId,details,binRuntimeHash) upsertContractMetaDataQuery
+          codeHash = undefined
+          binRuntimeHash = undefined
+        blocSql $ do
+          contrId <- query contractName createContractQuery
 
-        return $ PostCompileResponse contractName _hash
-
+          query
+            (contrId,bin,binRuntime,codeHash,binRuntimeHash)
+            upsertContractMetaDataQuery
+      for_ metaDataIds $ \ leftMetaDataId ->
+        for_ metaDataIds $ \ rightMetaDataId -> blocSql $
+          --  unless (leftMetaDataId == rightMetaDataId) $
+          -- TODO: Remove all same name queries and logic
+             query (leftMetaDataId,rightMetaDataId) insertContractLookup
+      let contractCodeHash = undefined
+      return $ PostCompileResponse contractName contractCodeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
@@ -328,7 +327,7 @@ instance ToSample PostCompileRequest where
   toSamples _ = noSamples
 
 data PostCompileResponse = PostCompileResponse
-  { postcompileresponseContractName :: String
+  { postcompileresponseContractName :: Text
   , postcompileresponseCodeHash :: Keccak256
   } deriving (Eq,Show,Generic)
 instance ToJSON PostCompileResponse where
