@@ -9,17 +9,17 @@ blocUserFolder: '/Users/kejace/devel/blockapps/minsheng/bloc_minsheng/app/users'
 # node 0 is the default url for all single node api calls
 nodes:
   - id: 0
-    explorerUrl: 'http://silo2.eastus.cloudapp.azure.com/explorer'
-    stratoUrl: 'http://silo2.eastus.cloudapp.azure.com/strato-api'
-    blocUrl: 'http://silo2.eastus.cloudapp.azure.com/bloc'
-    searchUrl: 'http://silo2.eastus.cloudapp.azure.com/cirrus'
-  - id: 1
-    explorerUrl: 'http://silo3.eastus.cloudapp.azure.com/explorer'
-    stratoUrl: 'http://silo3.eastus.cloudapp.azure.com/strato-api'
-    blocUrl: 'http://silo3.eastus.cloudapp.azure.com/bloc'
-    searchUrl: 'http://silo3.eastus.cloudapp.azure.com/cirrus'
-  - id: 2
-    explorerUrl: 'http://silo1a.eastus.cloudapp.azure.com/explorer'
-    stratoUrl: 'http://silo1a.eastus.cloudapp.azure.com/strato-api'
-    blocUrl: 'http://silo1a.eastus.cloudapp.azure.com/bloc'
-    searchUrl: 'http://silo1a.eastus.cloudapp.azure.com/cirrus'
+    explorerUrl: 'http://bayar4a.eastus.cloudapp.azure.com/explorer'
+    stratoUrl: 'http://bayar4a.eastus.cloudapp.azure.com/strato-api'
+    blocUrl: 'http://bayar4a.eastus.cloudapp.azure.com/bloc'
+    searchUrl: 'http://bayar4a.eastus.cloudapp.azure.com/cirrus'
+  #- id: 1
+  #  explorerUrl: 'http://silo3.eastus.cloudapp.azure.com/explorer'
+  #  stratoUrl: 'http://silo3.eastus.cloudapp.azure.com/strato-api'
+  #  blocUrl: 'http://silo3.eastus.cloudapp.azure.com/bloc'
+  #  searchUrl: 'http://silo3.eastus.cloudapp.azure.com/cirrus'
+  #- id: 2
+  #  explorerUrl: 'http://silo1a.eastus.cloudapp.azure.com/explorer'
+  #  stratoUrl: 'http://silo1a.eastus.cloudapp.azure.com/strato-api'
+  #  blocUrl: 'http://silo1a.eastus.cloudapp.azure.com/bloc'
+#  searchUrl: 'http://silo1a.eastus.cloudapp.azure.com/cirrus'

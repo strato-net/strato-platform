@@ -132,7 +132,7 @@ describe('network', function() {
       .then(function(scope){
         //wait for transactions to confirm
         return Promise.each(config.nodes, function(node, i){
-          return rest.waitNextBlock(i)(scope);
+          return rest.waitNextBlock(config.timeout, i)(scope);
         })
         .then(function(){
           return scope;
