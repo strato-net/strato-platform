@@ -570,7 +570,7 @@ createContractQuery = statement
   False
 
 upsertContractMetaDataQuery
-  :: Query (Int32,ContractDetails,ByteString) (Text,ByteString)
+  :: Query (Int32,ContractDetails,ByteString) Int32
 upsertContractMetaDataQuery = statement
   "WITH upsert AS (UPDATE contracts_metadata SET \
   \  bin = $2\
@@ -583,9 +583,11 @@ upsertContractMetaDataQuery = statement
   \      FROM contracts_instance CI \
   \      WHERE contract_metadata_id = id\
   \      ) \
-  \) \
-  \INSERT INTO contracts_metadata (contract_id, bin, bin_runtime, code_hash, bin_runtime_hash) \
-  \SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT * FROM upsert);"
+  \RETURNING id), \
+  \ins AS (INSERT INTO contracts_metadata (contract_id, bin, bin_runtime, code_hash, bin_runtime_hash) \
+  \SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT * FROM upsert) \
+  \RETURNING id) \
+  \SELECT id from upsert UNION SELECT id from ins;"
   encoder
   decoder
   False
@@ -603,6 +605,21 @@ upsertContractMetaDataQuery = statement
     decoder = Decoders.singleRow $ (,)
       <$> Decoders.value Decoders.text
       <*> Decoders.value Decoders.bytea
+
+insertContractLookup :: Query (Int32,Int32) ()
+insertContractLookup = statement
+  "INSERT INTO contracts_lookup (contract_metadata_id, linked_metadata_id) \
+  \SELECT $1,$2  WHERE NOT EXISTS \
+  \(SELECT contract_metadata_id, linked_metadata_id FROM contracts_lookup \
+  \ WHERE contract_metadata_id = $1 AND linked_metadata_id = $2);"
+  encoder
+  Decoders.unit
+  False
+  where
+    encoder = mconcat
+      [ contramap fst (Encoders.value Encoders.int4)
+      , contramap snd (Encoders.value Encoders.int4)
+      ]
 
 addressDecoder :: Decoders.Value Address
 addressDecoder
