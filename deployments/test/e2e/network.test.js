@@ -91,7 +91,7 @@ describe('network', function() {
     .catch(done);
   });
 
-  it("should return the same balance for all three nodes for alice and bob", function(done){
+  it("should return the same balance for all nodes for alice and bob", function(done){
     rest.setScope(scope)
       .then(getBalances(config.nodes, usersAndNodes))
       .then(function(scope) {
@@ -119,7 +119,7 @@ describe('network', function() {
   it("should send from alice to bob from all nodes", function(done){
     rest.setScope(scope)
       .then(function(scope) {
-        //send transactions to all three nodes
+        //send transactions to all nodes
         return Promise.each(usersAndNodes.filter(function(user, i){
           return i%2 == 1;
         }), function(uan, i){
