@@ -80,7 +80,7 @@ windows:
                   #            - graphs:
                   # - curl "http://localhost/strato-api/eth/v1.2/block/last/50" --silent | jq '.[] | {blockData}' | grep 'timestamp' | cut -d : -f2,3,4 | cut -d , -f1 | xargs -L1 -I x date -d x +'%s' | awk '{$2 = $1 - prev1; prev1 = $1; print;}' | cut -d ' ' -f2 | tail -n +2 | spark | awk -F":" '{ print $1 "\tblocktimes"}'
 
-    - stream_dumps:
+    - stream_dumps_1:
         layout: even-horizontal
         panes:
             - dumpkafkaunminedblocks:
@@ -89,6 +89,9 @@ windows:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
             - dumpkafkastatediff:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
+    - stream_dumps_2:
+        layout: even-horizontal
+        panes:
             - dumpkafkaunsequencer:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunsequencer'
             - dumpkafkasequencer:
@@ -128,4 +131,10 @@ windows:
                 - docker exec -it silo_redis_1 bash -c 'redis-cli info'
             - postgres-cirrus:
                 - docker exec -it silo_postgres-cirrus_1 bash -c 'su - postgres; pg_top cirrus'
+
+    - host:
+        layout: tiled
+        panes:
+            - bash:
+                - bash
 
