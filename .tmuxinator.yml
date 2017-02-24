@@ -71,7 +71,7 @@ windows:
                 - docker logs -ft --tail 1000 silo_postgrest_1
 
     - explorer:
-        layout: even-vertical 
+        layout: tiled 
         panes:
             - bestblock:
                 - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq '.'"
