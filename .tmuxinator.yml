@@ -49,7 +49,7 @@ windows:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-statediff-indexer
 
     - network:
-        layout: tiled
+        layout: even-vertical 
         panes:
             - ethereum-discover:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover
