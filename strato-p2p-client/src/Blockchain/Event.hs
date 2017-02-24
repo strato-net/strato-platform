@@ -16,6 +16,9 @@ import Control.Monad.State
 import Data.Conduit
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.ByteString             as BS
+import qualified Data.ByteString.Char8       as BS8
+import qualified Data.ByteString.Base16      as BC16
 import Data.Time.Clock
 
 import Blockchain.Colors
@@ -36,6 +39,7 @@ import Blockchain.SHA
 import Blockchain.Stream.VMEvent
 import Blockchain.Verification
 import Blockchain.DBM
+import Blockchain.Data.PubKey
 
 import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
@@ -77,7 +81,11 @@ maxReturnedHeaders :: Int
 maxReturnedHeaders = 1000
 
 peerString :: PPeer -> String
-peerString peer = show (pPeerPubkey peer) ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+    where
+        key = p2s (pPeerPubkey peer)
+        p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p 
+        p2s _                    = ""
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
