@@ -115,14 +115,14 @@ xabiFunctionsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4
   , Column PGBool
-  , Column PGText
-  , Column PGBytea
+  , Column (Nullable PGText)
+  , Column (Nullable PGBytea)
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBool
-  , Column PGText
-  , Column PGBytea
+  , Column (Nullable PGText)
+  , Column (Nullable PGBytea)
   )
 xabiFunctionsTable = Table "xabi_functions" $ p5
   ( optional "id"
@@ -135,22 +135,22 @@ xabiFunctionsTable = Table "xabi_functions" $ p5
 xabiTypesTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText
-  , Maybe (Column PGText)
+  , Column (Nullable PGText)
   , Column PGBool
   , Column PGBool
   , Column PGBool
-  , Maybe (Column PGInt4)
+  , Column (Nullable PGInt4)
   , Column PGInt4
   , Column PGInt4
   , Column PGInt4
   )
   ( Column PGInt4
   , Column PGText
-  , Column PGText
+  , Column (Nullable PGText)
   , Column PGBool
   , Column PGBool
   , Column PGBool
-  , Column PGInt4
+  , Column (Nullable PGInt4)
   , Column PGInt4
   , Column PGInt4
   , Column PGInt4
@@ -158,11 +158,11 @@ xabiTypesTable :: Table
 xabiTypesTable = Table "xabi_types" $ p10
   ( optional "id"
   , required "type"
-  , optional "typedef"
+  , required "typedef"
   , required "is_dynamic"
   , required "is_signed"
   , required "is_public"
-  , optional "bytes"
+  , required "bytes"
   , required "entry_type_id"
   , required "value_type_id"
   , required "key_type_id"
