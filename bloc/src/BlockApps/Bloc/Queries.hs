@@ -616,8 +616,8 @@ insertContractLookup = statement
       , contramap snd (Encoders.value Encoders.int4)
       ]
 
-insertXabiFunctions :: Query (Int32,Text,Text,Bool) Int32
-insertXabiFunctions = statement
+insertXabiFunction :: Query (Int32,Text,Text,Bool) Int32
+insertXabiFunction = statement
   "INSERT INTO xabi_functions \
   \  (contract_metadata_id,name,selector,is_constructor)\
   \  VALUES ($1,$2,$3,$4) RETURNING id;"
@@ -631,6 +631,28 @@ insertXabiFunctions = statement
      , contramap (\ (_,_,selector,_) -> (Text.encodeUtf8 selector)) (Encoders.value Encoders.bytea)
      , contramap (\ (_,_,_,isConstr) -> isConstr) (Encoders.value Encoders.bool)
      ]
+
+-- insertXabiArg :: Query (Int32,Int32,Text,Arg) ()
+-- insertXabiArg = statement
+--   ""
+--   encoder
+--   Decoders.unit
+--   False
+--   where
+--     encoder = mconcat
+--       [ contramap (\ (funcId,_,_,_) -> funcId) (Encoders.Value Encoders.int4)
+--       , contramap (\ (_,_,funcName,_) -> funcName) (Encoders.Value Encoders.text)
+--       , contramap (\ (_,_,_,arg) -> arg) argEncoder
+--       ]
+--     argEncoder = mconcat
+--       [ contramap argName (Encoders.value Encoders.text)
+--       , contramap argIndex (Encoders.value Encoders.int4)
+--       , contramap argType (Encoders.value Encoders.text)
+--       , contramap argTypedef (Encoders.value Encoders.text)
+--       , contramap argDynamic (Encoders.value Encoders.bool)
+--       , contramap argBytes (Encoders.value Encoders.int4)
+--       , contramap argEntry entryEncoder
+--       ]
 
 addressDecoder :: Decoders.Value Address
 addressDecoder

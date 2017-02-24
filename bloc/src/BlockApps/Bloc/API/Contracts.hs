@@ -183,18 +183,24 @@ instance MonadContracts Bloc where
       (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
       let
-        forContracts act = Map.traverseWithKey act $
-          Map.intersectionWith (,) xabis abiBins
-      metaDataIds <- forContracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
+        contracts = Map.intersectionWith (,) xabis abiBins
+      metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
         let
           codeHash = undefined
           binRuntimeHash = undefined
         blocSql $ do
           contrId <- query contractName createContractQuery
-
-          query
+          metaDataId <- query
             (contrId,bin,binRuntime,codeHash,binRuntimeHash)
             upsertContractMetaDataQuery
+          for_ xabiFuncs $ \ funcs ->
+            forMap_ funcs $ \ funcName Func{..} -> do
+              funcId <- query
+                (metaDataId,funcName,funcSelector,False)
+                insertXabiFunction
+              -- flip Map.traverseWithKey funcArgs $ \ argName arg ->
+              return ()
+          return metaDataId
       for_ metaDataIds $ \ leftMetaDataId ->
         for_ metaDataIds $ \ rightMetaDataId -> blocSql $
           --  unless (leftMetaDataId == rightMetaDataId) $
@@ -350,3 +356,10 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
+
+-- helper functions
+forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)
+forMap m act = Map.traverseWithKey act m
+
+forMap_ :: Applicative m => Map k v -> (k -> v -> m ()) -> m ()
+forMap_ m act = void $ forMap m act
