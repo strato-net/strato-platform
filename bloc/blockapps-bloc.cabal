@@ -23,6 +23,7 @@ library
     BlockApps.Bloc.API.Utils
     BlockApps.Bloc.Crypto
     BlockApps.Bloc.Database
+    BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Queries
   default-language: Haskell2010
@@ -46,6 +47,8 @@ library
     , logging-effect
     , monad-loops
     , mtl
+    , opaleye
+    , product-profunctors
     , QuickCheck
     , quickcheck-instances
     , saltine

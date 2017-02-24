@@ -56,8 +56,8 @@ blocSql session = do
   either (throwError . DBError) return resultEither
 
 blocStrato :: ClientM x -> Bloc x
-blocStrato client = do
+blocStrato client' = do
   url <- asks urlStrato
   mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client (ClientEnv mngr url)
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (throwError . StratoError) return resultEither
