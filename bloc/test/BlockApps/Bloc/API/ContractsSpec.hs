@@ -22,15 +22,15 @@ spec = do
           []
           simpleStorageContractName
           simpleStorageSrc
-      contractsEither <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr bayar4a)
+      contractsEither <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContracts" $
     it "gets a list of contracts" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM getContracts (ClientEnv mgr bayar4a)
+      contractsEither <- runClientM getContracts (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContractsData" $
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr bayar4a)
+      contractsEither <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContractsContract" $ do
     it "get xabi data for an uploaded contracted at a specific address" $ \ TestConfig {..} -> do
@@ -39,7 +39,7 @@ spec = do
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
     it "should also work when mappings are involved" $ \ TestConfig {..} -> do
       contractsEither <- runClientM
@@ -47,7 +47,7 @@ spec = do
           (ContractName testContractName)
           (Unnamed testContractAddress)
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContractsFunctions" $
     it "get a list of contract functions for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
@@ -56,7 +56,7 @@ spec = do
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContractsSymbols" $
     it "get a list of contract symbols for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
@@ -65,7 +65,7 @@ spec = do
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContractsState" $
     it "get contract state for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
@@ -74,7 +74,7 @@ spec = do
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight
   describe "getContractsStateMapping" $
     it "get contract state for a mapping within an uploaded contract at a specific address" $ \ TestConfig {..} -> do
@@ -85,7 +85,7 @@ spec = do
           (SymbolName "m")
           "1"
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEitherSimple `shouldSatisfy` isRight
       contractsEitherTest <- runClientM
         (getContractsStateMapping
@@ -94,7 +94,7 @@ spec = do
           (SymbolName "tMapping3")
           "1"
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEitherTest `shouldSatisfy` isRight
       contractsEitherBool <- runClientM
         (getContractsStateMapping
@@ -103,7 +103,7 @@ spec = do
           (SymbolName "m2")
           "1"
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEitherBool `shouldSatisfy` isRight
   describe "getContractsStates" $
     it "get contract states all uploaded contracts at a specific name" $ \ TestConfig {..} -> do
@@ -111,5 +111,5 @@ spec = do
         (getContractsStates
           (ContractName simpleMappingContractName)
         )
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       contractsEither `shouldSatisfy` isRight

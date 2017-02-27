@@ -22,27 +22,27 @@ spec :: SpecWith TestConfig
 spec = do
   describe "getUsers" $
     it "should get a list of users" $ \ TestConfig {..} -> do
-      usersEither <- runClientM getUsers (ClientEnv mgr bayar4a)
+      usersEither <- runClientM getUsers (ClientEnv mgr url)
       usersEither `shouldSatisfy` isRight
   describe "getUsersUser" $
     it "should get a list of user's addresses" $ \ TestConfig {..} -> do
-      userAddressesEither <- runClientM (getUsersUser userName) (ClientEnv mgr bayar4a)
+      userAddressesEither <- runClientM (getUsersUser userName) (ClientEnv mgr url)
       userAddressesEither `shouldSatisfy` isRight
   describe "postUsersUser" $
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
         username = UserName "blockapps"
         postUsersUserRequest = PostUsersUserRequest 1 pw
-      postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr bayar4a)
+      postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr url)
       postUsersEither `shouldSatisfy` isRight
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
       let
         postSendParameters = PostSendParameters (toUserAddress) 100 pw
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345"
-      postSendEither <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr bayar4a)
+      postSendEither <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr url)
       postSendEither `shouldSatisfy` isRight
-      postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr bayar4a)
+      postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr url)
       postSendEitherBad `shouldSatisfy` isLeft
   describe "postUsersContract" $
     it "should upload a contract" $ \ TestConfig {..} -> do
@@ -52,7 +52,7 @@ spec = do
           { src = simpleStorageSrc
           , password = pw
           }
-      postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr bayar4a)
+      postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr url)
       postUsersContractEither `shouldSatisfy` isRight
   describe "postUsersUploadList" $
     it "should upload a list of contracts" $ \ TestConfig {..} -> do
@@ -75,7 +75,7 @@ spec = do
           , uploadlistContracts = uploadListContracts
           , uploadlistResolve = True
           }
-      postUsersUploadEither <- runClientM (postUsersUploadList userName userAddress uploadListRequest) (ClientEnv mgr bayar4a)
+      postUsersUploadEither <- runClientM (postUsersUploadList userName userAddress uploadListRequest) (ClientEnv mgr url)
       postUsersUploadEither `shouldSatisfy` isRight
   describe "postUsersContractMethod" $
     it "should call a contract method" $ \ TestConfig {..} -> do
@@ -91,7 +91,7 @@ spec = do
           }
       postUsersContractMethodEither <- runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       postUsersContractMethodEither `shouldSatisfy` isRight
   describe "postUsersSendList" $
     it "should post a list of send transactions" $ \ TestConfig {..} -> do
@@ -109,7 +109,7 @@ spec = do
           }
       postSendListEither <- runClientM
         (postUsersSendList userName userAddress postSendListRequest)
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       postSendListEither `shouldSatisfy` isRight
   describe "postUsersContractMethodList" $
     it "should call a list of methods" $ \ TestConfig {..} -> do
@@ -130,5 +130,5 @@ spec = do
           }
       postCallMethodListEither <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
-        (ClientEnv mgr bayar4a)
+        (ClientEnv mgr url)
       postCallMethodListEither `shouldSatisfy` isRight

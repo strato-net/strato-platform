@@ -160,6 +160,7 @@ instance FromJSON TxParams where
 
 data TestConfig = TestConfig
   { mgr :: Manager
+  , url :: BaseUrl
   , userName :: UserName
   , userAddress :: Address
   , toUserName :: UserName

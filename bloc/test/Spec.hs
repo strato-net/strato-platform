@@ -36,6 +36,7 @@ setup = do
   let
     testConfig = TestConfig
       { mgr = mgr'
+      , url = bayar4a
       , userName = UserName "testUser1"
       , userAddress = Address 0x0
       , toUserName = UserName "testUser2"
