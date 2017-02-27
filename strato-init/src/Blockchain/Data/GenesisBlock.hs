@@ -22,12 +22,8 @@ import           Blockchain.BackupBlocks
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DiffDB
 import           Blockchain.Data.Extra
 import           Blockchain.Data.GenesisInfo
-import           Blockchain.Data.StateDiff            hiding
-                                                       (StateDiff (blockHash))
-import qualified Blockchain.Data.StateDiff            as StateDiff (StateDiff (blockHash))
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
@@ -35,6 +31,11 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
+
+import           Blockchain.Strato.StateDiff            hiding
+                                                       (StateDiff (blockHash))
+import qualified Blockchain.Strato.StateDiff            as StateDiff (StateDiff (blockHash))
+import           Blockchain.Strato.StateDiff.Database
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.Output                    (printLogMsg')

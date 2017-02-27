@@ -10,14 +10,14 @@ module Blockchain.Strato.Indexer.Kafka
 
 import           Data.Binary
 
-import           Blockchain.KafkaTopics          (lookupTopic)
-import           Blockchain.Strato.Indexer.Model
-import           Blockchain.Stream.Raw           (fetchBytes, setDefaultKafkaState)
-
 import qualified Data.ByteString.Lazy            as L
 import qualified Network.Kafka                   as K
 import qualified Network.Kafka.Producer          as KW
 import qualified Network.Kafka.Protocol          as KP
+
+import           Blockchain.KafkaTopics          (lookupTopic)
+import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Stream.Raw           (fetchBytes, setDefaultKafkaState)
 
 indexEventsTopicName :: KP.TopicName
 indexEventsTopicName = lookupTopic "indexevents"

@@ -22,7 +22,7 @@ library
                       , cryptohash
                       , blockapps-haskoin
                       , time
-  hs-source-dirs:        src
+  hs-source-dirs:       src
   default-language:     Haskell2010
   default-extensions:   MultiParamTypeClasses
                       , FlexibleContexts

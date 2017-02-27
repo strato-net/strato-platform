@@ -1,52 +1,50 @@
-{-# LANGUAGE FlexibleInstances, DataKinds, TypeFamilies, NamedFieldPuns, ViewPatterns, DeriveGeneric, ExplicitForAll, StandaloneDeriving, OverloadedStrings #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-module Blockchain.Data.StateDiff (
-  StateDiff(..),
---  TXResult(..),
-  AccountDiff(..),
-  Diff(..),
-  Detail(..),
-  Detailed(..),
-  stateDiff, 
-  eventualAccountState, 
-  incrementalAccountState
-  ) where
+{-# OPTIONS_GHC -fno-warn-orphans   #-}
+module Blockchain.Strato.StateDiff
+    ( StateDiff(..)
+    , AccountDiff(..)
+    , Diff(..)
+    , Detail(..)
+    , Detailed(..)
+    , stateDiff
+    , eventualAccountState
+    , incrementalAccountState
+    ) where
 
-import Blockchain.Database.MerklePatricia.Internal
-import qualified Blockchain.Database.MerklePatricia.Diff as Diff
-import Blockchain.Data.Address
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.RLP
-import Blockchain.DB.AddressStateDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.StateDB
-import Blockchain.ExtWord
-import Blockchain.Format
-import Blockchain.SHA
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia.Diff     as Diff
+import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.DB.AddressStateDB
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.StateDB
+import           Blockchain.ExtWord
+import           Blockchain.Format
+import           Blockchain.SHA
 
-import Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Resource
 
-import Data.Aeson
-import Data.Function
-import Data.Maybe
-import Data.String
+import           Data.Aeson
+import           Data.Function
+import           Data.Maybe
+import           Data.String
 
-import Data.ByteString (ByteString)
+import           Data.ByteString                             (ByteString)
 
-import Data.Map (Map)
-import qualified Data.Map as Map
+import           Data.Map                                    (Map)
+import qualified Data.Map                                    as Map
 
-import qualified Data.NibbleString as N
+import qualified Data.NibbleString                           as N
 
-import GHC.Generics
+import           GHC.Generics
 
 -- | Describes all the changes that have occurred in the blockchain
 -- database in a given block.
-data StateDiff = 
-  StateDiff {               
-    blockNumber :: Integer,
-    blockHash :: SHA,
+data StateDiff =
+  StateDiff {
+    blockNumber     :: Integer,
+    blockHash       :: SHA,
     -- | The 'Eventual value is the initial state of the contract
     createdAccounts :: Map Address (AccountDiff 'Eventual),
     -- | The 'Eventual value is the pre-deletion state of the contract
@@ -66,37 +64,24 @@ instance (ToJSON a) => ToJSON (Map SHA a) where
 
 instance ToJSON StateDiff
 
-{-
-data TXResult =
-  TXResult {
-    message :: String,
-    response :: String,
-    etherUsed :: Word256,
-    time :: Double
-  }
-  deriving (Generic)
-
-instance ToJSON TXResult 
--}
-
 -- | Describes all the changes to a particular account.  The address is not
 -- recorded; it appears as the key in the map in the 'StateDiff'
 data AccountDiff (v :: Detail) =
   AccountDiff {
     -- | The nonce may not change
-    nonce :: Maybe (Diff Integer v),
+    nonce        :: Maybe (Diff Integer v),
     -- | The balance may not change
-    balance :: Maybe (Diff Integer v),
+    balance      :: Maybe (Diff Integer v),
     -- | Only present for newly created contracts, since the code can never
     -- change
-    code :: Maybe (Diff ByteString v),
+    code         :: Maybe (Diff ByteString v),
     -- | Since we want to always be able to identify account-type
-    codeHash :: SHA, -- Maybe
-    -- | This is necessary for when we commit an AddressStateRef to SQL.  
+    codeHash     :: SHA, -- Maybe
+    -- | This is necessary for when we commit an AddressStateRef to SQL.
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot v),
     -- | Only the storage keys that change are present in this map.
-    storage :: Map Word256 (Diff Word256 v)
+    storage      :: Map Word256 (Diff Word256 v)
     }
     deriving (Generic)
 
@@ -110,7 +95,7 @@ instance ToJSON (AccountDiff 'Eventual)
 data family Diff a (v :: Detail)
 -- | This instance records the exact relationship between the initial and
 -- final states
-data instance Diff a 'Incremental = 
+data instance Diff a 'Incremental =
   Create {newValue :: a} |
   Delete {oldValue :: a} |
   Update {oldValue :: a, newValue :: a}
@@ -150,19 +135,19 @@ instance Detailed AccountDiff where
 
 instance {-# OVERLAPPABLE #-} (Num a) => Detailed (Diff a) where
   incrementalToEventual Delete{} = Value 0 -- ^ Ethereum-specific default value
-  incrementalToEventual x = Value $ newValue x
+  incrementalToEventual x        = Value $ newValue x
 
 instance Detailed (Diff StateRoot) where
   incrementalToEventual Delete{} = Value $ fromString ""
-  incrementalToEventual x = Value $ newValue x
+  incrementalToEventual x        = Value $ newValue x
 
 instance Detailed (Diff ByteString) where
   incrementalToEventual Delete{} = Value $ fromString ""
-  incrementalToEventual x = Value $ newValue x
+  incrementalToEventual x        = Value $ newValue x
 
 instance Detailed (Diff SHA) where
   incrementalToEventual Delete{} = Value $ hash ""
-  incrementalToEventual x = Value $ newValue x
+  incrementalToEventual x        = Value $ newValue x
 
 stateDiff :: (HasStateDB m, HasCodeDB m, HasHashDB m, MonadResource m) =>
              Integer -> SHA -> StateRoot -> StateRoot -> m StateDiff
@@ -170,7 +155,7 @@ stateDiff blockNumber blockHash oldRoot newRoot = do
   db <- getStateDB
   diffs <- Diff.dbDiff db oldRoot newRoot
   collectModes diffs $
-    \createdAccounts deletedAccounts updatedAccounts -> 
+    \createdAccounts deletedAccounts updatedAccounts ->
       StateDiff{
         blockNumber,
         blockHash,
@@ -194,7 +179,7 @@ stateDiff blockNumber blockHash oldRoot newRoot = do
       updateDiff <- accountUpdate k v1 v2
       coll c d (updateDiff : u) rest
 
-accountEnd :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) => 
+accountEnd :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
               [N.Nibble] -> Val -> m (Address, AccountDiff 'Eventual)
 accountEnd k v = do
   address <- lookupAddress k
@@ -211,9 +196,9 @@ accountUpdate k vOld vNew = do
   accountDiff <- incrementalAccountState oldAddrState newAddrState
   return (address, accountDiff)
 
-eventualAccountState :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) => 
+eventualAccountState :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                         AddressState -> m (AccountDiff 'Eventual)
-eventualAccountState 
+eventualAccountState
   AddressState{
     addressStateNonce,
     addressStateBalance,
@@ -222,15 +207,16 @@ eventualAccountState
     }
   = do
     code <- lookupCode addressStateCodeHash
-    storage <- eventualStorage addressStateContractRoot 
+    storage <- eventualStorage addressStateContractRoot
     return AccountDiff{
-      nonce = Just $ Value addressStateNonce,
-      balance = Just $ Value addressStateBalance,
-      contractRoot = Just $ Value addressStateContractRoot,
-      code = Just $ Value code,
+      nonce = Just (Value addressStateNonce),
+      balance = Just (Value addressStateBalance),
+      contractRoot = Just (Value addressStateContractRoot),
+      code = Just (Value code),
       codeHash = addressStateCodeHash,
       storage
       }
+
 
 incrementalAccountState :: (HasHashDB m, HasStateDB m, HasCodeDB m, MonadResource m) =>
                            AddressState -> AddressState -> m (AccountDiff 'Incremental)
@@ -241,13 +227,13 @@ incrementalAccountState oldState newState = do
     balance = (diff `on` addressStateBalance) oldState newState,
     contractRoot = (diff `on` addressStateContractRoot) oldState newState,
     code = Nothing,
-    codeHash = addressStateCodeHash newState, 
+    codeHash = addressStateCodeHash newState,
     storage
     }
 
   where
     diff :: (Eq a) => a -> a -> Maybe (Diff a 'Incremental)
-    diff x y = if x == y then Nothing else Just $ Update{oldValue = x, newValue = y}
+    diff x y = if x == y then Nothing else Just Update{oldValue = x, newValue = y}
 
 eventualStorage :: (HasHashDB m, HasCodeDB m, HasStateDB m, MonadResource m) =>
                    StateRoot -> m (Map Word256 (Diff Word256 'Eventual))
@@ -275,10 +261,10 @@ incrementalStorage oldRoot newRoot = do
       return (key, Delete{oldValue})
     decodeDiffKV (Diff.Update k vOld vNew) = do
       key <- lookupStorageKey $ N.pack k
-      let 
+      let
         oldValue = retrieveMPDBValue vOld
         newValue = retrieveMPDBValue vNew
-      return (key, Update{oldValue, newValue})  
+      return (key, Update{oldValue, newValue})
 
 decodeStorageKV :: (HasHashDB m, HasCodeDB m) => Key -> Val -> m (Word256, Word256)
 decodeStorageKV k v = do
@@ -293,7 +279,7 @@ lookupAddress :: (HasCodeDB m, HasHashDB m, MonadResource m) => [N.Nibble] -> m 
 lookupAddress (N.pack -> addrHash) = lookupInMPDB "address" getAddressFromHash addrHash
 
 lookupCode :: (HasHashDB m, HasCodeDB m, MonadResource m) => SHA -> m ByteString
-lookupCode = lookupInMPDB "contract code" getCode 
+lookupCode = lookupInMPDB "contract code" getCode
 
 lookupStorageKey :: (HasCodeDB m, HasHashDB m, MonadResource m) => Key -> m Word256
 lookupStorageKey = lookupInMPDB "storage key" getStorageKeyFromHash
