@@ -10,7 +10,6 @@ import           Lens.Family2
 import           Lens.Family2.TH
 import           Data.Foldable
 import           Data.Tree
-import           Numeric
 import           Data.Maybe
 -- import qualified Text.PrettyPrint.ANSI.Leijen as L
 
@@ -111,4 +110,4 @@ prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 
 showHash :: SHA -> String
-showHash (SHA h) = take 8 $ showHex h ""
+showHash = take 8 . shaToHex 

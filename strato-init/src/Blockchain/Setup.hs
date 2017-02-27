@@ -65,6 +65,7 @@ defineFlag "blockTime" (13 :: Integer) "Blocktime"
 defineFlag "minBlockDifficulty" (131072 :: Integer) "Minimum block difficulty"
 defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
+defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 data SetupDBs =
   SetupDBs {
@@ -173,7 +174,7 @@ defaultRedisBlockDBConfig = RedisBlockDBConf {
     redisHost           = flags_redisHost,
     redisPort           = flags_redisPort,
     redisAuth           = Nothing,
-    redisDBNumber       = 0,
+    redisDBNumber       = flags_redisDBNumber,
     redisMaxConnections = 10,
     redisMaxIdleTime    = 30
     }

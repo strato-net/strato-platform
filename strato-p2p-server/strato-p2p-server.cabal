@@ -57,7 +57,8 @@ library
                        text,
                        time,
                        transformers,
-                       hedis
+                       hedis,
+                       strato-redis-blockdb
  
   exposed-modules:
                    Blockchain.ServOptions

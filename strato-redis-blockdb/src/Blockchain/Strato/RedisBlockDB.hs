@@ -16,6 +16,8 @@ module Blockchain.Strato.RedisBlockDB
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
     , commonAncestorHelper
+    , getWorldBestBlockInfo, updateWorldBestBlockInfo
+    , acquireRedlock, releaseRedlock, defaultRedlockTTL
     ) where
 
 import           Blockchain.Strato.Model.Class
@@ -23,11 +25,13 @@ import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 
 import           Control.Arrow                         (second)
+import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as Set
+import           System.Random                         (randomIO)
 import           Database.Redis
 
 -- todo: move this somewhere?
@@ -193,7 +197,7 @@ getCanonicalChain :: Integer
                   -> Int
                   -> Redis [SHA]
 getCanonicalChain start limit = do
-    let chain = forM (take limit [start..]) getCanonical
+    let chain = forM (take (limit+1) [start..]) getCanonical
     catMaybes <$> chain
 
 getZippedCanonicalChain :: (SHA -> Redis (Maybe t))
@@ -263,6 +267,7 @@ putHeader h = do
         number    = blockHeaderBlockNumber h
         storeHead = morphBlockHeader h :: RedisHeader
         inNS'     = flip inNamespace sha
+    
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
@@ -270,9 +275,9 @@ putHeader h = do
         sadd (inNamespace Numbers number) [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
-        TxAborted   -> pure . Left $ SingleLine (S8.pack "Aborted")
-        TxError e   -> pure . Left $ SingleLine (S8.pack e)
-
+        TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
+        TxError e   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Error" ++ e)
+    
 putHeaders :: (Traversable f, BlockHeaderLike h)
            => f h
            -> Redis (f (Either Reply Status))
@@ -313,18 +318,22 @@ putBestBlockInfo :: SHA
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
+    --liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-        Just (oldSha, oldNumber, _) -> do
+        Just (RedisBestBlock oldSha oldNumber _) -> do
+            --liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
-                Left err -> return (Left err)
+                Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
+                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates) 
+                    --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                     res <- multiExec $ do
-                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ toKey num) (toValue sha)
-                        void . del $ inNamespace Canonical . toKey <$> deletions
-                        set bestBlockInfoKey . toValue $ RedisBestBlock (newSha, newNumber, newTDiff)
+                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
+                        unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
+                        forceBestBlockInfo newSha newNumber newTDiff
                     case res of
                         TxSuccess _ -> return $ Right Ok
                         TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
@@ -333,16 +342,17 @@ putBestBlockInfo newSha newNumber newTDiff = do
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
                      -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
-commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.singleton oldSha')
-        where helper oldShaChain newShaChain seen = do
+commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
+        where helper (x:[]) (y:[]) _ | x == y = return $ Right ([], []) 
+              helper oldShaChain newShaChain seen = do
                   let oldSha = head oldShaChain
                       newSha = head newShaChain
                   ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                  let seen' = foldl (flip Set.insert) seen ps -- todo double Set.insert is probably more optimal
-                  if newParent `Set.member` seen'
-                  then complete newParent newShaChain
+                  let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
+                  if newParent `Set.member` seen
+                  then complete newParent (mkParentChain newParent newShaChain)
                   else if oldParent `Set.member` seen
-                       then complete oldParent newShaChain
+                       then complete oldParent (mkParentChain oldParent newShaChain)
                        else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
               -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
@@ -353,28 +363,125 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- the second case is impossible because `helper`, which calls mkParentChain,
               -- always gets called with a list of at least length 1
               mkParentChain :: SHA -> [SHA] -> [SHA]
+              mkParentChain (SHA 0) xs = xs
               mkParentChain y xs@(x:_) = if x == y then xs else y:xs
               mkParentChain _ []       = error "the impossible happened, somehow called (mkParentChain _ [])"
 
               complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> return . Left . SingleLine . S8.pack $
-                                    "Could not get ancestor header for SHA " ++ shaToHex lca
-                      Just (ancestor :: RedisHeader) ->
+                      Nothing -> if lca /= (SHA 0) -- genesis block is sha 0 
+                                     then return . Left . SingleLine . S8.pack $
+                                              "Could not get ancestor header for SHA " ++ shaToHex lca
+                                     else complete (head newShaChain) newShaChain 
+                      Just (ancestor :: RedisHeader) -> do
+                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
-                              updates        = tail . flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
-                          in
-                              return $ Right (updates, deletions)
+                              updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
+                          return $ Right (updates, deletions)
+
+              -- safeTail :: [a] -> [a]
+              -- safeTail [] = []
+              -- safeTail xs = tail xs
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
-forceBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Status)
-forceBestBlockInfo = set bestBlockInfoKey . toValue . RedisBestBlock `totalRecall` (,,)
-    where infixr 3 `totalRecall`; totalRecall = (.).(.).(.)
+forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
+forceBestBlockInfo sha i j = do
+        forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,) 
 
-getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
-getBestBlockInfo = get bestBlockInfoKey >>= \case
+forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
+forceBestBlockInfo' key = set key . toValue
+
+getBestBlockInfo :: Redis (Maybe RedisBestBlock)
+getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
+
+getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
+getBestBlockInfo' key = get key >>= \case
     Left _  -> return Nothing
     Right r -> case r of
-        Nothing -> return Nothing --return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
-        Just bs -> let (RedisBestBlock (sha, num, tDiff)) = fromValue bs in return $ Just (sha, num, tDiff)
+        Nothing -> return Nothing -- return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
+        Just bs -> return . Just $ RedisBestBlock sha num tdiff
+            where
+              RedisBestBlock sha num tdiff = fromValue bs
+
+releaseRedlockScript :: S8.ByteString
+releaseRedlockScript = S8.pack . unlines $
+    [ "if redis.call(\"get\",KEYS[1]) == ARGV[1] then"
+    , "    return redis.call(\"del\",KEYS[1])"
+    , "else"
+    , "    return 0"
+    , "end "
+    ]
+
+worldBestBlockRedlockKey :: S8.ByteString
+worldBestBlockRedlockKey = "<worldbest_redlock>"
+{-# INLINE worldBestBlockRedlockKey #-}
+
+defaultRedlockTTL :: Int -- in milliseconds
+defaultRedlockTTL = 3000
+
+defaultRedlockBackoff :: Int -- in microseconds
+defaultRedlockBackoff = 100 {- ms -} * 1000 {- us/ms -}
+
+redisSetNXPX :: (RedisCtx m f) => S8.ByteString -> S8.ByteString -> Int -> m (f Status)
+redisSetNXPX key value lockTTL = sendRequest ["SET", key, value, "NX", "PX", S8.pack (show lockTTL)]
+
+acquireRedlock :: S8.ByteString -> Int -> Redis (Either Reply S8.ByteString)
+acquireRedlock key lockTTL = do
+    random <- S8.pack . (show :: Integer -> String) <$> liftIO randomIO
+    reply <- redisSetNXPX key random lockTTL
+    return $ case reply of
+        Right Ok -> Right random
+        Right (Status "") -> Left $ SingleLine "could not acquire the lock due to NX condition unmet"
+        Right (Status s)  -> Left . SingleLine $ "Somehow got a nonempty status, which makes no fucking sense: " `S8.append` s
+        Right Pong -> Left $ SingleLine "Somehow got a \"PONG\", which makes no fucking sense."
+        Left err -> Left err
+
+releaseRedlock :: S8.ByteString -> S8.ByteString -> Redis (Either Reply Bool)
+releaseRedlock key lock = eval releaseRedlockScript [key] [lock]
+
+acquireWorldBestBlockRedlock :: Int -> Redis (Either Reply S8.ByteString)
+acquireWorldBestBlockRedlock = acquireRedlock worldBestBlockRedlockKey
+
+releaseWorldBestBlockRedlock :: S8.ByteString -> Redis (Either Reply Bool)
+releaseWorldBestBlockRedlock = releaseRedlock worldBestBlockRedlockKey
+
+worldBestBlockKey :: S8.ByteString
+worldBestBlockKey = "<worldbest>"
+{-# INLINE worldBestBlockKey #-}
+
+getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
+getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
+
+updateWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
+updateWorldBestBlockInfo sha num tdiff = do
+    maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
+    case maybeLockID of
+        Left err -> do
+            liftIO . putStrLn $ "Could not acquire redlock, will retry; " ++ show err
+            liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
+            updateWorldBestBlockInfo sha num tdiff
+        Right lockID -> do
+            liftIO (putStrLn "Acquired ")
+            maybeExistingWBBI <- getWorldBestBlockInfo
+            case maybeExistingWBBI of
+                Nothing -> do
+                    liftIO $ putStrLn "No WorldBestBlock in Redis, will force"
+                    void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                    releaseAndFinalize lockID True
+                Just (RedisBestBlock _ _ oldTDiff) -> do
+                    liftIO . putStr $ "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff
+                    let willUpdate = oldTDiff <= tdiff
+                    if willUpdate
+                        then do
+                            liftIO (putStrLn " updating")
+                            void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                        else
+                            liftIO (putStrLn " not updating")
+                    releaseAndFinalize lockID willUpdate
+    where releaseAndFinalize lockID didUpdate = do
+              didRelease <- releaseWorldBestBlockRedlock lockID
+              return $ case didRelease of
+                  Right True  -> Right didUpdate
+                  Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
+                  err         -> err
