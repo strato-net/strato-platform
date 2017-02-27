@@ -97,18 +97,25 @@ JOIN contracts C2
 JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM2.id;
 -}
--- getContractsNamesAsAddressesQuery :: Query () [(Text,Text,UTCTime)]
--- getContractsNamesAsAddressesQuery = joinF
---   (\ () () -> )
---   (\ () () -> )
---   (queryTable contractsInstanceTable) $ joinF
---     (\ () () -> )
---     (\ () () -> )
---     (queryTable contractsTable) $ joinF
---       (\ () () -> )
---       (\ () () -> )
---       (queryTable contractsMetaDataTable) $ joinF
---         (\ () () -> )
---         (\ () () -> )
---         (queryTable contractsLookupTable)
---         (queryTable contractsMetaDataTable)
+getContractsNamesAsAddressesQuery :: Query
+  ( Column PGText
+  , Column PGText
+  , Column PGTimestamptz
+  )
+getContractsNamesAsAddressesQuery = joinF
+  (\ (_,_,_,timestamp) (name,name2,_) -> (name,name2,timestamp))
+  (\ (_,ciContractMetaDataId,_,_) (_,_,cm2Id) -> ciContractMetaDataId .== cm2Id)
+  (queryTable contractsInstanceTable) $ joinF
+    (\ (_,name2) (name,cm2Id,_) -> (name,name2,cm2Id))
+    (\ (c2Id,_) (_,_,contractId2) -> c2Id .== contractId2)
+    (queryTable contractsTable) $ joinF
+      (\ (cm2Id,contractId2,_,_,_,_) (name,_) -> (name,cm2Id,contractId2))
+      (\ (cm2Id,_,_,_,_,_) (_,linkedMetadataId) -> cm2Id .== linkedMetadataId)
+      (queryTable contractsMetaDataTable) $ joinF
+        (\ (_,linkedMetadataId) (name,_) -> (name,linkedMetadataId))
+        (\ (clContractMetaDataId,_) (_,cmId) -> clContractMetaDataId .== cmId)
+        (queryTable contractsLookupTable) $ joinF
+          (\ (_,name) (cmId,_,_,_,_,_) -> (name,cmId))
+          (\ (cid,_) (_,contractId,_,_,_,_) -> cid .== contractId)
+          (queryTable contractsTable)
+          (queryTable contractsMetaDataTable)
