@@ -35,7 +35,7 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
     (offset, idxEvents) <- getUnprocessedIndexEvents
     $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
     let zipIdxEvents = zip [offset+1..] idxEvents
-    forM_ zipIdxEvents $ \(idx, e) -> do
+    forM_ zipIdxEvents $ \(nextIdx, e) -> do
         void $ case e of
             RanBlock b -> do
                 $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
@@ -44,7 +44,7 @@ p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
                 $logInfoS "p2pIndexer" . T.pack $
                     "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
                 RBDB.withRedisBlockDB (RBDB.putBestBlockInfo sha num tdiff)
-        setKafkaCheckpoint idx
+        setKafkaCheckpoint nextIdx
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-p2p-indexer", lookupConsumerGroup "strato-p2p-indexer")

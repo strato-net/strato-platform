@@ -45,7 +45,6 @@ import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.ExtWord
 import Blockchain.VMOptions
-import Blockchain.Sequencer.Event
 import Blockchain.SHA
 import Blockchain.Util
 import Blockchain.VM.Code

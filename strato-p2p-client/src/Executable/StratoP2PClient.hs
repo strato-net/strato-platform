@@ -1,120 +1,122 @@
-{-# LANGUAGE FlexibleContexts, ScopedTypeVariables, PatternGuards, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PatternGuards         #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 module Executable.StratoP2PClient (stratoP2PClient) where
 
-import Control.Concurrent hiding (yield)
-import Control.Concurrent.STM.MonadIO
-import Control.Exception.Lifted
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.State
-import Control.Monad.Trans.Resource
-import Crypto.PubKey.ECC.DH
-import Crypto.Types.PubKey.ECC
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import Data.Conduit
-import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.List as CL
-import Data.Conduit.Network
-import qualified Database.Persist.Postgresql as SQL
-import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Network.Haskoin.Internals as H
-import System.Random
+import           Control.Concurrent                    hiding (yield)
+import           Control.Concurrent.STM.MonadIO
+import           Control.Exception.Lifted
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import           Crypto.PubKey.ECC.DH
+import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import qualified Data.ByteString.Lazy                  as BL
+import           Data.Conduit
+import qualified Data.Conduit.Binary                   as CB
+import qualified Data.Conduit.List                     as CL
+import           Data.Conduit.Network
+import qualified Data.Set                              as S
+import qualified Data.Text                             as T
+import qualified Database.Persist.Postgresql           as SQL
+import qualified Network.Haskoin.Internals             as H
+import           System.Random
 
-import Blockchain.Frame
-import Blockchain.RLPx
+import           Blockchain.Frame
+import           Blockchain.RLPx
 
-import Blockchain.BlockNotify
-import qualified Blockchain.Colors as C
-import Blockchain.Constants
-import Blockchain.Context
-import Blockchain.Data.BlockDB
-import Blockchain.Data.Extra
-import Blockchain.Data.RLP
-import Blockchain.Data.Wire
-import Blockchain.DB.DetailsDB
-import Blockchain.DB.SQLDB
-import Blockchain.DBM
-import Blockchain.Display
-import Blockchain.EthConf hiding (genesisHash,port)
-import Blockchain.EthEncryptionException
-import Blockchain.Event
-import Blockchain.EventException
-import Blockchain.ExtMergeSources
-import Blockchain.Format
-import Blockchain.Options
-import Blockchain.PeerUrls
-import Blockchain.RawTXNotify
-import Blockchain.Stream.VMEvent
-import Blockchain.TCPClientWithTimeout
-import Blockchain.TimerSource
-import Blockchain.Util
-import Executable.StratoP2PClientComm
+import           Blockchain.BlockNotify
+import qualified Blockchain.Colors                     as C
+import           Blockchain.Constants
+import           Blockchain.Context
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Extra
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Wire
+import           Blockchain.DB.DetailsDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.Display
+import           Blockchain.EthConf                    hiding (genesisHash,
+                                                        port)
+import           Blockchain.EthEncryptionException
+import           Blockchain.Event
+import           Blockchain.EventException
+import           Blockchain.ExtMergeSources
+import           Blockchain.Format
+import           Blockchain.Options
+import           Blockchain.PeerUrls
+import           Blockchain.RawTXNotify
+import           Blockchain.Stream.VMEvent
+import           Blockchain.TCPClientWithTimeout
+import           Blockchain.TimerSource
+import           Blockchain.Util
+import           Executable.StratoP2PClientComm
 
-import Data.Maybe
+import           Data.Maybe
 
-import qualified Database.Redis                 as Redis
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import qualified Database.Redis                        as Redis
 
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Discovery.UDP
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.UDP
 
-awaitMsg::MonadIO m=>
-          ConduitM Event Message m (Maybe Message)
-awaitMsg = do
-  x <- await
-  case x of
-   Just (MsgEvt msg) -> return $ Just msg
-   Nothing -> return Nothing
-   _ -> awaitMsg
+awaitMsg :: MonadIO m
+         => ConduitM Event Message m (Maybe Message)
+awaitMsg = await >>= \case
+     Just (MsgEvt msg) -> return $ Just msg
+     Nothing           -> return Nothing
+     _                 -> awaitMsg
 
-handleMsg::(MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)=>
-           Point->PPeer->Conduit Event m Message
+handleMsg :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
+          => Point
+          -> PPeer
+          -> Conduit Event m Message
 handleMsg myId peer = do
-  yield Hello { version = 4
-              , clientId = stratoVersionString
-              , capability = [ETH ethVersion] -- , SHH shhVersion],
-              , port = 0
-              , nodeId = myId
-              }
+    yield Hello { version = 4
+                , clientId = stratoVersionString
+                , capability = [ETH ethVersion]
+                , port = 0
+                , nodeId = myId
+                }
+    awaitMsg >>= \case
+        Just Hello{} ->
+            RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
+                Nothing -> error "we don't have a local BestBlock!"
+                Just (RedisBestBlock hash _ tdiff) -> do
+                    genHash <- lift getGenesisBlockHash
+                    yield Status {
+                        protocolVersion = fromIntegral ethVersion,
+                        networkID       = ourNetworkID,
+                        totalDifficulty = fromIntegral tdiff,
+                        latestHash      = hash,
+                        genesisHash     = genHash
+                    }
+        other -> assertHandshake other
 
-  helloResponse <- awaitMsg
+    awaitMsg >>= \case
+        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
+            genesisBlockHash <- lift getGenesisHash
+            when (peerGH /= genesisBlockHash) $ throwIO WrongGenesisBlock
+            void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
+            lastBlockNumber <- liftIO getBestKafkaBlockNumber
+            Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
+            yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
+            stampActionTimestamp
+        other -> assertHandshake other
 
-  case helloResponse of
-   Just Hello{} -> do
-     bestBlock <- lift getBestBlock
-     genesisBlockHash <- lift getGenesisHash
-     yield Status{
-       protocolVersion=fromIntegral ethVersion,
-       networkID=if flags_cNetworkID == -1
-                 then (if flags_cTestnet then 0 else 1) 
-                 else flags_cNetworkID,
-                      totalDifficulty=0,
-       latestHash=blockHash bestBlock,
-       genesisHash=genesisBlockHash
-       }
-   Just e -> throwIO (EventBeforeHandshake e)
-   Nothing -> throwIO PeerDisconnected
+    handleEvents (if flags_debugFail then Fail else Log) peer
 
-  statusResponse <- awaitMsg
-
-  case statusResponse of
-   Just Status{latestHash=_, genesisHash=gh} -> do
-     genesisBlockHash <- lift getGenesisHash
-     when (gh /= genesisBlockHash) $ throwIO WrongGenesisBlock
-     lastBlockNumber <- liftIO getBestKafkaBlockNumber
-
-     Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-
-     yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
-     stampActionTimestamp
-   Just e -> throwIO $ EventBeforeHandshake e
-   Nothing -> throwIO PeerDisconnected
-
-  handleEvents (if flags_debugFail then Fail else Log) peer
+    where assertHandshake = throwIO . maybe PeerDisconnected EventBeforeHandshake
+          ourNetworkID    = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
 cbSafeTake::Monad m=>Int->ConduitM BC.ByteString o m BC.ByteString
 cbSafeTake i = do
@@ -122,44 +124,42 @@ cbSafeTake i = do
     if B.length ret /= i
        then error "safeTake: not enough data"
        else return ret
-           
+
 getRLPData::Monad m=>Consumer B.ByteString m B.ByteString
 getRLPData = do
-  first <- fmap (fromMaybe $ error "no rlp data") CB.head
-  case first of
-    x | x < 128 -> return $ B.singleton x
-    x | x >= 192 && x <= 192+55 -> do
-               rest <- cbSafeTake $ fromIntegral $ x - 192
-               return $ x `B.cons` rest
-    x | x >= 0xF8 && x <= 0xFF -> do
-               length' <- cbSafeTake $ fromIntegral x-0xF7
-               rest <- cbSafeTake $ fromIntegral $ bytes2Integer $ B.unpack length'
-               return $ x `B.cons` length' `B.append` rest
-    x -> error $ "missing case in getRLPData: " ++ show x 
+    first <- fmap (fromMaybe $ error "no rlp data") CB.head
+    case first of
+        x | x < 128 -> return $ B.singleton x
+        x | x >= 192 && x <= 192+55 ->
+                   B.cons x <$> cbSafeTake (fromIntegral x - 192)
+        x | x >= 0xF8 && x <= 0xFF -> do
+                   length' <- cbSafeTake $ fromIntegral x-0xF7
+                   rest <- cbSafeTake $ fromIntegral $ bytes2Integer $ B.unpack length'
+                   return $ x `B.cons` length' `B.append` rest
+        x -> error $ "missing case in getRLPData: " ++ show x
 
-bytesToMessages::Monad m=>Conduit B.ByteString m Message
+bytesToMessages :: Monad m=>Conduit B.ByteString m Message
 bytesToMessages = forever $ do
-  msgTypeData <- cbSafeTake 1
-  let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData::Integer)
+    msgTypeData <- cbSafeTake 1
+    let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData::Integer)
+    objBytes <- getRLPData
+    yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
-  objBytes <- getRLPData
-  yield $ obj2WireMessage word $ rlpDeserialize objBytes
-          
-messagesToBytes::Monad m=>Conduit Message m B.ByteString
-messagesToBytes = do
-  maybeMsg <- await
-  case maybeMsg of
+messagesToBytes :: Monad m => Conduit Message m B.ByteString
+messagesToBytes = forever $ await >>= \case
     Nothing -> return ()
     Just msg -> do
         let (theWord, o) = wireMessage2Obj msg
         yield $ theWord `B.cons` rlpSerialize o
-        messagesToBytes
-             
-theCurve::Curve
+
+theCurve :: Curve
 theCurve = getCurveByName SEC_p256k1
-  
-runPeer::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
-         TVar (S.Set String)->PPeer->PrivateNumber->m ()
+
+runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
+        => TVar (S.Set String)
+        -> PPeer
+        -> PrivateNumber
+        -> m ()
 runPeer connectedPeers peer myPriv = do
     let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
     logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
@@ -217,7 +217,7 @@ getPubKeyRunPeer connectedPeers peer = do
               runPeer connectedPeers peer{pPeerPubkey=Just otherPubKey} myPriv
             Left e -> logInfoN $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
     Just _ -> runPeer connectedPeers peer myPriv
-                      
+
 
 runPeerInList::(MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)=>
                --[(String, PortNumber, Maybe Point)]->Maybe Int->m ()
@@ -227,20 +227,20 @@ runPeerInList connectedPeers peers peerNumber = do
   let thePeer = peers !! peerNumber
 
   liftIO $ disablePeerForSeconds thePeer 60 --don't connect to a peer more than once per minute, out of politeness
-  
+
   getPubKeyRunPeer connectedPeers thePeer
-               
-stratoP2PClient::[String]->LoggingT IO ()    
+
+stratoP2PClient::[String]->LoggingT IO ()
 stratoP2PClient args = do
   let maybePeerNumber =
         case args of
-          [] -> Nothing
+          []  -> Nothing
           [x] -> return $ read x
-          _ -> error "usage: strato-p2p-client [servernum]"
+          _   -> error "usage: strato-p2p-client [servernum]"
 
 
   connectedPeers <- newTVar S.empty
-  
+
   _ <- liftIO $ forkIO $ runStratoP2PClientComm connectedPeers
 
   forever $ do
@@ -256,7 +256,7 @@ stratoP2PClient args = do
      _ -> do
        peerNumber <-
          case maybePeerNumber of
-          Just x -> return x
+          Just x  -> return x
           Nothing -> liftIO $ randomRIO (0, length peers - 1)
        result <- try $ runPeerInList connectedPeers peers peerNumber
        case result of

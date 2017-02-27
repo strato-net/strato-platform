@@ -13,13 +13,13 @@ nodes:
     stratoUrl: 'http://0.0.0.0/strato-api'
     blocUrl: 'http://0.0.0.0/bloc'
     searchUrl: 'http://0.0.0.0/cirrus'
-  #- id: 1
-  #  explorerUrl: 'http://silo3.eastus.cloudapp.azure.com/explorer'
-  #  stratoUrl: 'http://silo3.eastus.cloudapp.azure.com/strato-api'
-  #  blocUrl: 'http://silo3.eastus.cloudapp.azure.com/bloc'
-  #  searchUrl: 'http://silo3.eastus.cloudapp.azure.com/cirrus'
-  #- id: 2
-  #  explorerUrl: 'http://silo1a.eastus.cloudapp.azure.com/explorer'
-  #  stratoUrl: 'http://silo1a.eastus.cloudapp.azure.com/strato-api'
-  #  blocUrl: 'http://silo1a.eastus.cloudapp.azure.com/bloc'
-#  searchUrl: 'http://silo1a.eastus.cloudapp.azure.com/cirrus'
+  # - id: 1
+  #   explorerUrl: 'http://silo3.eastus.cloudapp.azure.com/explorer'
+  #   stratoUrl: 'http://silo3.eastus.cloudapp.azure.com/strato-api'
+  #   blocUrl: 'http://silo3.eastus.cloudapp.azure.com/bloc'
+  #   searchUrl: 'http://silo3.eastus.cloudapp.azure.com/cirrus'
+  # - id: 2
+  #   explorerUrl: 'http://silo1a.eastus.cloudapp.azure.com/explorer'
+  #   stratoUrl: 'http://silo1a.eastus.cloudapp.azure.com/strato-api'
+  #   blocUrl: 'http://silo1a.eastus.cloudapp.azure.com/bloc'
+  #   searchUrl: 'http://silo1a.eastus.cloudapp.azure.com/cirrus'
