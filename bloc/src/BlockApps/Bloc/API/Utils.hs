@@ -17,8 +17,6 @@ import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Data.Int (Int32)
-import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Generic.Random.Generic
