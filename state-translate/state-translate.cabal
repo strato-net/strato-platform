@@ -20,7 +20,7 @@ library
                      , SolidityStateTranslate
                      , BlockApps.Solidity
   build-depends:       base >= 4.7 && < 5
-                     , blockapps-data
+                     , blockapps-ethereum
                      , aeson
                      , bytestring
                      , solidity-abi

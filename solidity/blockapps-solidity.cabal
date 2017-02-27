@@ -1,0 +1,45 @@
+name: blockapps-solidity
+version: 0.1.0.0
+synopsis: Solidity datatypes
+description: Solidity datatypes
+homepage: https://github.com/blockapps/blockapps-haskell/blockapps-solidity
+license: BSD3
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    BlockApps.Solidity
+  default-language: Haskell2010
+  ghc-options: -Wall
+  build-depends: base
+    , aeson
+    , aeson-casing
+    , bytestring
+    , containers
+    , generic-random
+    , QuickCheck
+    , quickcheck-instances
+    , text
+
+test-suite blockapps-solidity-test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  ghc-options: -Wall
+  main-is: Spec.hs
+  other-modules:
+    BlockApps.SoliditySpec
+  build-depends: base >=4 && < 5
+    , blockapps-solidity
+    , hspec
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/blockapps-solidity
