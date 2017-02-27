@@ -16,8 +16,13 @@ const stratoHost    = (process.env.STRATO    || 'strato:3000') ;
 const postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
 const zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
 
-const delay = 200;
-const totalAttempts = 5;
+const delay         = (process.env.DELAY || 200);
+const totalAttempts = (process.env.ATTEMPTS || 5);
+const startOffset   = (process.env.OFFSET || 0);
+const fetchMaxMegabytes = (process.env.FETCHMAX_MB || 15); // unit megabytes
+
+
+
 
 var count =  0;
 
@@ -30,18 +35,19 @@ function start() {
       var client = new kafka.Client(zookeeperHost);
       const payloads = [{
         topic: scope.kafkaTopic,
-        offset: 0 ,
+        offset: startOffset,
         partition: 0,
       }];
       const options = {
         fromOffset: true,
-        fetchMaxBytes: 1024*1024*150,
+        fetchMaxBytes: 1024*1024*fetchMaxMegabytes,
       };
       scope.consumer = Promise.promisifyAll(new Consumer(client, payloads, options));
-      scope.offset = 0;
+      scope.offset = startOffset;
       scope.isCirrusInserting = false;
 
       const useNewConsume = true;
+      // const useNewConsume = false;
       if(useNewConsume) {
         scope.consumer.on('message', consume(scope));
         scope.consumer.on('error', function (err) {
@@ -83,15 +89,22 @@ function resetOffset() {
 function consumeMessage(m) {
   console.log(chalk.yellow("Incoming state update at offset: " + m.offset));
   var state = JSON.parse(m.value);
+  var createdAccounts = [];
+  var updatedAccounts = [];
+  var deletedAccounts = [];
 
-  // for now, remove accounts that have no code
-  state.createdAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
-  // for now, only update accounts with changed storage
-  state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
-
-  var createdAccounts = Object.keys(state.createdAccounts);
-  var updatedAccounts = Object.keys(state.updatedAccounts);
-  var deletedAccounts = Object.keys(state.deletedAccounts);
+  if(state.createdAccounts) {
+    // for now, remove accounts that have no code
+    state.createdAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
+    createdAccounts = Object.keys(state.createdAccounts);
+  }
+  if(state.updatedAccounts) {
+    state.updatedAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
+    updatedAccounts = Object.keys(state.updatedAccounts);
+  }
+  if(state.deletedAccounts) {
+    deletedAccounts = Object.keys(state.deletedAccounts);
+  }
 
   console.log(chalk.green("|\tCreated accounts: " + createdAccounts));
   console.log(chalk.blue("|\tUpdated accounts: " + updatedAccounts));
@@ -199,20 +212,28 @@ function consume(scope) {
       })
   }
 
-  // --Support functions consume functions-- //
+  // --Support functions for consume(scope)-- //
   function getAccountsForStateDiffss(m) {
-    var state = JSON.parse(m.value);
-
-    // remove accounts that have no code
-    state.createdAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
-    // only update accounts with changed storage
-    state.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
-
-    const accounts = {
-      createdAccounts: state.createdAccounts,
-      updatedAccounts: state.updatedAccounts,
-      deletedAccounts: state.deletedAccounts,
+    const emptyStringHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+    const state = JSON.parse(m.value);
+    var accounts = {
+      createdAccounts: [],
+      updatedAccounts: [],
+      deletedAccounts: [],
     };
+
+    if(state.createdAccounts) {
+      // remove accounts that have no code
+      accounts.createdAccounts = _.omitBy(v => v.codeHash == emptyStringHash)(state.createdAccounts)
+    }
+    if(state.updatedAccounts) {
+      // only update accounts with changed storage
+      accounts.updatedAccounts = _.omitBy(v => Object.keys(v.storage).length == 0)(state.updatedAccounts)
+    }
+    if(state.deletedAccounts) {
+      accounts.deletedAccounts = accounts.deletedAccounts
+    }
+
     return accounts;
   }
 
