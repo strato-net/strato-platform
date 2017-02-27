@@ -54,8 +54,6 @@ import           Blockchain.Data.ExecResults
 import           Blockchain.Data.Extra
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
--- import           Blockchain.Data.StateDiff          hiding
---                                                      (StateDiff (blockHash))
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
