@@ -5,10 +5,14 @@
 module BlockApps.Bloc.Database.Queries where
 
 import Control.Arrow
+import qualified Data.ByteString.Char8 as Char8
+import Data.Int (Int32)
 import Data.Text (Text)
 import Opaleye
+import qualified Opaleye as Opaleye (not,null)
 
 import BlockApps.Bloc.Database.Tables
+import BlockApps.Ethereum
 
 {- |
 SELECT address from key_store;
@@ -16,19 +20,6 @@ SELECT address from key_store;
 getAddressesQuery :: Query (Column PGBytea)
 getAddressesQuery = proc () -> do
   (_,_,_,_,_,_,addr,_) <- queryTable keyStoreTable -< ()
-  returnA -< addr
-
-{- |
-SELECT CI.address FROM contracts_instance CI
- JOIN contracts_metadata CM ON CM.id = CI.contracts_metadata_id
- JOIN contracts C ON C.id = CM.contract_id
- WHERE C.name = $1 ORDER BY timestamp DESC;
--}
-getSearchContractQuery :: Text -> Query (Column PGBytea)
-getSearchContractQuery contractName = proc () -> do
-  (name,addr,_) <- orderBy (desc (\(_,_,timestamp) -> timestamp))
-    getContractsAddressesQuery -< ()
-  restrict -< name .== constant contractName
   returnA -< addr
 
 {- |
@@ -41,7 +32,7 @@ getUsersQuery = proc () -> do
 
 {- |
 SELECT K.address FROM users U JOIN keystore K
- ON K.user_id = U.id WHERE U.name = $1;
+  ON K.user_id = U.id WHERE U.name = $1;
 -}
 getUsersUserQuery :: Text -> Query (Column PGBytea)
 getUsersUserQuery userName = proc () -> do
@@ -54,6 +45,82 @@ getUsersUserQuery userName = proc () -> do
       (\ (uid,_) (_,_,_,_,_,_,_,userId) -> userId .== uid)
       (queryTable usersTable)
       (queryTable keyStoreTable)
+
+contractsJoinTable :: Query
+  ( Column PGInt4
+  , Column PGText
+  , Column PGBytea
+  , Column PGTimestamptz
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  )
+contractsJoinTable = joinF
+  (\ (_,_,a,ts) (cmId,n,b,br,brh,ch) -> (cmId,n,a,ts,b,br,brh,ch))
+  (\ (_,contractMetaDataId,_,_) (cmId,_,_,_,_,_) -> cmId .== contractMetaDataId)
+  (queryTable contractsInstanceTable) $ joinF
+    (\ (cmId,_,b,br,brh,ch) (_,n) -> (cmId,n,b,br,brh,ch))
+    (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+    (queryTable contractsMetaDataTable)
+    (queryTable contractsTable)
+
+contractByAddress
+  :: Text
+  -> Address
+  -> Query
+    ( Column PGInt4
+    , Column PGText
+    , Column PGBytea
+    , Column PGTimestamptz
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    )
+contractByAddress contractName contractAddress = proc () -> do
+  contract@(_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+  restrict -< name .== constant contractName
+  restrict -< addr .== constant (Char8.pack (addressString contractAddress))
+  returnA -< contract
+
+linkedContractsJoinTable :: Query
+  ( Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGBytea
+  , Column PGText
+  , Column PGText
+  , Column PGInt4
+  )
+linkedContractsJoinTable = joinF
+  (\ (_,name2) (name,cm2Id,_,b,br,brh,ch) -> (b,br,brh,ch,name,name2,cm2Id))
+  (\ (c2Id,_) (_,_,contractId2,_,_,_,_) -> c2Id .== contractId2)
+  (queryTable contractsTable) $ joinF
+    (\ (cm2Id,contractId2,_,_,_,_) (name,_,b,br,brh,ch) -> (name,cm2Id,contractId2,b,br,brh,ch))
+    (\ (cm2Id,_,_,_,_,_) (_,linkedMetadataId,_,_,_,_) -> cm2Id .== linkedMetadataId)
+    (queryTable contractsMetaDataTable) $ joinF
+      (\ (_,linkedMetadataId) (name,_,b,br,brh,ch) -> (name,linkedMetadataId,b,br,brh,ch))
+      (\ (contractMetaDataId,_) (_,cmId,_,_,_,_) -> contractMetaDataId .== cmId)
+      (queryTable contractsLookupTable) $ joinF
+        (\ (_,name) (cmId,_,b,br,brh,ch) -> (name,cmId,b,br,brh,ch))
+        (\ (cid,_) (_,contractId,_,_,_,_) -> cid .== contractId)
+        (queryTable contractsTable)
+        (queryTable contractsMetaDataTable)
+
+{- |
+SELECT CI.address FROM contracts_instance CI
+ JOIN contracts_metadata CM ON CM.id = CI.contracts_metadata_id
+ JOIN contracts C ON C.id = CM.contract_id
+ WHERE C.name = $1 ORDER BY timestamp DESC;
+-}
+getSearchContractQuery :: Text -> Query (Column PGBytea)
+getSearchContractQuery contractName = proc () -> do
+  (_,name,addr,_,_,_,_,_) <-
+    orderBy (desc (\(_,_,_,timestamp,_,_,_,_) -> timestamp))
+      contractsJoinTable -< ()
+  restrict -< name .== constant contractName
+  returnA -< addr
 
 {- |
 SELECT
@@ -71,14 +138,9 @@ getContractsAddressesQuery :: Query
   , Column PGBytea
   , Column PGTimestamptz
   )
-getContractsAddressesQuery = joinF
-  (\ (_,_,addr,timestamp) (_,name) -> (name,addr,timestamp))
-  (\ (_,contractMetaDataId,_,_) (cmId,_) -> cmId .== contractMetaDataId)
-  (queryTable contractsInstanceTable) $ joinF
-    (\ (cmId,_,_,_,_,_) (_,name) -> (cmId,name))
-    (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
-    (queryTable contractsMetaDataTable)
-    (queryTable contractsTable)
+getContractsAddressesQuery = proc () -> do
+  (_,name,addr,timestamp,_,_,_,_) <- contractsJoinTable -< ()
+  returnA -< (name,addr,timestamp)
 
 {- |
 SELECT
@@ -103,19 +165,355 @@ getContractsNamesAsAddressesQuery :: Query
   , Column PGTimestamptz
   )
 getContractsNamesAsAddressesQuery = joinF
-  (\ (_,_,_,timestamp) (name,name2,_) -> (name,name2,timestamp))
-  (\ (_,ciContractMetaDataId,_,_) (_,_,cm2Id) -> ciContractMetaDataId .== cm2Id)
-  (queryTable contractsInstanceTable) $ joinF
-    (\ (_,name2) (name,cm2Id,_) -> (name,name2,cm2Id))
-    (\ (c2Id,_) (_,_,contractId2) -> c2Id .== contractId2)
-    (queryTable contractsTable) $ joinF
-      (\ (cm2Id,contractId2,_,_,_,_) (name,_) -> (name,cm2Id,contractId2))
-      (\ (cm2Id,_,_,_,_,_) (_,linkedMetadataId) -> cm2Id .== linkedMetadataId)
-      (queryTable contractsMetaDataTable) $ joinF
-        (\ (_,linkedMetadataId) (name,_) -> (name,linkedMetadataId))
-        (\ (clContractMetaDataId,_) (_,cmId) -> clContractMetaDataId .== cmId)
-        (queryTable contractsLookupTable) $ joinF
-          (\ (_,name) (cmId,_,_,_,_,_) -> (name,cmId))
-          (\ (cid,_) (_,contractId,_,_,_,_) -> cid .== contractId)
-          (queryTable contractsTable)
-          (queryTable contractsMetaDataTable)
+  (\ (_,_,_,timestamp) (_,_,_,_,name,name2,_) -> (name,name2,timestamp))
+  (\ (_,contractMetaDataId,_,_) (_,_,_,_,_,_,cm2Id) -> contractMetaDataId .== cm2Id)
+  (queryTable contractsInstanceTable)
+  linkedContractsJoinTable
+
+{- |
+SELECT
+  CI.address
+FROM contracts C
+JOIN contracts_metadata CM
+  ON CM.contract_id = C.id
+JOIN contracts_instance CI
+  ON CI.contract_metadata_id = CM.id
+WHERE C.name=$1;
+-}
+getContractsDataAddressesQuery :: Text -> Query (Column PGBytea)
+getContractsDataAddressesQuery contractName = proc () -> do
+  (_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+  restrict -< name .== constant contractName
+  returnA -< addr
+
+{- |
+SELECT C.name
+FROM contracts C
+WHERE C.name=$1
+UNION
+SELECT
+  C2.Name
+FROM contracts C
+JOIN contracts_metadata CM
+  ON CM.contract_id = C.id
+JOIN contracts_lookup CL
+  ON CL.contract_metadata_id = CM.id
+JOIN contracts_metadata CM2
+  ON CM2.id = CL.linked_metadata_id
+JOIN contracts C2
+  ON C2.id = CM2.contract_id
+WHERE C.name=$1
+UNION
+SELECT 'Latest'
+FROM contracts C
+WHERE C.name=$1;
+-}
+getContractsDataNamesQuery :: Text -> Query (Column PGText)
+getContractsDataNamesQuery contractName =
+  sameName `union` differentName `union` latest
+  where
+    sameName = proc () -> do
+      (_,name) <- queryTable contractsTable -< ()
+      restrict -< name .== constant contractName
+      returnA -< name
+    differentName = proc () -> do
+      (_,_,_,_,name,name2,_) <- linkedContractsJoinTable -< ()
+      restrict -< name .== constant contractName
+      returnA -< name2
+    latest = proc () -> do
+      (_,name) <- queryTable contractsTable -< ()
+      restrict -< name .== constant contractName
+      returnA -< constant "Latest"
+
+{- |
+SELECT CM.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+JOIN contracts_instance CI
+  ON CI.contract_metadata_id = CM.id
+WHERE C.name=$1 AND CI.address=$2;
+-}
+getContractsMetaDataIdByAddressQuery :: Text -> Address -> Query (Column PGInt4)
+getContractsMetaDataIdByAddressQuery contractName contractAddress = proc () -> do
+  (cmId,_,_,_,_,_,_,_) <- contractByAddress contractName contractAddress -< ()
+  returnA -< cmId
+
+{- |
+SELECT
+   CM.bin
+ , CI.address
+ , CM.bin_runtime
+ , CM.code_hash
+ , C.name
+ , CM.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+JOIN contracts_instance CI
+  ON CI.contract_metadata_id = CM.id
+WHERE C.name=$1 AND CI.address=$2;
+-}
+getContractsContractByAddressQuery
+  :: Text
+  -> Address
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGInt4
+    )
+getContractsContractByAddressQuery contractName contractAddress = proc () -> do
+  (cmId,name,addr,_,bin,binRuntime,_,codeHash) <-
+    contractByAddress contractName contractAddress -< ()
+  returnA -< (bin,addr,binRuntime,codeHash,name,cmId)
+
+{- |
+SELECT CM2.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+JOIN contracts_lookup CL
+  ON CL.contract_metadata_id = CM.id
+JOIN contracts_metadata CM2
+  ON CM2.id = CL.linked_metadata_id
+JOIN contracts C2
+  ON C2.id = CM2.contract_id
+WHERE C.name = $1 AND C2.name=$2
+ORDER BY CM2.id DESC
+LIMIT 1;
+-}
+getContractsMetaDataIdByNameQuery
+  :: Text
+  -> Text
+  -> Query (Column PGInt4)
+getContractsMetaDataIdByNameQuery contractName1 contractName2 =
+  limit 1 . orderBy (desc (\ cm2Id -> cm2Id)) $ proc () -> do
+    (_,_,_,_,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
+    restrict -< name1 .== constant contractName1
+    restrict -< name2 .== constant contractName2
+    returnA -< cm2Id
+
+{- |
+SELECT
+   CM2.bin
+ , CM2.bin_runtime
+ , CM2.code_hash
+ , C2.name
+ , CM2.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+JOIN contracts_lookup CL
+  ON CL.contract_metadata_id = CM.id
+JOIN contracts_metadata CM2
+  ON CM2.id = CL.linked_metadata_id
+JOIN contracts C2
+  ON C2.id = CM2.contract_id
+WHERE C.name = $1 AND C2.name=$2
+ORDER BY CM2.id DESC
+LIMIT 1;
+-}
+getContractsContractByNameQuery
+  :: Text
+  -> Text
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGInt4
+    )
+getContractsContractByNameQuery contractName1 contractName2 =
+  limit 1 . orderBy (desc (\ (_,_,_,_,cm2Id) -> cm2Id)) $ proc () -> do
+    (b,br,_,ch,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
+    restrict -< name1 .== constant contractName1
+    restrict -< name2 .== constant contractName2
+    returnA -< (b,br,ch,name2,cm2Id)
+
+{- |
+SELECT CM.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+WHERE C.name = $1
+ORDER BY CM.id DESC
+LIMIT 1;
+-}
+getContractMetaDataIdBySameNameQuery :: Text -> Query (Column PGInt4)
+getContractMetaDataIdBySameNameQuery contractName =
+  limit 1 . orderBy (desc (\ cmId -> cmId)) $ proc () -> do
+    (cmId,name) <- joinTable -< ()
+    restrict -< name .== constant contractName
+    returnA -< cmId
+  where
+    joinTable = joinF
+      (\ (cmId,_,_,_,_,_) (_,name) -> (cmId,name))
+      (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
+      (queryTable contractsMetaDataTable)
+      (queryTable contractsTable)
+
+{- |
+SELECT
+   CM.bin
+ , CM.bin_runtime
+ , CM.code_hash
+ , C.name
+ , CM.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+WHERE C.name = $1
+ORDER BY CM.id DESC
+LIMIT 1;
+-}
+getContractsContractBySameNameQuery
+  :: Text
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGInt4
+    )
+getContractsContractBySameNameQuery contractName =
+  limit 1 . orderBy (desc (\ (_,_,_,_,cmId) -> cmId)) $ proc () -> do
+    contract@(_,_,_,name,_) <- joinTable -< ()
+    restrict -< name .== constant contractName
+    returnA -< contract
+  where
+    joinTable = joinF
+      (\ (cmId,_,b,br,_,ch) (_,name) -> (b,br,ch,name,cmId))
+      (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
+      (queryTable contractsMetaDataTable)
+      (queryTable contractsTable)
+
+{- |
+SELECT CM.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+JOIN contracts_instance CI
+  ON CI.contract_metadata_id = CM.id
+WHERE C.name = $1
+ORDER BY CI.timestamp DESC
+LIMIT 1;
+-}
+getContractMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
+getContractMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
+  (cmId,name,_,_,_,_,_,_) <-
+    orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
+      contractsJoinTable -< ()
+  restrict -< name .== constant contractName
+  returnA -< cmId
+
+{- |
+SELECT
+   CM.bin
+ , CM.bin_runtime
+ , CM.code_hash
+ , C2.name
+ , CM.id
+FROM contracts_metadata CM
+JOIN contracts C
+  ON C.id = CM.contract_id
+JOIN contracts_instance CI
+  ON CI.contract_metadata_id = CM.id
+WHERE C.name = $1
+ORDER BY CI.timestamp DESC
+LIMIT 1;
+-}
+getContractsContractLatestQuery
+  :: Text
+  -> Query
+    ( Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGText
+    , Column PGInt4
+    )
+getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
+  (cmId,name,_,_,b,br,_,ch) <-
+    orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
+      contractsJoinTable -< ()
+  restrict -< name .== constant contractName
+  returnA -< (b,br,ch,name,cmId)
+
+{- |
+SELECT
+  XF.id
+ ,XF.name
+ ,XF.selector
+FROM xabi_functions XF
+WHERE XF.is_constructor = false AND XF.contract_metadata_id = $1;
+-}
+getXabiFunctionsQuery
+  :: Int32
+  -> Query
+    ( Column PGInt4
+    , Column (Nullable PGText)
+    , Column (Nullable PGBytea)
+    )
+getXabiFunctionsQuery cmId = proc () -> do
+  (xfId,contractMetaDataId,isConstr,name,selector) <-
+    queryTable xabiFunctionsTable -< ()
+  restrict -< contractMetaDataId .== constant cmId .&& Opaleye.not isConstr
+  returnA -< (xfId,name,selector)
+
+{- |
+SELECT XF.id
+FROM xabi_functions XF
+WHERE XF.is_constructor = true AND XF.contract_metadata_id = $1;
+-}
+getXabiConstrQuery :: Int32 -> Query (Column PGInt4)
+getXabiConstrQuery cmId = proc () -> do
+  (xfId,contractMetaDataId,isConstr,_,_) <-
+    queryTable xabiFunctionsTable -< ()
+  restrict -< contractMetaDataId .== constant cmId .&& isConstr
+  returnA -< xfId
+
+{- |
+SELECT
+  ,XFA.name
+  ,XFA.index
+  ,XT.type
+  ,XT.typedef
+  ,XT.is_dynamic
+  ,XT.bytes
+  ,XTE.type as entry_type
+  ,XTE.bytes as entry_bytes
+FROM xabi_function_arguments XFA
+JOIN xabi_types XT
+  ON XT.id = XFA.type_id
+LEFT OUTER JOIN xabi_types XTE
+  ON XTE.id = XT.entry_type_id
+WHERE XFA.function_id = $1;
+-}
+getXabiFunctionsArgsQuery
+  :: Int32
+  -> Query
+    ( Column PGText
+    , Column PGInt4
+    , Column PGText
+    , Column (Nullable PGText)
+    , Column PGBool
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
+    )
+getXabiFunctionsArgsQuery funcId = proc () -> do
+  (functionId,name,index,ty,tyd,dy,by,ety,eby) <- joinTable -< ()
+  restrict -< functionId .== constant funcId
+  returnA -< (name,index,ty,tyd,dy,by,ety,eby)
+  where
+    joinTable = joinF
+      (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index,ty,tyd,dy,by,ety,eby))
+      (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
+      (queryTable xabiFunctionArgumentsTable) $ leftJoinF
+        (\ (xtId,ty,tyd,dy,_,_,by,_,_,_) (_,ety,_,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,toNullable ety,eby))
+        (\ (xtId,ty,tyd,dy,_,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
+        (\ (_,_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_,_) -> xteId .== entryTypeId)
+        (queryTable xabiTypesTable)
+        (queryTable xabiTypesTable)
