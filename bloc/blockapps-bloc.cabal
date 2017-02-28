@@ -24,6 +24,7 @@ library
     BlockApps.Bloc.Crypto
     BlockApps.Bloc.Database
     BlockApps.Bloc.Monad
+    BlockApps.Bloc.Options
     BlockApps.Bloc.Queries
   default-language: Haskell2010
   ghc-options: -Wall
@@ -40,6 +41,7 @@ library
     , bytestring
     , generic-random
     , hasql
+    , hflags
     , http-api-data
     , http-client
     , http-media
@@ -71,6 +73,7 @@ executable blockapps-bloc
     , blockapps-strato-api
     , blockapps-strato-client
     , hasql
+    , hflags
     , http-client
     , warp
   default-language: Haskell2010
