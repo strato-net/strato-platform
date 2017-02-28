@@ -11,6 +11,7 @@ import Test.Hspec
 
 import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.API.SpecUtils
 
 spec :: SpecWith TestConfig
 spec =

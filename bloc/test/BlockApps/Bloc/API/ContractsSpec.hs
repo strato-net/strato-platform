@@ -11,6 +11,7 @@ import Servant.Client
 import Test.Hspec
 
 import BlockApps.Bloc.API.Contracts
+import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
 
 spec :: SpecWith TestConfig
