@@ -4,6 +4,7 @@
 
 module BlockApps.Bloc.Monad where
 
+import Control.Exception (Exception)
 import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
@@ -39,8 +40,11 @@ data BlocEnv = BlocEnv
 
 data BlocError
   = DBError Error
+  | DBConnectionError ConnectionError
   | StratoError ServantError
   deriving Show
+
+instance Exception BlocError where
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x

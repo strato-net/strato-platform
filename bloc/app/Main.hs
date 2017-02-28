@@ -4,6 +4,7 @@
 
 module Main where
 
+import Control.Exception
 import Hasql.Connection
 import qualified Hasql.Session as Session
 import Hasql.Query
@@ -16,38 +17,43 @@ import BlockApps.Bloc.Monad
 import BlockApps.Strato.Client
 import BlockApps.Bloc.Database
 
+handleErr::Exception e=>
+           (a->e)->Either a b->b
+handleErr typeF (Left e) = throw $ typeF e
+handleErr _ (Right x) = x
+
 --TODO: refactor
 main :: IO ()
 main = do
-  dbCreateConnEither <- acquire $ settings "localhost" 5432 "postgres" "" "postgres"
-  case dbCreateConnEither of
-    Left err -> print err
-    Right dbCreateConn -> do
-      let
-        queryString = "SELECT 1 FROM pg_database WHERE datname='bloc';"
+  dbCreateConn <- fmap (handleErr DBConnectionError) $
+                  acquire $ settings "localhost" 5432 "postgres" "" "postgres"
+
+  let
+        queryString' = "SELECT 1 FROM pg_database WHERE datname='bloc';"
         params = mempty
         results = maybeRow (value int8)
-        query = statement queryString params results False
-      sessionEither <- Session.run (Session.query () query) dbCreateConn
-      case sessionEither of
-        Left err -> print err
-        Right Nothing -> do
-          resultEither <- Session.run (Session.sql "CREATE DATABASE bloc;") dbCreateConn
-          case resultEither of
-            Left err -> print err
-            Right _ -> return ()
-        Right (Just 1) -> return ()
-        Right (Just _) -> putStrLn "Unexpected result from db exists check"
-      release dbCreateConn
-  connEither <- acquire $ settings "localhost" 5432 "postgres" "" "bloc"
+        query = statement queryString' params results False
+        
+  session <- fmap (handleErr DBError) $
+             Session.run (Session.query () query) dbCreateConn
+
+  case session of
+   Nothing -> 
+     fmap (handleErr DBError) $
+       Session.run (Session.sql "CREATE DATABASE bloc;") dbCreateConn
+   Just 1 -> return ()
+   Just _ -> putStrLn "Unexpected result from db exists check"
+   
+  release dbCreateConn
+
+  conn <- fmap (handleErr DBConnectionError) $
+          acquire $ settings "localhost" 5432 "postgres" "" "bloc"
+
   -- TODO: database connection resource management
-  case connEither of
-    Left err -> print err
-    Right conn -> do
-      sessionEither <- Session.run (Session.sql createTables) conn
-      case sessionEither of
-        Left err -> print err
-        Right () -> do
-          mgr <- newManager defaultManagerSettings
-          let blocEnv = BlocEnv stratoDev mgr conn
-          run 8000 (appBloc blocEnv)
+
+  fmap (handleErr DBError) $
+    Session.run (Session.sql createTables) conn
+
+  mgr' <- newManager defaultManagerSettings
+  let blocEnv = BlocEnv stratoDev mgr' conn
+  run 8000 (appBloc blocEnv)
