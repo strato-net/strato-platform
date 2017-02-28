@@ -31,8 +31,13 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Setup EthereumH DBs"
 
-  dbCreateConn <- fmap (handleErr DBConnectionError) $
-                  acquire $ settings "localhost" 5432 "postgres" (fromString flags_password) "postgres"
+  dbCreateConn <-
+    fmap (handleErr DBConnectionError) $
+    acquire $ settings (fromString flags_pghost)
+                       5432
+                       (fromString flags_pguser)
+                       (fromString flags_password)
+                       "postgres"
 
   let
         queryString' = "SELECT 1 FROM pg_database WHERE datname='bloc';"
@@ -53,7 +58,11 @@ main = do
   release dbCreateConn
   
   conn <- fmap (handleErr DBConnectionError) $
-          acquire $ settings "localhost" 5432 "postgres" (fromString flags_password) "bloc"
+          acquire $ settings (fromString flags_pghost)
+                             5432
+                             (fromString flags_pguser)
+                             (fromString flags_password)
+                             "bloc"
 
   -- TODO: database connection resource management
 
