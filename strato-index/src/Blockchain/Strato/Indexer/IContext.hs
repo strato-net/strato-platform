@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -6,30 +8,33 @@
 module Blockchain.Strato.Indexer.IContext
     ( IContext(..)
     , IContextM
-    , IndexerBestBlockInfo
+    , IndexerBestBlockInfo(..)
     , runIContextM
     , getIndexerBestBlockInfo
     , putIndexerBestBlockInfo
     , targetTopicName
-    , kafkaClientIds
+    , unIBBI
+    , reIBBI
     ) where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
-import qualified Data.Text                      as T
-import qualified Database.Persist.Postgresql    as SQL
+import           Data.Int                        (Int64)
+import qualified Data.Text                       as T
+import qualified Database.Persist.Postgresql     as SQL
 
+import           Blockchain.Data.DataDefs        (Block, Key (BlockKey))
 import           Blockchain.DB.SQLDB
-import           Blockchain.Data.DataDefs       (Block)
 import           Blockchain.EthConf
-import           Blockchain.Sequencer.Kafka     (seqEventsTopicName)
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import qualified Database.Redis                 as Redis
+import qualified Blockchain.Strato.RedisBlockDB  as RBDB
+import qualified Database.Redis                  as Redis
 
 import           Network.Kafka
-import           Network.Kafka.Protocol         (TopicName, ConsumerGroup)
+import           Network.Kafka.Protocol
+
+import           Blockchain.Strato.Indexer.Kafka
 
 data IContext = IContext {
     contextSQLDB        :: SQLDB,
@@ -40,7 +45,8 @@ data IContext = IContext {
 
 type IContextM = StateT IContext (ResourceT (LoggingT IO))
 
-type IndexerBestBlockInfo = SQL.Key Block
+newtype IndexerBestBlockInfo = IndexerBestBlockInfo (SQL.Key Block)
+    deriving (Eq, Ord, Read, Show)
 
 instance HasSQLDB IContextM where
   getSQLDB = contextSQLDB <$> get
@@ -66,16 +72,20 @@ pgPoolSize :: Int
 pgPoolSize = 20
 
 targetTopicName :: TopicName
-targetTopicName = seqEventsTopicName
+targetTopicName = indexEventsTopicName
 
-kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-index", lookupConsumerGroup "strato-index")
+-- todo: Database.Persist.Postgresql.SqlBackendKey appears to be an Int64 under the hood. Need to verify.
+unIBBI :: IndexerBestBlockInfo -> Int64
+unIBBI (IndexerBestBlockInfo (BlockKey k)) = fromIntegral k
+
+reIBBI :: Int64 -> IndexerBestBlockInfo
+reIBBI = IndexerBestBlockInfo . BlockKey . fromIntegral
 
 runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
 runIContextM cid f = do
     $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
     sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr' pgPoolSize
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
-    (ret, _) <- runResourceT $ runStateT f (IContext sqldb (mkConfiguredKafkaState cid) redis undefined)
+    (ret, _) <- runResourceT $ runStateT f (IContext sqldb (mkConfiguredKafkaState cid) redis (reIBBI 0))
     $logInfoS "runIContextM" "runIContextM complete, returning"
     return ret

@@ -9,7 +9,7 @@ description:         Functions to operate against the Redis-backed BlockDB
 
 library
   exposed-modules:     Blockchain.Strato.RedisBlockDB
-  other-modules:       Blockchain.Strato.RedisBlockDB.Models
+                     , Blockchain.Strato.RedisBlockDB.Models
   build-depends:       base
                      , containers
                      , mtl
@@ -19,6 +19,7 @@ library
                      , blockapps-data
                      , hedis
                      , base16-bytestring
+                     , random
                      -- solely for REPL
                      , strato-conf
                      , blockapps-data
@@ -36,7 +37,6 @@ executable strato-redis-viz
         optparse-applicative,
         blockapps-data,
         blockapps-util,
-        async,
         base,
         diagrams-contrib,
         diagrams-lib,
@@ -48,15 +48,40 @@ executable strato-redis-viz
         lens-family,
         QuickCheck,
         hedis,
-        stm,
-        ethereum-rlp,
         text,
-        mtl,
         strato-redis-blockdb,
-        strato-model,
-        time
+        strato-model
   default-language:    Haskell2010
   ghc-options: -threaded -Wall -Werror
+
+-- test-suite strato-redis-blockdb-style
+--     type: exitcode-stdio-1.0
+--     hs-source-dirs: src, test
+--     main-is: HLint.hs
+--     other-modules: Blockchain.Strato.RedisBlockDB.Test.Chain
+--     build-depends:
+--         hlint,
+--         ansi-wl-pprint,
+--         blockapps-data,
+--         blockapps-util,
+--         base,
+--         containers,
+--         lens-family,
+--         lens-family-th,
+--         bytestring,
+--         hedis,
+--         HUnit,
+--         hspec-contrib,
+--         hspec,
+--         hspec-core,
+--         QuickCheck,
+--         text,
+--         strato-redis-blockdb,
+--         strato-model
+--     -- We use -O0 here, since GHC takes *very* long to compile so many constants
+--     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind
+--     default-language: Haskell2010
+
 
 test-suite strato-redis-blockdb-test
     type: exitcode-stdio-1.0
@@ -67,7 +92,6 @@ test-suite strato-redis-blockdb-test
         ansi-wl-pprint,
         blockapps-data,
         blockapps-util,
-        async,
         base,
         containers,
         lens-family,
@@ -79,13 +103,9 @@ test-suite strato-redis-blockdb-test
         hspec,
         hspec-core,
         QuickCheck,
-        stm,
-        ethereum-rlp,
         text,
-        mtl,
         strato-redis-blockdb,
-        strato-model,
-        time
+        strato-model
     -- We use -O0 here, since GHC takes *very* long to compile so many constants
     ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind
     default-language: Haskell2010

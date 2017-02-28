@@ -56,11 +56,14 @@ newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show,
 newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
-newtype RedisBestBlock = RedisBestBlock (SHA, Integer, Integer) deriving (Eq, Read, Show)
+data RedisBestBlock = RedisBestBlock { bestBlockHash :: SHA
+                                     , bestBlockNumber :: Integer          -- todo: BlockNumber
+                                     , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
+                                     } deriving (Eq, Read, Show)
 
 instance RedisDBValuable RedisBestBlock where
     toValue = rlpSerialize . wrap
-        where wrap (RedisBestBlock (sha, num, total)) = RLPArray [rlpEncode sha, rlpEncode num, rlpEncode total]
+        where wrap (RedisBestBlock sha num total) = RLPArray [rlpEncode sha, rlpEncode num, rlpEncode total]
     fromValue = unwrap . rlpDeserialize
-        where unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha, rlpDecode num, rlpDecode total)
+        where unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha) (rlpDecode num) (rlpDecode total)
               unwrap _ = error "we are clearly incapable of humane exception handling"

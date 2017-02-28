@@ -37,6 +37,7 @@ executable strato-setup
                  , ethereum-rlp
                  , file-embed
                  , filepath
+                 , hedis
                  , hflags
                  , leveldb-haskell
                  , merkle-patricia-db
@@ -46,6 +47,7 @@ executable strato-setup
                  , process
                  , resourcet
                  , strato-conf
+                 , strato-redis-blockdb
                  , text
                  , time
                  , transformers
@@ -53,6 +55,7 @@ executable strato-setup
                  , binary
                  , stm
                  , persistent
+                 , strato-statediff
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
                    Blockchain.Data.GenesisBlock

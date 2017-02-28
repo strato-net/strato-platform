@@ -33,11 +33,14 @@ function newnode {
   echo "Starting strato-sequencer"
   runForever strato-sequencer >> logs/strato-sequencer 2>&1
 
-  echo "Starting strato-index"
-  runForever strato-index >> logs/strato-index 2>&1
+  echo "Starting strato-api-indexer"
+  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
+
+  echo "Starting strato-p2p-indexer"
+  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting ethereum-vm"
-  runForever ethereum-vm --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1
+  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1
 
   if $initialize
   then doRegister
@@ -52,7 +55,7 @@ function doInit {
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort \
+                    --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
                     --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
@@ -60,7 +63,7 @@ function doInit {
   if [[ ${backupblocks} ]] ; then
      cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
                        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                       --redisHost=$redisBDBHost --redisPort=$redisBDBPort \
+                       --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                        --addBootnodes=$addBootnodes $stratoBootnode \
                        --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
      echo $cmd
@@ -117,6 +120,7 @@ setEnv zkHost zookeeper
 
 setEnv redisBDBHost redis
 setEnv redisBDBPort 6379
+setEnv redisBDBNumber 0
 
 setEnv explorerHost explorer
 
@@ -135,6 +139,7 @@ setEnv serveBlocks true
 setEnv receiveBlocks true
 setEnv addBootnodes false
 setEnv noMinPeers false
+setEnv useSyncMode false
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true

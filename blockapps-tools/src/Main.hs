@@ -215,7 +215,7 @@ run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)
 run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
-run Psql{}                     = psql
+run Psql{}                     = psql                                  
 run InsertTX{}                 = insertTX
 run Checkpoints{..}            = case operation of
     Get           -> doCheckpointGet service

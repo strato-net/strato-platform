@@ -45,7 +45,7 @@ sequencer = forever $ do
         setNextIngestedOffset ofs
 
 -- bootstrap genesis block into leveldb if needed
-bootstrap :: BDB.Block -> SequencerM ()
+bootstrap :: BDB.Block -> SequencerM OutputBlock
 bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs, BDB.blockBlockUncles = us} = helper
     where shortCircuit = OutputBlock { obOrigin              = TO.Direct
                                      , obBlockData           = bd
@@ -62,11 +62,12 @@ bootstrap BDB.Block{BDB.blockBlockData = bd, BDB.blockReceiptTransactions = txs,
                                         , otHash   = TX.transactionHash t
                                         }
           helper = do
-            bootstrapGenesisBlock hash difficulty
-            shouldEmit <- bootstrapDoEmit <$> ask
-            when shouldEmit $ do
-                assertTopicCreation'
-                writeSeqEvents' [OEBlock shortCircuit]
+              bootstrapGenesisBlock hash difficulty
+              shouldEmit <- bootstrapDoEmit <$> ask
+              when shouldEmit $ do
+                  assertTopicCreation'
+                  writeSeqEvents' [OEBlock shortCircuit]  -- todo handle the error :)
+              return shortCircuit
 
 transformEvents :: [IngestEvent] -> SequencerM ([Maybe LDB.BatchOp], [OutputEvent])
 transformEvents input = unzip . join <$> forM input unboxAndTransform
@@ -81,7 +82,8 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                     return [] -- ignore transactions we cant ECrecover
                 Just tx -> do
                     let witnessHash = witnessableHash tx
-                    txWasWitnessed <- wasTransactionHashWitnessed witnessHash
+                    -- txWasWitnessed <- wasTransactionHashWitnessed witnessHash
+                    let txWasWitnessed = False -- we have a mempool now, now need for tx dedup. todo: remove SeenTxDB completely
                     if txWasWitnessed
                       then do
                         $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx inTx ++ "; not emitting"

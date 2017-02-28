@@ -56,7 +56,8 @@ executable queryStrato
                  , aeson
                  , text
                  , strato-sequencer
-                 
+                 , strato-index
+                 , strato-statediff
     main-is: Main.hs
     other-modules:
                    Block

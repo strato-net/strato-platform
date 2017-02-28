@@ -1,88 +1,102 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, FlexibleInstances, TypeSynonymInstances, NamedFieldPuns, BangPatterns, TemplateHaskell #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
+{-# OPTIONS -fno-warn-orphans      #-}
 
-module Blockchain.BlockChain (
-  addBlock,
-  addBlocks,
-  addTransaction,
-  addTransactions,
-  runCodeForTransaction,
-  calculateIntrinsicGas'
+module Blockchain.BlockChain
+    ( addBlock
+    , addBlocks
+    , addTransaction
+    , addTransactions
+    , runCodeForTransaction
+    , calculateIntrinsicGas'
   ) where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Extra (unlessM)
-import Control.Monad.Logger
-import Control.Monad.Trans
-import Control.Monad.Trans.Either
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.List
-import qualified Data.Map as M
-import Data.Maybe
-import Data.Ord (comparing)
-import Data.IORef (newIORef, readIORef, writeIORef)
-import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Data.Time.Clock
-import Data.Time.Clock.POSIX
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
-import Text.Printf
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Extra                (unlessM)
+import           Control.Monad.Logger
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Either
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as BC
+import qualified Data.ByteString.Lazy               as BL
+import           Data.IORef                         (newIORef, readIORef,
+                                                     writeIORef)
+import           Data.List
+import qualified Data.Map                           as M
+import           Data.Maybe
+import           Data.Ord                           (comparing)
+import qualified Data.Set                           as S
+import qualified Data.Text                          as T
+import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
+import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), lines)
+import           Text.Printf
 
-import qualified Data.Aeson as Aeson
+import qualified Data.Aeson                         as Aeson
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Constants
-import Blockchain.Data.Address
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockDB
-import Blockchain.Data.BlockSummary
-import Blockchain.Data.Code
-import Blockchain.Data.DataDefs
-import Blockchain.Data.DiffDB
-import Blockchain.Data.ExecResults
-import Blockchain.Data.Extra
-import Blockchain.Data.Log
-import Blockchain.Data.LogDB
-import Blockchain.Data.StateDiff hiding (StateDiff(blockHash))
-import Blockchain.Data.Transaction
-import Blockchain.Data.TransactionResult
+import qualified Blockchain.Colors                  as CL
+import           Blockchain.Constants
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.ExecResults
+import           Blockchain.Data.Extra
+import           Blockchain.Data.Log
+import           Blockchain.Data.LogDB
+import           Blockchain.Data.Transaction
+import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.DB.AddressStateDB as NoCache
-import qualified Blockchain.DB.BlockSummaryDB as BSDB
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.ModifyStateDB
-import Blockchain.DB.StateDB
-import Blockchain.DB.StorageDB
-import Blockchain.ExtWord
-import Blockchain.Format
-import Blockchain.Stream.UnminedBlock
-import Blockchain.Stream.Raw
-import Blockchain.Sequencer.Event
-import Blockchain.TheDAOFork
-import Blockchain.VMContext
-import Blockchain.VMOptions
-import Blockchain.Verifier
-import Blockchain.VM
-import Blockchain.VM.Code
-import Blockchain.VM.OpcodePrices
-import Blockchain.VM.VMState
+import qualified Blockchain.DB.AddressStateDB       as NoCache
+import qualified Blockchain.DB.BlockSummaryDB       as BSDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.ModifyStateDB
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
+import           Blockchain.ExtWord
+import           Blockchain.Format
+import           Blockchain.Sequencer.Event
+import           Blockchain.Stream.Raw
+import           Blockchain.Stream.UnminedBlock
+import           Blockchain.TheDAOFork
+import           Blockchain.Verifier
+import           Blockchain.VM
+import           Blockchain.VM.Code
+import           Blockchain.VM.OpcodePrices
+import           Blockchain.VM.VMState
+import           Blockchain.VMContext
+import           Blockchain.VMOptions
 
-import Blockchain.Output (rightPad)
+import           Blockchain.Output                  (rightPad)
 
-import qualified Control.Monad.State as State
-import qualified Blockchain.Bagger as Bagger
-import qualified Blockchain.Bagger.BaggerState as BaggerState
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.SHA
-import Blockchain.SHA (formatSHAWithoutColor)
+import qualified Blockchain.Bagger                  as Bagger
+import           Blockchain.SHA                     (formatSHAWithoutColor)
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Output                  (rightPad)
+import           Blockchain.Strato.StateDiff        hiding
+                                                      (StateDiff(blockHash))
+import           Blockchain.Strato.StateDiff.Database
+import           Blockchain.Strato.StateDiff.Event
+import           Blockchain.Strato.StateDiff.Kafka
+import qualified Control.Monad.State                as State
 
-import Network.Kafka (withKafkaViolently)
+import           Blockchain.Strato.Indexer.Kafka    (writeIndexEvents)
+import           Blockchain.Strato.Indexer.Model    (IndexEvent (..))
 
-import Executable.EVMFlags
+import           Network.Kafka                      (withKafkaViolently)
+
+import           Executable.EVMFlags
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer -- txCost, accountBalance
                              | TFIntrinsicGasExceedsTxLimit Integer Integer -- intrinsicGas, txGasLimit
@@ -166,7 +180,7 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
 
 isNonceRejection :: Bagger.BaggerTxRejection -> Bool
 isNonceRejection Bagger.NonceTooLow{} = True
-isNonceRejection _ = False
+isNonceRejection _                    = False
 
 timeit::(MonadIO m, MonadLogger m)=>String->m a->m a
 timeit message f = do
@@ -187,7 +201,11 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               forM_ blocks' $ timeit "Block insertion" . addBlock isUnmined
               $logInfoS "addBlocks_old" "done inserting, now will replace best if best is among the list"
               let bestIfBetterCandidate = maximumBy (comparing obTotalDifficulty) blocks'
-              unless isUnmined . void $ replaceBestIfBetter bestIfBetterCandidate True
+              unless isUnmined $ do
+                  void $ withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+                  (_, nbb) <- replaceBestIfBetter bestIfBetterCandidate True
+                  void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+
 
           addBlocks_new = do
               let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
@@ -197,18 +215,22 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               let oldStateRoot = blockDataStateRoot oldHeader
               didReplaceBest <- liftIO (newIORef False)
               replacedBest   <- liftIO (newIORef undefined)
+              replacedBBI    <- liftIO (newIORef undefined)
               forM_ blocks' $ \block -> timeit "Block insertion" $ do
                   addBlock isUnmined block
                   unless isUnmined $ do
-                      didReplaceThisTime <- replaceBestIfBetter block False
+                      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
                       when didReplaceThisTime . liftIO $ do
                           writeIORef didReplaceBest True
-                          writeIORef replacedBest block
+                          writeIORef replacedBest (block, replacedBits)
               didReplaceBest' <- liftIO (readIORef didReplaceBest)
-              when (not isUnmined && didReplaceBest') $ do
-                  $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
-                  newBestBlock <- liftIO (readIORef replacedBest)
-                  calculateAndEmitStateDiffs newBestBlock oldStateRoot
+              unless isUnmined $ do
+                  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+                  when didReplaceBest' $ do
+                      $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
+                      (theBlock, nbb) <- liftIO (readIORef replacedBest)
+                      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+                      calculateAndEmitStateDiffs theBlock oldStateRoot
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
@@ -266,7 +288,7 @@ addTransactions isUnmined b blockGas (t:rest) = do
   beforeMap <- getAddressStateDBMap
   !(deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
   afterMap <- getAddressStateDBMap
-  
+
   printTransactionMessage t result deltaT
 
   unless isUnmined $
@@ -274,7 +296,7 @@ addTransactions isUnmined b blockGas (t:rest) = do
 
   let remainingBlockGas =
         case result of
-         Left _ -> blockGas
+         Left _           -> blockGas
          Right execResult -> erRemainingBlockGas execResult
 
   addTransactions isUnmined b remainingBlockGas rest
@@ -322,7 +344,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
     else do
       lift $ incrementNonce tAddr
       return $ transactionTo bt
-  
+
   success <- lift $ addToBalance tAddr (-transactionGasLimit bt * transactionGasPrice bt)
 
   when flags_debug $ lift $ $logDebugS "addTx" "running code"
@@ -333,7 +355,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
         s1 <- lift $ addToBalance (blockDataCoinbase b) (transactionGasLimit bt * transactionGasPrice bt)
         unless s1 $ error "addToBalance failed even after a check in addBlock"
-        
+
         case result of
           Left e -> do
             when flags_debug $ lift $ $logDebugS "addTx" . T.pack $ CL.red $ show e
@@ -348,7 +370,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                   then Just theAddress
                   else Nothing
                 }
-              -- (newVMState'{vmException = Just e}, 
+              -- (newVMState'{vmException = Just e},
           Right _ -> do
             let realRefund =
                   min (refund newVMState') ((transactionGasLimit bt - vmGasRemaining newVMState') `div` 2)
@@ -361,8 +383,8 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             forM_ (S.toList $ suicideList newVMState') $ \address' -> do
               lift $ purgeStorageMap address'
               lift $ deleteAddressState address'
-                         
-        
+
+
             return
               ExecResults {
                 erRemainingBlockGas=remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState'),
@@ -425,20 +447,20 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
     where
       zeroLen = fromIntegral $ zeroBytesLength t
       txCost t' | isMessageTX t' = gTX
-      txCost _ = if isHomestead then gCREATETX else gTX
+      txCost _  = if isHomestead then gCREATETX else gTX
 
 --outputTransactionMessage::IO ()
 outputTransactionResult::BlockData->OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->
                          M.Map Address AddressStateModification->M.Map Address AddressStateModification->ContextM ()
 outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} result deltaT beforeMap afterMap = do
-  let 
+  let
     (message, gasRemaining) =
-      case result of 
+      case result of
         Left err -> (show err, 0) -- TODO Also include the trace
-        Right r -> ("Success!", erRemainingBlockGas r)
+        Right r  -> ("Success!", erRemainingBlockGas r)
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasLimit t)
-    
+
   when flags_createTransactionResults $ do
       let beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
           beforeDeletes = S.fromList [ x | (x, ASDeleted) <-  M.toList beforeMap ]
@@ -450,23 +472,23 @@ outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} re
       --addrDiff <- addrDbDiff mpdb stateRootBefore stateRootAfter
 
       let (response, theTrace', theLogs) =
-            case result of 
+            case result of
               Left _ -> ("", [], []) --TODO keep the trace when the run fails
-              Right r -> 
+              Right r ->
                 (BC.unpack $ B16.encode $ fromMaybe "" $ erReturnVal r, unlines $ reverse $ erTrace r, erLogs r)
 
       let defaultNewAddrs = S.toList modified
           moveToFront (Just thisAddress) | thisAddress `S.member` modified = thisAddress : S.toList (S.delete thisAddress modified)
           moveToFront _ = defaultNewAddrs
 
-      newAddresses <- 
+      newAddresses <-
           case result of
               Left _ -> return []
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       forM_ theLogs $ \log' ->
         putLogDB $ LogDB txHash tAddr (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
-                                   
+
       _ <- putTransactionResult
              TransactionResult {
                transactionResultBlockHash=blockHeaderHash b,
@@ -482,7 +504,7 @@ outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} re
                transactionResultTime=realToFrac deltaT,
                transactionResultNewStorage="",
                transactionResultDeletedStorage=""
-               } 
+               }
       return ()
 
 
@@ -533,19 +555,19 @@ printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=txHash} (Rig
                                ]
 
 indexMaybe :: [a] -> Int -> Maybe a
-indexMaybe _ i | i < 0 = error "indexMaybe called for i < 0"
-indexMaybe [] _        = Nothing
-indexMaybe (x:_) 0     = Just x
-indexMaybe (_:rest) i  = indexMaybe rest (i-1)
+indexMaybe _ i        | i < 0 = error "indexMaybe called for i < 0"
+indexMaybe [] _       = Nothing
+indexMaybe (x:_) 0    = Just x
+indexMaybe (_:rest) i = indexMaybe rest (i-1)
 
 formatAddress :: Address->String
 formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> Bool -> ContextM Bool
+replaceBestIfBetter :: OutputBlock -> Bool -> ContextM (Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} emitStateDiff = do
-    ContextBestBlockInfo(_, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getContextBestBlockInfo
+    ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getContextBestBlockInfo
 
     let newNumber     = blockDataNumber bd
         newStateRoot  = blockDataStateRoot bd
@@ -574,7 +596,12 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
     when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
         Bagger.processNewBestBlock bH bd bTHs
 
-    return shouldReplace
+    let bestBlockInfo = (bestSha, bestNum, bestTdiff)
+        bestSha       = if shouldReplace then bH        else oldBestSha
+        bestNum       = if shouldReplace then newNumber else oldNumber
+        bestTdiff     = if shouldReplace then td        else oldBestDifficulty
+
+    return (shouldReplace, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
@@ -589,5 +616,8 @@ calculateAndEmitStateDiffs newBlock oldStateRoot = when (flags_sqlDiff || flags_
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
     when flags_sqlDiff $ commitSqlDiffs diffs
     when flags_diffPublish $
-        let diffBS = BL.toStrict $ Aeson.encode diffs
-         in void . withKafkaViolently $ produceBytes' "statediff" [diffBS]
+        let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
+         in withKafkaViolently $ do
+             void $ writeStateDiffEvents deletionEvents
+             void $ writeStateDiffEvents creationEvents
+             void $ writeStateDiffEvents updateEvents

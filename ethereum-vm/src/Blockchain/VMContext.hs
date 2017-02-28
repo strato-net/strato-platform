@@ -1,4 +1,8 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 module Blockchain.VMContext (
   Context(..),
@@ -15,41 +19,42 @@ module Blockchain.VMContext (
   ) where
 
 
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource
-import Control.Monad.State
-import qualified Data.Map as M
-import qualified Database.LevelDB as DB
-import qualified Database.Persist.Postgresql as SQL
-import System.Directory
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import qualified Data.Map                           as M
+import qualified Database.LevelDB                   as DB
+import qualified Database.Persist.Postgresql        as SQL
+import           System.Directory
+import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 
 
-import Blockchain.Data.Address
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockDB
+import           Blockchain.Constants
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockDB
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StorageDB
-import Blockchain.DB.SQLDB
-import Blockchain.DB.StateDB
-import Blockchain.Constants
-import Blockchain.EthConf
-import Blockchain.ExtWord
-import Blockchain.VMOptions
+import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
+import           Blockchain.EthConf
+import           Blockchain.ExtWord
+import           Blockchain.VMOptions
 
-import Blockchain.Bagger
-import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
+import           Blockchain.Bagger
+import           Blockchain.Bagger.BaggerState      (BaggerState,
+                                                     defaultBaggerState)
 
-import Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.SHA
 
-import qualified Network.Kafka as K
-
---import Debug.Trace
+import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import qualified Database.Redis                     as Redis
+import qualified Network.Kafka                      as K
 
 data Context = Context {
     contextStateDB           :: MP.MPDB,
@@ -61,7 +66,8 @@ data Context = Context {
     contextStorageMap        :: M.Map (Address, Word256) Word256,
     contextBaggerState       :: !BaggerState,
     contextKafkaState        :: K.KafkaState,
-    contextBestBlockInfo     :: ContextBestBlockInfo
+    contextBestBlockInfo     :: ContextBestBlockInfo,
+    contextRedisPool         :: Redis.Connection
 }
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
@@ -70,9 +76,7 @@ data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, 
     deriving (Eq, Read, Show)
 
 instance HasStateDB ContextM where
-  getStateDB = do
-    cxt <- get
-    return $ contextStateDB cxt
+  getStateDB = contextStateDB <$> get
   setStateDBStateRoot sr = do
     cxt <- get
     put cxt{contextStateDB=(contextStateDB cxt){MP.stateRoot=sr}}
@@ -84,9 +88,7 @@ instance K.HasKafkaState ContextM where
         put $ ctx {contextKafkaState = ks}
 
 instance HasMemAddressStateDB ContextM where
-  getAddressStateDBMap = do
-    cxt <- get
-    return $ contextAddressStateDBMap cxt
+  getAddressStateDBMap = contextAddressStateDBMap <$> get
   putAddressStateDBMap theMap = do
     cxt <- get
     put $ cxt{contextAddressStateDBMap=theMap}
@@ -101,24 +103,19 @@ instance HasStorageDB ContextM where
     put cxt{contextStorageMap=theMap}
 
 instance HasHashDB ContextM where
-  getHashDB = fmap contextHashDB get
+  getHashDB = contextHashDB <$> get
 
 instance HasCodeDB ContextM where
-  getCodeDB = fmap contextCodeDB get
+  getCodeDB = contextCodeDB <$> get
 
 instance HasBlockSummaryDB ContextM where
-  getBlockSummaryDB = fmap contextBlockSummaryDB get
+  getBlockSummaryDB = contextBlockSummaryDB <$> get
 
 instance HasSQLDB ContextM where
-  getSQLDB = fmap contextSQLDB get
+  getSQLDB = contextSQLDB <$> get
 
-{-
-connStr'::SQL.ConnectionString
-connStr' = BC.pack $ "host=localhost dbname=eth user=postgres password=api port=" ++ show (port $ sqlConfig ethConf)
--}
-
---runContextM::MonadIO m=>
---             ContextM a->m ()
+instance RBDB.HasRedisBlockDB ContextM where
+    getRedisBlockDB = contextRedisPool <$> get
 
 runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
                 StateT Context (ResourceT m) a -> m (a, Context)
@@ -134,6 +131,7 @@ runContextM f = do
         blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
                  DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
         conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
+        redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
         let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
         runStateT f (Context
                         MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateroot not set"}
@@ -145,7 +143,8 @@ runContextM f = do
                         M.empty
                         defaultBaggerState
                         initialKafkaState
-                        Unspecified)
+                        Unspecified
+                        redisPool)
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (ResourceT m) a -> m a
