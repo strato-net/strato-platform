@@ -4,49 +4,35 @@ module Executable.StratoAdit (
   stratoAdit
 ) where
 
-import Control.Concurrent.Lifted
-import Control.Concurrent.STM
-import Control.Monad
-import Control.Monad.Logger
-import Control.Monad.State
-import Control.Monad.Trans.Resource
-import Data.Maybe
+import           Control.Concurrent.Lifted
+import           Control.Concurrent.STM
+import           Control.Monad
+import           Control.Monad.Logger
+import           Control.Monad.State
 import qualified Data.Text as T
-import Control.Monad.IO.Class
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
-import System.IO.Unsafe
-import System.CPUTime
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           System.CPUTime
+import           Network.Kafka
+import           Network.Kafka.Protocol
 
-import Blockchain.Mining
-import Blockchain.Mining.SHA
-import Blockchain.Mining.Normal
-import Blockchain.Mining.Instant
-
-import Blockchain.Stream.UnminedBlock
-import Blockchain.Stream.VMEvent
-
-import Network.Kafka
-import Network.Kafka.Protocol
-
-import Blockchain.Format
-
-import Blockchain.Data.BlockDB
-import Blockchain.Data.NewBlk
-import Blockchain.DB.SQLDB
-import Blockchain.Data.DataDefs()
-import Blockchain.EthConf
-import Blockchain.KafkaTopics
-
-import Blockchain.Stream.Raw (setDefaultKafkaState)
-
-import Blockchain.Mining.Options
-
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
+import           Blockchain.Mining
+import           Blockchain.Mining.SHA
+import           Blockchain.Mining.Normal
+import           Blockchain.Mining.Instant
+import           Blockchain.Stream.UnminedBlock
+import           Blockchain.Stream.VMEvent
+import           Blockchain.Format
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.NewBlk
+import           Blockchain.Data.DataDefs()
+import           Blockchain.KafkaTopics
+import           Blockchain.Stream.Raw (setDefaultKafkaState)
+import           Blockchain.Mining.Options
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Kafka
 import qualified Blockchain.Data.TXOrigin as TO
 
-import Executable.AditM
-import Executable.SQLMonad
+import           Executable.AditM
 
 lookupMiner :: MinerType -> Miner
 lookupMiner = \case
@@ -55,9 +41,9 @@ lookupMiner = \case
     _       -> shaMiner
 
 miners :: [(Miner, Int)]
-miners = take flags_threads miners
-    where miners = zip (repeat miner) [1..]
-          miner  = lookupMiner flags_aMiner
+miners = take flags_threads miners'
+    where miners' = zip (repeat miner') [1..]
+          miner'  = lookupMiner flags_aMiner
 
 toLog :: T.Text -> Int -> String -> AditM ()
 toLog src minerNum = $logInfoS src . T.pack . show . color minerNum . text
@@ -67,10 +53,11 @@ toLog src minerNum = $logInfoS src . T.pack . show . color minerNum . text
 
 doBlock :: Int -> Block -> Integer -> AditM ()
 doBlock minerNumber n newNonce = do
-    toLog "doBlock" minerNumber $ "Miner success for " ++ format (blockHash n) ++ " -> " ++ show newNonce ++ "!" --(format $ n)
     let theblockData = (blockBlockData n){blockDataNonce = fromIntegral newNonce}
         theMinedBlock = n{blockBlockData = theblockData}
-    let theHash = blockHash theMinedBlock
+        coinbase = format . blockDataCoinbase . blockBlockData $ n
+        theHash = blockHash theMinedBlock
+    toLog "doBlock" minerNumber $ "Miner success for " ++ format (blockHash n) ++ " -> " ++ show newNonce ++ "(" ++ coinbase ++ ")" --(format $ n)
     toLog "doBlock" minerNumber $ "New block hash is " ++ format theHash ++ "!"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
@@ -88,7 +75,7 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
       mineBlock mv nnow (i + 1) (m,mi)
     miningSuccess b nonce = do
       !now <- liftIO getCPUTime
-      toLog "mineBlock/success" mi $ "Mining success after passes: " ++ show i ++ " for miner " ++ show mi ++ " with " ++ show (10^12 * i `div` (1 + now - t)) ++ " hash/s "
+      toLog "mineBlock/success" mi $ "Mining success after passes: " ++ show i ++ " for miner " ++ show mi ++ " with " ++ show ( 10^ (12 :: Integer) * i `div` (1 + now - t)) ++ " hash/s "
       doBlock mi b nonce
       liftIO . atomically $ do
         nextBlock <- takeTMVar mv 

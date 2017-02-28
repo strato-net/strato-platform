@@ -42,6 +42,6 @@ instance Binary TXOrigin where
             _ -> error "the impossible happened in get of Binary instance of TXOrigin"
 
 instance Format TXOrigin where
-    format (BlockHash sha) = "BlockHash " ++ format sha
-    format (PeerString p ) = "Peer " ++ p
+    format (BlockHash sha) = shaToHex sha
+    format (PeerString p ) = p
     format               x = show x
