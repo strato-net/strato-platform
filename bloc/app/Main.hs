@@ -71,4 +71,4 @@ main = do
 
   mgr' <- newManager defaultManagerSettings
   let blocEnv = BlocEnv stratoDev mgr' conn
-  run 8000 (appBloc blocEnv)
+  run flags_port (appBloc blocEnv)

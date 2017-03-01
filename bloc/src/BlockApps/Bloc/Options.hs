@@ -9,3 +9,4 @@ import HFlags
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
 defineFlag "p:password" ("" :: String) "Postgres password"
+defineFlag "port" (8000::Int) "The port which the server runs on"
