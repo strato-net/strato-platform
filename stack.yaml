@@ -3,6 +3,7 @@ packages:
 - bloc
 - ethereum
 - solidity
+- solidity-abi
 - strato/api
 - strato/client
 - location:
