@@ -49,6 +49,7 @@ library
     , monad-loops
     , mtl
     , opaleye
+    , postgresql-simple
     , product-profunctors
     , QuickCheck
     , quickcheck-instances

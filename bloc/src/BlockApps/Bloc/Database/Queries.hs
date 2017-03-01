@@ -5,9 +5,12 @@
 module BlockApps.Bloc.Database.Queries where
 
 import Control.Arrow
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
 import Data.Int (Int32)
 import Data.Text (Text)
+import qualified Data.Text.Encoding as Text
+import Database.PostgreSQL.Simple (Connection)
 import Opaleye
 import qualified Opaleye as Opaleye (not,null)
 
@@ -517,3 +520,186 @@ getXabiFunctionsArgsQuery funcId = proc () -> do
         (\ (_,_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_,_) -> xteId .== entryTypeId)
         (queryTable xabiTypesTable)
         (queryTable xabiTypesTable)
+{- |
+SELECT
+  (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name
+  ,XFR.index
+  ,XT.type
+  ,XT.typedef
+  ,XT.is_dynamic
+  ,XT.bytes
+  ,XTE.type as entry_type
+  ,XTE.bytes as entry_bytes
+FROM xabi_function_return XFR
+JOIN xabi_types XT
+  ON XT.id = XFR.type_id
+LEFT OUTER JOIN xabi_types XTE
+  ON XTE.id = XT.entry_type_id
+WHERE XFR.function_id = $1;"
+-}
+getXabiFunctionsReturnValuesQuery
+  :: Int32
+  -> Query
+    ( Column PGInt4
+    , Column PGInt4
+    , Column PGText
+    , Column (Nullable PGText)
+    , Column PGBool
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
+    )
+getXabiFunctionsReturnValuesQuery funcId = proc () -> do
+  (functionId,xfrId,index,ty,tyd,dy,by,ety,eby) <- joinTable -< ()
+  restrict -< functionId .== constant funcId
+  returnA -< (xfrId,index,ty,tyd,dy,by,ety,eby)
+  where
+    joinTable = joinF
+      (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index,ty,tyd,dy,by,ety,eby))
+      (\ (_,_,_,typeId) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
+      (queryTable xabiFunctionReturnsTable) $ leftJoinF
+        (\ (xtId,ty,tyd,dy,_,_,by,_,_,_) (_,ety,_,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,toNullable ety,eby))
+        (\ (xtId,ty,tyd,dy,_,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
+        (\ (_,_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_,_) -> xteId .== entryTypeId)
+        (queryTable xabiTypesTable)
+        (queryTable xabiTypesTable)
+
+{- |
+SELECT
+   XV.name
+  ,XV.at_bytes
+  ,XT.type
+  ,XT.typedef
+  ,XT.is_dynamic
+  ,XT.is_signed
+  ,XT.bytes
+  ,XTE.type as entry_type
+  ,XTE.bytes as entry_bytes
+  ,XTV.type as value_type
+  ,XTV.bytes as values_bytes
+  ,XTV.is_dynamic as value_is_dynamic
+  ,XTV.is_signed as value_is_signed
+  ,XTVE.type as value_entry_type
+  ,XTVE.bytes as value_entry_bytes
+  ,XTK.type as key_type
+  ,XTK.bytes as key_bytes
+  ,XTK.is_dynamic as key_is_dynamic
+  ,XTK.is_signed as key_is_signed
+  ,XTVK.type as key_entry_type
+  ,XTVK.bytes as key_entry_bytes
+FROM
+  xabi_variables XV
+LEFT OUTER JOIN
+  xabi_types XT ON XT.id = XV.type_id
+LEFT OUTER JOIN
+  xabi_types XTE ON XTE.id = XT.entry_type_id
+LEFT OUTER JOIN
+  xabi_types XTV ON XTV.id = XT.value_type_id
+LEFT OUTER JOIN
+  xabi_types XTK ON XTK.id = XT.key_type_id
+LEFT OUTER JOIN
+  xabi_types XTVE ON XTVE.id = XT.entry_type_id
+LEFT OUTER JOIN
+  xabi_types XTKE ON XTKE.id = XT.entry_type_id
+WHERE XV.contract_metadata_id = $1;
+-}
+getXabiVariablesQuery
+  :: Int32
+  -> Query
+    ( Column PGText
+    , Column PGInt4
+    , Column PGText
+    , Column PGText
+    , Column PGBool
+    , Column PGBool
+    , Column PGInt4
+    , Column PGText
+    , Column PGInt4
+    , Column PGText
+    , Column PGInt4
+    , Column PGBool
+    , Column PGBool
+    , Column PGText
+    , Column PGInt4
+    , Column PGText
+    , Column PGInt4
+    , Column PGBool
+    , Column PGBool
+    , Column PGText
+    , Column PGInt4
+    )
+getXabiVariablesQuery = undefined
+
+{- |
+WITH contract_id AS (
+ SELECT id FROM contracts WHERE name = $1)
+ , new_contract_id AS
+ (
+   INSERT INTO contracts (name)
+   SELECT $1 WHERE NOT EXISTS (SELECT id FROM contracts WHERE name = $1)
+   RETURNING id
+ )
+SELECT id FROM contract_id UNION SELECT id FROM new_contract_id;
+-}
+createContractQuery :: Text -> Query (Column PGInt4)
+createContractQuery = undefined
+
+{- |
+WITH upsert AS (UPDATE contracts_metadata SET
+  bin = $2
+ ,bin_runtime = $3
+ ,code_hash = $4
+ ,bin_runtime_hash = $5
+WHERE contract_id = $1
+  AND NOT EXISTS (
+      SELECT CI.id
+      FROM contracts_instance CI
+      WHERE contract_metadata_id = i
+      )
+RETURNING id),
+ins AS (INSERT INTO contracts_metadata (contract_id, bin, bin_runtime, code_hash, bin_runtime_hash)
+SELECT $1,$2,$3,$4,$5 WHERE NOT EXISTS (SELECT * FROM upsert)
+RETURNING id)
+SELECT id from upsert UNION SELECT id from ins;
+-}
+upsertContractMetaDataQuery
+  :: Int32
+  -> Text
+  -> Text
+  -> ByteString
+  -> ByteString
+  -> Query (Column PGInt4)
+upsertContractMetaDataQuery = undefined
+
+{- |
+INSERT INTO contracts_lookup (contract_metadata_id, linked_metadata_id)
+SELECT $1,$2  WHERE NOT EXISTS
+(SELECT contract_metadata_id, linked_metadata_id FROM contracts_lookup
+WHERE contract_metadata_id = $1 AND linked_metadata_id = $2);
+-}
+insertContractLookup :: Int32 -> Int32 -> IO ()
+insertContractLookup = undefined
+
+{- |
+INSERT INTO xabi_functions
+  (contract_metadata_id,name,selector,is_constructor)
+  VALUES ($1,$2,$3,$4) RETURNING id;
+-}
+insertXabiFunction
+  :: Int32
+  -> Text
+  -> Text
+  -> Bool
+  -> Connection
+  -> IO [Int32]
+insertXabiFunction contractMetaDataId name selector isConstr conn = do
+  runInsertReturning
+    conn
+    xabiFunctionsTable
+    ( Nothing
+    , constant contractMetaDataId
+    , constant isConstr
+    , toNullable (constant name)
+    , toNullable (constant (Text.encodeUtf8 selector))
+    )
+    (\ (xfId,_,_,_,_) -> xfId)
