@@ -19,6 +19,7 @@ RUN apk add --no-cache $APKS                                  && \
 USER root
 COPY . $HOME/cirrus
 COPY lib $HOME/cirrus/lib
+COPY pkg/doit.sh /.
 RUN chown -R app:app $HOME/*
 USER app
 
