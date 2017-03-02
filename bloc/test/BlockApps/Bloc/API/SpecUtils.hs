@@ -28,7 +28,9 @@ import Network.HTTP.Client
 
 data TestConfig = TestConfig
   { mgr :: Manager
-  , url :: BaseUrl
+  , blocUrl :: BaseUrl
+  , stratoUrl :: BaseUrl
+  -- , url :: BaseUrl
   , userName :: UserName
   , userAddress :: Address
   , toUserName :: UserName

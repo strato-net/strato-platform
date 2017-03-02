@@ -9,7 +9,6 @@ import qualified Data.HashMap.Strict as HashMap
 import Network.HTTP.Client
 import Servant.Client
 import Test.Hspec
-import System.Directory
 
 import qualified BlockApps.Bloc.API.AddressesSpec as Addresses
 import BlockApps.Bloc.API.Contracts
@@ -32,20 +31,20 @@ main = hspec $ do
     Contracts.spec
     Search.spec
     Users.spec
+  beforeAll setup $ do
     E2E.spec
 
 setup :: IO TestConfig
 setup = do
   mgr' <- newManager defaultManagerSettings
-  cwd <- getCurrentDirectory
-  print cwd
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"
   let
     testConfig = TestConfig
       { mgr = mgr'
-      , url = bayar4a
+      , blocUrl = bayar4a
+      , stratoUrl = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
       , userName = UserName "testUser1"
       , userAddress = Address 0x0
       , toUserName = UserName "testUser2"

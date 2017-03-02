@@ -237,13 +237,15 @@ data Account = Account
   , accountNonce :: Natural
   , accountBalance :: Strung Natural
   , accountContractRoot :: Keccak256
-  , accountCode :: Keccak256
+  , accountCode :: Text
+  , accountCodeHash :: Keccak256
   , accountLatestBlockNum :: Natural
   } deriving (Eq, Show, Generic)
 instance FromJSON Account where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToJSON Account where
   toJSON = genericToJSON (aesonPrefix camelCase)
+
 
 newtype Difficulty = Difficulty { unDifficulty :: Integer }
   deriving (Eq, Show, Generic)
