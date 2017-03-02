@@ -91,7 +91,7 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
       toLog "mineBlock/success" mi $ "Mining success after passes: " ++ show i ++ " for miner " ++ show mi ++ " with " ++ show (10^12 * i `div` (1 + now - t)) ++ " hash/s "
       doBlock mi b nonce
       liftIO . atomically $ do
-        nextBlock <- takeTMVar mv 
+        nextBlock <- takeTMVar mv
         when (nextBlock /= b) $ putTMVar mv nextBlock
       !nnnow <- liftIO getCPUTime
       mineBlock mv nnnow 0 (m,mi)
@@ -109,7 +109,7 @@ stratoAdit = runAditT flags_pgPoolSize $ do
     $logInfoS "stratoAdit" "Starting adit"
     $logInfoS "stratoAdit" "Before STM op in mining loop"
 
-    c <- liftIO $ atomically newEmptyTMVar 
+    c <- liftIO $ atomically newEmptyTMVar
 
     $logInfoS "stratoAdit" . T.pack $ "Dispatching " ++ show (length miners) ++ " miners"
 

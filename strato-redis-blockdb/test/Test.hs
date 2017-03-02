@@ -182,32 +182,32 @@ specTest = around (withConn 1) $ do
 
     describe "ReplaceBestBlock" $ do
         
-        flushDB
+        forM_ [1,2,3] $ \n -> do
+            flushDB
+            it "Should generate a tree" $ \conn -> do
+                g <- liftIO $ makeGenesisBlock
+                tree <- bush g n 3 :: IO (Tree BlockData)
+                -- liftIO . putStrLn $ showTree $ pb <$> tree
+                -- pick two leaves
+                let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
+                -- forM_ bestBlocks $ \bb -> do
+                --     liftIO . putStrLn . show $ pb bb
+                let chains = flip stem' (toList tree) <$> bestBlocks
 
-        it "Should generate a tree" $ \conn -> do
-           g <- liftIO $ makeGenesisBlock
-           tree <- bush g 20 3 :: IO (Tree BlockData)
-           -- liftIO . putStrLn $ showTree $ pb <$> tree
-           -- pick two leaves
-           let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
-           -- forM_ bestBlocks $ \bb -> do
-           --     liftIO . putStrLn . show $ pb bb
-           let chains = flip stem' (toList tree) <$> bestBlocks
+                r <- runRedis conn $ do
+                    forM chains $ \chain -> do
+                        putChain RDB.forceBestBlockInfo chain 
+                        RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
 
-           r <- runRedis conn $ do
-               forM chains $ \chain -> do
-                   putChain RDB.forceBestBlockInfo chain 
-                   RDB.getBestBlockInfo :: Redis (Maybe (SHA, Integer, Integer))
+                let lengths = fromIntegral . length <$> chains
+                let mix = zip3 r lengths bestBlocks 
+                results <- forM mix $ \(b, l, a) -> do
+                    let ls = Just (blockHeaderHash a, blockDataNumber a, l)
+                    return $ ls == b
 
-           let lengths = fromIntegral . length <$> chains
-           let mix = zip3 r lengths bestBlocks 
-           results <- forM mix $ \(b, l, a) -> do
-               let ls = Just (blockHeaderHash a, blockDataNumber a, l)
-               return $ ls == b
-
-           HUnit.assertBool
-               "Couldn't get best block iterated from chain"
-               (and results)
+                HUnit.assertBool
+                    "Couldn't get best block iterated from chain"
+                    (and results)
 
         it "Should fetch the canonical chain" $ \conn -> do
             g <- liftIO $ makeGenesisBlock
