@@ -2,7 +2,10 @@
     LambdaCase
 #-}
 
-module BlockApps.Solidity where
+module BlockApps.SolidityVarReader (
+  Type,
+  decodeValue
+  ) where
 
 import Data.Bits
 import Data.ByteString (ByteString)

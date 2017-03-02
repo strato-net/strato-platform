@@ -18,7 +18,7 @@ library
                      , ProcessSimpleTypes
                      , ProcessComplexTypes
                      , SolidityStateTranslate
-                     , BlockApps.Solidity
+                     , BlockApps.SolidityVarReader
   build-depends:       base >= 4.7 && < 5
                      , blockapps-ethereum
                      , aeson

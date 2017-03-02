@@ -17,6 +17,7 @@ import Control.Monad
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
+import qualified Data.ByteString as B
 import Data.Int
 import Data.Foldable
 import Data.Traversable
@@ -42,8 +43,12 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
+import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
+
+
+import DummyContractStorage
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -124,7 +129,11 @@ instance MonadContracts Bloc where
     return $ contractDetails
       { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
-  getContractsState = undefined
+  getContractsState contractName contractId = do
+    vars <- getVariablesAndTypes contractName contractId
+    let storage = B.replicate 100 0
+        ret = map (fmap (decodeValue storage 0)) vars
+    return $ Map.fromList []
 
   getContractsFunctions (ContractName contractName) contractId = blocSql $ do
     metadataId <- case contractId of
