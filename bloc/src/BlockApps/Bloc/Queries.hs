@@ -4,6 +4,9 @@
 
 module BlockApps.Bloc.Queries where
 
+import qualified Crypto.Saltine.Class as Saltine
+import qualified Crypto.Saltine.Core.SecretBox as SecretBox
+import Crypto.Secp256k1
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
 import Data.Functor.Contravariant
@@ -79,9 +82,9 @@ postUsersUserQuery = statement
     keyStoreEncoder = mconcat
       [ contramap keystoreSalt (Encoders.value Encoders.bytea)
       , contramap keystorePasswordHash (Encoders.value Encoders.bytea)
-      , contramap keystoreAcctNonce (Encoders.value Encoders.bytea)
+      , contramap keystoreAcctNonce (Encoders.value nonceEncoder)
       , contramap keystoreAcctEncSecKey (Encoders.value Encoders.bytea)
-      , contramap keystorePubKey (Encoders.value Encoders.bytea)
+      , contramap keystorePubKey (Encoders.value pkEncoder)
       , contramap keystoreAcctAddress (Encoders.value addressEncoder)
       ]
 
@@ -662,6 +665,12 @@ addressDecoder
 
 addressEncoder :: Encoders.Value Address
 addressEncoder = contramap (Char8.pack . addressString) Encoders.bytea
+
+nonceEncoder :: Encoders.Value SecretBox.Nonce
+nonceEncoder = contramap Saltine.encode Encoders.bytea
+
+pkEncoder :: Encoders.Value PubKey
+pkEncoder = contramap (exportPubKey False) Encoders.bytea
 
 entryDecoder :: Decoders.Row (Maybe Entry)
 entryDecoder = do

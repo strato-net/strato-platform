@@ -1,5 +1,7 @@
 {-# LANGUAGE
-    GeneralizedNewtypeDeriving
+    FlexibleContexts
+  , GeneralizedNewtypeDeriving
+  , OverloadedStrings
 #-}
 
 module BlockApps.Bloc.Monad where
@@ -8,9 +10,13 @@ import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Hasql.Connection
-import Hasql.Session
+import Data.Text (Text)
+import Database.PostgreSQL.Simple (Connection,withTransaction)
+import Data.Profunctor.Product.Default
+-- import Hasql.Connection
+-- import Hasql.Session
 import Network.HTTP.Client
+import Opaleye
 import Servant
 import Servant.Client
 import Text.PrettyPrint.Leijen.Text
@@ -38,8 +44,8 @@ data BlocEnv = BlocEnv
   }
 
 data BlocError
-  = DBError Error
-  | StratoError ServantError
+  = StratoError ServantError
+  | DBError Text
   deriving Show
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
@@ -49,11 +55,24 @@ enterBloc env x
   $ flip runLoggingT (liftIO . print)
   $ flip runReaderT env $ runBloc x
 
-blocSql :: Session x -> Bloc x
-blocSql session = do
+blocQuery :: Default QueryRunner x y => Query x -> Bloc [y]
+blocQuery q = do
   conn <- asks dbConnection
-  resultEither <- liftIO $ run session conn
-  either (throwError . DBError) return resultEither
+  liftIO . withTransaction conn $ runQuery conn q
+
+blocQuery1 :: Default QueryRunner x y => Query x -> Bloc y
+blocQuery1 q = do
+  conn <- asks dbConnection
+  results <- liftIO . withTransaction conn $ runQuery conn q
+  case results of
+    [] -> throwError $ DBError "No result, expected one row"
+    [y] -> return y
+    _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+
+blocModify :: (Connection -> IO x) -> Bloc x
+blocModify modify = do
+  conn <- asks dbConnection
+  liftIO $ withTransaction conn (modify conn)
 
 blocStrato :: ClientM x -> Bloc x
 blocStrato client' = do

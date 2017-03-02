@@ -16,6 +16,8 @@ import BlockApps.Bloc.Monad
 import BlockApps.Strato.Client
 import BlockApps.Bloc.Database
 
+main = putStrLn "hi"
+{-
 --TODO: refactor
 main :: IO ()
 main = do
@@ -51,3 +53,4 @@ main = do
           mgr <- newManager defaultManagerSettings
           let blocEnv = BlocEnv stratoDev mgr conn
           run 8000 (appBloc blocEnv)
+-}

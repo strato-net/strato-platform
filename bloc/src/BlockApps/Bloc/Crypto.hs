@@ -13,7 +13,6 @@ import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
 import qualified Crypto.Saltine.Class as Saltine
 import Data.ByteString (ByteString)
 import Data.Maybe
-import GHC.Generics
 
 import BlockApps.Ethereum
 
@@ -22,11 +21,11 @@ newtype Password = Password ByteString
 data KeyStore = KeyStore
   { keystoreSalt :: ByteString
   , keystorePasswordHash :: ByteString
-  , keystoreAcctNonce :: ByteString
+  , keystoreAcctNonce :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
-  , keystorePubKey :: ByteString
+  , keystorePubKey :: PubKey
   , keystoreAcctAddress :: Address
-  } deriving (Eq,Show,Generic)
+  }
 
 newKeyStore :: Password -> IO KeyStore
 newKeyStore (Password pw) = do
@@ -54,8 +53,8 @@ newKeyStore (Password pw) = do
   return KeyStore
     { keystoreSalt = salt
     , keystorePasswordHash = pwHash
-    , keystoreAcctNonce = Saltine.encode acctNonce
+    , keystoreAcctNonce = acctNonce
     , keystoreAcctEncSecKey = encAcctSk
-    , keystorePubKey = exportPubKey False acctPk
+    , keystorePubKey = acctPk
     , keystoreAcctAddress = acctAddr
     }

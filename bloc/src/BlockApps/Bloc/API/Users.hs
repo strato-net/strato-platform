@@ -23,7 +23,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
-import Hasql.Session
+-- import Hasql.Session
 import Numeric.Natural
 import Servant.API
 import Servant.Client
@@ -34,7 +34,7 @@ import Web.FormUrlEncoded
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Queries
+import BlockApps.Bloc.Database.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Types (PostTransaction)
@@ -66,15 +66,15 @@ instance MonadUsers ClientM where
   postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 instance MonadUsers Bloc where
 
-  getUsers = blocSql $ map UserName <$> query () getUsersQuery
+  getUsers = map UserName <$> blocQuery getUsersQuery
 
-  getUsersUser (UserName name) = blocSql $ query name getUsersUserQuery
+  getUsersUser (UserName name) = blocQuery $ getUsersUserQuery name
 
   postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
     keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pass
     mngr <- asks httpManager
     url <- asks urlStrato
-    blocSql $ query (name,keyStore) postUsersUserQuery
+    -- () <- blocQuery $ postUsersUserQuery name keyStore
     let
       addr = keystoreAcctAddress keyStore
     liftIO . when (faucet == 1) $

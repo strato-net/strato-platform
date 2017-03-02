@@ -1,21 +1,34 @@
 {-# LANGUAGE
     Arrows
+  , FlexibleInstances
+  , LambdaCase
+  , MultiParamTypeClasses
+  , OverloadedStrings
+  , RecordWildCards
 #-}
 
 module BlockApps.Bloc.Database.Queries where
 
 import Control.Arrow
+import qualified Crypto.Saltine.Class as Saltine
+import qualified Crypto.Saltine.Core.SecretBox as SecretBox
+import Crypto.Secp256k1
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
 import Data.Int (Int32)
+import Data.Maybe
+import Data.Profunctor
+import Data.Profunctor.Product.Default
 import Data.Text (Text)
 import qualified Data.Text.Encoding as Text
 import Database.PostgreSQL.Simple (Connection)
 import Opaleye
 import qualified Opaleye as Opaleye (not,null)
 
+import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
+import BlockApps.Bloc.API.Utils
 
 {- |
 SELECT address from key_store;
@@ -48,6 +61,44 @@ getUsersUserQuery userName = proc () -> do
       (\ (uid,_) (_,_,_,_,_,_,_,userId) -> userId .== uid)
       (queryTable usersTable)
       (queryTable keyStoreTable)
+
+{- |
+WITH userid AS (
+ SELECT id FROM users WHERE name = $1)
+ , newUserId AS
+ (
+   INSERT INTO users (name)
+   SELECT $1 WHERE NOT EXISTS (SELECT id FROM users WHERE name = $1)
+   RETURNING id
+ )
+ INSERT INTO keystore (salt,password_hash,nonce,enc_sec_key,pub_key,address,user_id)
+ SELECT $2, $3, $4, $5, $6, $7, uid.id FROM
+(SELECT id FROM userid UNION SELECT id FROM newUserId) uid;
+-}
+postUsersUserQuery :: Text -> KeyStore -> Connection -> IO Bool
+postUsersUserQuery userName KeyStore{..} conn = do
+  userIds1 <- runQuery conn $ proc () -> do
+    (userId,name) <- queryTable usersTable -< ()
+    restrict -< name .== constant userName
+    returnA -< userId
+  userIds2 <- case listToMaybe userIds1 of
+    Nothing -> runInsertReturning conn usersTable
+      (Nothing,constant userName) (\(userId,_) -> userId)
+    Just userId -> return [userId::Int32]
+  case listToMaybe userIds2 of
+    Nothing -> return False
+    Just userId -> do
+      _ <- runInsert conn keyStoreTable
+        ( Nothing
+        , constant keystoreSalt
+        , constant keystorePasswordHash
+        , constant keystoreAcctNonce
+        , constant keystoreAcctEncSecKey
+        , constant keystorePubKey
+        , constant keystoreAcctAddress
+        , constant userId
+        )
+      return True
 
 contractsJoinTable :: Query
   ( Column PGInt4
@@ -84,7 +135,7 @@ contractByAddress
 contractByAddress contractName contractAddress = proc () -> do
   contract@(_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
   restrict -< name .== constant contractName
-  restrict -< addr .== constant (Char8.pack (addressString contractAddress))
+  restrict -< addr .== constant contractAddress
   returnA -< contract
 
 linkedContractsJoinTable :: Query
@@ -226,7 +277,17 @@ getContractsDataNamesQuery contractName =
     latest = proc () -> do
       (_,name) <- queryTable contractsTable -< ()
       restrict -< name .== constant contractName
-      returnA -< constant "Latest"
+      returnA -< constant ("Latest"::Text)
+
+getContractsMetaDataId :: Text -> MaybeNamed Address -> Query (Column PGInt4)
+getContractsMetaDataId contractName = \case
+  Named "Latest" ->
+    getContractsMetaDataIdByLatestQuery contractName
+  Unnamed contractAddress ->
+    getContractsMetaDataIdByAddressQuery contractName contractAddress
+  Named name -> if contractName == name
+    then getContractsMetaDataIdBySameNameQuery contractName
+    else getContractsMetaDataIdByNameQuery contractName name
 
 {- |
 SELECT CM.id
@@ -345,8 +406,8 @@ WHERE C.name = $1
 ORDER BY CM.id DESC
 LIMIT 1;
 -}
-getContractMetaDataIdBySameNameQuery :: Text -> Query (Column PGInt4)
-getContractMetaDataIdBySameNameQuery contractName =
+getContractsMetaDataIdBySameNameQuery :: Text -> Query (Column PGInt4)
+getContractsMetaDataIdBySameNameQuery contractName =
   limit 1 . orderBy (desc (\ cmId -> cmId)) $ proc () -> do
     (cmId,name) <- joinTable -< ()
     restrict -< name .== constant contractName
@@ -404,8 +465,8 @@ WHERE C.name = $1
 ORDER BY CI.timestamp DESC
 LIMIT 1;
 -}
-getContractMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
-getContractMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
+getContractsMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
+getContractsMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
   (cmId,name,_,_,_,_,_,_) <-
     orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
       contractsJoinTable -< ()
@@ -703,3 +764,14 @@ insertXabiFunction contractMetaDataId name selector isConstr conn = do
     , toNullable (constant (Text.encodeUtf8 selector))
     )
     (\ (xfId,_,_,_,_) -> xfId)
+
+instance QueryRunnerColumnDefault PGBytea Address where
+  queryRunnerColumnDefault = queryRunnerColumn id
+    (fromMaybe (error "could not decode address") . stringAddress . Char8.unpack)
+    queryRunnerColumnDefault
+instance Default Constant Address (Column PGBytea) where
+  def = lmap (Char8.pack . addressString) def
+instance Default Constant SecretBox.Nonce (Column PGBytea) where
+  def = lmap Saltine.encode def
+instance Default Constant PubKey (Column PGBytea) where
+  def = lmap (exportPubKey False) def
