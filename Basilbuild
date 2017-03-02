@@ -1,0 +1,52 @@
+ifeq ($(BASIL_DOCKER_TAG),)
+  $(error BASIL_DOCKER_TAG is not set)
+endif
+
+BASILWORK=.basil-work
+STACKWORK=$(BASILWORK)/stack
+SOLCWORK=$(BASILWORK)/solc
+FAKEROOT=$(BASILWORK)/fakeroot
+
+SOLCBRANCH=v0.3.6
+SOLCREPOSITORY=https://github.com/ethereum/solidity.git
+SOLCBUILDDIR=$(SOLCWORK)/solidity/build
+SOLCMAKEFLAGS=-j4
+
+all: build_docker
+
+prebuild:
+	mkdir -p $(BASILWORK)
+	mkdir -p $(STACKWORK)
+	mkdir -p $(SOLCWORK)
+	mkdir -p $(FAKEROOT)
+	mkdir -p $(FAKEROOT)/usr/lib
+	mkdir -p $(FAKEROOT)/usr/bin
+	mkdir -p /tmp/docker-dummy
+
+build_solidity: prebuild
+	if `test -f $(SOLCBUILDDIR)/Makefile`; \
+	then \
+		echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."; \
+	else \
+		git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY) && \
+		mkdir $(SOLCBUILDDIR) && \
+		( \
+			cd $(SOLCBUILDDIR) && \
+			cmake -DCMAKE_INSTALL_PREFIX=$(FAKEROOT)/usr .. && \
+			make $(SOLCMAKEFLAGS) solc ; \
+		) \
+	fi
+	make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
+
+build_haskell: prebuild
+	stack setup
+	stack install --local-bin-path=$(FAKEROOT)/usr/bin
+
+build_deploybase:
+	cp -f Dockerfile.deploybase /tmp/docker-dummy
+	docker build -t strato-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
+
+build_docker: build_deploybase build_haskell build_solidity
+	cp -f Dockerfile $(FAKEROOT)
+	cp -f doit.sh $(FAKEROOT)
+	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
