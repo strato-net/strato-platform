@@ -172,13 +172,13 @@ xabiFunctionArgumentsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4
   , Column PGInt4
-  , Column PGText
+  , Column (Nullable PGText)
   , Column PGInt4
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGInt4
-  , Column PGText
+  , Column (Nullable PGText)
   , Column PGInt4
   )
 xabiFunctionArgumentsTable = Table "xabi_function_arguments" $ p5

@@ -141,7 +141,7 @@ instance MonadContracts Bloc where
           tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
           for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
             return Arg
-              { argName = Just name
+              { argName = name
               , argIndex = index
               , argType = Just ty
               , argTypedef = tyd
@@ -172,7 +172,7 @@ instance MonadContracts Bloc where
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
       for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
         return Arg
-          { argName = Just name
+          { argName = name
           , argIndex = index
           , argType = Just ty
           , argTypedef = tyd

@@ -558,7 +558,7 @@ WHERE XFA.function_id = $1;
 getXabiFunctionsArgsQuery
   :: Int32
   -> Query
-    ( Column PGText
+    ( Column (Nullable PGText)
     , Column PGInt4
     , Column PGText
     , Column (Nullable PGText)
