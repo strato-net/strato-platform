@@ -74,10 +74,11 @@ instance MonadUsers Bloc where
     keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pass
     mngr <- asks httpManager
     url <- asks urlStrato
-    -- () <- blocQuery $ postUsersUserQuery name keyStore
+    createdUser <- blocModify $ postUsersUserQuery name keyStore
+    unless createdUser (throwError (DBError "failed to create user"))
     let
       addr = keystoreAcctAddress keyStore
-    liftIO . when (faucet == 1) $
+    liftIO . when (faucet /= 0) $
       void $ runClientM (postFaucet addr) (ClientEnv mngr url)
     return addr
 

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE
     Arrows
   , FlexibleInstances
@@ -298,10 +299,15 @@ JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM.id
 WHERE C.name=$1 AND CI.address=$2;
 -}
-getContractsMetaDataIdByAddressQuery :: Text -> Address -> Query (Column PGInt4)
-getContractsMetaDataIdByAddressQuery contractName contractAddress = proc () -> do
-  (cmId,_,_,_,_,_,_,_) <- contractByAddress contractName contractAddress -< ()
-  returnA -< cmId
+getContractsMetaDataIdByAddressQuery
+  :: Text
+  -> Address
+  -> Query (Column PGInt4)
+getContractsMetaDataIdByAddressQuery contractName contractAddress =
+  proc () -> do
+    (cmId,_,_,_,_,_,_,_) <-
+      contractByAddress contractName contractAddress -< ()
+    returnA -< cmId
 
 {- |
 SELECT
@@ -316,23 +322,24 @@ JOIN contracts C
   ON C.id = CM.contract_id
 JOIN contracts_instance CI
   ON CI.contract_metadata_id = CM.id
-WHERE C.name=$1 AND CI.address=$2;
+WHERE C.name=$1 AND CI.address=$2
+LIMIT 1;
 -}
 getContractsContractByAddressQuery
   :: Text
   -> Address
   -> Query
     ( Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGBytea
-    , Column PGText
-    , Column PGInt4
-    )
-getContractsContractByAddressQuery contractName contractAddress = proc () -> do
-  (cmId,name,addr,_,bin,binRuntime,_,codeHash) <-
-    contractByAddress contractName contractAddress -< ()
-  returnA -< (bin,addr,binRuntime,codeHash,name,cmId)
+    , ( Column PGBytea
+      , Column PGBytea
+      , Column PGBytea
+      , Column PGText
+    ) )
+getContractsContractByAddressQuery contractName contractAddress =
+  limit 1 $ proc () -> do
+    (_,name,addr,_,bin,binRuntime,_,codeHash) <-
+      contractByAddress contractName contractAddress -< ()
+    returnA -< (addr,(bin,binRuntime,codeHash,name))
 
 {- |
 SELECT CM2.id
@@ -366,7 +373,6 @@ SELECT
  , CM2.bin_runtime
  , CM2.code_hash
  , C2.name
- , CM2.id
 FROM contracts_metadata CM
 JOIN contracts C
   ON C.id = CM.contract_id
@@ -377,7 +383,6 @@ JOIN contracts_metadata CM2
 JOIN contracts C2
   ON C2.id = CM2.contract_id
 WHERE C.name = $1 AND C2.name=$2
-ORDER BY CM2.id DESC
 LIMIT 1;
 -}
 getContractsContractByNameQuery
@@ -388,14 +393,13 @@ getContractsContractByNameQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
-    , Column PGInt4
     )
 getContractsContractByNameQuery contractName1 contractName2 =
-  limit 1 . orderBy (desc (\ (_,_,_,_,cm2Id) -> cm2Id)) $ proc () -> do
-    (b,br,_,ch,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
+  limit 1 $ proc () -> do
+    (b,br,_,ch,name1,name2,_) <- linkedContractsJoinTable -< ()
     restrict -< name1 .== constant contractName1
     restrict -< name2 .== constant contractName2
-    returnA -< (b,br,ch,name2,cm2Id)
+    returnA -< (b,br,ch,name2)
 
 {- |
 SELECT CM.id
@@ -425,12 +429,10 @@ SELECT
  , CM.bin_runtime
  , CM.code_hash
  , C.name
- , CM.id
 FROM contracts_metadata CM
 JOIN contracts C
   ON C.id = CM.contract_id
 WHERE C.name = $1
-ORDER BY CM.id DESC
 LIMIT 1;
 -}
 getContractsContractBySameNameQuery
@@ -440,13 +442,12 @@ getContractsContractBySameNameQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
-    , Column PGInt4
     )
 getContractsContractBySameNameQuery contractName =
-  limit 1 . orderBy (desc (\ (_,_,_,_,cmId) -> cmId)) $ proc () -> do
-    contract@(_,_,_,name,_) <- joinTable -< ()
+  limit 1 $ proc () -> do
+    contract@(b,br,ch,name,_) <- joinTable -< ()
     restrict -< name .== constant contractName
-    returnA -< contract
+    returnA -< (b,br,ch,name)
   where
     joinTable = joinF
       (\ (cmId,_,b,br,_,ch) (_,name) -> (b,br,ch,name,cmId))
@@ -496,14 +497,13 @@ getContractsContractLatestQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
-    , Column PGInt4
     )
 getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
   (cmId,name,_,_,b,br,_,ch) <-
     orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
-  returnA -< (b,br,ch,name,cmId)
+  returnA -< (b,br,ch,name)
 
 {- |
 SELECT

@@ -26,7 +26,6 @@ library
     BlockApps.Bloc.Database.Queries
     BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
-    BlockApps.Bloc.Queries
   default-language: Haskell2010
   ghc-options: -Wall
   build-depends: base
@@ -41,7 +40,6 @@ library
     , cryptonite
     , bytestring
     , generic-random
-    , hasql
     , http-api-data
     , http-client
     , http-media
@@ -49,7 +47,6 @@ library
     , monad-loops
     , mtl
     , opaleye
-    , opaleye-trans
     , postgresql-simple
     , product-profunctors
     , profunctors

@@ -8,6 +8,8 @@
   , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
+  , ScopedTypeVariables
+  , TupleSections
   , TypeApplications
   , TypeOperators
 #-}
@@ -21,12 +23,16 @@ import Data.Aeson.Casing
 import Data.Aeson.Encoding
 import Data.Foldable
 import Data.Int
-import Data.Proxy
-import Data.Time.Clock.POSIX
+import Data.Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Monoid
+import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import Data.Time.Clock.POSIX
+import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import Servant.API
@@ -90,85 +96,118 @@ instance MonadContracts Bloc where
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract _ _ = undefined
-
-  -- getContractsContract (ContractName contractName) contractId = do
-  --   (contractDetails,metadataId) <- case contractId of
-  --     Named "Latest" -> do
-  --       (bin,binRuntime,codeHash,name,cmId) <-
-  --         blocQuery1 $ getContractsContractLatestQuery contractName
-  --       return ( ContractDetails
-  --         { contractdetailsBin = Text.decodeUtf8 bin
-  --         , contractdetailsAddress = Nothing
-  --         , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-  --         , contractdetailsCodeHash = Text.decodeUtf8 codeHash
-  --         , contractdetailsName = name
-  --         , contractdetailsXabi = Xabi Nothing Nothing Nothing
-  --         }
-  --         , cmId
-  --         )
-  --     Unnamed addr -> do
-  --       (bin,addr',binRuntime,codeHash,name,cmId) <-
-  --         blocQuery1 $ getContractsContractByAddressQuery contractName addr
-  --       return ( ContractDetails
-  --         { contractdetailsBin = Text.decodeUtf8 bin
-  --         , contractdetailsAddress = Just (Unnamed addr')
-  --         , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-  --         , contractdetailsCodeHash = Text.decodeUtf8 codeHash
-  --         , contractdetailsName = name
-  --         , contractdetailsXabi = Xabi Nothing Nothing Nothing
-  --         }
-  --         , cmId
-  --         )
-  --     Named name ->
-  --       if contractName == name
-  --         then do
-  --           (bin,binRuntime,codeHash,name,cmId) <-
-  --             blocQuery1 $ getContractsContractBySameNameQuery name
-  --           return ( ContractDetails
-  --             { contractdetailsBin = Text.decodeUtf8 bin
-  --             , contractdetailsAddress = Just (Named name)
-  --             , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-  --             , contractdetailsCodeHash = Text.decodeUtf8 codeHash
-  --             , contractdetailsName = name
-  --             , contractdetailsXabi = Xabi Nothing Nothing Nothing
-  --             }
-  --             , cmId
-  --             )
-  --         else do
-  --           (bin,binRuntime,codeHash,name,cmId) <-
-  --             blocQuery1 $ getContractsContractByNameQuery contractName name
-  --           return ( ContractDetails
-  --             { contractdetailsBin = Text.decodeUtf8 bin
-  --             , contractdetailsAddress = Just (Named name)
-  --             , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-  --             , contractdetailsCodeHash = Text.decodeUtf8 codeHash
-  --             , contractdetailsName = name
-  --             , contractdetailsXabi = Xabi Nothing Nothing Nothing
-  --             }
-  --             , cmId
-  --             )
-  --   funcIdNameSels <- blocQuery $ getXabiFunctionsQuery metadataId
-  --   let
-  --     -- TODO: fix this in next API iteration
-  --     argsToPairs = map (\ arg -> (fromMaybe "arggg" (argName arg), arg))
-  --   funcs <- fmap Map.fromList $
-  --     for funcIdNameSels $ \ (funcId,funcName,sel) -> do
-  --       args <- blocQuery $ getXabiFunctionsArgsQuery funcId
-  --       vals <- blocQuery $ getXabiFunctionsReturnValuesQuery funcId
-  --       let
-  --         func = Func
-  --           { funcArgs = Map.fromList (argsToPairs args)
-  --           , funcSelector = Text.decodeUtf8 (_ sel)
-  --           , funcVals = Map.fromList vals
-  --           }
-  --       return $ (funcName,func)
-  --   constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-  --   constr <- Map.fromList . argsToPairs <$>
-  --     blocQuery1 (getXabiFunctionsArgsQuery constrId)
-  --   vars <- Map.fromList <$> blocQuery (getXabiVariablesQuery metadataId)
-  --   return $ contractDetails
-  --     { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
+  getContractsContract (ContractName contractName) contractId = do
+    let
+      noXabi = Xabi Nothing Nothing Nothing
+      detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
+        ContractDetails
+          { contractdetailsBin = Text.decodeUtf8 bin
+          , contractdetailsAddress = detailsAddr
+          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
+          , contractdetailsCodeHash = Text.decodeUtf8 codeHash
+          , contractdetailsName = name
+          , contractdetailsXabi = noXabi
+          }
+    contractDetails <- case contractId of
+      Named "Latest" -> do
+        tuple <- blocQuery1 $
+          getContractsContractLatestQuery contractName
+        return $ detailsWith Nothing tuple
+      Unnamed addr -> do
+        (addr',tuple) <- blocQuery1 $
+          getContractsContractByAddressQuery contractName addr
+        return $ detailsWith (Just (Unnamed addr')) tuple
+      Named name -> if contractName == name
+        then do
+          tuple <- blocQuery1 $
+            getContractsContractBySameNameQuery name
+          return $ detailsWith (Just (Named name)) tuple
+        else do
+          tuple <- blocQuery1 $
+            getContractsContractByNameQuery contractName name
+          return $ detailsWith (Just (Named name)) tuple
+    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+    funcIdNameSelsMaybe <- blocQuery $ getXabiFunctionsQuery metadataId
+    let
+      -- TODO: fix this in next API iteration
+      funcIdNameSels =
+        [ (funcId, funcName, sel)
+        | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
+        ]
+      argsToPairs = map (\ arg -> (fromMaybe "arggg" (argName arg), arg))
+    funcs <- fmap Map.fromList $
+      for funcIdNameSels $ \ (funcId,funcName,sel) -> do
+        args <- do
+          tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
+          for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
+            return Arg
+              { argName = Just name
+              , argIndex = index
+              , argType = Just ty
+              , argTypedef = tyd
+              , argDynamic = Just dy
+              , argBytes = by
+              , argEntry = Entry <$> eby <*> ety
+              }
+        vals <- do
+          tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
+          for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
+            return $ ("#" <> Text.pack (show index),) Val
+              { valIndex = index
+              , valType = Just ty
+              , valTypedef = tyd
+              , valDynamic = Just dy
+              , valBytes = by
+              , valEntry = Entry <$> eby <*> ety
+              }
+        let
+          func = Func
+            { funcArgs = Map.fromList (argsToPairs args)
+            , funcSelector = Text.decodeUtf8 sel
+            , funcVals = Map.fromList vals
+            }
+        return $ (funcName,func)
+    constrId <- blocQuery1 $ getXabiConstrQuery metadataId
+    constr <- Map.fromList . argsToPairs <$> do
+      tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
+      for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
+        return Arg
+          { argName = Just name
+          , argIndex = index
+          , argType = Just ty
+          , argTypedef = tyd
+          , argDynamic = Just dy
+          , argBytes = by
+          , argEntry = Entry <$> eby <*> ety
+          }
+    vars <- Map.fromList <$> do
+      tuples <- blocQuery (getXabiVariablesQuery metadataId)
+      for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
+        return $ (name,) Var
+          { varAtBytes = atBy
+          , varType = Just ty
+          , varTypedef = Just tyd
+          , varDynamic = Just dy
+          , varSigned = Just si
+          , varBytes = Just by
+          , varEntry = Entry <$> Just eby <*> Just ety
+          , varVal = Just $ SimpleVar
+            { simplevarType = vty
+            , simplevarBytes = Just vby
+            , simplevarDynamic = Just vdy
+            , simplevarSigned = Just vsi
+            , simplevarEntry = Entry <$> Just veby <*> Just vety
+            }
+          , varKey = Just $ SimpleVar
+            { simplevarType = kty
+            , simplevarBytes = Just kby
+            , simplevarDynamic = Just kdy
+            , simplevarSigned = Just ksi
+            , simplevarEntry = Entry <$> Just keby <*> Just kety
+            }
+          }
+    return $ contractDetails
+      { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
   getContractsState = undefined
 
