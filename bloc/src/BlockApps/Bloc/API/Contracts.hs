@@ -132,8 +132,8 @@ instance MonadContracts Bloc where
   getContractsState contractName contractId = do
     vars <- getVariablesAndTypes contractName contractId
     let storage = B.replicate 100 0
-        ret = map (fmap (decodeValue storage 0)) vars
-    return $ Map.fromList []
+        ret = map (fmap (valueToSolidityValue . decodeValue storage 0)) vars
+    return $ Map.fromList ret
 
   getContractsFunctions (ContractName contractName) contractId = blocSql $ do
     metadataId <- case contractId of

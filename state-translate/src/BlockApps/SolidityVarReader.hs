@@ -3,8 +3,9 @@
 #-}
 
 module BlockApps.SolidityVarReader (
-  Type,
-  decodeValue
+  Type(..),
+  decodeValue,
+  valueToSolidityValue
   ) where
 
 import Data.Bits
@@ -13,12 +14,15 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Binary
 import Data.LargeWord
+import qualified Data.Text as T
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import Numeric
 import Numeric.Natural
 
 import BlockApps.Ethereum (Address(..))
+import BlockApps.Solidity
 
 data Type
   = TypeBool
@@ -65,6 +69,12 @@ data Value
   | ValueString Text
   | ValueFunction ByteString ByteString
   deriving (Eq,Show)
+
+valueToSolidityValue::Value->SolidityValue
+valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ "0x" ++ showHex v ""
+valueToSolidityValue _ = undefined
+
+
 
 decodeValue
   :: ByteString
