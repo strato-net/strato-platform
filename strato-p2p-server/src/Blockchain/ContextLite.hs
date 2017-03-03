@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.ContextLite (
@@ -25,7 +26,7 @@ import Blockchain.Context
 import Blockchain.DBM
 import Blockchain.DB.SQLDB
 import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.EthConf (lookupRedisBlockDBConfig)
+import Blockchain.EthConf (lookupRedisBlockDBConfig, mkConfiguredKafkaState)
 
 import qualified Database.Persist.Postgresql as SQL
 import qualified Database.PostgreSQL.Simple as PS
@@ -38,9 +39,9 @@ instance Show PS.Connection where
 
 type ContextMLite = StateT Context (ResourceT (LoggingT IO))
 
-runEthCryptMLite :: (MonadBaseControl IO m ) 
-                 => s 
-                 -> StateT s (ResourceT m) a 
+runEthCryptMLite :: (MonadBaseControl IO m )
+                 => s
+                 -> StateT s (ResourceT m) a
                  -> m ()
 runEthCryptMLite cxt f = void . runResourceT $ runStateT f cxt
 
@@ -50,6 +51,7 @@ initContextLite _ = do
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return Context { actionTimestamp = Nothing
                  , contextRedisBlockDB = redisBDBPool
+                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p-client"
                  , contextSQLDB = sqlDB' dbs
                  , blockHeaders=[]
                  , vmTrace=[]
@@ -63,9 +65,9 @@ addPeer peer = do
     SQL.runSqlPool (actions maybePeer) db
   where actions mp = case mp of
             Nothing -> SQL.insert peer
-  
-            Just peer'-> do 
-              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]  
+
+            Just peer'-> do
+              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
               return (SQL.entityKey peer')
 
 getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>String->m (Maybe (SQL.Entity PPeer))
@@ -77,5 +79,5 @@ getPeerByIP ip = do
 
     where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
 
-  
+
 
