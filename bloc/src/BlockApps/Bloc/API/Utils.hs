@@ -158,25 +158,7 @@ instance ToJSON TxParams where
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 
-data TestConfig = TestConfig
-  { mgr :: Manager
-  , userName :: UserName
-  , userAddress :: Address
-  , toUserName :: UserName
-  , toUserAddress :: Address
-  , pw :: Text
-  , simpleStorageContractName :: Text
-  , simpleStorageContractAddress :: Address
-  , testContractName :: Text
-  , testContractAddress :: Address
-  , simpleMappingContractName :: Text
-  , simpleMappingContractAddress :: Address
-  , txParams :: TxParams
-  , simpleStorageSrc :: Text
-  , testSrc :: Text
-  , simpleMappingSrc :: Text
-  , delay :: Int --microsecond
-  } deriving (Generic)
+
 
 data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
 instance ToJSON a => ToJSON (MaybeNamed a) where
