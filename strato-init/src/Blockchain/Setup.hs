@@ -5,52 +5,51 @@ module Blockchain.Setup (
   oneTimeSetup
   ) where
 
-import Control.Concurrent
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Resource
-import Control.Monad.Trans.State
+import           Control.Concurrent
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.State
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C
-import Data.FileEmbed
-import Data.String
+import           Data.FileEmbed
+import           Data.String
 import qualified Database.LevelDB as DB
-import Database.Persist.Postgresql hiding (get)
-import System.Directory
-import System.FilePath
-import Data.Maybe
--- import Data.Aeson
-import Data.Yaml
+import           Database.Persist.Postgresql hiding (get)
+import qualified Database.Redis as Redis hiding (get)
+import           System.Directory
+import           System.FilePath
+import           Data.Maybe
+import           Data.Yaml
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import Network.Kafka
-import Network.Kafka.Protocol
-import System.Entropy
+import           Network.Kafka
+import           Network.Kafka.Protocol
+import           System.Entropy
 
---import Paths_strato_init
-
-import Blockchain.APIFiles
+import           Blockchain.APIFiles
 import qualified Blockchain.Colors as CL
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Data.Blockchain
-import Blockchain.Data.DataDefs
-import Blockchain.Data.GenesisBlock
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.StateDB
-import Blockchain.DB.SQLDB
-import Blockchain.Constants
-import Blockchain.EthConf
-import Blockchain.PrivateKeyConf
-import Blockchain.KafkaTopics
-import Blockchain.Output
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import           Blockchain.Data.Blockchain
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.GenesisBlock
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.Constants
+import           Blockchain.EthConf
+import           Blockchain.PrivateKeyConf
+import           Blockchain.KafkaTopics
+import           Blockchain.Output
 
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 
-import HFlags 
+import           HFlags 
 
 defineFlag "u:pguser" ("" :: String) "Postgres user"
 defineFlag "P:pghost" ("" :: String) "Postgres hostname"
@@ -66,13 +65,15 @@ defineFlag "blockTime" (13 :: Integer) "Blocktime"
 defineFlag "minBlockDifficulty" (131072 :: Integer) "Minimum block difficulty"
 defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
+defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 data SetupDBs =
   SetupDBs {
     stateDB::StateDB,
     hashDB::HashDB,
     codeDB::CodeDB,
-    sqlDB::SQLDB
+    sqlDB::SQLDB,
+    redisDB::Redis.Connection
     }
 
 type SetupDBM = StateT SetupDBs (ResourceT IO)
@@ -97,6 +98,9 @@ instance HasCodeDB SetupDBM where
 
 instance HasSQLDB SetupDBM where
   getSQLDB = fmap sqlDB get
+
+instance RBDB.HasRedisBlockDB SetupDBM where
+  getRedisBlockDB = fmap redisDB get
 
 {-
 connStr::ConnectionString
@@ -170,7 +174,7 @@ defaultRedisBlockDBConfig = RedisBlockDBConf {
     redisHost           = flags_redisHost,
     redisPort           = flags_redisPort,
     redisAuth           = Nothing,
-    redisDBNumber       = 0,
+    redisDBNumber       = flags_redisDBNumber,
     redisMaxConnections = 10,
     redisMaxIdleTime    = 30
     }
@@ -365,7 +369,7 @@ topics = [ "unminedblock"
          , "seqevents"
          , "unseqevents"
          , "jsonrpcresponse"
-         , "ranblocks"
+         , "indexevents"
          ]
 
 genesisFiles::[(FilePath, B.ByteString)]
@@ -393,7 +397,7 @@ addStandardGenesisBlockIfNeeded genesisBlockName = do
 
   To be safe, this operation should be idempotent. Thus we check for the presence of ~/.ethereumH.
 
-  Preconditions: installed LevelDB, Postgres, Kafka.
+  Preconditions: installed LevelDB, Postgres, Kafka, Redis.
 -}
 
 oneTimeSetup :: String -> IO ()
@@ -561,7 +565,9 @@ oneTimeSetup genesisBlockName = do
 
               pool <- runNoLoggingT $ createPostgresqlPool connStr 20
 
-              _ <- flip runStateT (SetupDBs smpdb hdb cdb pool) $ do
+              redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig) 
+              
+              _ <- flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool) $ do
                 addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
                 liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
                 case (flags_backupmp, flags_backupblocks) of
@@ -581,6 +587,3 @@ oneTimeSetup genesisBlockName = do
       flip runLoggingT printLogMsg $ EthDiscovery.setup bootnodes
 
       return ()
-
-                    
-

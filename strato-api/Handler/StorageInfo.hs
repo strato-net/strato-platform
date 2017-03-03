@@ -16,13 +16,10 @@ import Import
 import Handler.Common 
 import Handler.Filters
 
-import Data.List
-
 import Blockchain.Data.Address
 import Blockchain.ExtWord (Word256)
 
 import qualified Database.Esqueleto as E
-
 import qualified Prelude as P
 
 data StorageAddress = StorageAddress {

@@ -34,6 +34,8 @@ import Executable.EVMFlags
 import Executable.EVMCheckpoint
 
 import qualified Blockchain.Bagger as Bagger
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models
 
 import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
 
@@ -74,7 +76,11 @@ ethereumVM = void . execContextM $ do
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks False blocks
 
-        when (not makeLazyBlocks || not (null poolableNewTxs)) $ do
+        -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
+        -- todo: which may fail
+        isCaughtUp <- shouldProcessNewTransactions
+        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs))
+        when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
@@ -151,3 +157,22 @@ getUnprocessedKafkaEvents offset = do
     ret <- K.withKafkaViolently (readSeqEvents offset)
     $logInfoS "getUnprocessedKafkaEvents" . T.pack $ "Got: " ++ show (length ret) ++ " unprocessed blocks/txs"
     return ret
+
+shouldProcessNewTransactions :: ContextM Bool -- todo: probably shouldn't do it by number, but tdiff.
+shouldProcessNewTransactions =
+    if flags_useSyncMode then do
+        worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
+        case worldBestBlock of
+            Nothing -> do
+                $logInfoS "shouldProcessNewTransactions" "got Nothing from worldBestBlockInfo, playing it safe and not mining Txs"
+                return False -- we either had no peers or some other error, lets play it safe
+            Just (RedisBestBlock worldBestSha _ _) -> do
+                didRunBest <- hasBSum worldBestSha
+                let msg = if didRunBest
+                            then "don't have a block summary for worldBestSha " ++ format worldBestSha ++ ", not mining"
+                            else "found blockSummary for worldBestSha " ++ format worldBestSha ++ ", will mine"
+                $logInfoS "shouldProcessNewTransactions" (T.pack msg)
+                return didRunBest  -- todo, verify TDiff etc.
+    else do
+        $logInfoS "shouldProcessNewTransactions" "flags_useSyncMode == false, will process all new TXs"
+        return True

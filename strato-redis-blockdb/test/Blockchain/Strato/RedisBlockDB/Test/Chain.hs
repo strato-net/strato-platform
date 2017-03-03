@@ -10,7 +10,6 @@ import           Lens.Family2
 import           Lens.Family2.TH
 import           Data.Foldable
 import           Data.Tree
-import           Numeric
 import           Data.Maybe
 -- import qualified Text.PrettyPrint.ANSI.Leijen as L
 
@@ -41,8 +40,23 @@ buildChain seed depth maxSiblings = do
     tree <- buildTree seed depth maxSiblings
     return $ toList tree
 
+-- data Tree a = T a [Tree a]
+--                                                |- o
+-- a : b : c : d : [e,f,g]                o-o-o-o-|- o
+--                                                |_ o
+--
+-- T a [T b [T c [T d [T e [], T f [], T g []]]]
+
+buildY ::  BlockData -> Int -> Int -> IO (Tree BlockData)
+buildY g d m = stem `prune` hat
+    where
+       stem = take d $ repeat g 
+       hat  = take m $ repeat g
+       prune x y = undefined
+
 buildTree :: BlockData -> Int -> Int -> IO (Tree BlockData)
 buildTree seed 0     _           = pure (Node seed []) 
+buildTree _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
 buildTree seed depth maxSiblings = do
     siblingCount    <- generate $ invDist maxSiblings 
     nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) 
@@ -60,9 +74,9 @@ buildTree seed depth maxSiblings = do
                            grandchildren <- buildTree sibling (max (depth - deathRate) 0) maxSiblings
                            return $ grandchildren
     return $ Node seed expanded
-
-invDist :: Int -> Gen Int
-invDist n = frequency [(n*n, choose (1, 1)), (1, choose (1, n))]
+        where
+            invDist :: Int -> Gen Int
+            invDist n = frequency [(n, choose (1, 1)), (1, choose (2, n))]
 
 prettyTree :: (Show a) => Tree a -> Tree String
 prettyTree t = show <$> t
@@ -81,7 +95,7 @@ bush :: BlockData -> Int -> Int -> IO (Tree BlockData)
 bush g n m = do
     tree <- buildTree g n m
     if (length . leaves $ tree) < 2
-    then bush g n m
+    then bush g n (m + 1)
     else return tree
 
 leaves :: Tree a -> [a]
@@ -111,4 +125,4 @@ prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 
 showHash :: SHA -> String
-showHash (SHA h) = take 8 $ showHex h ""
+showHash = take 8 . shaToHex 

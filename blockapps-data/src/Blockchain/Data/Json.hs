@@ -13,28 +13,21 @@ import Blockchain.Data.Code
 import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction
 import Blockchain.Data.TXOrigin
+import Blockchain.Format
 
-import Data.Aeson
+import           Data.Aeson
 import qualified Data.ByteString.Base16 as B16
---import Database.Persist.Postgresql
 import qualified Data.Text.Encoding as T
-
-import Data.Time.Calendar
-import Data.Time.Clock
-
+import           Data.Time.Calendar
+import           Data.Time.Clock
 import qualified Data.ByteString as B
-
-import Numeric
-
---import Debug.Trace
-
-import Data.Word
-import Data.Maybe
-
-import GHC.Generics
+import           Numeric
+import           Data.Word
+import           Data.Maybe
+import           GHC.Generics
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
-jsonBlk a = return . toJSON $ a
+jsonBlk = return . toJSON
 
 data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
 
@@ -55,7 +48,7 @@ instance ToJSON RawTransaction' where
         "hash" .= h,
         "transactionType" .= (show $ rawTransactionSemantics rt),
         "timestamp" .= show t,
-        "origin" .= show o
+        "origin" .= format o
                ]
     toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl Nothing val cod r s v bn h o) next) =
         object ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
@@ -67,7 +60,7 @@ instance ToJSON RawTransaction' where
         "hash" .= h,
         "transactionType" .= (show $ rawTransactionSemantics rt),
         "timestamp" .= show t,
-        "origin" .= show o
+        "origin" .= format o
                ]
 
 instance FromJSON RawTransaction' where
@@ -113,7 +106,7 @@ instance ToJSON RawTransaction where
         "hash" .= h,
         "transactionType" .= (show $ rawTransactionSemantics rt),
         "timestamp" .= t,
-        "origin" .= o
+        "origin" .= format o
                ]
     toJSON rt@(RawTransaction t (Address fa) non gp gl Nothing val cod r s v bn h o) =
         object ["from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
@@ -125,7 +118,7 @@ instance ToJSON RawTransaction where
         "hash" .= h,
         "transactionType" .= (show $ rawTransactionSemantics rt),
         "timestamp" .= t,
-        "origin" .= o
+        "origin" .= format o
                ]
 
 instance FromJSON RawTransaction where
@@ -257,7 +250,7 @@ instance ToJSON Transaction where
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
 tToTPrime :: Transaction -> Transaction'
-tToTPrime x = Transaction' x
+tToTPrime = Transaction'
 
 data Block' = Block' Block String deriving (Eq, Show)
 
@@ -298,7 +291,7 @@ instance ToJSON BlockData' where
       --toJSON _ = object ["malformed BlockData" .= True]
 
 bdToBdPrime :: BlockData -> BlockData'
-bdToBdPrime x = BlockData' x
+bdToBdPrime = BlockData'
 
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
@@ -312,7 +305,7 @@ instance ToJSON BlockDataRef' where
 
 
 bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
-bdrToBdrPrime x = BlockDataRef' x
+bdrToBdrPrime = BlockDataRef'
 
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 
@@ -332,8 +325,7 @@ instance FromJSON AddressStateRef' where
       if kind /= ("AddressStateRef" :: String)
         then fail "JSON is not AddressStateRef"
         else asrToAsrPrime' <$> 
-              (AddressStateRef
-                <$> Address . fst . head . readHex <$> s .: "address"
+              (AddressStateRef . Address . fst . head . readHex <$> s .: "address"
                 <*> s .: "nonce"
                 <*> (read <$> (s .: "balance"))
                 <*> s .: "contractRoot"
@@ -344,7 +336,7 @@ instance FromJSON AddressStateRef' where
     parseJSON _ = fail "JSON not an object"
 
 showHexSimple :: (Show a, Integral a) => a -> String
-showHexSimple = (\t -> (showHex t "")) 
+showHexSimple t = showHex t ""
 
 instance ToJSON LogDB where
     toJSON (LogDB h
@@ -357,10 +349,10 @@ instance ToJSON LogDB where
                   bloomW512) = 
         object ["hash" .= h,
                 "address" .= (showHex x ""),
-                "topic1" .= ((fromMaybe "" (fmap showHexSimple maybeTopic1)) :: String),
-                "topic2" .= ((fromMaybe "" (fmap showHexSimple maybeTopic2)) :: String),
-                "topic3" .= ((fromMaybe "" (fmap showHexSimple maybeTopic3)) :: String),
-                "topic4" .= ((fromMaybe "" (fmap showHexSimple maybeTopic4)) :: String),
+                "topic1" .= (maybe "" showHexSimple maybeTopic1 :: String),
+                "topic2" .= (maybe "" showHexSimple maybeTopic2 :: String),
+                "topic3" .= (maybe "" showHexSimple maybeTopic3 :: String),
+                "topic4" .= (maybe "" showHexSimple maybeTopic4 :: String),
 
                 "data" .= dataBS,
                 "bloom" .= showHexSimple bloomW512 ]

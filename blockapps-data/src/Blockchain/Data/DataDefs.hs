@@ -18,9 +18,6 @@ import Database.Persist
 import Database.Persist.TH
 import Database.Persist.Quasi
 
-import Crypto.Types.PubKey.ECC
-
-import Data.Text
 import Data.Time
 
 import Blockchain.Data.Address
@@ -38,8 +35,6 @@ import Data.Word
 
 import Data.Aeson
 import GHC.Generics
-
-import qualified Blockchain.Data.RLP as RLP
 
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
