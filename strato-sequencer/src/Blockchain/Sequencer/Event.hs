@@ -264,7 +264,7 @@ instance Format OutputBlock where
                          , obReceiptTransactions = receipts
                          , obBlockUncles         = uncles
                          } =
-        CL.blue ("OutputBlock #" ++ show (BDB.blockDataNumber bd) ++ "; total diff" ++ show totDiff) ++ " (via " ++ format origin ++ ") " ++
+        CL.blue ("OutputBlock #" ++ show (BDB.blockDataNumber bd) ++ "; total diff " ++ show totDiff) ++ " (via " ++ format origin ++ ") " ++
         tab (format (outputBlockHash b) ++ "\n" ++
              format bd ++
              (if null receipts
