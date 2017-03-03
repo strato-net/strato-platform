@@ -213,7 +213,7 @@ specTest = around (withConn 1) $ do
                 flushDB
                 it "Should update canonical chainY after switching all branches" $ \conn -> do
                     g <- liftIO makeGenesisBlock
-                    tree <- bushY g m Couldn't guess that module name. Does it exist? :: IO (Tree BlockData)
+                    tree <- bushY g m n :: IO (Tree BlockData)
                     let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
                     let allblocks = toList $ tree
                     let chains = flip stem' allblocks <$> bestBlocks
