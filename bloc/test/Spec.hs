@@ -31,7 +31,6 @@ main = hspec $ do
     Contracts.spec
     Search.spec
     Users.spec
-  beforeAll setup $ do
     E2E.spec
 
 setup :: IO TestConfig
