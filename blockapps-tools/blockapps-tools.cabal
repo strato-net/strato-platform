@@ -58,6 +58,9 @@ executable queryStrato
                  , strato-sequencer
                  , strato-index
                  , strato-statediff
+                 , strato-redis-blockdb
+                 , strato-model
+                 , hedis
     main-is: Main.hs
     other-modules:
                    Block
@@ -71,6 +74,7 @@ executable queryStrato
                    DumpKafkaStateDiff
                    DumpKafkaRaw
                    DumpLevelDB
+                   DumpRedis
                    FRawMP
                    Hash
                    Raw

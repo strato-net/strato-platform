@@ -19,3 +19,9 @@ nodes:
     stratoUrl: 'http://node4.eastus.cloudapp.azure.com/strato-api'
     blocUrl: 'http://node4.eastus.cloudapp.azure.com/bloc'
     searchUrl: 'http://node4.eastus.cloudapp.azure.com/cirrus'
+
+  - id: 2
+    explorerUrl: 'http://node5.eastus.cloudapp.azure.com/explorer'
+    stratoUrl: 'http://node5.eastus.cloudapp.azure.com/strato-api'
+    blocUrl: 'http://node5.eastus.cloudapp.azure.com/bloc'
+    searchUrl: 'http://node5.eastus.cloudapp.azure.com/cirrus'
