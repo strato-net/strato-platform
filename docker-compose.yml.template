@@ -23,7 +23,8 @@ services:
   postgres:
     image: %REPO%postgres-packager
     restart: always
-
+    ports:
+      - "5432:5432"
   strato:
     image: %REPO%monstrato
     volumes:
