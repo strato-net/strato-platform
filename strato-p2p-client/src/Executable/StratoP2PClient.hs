@@ -178,7 +178,9 @@ runPeer connectedPeers peer myPriv = do
             pool <- runNoLoggingT $ SQL.createPostgresqlPool
                     connStr' 20
 
-            void $ flip runStateT (Context pool redisBDBPool [] [] Nothing) $ do
+            let kafkaState = mkConfiguredKafkaState "strato-p2p-client"
+
+            void $ flip runStateT (Context pool redisBDBPool kafkaState [] [] Nothing) $ do
                 (_, (outCxt, inCxt)) <- liftIO $
                     appSource server $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink server
 

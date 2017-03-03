@@ -3,7 +3,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Model.ExtendedWord
  (
-    Word128, Word160, Word256, Word512,
+    Word64, Word128, Word160, Word256, Word512,
     word64ToBytes,  bytesToWord64,
     word128ToBytes, bytesToWord128,
     word160ToBytes, bytesToWord160,

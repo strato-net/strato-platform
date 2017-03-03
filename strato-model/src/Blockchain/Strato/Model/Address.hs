@@ -9,6 +9,8 @@ import           Data.Maybe                           (fromMaybe)
 
 import           Blockchain.Strato.Model.ExtendedWord (Word160)
 import           Blockchain.Strato.Model.Util
+import           Blockchain.Data.RLP
+
 import           Data.Binary
 import qualified Data.ByteString.Lazy                 as BL
 
@@ -16,6 +18,12 @@ import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
 
 import           GHC.Generics
+
+
+instance RLPSerializable Address where
+  rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
+  rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
+  rlpDecode x = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
 
 newtype Address = Address Word160 deriving (Show, Eq, Read, Enum, Real, Bounded, Num, Ord, Generic, Integral)
 

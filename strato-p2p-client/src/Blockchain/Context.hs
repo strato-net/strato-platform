@@ -22,6 +22,7 @@ import Data.Time.Clock
 import Blockchain.Data.BlockHeader
 import Blockchain.DB.SQLDB
 
+import qualified Network.Kafka as K
 import qualified Database.Redis as Redis
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
@@ -29,12 +30,19 @@ data Context =
     Context {
         contextSQLDB        :: SQLDB,
         contextRedisBlockDB :: Redis.Connection,
+        contextKafkaState   :: K.KafkaState,
         vmTrace             :: [String],
         blockHeaders        :: [BlockHeader],
         actionTimestamp     :: Maybe UTCTime
     }
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
+
+instance (MonadState Context m) => K.HasKafkaState m where
+    getKafkaState = contextKafkaState <$> get
+    putKafkaState s = do
+      ctx <- get
+      put $ ctx { contextKafkaState = s }
 
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get

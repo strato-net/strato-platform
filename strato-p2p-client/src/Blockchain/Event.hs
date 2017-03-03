@@ -20,6 +20,7 @@ import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Char8       as BS8
 import qualified Data.ByteString.Base16      as BC16
 import Data.Time.Clock
+import Network.Kafka as K
 
 import Blockchain.Colors
 import Blockchain.Context
@@ -43,7 +44,6 @@ import Blockchain.Data.PubKey
 
 import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
-import Blockchain.EthConf (runKafkaConfigured)
 
 import Blockchain.Util (getCurrentMicrotime)
 
@@ -84,29 +84,21 @@ peerString :: PPeer -> String
 peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
     where
         key = p2s (pPeerPubkey peer)
-        p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p 
+        p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
         p2s _                    = ""
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
+emitKafkaTransactions :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
     ts <- liftIO getCurrentMicrotime
     let ingestTxs = IETx ts . IngestTx origin <$> txs
-    rets <- liftIO $ runKafkaConfigured "strato-p2p-client" $ writeUnseqEvents ingestTxs
-    case rets of
-        Left e      -> logErrorN . T.pack $ "Could not write txs to Kafka: " ++ show e
-        Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ show resps
-    return ()
+    void . withKafkaViolently $ writeUnseqEvents ingestTxs
 
-emitKafkaBlock :: (MonadIO m, MonadLogger m) => Origin.TXOrigin -> Block -> m ()
+emitKafkaBlock :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> Block -> m ()
 emitKafkaBlock origin baseBlock = do
     let ingestBlock = IEBlock $ blockToIngestBlock origin baseBlock
-    rets <- liftIO $ runKafkaConfigured "strato-p2p-client" $ writeUnseqEvents [ingestBlock]
-    case rets of
-        Left e      -> logErrorN . T.pack $ "Could not write block to Kafka: " ++ show e
-        Right resps -> logDebugN . T.pack $ "Kafka commit: " ++ show resps
-    return ()
+    void . withKafkaViolently $ writeUnseqEvents [ingestBlock]
 
-handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
+handleEvents :: (MonadIO m, HasSQLDB m, RBDB.HasRedisBlockDB m, K.HasKafkaState m, MonadState Context m, MonadLogger m)
              =>  DebugMode -> PPeer -> Conduit Event m Message
 handleEvents mode peer = awaitForever $ \case
     MsgEvt Hello{}  -> error "A hello message appeared after the handshake"
