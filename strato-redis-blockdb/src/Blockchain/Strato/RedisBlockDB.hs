@@ -341,9 +341,10 @@ putBestBlockInfo newSha newNumber newTDiff = do
 
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
-                     -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
+                     -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
-        where helper (x:[]) (y:[]) _ | x == y = return $ Right ([], []) 
+        where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], []) 
+              helper (_:(oldSha'':_)) (_:(newSha'':_)) _ | oldSha'' == newSha'' = return $ Right ([(newSha'', newNum)], [oldNum])
               helper oldShaChain newShaChain seen = do
                   let oldSha = head oldShaChain
                       newSha = head newShaChain
@@ -374,7 +375,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain 
                       Just (ancestor :: RedisHeader) -> do
-                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          -- liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain

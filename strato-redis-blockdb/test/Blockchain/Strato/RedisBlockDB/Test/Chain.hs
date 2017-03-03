@@ -40,8 +40,31 @@ buildChain seed depth maxSiblings = do
     tree <- buildTree seed depth maxSiblings
     return $ toList tree
 
+--------------------
+--                /o
+--  o-o-o-o-o-o-o--o
+--                \o
+buildY :: BlockData -> Int -> Int -> IO (Tree BlockData)
+buildY seed 0     _           = pure (Node seed []) 
+buildY _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
+buildY seed depth maxSiblings = do
+    let spread = if depth == 1 then maxSiblings else 1
+    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) 
+    nextNumber      <- return $ (blockDataNumber seed) + 1
+    siblings        <- generate $ vectorOf spread arbitrary :: IO [BlockData] 
+    withUpdates     <- return $ ( (over _blockDataParentHash      (const . blockHeaderHash $ seed))
+                                . (over _blockDataDifficulty      (const nextDifficulty'))
+                                . (over _blockDataNumber          (const nextNumber))
+                                )
+                               <$> siblings
+    expanded        <- forM withUpdates $ \sibling -> do
+                           grandchildren <- buildY sibling (depth - 1) maxSiblings
+                           return $ grandchildren
+    return $ Node seed expanded 
+
 buildTree :: BlockData -> Int -> Int -> IO (Tree BlockData)
 buildTree seed 0     _           = pure (Node seed []) 
+buildTree _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
 buildTree seed depth maxSiblings = do
     siblingCount    <- generate $ invDist maxSiblings 
     nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) 
@@ -59,9 +82,9 @@ buildTree seed depth maxSiblings = do
                            grandchildren <- buildTree sibling (max (depth - deathRate) 0) maxSiblings
                            return $ grandchildren
     return $ Node seed expanded
-
-invDist :: Int -> Gen Int
-invDist n = frequency [(n*n, choose (1, 1)), (1, choose (1, n))]
+        where
+            invDist :: Int -> Gen Int
+            invDist n = frequency [(n, choose (1, 1)), (1, choose (2, n))]
 
 prettyTree :: (Show a) => Tree a -> Tree String
 prettyTree t = show <$> t
@@ -80,7 +103,14 @@ bush :: BlockData -> Int -> Int -> IO (Tree BlockData)
 bush g n m = do
     tree <- buildTree g n m
     if (length . leaves $ tree) < 2
-    then bush g n m
+    then bush g n (m + 1)
+    else return tree
+
+bushY :: BlockData -> Int -> Int -> IO (Tree BlockData)
+bushY g n m = do
+    tree <- buildY g n m
+    if (length . leaves $ tree) < 2
+    then bushY g n (m + 1)
     else return tree
 
 leaves :: Tree a -> [a]
