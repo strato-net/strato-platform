@@ -78,11 +78,11 @@ windows:
             - lasttx:
                 - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq '.'"
                   #            - graphs:
-                  # - curl -s localhost/strato-api/eth/v1.2/block/last/50| jq '.[] | {blockData}' | grep 'timestamp' | cut -d : -f2,3,4 | cut -d , -f1 | xargs -L1 -I x date -d x +'%s' | awk '{$2 = $1 - prev1; prev1 = $1; print;}' | cut -d ' ' -f2 | tail -n +2 | spark | awk -F":" '{ print $1 "\tblocktimes"}'
+                  # - curl -s localhost/strato-api/eth/v1.2/block/last/100| jq '.[] | {blockData}' | grep 'timestamp' | cut -d : -f2,3,4 | cut -d , -f1 | xargs -L1 -I x date -d x +'%s' | awk '{$2 = $1 - prev1; prev1 = $1; print;}' | cut -d ' ' -f2 | tail -n +2 | spark | awk -F":" '{ print $1 "\tblocktimes"}'
             - version:
                 - watch -n 10 "curl -s localhost/strato-api/version | jq '.'"
             - coinbase:
-                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/50 | jq '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
+                - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
     - stream_dumps_1:
         layout: even-horizontal
