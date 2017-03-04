@@ -15,6 +15,7 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -33,6 +34,7 @@ import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
 import Hasql.Session
+import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -132,9 +134,25 @@ instance MonadContracts Bloc where
 
   getContractsState contractName contractId = do
     vars <- getVariablesAndTypes contractName contractId
-    let storage = \case
-          0 -> 0
-          _ -> 0
+
+    let url = BaseUrl Http "strato-ms-dev.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+
+    mgr <- liftIO $ newManager defaultManagerSettings
+           
+    storageOrError <-
+      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ Address 0
+
+    let storage' =
+          case storageOrError of
+           Left e -> error $ show e
+           Right x -> x
+      
+    let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+    let storage k =
+          case Map.lookup k storageMap of
+           Just v -> v
+           Nothing -> 0
+           
         ret = map (fmap (valueToSolidityValue . decodeValue storage 0)) vars
     return $ Map.fromList ret
 
