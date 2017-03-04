@@ -78,10 +78,12 @@ valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ "0x" ++ showHex v ""
 valueToSolidityValue (ValueAddress (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
-valueToSolidityValue (ValueFunction _ paramTypes returnType) =
+valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map show paramTypes)
-                          ++ ") returns " ++ show returnType
+                          ++ ") returns ("
+                          ++ intercalate "," (map show returnTypes)
+                          ++ ")"
 valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
 
 
