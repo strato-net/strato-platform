@@ -14,12 +14,15 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Binary
 import Data.LargeWord
+import Data.List
+import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Numeric
 import Numeric.Natural
+import Text.Printf
 
 import BlockApps.Ethereum (Address(..))
 import BlockApps.Solidity
@@ -50,13 +53,14 @@ data Type
   -- bytes: dynamic sized byte sequence.
   | TypeString
   -- ^ string: dynamic sized unicode string assumed to be UTF-8 encoded.
-  | TypeFunction [Type]
+  | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- ^ function: equivalent to bytes24: an address,
   -- followed by a function selector
   | TypeArray Type (Maybe Int)
   -- ^ <type>[M]: a fixed-length array of the given fixed-length type.
   -- <type>[]: a variable-length array of the given fixed-length type.
   | TypeMapping Type Type
+  deriving (Eq, Show)
 
 data Value
   = ValueBool Bool
@@ -67,16 +71,23 @@ data Value
   | ValueUFixed Double
   | ValueBytes ByteString
   | ValueString Text
-  | ValueFunction ByteString ByteString
+  | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   deriving (Eq,Show)
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ "0x" ++ showHex v ""
-valueToSolidityValue _ = undefined
+valueToSolidityValue (ValueAddress (Address addr)) =
+  SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
+valueToSolidityValue (ValueFunction _ paramTypes returnType) =
+  SolidityValueAsString $ T.pack $ "function ("
+                          ++ intercalate "," (map show paramTypes)
+                          ++ ") returns " ++ show returnType
+valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
 
 
 
 decodeValue
+--  :: M.Map Word256 ByteString
   :: ByteString
   -> Int
   -> Type
@@ -130,10 +141,10 @@ decodeValue storage offset = \case
       ValueBytes bytes = decodeValue storage offset (TypeBytes Nothing)
     in
       ValueString $ Text.decodeUtf8 bytes
-  TypeFunction tys -> undefined
-  TypeArray ty (Just n) -> undefined
-  TypeArray ty Nothing -> undefined
-  TypeMapping tyk tyv -> undefined
+  TypeFunction selector args returns -> ValueFunction selector args returns
+  TypeArray ty (Just n) -> error "TypeArray Just n is undefined in decodeValue"
+  TypeArray ty Nothing -> error "TypeArray Nothing is undefined in decodeValue" 
+  TypeMapping tyk tyv -> error "TypeMapping is undefined in decodeValue"
   where
     slice :: Int -> ByteString
     slice len = ByteString.take len $ ByteString.drop offset storage

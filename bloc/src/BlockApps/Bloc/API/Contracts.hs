@@ -135,6 +135,14 @@ instance MonadContracts Bloc where
         ret = map (fmap (valueToSolidityValue . decodeValue storage 0)) vars
     return $ Map.fromList ret
 
+{-
+/eth/v1.2/storage?minkey=0&maxkey=0&address=ea1827948bbcf15351d609a83dac48f5eae29eac
+
+[
+  {"value":"0000000000000000000000000000000000000000000000000000000000000011","address":"71a2b77372d87b99541701f72626de3f72cdb4ca","key":"0000000000000000000000000000000000000000000000000000000000000000"},
+  {"value":"000000000000000000000000000000000000000000000000000000000000000b","address":"7372d2241e0d5cb9c4ed0de0eb3588a5ae5bae10","key":"eb0af23d6bac7d94dd2ccf7fb17952ea9fb390eee52503b3e8463b2c96c2503e"}]
+-}
+
   getContractsFunctions (ContractName contractName) contractId = blocSql $ do
     metadataId <- case contractId of
       Named "Latest" ->
