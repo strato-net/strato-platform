@@ -4,6 +4,7 @@
   , DeriveAnyClass
   , DeriveGeneric
   , FlexibleInstances
+  , LambdaCase
   , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
@@ -131,7 +132,9 @@ instance MonadContracts Bloc where
 
   getContractsState contractName contractId = do
     vars <- getVariablesAndTypes contractName contractId
-    let storage = B.replicate 100 0
+    let storage = \case
+          0 -> 0
+          _ -> 0
         ret = map (fmap (valueToSolidityValue . decodeValue storage 0)) vars
     return $ Map.fromList ret
 

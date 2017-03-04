@@ -89,25 +89,17 @@ valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ sh
 
 
 decodeValue
---  :: M.Map Word256 ByteString
-  :: ByteString
-  -> Int
+  ::(Word256->Word256)
+--  :: ByteString
+  -> Word256
   -> Type
   -> Value
 decodeValue storage offset = \case
-  TypeBool -> ValueBool (ByteString.index (slice 32) 31 /= 0)
-  TypeUInt (Just n) ->
-    ValueUInt . sum $ zipWith shiftL bytes [n-8,n-16..0]
-    where
-      bytes
-        = map fromIntegral
-        . ByteString.unpack
-        . ByteString.take (n `div` 8)
-        . ByteString.drop (32 - ((n `div` 8) `mod` 32))
-        $ ByteString.drop offset storage
+  TypeBool -> ValueBool $ storage offset /= 0
+  TypeUInt (Just n) -> ValueUInt $ fromIntegral $ storage offset --TODO check for error where value too high for type
   TypeUInt Nothing -> decodeValue storage offset (TypeUInt (Just 256))
-  TypeInt (Just n) ->
-    let
+  TypeInt (Just n) -> ValueInt $ fromIntegral $ storage offset --TODO clean this up, deal with negatives
+{-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
       (sign, significant) =
         if byte == 0xff
@@ -118,12 +110,16 @@ decodeValue storage offset = \case
     in
       ValueInt . sign . sum $
         zipWith shiftL significant' [8*(m-1),8*(m-2)..0]
+-}
+{-
   TypeInt Nothing -> decodeValue storage offset (TypeInt (Just 256))
+-}
   TypeAddress ->
     let
       ValueUInt addr = decodeValue storage offset (TypeUInt (Just 160))
     in
       ValueAddress . Address $ fromIntegral addr
+{-
   TypeFixed (Just (n,m)) ->
     let
       ValueInt x = decodeValue storage offset (TypeInt (Just 256))
@@ -143,10 +139,17 @@ decodeValue storage offset = \case
       ValueBytes bytes = decodeValue storage offset (TypeBytes Nothing)
     in
       ValueString $ Text.decodeUtf8 bytes
+-}
   TypeFunction selector args returns -> ValueFunction selector args returns
+{-
   TypeArray ty (Just n) -> error "TypeArray Just n is undefined in decodeValue"
   TypeArray ty Nothing -> error "TypeArray Nothing is undefined in decodeValue" 
   TypeMapping tyk tyv -> error "TypeMapping is undefined in decodeValue"
-  where
-    slice :: Int -> ByteString
-    slice len = ByteString.take len $ ByteString.drop offset storage
+-}
+  x -> error $ "Missing case in decodeValue: " ++ show x
+{-
+--  where
+--    slice :: Int -> ByteString
+--    slice len = ByteString.take len $ ByteString.drop offset storage
+
+-}
