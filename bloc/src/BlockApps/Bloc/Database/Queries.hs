@@ -11,6 +11,7 @@
 module BlockApps.Bloc.Database.Queries where
 
 import Control.Arrow
+import Control.Monad
 import qualified Crypto.Saltine.Class as Saltine
 import qualified Crypto.Saltine.Core.SecretBox as SecretBox
 import Crypto.Secp256k1
@@ -23,7 +24,7 @@ import Data.Profunctor.Product.Default
 import Data.Text (Text)
 import qualified Data.Text.Encoding as Text
 import Database.PostgreSQL.Simple (Connection)
-import Opaleye
+import Opaleye hiding (not,null)
 import qualified Opaleye as Opaleye (not,null)
 
 import BlockApps.Bloc.Crypto
@@ -499,7 +500,7 @@ getContractsContractLatestQuery
     , Column PGText
     )
 getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
-  (cmId,name,_,_,b,br,_,ch) <-
+  (_,name,_,_,b,br,_,ch) <-
     orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
@@ -702,8 +703,18 @@ WITH contract_id AS (
  )
 SELECT id FROM contract_id UNION SELECT id FROM new_contract_id;
 -}
-createContractQuery :: Text -> Query (Column PGInt4)
-createContractQuery = undefined
+createContractQuery :: Text -> Connection -> IO (Maybe Int32)
+createContractQuery contractName conn = do
+  cIds <- runQuery conn $ proc () -> do
+    (cId,name) <- queryTable contractsTable -< ()
+    restrict -< name .== constant contractName
+    returnA -< cId
+  cIds' <- case listToMaybe cIds of
+    Just cId -> return cIds
+    Nothing -> runInsertReturning conn contractsTable
+      (Nothing, constant contractName)
+      (\ (cId, _) -> cId)
+  return $ listToMaybe cIds'
 
 {- |
 WITH upsert AS (UPDATE contracts_metadata SET
@@ -715,7 +726,7 @@ WHERE contract_id = $1
   AND NOT EXISTS (
       SELECT CI.id
       FROM contracts_instance CI
-      WHERE contract_metadata_id = i
+      WHERE contract_metadata_id = id
       )
 RETURNING id),
 ins AS (INSERT INTO contracts_metadata (contract_id, bin, bin_runtime, code_hash, bin_runtime_hash)
@@ -729,8 +740,34 @@ upsertContractMetaDataQuery
   -> Text
   -> ByteString
   -> ByteString
-  -> Query (Column PGInt4)
-upsertContractMetaDataQuery = undefined
+  -> Connection
+  -> IO (Maybe Int32)
+upsertContractMetaDataQuery
+  contractId bin binRuntime codeHash binRuntimeHash conn = do
+    ciIds <- runQuery conn $ proc () -> do
+      (ciId,contractMetaDataId,_,_) <- queryTable contractsInstanceTable -< ()
+      restrict -< contractMetaDataId .== ciId
+      returnA -< ciId
+    listToMaybe <$>
+      if null (ciIds::[Int32])
+        then
+          runUpdateReturning conn contractsMetaDataTable
+            (\ _ -> writeColumns)
+            (\ (_,cId,_,_,_,_) -> cId .== constant contractId)
+            (\ (contractMetaDataId,_,_,_,_,_) -> contractMetaDataId)
+        else
+          runInsertReturning conn contractsMetaDataTable
+            writeColumns
+            (\ (contractMetaDataId,_,_,_,_,_) -> contractMetaDataId)
+  where
+    writeColumns =
+      ( Nothing
+      , constant contractId
+      , constant (Text.encodeUtf8 bin)
+      , constant (Text.encodeUtf8 binRuntime)
+      , constant binRuntimeHash
+      , constant codeHash
+      )
 
 {- |
 INSERT INTO contracts_lookup (contract_metadata_id, linked_metadata_id)
@@ -738,8 +775,17 @@ SELECT $1,$2  WHERE NOT EXISTS
 (SELECT contract_metadata_id, linked_metadata_id FROM contracts_lookup
 WHERE contract_metadata_id = $1 AND linked_metadata_id = $2);
 -}
-insertContractLookup :: Int32 -> Int32 -> IO ()
-insertContractLookup = undefined
+insertContractLookup :: Int32 -> Int32 -> Connection -> IO ()
+insertContractLookup metaDataId linkedId conn = do
+  rows <- runQuery conn $ proc () -> do
+    row@(contractMetaDataId,linkedMetadataId) <-
+      queryTable contractsLookupTable -< ()
+    restrict -< contractMetaDataId .== constant metaDataId
+      .&& linkedMetadataId .== constant linkedId
+    returnA -< row
+  when (null (rows::[(Int32,Int32)])) . void $
+    runInsert conn contractsLookupTable
+      (constant metaDataId,constant linkedId)
 
 {- |
 INSERT INTO xabi_functions
@@ -754,8 +800,7 @@ insertXabiFunction
   -> Connection
   -> IO [Int32]
 insertXabiFunction contractMetaDataId name selector isConstr conn = do
-  runInsertReturning
-    conn
+  runInsertReturning conn
     xabiFunctionsTable
     ( Nothing
     , constant contractMetaDataId
