@@ -91,12 +91,21 @@ test-suite blockapps-bloc-test
     BlockApps.Bloc.API.ContractsSpec
     BlockApps.Bloc.API.SearchSpec
     BlockApps.Bloc.API.UsersSpec
+    BlockApps.Bloc.API.SpecUtils
   other-modules:
   build-depends: base >=4 && < 5
     , blockapps-bloc
+    , blockapps-strato-api
+    , blockapps-strato-client
+    , blockapps-solidity
     , blockapps-ethereum
+    , directory
+    , generic-random
     , hspec
     , http-client
+    , QuickCheck
+    , quickcheck-instances
+    , text
     -- , servant-aeson-specs
     , servant-client
     , unordered-containers

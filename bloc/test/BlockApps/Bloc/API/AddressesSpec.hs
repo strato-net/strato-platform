@@ -11,10 +11,11 @@ import Test.Hspec
 
 import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.API.SpecUtils
 
 spec :: SpecWith TestConfig
 spec =
   describe "getAddresses" $
     it "gets a list of addresses" $ \ TestConfig {..} -> do
-      addrsEither <- runClientM getAddresses (ClientEnv mgr bayar4a)
+      addrsEither <- runClientM getAddresses (ClientEnv mgr blocUrl)
       addrsEither `shouldSatisfy` isRight
