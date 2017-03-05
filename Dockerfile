@@ -10,7 +10,7 @@ COPY *.js /usr/lib/strato/cirrus/
 COPY nginx /usr/lib/strato/cirrus/.
 COPY lib/* /usr/lib/strato/cirrus/lib/
 RUN mkdir -p /var/run/strato/cirrus 
-ENV APKS="git python alpine-sdk nasm autoconf automake zlib zlib-dev curl"
+ENV APKS="bash git python alpine-sdk nasm autoconf automake zlib zlib-dev curl"
 RUN apk add --no-cache $APKS                                  && \
     cd /usr/lib/strato/cirrus                                 && \
     npm set progress=false                                    && \
@@ -32,5 +32,4 @@ COPY doit.sh /
 #RUN chown -R app:app /doit.sh
 #USER app
 
-#ENTRYPOINT ["/doit.sh"]
-#CMD ["node", "main.js"]
+ENTRYPOINT ["/doit.sh"]
