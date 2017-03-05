@@ -23,12 +23,12 @@ getVariablesAndTypes (ContractName contractName) _ =
    "Payout" ->
      return
      [
-       ("Setup", TypeFunction B.empty [] []),
-       ("Dividend", TypeFunction B.empty [] []),
        ("Victor", TypeAddress), --atBytes: 0
        ("Jim", TypeAddress), --atBytes: 32
-       ("Kieren", TypeAddress) --atBytes: 64
-  --     ("ownershipDistribution", TypeMapping TypeAddress (TypeInt (Just 32))) --atBytes: 96
+       ("Kieren", TypeAddress), --atBytes: 64
+       --("ownershipDistribution", TypeMapping TypeAddress (TypeInt (Just 32))) --atBytes: 96
+       ("Setup", TypeFunction B.empty [] []),
+       ("Dividend", TypeFunction B.empty [] [])
      ]
 
 {-

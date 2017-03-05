@@ -140,20 +140,20 @@ instance MonadContracts Bloc where
     mgr <- liftIO $ newManager defaultManagerSettings
            
     storageOrError <-
-      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ Address 0
+      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ Address 0x953ac16faebbe2ce2136814cee884d82f0ecb1aa
 
     let storage' =
           case storageOrError of
            Left e -> error $ show e
            Right x -> x
-      
+           
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
     let storage k =
           case Map.lookup k storageMap of
            Just v -> v
            Nothing -> 0
            
-        ret = map (fmap (valueToSolidityValue . decodeValue storage 0)) vars
+        ret = map (\(position, var) -> fmap (valueToSolidityValue . decodeValue storage position) var) $ zip [0..] vars
     return $ Map.fromList ret
 
 {-
