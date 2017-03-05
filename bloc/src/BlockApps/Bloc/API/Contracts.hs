@@ -138,9 +138,13 @@ instance MonadContracts Bloc where
     let url = BaseUrl Http "strato-ms-dev.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
 
     mgr <- liftIO $ newManager defaultManagerSettings
-           
+
+    let payoutAddress=Address 0x953ac16faebbe2ce2136814cee884d82f0ecb1aa
+        stakeAddress=Address 0xbcca0649c1c41486e95ca1a8287e2a5f7000a8aa
+        
     storageOrError <-
-      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ Address 0x953ac16faebbe2ce2136814cee884d82f0ecb1aa
+      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just stakeAddress
+
 
     let storage' =
           case storageOrError of
@@ -152,8 +156,12 @@ instance MonadContracts Bloc where
           case Map.lookup k storageMap of
            Just v -> v
            Nothing -> 0
-           
+
         ret = map (\(position, var) -> fmap (valueToSolidityValue . decodeValue storage position) var) $ zip [0..] vars
+
+    liftIO $ print storage'
+    liftIO $ print storageMap
+    
     return $ Map.fromList ret
 
 {-
