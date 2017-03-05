@@ -1,3 +1,3 @@
 FROM strato-deploybase:latest
 COPY ./ /
-ENTRYPOINT ["/doit.sh"]
+ENTRYPOINT ["/var/lib/strato/doit.sh"]
