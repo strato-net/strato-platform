@@ -7,4 +7,4 @@ RUN apt-get -y update                                          && \
                        netcat-openbsd libstdc++6 nodejs        && \
     apt-get autoremove                                         && \
     rm -rf /var/lib/apt/lists/*
-
+RUN mkdir -p /var/lib/strato
