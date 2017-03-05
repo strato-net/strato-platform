@@ -23,4 +23,5 @@ RUN wget "$POSTGREST_SOURCE/v$POSTGREST_VERSION/$POSTGREST_FILE" && \
 RUN wget "$DOCKERIZE_SOURCE/$DOCKERIZE_VERSION/$DOCKERIZE_FILE"  && \
     tar -C /usr/local/bin -xvzf $DOCKERIZE_FILE
 COPY doit.sh /doit.sh
+RUN chmod a+x /doit.sh
 ENTRYPOINT ["/doit.sh"]
