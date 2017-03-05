@@ -30,44 +30,57 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("Setup", TypeFunction B.empty [] []),
        ("Dividend", TypeFunction B.empty [] [])
      ]
-
+   "Stake" ->
+     return
+     [
+       ("stake", TypeMapping TypeAddress (TypeUInt Nothing)),
+       ("stakeHolders", TypeArray TypeAddress Nothing),
+       ("holdingTheBag", TypeAddress),
+       ("numStakeHolders", TypeUInt Nothing),
+       ("currentStake", TypeUInt Nothing),
+       ("sumStake", TypeUInt Nothing),
+       ("payout", TypeFunction "63bd1d4a" [] []),
+       ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", TypeAddress)] [])
+     ]
+  
 {-
-"xabi":
-       {
-         "vars":
-                {
-                  "Victor":
-                           {
-                             "atBytes":0,
-                             "type":"Address"
-                           },
-                  "Jim":
-                        {
-                          "atBytes":32,
-                          "type":"Address"
-                        },
-                  "Kieren":
-                           {
-                             "atBytes":64,
-                             "type":"Address"
-                           },
-                  "ownershipDistribution":
-                                          {
-                                            "atBytes":96,
-                                            "dynamic":true,
-                                            "value":
-                                                    {
-                                                      "type":"Int",
-                                                      "bytes":32
-                                                    },
-                                            "key":
-                                                  {
-                                                    "type":"Address"
-                                                  },
-                                            "type":"Mapping"
-                                          }
-                }
-       }
+
+Payout-
+"vars": {
+  "Victor": {"atBytes":0, "type":"Address"},
+  "Jim": {"atBytes":32, "type":"Address"},
+  "Kieren": {"atBytes":64, "type":"Address"},
+  "ownershipDistribution": {
+    "atBytes":96,
+    "dynamic":true,
+    "value":{"type":"Int","bytes":32},
+    "key":{"type":"Address"},
+    "type":"Mapping"
+  }
+}
+
+
+Stake-
+"vars": {
+  "holdingTheBag":{"atBytes":64,"type":"Address"},
+  "numStakeHolders":{"atBytes":96,"type":"Int","bytes":32},
+  "stake":{"atBytes":0,"dynamic":true,"value":{"type":"Int","bytes":32},"key":{"type":"Address"},"
+type":"Mapping"},
+  "sumStake":{"atBytes":160,"type":"Int","bytes":32},
+  "stakeHolders":{"atBytes":32,"dynamic":true,"entry":{"type":"Address"},"type":"Array"},
+  "currentStake":{"atBytes":128,"type":"Int","bytes":32}
+}
+
+
+
+
+
+
+
+
+
+
+
 -}
 
      
