@@ -82,13 +82,14 @@ data Value
   deriving (Eq,Show)
 
 valueToSolidityValue::Value->SolidityValue
-valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ "0x" ++ showHex v ""
+valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (ValueUInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueString s) = SolidityValueAsString s
 valueToSolidityValue (ValueAddress (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
-                          ++ intercalate "," (map show paramTypes)
+                          ++ intercalate "," (map (formatType . snd) paramTypes)
                           ++ ") returns ("
                           ++ intercalate "," (map show returnTypes)
                           ++ ")"
@@ -151,8 +152,8 @@ decodeValue storage offset = \case
   TypeFunction selector args returns -> ValueFunction selector args returns
 {-
   TypeArray ty (Just n) -> error "TypeArray Just n is undefined in decodeValue"
-  TypeArray ty Nothing -> error "TypeArray Nothing is undefined in decodeValue"
 -}
+  --TypeArray ty Nothing -> ValueString $ T.pack $ "array"
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
   x -> error $ "Missing case in decodeValue: " ++ show x
 {-
