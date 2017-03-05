@@ -262,7 +262,7 @@ instance ToJSON TxCount where
   toJSON (TxCount n) = object [ "transactionCount" .= n ]
 
 data Storage = Storage
-  { storageAddressStateRefId :: Int
+  { storageAddress :: Address
   , storageKey :: Hex Word256
   , storageValue :: Hex Word256
   } deriving (Eq, Show, Generic)
