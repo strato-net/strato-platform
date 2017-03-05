@@ -1,5 +1,6 @@
 {-# LANGUAGE
     LambdaCase
+  , OverloadedStrings
 #-}
 
 module BlockApps.SolidityVarReader (
@@ -62,6 +63,12 @@ data Type
   | TypeMapping Type Type
   deriving (Eq, Show)
 
+formatType::Type->String
+formatType TypeAddress = "Address"
+formatType (TypeInt Nothing) = "Int"
+formatType (TypeUInt Nothing) = "UInt"
+formatType x = show x
+
 data Value
   = ValueBool Bool
   | ValueUInt Natural
@@ -76,6 +83,7 @@ data Value
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ "0x" ++ showHex v ""
+valueToSolidityValue (ValueString s) = SolidityValueAsString s
 valueToSolidityValue (ValueAddress (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
@@ -143,9 +151,9 @@ decodeValue storage offset = \case
   TypeFunction selector args returns -> ValueFunction selector args returns
 {-
   TypeArray ty (Just n) -> error "TypeArray Just n is undefined in decodeValue"
-  TypeArray ty Nothing -> error "TypeArray Nothing is undefined in decodeValue" 
-  TypeMapping tyk tyv -> error "TypeMapping is undefined in decodeValue"
+  TypeArray ty Nothing -> error "TypeArray Nothing is undefined in decodeValue"
 -}
+  TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
   x -> error $ "Missing case in decodeValue: " ++ show x
 {-
 --  where

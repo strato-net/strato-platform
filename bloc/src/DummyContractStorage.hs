@@ -26,7 +26,7 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("Victor", TypeAddress), --atBytes: 0
        ("Jim", TypeAddress), --atBytes: 32
        ("Kieren", TypeAddress), --atBytes: 64
-       --("ownershipDistribution", TypeMapping TypeAddress (TypeInt (Just 32))) --atBytes: 96
+       ("ownershipDistribution", TypeMapping TypeAddress (TypeUInt Nothing)), --atBytes: 96
        ("Setup", TypeFunction B.empty [] []),
        ("Dividend", TypeFunction B.empty [] [])
      ]
