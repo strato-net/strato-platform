@@ -42,7 +42,7 @@ build_haskell: prebuild
 	stack setup
 	stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
-build_deploybase:
+build_deploybase: prebuild
 	cp -f Dockerfile.deploybase /tmp/docker-dummy
 	docker build -t strato-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
 
