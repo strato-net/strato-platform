@@ -85,12 +85,12 @@ instance Binary Address where
     let byteString = B.pack bytes
     return (Address $ fromInteger $ byteString2Integer byteString)
 
-
-
+{-
 instance RLPSerializable Address where
   rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
   rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
   rlpDecode x = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
+-}
 
 getNewAddress_unsafe ::Address->Integer->Address
 getNewAddress_unsafe a n =

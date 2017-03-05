@@ -7,3 +7,6 @@ defineFlag "mempoolLivenessCutoff" (30 :: Integer) "max age of a transaction in 
 defineFlag "useTestnet" False "Change difficulty computation for ethdev testnet"
 defineFlag "newRBIBBehavior" True "Use new replaceBestIfBetter behavior"
 defineFlag "useSyncMode" False "Whether or not to wait for P2P world state to get filled before buffering transactions"
+
+defineFlag "ldbCacheSize" (33554432 {- 32 MiB -} :: Int) "size in bytes of LDB block cache per namespace (0 = default of 8MB)"
+defineFlag "ldbBlockSize" (4096     {-  4 KiB-}  :: Int) "size in bytes of LDB block packing per namespace (default is 4096)"

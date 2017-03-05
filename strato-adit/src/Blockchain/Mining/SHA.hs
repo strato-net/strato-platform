@@ -28,7 +28,7 @@ invDiff d = round diff' :: Integer
 
 -- mine = foldl (&&) (repeat verify) -- (if verify could live in a monad keeping state..) 
 mineSHA :: Block -> IO (Maybe Integer)
-mineSHA b@(Block{blockBlockData=bd}) = do
+mineSHA b@Block{blockBlockData=bd} = do
 
     let difficulty = blockDataDifficulty bd
 

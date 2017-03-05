@@ -55,6 +55,7 @@ executable strato-setup
                  , binary
                  , stm
                  , persistent
+                 , strato-statediff
     other-modules: Blockchain.BackupBlocks
                    Blockchain.BackupMP
                    Blockchain.Data.GenesisBlock

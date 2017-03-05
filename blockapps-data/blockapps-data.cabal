@@ -80,7 +80,6 @@ library
                    Blockchain.Data.BlockSummary
                    Blockchain.Data.Code
                    Blockchain.Data.DataDefs
-                   Blockchain.Data.DiffDB
                    Blockchain.Data.Extra
                    Blockchain.Data.Json
                    Blockchain.Data.Log
@@ -88,7 +87,6 @@ library
                    Blockchain.Data.NewBlk
                    Blockchain.Data.PersistTypes
                    Blockchain.Data.RawTransaction
-                   Blockchain.Data.StateDiff
                    Blockchain.Data.Transaction
                    Blockchain.Data.TransactionDef
                    Blockchain.Data.TransactionReceipt

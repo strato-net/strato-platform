@@ -41,7 +41,7 @@ class Monad m => PeerMonad m where
   peerGenesisHash :: m SHA
   peerLatestHash :: m SHA
   peerBestBlock :: m Block
-
+  peerAddBlock :: Block -> m Bool 
 
 newtype InMemoryServer k v a = InMemoryServer { unInMemoryServer :: StateT (Map.Map k v) IO a } 
   deriving (Functor, Applicative, Monad)
@@ -53,6 +53,7 @@ instance PeerMonad (InMemoryServer SHA Block)  where
   peerEthVersion = return 0
   peerLatestHash = return (SHA 0)
   peerBestBlock = undefined 
+  peerAddBlock = undefined
 
 runInMemoryServer :: InMemoryServer k v a -> Map.Map k v ->  IO (a, Map.Map k v) 
 runInMemoryServer action s = runStateT ( unInMemoryServer action ) s 
@@ -71,6 +72,7 @@ instance PeerMonad (InMemoryClient SHA Block) where
   peerEthVersion = return 0
   peerLatestHash = return (SHA 0)
   peerBestBlock = undefined 
+  peerAddBlock = undefined
 
 runInMemoryClient :: InMemoryClient k v a -> Map.Map k v -> IO (a, Map.Map k v) 
 runInMemoryClient action s = runStateT ( unInMemoryClient action ) s 
@@ -111,6 +113,7 @@ handleEvents' _ = awaitForever $ \case
     MsgEvt (BlockHeaders _) -> error "BlockHeaders handler unimplemented"
     MsgEvt (GetBlockBodies []) -> do
       bestBlk <- lift peerBestBlock
+      _ <- lift $ peerAddBlock bestBlk  
       error $ "GetBlockBodies handler unimplemented" ++ (show bestBlk) 
     MsgEvt (BlockBodies []) -> error "BlockBodies [] handler unimplemented" 
     MsgEvt (BlockBodies _) -> error "BlockBodies bodies handler unimplemented" 

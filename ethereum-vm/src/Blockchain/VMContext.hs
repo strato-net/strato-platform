@@ -56,6 +56,8 @@ import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import qualified Database.Redis                     as Redis
 import qualified Network.Kafka                      as K
 
+import Executable.EVMFlags
+
 data Context = Context {
     contextStateDB           :: MP.MPDB,
     contextHashDB            :: HashDB,
@@ -122,14 +124,15 @@ runContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) =>
 runContextM f = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     runResourceT $ do
-        sdb <- DB.open (dbDir "h" ++ stateDBPath)
-                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-        hdb <- DB.open (dbDir "h" ++ hashDBPath)
-                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-        cdb <- DB.open (dbDir "h" ++ codeDBPath)
-                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath)
-                 DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+        let ldbOptions = DB.defaultOptions {
+            DB.createIfMissing = True,
+            DB.cacheSize       = flags_ldbCacheSize,
+            DB.blockSize       = flags_ldbBlockSize
+        }
+        sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+        hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
+        cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
+        blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
         conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
         redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
         let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
