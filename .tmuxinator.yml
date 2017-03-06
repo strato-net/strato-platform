@@ -87,6 +87,10 @@ windows:
         panes:
             - blocktimes:
                 - watch -n 20 ./watcher.sh explorer-blocktimes
+            - numtxs:
+                - watch -n 20 ./watcher.sh explorer-numtxs
+            - numuncles:
+                - watch -n 20 ./watcher.sh explorer-numuncles
 
     - stream_dumps_1:
         layout: even-horizontal
