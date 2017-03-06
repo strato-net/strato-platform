@@ -24,7 +24,7 @@ import Text.PrettyPrint.Leijen.Text
 newtype Bloc x = Bloc
   { runBloc ::
       ReaderT BlocEnv -- global immutable environment variable
-        ( LoggingT (WithSeverity Doc) -- log all the things
+        ( LoggingT (WithSeverity Text) -- log all the things
           ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
   } deriving
@@ -34,7 +34,7 @@ newtype Bloc x = Bloc
   , MonadIO
   , MonadReader BlocEnv
   , MonadError BlocError
-  , MonadLog (WithSeverity Doc)
+  , MonadLog (WithSeverity Text)
   )
 
 data BlocEnv = BlocEnv
@@ -46,6 +46,7 @@ data BlocEnv = BlocEnv
 data BlocError
   = StratoError ServantError
   | DBError Text
+  | UserError Text
   deriving Show
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x

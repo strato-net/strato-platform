@@ -1,5 +1,6 @@
 {-# LANGUAGE
-    DataKinds
+    Arrows
+  , DataKinds
   , DeriveGeneric
   , FlexibleInstances
   , MultiParamTypeClasses
@@ -11,20 +12,26 @@
 
 module BlockApps.Bloc.API.Users where
 
+import Control.Arrow
 import Control.Monad.Except
+import Control.Monad.Log
 import Control.Monad.Reader
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import Data.Int (Int32)
+import Data.Maybe
+import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
--- import Hasql.Session
 import Numeric.Natural
+import Opaleye
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -35,6 +42,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
+import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Types (PostTransaction)
@@ -71,7 +79,7 @@ instance MonadUsers Bloc where
   getUsersUser (UserName name) = blocQuery $ getUsersUserQuery name
 
   postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
-    keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pass
+    keyStore <- newKeyStore pass
     mngr <- asks httpManager
     url <- asks urlStrato
     createdUser <- blocModify $ postUsersUserQuery name keyStore
@@ -83,9 +91,50 @@ instance MonadUsers Bloc where
     return addr
 
   postUsersSend = undefined
-  postUsersContract = undefined
+
+  postUsersContract (UserName userName) addr
+    (PostUsersContractRequest src password contract args txParams) = do
+      logNotice $ "constructor arguments: " <> Text.pack (show args)
+      uIds <- blocQuery $ proc () -> do
+        (uId,name) <- queryTable usersTable -< ()
+        restrict -< name .== constant userName
+        returnA -< uId
+      cryptos <- case listToMaybe uIds of
+        Nothing -> throwError . DBError $
+          "no user found with name: " <> userName
+        Just uId -> blocQuery $ proc () -> do
+          (_,salt,_,nonce,encSecKey,_,addr',uId') <-
+            queryTable keyStoreTable -< ()
+          restrict -< uId' .== constant (uId::Int32)
+            .&& addr' .== constant addr
+          returnA -< (salt,nonce,encSecKey)
+      secKeyMaybe <- case listToMaybe cryptos of
+        Nothing -> throwError . DBError $
+          "address does not exist for user:" <> userName
+        Just (salt,nonce,encSecKey) -> return $
+          decryptSecKey password salt nonce encSecKey
+      case secKeyMaybe of
+        Nothing -> throwError $ UserError "incorrect password"
+        Just secKey -> return undefined
+
   postUsersUploadList = undefined
+
   postUsersContractMethod = undefined
+
+  -- postUsersContractMethod
+  --   (UserName userName) addr
+  --   (ContractName contractName) contractAddr
+  --   PostUsersContractMethodRequest
+  --     {
+  --     } = do
+
+      -- return PostUsersContractMethodRequest
+      --   { postuserscontractmethodPassword =
+      --   , postuserscontractmethodMethod =
+      --   , postuserscontractmethodArgs =
+      --   , postuserscontractmethodValue =
+      --   }
+
   postUsersSendList = undefined
   postUsersContractMethodList = undefined
 
@@ -101,7 +150,7 @@ type PostUsersUser = "users"
   :> Post '[HTMLifiedAddress] Address
 data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
-  , userPassword :: Text
+  , userPassword :: Password
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersUserRequest where
@@ -127,7 +176,7 @@ type PostUsersSend = "users"
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
-  , sendPassword :: Text
+  , sendPassword :: Password
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendParameters where
@@ -149,24 +198,30 @@ type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
-  :> ReqBody '[FormUrlEncoded] PostUsersContractRequest
+  :> ReqBody '[JSON] PostUsersContractRequest
   :> Post '[HTMLifiedAddress] Address
 data PostUsersContractRequest = PostUsersContractRequest
-  { src :: Text
-  , password :: Text
+  { postuserscontractrequestSrc :: Text
+  , postuserscontractrequestPassword :: Password
+  , postuserscontractrequestContract :: Text
+  , postuserscontractrequestArgs :: Maybe (HashMap Text Text)
+  , postuserscontractrequestTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
-instance ToJSON PostUsersContractRequest
-instance FromJSON PostUsersContractRequest
-instance ToForm PostUsersContractRequest
-instance FromForm PostUsersContractRequest
+instance ToJSON PostUsersContractRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostUsersContractRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostUsersContractRequest where
   toSamples _ = singleSample PostUsersContractRequest
-    { src =
+    { postuserscontractrequestSrc =
       "contract SimpleStorage { uint storedData; function set(uint x) \
       \{ storedData = x; } function get() returns (uint retVal) \
       \{ return storedData; } }"
-    , password = "securePassword"
+    , postuserscontractrequestPassword = "securePassword"
+    , postuserscontractrequestContract = "SimpleStorage"
+    , postuserscontractrequestArgs = Nothing
+    , postuserscontractrequestTxParams = Nothing
     }
 
 type PostUsersUploadList = "users"
@@ -176,7 +231,7 @@ type PostUsersUploadList = "users"
   :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] [PostUsersUploadListResponse]
 data UploadListRequest = UploadListRequest
-  { uploadlistPassword :: Text
+  { uploadlistPassword :: Password
   , uploadlistContracts :: [UploadListContract]
   , uploadlistResolve :: Bool
   } deriving (Eq,Show,Generic)
@@ -224,7 +279,7 @@ type PostUsersContractMethod = "users"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
   :> Post '[HTMLifiedPlainText] PostUsersContractMethodResponse
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
-  { postuserscontractmethodPassword :: Text
+  { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
   , postuserscontractmethodArgs :: HashMap Text SolidityValue
   , postuserscontractmethodValue :: Natural
@@ -257,7 +312,7 @@ type PostUsersSendList = "users"
   :> ReqBody '[JSON] PostSendListRequest
   :> Post '[JSON] [PostSendListResponse]
 data PostSendListRequest = PostSendListRequest
-  { postsendlistrequestPassword :: Text
+  { postsendlistrequestPassword :: Password
   , postsendlistrequestResolve :: Bool
   , postsendlistrequestTxs :: [SendTransaction]
   } deriving (Eq,Show,Generic)
@@ -298,7 +353,7 @@ type PostUsersContractMethodList = "users"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [PostMethodListResponse]
 data PostMethodListRequest = PostMethodListRequest
-  { postmethodlistrequestPassword :: Text
+  { postmethodlistrequestPassword :: Password
   , postmethodlistrequestResolve :: Bool
   , postmethodlistrequestTxs :: [MethodCall]
   } deriving (Eq,Show,Generic)

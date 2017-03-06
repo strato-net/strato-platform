@@ -816,7 +816,13 @@ instance QueryRunnerColumnDefault PGBytea Address where
     queryRunnerColumnDefault
 instance Default Constant Address (Column PGBytea) where
   def = lmap (Char8.pack . addressString) def
+
+instance QueryRunnerColumnDefault PGBytea SecretBox.Nonce where
+  queryRunnerColumnDefault = queryRunnerColumn id
+    (fromMaybe (error "could not decode nonce") . Saltine.decode)
+    queryRunnerColumnDefault
 instance Default Constant SecretBox.Nonce (Column PGBytea) where
   def = lmap Saltine.encode def
+
 instance Default Constant PubKey (Column PGBytea) where
   def = lmap (exportPubKey False) def

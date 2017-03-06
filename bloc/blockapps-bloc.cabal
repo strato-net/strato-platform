@@ -89,6 +89,7 @@ test-suite blockapps-bloc-test
     BlockApps.Bloc.APISpec
     BlockApps.Bloc.API.AddressesSpec
     BlockApps.Bloc.API.ContractsSpec
+    BlockApps.Bloc.API.E2ESpec
     BlockApps.Bloc.API.SearchSpec
     BlockApps.Bloc.API.UsersSpec
     BlockApps.Bloc.API.SpecUtils

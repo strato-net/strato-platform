@@ -28,6 +28,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Monoid
 import Data.Proxy
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -418,6 +419,8 @@ instance Arbitrary PostCompileResponse where
   arbitrary = genericArbitrary uniform
 
 newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
+instance IsString SymbolName where
+  fromString = SymbolName . Text.pack
 instance ToSample SymbolName where
   toSamples _ = samples
     [ SymbolName name | name <- ["variable1","variable2"]]

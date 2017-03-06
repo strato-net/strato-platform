@@ -83,7 +83,7 @@ spec = do
         (getContractsStateMapping
           (ContractName simpleMappingContractName)
           (Unnamed simpleMappingContractAddress)
-          (SymbolName "m")
+          "m"
           "1"
         )
         (ClientEnv mgr blocUrl)
@@ -92,7 +92,7 @@ spec = do
         (getContractsStateMapping
           (ContractName testContractName)
           (Unnamed testContractAddress)
-          (SymbolName "tMapping3")
+          "tMapping3"
           "1"
         )
         (ClientEnv mgr blocUrl)
@@ -101,7 +101,7 @@ spec = do
         (getContractsStateMapping
           (ContractName simpleMappingContractName)
           (Unnamed simpleMappingContractAddress)
-          (SymbolName "m2")
+          "m2"
           "1"
         )
         (ClientEnv mgr blocUrl)

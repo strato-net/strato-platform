@@ -17,6 +17,7 @@ import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Generic.Random.Generic
@@ -55,6 +56,8 @@ instance MimeRender HTMLifiedAddress Address where
   mimeRender _ = Lazy.Char8.pack . addressString
 
 newtype ContractName = ContractName Text
+instance IsString ContractName where
+  fromString = ContractName . Text.pack
 instance ToHttpApiData ContractName where
   toUrlPiece (ContractName name) = name
 instance FromHttpApiData ContractName where
@@ -131,6 +134,8 @@ waitNewBlock = do
       . head <$> getBlocksLast 0
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
+instance IsString UserName where
+  fromString = UserName . Text.pack
 instance ToHttpApiData UserName where
   toUrlPiece (UserName name) = name
 instance FromHttpApiData UserName where
