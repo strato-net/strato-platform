@@ -105,7 +105,7 @@ windows:
     - stream_blocks:
         layout: even-horizontal
         panes:
-           - dumpkafkablocks:
+            - dumpkafkablocks:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
             - dumpkafkaunminedblocks:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'
