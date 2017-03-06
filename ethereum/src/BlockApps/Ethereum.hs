@@ -19,6 +19,7 @@ module BlockApps.Ethereum
   , keccak256
   , keccak256lazy
   , keccak256String
+  , keccak256ByteString
   , stringKeccak256
     -- * Account States
   , AccountState (..)
@@ -39,6 +40,7 @@ import Crypto.Random.Entropy
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.Binary as Binary
+import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
@@ -111,6 +113,8 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
 newtype Keccak256 = Keccak256 (Digest Keccak_256) deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
+keccak256ByteString :: Keccak256 -> ByteString
+keccak256ByteString (Keccak256 digest) = ByteString.pack $ ByteArray.unpack digest
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =
   if ByteString.null r then Keccak256 <$> digestFromByteString bs else Nothing
