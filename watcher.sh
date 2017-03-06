@@ -6,7 +6,7 @@
 function cirrus-count {
   for i in $(curl -s localhost/cirrus/search/ | jq '.[] | [.name]' | grep \" | sed 's/  \"//g' | sed 's/\"//g' )
     do 
-      printf \\n$i
+      printf \\n$i\\t
       curl -s localhost/cirrus/search/$i?select=count | jq '.[]' | grep \" | sed 's/  \"//g' | sed 's/\"//g'
     done
 }
