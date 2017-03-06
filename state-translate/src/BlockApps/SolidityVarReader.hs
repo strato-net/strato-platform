@@ -11,12 +11,10 @@ module BlockApps.SolidityVarReader (
   valueToSolidityValue
   ) where
 
-import qualified Crypto.Hash.SHA3 as SHA3
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.Binary
 import Data.LargeWord
 import Data.List
 import qualified Data.Map as M
@@ -28,7 +26,7 @@ import Numeric
 import Numeric.Natural
 import Text.Printf
 
-import BlockApps.Ethereum (Address(..))
+import BlockApps.Ethereum
 import BlockApps.Solidity
 
 data Type
@@ -168,7 +166,7 @@ decodeValue storage offset = \case
 -}
   TypeArray ty Nothing -> ValueArray $ map (flip (decodeValue storage) ty) $ map (startingKey+) [0..storage offset-1]
     where
-      startingKey=byteStringToWord256 $ SHA3.hash 256 $ word256ToByteString offset
+      startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
   x -> error $ "Missing case in decodeValue: " ++ show x
 {-
