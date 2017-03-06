@@ -14,9 +14,11 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Monad.Loops
 import Control.Monad.IO.Class
+import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+import Data.HashMap.Strict (HashMap)
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -30,6 +32,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Numeric.Natural
 
+import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Client
@@ -152,16 +155,15 @@ instance ToCapture (Capture "user" UserName) where
 instance Arbitrary UserName where arbitrary = genericArbitrary uniform
 
 data TxParams = TxParams
-  { txparamsGasLimit :: Natural
-  , txparamsGasPrice :: Natural
+  { txparamsGasLimit :: Maybe Gas
+  , txparamsGasPrice :: Maybe Wei
+  , txparamsNonce :: Maybe Nonce
   } deriving (Eq,Show,Generic)
 instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
 instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-
 
 data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
 instance ToJSON a => ToJSON (MaybeNamed a) where
@@ -185,3 +187,11 @@ instance ToSample (MaybeNamed Address) where
   toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
+
+-- upload
+--   :: ContractName
+--   -> SecKey
+--   -> HashMap Text Text
+--   -> TxParams
+--   -> Bloc Address
+-- upload (ContractName contractName) sk args params = do

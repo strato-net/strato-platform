@@ -66,6 +66,7 @@ import BlockApps.Ethereum
   , stringAddress
   , Keccak256 (..)
   , keccak256lazy
+  , Nonce
   )
 import BlockApps.Solidity
 
@@ -234,7 +235,7 @@ instance ToJSON Block where
 
 data Account = Account
   { accountAddress :: Address
-  , accountNonce :: Natural
+  , accountNonce :: Nonce
   , accountBalance :: Strung Natural
   , accountContractRoot :: Keccak256
   , accountCode :: Text

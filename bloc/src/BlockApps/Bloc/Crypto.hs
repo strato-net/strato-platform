@@ -67,8 +67,7 @@ decryptSecKey (Password pw) salt nonce encSecKey = do
     err = error "could not decode encryption key"
     decKey = fromMaybe err . Saltine.decode $
       Scrypt.generate scryptParams pw salt
-  bytes <- SecretBox.secretboxOpen decKey nonce encSecKey
-  secKey bytes
+  secKey =<< SecretBox.secretboxOpen decKey nonce encSecKey
 
 newKeyStore :: MonadIO io => Password -> io KeyStore
 newKeyStore (Password pw) = liftIO $ do

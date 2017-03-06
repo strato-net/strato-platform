@@ -5,6 +5,7 @@
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , RecordWildCards
   , TypeApplications
   , TypeOperators
   , GeneralizedNewtypeDeriving
@@ -22,6 +23,7 @@ import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.Int (Int32)
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
@@ -45,7 +47,7 @@ import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Solidity
-import BlockApps.Strato.Types (PostTransaction)
+import BlockApps.Strato.Types
 import BlockApps.Strato.Client
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
@@ -93,7 +95,7 @@ instance MonadUsers Bloc where
   postUsersSend = undefined
 
   postUsersContract (UserName userName) addr
-    (PostUsersContractRequest src password contract args txParams) = do
+    (PostUsersContractRequest src password contract args TxParams{..} value) = do
       logNotice $ "constructor arguments: " <> Text.pack (show args)
       uIds <- blocQuery $ proc () -> do
         (uId,name) <- queryTable usersTable -< ()
@@ -115,7 +117,49 @@ instance MonadUsers Bloc where
           decryptSecKey password salt nonce encSecKey
       case secKeyMaybe of
         Nothing -> throwError $ UserError "incorrect password"
-        Just secKey -> return undefined
+        Just secKey -> do
+          accts <- blocStrato $ getAccountsFilter
+            accountsFilterParams{qaAddress = Just addr}
+          nonce <- case listToMaybe accts of
+            Nothing -> throwError . UserError $ "strato error: failed to find account"
+            Just acct -> return . incrNonce $ accountNonce acct
+          (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+            (,) <$> postExtabi (Src src) <*> postSolc (Src src)
+          let
+            contracts = Map.intersectionWith (,) xabis abiBins
+          let
+            unsignedTx = UnsignedTransaction
+              { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
+              , unsignedTransactionGasPrice =
+                  fromMaybe (Wei 1000000000000000000) txparamsGasPrice
+              , unsignedTransactionGasLimit =
+                  fromMaybe (Gas 3141592) txparamsGasLimit
+              , unsignedTransactionTo = Nothing
+              , unsignedTransactionValue = Wei $ fromIntegral value
+              , unsignedTransactionInitOrData = undefined
+              }
+            -- todo: rlp encode the unsigned transaction
+            -- todo: keccak that
+            -- todo: sign that and make a postTx
+            Gas gasLimit = unsignedTransactionGasLimit unsignedTx
+            Wei gasPrice = unsignedTransactionGasPrice unsignedTx
+            Nonce nonce' = unsignedTransactionNonce unsignedTx
+            tx = PostTransaction
+              { posttransactionHash = undefined
+              , posttransactionGasLimit = Strung $ fromIntegral gasLimit
+              , posttransactionCodeOrData = undefined
+              , posttransactionGasPrice = Strung $ fromIntegral gasPrice
+              , posttransactionTo = Nothing
+              , posttransactionFrom = addr
+              , posttransactionValue = Strung value
+              , posttransactionR = undefined
+              , posttransactionS = undefined
+              , posttransactionV = undefined
+              , posttransactionNonce = Strung $ fromIntegral nonce'
+              }
+          _ <- blocStrato $ postTx tx
+          -- todo: poll strato???
+          return undefined
 
   postUsersUploadList = undefined
 
@@ -205,7 +249,8 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Text
   , postuserscontractrequestArgs :: Maybe (HashMap Text Text)
-  , postuserscontractrequestTxParams :: Maybe TxParams
+  , postuserscontractrequestTxParams :: TxParams
+  , postuserscontractrequestValue :: Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersContractRequest where
@@ -221,7 +266,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestPassword = "securePassword"
     , postuserscontractrequestContract = "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
-    , postuserscontractrequestTxParams = Nothing
+    , postuserscontractrequestTxParams = TxParams Nothing Nothing Nothing
     }
 
 type PostUsersUploadList = "users"
@@ -326,7 +371,7 @@ instance ToSample PostSendListRequest where
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue :: Natural
-  , sendtransactionTxParams :: Maybe TxParams
+  , sendtransactionTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
 instance ToJSON SendTransaction where
@@ -380,7 +425,7 @@ data MethodCall = MethodCall
   , methodcallMethodName :: Text
   , methodcallArgs :: HashMap Text SolidityValue
   , methodcallValue :: Natural
-  , methodcallTxParams :: TxParams --TODO: Params maybe optional
+  , methodcallTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
 instance ToJSON MethodCall where

@@ -29,6 +29,7 @@ module BlockApps.Ethereum
   , BlockHeader (..)
     -- * Ethereum Types
   , Nonce (..)
+  , incrNonce
   , Wei (..)
   , Gas (..)
   , BloomFilter (..)
@@ -187,10 +188,27 @@ data BlockHeader = BlockHeader
   } deriving (Eq,Show,Generic)
 
 newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
+instance ToJSON Nonce where
+  toJSON (Nonce n) = toJSON $ toInteger n
+instance FromJSON Nonce where
+  parseJSON = fmap (Nonce . fromInteger) . parseJSON
+instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
+incrNonce :: Nonce -> Nonce
+incrNonce (Nonce n) = Nonce (n+1)
 
 newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
+instance Arbitrary Wei where arbitrary = Wei . fromInteger <$> arbitrary
+instance ToJSON Wei where
+  toJSON (Wei g) = toJSON $ toInteger g
+instance FromJSON Wei where
+  parseJSON = fmap (Wei . fromInteger) . parseJSON
 
 newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
+instance Arbitrary Gas where arbitrary = Gas . fromInteger <$> arbitrary
+instance ToJSON Gas where
+  toJSON (Gas g) = toJSON $ toInteger g
+instance FromJSON Gas where
+  parseJSON = fmap (Gas . fromInteger) . parseJSON
 
 newtype BloomFilter = BloomFilter
   ( LargeKey
