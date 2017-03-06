@@ -60,7 +60,7 @@ windows:
             - p2p-server:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-server
 
-     - strato-api:
+    - strato-api:
         layout: tiled
         panes:
             - strato-api-get:
@@ -68,7 +68,7 @@ windows:
             - strato-api-post:
                 - docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 POST
             
-     - misc-api:
+    - misc-api:
         layout: tiled
         panes: 
             - bloc:
