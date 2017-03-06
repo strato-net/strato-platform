@@ -1,7 +1,7 @@
 # ~/.tmuxinator/strato-dashboard.yml
 
 name: strato
-root: ~/
+root: . 
 
 # Optional tmux socket
 # socket_name: foo
@@ -121,6 +121,13 @@ windows:
             - p2p-indexer:
                 - watch -n 1 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s p2pindexer -o get'"
 
+    - cirrus:
+        layout: even-horizontal 
+        panes:
+            - contracts:
+                - watch -n 1 "curl -s localhost/cirrus/search/ | jq '.'"
+            - counts:
+                - watch -n1 ./watcher.sh cirrus-count 
     - monitor:
         layout: tiled
         panes:
