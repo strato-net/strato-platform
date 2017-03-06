@@ -42,6 +42,23 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("payout", TypeFunction "63bd1d4a" [] []),
        ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", TypeAddress)] [])
      ]
+   "SimpleMultiSig" ->
+     return
+     [
+       ("alice1", TypeAddress),
+       ("alice2", TypeAddress),
+       ("bob", TypeAddress),
+       ("numSigned", TypeUInt Nothing),
+       ("error", TypeBytes Nothing),
+       ("registeredYet", TypeBool),
+       ("signedYet", TypeMapping TypeAddress TypeBool),
+       ("register", TypeFunction "aa677354" [("registerAlice1", TypeAddress), ("registerAlice2", TypeAddress)] []),
+       ("withdraw", TypeFunction "51cff8d9" [("to", TypeAddress)] []),
+       ("addSignature", TypeFunction "5614d3e0" [] [])
+     ]
+
+
+
   
 {-
 
@@ -69,16 +86,27 @@ type":"Mapping"},
   "sumStake":{"atBytes":160,"type":"Int","bytes":32},
   "stakeHolders":{"atBytes":32,"dynamic":true,"entry":{"type":"Address"},"type":"Array"},
   "currentStake":{"atBytes":128,"type":"Int","bytes":32}
+
+SimpleMultiSig-
+"vars":{
+  "bob":{"atBytes":64,"type":"Address"},
+  "signedYet":{"atBytes":192,"dynamic":true,"value":{"type":"Bool"},"key":{"type":"Address"},"type":"Mapping"},
+  "error":{"atBytes":128,"type":"Bytes","bytes":32},
+  "alice1":{"atBytes":0,"type":"Address"},
+  "numSigned":{"atBytes":96,"type":"Int","bytes":32},
+  "alice2":{"atBytes":32,"type":"Address"},
+  "registeredYet":{"atBytes":160,"type":"Bool"}
 }
-
-
-
-
-
-
-
-
-
+"funcs":{
+  "register":{"args":{
+        "registerAlice1":{"type":"Address","index":0,"name":"registerAlice1"},
+        "registerAlice2":{"type":"Address","index":1,"name":"registerAlice2"}},
+        "selector":"aa677354","vals":{}},
+  "withdraw":{"args":{
+                "to":{"type":"Address","index":0,"name":"to"}
+              },"selector":"51cff8d9","vals":{}},
+  "addSignature":{"args":{},"selector":"5614d3e0","vals":{}}
+}
 
 
 -}
@@ -93,4 +121,4 @@ type":"Mapping"},
 getAddress::ContractName->MaybeNamed Address->Address
 getAddress (ContractName "Payout") _ = Address 0x953ac16faebbe2ce2136814cee884d82f0ecb1aa
 getAddress (ContractName "Stake") _ = Address 0xbcca0649c1c41486e95ca1a8287e2a5f7000a8aa
-        
+getAddress (ContractName "SimpleMultiSig") _ = Address 0x944368b7c7dbf16e97236e2ecf80df7f7c30ae88
