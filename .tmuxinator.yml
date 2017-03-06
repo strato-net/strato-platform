@@ -71,6 +71,8 @@ windows:
     - misc-api:
         layout: tiled
         panes: 
+            - strato-api:
+                - docker logs -ft --tail 1000 silo_strato_1
             - bloc:
                 - docker logs -ft --tail 1000 silo_bloc_1
             - cirrus:
