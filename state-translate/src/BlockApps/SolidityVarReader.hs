@@ -6,9 +6,12 @@
 module BlockApps.SolidityVarReader (
   Type(..),
   decodeValue,
+  word256ToByteString,
+  byteStringToWord256,
   valueToSolidityValue
   ) where
 
+import qualified Crypto.Hash.SHA3 as SHA3
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
@@ -77,6 +80,7 @@ data Value
   | ValueFixed Double
   | ValueUFixed Double
   | ValueBytes ByteString
+  | ValueArray [Value]
   | ValueString Text
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   deriving (Eq,Show)
@@ -87,6 +91,7 @@ valueToSolidityValue (ValueUInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueString s) = SolidityValueAsString s
 valueToSolidityValue (ValueAddress (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
+valueToSolidityValue (ValueArray values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)
@@ -94,6 +99,14 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
                           ++ intercalate "," (map show returnTypes)
                           ++ ")"
 valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
+
+
+word256ToByteString::Word256->ByteString
+word256ToByteString x= ByteString.pack $ map (fromIntegral . (x `shiftR`) . (*8)) [31, 30..0]
+
+
+byteStringToWord256::ByteString->Word256
+byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) $ zip [31,30..0] $ map fromIntegral $ ByteString.unpack x
 
 
 
@@ -153,7 +166,9 @@ decodeValue storage offset = \case
 {-
   TypeArray ty (Just n) -> error "TypeArray Just n is undefined in decodeValue"
 -}
-  --TypeArray ty Nothing -> ValueString $ T.pack $ "array"
+  TypeArray ty Nothing -> ValueArray $ map (flip (decodeValue storage) ty) $ map (startingKey+) [0..storage offset-1]
+    where
+      startingKey=byteStringToWord256 $ SHA3.hash 256 $ word256ToByteString offset
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
   x -> error $ "Missing case in decodeValue: " ++ show x
 {-

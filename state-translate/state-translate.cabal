@@ -24,6 +24,7 @@ library
                      , aeson
                      , blockapps-solidity
                      , bytestring
+                     , cryptohash
                      , solidity-abi
                      , vector
                      , containers
