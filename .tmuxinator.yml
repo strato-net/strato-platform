@@ -102,30 +102,28 @@ windows:
             - numuncles:
                 - watch -n 20 ./watcher.sh explorer-numuncles
 
-    - stream_dumps_1:
+    - stream_blocks:
         layout: even-horizontal
         panes:
+           - dumpkafkablocks:
+                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
             - dumpkafkaunminedblocks:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'
-            - dumpkafkablocks:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
-            - dumpkafkastatediff:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
-    - stream_dumps_2:
+    - stream_seq:
         layout: even-horizontal
         panes:
             - dumpkafkaunsequencer:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunsequencer'
             - dumpkafkasequencer:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkasequencer'
-            - dumpkafkaindexevents:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaindexevents'
+            - dumpkafkastatediff:
+                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
 
-    - stream_dumps_3:
+    - stream_dbs:
         layout : even-horizontal
         panes:
             - dumpredis:
-                - watch -n 1 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpredis 1"
+                - watch -n 1 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpredis 1'"
 
     - checkpoints:
         layout: even-vertical
