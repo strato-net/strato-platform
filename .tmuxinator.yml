@@ -78,7 +78,7 @@ windows:
             - lasttx:
                 - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq '.'"
             - version:
-                - watch -n 10 "curl -s localhost/strato-api/version | jq '.'"
+                - watch -n 60 "curl -s localhost/strato-api/version | jq '.'"
             - coinbase:
                 - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
