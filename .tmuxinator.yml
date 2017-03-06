@@ -83,7 +83,7 @@ windows:
                 - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
     - graphs:
-        layout: even-vertical:
+        layout: even-vertical
         panes:
             - blocktimes:
                 - watch -n 20 ./watcher.sh explorer-blocktimes
