@@ -27,3 +27,6 @@ extra-deps:
   - hflags-0.4.2
 flags: {}
 extra-package-dbs: []
+
+ghc-options:
+  state-translate:      -Wall -Werror

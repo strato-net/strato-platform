@@ -14,11 +14,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     SolidityStateTypes
-                     , ProcessSimpleTypes
-                     , ProcessComplexTypes
-                     , SolidityStateTranslate
-                     , BlockApps.SolidityVarReader
+  exposed-modules:     BlockApps.SolidityVarReader
   build-depends:       base >= 4.7 && < 5
                      , blockapps-ethereum
                      , aeson

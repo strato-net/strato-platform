@@ -14,15 +14,10 @@ module BlockApps.SolidityVarReader (
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.LargeWord
 import Data.List
-import qualified Data.Map as M
-import qualified Data.Text as T
 import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Numeric
+import qualified Data.Text as T
 import Numeric.Natural
 import Text.Printf
 
@@ -116,9 +111,9 @@ decodeValue
   -> Value
 decodeValue storage offset = \case
   TypeBool -> ValueBool $ storage offset /= 0
-  TypeUInt (Just n) -> ValueUInt $ fromIntegral $ storage offset --TODO check for error where value too high for type
+  TypeUInt (Just _) -> ValueUInt $ fromIntegral $ storage offset --TODO check for error where value too high for type
   TypeUInt Nothing -> decodeValue storage offset (TypeUInt (Just 256))
-  TypeInt (Just n) -> ValueInt $ fromIntegral $ storage offset --TODO clean this up, deal with negatives
+  TypeInt (Just _) -> ValueInt $ fromIntegral $ storage offset --TODO clean this up, deal with negatives
 {-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
       (sign, significant) =
@@ -161,17 +156,12 @@ decodeValue storage offset = \case
       ValueString $ Text.decodeUtf8 bytes
 -}
   TypeFunction selector args returns -> ValueFunction selector args returns
-{-
-  TypeArray ty (Just n) -> error "TypeArray Just n is undefined in decodeValue"
--}
+
+  TypeArray _ (Just _) -> error "TypeArray Just n is undefined in decodeValue"
+
   TypeArray ty Nothing -> ValueArray $ map (flip (decodeValue storage) ty) $ map (startingKey+) [0..storage offset-1]
     where
       startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
+
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
   x -> error $ "Missing case in decodeValue: " ++ show x
-{-
---  where
---    slice :: Int -> ByteString
---    slice len = ByteString.take len $ ByteString.drop offset storage
-
--}
