@@ -58,6 +58,7 @@ data Type
   -- ^ <type>[M]: a fixed-length array of the given fixed-length type.
   -- <type>[]: a variable-length array of the given fixed-length type.
   | TypeMapping Type Type
+  | TypeContract Text
   deriving (Eq, Show)
 
 formatType::Type->String
