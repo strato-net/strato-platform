@@ -112,3 +112,6 @@ setup = do
   case cfgEither of
     Left err -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg
+
+localhost :: BaseUrl
+localhost = BaseUrl Http "localhost" 8000 ""
