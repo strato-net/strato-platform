@@ -214,3 +214,8 @@ getAddress::ContractName->MaybeNamed Address->Address
 getAddress (ContractName "Payout") _ = Address 0x953ac16faebbe2ce2136814cee884d82f0ecb1aa
 getAddress (ContractName "Stake") _ = Address 0xbcca0649c1c41486e95ca1a8287e2a5f7000a8aa
 getAddress (ContractName "SimpleMultiSig") _ = Address 0x944368b7c7dbf16e97236e2ecf80df7f7c30ae88
+getAddress (ContractName "Consumer") _ = Address 0x687f7a384cf998eca6afadb67d76f3ffa9e0741d
+--getAddress (ContractName "Greeter") _ = Address 0x
+getAddress (ContractName "InfoFeed") _ = Address 0xf503bdf764474ab89130511860229dc0ed9c2bd6
+getAddress (ContractName "SimpleDataFeed") _ = Address 0x3fbbcae9815773e8820bb53a855c2ae8cb75e9c0
+getAddress (ContractName "SimpleStorage") _ = Address 0x12ed0ad1f6838d49502fc34458f1bee7222d4ba3
