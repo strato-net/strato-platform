@@ -2,8 +2,10 @@
     DataKinds
   , DeriveGeneric
   , FlexibleInstances
+  , LambdaCase
   , OverloadedLists
   , OverloadedStrings
+  , RecordWildCards
   , TypeApplications
 #-}
 
@@ -25,6 +27,8 @@ module BlockApps.Ethereum
     -- * Transactions
   , Transaction (..)
   , UnsignedTransaction (..)
+  , signRLP
+  , signTransaction
     -- * Blocks
   , BlockHeader (..)
     -- * Ethereum Types
@@ -35,11 +39,13 @@ module BlockApps.Ethereum
   , BloomFilter (..)
   ) where
 
+import Control.Applicative
 import Crypto.Hash
 import Crypto.Random.Entropy
 import Crypto.Secp256k1
-import Data.Aeson
+import Data.Aeson hiding (Array,String)
 import qualified Data.Binary as Binary
+import Data.ByteArray (convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
@@ -48,6 +54,7 @@ import qualified Data.ByteString.Lazy as Lazy (ByteString)
 import Data.LargeWord
 import Data.Maybe
 import Data.Monoid
+import Data.RLP
 import qualified Data.Text as Text
 import Data.Time
 import GHC.Generics
@@ -56,7 +63,7 @@ import Numeric.Natural
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck
-import Text.Read
+import Text.Read hiding (String)
 import Web.FormUrlEncoded
 
 newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
@@ -90,6 +97,9 @@ instance ToCapture (Capture "address" Address) where
   toCapture _ = DocCapture "address" "an Ethereum address"
 instance ToCapture (Capture "contractAddress" Address) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address"
+instance RLPEncodable Address where
+  rlpEncode (Address addr) = rlpEncode $ toInteger addr
+  rlpDecode obj = Address . fromInteger <$> rlpDecode obj
 
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
@@ -168,6 +178,47 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionValue :: Wei
   , unsignedTransactionInitOrData :: ByteString
   } deriving (Eq,Show,Generic)
+instance RLPEncodable UnsignedTransaction where
+  rlpEncode UnsignedTransaction{..} = Array
+    [ rlpEncode unsignedTransactionNonce
+    , rlpEncode unsignedTransactionGasPrice
+    , rlpEncode unsignedTransactionGasLimit
+    , maybe (String ByteString.empty) rlpEncode unsignedTransactionTo
+    , rlpEncode unsignedTransactionValue
+    , rlpEncode unsignedTransactionInitOrData
+    ]
+  rlpDecode = \case
+    Array [ob1,ob2,ob3,ob4,ob5,ob6] -> UnsignedTransaction
+      <$> rlpDecode ob1
+      <*> rlpDecode ob2
+      <*> rlpDecode ob3
+      <*> ((Just <$> rlpDecode ob4) <|> (case ob4 of String "" -> Right Nothing; _ -> Left "aggg"))
+      <*> rlpDecode ob5
+      <*> rlpDecode ob6
+    rlpObj -> Left $
+      "rlpDecode UnsignedTransaction: Expected Array with 6 elements, Saw "
+      ++ show rlpObj
+
+signRLP :: RLPEncodable x => SecKey -> x -> CompactRecSig
+signRLP sk x =
+  let
+    rlp = packRLP $ rlpEncode x
+    Keccak256 hash = keccak256 rlp
+    err = error "singRLP failure"
+    message = fromMaybe err (msg (convert hash))
+  in
+    exportCompactRecSig $ signRecMsg sk message
+
+signTransaction :: SecKey -> UnsignedTransaction -> Transaction
+signTransaction sk utx@UnsignedTransaction{..} = Transaction
+  { transactionNonce = unsignedTransactionNonce
+  , transactionGasPrice = unsignedTransactionGasPrice
+  , transactionGasLimit = unsignedTransactionGasLimit
+  , transactionTo = unsignedTransactionTo
+  , transactionValue = unsignedTransactionValue
+  , transactionSignature = signRLP sk utx
+  , transactionInitOrData = unsignedTransactionInitOrData
+  }
 
 data BlockHeader = BlockHeader
   { blockHeaderParentHash :: Keccak256
@@ -193,6 +244,9 @@ instance ToJSON Nonce where
 instance FromJSON Nonce where
   parseJSON = fmap (Nonce . fromInteger) . parseJSON
 instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
+instance RLPEncodable Nonce where
+  rlpEncode (Nonce n) = rlpEncode $ toInteger n
+  rlpDecode obj = Nonce . fromInteger <$> rlpDecode obj
 incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n+1)
 
@@ -202,6 +256,9 @@ instance ToJSON Wei where
   toJSON (Wei g) = toJSON $ toInteger g
 instance FromJSON Wei where
   parseJSON = fmap (Wei . fromInteger) . parseJSON
+instance RLPEncodable Wei where
+  rlpEncode (Wei n) = rlpEncode $ toInteger n
+  rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
 
 newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
 instance Arbitrary Gas where arbitrary = Gas . fromInteger <$> arbitrary
@@ -209,6 +266,9 @@ instance ToJSON Gas where
   toJSON (Gas g) = toJSON $ toInteger g
 instance FromJSON Gas where
   parseJSON = fmap (Gas . fromInteger) . parseJSON
+instance RLPEncodable Gas where
+  rlpEncode (Gas n) = rlpEncode $ toInteger n
+  rlpDecode obj = Gas . fromInteger <$> rlpDecode obj
 
 newtype BloomFilter = BloomFilter
   ( LargeKey

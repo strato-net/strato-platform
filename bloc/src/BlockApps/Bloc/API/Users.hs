@@ -17,6 +17,7 @@ import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.Log
 import Control.Monad.Reader
+import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy as ByteString.Lazy
@@ -110,14 +111,14 @@ instance MonadUsers Bloc where
           restrict -< uId' .== constant (uId::Int32)
             .&& addr' .== constant addr
           returnA -< (salt,nonce,encSecKey)
-      secKeyMaybe <- case listToMaybe cryptos of
+      skMaybe <- case listToMaybe cryptos of
         Nothing -> throwError . DBError $
           "address does not exist for user:" <> userName
         Just (salt,nonce,encSecKey) -> return $
           decryptSecKey password salt nonce encSecKey
-      case secKeyMaybe of
+      case skMaybe of
         Nothing -> throwError $ UserError "incorrect password"
-        Just secKey -> do
+        Just sk -> do
           accts <- blocStrato $ getAccountsFilter
             accountsFilterParams{qaAddress = Just addr}
           nonce <- case listToMaybe accts of
@@ -138,6 +139,7 @@ instance MonadUsers Bloc where
               , unsignedTransactionValue = Wei $ fromIntegral value
               , unsignedTransactionInitOrData = undefined
               }
+            CompactRecSig{..} = signRLP sk unsignedTx
             -- todo: rlp encode the unsigned transaction
             -- todo: keccak that
             -- todo: sign that and make a postTx
