@@ -85,7 +85,7 @@ valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueUInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueString s) = SolidityValueAsString s
 valueToSolidityValue (ValueAddress (Address addr)) =
-  SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
+  SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueArray values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueBytes bytes) = SolidityValueAsString $ T.pack $ BC.unpack bytes
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
