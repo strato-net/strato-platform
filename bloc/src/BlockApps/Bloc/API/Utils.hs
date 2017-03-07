@@ -12,13 +12,17 @@ module BlockApps.Bloc.API.Utils where
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Monad.Log
 import Control.Monad.Loops
 import Control.Monad.IO.Class
+import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Data.Int (Int32)
-import Data.Map.Strict (Map)
+import Data.HashMap.Strict (HashMap)
+import Data.Maybe
+import Data.Monoid
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Generic.Random.Generic
@@ -31,6 +35,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Numeric.Natural
 
+import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Client
@@ -57,6 +62,8 @@ instance MimeRender HTMLifiedAddress Address where
   mimeRender _ = Lazy.Char8.pack . addressString
 
 newtype ContractName = ContractName Text
+instance IsString ContractName where
+  fromString = ContractName . Text.pack
 instance ToHttpApiData ContractName where
   toUrlPiece (ContractName name) = name
 instance FromHttpApiData ContractName where
@@ -132,7 +139,16 @@ waitNewBlock = do
       . withoutNext
       . head <$> getBlocksLast 0
 
+pollTxResult :: Text -> Bloc TransactionResult
+pollTxResult hash = untilJust $ do
+  liftIO $ threadDelay 1000000
+  logNotice $ "Looking up " <> hash
+  result <- blocStrato $ getTxResult hash
+  return $ listToMaybe result
+
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
+instance IsString UserName where
+  fromString = UserName . Text.pack
 instance ToHttpApiData UserName where
   toUrlPiece (UserName name) = name
 instance FromHttpApiData UserName where
@@ -149,16 +165,15 @@ instance ToCapture (Capture "user" UserName) where
 instance Arbitrary UserName where arbitrary = genericArbitrary uniform
 
 data TxParams = TxParams
-  { txparamsGasLimit :: Natural
-  , txparamsGasPrice :: Natural
+  { txparamsGasLimit :: Maybe Gas
+  , txparamsGasPrice :: Maybe Wei
+  , txparamsNonce :: Maybe Nonce
   } deriving (Eq,Show,Generic)
 instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
 instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-
 
 data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
 instance ToJSON a => ToJSON (MaybeNamed a) where
@@ -182,3 +197,11 @@ instance ToSample (MaybeNamed Address) where
   toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
+
+-- upload
+--   :: ContractName
+--   -> SecKey
+--   -> HashMap Text Text
+--   -> TxParams
+--   -> Bloc Address
+-- upload (ContractName contractName) sk args params = do

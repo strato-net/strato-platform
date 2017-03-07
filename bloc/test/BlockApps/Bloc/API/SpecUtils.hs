@@ -23,6 +23,7 @@ import BlockApps.Solidity
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.Crypto
 import Network.HTTP.Client
 
 
@@ -35,7 +36,7 @@ data TestConfig = TestConfig
   , userAddress :: Address
   , toUserName :: UserName
   , toUserAddress :: Address
-  , pw :: Text
+  , pw :: Password
   , simpleStorageContractName :: Text
   , simpleStorageContractAddress :: Address
   , testContractName :: Text

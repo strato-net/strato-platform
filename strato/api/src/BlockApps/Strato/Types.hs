@@ -19,6 +19,7 @@ module BlockApps.Strato.Types
   , WithNext (..)
   , TransactionType (..)
   , Transaction (..)
+  , TransactionResult (..)
   , PostTransaction (..)
   , toPostTx
   , BlockData (..)
@@ -66,6 +67,7 @@ import BlockApps.Ethereum
   , stringAddress
   , Keccak256 (..)
   , keccak256lazy
+  , Nonce
   )
 import BlockApps.Solidity
 
@@ -234,7 +236,7 @@ instance ToJSON Block where
 
 data Account = Account
   { accountAddress :: Address
-  , accountNonce :: Natural
+  , accountNonce :: Nonce
   , accountBalance :: Strung Natural
   , accountContractRoot :: Keccak256
   , accountCode :: Text
@@ -315,3 +317,23 @@ instance MimeUnrender PlainText SolcResponse where
   mimeUnrender _ = eitherDecode
 instance MimeRender PlainText SolcResponse where
   mimeRender _ = encode
+
+data TransactionResult = TransactionResult
+  { transactionresultBlockHash :: Keccak256
+  , transactionresultTransactionHash :: Keccak256
+  , transactionresultMessage :: Text
+  , transactionresultResponse :: Text
+  , transactionresultTrace :: Text
+  , transactionresultGasUsed :: Hex Word256
+  , transactionresultEtherUsed :: Hex Word256
+  , transactionresultContractsCreated :: Text
+  , transactionresultContractsDeleted :: Text
+  , transactionresultStateDiff :: Text
+  , transactionresultTime :: Double
+  , transactionresultNewStorage :: Text
+  , transactionresultDeletedStorage :: Text
+  } deriving (Show, Generic, Eq)
+instance ToJSON TransactionResult where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON TransactionResult where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)

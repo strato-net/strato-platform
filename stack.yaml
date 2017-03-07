@@ -22,5 +22,8 @@ extra-deps:
   - tuple-th-0.2.5
   - vector-0.11.0.0
   - primitive-0.6.1.0
+  - relapse-0.1.0.1
 flags: {}
 extra-package-dbs: []
+ghc-options:
+  blockapps-bloc: -fsimpl-tick-factor=1000

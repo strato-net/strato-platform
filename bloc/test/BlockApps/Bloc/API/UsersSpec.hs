@@ -32,7 +32,7 @@ spec = do
   describe "postUsersUser" $
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
-        username = UserName "blockapps"
+        username = "blockapps"
         postUsersUserRequest = PostUsersUserRequest 1 pw
       postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr blocUrl)
       postUsersEither `shouldSatisfy` isRight
@@ -50,8 +50,11 @@ spec = do
       threadDelay delay
       let
         postUsersContractRequest = PostUsersContractRequest
-          { src = simpleStorageSrc
-          , password = pw
+          { postuserscontractrequestSrc = simpleStorageSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = simpleStorageContractName
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = Nothing
           }
       postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight

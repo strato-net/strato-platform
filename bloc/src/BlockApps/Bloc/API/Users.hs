@@ -1,9 +1,11 @@
 {-# LANGUAGE
-    DataKinds
+    Arrows
+  , DataKinds
   , DeriveGeneric
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
+  , RecordWildCards
   , TypeApplications
   , TypeOperators
   , GeneralizedNewtypeDeriving
@@ -11,20 +13,29 @@
 
 module BlockApps.Bloc.API.Users where
 
+import Control.Arrow
 import Control.Monad.Except
+import Control.Monad.Log
 import Control.Monad.Reader
+import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as HashMap
+import Data.Int (Int32)
+import qualified Data.Map.Strict as Map
+import Data.Maybe
+import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
-import Hasql.Session
 import Numeric.Natural
+import Opaleye
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -34,10 +45,11 @@ import Web.FormUrlEncoded
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Queries
+import BlockApps.Bloc.Database.Queries
+import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Solidity
-import BlockApps.Strato.Types (PostTransaction)
+import BlockApps.Strato.Types
 import BlockApps.Strato.Client
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
@@ -66,25 +78,118 @@ instance MonadUsers ClientM where
   postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 instance MonadUsers Bloc where
 
-  getUsers = blocSql $ map UserName <$> query () getUsersQuery
+  getUsers = map UserName <$> blocQuery getUsersQuery
 
-  getUsersUser (UserName name) = blocSql $ query name getUsersUserQuery
+  getUsersUser (UserName name) = blocQuery $ getUsersUserQuery name
 
   postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
-    keyStore <- liftIO . newKeyStore . Password $ Text.encodeUtf8 pass
-    mngr <- asks httpManager
-    url <- asks urlStrato
-    blocSql $ query (name,keyStore) postUsersUserQuery
+    keyStore <- newKeyStore pass
+    createdUser <- blocModify $ postUsersUserQuery name keyStore
+    unless createdUser (throwError (DBError "failed to create user"))
     let
       addr = keystoreAcctAddress keyStore
-    liftIO . when (faucet == 1) $
-      void $ runClientM (postFaucet addr) (ClientEnv mngr url)
+    when (faucet /= 0) . void $ blocStrato (postFaucet addr)
     return addr
 
   postUsersSend = undefined
-  postUsersContract = undefined
+
+  postUsersContract (UserName userName) addr
+    (PostUsersContractRequest src password contract args TxParams{..} value) = do
+      logNotice $ "constructor arguments: " <> Text.pack (show args)
+      uIds <- blocQuery $ proc () -> do
+        (uId,name) <- queryTable usersTable -< ()
+        restrict -< name .== constant userName
+        returnA -< uId
+      cryptos <- case listToMaybe uIds of
+        Nothing -> throwError . DBError $
+          "no user found with name: " <> userName
+        Just uId -> blocQuery $ proc () -> do
+          (_,salt,_,nonce,encSecKey,_,addr',uId') <-
+            queryTable keyStoreTable -< ()
+          restrict -< uId' .== constant (uId::Int32)
+            .&& addr' .== constant addr
+          returnA -< (salt,nonce,encSecKey)
+      skMaybe <- case listToMaybe cryptos of
+        Nothing -> throwError . DBError $
+          "address does not exist for user:" <> userName
+        Just (salt,nonce,encSecKey) -> return $
+          decryptSecKey password salt nonce encSecKey
+      case skMaybe of
+        Nothing -> throwError $ UserError "incorrect password"
+        Just sk -> do
+          accts <- blocStrato $ getAccountsFilter
+            accountsFilterParams{qaAddress = Just addr}
+          nonce <- case listToMaybe accts of
+            Nothing -> throwError . UserError $ "strato error: failed to find account"
+            Just acct -> return . incrNonce $ accountNonce acct
+          bins <- blocQuery $ proc () -> do
+            (name,bin) <- joinF
+              (\ (_,_,bin,_,_,_) (_,name) -> (name,bin))
+              (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+              (queryTable contractsMetaDataTable)
+              (queryTable contractsTable) -< ()
+            restrict -< name .== constant contract
+            returnA -< bin
+          bin <- case listToMaybe bins of
+            Nothing -> throwError $ DBError "could not find bin for contract"
+            Just bin -> return (bin::ByteString)
+          -- TODO: get args for constructor
+          let
+            unsignedTx = UnsignedTransaction
+              { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
+              , unsignedTransactionGasPrice =
+                  fromMaybe (Wei 1000000000000000000) txparamsGasPrice
+              , unsignedTransactionGasLimit =
+                  fromMaybe (Gas 3141592) txparamsGasLimit
+              , unsignedTransactionTo = Nothing
+              , unsignedTransactionValue = Wei $ fromIntegral value
+              , unsignedTransactionInitOrData = undefined
+              }
+            (hash,CompactRecSig{..}) = signRLP sk unsignedTx
+            Gas gasLimit = unsignedTransactionGasLimit unsignedTx
+            Wei gasPrice = unsignedTransactionGasPrice unsignedTx
+            Nonce nonce' = unsignedTransactionNonce unsignedTx
+            tx = PostTransaction
+              { posttransactionHash = hash
+              , posttransactionGasLimit = Strung $ fromIntegral gasLimit
+              , posttransactionCodeOrData = Text.decodeUtf8 bin -- TODO: add args?
+              , posttransactionGasPrice = Strung $ fromIntegral gasPrice
+              , posttransactionTo = Nothing
+              , posttransactionFrom = addr
+              , posttransactionValue = Strung value
+              , posttransactionR = Hex $ fromIntegral getCompactRecSigR
+              , posttransactionS = Hex $ fromIntegral getCompactRecSigS
+              , posttransactionV = Hex getCompactRecSigV
+              , posttransactionNonce = Strung $ fromIntegral nonce'
+              }
+          hash <- blocStrato $ postTx tx
+          txResult <- pollTxResult hash
+          let
+            addressMaybe = do
+              str <- listToMaybe $ Text.splitOn "," (transactionresultContractsCreated txResult)
+              stringAddress $ Text.unpack str
+          case addressMaybe of
+            Nothing -> throwError $ UserError "could not find txResult address"
+            Just addr -> return addr
+
   postUsersUploadList = undefined
+
   postUsersContractMethod = undefined
+
+  -- postUsersContractMethod
+  --   (UserName userName) addr
+  --   (ContractName contractName) contractAddr
+  --   PostUsersContractMethodRequest
+  --     {
+  --     } = do
+
+      -- return PostUsersContractMethodRequest
+      --   { postuserscontractmethodPassword =
+      --   , postuserscontractmethodMethod =
+      --   , postuserscontractmethodArgs =
+      --   , postuserscontractmethodValue =
+      --   }
+
   postUsersSendList = undefined
   postUsersContractMethodList = undefined
 
@@ -100,7 +205,7 @@ type PostUsersUser = "users"
   :> Post '[HTMLifiedAddress] Address
 data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
-  , userPassword :: Text
+  , userPassword :: Password
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersUserRequest where
@@ -126,7 +231,7 @@ type PostUsersSend = "users"
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
-  , sendPassword :: Text
+  , sendPassword :: Password
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendParameters where
@@ -148,24 +253,32 @@ type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
-  :> ReqBody '[FormUrlEncoded] PostUsersContractRequest
+  :> ReqBody '[JSON] PostUsersContractRequest
   :> Post '[HTMLifiedAddress] Address
 data PostUsersContractRequest = PostUsersContractRequest
-  { src :: Text
-  , password :: Text
+  { postuserscontractrequestSrc :: Text
+  , postuserscontractrequestPassword :: Password
+  , postuserscontractrequestContract :: Text
+  , postuserscontractrequestArgs :: Maybe (HashMap Text Text)
+  , postuserscontractrequestTxParams :: TxParams
+  , postuserscontractrequestValue :: Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
-instance ToJSON PostUsersContractRequest
-instance FromJSON PostUsersContractRequest
-instance ToForm PostUsersContractRequest
-instance FromForm PostUsersContractRequest
+instance ToJSON PostUsersContractRequest where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostUsersContractRequest where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostUsersContractRequest where
   toSamples _ = singleSample PostUsersContractRequest
-    { src =
+    { postuserscontractrequestSrc =
       "contract SimpleStorage { uint storedData; function set(uint x) \
       \{ storedData = x; } function get() returns (uint retVal) \
       \{ return storedData; } }"
-    , password = "securePassword"
+    , postuserscontractrequestPassword = "securePassword"
+    , postuserscontractrequestContract = "SimpleStorage"
+    , postuserscontractrequestArgs = Nothing
+    , postuserscontractrequestTxParams = TxParams Nothing Nothing Nothing
+    , postuserscontractrequestValue = 1000000
     }
 
 type PostUsersUploadList = "users"
@@ -175,7 +288,7 @@ type PostUsersUploadList = "users"
   :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] [PostUsersUploadListResponse]
 data UploadListRequest = UploadListRequest
-  { uploadlistPassword :: Text
+  { uploadlistPassword :: Password
   , uploadlistContracts :: [UploadListContract]
   , uploadlistResolve :: Bool
   } deriving (Eq,Show,Generic)
@@ -223,7 +336,7 @@ type PostUsersContractMethod = "users"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
   :> Post '[HTMLifiedPlainText] PostUsersContractMethodResponse
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
-  { postuserscontractmethodPassword :: Text
+  { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
   , postuserscontractmethodArgs :: HashMap Text SolidityValue
   , postuserscontractmethodValue :: Natural
@@ -256,7 +369,7 @@ type PostUsersSendList = "users"
   :> ReqBody '[JSON] PostSendListRequest
   :> Post '[JSON] [PostSendListResponse]
 data PostSendListRequest = PostSendListRequest
-  { postsendlistrequestPassword :: Text
+  { postsendlistrequestPassword :: Password
   , postsendlistrequestResolve :: Bool
   , postsendlistrequestTxs :: [SendTransaction]
   } deriving (Eq,Show,Generic)
@@ -270,7 +383,7 @@ instance ToSample PostSendListRequest where
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue :: Natural
-  , sendtransactionTxParams :: Maybe TxParams
+  , sendtransactionTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
 instance ToJSON SendTransaction where
@@ -297,7 +410,7 @@ type PostUsersContractMethodList = "users"
   :> ReqBody '[JSON] PostMethodListRequest
   :> Post '[JSON] [PostMethodListResponse]
 data PostMethodListRequest = PostMethodListRequest
-  { postmethodlistrequestPassword :: Text
+  { postmethodlistrequestPassword :: Password
   , postmethodlistrequestResolve :: Bool
   , postmethodlistrequestTxs :: [MethodCall]
   } deriving (Eq,Show,Generic)
@@ -324,7 +437,7 @@ data MethodCall = MethodCall
   , methodcallMethodName :: Text
   , methodcallArgs :: HashMap Text SolidityValue
   , methodcallValue :: Natural
-  , methodcallTxParams :: TxParams --TODO: Params maybe optional
+  , methodcallTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
 instance ToJSON MethodCall where

@@ -29,6 +29,7 @@ library
     , largeword
     , memory
     , QuickCheck
+    , relapse
     , secp256k1
     , servant
     , servant-docs

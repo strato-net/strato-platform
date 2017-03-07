@@ -19,7 +19,6 @@ import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
-import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -28,7 +27,7 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Queries
+import BlockApps.Bloc.Database.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
 
@@ -43,7 +42,7 @@ instance MonadSearchContract ClientM where
 instance MonadSearchContract Bloc where
 
   getSearchContract (ContractName contractName) =
-    blocSql $ map Unnamed <$> query contractName getSearchContractQuery
+    map Unnamed <$> blocQuery (getSearchContractQuery contractName)
 
   getSearchContractState = undefined
   getSearchContractStateReduced = undefined

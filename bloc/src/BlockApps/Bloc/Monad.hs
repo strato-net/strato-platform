@@ -1,5 +1,7 @@
 {-# LANGUAGE
-    GeneralizedNewtypeDeriving
+    FlexibleContexts
+  , GeneralizedNewtypeDeriving
+  , OverloadedStrings
 #-}
 
 module BlockApps.Bloc.Monad where
@@ -8,9 +10,13 @@ import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Hasql.Connection
-import Hasql.Session
+import Data.Text (Text)
+import Database.PostgreSQL.Simple (Connection,withTransaction)
+import Data.Profunctor.Product.Default
+-- import Hasql.Connection
+-- import Hasql.Session
 import Network.HTTP.Client
+import Opaleye
 import Servant
 import Servant.Client
 import Text.PrettyPrint.Leijen.Text
@@ -18,7 +24,7 @@ import Text.PrettyPrint.Leijen.Text
 newtype Bloc x = Bloc
   { runBloc ::
       ReaderT BlocEnv -- global immutable environment variable
-        ( LoggingT (WithSeverity Doc) -- log all the things
+        ( LoggingT (WithSeverity Text) -- log all the things
           ( ExceptT BlocError IO ) -- throw and catch errors
         ) x
   } deriving
@@ -28,7 +34,7 @@ newtype Bloc x = Bloc
   , MonadIO
   , MonadReader BlocEnv
   , MonadError BlocError
-  , MonadLog (WithSeverity Doc)
+  , MonadLog (WithSeverity Text)
   )
 
 data BlocEnv = BlocEnv
@@ -38,8 +44,9 @@ data BlocEnv = BlocEnv
   }
 
 data BlocError
-  = DBError Error
-  | StratoError ServantError
+  = StratoError ServantError
+  | DBError Text
+  | UserError Text
   deriving Show
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
@@ -49,15 +56,28 @@ enterBloc env x
   $ flip runLoggingT (liftIO . print)
   $ flip runReaderT env $ runBloc x
 
-blocSql :: Session x -> Bloc x
-blocSql session = do
+blocQuery :: Default QueryRunner x y => Query x -> Bloc [y]
+blocQuery q = do
   conn <- asks dbConnection
-  resultEither <- liftIO $ run session conn
-  either (throwError . DBError) return resultEither
+  liftIO . withTransaction conn $ runQuery conn q
+
+blocQuery1 :: Default QueryRunner x y => Query x -> Bloc y
+blocQuery1 q = do
+  conn <- asks dbConnection
+  results <- liftIO . withTransaction conn $ runQuery conn q
+  case results of
+    [] -> throwError $ DBError "No result, expected one row"
+    [y] -> return y
+    _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+
+blocModify :: (Connection -> IO x) -> Bloc x
+blocModify modify = do
+  conn <- asks dbConnection
+  liftIO $ withTransaction conn (modify conn)
 
 blocStrato :: ClientM x -> Bloc x
-blocStrato client = do
+blocStrato client' = do
   url <- asks urlStrato
   mngr <- asks httpManager
-  resultEither <- liftIO $ runClientM client (ClientEnv mngr url)
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (throwError . StratoError) return resultEither

@@ -19,20 +19,20 @@ spec = do
   describe "getSearchContract" $
     it "gets a list of addresses in a contract" $ \ TestConfig {..} -> do
       addrsEither <- runClientM
-        (getSearchContract (ContractName "SimpleStorage"))
+        (getSearchContract "SimpleStorage")
         (ClientEnv mgr blocUrl)
       addrsEither `shouldSatisfy` isRight
 
   describe "getSearchContractState" $
     it "gets the state of all variables in addresses in a contract" $ \ TestConfig {..} -> do
       responseEither <- runClientM
-        (getSearchContractState (ContractName "SimpleStorage"))
+        (getSearchContractState "SimpleStorage")
         (ClientEnv mgr blocUrl)
       responseEither `shouldSatisfy` isRight
 
   describe "getSearchContractStateReduced" $
     it "gets the state of some variables in addresses in a contract" $ \ TestConfig {..} -> do
       responseEither <- runClientM
-        (getSearchContractStateReduced (ContractName "SimpleStorage") ["get"])
+        (getSearchContractStateReduced "SimpleStorage" ["get"])
         (ClientEnv mgr blocUrl)
       responseEither `shouldSatisfy` isRight

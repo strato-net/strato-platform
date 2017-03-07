@@ -14,6 +14,7 @@ module BlockApps.Strato.Client
   , getTxsFilter
   , getTxsLast
   , postTx
+  , getTxResult
   , getBlocksFilter
   , getBlocksLast
   , getAccountsFilter
@@ -99,6 +100,7 @@ accountsFilterParams = AccountsFilterParams
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Text
+getTxResult :: Text -> ClientM [TransactionResult]
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
 getBlocksLast :: Natural -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
@@ -112,6 +114,7 @@ postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx
+  :<|> getTxResult
   :<|> getBlocksFilter
   :<|> getBlocksLast
   :<|> getAccountsFilter
@@ -125,6 +128,7 @@ getTxsFilter
     uncurryTxsFilterParams getTxsFilter'
     :<|> getTxsLast'
     :<|> postTx'
+    :<|> getTxResult'
     :<|> uncurryBlocksFilterParams getBlocksFilter'
     :<|> getBlocksLast'
     :<|> uncurryAccountsFilterParams getAccountsFilter'
@@ -139,6 +143,7 @@ getTxsFilter
     getTxsFilter'
       :<|> getTxsLast'
       :<|> postTx'
+      :<|> getTxResult'
       :<|> getBlocksFilter'
       :<|> getBlocksLast'
       :<|> getAccountsFilter'

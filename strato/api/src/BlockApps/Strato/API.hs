@@ -39,6 +39,9 @@ type API =
   :<|> "transaction"
     :> ReqBody '[JSON] PostTransaction
     :> Post '[PlainText] Text
+  :<|> "transactionResult"
+    :> Capture "hash" Text
+    :> Get '[JSON] [TransactionResult]
   :<|> "block"
     :> QueryParam "number" Natural
     :> QueryParam "minnumber" Natural

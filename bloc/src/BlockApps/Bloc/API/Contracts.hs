@@ -1,36 +1,41 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE
-    DataKinds
+    Arrows
+  , DataKinds
   , DeriveAnyClass
   , DeriveGeneric
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
+  , ScopedTypeVariables
+  , TupleSections
   , TypeApplications
   , TypeOperators
 #-}
 
 module BlockApps.Bloc.API.Contracts where
 
+import Control.Arrow
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
-import Data.Int
 import Data.Foldable
-import Data.Traversable
-import Data.Proxy
-import Data.Time.Clock.POSIX
+import Data.Int
+import Data.Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe
+import Data.Monoid
+import Data.Proxy
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import Data.Time.Clock.POSIX
+import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
-import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -39,11 +44,11 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Queries
+import BlockApps.Bloc.Database.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
+-- import BlockApps.Strato.Client
+-- import BlockApps.Strato.Types
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -67,7 +72,7 @@ instance MonadContracts ClientM where
   postContractsCompile = client (Proxy @ PostContractsCompile)
 
 instance MonadContracts Bloc where
-  getContracts = blocSql $ do
+  getContracts = do
     let
       -- current bloc returns milliseconds
       -- TODO: get those extra 3 significant figures of accuracy
@@ -80,36 +85,82 @@ instance MonadContracts Bloc where
       namesToMap = foldr'
         (\ (key,name,utc) -> Map.insertWith (++) key [nameToVal name utc])
         Map.empty
-    contractsAddresses <- query () getContractsAddressesQuery
-    contractsNamesAsAddresses <- query () getContractsNamesAsAddressesQuery
+    contractsAddresses <- blocQuery getContractsAddressesQuery
+    contractsNamesAsAddresses <- blocQuery getContractsNamesAsAddressesQuery
     return . GetContractsResponse $
       addressesToMap contractsAddresses
       `Map.union`
       namesToMap contractsNamesAsAddresses
 
-  getContractsData (ContractName contractName) = blocSql $ do
-    addresses <- query contractName getContractsDataAddressesQuery
-    names <- query contractName getContractsDataNamesQuery
+  getContractsData (ContractName contractName) = do
+    addresses <- blocQuery $ getContractsDataAddressesQuery contractName
+    names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract (ContractName contractName) contractId = blocSql $ do
-    (contractDetails,metadataId) <- case contractId of
-      Named "Latest" ->
-        query contractName getContractsContractLatestQuery
-      Unnamed addr ->
-        query (contractName,addr) getContractsContractByAddressQuery
-      Named name ->
-        if contractName == name
-          then query name getContractsContractBySameNameQuery
-          else query (contractName,name) getContractsContractByNameQuery
-    funcIdNameSels <- query metadataId getXabiFunctionsQuery
+  getContractsContract (ContractName contractName) contractId = do
+    let
+      noXabi = Xabi Nothing Nothing Nothing
+      detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
+        ContractDetails
+          { contractdetailsBin = Text.decodeUtf8 bin
+          , contractdetailsAddress = detailsAddr
+          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
+          , contractdetailsCodeHash = Text.decodeUtf8 codeHash
+          , contractdetailsName = name
+          , contractdetailsXabi = noXabi
+          }
+    contractDetails <- case contractId of
+      Named "Latest" -> do
+        tuple <- blocQuery1 $
+          getContractsContractLatestQuery contractName
+        return $ detailsWith Nothing tuple
+      Unnamed addr -> do
+        (addr',tuple) <- blocQuery1 $
+          getContractsContractByAddressQuery contractName addr
+        return $ detailsWith (Just (Unnamed addr')) tuple
+      Named name -> if contractName == name
+        then do
+          tuple <- blocQuery1 $
+            getContractsContractBySameNameQuery name
+          return $ detailsWith (Just (Named name)) tuple
+        else do
+          tuple <- blocQuery1 $
+            getContractsContractByNameQuery contractName name
+          return $ detailsWith (Just (Named name)) tuple
+    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+    funcIdNameSelsMaybe <- blocQuery $ getXabiFunctionsQuery metadataId
     let
       -- TODO: fix this in next API iteration
+      funcIdNameSels =
+        [ (funcId, funcName, sel)
+        | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
+        ]
       argsToPairs = map (\ arg -> (fromMaybe "arggg" (argName arg), arg))
     funcs <- fmap Map.fromList $
       for funcIdNameSels $ \ (funcId,funcName,sel) -> do
-        args <- query funcId getXabiFunctionsArgsQuery
-        vals <- query funcId getXabiFunctionsReturnValuesQuery
+        args <- do
+          tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
+          for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
+            return Arg
+              { argName = name
+              , argIndex = index
+              , argType = Just ty
+              , argTypedef = tyd
+              , argDynamic = Just dy
+              , argBytes = by
+              , argEntry = Entry <$> eby <*> ety
+              }
+        vals <- do
+          tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
+          for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
+            return $ ("#" <> Text.pack (show index),) Val
+              { valIndex = index
+              , valType = Just ty
+              , valTypedef = tyd
+              , valDynamic = Just dy
+              , valBytes = by
+              , valEntry = Entry <$> eby <*> ety
+              }
         let
           func = Func
             { funcArgs = Map.fromList (argsToPairs args)
@@ -117,42 +168,64 @@ instance MonadContracts Bloc where
             , funcVals = Map.fromList vals
             }
         return $ (funcName,func)
-    constrId <- query metadataId getXabiConstrQuery
-    constr <- Map.fromList . argsToPairs <$>
-      query constrId getXabiFunctionsArgsQuery
-    vars <- Map.fromList <$> query metadataId getXabiVariablesQuery
+    constrId <- blocQuery1 $ getXabiConstrQuery metadataId
+    constr <- Map.fromList . argsToPairs <$> do
+      tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
+      for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
+        return Arg
+          { argName = name
+          , argIndex = index
+          , argType = Just ty
+          , argTypedef = tyd
+          , argDynamic = Just dy
+          , argBytes = by
+          , argEntry = Entry <$> eby <*> ety
+          }
+    vars <- Map.fromList <$> do
+      tuples <- blocQuery (getXabiVariablesQuery metadataId)
+      for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
+        return $ (name,) Var
+          { varAtBytes = atBy
+          , varType = Just ty
+          , varTypedef = Just tyd
+          , varDynamic = Just dy
+          , varSigned = Just si
+          , varBytes = Just by
+          , varEntry = Entry <$> Just eby <*> Just ety
+          , varVal = Just $ SimpleVar
+            { simplevarType = vty
+            , simplevarBytes = Just vby
+            , simplevarDynamic = Just vdy
+            , simplevarSigned = Just vsi
+            , simplevarEntry = Entry <$> Just veby <*> Just vety
+            }
+          , varKey = Just $ SimpleVar
+            { simplevarType = kty
+            , simplevarBytes = Just kby
+            , simplevarDynamic = Just kdy
+            , simplevarSigned = Just ksi
+            , simplevarEntry = Entry <$> Just keby <*> Just kety
+            }
+          }
     return $ contractDetails
       { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
   getContractsState = undefined
 
-  getContractsFunctions (ContractName contractName) contractId = blocSql $ do
-    metadataId <- case contractId of
-      Named "Latest" ->
-        query contractName getContractMetaDataIdByLatestQuery
-      Unnamed addr ->
-        query (contractName,addr) getContractsMetaDataIdByAddressQuery
-      Named name ->
-        if contractName == name
-          then query name getContractMetaDataIdBySameNameQuery
-          else query (contractName,name) getContractsMetaDataIdByNameQuery
-    funcIdNameSels <- query metadataId getXabiFunctionsQuery
-    return $ map (\ (_, funcName, _) -> FunctionName funcName) funcIdNameSels
+  getContractsFunctions (ContractName contractName) contractId = do
+    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+    funcNames <- blocQuery $ proc () -> do
+      (_,funcName,_) <- getXabiFunctionsQuery metadataId -< ()
+      returnA -< funcName
+    return [FunctionName funcName | Just funcName <- funcNames]
 
-
-
-  getContractsSymbols (ContractName contractName) contractId = blocSql $ do
-    metadataId <- case contractId of
-      Named "Latest" ->
-        query contractName getContractMetaDataIdByLatestQuery
-      Unnamed addr ->
-        query (contractName,addr) getContractsMetaDataIdByAddressQuery
-      Named name ->
-        if contractName == name
-          then query name getContractMetaDataIdBySameNameQuery
-          else query (contractName,name) getContractsMetaDataIdByNameQuery
-    vars <- query metadataId getXabiVariablesQuery
-    return $ map (\ (varName, _) -> SymbolName varName) vars
+  getContractsSymbols (ContractName contractName) contractId = do
+    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+    vars <- blocQuery $ proc () -> do
+      (varName,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_) <-
+        getXabiVariablesQuery metadataId -< ()
+      returnA -< varName
+    return $ map SymbolName vars
 
   getContractsStateMapping = undefined
     -- (ContractName contractName) addr (SymbolName mapping) key = do
@@ -173,41 +246,41 @@ instance MonadContracts Bloc where
 
   getContractsStates = undefined
 
-  -- postContractsCompile = undefined
+  postContractsCompile = undefined
 
-  postContractsCompile = traverse $ \ PostCompileRequest
-    { postcompilerequestSearchable = searchable -- TODO: Support Cirrus here
-    , postcompilerequestContractName = contractName
-    , postcompilerequestSource = source
-    } -> do
-      (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-        (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-      let
-        contracts = Map.intersectionWith (,) xabis abiBins
-      metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
-        let
-          codeHash = undefined
-          binRuntimeHash = undefined
-        blocSql $ do
-          contrId <- query contractName createContractQuery
-          metaDataId <- query
-            (contrId,bin,binRuntime,codeHash,binRuntimeHash)
-            upsertContractMetaDataQuery
-          for_ xabiFuncs $ \ funcs ->
-            forMap_ funcs $ \ funcName Func{..} -> do
-              funcId <- query
-                (metaDataId,funcName,funcSelector,False)
-                insertXabiFunction
-              -- flip Map.traverseWithKey funcArgs $ \ argName arg ->
-              return ()
-          return metaDataId
-      for_ metaDataIds $ \ leftMetaDataId ->
-        for_ metaDataIds $ \ rightMetaDataId -> blocSql $
-          --  unless (leftMetaDataId == rightMetaDataId) $
-          -- TODO: Remove all same name queries and logic
-             query (leftMetaDataId,rightMetaDataId) insertContractLookup
-      let contractCodeHash = undefined
-      return $ PostCompileResponse contractName contractCodeHash
+  -- postContractsCompile = traverse $ \ PostCompileRequest
+  --   { postcompilerequestSearchable = searchable -- TODO: Support Cirrus here
+  --   , postcompilerequestContractName = contractName
+  --   , postcompilerequestSource = source
+  --   } -> do
+  --     (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+  --       (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  --     let
+  --       contracts = Map.intersectionWith (,) xabis abiBins
+  --     metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
+  --       let
+  --         codeHash = undefined
+  --         binRuntimeHash = undefined
+  --       blocQuery $ do
+  --         contrId <- query contractName createContractQuery
+  --         metaDataId <- query
+  --           (contrId,bin,binRuntime,codeHash,binRuntimeHash)
+  --           upsertContractMetaDataQuery
+  --         for_ xabiFuncs $ \ funcs ->
+  --           forMap_ funcs $ \ funcName Func{..} -> do
+  --             funcId <- query
+  --               (metaDataId,funcName,funcSelector,False)
+  --               insertXabiFunction
+  --             -- flip Map.traverseWithKey funcArgs $ \ argName arg ->
+  --             return ()
+  --         return metaDataId
+  --     for_ metaDataIds $ \ leftMetaDataId ->
+  --       for_ metaDataIds $ \ rightMetaDataId -> blocQuery $
+  --         --  unless (leftMetaDataId == rightMetaDataId) $
+  --         -- TODO: Remove all same name queries and logic
+  --            query (leftMetaDataId,rightMetaDataId) insertContractLookup
+  --     let contractCodeHash = undefined
+  --     return $ PostCompileResponse contractName contractCodeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
@@ -346,6 +419,8 @@ instance Arbitrary PostCompileResponse where
   arbitrary = genericArbitrary uniform
 
 newtype SymbolName = SymbolName Text deriving (Eq,Show,Generic)
+instance IsString SymbolName where
+  fromString = SymbolName . Text.pack
 instance ToSample SymbolName where
   toSamples _ = samples
     [ SymbolName name | name <- ["variable1","variable2"]]
