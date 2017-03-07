@@ -23,10 +23,10 @@ getVariablesAndTypes (ContractName contractName) _ =
    "Payout" ->
      return
      [
-       ("Victor", TypeAddress), --atBytes: 0
-       ("Jim", TypeAddress), --atBytes: 32
-       ("Kieren", TypeAddress), --atBytes: 64
-       ("ownershipDistribution", TypeMapping TypeAddress (TypeUInt Nothing)), --atBytes: 96
+       ("Victor", TypeAddress),
+       ("Jim", TypeAddress),
+       ("Kieren", TypeAddress),
+       ("ownershipDistribution", TypeMapping TypeAddress (TypeUInt Nothing)),
        ("Setup", TypeFunction B.empty [] []),
        ("Dividend", TypeFunction B.empty [] [])
      ]
@@ -56,10 +56,44 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("withdraw", TypeFunction "51cff8d9" [("to", TypeAddress)] []),
        ("addSignature", TypeFunction "5614d3e0" [] [])
      ]
+   "Greeter" ->
+     return
+     [
+       ("owner", TypeAddress),
+       ("greeting", TypeString),
+       ("kill", TypeFunction "41c0e1b5" [] []),
+       ("greet", TypeFunction "cfae3217" [] [(Nothing, TypeString)])
+       --Do we include constuctors?
+       -- ("constr", TypeFunction "" [("_greeting", TypeString)] [])
+     ]
+   "SimpleDataFeed" ->
+     return
+     [
+       ("lastPrice", TypeUInt Nothing),
+       ("update", TypeFunction "82ab890a" [("newPrice", TypeUInt Nothing)] [])
+     ]
+   "SimpleStorage" ->
+     return
+     [
+       ("storedData", TypeUInt Nothing),
+       ("set", TypeFunction "60fe47b1" [("x", TypeUInt Nothing)] []),
+       ("get", TypeFunction "6d4ce63c" [] [(Just "retVal", TypeUInt Nothing)])
+     ]
+   "Consumer" ->
+     return
+     [
+       ("feed", TypeContract "InfoFeed"),
+       ("global", TypeUInt Nothing),
+       ("setFeed", TypeFunction "55b775ea" [("addr", TypeAddress)] []),
+       ("callFeed", TypeFunction "f198f5df" [] [])
+     ]
 
+   "InfoFeed" ->
+     return
+     [
+       ("info", TypeFunction "370158ea" [] [(Just "ret", TypeUInt Nothing)])
+     ]
 
-
-  
 {-
 
 Payout-
@@ -107,6 +141,64 @@ SimpleMultiSig-
               },"selector":"51cff8d9","vals":{}},
   "addSignature":{"args":{},"selector":"5614d3e0","vals":{}}
 }
+
+
+
+
+
+
+
+
+
+
+
+Greeter-
+"funcs":{
+  "kill":{"args":{},"selector":"41c0e1b5","vals":{}},
+  "greet":{"args":{},"selector":"cfae3217","vals":{"#0":{"dynamic":true,"type":"String","index":0}}}},
+  "constr":{"_greeting":{"dynamic":true,"type":"String","index":0}}
+"vars":{
+  "owner":{"atBytes":0,"type":"Address"},
+  "greeting":{"atBytes":32,"dynamic":true,"type":"String"}
+}
+
+
+SimpleDataFeed-
+"funcs":{
+  "update":{
+    "args":{
+      "newPrice":{"type":"Int","index":0,"bytes":32}
+    },"selector":"82ab890a","vals":{}}},
+"vars":{
+  "lastPrice":{"atBytes":0,"type":"Int","bytes":32}
+}
+
+SimpleStorage-
+"funcs":{
+  "set":{"args":{"x":{"type":"Int","index":0,"bytes":32}},"selector":"60fe47b1","vals":{}},
+  "get":{"args":{},"selector":"6d4ce63c","vals":{"retVal":{"type":"Int","index":0,"bytes":32}}}
+}
+"vars":{
+  "storedData":{"atBytes":0,"type":"Int","bytes":32}
+}
+
+Consumer-
+"funcs":{
+  "setFeed":{"args":{"addr":{"type":"Address","index":0}},"selector":"55b775ea","vals":{}},
+  "callFeed":{"args":{},"selector":"f198f5df","vals":{}}},
+"vars":{
+  "feed":{"atBytes":0,"typedef":"InfoFeed","type":"Contract","bytes":20},
+  "global":{"atBytes":32,"type":"Int","bytes":32}
+}
+
+InfoFeed-
+"funcs":{
+  "info":{"args":{},"selector":"370158ea","vals":{"ret":{"type":"Int","index":0,"bytes":32}}}
+}
+
+
+
+
 
 
 -}
