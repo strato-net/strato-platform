@@ -1,152 +1,165 @@
 {-# LANGUAGE
     OverloadedStrings
+  , QuasiQuotes
 #-}
 
 module BlockApps.Bloc.Database where
 
 import Database.PostgreSQL.Simple
+import Database.PostgreSQL.Simple.SqlQQ
 
 createDatabase :: Query
-createDatabase =
-  "CREATE DATABASE bloc;"
+createDatabase = [sql|
+CREATE DATABASE bloc;
+|]
 
 usersTable :: Query
-usersTable =
-  "CREATE TABLE IF NOT EXISTS users(\
-    \id serial PRIMARY KEY,\
-    \name varchar(512) NOT NULL UNIQUE\
-  \);"
+usersTable = [sql|
+CREATE TABLE IF NOT EXISTS users(
+  id serial PRIMARY KEY,
+  name varchar(512) NOT NULL UNIQUE
+);
+|]
 
 keyStoreTable :: Query
-keyStoreTable =
-  "CREATE TABLE IF NOT EXISTS keystore(\
-    \id serial PRIMARY KEY,\
-    \salt bytea NOT NULL,\
-    \password_hash bytea NOT NULL,\
-    \nonce bytea NOT NULL,\
-    \enc_sec_key bytea NOT NULL,\
-    \pub_key bytea NOT NULL,\
-    \address bytea NOT NULL UNIQUE,\
-    \user_id int NOT NULL REFERENCES users(id),\
-    \FOREIGN KEY (user_id) REFERENCES users(id)\
-  \);"
+keyStoreTable = [sql|
+CREATE TABLE IF NOT EXISTS keystore(
+  id serial PRIMARY KEY,
+  salt bytea NOT NULL,
+  password_hash bytea NOT NULL,
+  nonce bytea NOT NULL,
+  enc_sec_key bytea NOT NULL,
+  pub_key bytea NOT NULL,
+  address bytea NOT NULL UNIQUE,
+  user_id int NOT NULL REFERENCES users(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+|]
 
 contractsTable :: Query
-contractsTable =
-  "CREATE TABLE IF NOT EXISTS contracts(\
-    \id serial PRIMARY KEY,\
-    \name varchar(512) NOT NULL UNIQUE\
-  \);"
+contractsTable = [sql|
+CREATE TABLE IF NOT EXISTS contracts(
+  id serial PRIMARY KEY,
+  name varchar(512) NOT NULL UNIQUE
+);
+|]
 
 contractsMetaDataTable :: Query
-contractsMetaDataTable =
-  "CREATE TABLE IF NOT EXISTS contracts_metadata(\
-    \id serial PRIMARY KEY,\
-    \contract_id int NOT NULL REFERENCES contracts(id),\
-    \bin bytea NOT NULL,\
-    \bin_runtime bytea NOT NULL,\
-    \bin_runtime_hash bytea NOT NULL,\
-    \code_hash bytea NOT NULL,\
-    \UNIQUE (bin_runtime_hash, code_hash),\
-    \FOREIGN KEY (contract_id) REFERENCES contracts(id)\
-  \);"
+contractsMetaDataTable = [sql|
+CREATE TABLE IF NOT EXISTS contracts_metadata(
+  id serial PRIMARY KEY,
+  contract_id int NOT NULL REFERENCES contracts(id),
+  bin bytea NOT NULL,
+  bin_runtime bytea NOT NULL,
+  bin_runtime_hash bytea NOT NULL,
+  code_hash bytea NOT NULL,
+  UNIQUE (bin_runtime_hash, code_hash),
+  FOREIGN KEY (contract_id) REFERENCES contracts(id)
+);
+|]
 
 contractsInstanceTable :: Query
-contractsInstanceTable =
-  "CREATE TABLE IF NOT EXISTS contracts_instance(\
-    \id serial PRIMARY KEY,\
-    \contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),\
-    \address bytea NOT NULL UNIQUE,\
-    \timestamp timestamptz NOT NULL,\
-    \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)\
-  \);"
+contractsInstanceTable = [sql|
+CREATE TABLE IF NOT EXISTS contracts_instance(
+  id serial PRIMARY KEY,
+  contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
+  address bytea NOT NULL UNIQUE,
+  timestamp timestamptz NOT NULL,
+  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
+);
+|]
 
 contractsLookupTable :: Query
-contractsLookupTable =
-  "CREATE TABLE IF NOT EXISTS contracts_lookup(\
-    \contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),\
-    \linked_metadata_id int NOT NULL REFERENCES contracts_metadata(id),\
-    \PRIMARY KEY (contract_metadata_id, linked_metadata_id),\
-    \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
-    \FOREIGN KEY (linked_metadata_id) REFERENCES contracts_metadata(id)\
-  \);"
+contractsLookupTable = [sql|
+CREATE TABLE IF NOT EXISTS contracts_lookup(
+  contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
+  linked_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
+  PRIMARY KEY (contract_metadata_id, linked_metadata_id),
+  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
+  FOREIGN KEY (linked_metadata_id) REFERENCES contracts_metadata(id)
+);
+|]
 
 xabiFunctionsTable :: Query
-xabiFunctionsTable =
-  "CREATE TABLE IF NOT EXISTS xabi_functions(\
-    \id serial PRIMARY KEY,\
-    \contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),\
-    \is_constructor boolean NOT NULL,\
-    \name varchar(512),\
-    \selector bytea,\
-    \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)\
-  \);"
+xabiFunctionsTable = [sql|
+CREATE TABLE IF NOT EXISTS xabi_functions(
+  id serial PRIMARY KEY,
+  contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
+  is_constructor boolean NOT NULL,
+  name varchar(512),
+  selector bytea,
+  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
+);
+|]
 
 xabiTypesTable :: Query
-xabiTypesTable =
-  "CREATE TABLE IF NOT EXISTS xabi_types(\
-    \id serial PRIMARY KEY,\
-    \type varchar(50) NOT NULL,\
-    \typedef varchar(512),\
-    \is_dynamic boolean NOT NULL,\
-    \is_signed boolean NOT NULL,\
-    \is_public boolean NOT NULL,\
-    \bytes integer NULL,\
-    \entry_type_id int REFERENCES xabi_types(id),\
-    \value_type_id int REFERENCES xabi_types(id),\
-    \key_type_id int REFERENCES xabi_types(id),\
-    \FOREIGN KEY (entry_type_id) REFERENCES xabi_types(id),\
-    \FOREIGN KEY (value_type_id) REFERENCES xabi_types(id),\
-    \FOREIGN KEY (key_type_id) REFERENCES xabi_types(id)\
-  \);"
+xabiTypesTable = [sql|
+CREATE TABLE IF NOT EXISTS xabi_types(
+  id serial PRIMARY KEY,
+  type varchar(50) NOT NULL,
+  typedef varchar(512),
+  is_dynamic boolean NOT NULL,
+  is_signed boolean NOT NULL,
+  is_public boolean NOT NULL,
+  bytes integer NULL,
+  entry_type_id int REFERENCES xabi_types(id),
+  value_type_id int REFERENCES xabi_types(id),
+  key_type_id int REFERENCES xabi_types(id),
+  FOREIGN KEY (entry_type_id) REFERENCES xabi_types(id),
+  FOREIGN KEY (value_type_id) REFERENCES xabi_types(id),
+  FOREIGN KEY (key_type_id) REFERENCES xabi_types(id)
+);
+|]
 
 xabiFunctionArgumentsTable :: Query
-xabiFunctionArgumentsTable =
-  "CREATE TABLE IF NOT EXISTS xabi_function_arguments(\
-    \id serial PRIMARY KEY,\
-    \function_id int NOT NULL REFERENCES xabi_functions(id),\
-    \type_id int NOT NULL REFERENCES xabi_types(id),\
-    \name varchar(512) NOT NULL,\
-    \index integer NOT NULL,\
-    \FOREIGN KEY (function_id) REFERENCES xabi_functions(id),\
-    \FOREIGN KEY (type_id) REFERENCES xabi_types(id)\
-  \);"
+xabiFunctionArgumentsTable = [sql|
+CREATE TABLE IF NOT EXISTS xabi_function_arguments(
+  id serial PRIMARY KEY,
+  function_id int NOT NULL REFERENCES xabi_functions(id),
+  type_id int NOT NULL REFERENCES xabi_types(id),
+  name varchar(512) NOT NULL,
+  index integer NOT NULL,
+  FOREIGN KEY (function_id) REFERENCES xabi_functions(id),
+  FOREIGN KEY (type_id) REFERENCES xabi_types(id)
+);
+|]
 
 xabiFunctionReturnsTable :: Query
-xabiFunctionReturnsTable =
-  "CREATE TABLE IF NOT EXISTS xabi_function_returns(\
-    \id serial PRIMARY KEY,\
-    \function_id int NOT NULL REFERENCES xabi_functions(id),\
-    \index integer NOT NULL,\
-    \type_id int NOT NULL REFERENCES xabi_types(id),\
-    \FOREIGN KEY (function_id) REFERENCES xabi_functions(id),\
-    \FOREIGN KEY (type_id) REFERENCES xabi_types(id)\
-  \);"
+xabiFunctionReturnsTable = [sql|
+CREATE TABLE IF NOT EXISTS xabi_function_returns(
+  id serial PRIMARY KEY,
+  function_id int NOT NULL REFERENCES xabi_functions(id),
+  index integer NOT NULL,
+  type_id int NOT NULL REFERENCES xabi_types(id),
+  FOREIGN KEY (function_id) REFERENCES xabi_functions(id),
+  FOREIGN KEY (type_id) REFERENCES xabi_types(id)
+);
+|]
 
 xabiVariablesTable :: Query
-xabiVariablesTable =
-  "CREATE TABLE IF NOT EXISTS xabi_variables(\
-    \id serial PRIMARY KEY,\
-    \contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),\
-    \type_id int NOT NULL REFERENCES xabi_types(id),\
-    \name varchar(512) NOT NULL,\
-    \at_bytes integer NOT NULL,\
-    \FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),\
-    \FOREIGN KEY (type_id) REFERENCES xabi_types(id)\
-  \);"
+xabiVariablesTable = [sql|
+CREATE TABLE IF NOT EXISTS xabi_variables(
+  id serial PRIMARY KEY,
+  contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
+  type_id int NOT NULL REFERENCES xabi_types(id),
+  name varchar(512) NOT NULL,
+  at_bytes integer NOT NULL,
+  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
+  FOREIGN KEY (type_id) REFERENCES xabi_types(id)
+);
+|]
 
 createTables :: Query
-createTables =
-  mconcat
-    [ usersTable
-    , keyStoreTable
-    , contractsTable
-    , contractsMetaDataTable
-    , contractsInstanceTable
-    , contractsLookupTable
-    , xabiFunctionsTable
-    , xabiTypesTable
-    , xabiFunctionArgumentsTable
-    , xabiFunctionReturnsTable
-    , xabiVariablesTable
-    ]
+createTables = mconcat
+  [ usersTable
+  , keyStoreTable
+  , contractsTable
+  , contractsMetaDataTable
+  , contractsInstanceTable
+  , contractsLookupTable
+  , xabiFunctionsTable
+  , xabiTypesTable
+  , xabiFunctionArgumentsTable
+  , xabiFunctionReturnsTable
+  , xabiVariablesTable
+  ]
