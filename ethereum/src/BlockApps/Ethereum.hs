@@ -192,22 +192,24 @@ instance RLPEncodable UnsignedTransaction where
       <$> rlpDecode ob1
       <*> rlpDecode ob2
       <*> rlpDecode ob3
-      <*> ((Just <$> rlpDecode ob4) <|> (case ob4 of String "" -> Right Nothing; _ -> Left "aggg"))
+      <*> ((Just <$> rlpDecode ob4) <|> (case ob4 of String "" -> Right Nothing; _ -> Left "aggg")) -- push Maybe rlp upstream
       <*> rlpDecode ob5
       <*> rlpDecode ob6
     rlpObj -> Left $
       "rlpDecode UnsignedTransaction: Expected Array with 6 elements, Saw "
       ++ show rlpObj
 
-signRLP :: RLPEncodable x => SecKey -> x -> CompactRecSig
+signRLP :: RLPEncodable x => SecKey -> x -> (Keccak256,CompactRecSig)
 signRLP sk x =
   let
     rlp = packRLP $ rlpEncode x
-    Keccak256 hash = keccak256 rlp
+    kecc = keccak256 rlp
+    Keccak256 dig = keccak256 rlp
     err = error "singRLP failure"
-    message = fromMaybe err (msg (convert hash))
+    hash = convert dig
+    message = fromMaybe err (msg hash)
   in
-    exportCompactRecSig $ signRecMsg sk message
+    (kecc,exportCompactRecSig $ signRecMsg sk message)
 
 signTransaction :: SecKey -> UnsignedTransaction -> Transaction
 signTransaction sk utx@UnsignedTransaction{..} = Transaction
@@ -216,7 +218,7 @@ signTransaction sk utx@UnsignedTransaction{..} = Transaction
   , transactionGasLimit = unsignedTransactionGasLimit
   , transactionTo = unsignedTransactionTo
   , transactionValue = unsignedTransactionValue
-  , transactionSignature = signRLP sk utx
+  , transactionSignature = snd (signRLP sk utx)
   , transactionInitOrData = unsignedTransactionInitOrData
   }
 

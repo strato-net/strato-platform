@@ -20,6 +20,7 @@ import Control.Monad.Reader
 import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
@@ -83,14 +84,11 @@ instance MonadUsers Bloc where
 
   postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
     keyStore <- newKeyStore pass
-    mngr <- asks httpManager
-    url <- asks urlStrato
     createdUser <- blocModify $ postUsersUserQuery name keyStore
     unless createdUser (throwError (DBError "failed to create user"))
     let
       addr = keystoreAcctAddress keyStore
-    liftIO . when (faucet /= 0) $
-      void $ runClientM (postFaucet addr) (ClientEnv mngr url)
+    when (faucet /= 0) . void $ blocStrato (postFaucet addr)
     return addr
 
   postUsersSend = undefined
@@ -124,10 +122,18 @@ instance MonadUsers Bloc where
           nonce <- case listToMaybe accts of
             Nothing -> throwError . UserError $ "strato error: failed to find account"
             Just acct -> return . incrNonce $ accountNonce acct
-          (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-            (,) <$> postExtabi (Src src) <*> postSolc (Src src)
-          let
-            contracts = Map.intersectionWith (,) xabis abiBins
+          bins <- blocQuery $ proc () -> do
+            (name,bin) <- joinF
+              (\ (_,_,bin,_,_,_) (_,name) -> (name,bin))
+              (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+              (queryTable contractsMetaDataTable)
+              (queryTable contractsTable) -< ()
+            restrict -< name .== constant contract
+            returnA -< bin
+          bin <- case listToMaybe bins of
+            Nothing -> throwError $ DBError "could not find bin for contract"
+            Just bin -> return (bin::ByteString)
+          -- TODO: get args for constructor
           let
             unsignedTx = UnsignedTransaction
               { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
@@ -139,24 +145,21 @@ instance MonadUsers Bloc where
               , unsignedTransactionValue = Wei $ fromIntegral value
               , unsignedTransactionInitOrData = undefined
               }
-            CompactRecSig{..} = signRLP sk unsignedTx
-            -- todo: rlp encode the unsigned transaction
-            -- todo: keccak that
-            -- todo: sign that and make a postTx
+            (hash,CompactRecSig{..}) = signRLP sk unsignedTx
             Gas gasLimit = unsignedTransactionGasLimit unsignedTx
             Wei gasPrice = unsignedTransactionGasPrice unsignedTx
             Nonce nonce' = unsignedTransactionNonce unsignedTx
             tx = PostTransaction
-              { posttransactionHash = undefined
+              { posttransactionHash = hash
               , posttransactionGasLimit = Strung $ fromIntegral gasLimit
-              , posttransactionCodeOrData = undefined
+              , posttransactionCodeOrData = Text.decodeUtf8 bin -- TODO: add args?
               , posttransactionGasPrice = Strung $ fromIntegral gasPrice
               , posttransactionTo = Nothing
               , posttransactionFrom = addr
               , posttransactionValue = Strung value
-              , posttransactionR = undefined
-              , posttransactionS = undefined
-              , posttransactionV = undefined
+              , posttransactionR = Hex $ fromIntegral getCompactRecSigR
+              , posttransactionS = Hex $ fromIntegral getCompactRecSigS
+              , posttransactionV = Hex getCompactRecSigV
               , posttransactionNonce = Strung $ fromIntegral nonce'
               }
           _ <- blocStrato $ postTx tx
@@ -269,6 +272,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestContract = "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = TxParams Nothing Nothing Nothing
+    , postuserscontractrequestValue = 1000000
     }
 
 type PostUsersUploadList = "users"
