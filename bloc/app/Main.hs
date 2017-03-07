@@ -12,7 +12,7 @@ import Network.Wai.Handler.Warp
 import BlockApps.Bloc.API
 import BlockApps.Bloc.Monad
 import BlockApps.Strato.Client
-import BlockApps.Bloc.Database
+import BlockApps.Bloc.Database.Create
 
 main :: IO ()
 main = do

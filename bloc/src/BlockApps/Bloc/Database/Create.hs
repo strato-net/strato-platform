@@ -3,7 +3,7 @@
   , QuasiQuotes
 #-}
 
-module BlockApps.Bloc.Database where
+module BlockApps.Bloc.Database.Create where
 
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.SqlQQ

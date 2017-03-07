@@ -22,7 +22,7 @@ library
     BlockApps.Bloc.API.Users
     BlockApps.Bloc.API.Utils
     BlockApps.Bloc.Crypto
-    BlockApps.Bloc.Database
+    BlockApps.Bloc.Database.Create
     BlockApps.Bloc.Database.Queries
     BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
