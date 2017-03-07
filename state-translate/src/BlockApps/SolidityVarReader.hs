@@ -14,6 +14,7 @@ module BlockApps.SolidityVarReader (
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Char8 as BC
 import Data.LargeWord
 import Data.List
 import Data.Text (Text)
@@ -79,12 +80,14 @@ data Value
   deriving (Eq,Show)
 
 valueToSolidityValue::Value->SolidityValue
+valueToSolidityValue (ValueBool x) = SolidityBool x
 valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueUInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueString s) = SolidityValueAsString s
 valueToSolidityValue (ValueAddress (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Int)
 valueToSolidityValue (ValueArray values) = SolidityArray $ map valueToSolidityValue values
+valueToSolidityValue (ValueBytes bytes) = SolidityValueAsString $ T.pack $ BC.unpack bytes
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)
@@ -141,7 +144,10 @@ decodeValue storage offset = \case
     in
       ValueFixed $ fromIntegral x / 2 ** fromIntegral n
   TypeFixed Nothing -> decodeValue storage offset (TypeFixed (Just (128,128)))
-  TypeBytes (Just n) -> ValueBytes $ slice n
+-}
+  TypeBytes (Just 32) -> ValueBytes $ word256ToByteString $ storage offset
+  TypeBytes (Just _) -> error "decodeValue not implemented for TypeBytes (Just n)"
+{-
   TypeBytes Nothing ->
     let
       ValueUInt len = decodeValue storage offset (TypeUInt (Just 256))
