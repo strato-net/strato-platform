@@ -13,13 +13,10 @@ import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Text (Text)
 import Database.PostgreSQL.Simple (Connection,withTransaction)
 import Data.Profunctor.Product.Default
--- import Hasql.Connection
--- import Hasql.Session
 import Network.HTTP.Client
 import Opaleye
 import Servant
 import Servant.Client
-import Text.PrettyPrint.Leijen.Text
 
 newtype Bloc x = Bloc
   { runBloc ::

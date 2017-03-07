@@ -58,7 +58,6 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Text.Read
 import Text.Read.Lex
-import Web.HttpApiData
 import Web.FormUrlEncoded hiding (fieldLabelModifier)
 
 import BlockApps.Ethereum

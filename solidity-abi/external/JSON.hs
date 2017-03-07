@@ -10,7 +10,7 @@ import qualified Data.List as List
 import Data.Maybe
 import Data.String
 
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import qualified Data.Vector as Vector
 import qualified Data.Text as Text
 
@@ -36,7 +36,7 @@ contractABI fL name (ContractDef objs types _) =
   where
     nonempty :: (Value -> Pair) -> Value -> [Pair]
     nonempty f ob@(Object o) =
-      if HashMap.null o
+      if Map.null o
       then []
       else [f ob]
     nonempty f ar@(Array a) =

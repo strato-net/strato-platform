@@ -206,8 +206,7 @@ signRLP sk x =
     kecc = keccak256 rlp
     Keccak256 dig = keccak256 rlp
     err = error "singRLP failure"
-    hash = convert dig
-    message = fromMaybe err (msg hash)
+    message = fromMaybe err (msg (convert dig))
   in
     (kecc,exportCompactRecSig $ signRecMsg sk message)
 

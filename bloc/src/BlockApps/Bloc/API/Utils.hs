@@ -15,11 +15,9 @@ import Control.Concurrent
 import Control.Monad.Log
 import Control.Monad.Loops
 import Control.Monad.IO.Class
-import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Data.HashMap.Strict (HashMap)
 import Data.Maybe
 import Data.Monoid
 import Data.String
@@ -33,14 +31,12 @@ import Servant.Docs
 import qualified Network.HTTP.Media as M
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
-import Numeric.Natural
 
 import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
-import Network.HTTP.Client
 
 -- hack because endpoints are returning stringified json as text/html
 data HTMLifiedJSON
@@ -201,7 +197,7 @@ instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
 -- upload
 --   :: ContractName
 --   -> SecKey
---   -> HashMap Text Text
+--   -> Map Text Text
 --   -> TxParams
 --   -> Bloc Address
 -- upload (ContractName contractName) sk args params = do

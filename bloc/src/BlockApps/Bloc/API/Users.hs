@@ -16,16 +16,13 @@ module BlockApps.Bloc.API.Users where
 import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.Log
-import Control.Monad.Reader
 import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.HashMap.Strict (HashMap)
-import qualified Data.HashMap.Strict as HashMap
+import Data.Map.Strict (Map)
 import Data.Int (Int32)
-import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
@@ -94,7 +91,8 @@ instance MonadUsers Bloc where
   postUsersSend = undefined
 
   postUsersContract (UserName userName) addr
-    (PostUsersContractRequest src password contract args TxParams{..} value) = do
+    (PostUsersContractRequest _src password contract args TxParams{..} value) = do
+      -- TODO: compile the contract first
       logNotice $ "constructor arguments: " <> Text.pack (show args)
       uIds <- blocQuery $ proc () -> do
         (uId,name) <- queryTable usersTable -< ()
@@ -145,12 +143,12 @@ instance MonadUsers Bloc where
               , unsignedTransactionValue = Wei $ fromIntegral value
               , unsignedTransactionInitOrData = undefined
               }
-            (hash,CompactRecSig{..}) = signRLP sk unsignedTx
+            (kecc,CompactRecSig{..}) = signRLP sk unsignedTx
             Gas gasLimit = unsignedTransactionGasLimit unsignedTx
             Wei gasPrice = unsignedTransactionGasPrice unsignedTx
             Nonce nonce' = unsignedTransactionNonce unsignedTx
             tx = PostTransaction
-              { posttransactionHash = hash
+              { posttransactionHash = kecc
               , posttransactionGasLimit = Strung $ fromIntegral gasLimit
               , posttransactionCodeOrData = Text.decodeUtf8 bin -- TODO: add args?
               , posttransactionGasPrice = Strung $ fromIntegral gasPrice
@@ -170,7 +168,7 @@ instance MonadUsers Bloc where
               stringAddress $ Text.unpack str
           case addressMaybe of
             Nothing -> throwError $ UserError "could not find txResult address"
-            Just addr -> return addr
+            Just addr' -> return addr'
 
   postUsersUploadList = undefined
 
@@ -259,7 +257,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc :: Text
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Text
-  , postuserscontractrequestArgs :: Maybe (HashMap Text Text)
+  , postuserscontractrequestArgs :: Maybe (Map Text Text)
   , postuserscontractrequestTxParams :: TxParams
   , postuserscontractrequestValue :: Natural
   } deriving (Eq,Show,Generic)
@@ -301,7 +299,7 @@ instance ToSample UploadListRequest where
   toSamples _ = noSamples
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
-  , uploadlistcontractArgs :: HashMap Text Text
+  , uploadlistcontractArgs :: Map Text Text
   , uploadlistcontractTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
@@ -338,7 +336,7 @@ type PostUsersContractMethod = "users"
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
-  , postuserscontractmethodArgs :: HashMap Text SolidityValue
+  , postuserscontractmethodArgs :: Map Text SolidityValue
   , postuserscontractmethodValue :: Natural
   } deriving (Eq,Show,Generic)
 
@@ -435,7 +433,7 @@ data MethodCall = MethodCall
   { methodcallContractName :: Text
   , methodcallContractAddress :: Address
   , methodcallMethodName :: Text
-  , methodcallArgs :: HashMap Text SolidityValue
+  , methodcallArgs :: Map Text SolidityValue
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams
   } deriving (Eq,Show,Generic)

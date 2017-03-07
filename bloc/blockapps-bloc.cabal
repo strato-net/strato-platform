@@ -27,7 +27,7 @@ library
     BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   build-depends: base
     , blockapps-ethereum
     , blockapps-solidity
@@ -69,7 +69,7 @@ library
 executable blockapps-bloc
   hs-source-dirs: app
   main-is: Main.hs
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
   build-depends: base
     , blockapps-bloc
     , blockapps-strato-api
@@ -83,7 +83,7 @@ test-suite blockapps-bloc-test
   default-language: Haskell2010
   type: exitcode-stdio-1.0
   hs-source-dirs: test
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   main-is: Spec.hs
   other-modules:
     BlockApps.Bloc.APISpec

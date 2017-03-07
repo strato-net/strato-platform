@@ -8,7 +8,7 @@ import Blockchain.Ethereum.Solidity.Layout
   
 import qualified Data.Binary as BN
 import Data.Aeson
-import qualified Data.HashMap.Strict as H
+import qualified Data.Map.Strict as H
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.ByteString.Lazy as BS
 

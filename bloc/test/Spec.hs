@@ -5,7 +5,7 @@
 module Main where
 
 import Control.Monad
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import Network.HTTP.Client
 import Servant.Client
 import Test.Hspec
@@ -70,17 +70,17 @@ setup = do
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
-      , uploadlistcontractArgs = HashMap.empty
+      , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
       }
     uploadListContract2 = UploadListContract
       { uploadlistcontractContractName = testContractName testConfig
-      , uploadlistcontractArgs = HashMap.empty
+      , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
       }
     uploadListContract3 = UploadListContract
       { uploadlistcontractContractName = simpleMappingContractName testConfig
-      , uploadlistcontractArgs = HashMap.empty
+      , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
       }
     uploadListRequest = UploadListRequest

@@ -14,7 +14,7 @@ module BlockApps.Bloc.API.Search where
 
 import Data.Aeson
 import Data.Aeson.Casing
-import Data.HashMap.Strict (HashMap)
+import Data.Map.Strict (Map)
 import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
@@ -70,7 +70,7 @@ instance ToParam (QueryParams "props" Text) where
 
 data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
-  , searchcontractstateState :: HashMap Text SolidityValue
+  , searchcontractstateState :: Map Text SolidityValue
   } deriving (Eq, Show, Generic)
 instance ToJSON SearchContractState where
   toJSON = genericToJSON (aesonPrefix camelCase)

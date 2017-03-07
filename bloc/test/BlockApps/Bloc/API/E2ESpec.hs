@@ -6,7 +6,7 @@
 module BlockApps.Bloc.API.E2ESpec where
 
 import Control.Concurrent
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import Data.Either
 import Network.HTTP.Client
 import Numeric

@@ -6,9 +6,8 @@
 module BlockApps.Bloc.API.UsersSpec where
 
 import Control.Concurrent
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import Data.Either
-import Network.HTTP.Client
 import Servant.Client
 import Test.Hspec
 
@@ -66,12 +65,12 @@ spec = do
         uploadListContracts =
           [ UploadListContract
             { uploadlistcontractContractName = simpleStorageContractName
-            , uploadlistcontractArgs = HashMap.empty
+            , uploadlistcontractArgs = Map.empty
             , uploadlistcontractTxParams = txParams
             }
           , UploadListContract
             { uploadlistcontractContractName = testContractName
-            , uploadlistcontractArgs = HashMap.empty
+            , uploadlistcontractArgs = Map.empty
             , uploadlistcontractTxParams = txParams
             }
           ]
@@ -91,7 +90,7 @@ spec = do
         postUsersContractMethodRequest = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
-          , postuserscontractmethodArgs = HashMap.empty
+          , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = 0
           }
       postUsersContractMethodEither <- runClientM
@@ -128,7 +127,7 @@ spec = do
               { methodcallContractName = simpleStorageContractName
               , methodcallContractAddress = simpleStorageContractAddress
               , methodcallMethodName = "get"
-              , methodcallArgs = HashMap.empty
+              , methodcallArgs = Map.empty
               , methodcallValue = 0
               , methodcallTxParams = txParams
               }

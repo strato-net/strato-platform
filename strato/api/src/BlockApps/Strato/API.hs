@@ -6,14 +6,10 @@
 
 module BlockApps.Strato.API where
 
-import Data.HashMap.Strict (HashMap)
-import Data.Map.Strict (Map)
 import Data.Text (Text)
-import GHC.Generics
 import Numeric.Natural
 import Servant.API
 
-import BlockApps.Solidity
 import BlockApps.Strato.Types
 
 type API =

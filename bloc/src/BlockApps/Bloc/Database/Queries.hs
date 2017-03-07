@@ -446,7 +446,7 @@ getContractsContractBySameNameQuery
     )
 getContractsContractBySameNameQuery contractName =
   limit 1 $ proc () -> do
-    contract@(b,br,ch,name,_) <- joinTable -< ()
+    (b,br,ch,name,_) <- joinTable -< ()
     restrict -< name .== constant contractName
     returnA -< (b,br,ch,name)
   where
@@ -710,7 +710,7 @@ createContractQuery contractName conn = do
     restrict -< name .== constant contractName
     returnA -< cId
   cIds' <- case listToMaybe cIds of
-    Just cId -> return cIds
+    Just cId -> return [cId]
     Nothing -> runInsertReturning conn contractsTable
       (Nothing, constant contractName)
       (\ (cId, _) -> cId)
