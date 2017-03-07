@@ -54,7 +54,8 @@ spec = do
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
-          , postuserscontractrequestTxParams = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = 0
           }
       postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
@@ -108,7 +109,7 @@ spec = do
               SendTransaction
               { sendtransactionToAddress = toUserAddress
               , sendtransactionValue = 100
-              , sendtransactionTxParams = Just $ txParams
+              , sendtransactionTxParams = txParams
               }
           }
       postSendListEither <- runClientM
