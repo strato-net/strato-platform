@@ -84,13 +84,13 @@ windows:
         layout: tiled 
         panes:
             - bestblock:
-                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq '.'"
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq -C '.'"
             - lasttx:
-                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq '.'"
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq -C '.'"
             - version:
-                - watch -n 60 "curl -s localhost/strato-api/version | jq '.'"
+                - watch -c -n 60 "curl -s localhost/strato-api/version | jq -C '.'"
             - coinbase:
-                - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
+                - watch -c -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
     - graphs:
         layout: even-vertical
@@ -141,9 +141,9 @@ windows:
         layout: even-horizontal 
         panes:
             - contracts:
-                - watch -n 1 "curl -s localhost/cirrus/search/ | jq '.'"
+                - watch -c -n 1 "curl -s localhost/cirrus/search/ | jq '.'"
             - counts:
-                - watch -n1 ./watcher.sh cirrus-count 
+                - watch -c -n 1 ./watcher.sh cirrus-count 
     - monitor:
         layout: tiled
         panes:
