@@ -49,7 +49,7 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("alice2", TypeAddress),
        ("bob", TypeAddress),
        ("numSigned", TypeUInt Nothing),
-       ("error", TypeBytes Nothing),
+       ("error", TypeBytes (Just 32)),
        ("registeredYet", TypeBool),
        ("signedYet", TypeMapping TypeAddress TypeBool),
        ("register", TypeFunction "aa677354" [("registerAlice1", TypeAddress), ("registerAlice2", TypeAddress)] []),
