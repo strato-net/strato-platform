@@ -12,6 +12,7 @@ module BlockApps.Bloc.API.Utils where
 
 import Control.Applicative
 import Control.Concurrent
+import Control.Monad.Log
 import Control.Monad.Loops
 import Control.Monad.IO.Class
 import Crypto.Secp256k1
@@ -19,6 +20,8 @@ import Data.Aeson
 import Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.HashMap.Strict (HashMap)
+import Data.Maybe
+import Data.Monoid
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -135,6 +138,13 @@ waitNewBlock = do
       . blockBlockData
       . withoutNext
       . head <$> getBlocksLast 0
+
+pollTxResult :: Text -> Bloc TransactionResult
+pollTxResult hash = untilJust $ do
+  liftIO $ threadDelay 1000000
+  logNotice $ "Looking up " <> hash
+  result <- blocStrato $ getTxResult hash
+  return $ listToMaybe result
 
 newtype UserName = UserName Text deriving (Eq,Show,Generic)
 instance IsString UserName where

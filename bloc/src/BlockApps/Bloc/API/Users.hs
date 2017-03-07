@@ -162,9 +162,15 @@ instance MonadUsers Bloc where
               , posttransactionV = Hex getCompactRecSigV
               , posttransactionNonce = Strung $ fromIntegral nonce'
               }
-          _ <- blocStrato $ postTx tx
-          -- todo: poll strato???
-          return undefined
+          hash <- blocStrato $ postTx tx
+          txResult <- pollTxResult hash
+          let
+            addressMaybe = do
+              str <- listToMaybe $ Text.splitOn "," (transactionresultContractsCreated txResult)
+              stringAddress $ Text.unpack str
+          case addressMaybe of
+            Nothing -> throwError $ UserError "could not find txResult address"
+            Just addr -> return addr
 
   postUsersUploadList = undefined
 
