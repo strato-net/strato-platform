@@ -25,3 +25,5 @@ extra-deps:
   - relapse-0.1.0.1
 flags: {}
 extra-package-dbs: []
+ghc-options:
+  blockapps-bloc: -fsimpl-tick-factor=1000
