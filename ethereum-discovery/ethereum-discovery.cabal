@@ -28,12 +28,12 @@ library
                      , monad-logger
                      , mtl
                      , network
+                     , network-uri
                      , persistent
                      , persistent-postgresql
                      , persistent-template
                      , postgresql-simple
                      , random
-                     , regex-pcre
                      , resourcet
                      , split
                      , strato-conf

@@ -1,9 +1,55 @@
 module Blockchain.Strato.Discovery.Data.PeerSpec where
 
 import Test.Hspec
+import Control.Exception (evaluate)
+
+import Blockchain.Strato.Discovery.Data.Peer
+
+publicKey :: String
+publicKey = take 128 (repeat '1')
+
+port :: Int
+port = 30303
+
+mkAddress :: String -> String
+mkAddress host = mkAddress' (Just publicKey) host port
+
+mkAddress' :: Maybe String -> String -> Int -> String
+mkAddress' mPubKey host portNum =
+    case mPubKey of
+        Nothing -> "enode://" ++ host ++ ":" ++ show portNum
+        (Just key) -> "enode://" ++ key ++ "@" ++ host ++ ":" ++ show portNum
 
 spec :: Spec
 spec = do
-  describe "testing" $ do
-    it "can test stuff" $ do
-      True `shouldBe` True
+    describe "parseEnode" $ do
+        it "parses IP addresses like 192.168.1.17" $ do
+            let ip = "192.168.1.17"
+            parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+
+        it "parses IP addresses like 10.10.1.10" $ do
+            let ip = "10.10.1.10"
+            parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+
+        it "parses IP addresses like 0.0.0.0" $ do
+            let ip = "0.0.0.0"
+            parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+
+        it "parses docker-like hostname aliases" $ do
+            let hostname = "somedockerhostname"
+            parseEnode (mkAddress hostname) `shouldBe` (Just publicKey, hostname, port)
+
+        it "parses domain names" $ do
+            let hostname = "cheeseburgers.com"
+            parseEnode (mkAddress hostname) `shouldBe` (Just publicKey, hostname, port)
+
+        it "parses domain names with subdomains" $ do
+            let hostname = "chili.cheeseburgers.com"
+            parseEnode (mkAddress hostname) `shouldBe` (Just publicKey, hostname, port)
+
+        it "parses addresses without a public key" $ do
+            let hostname = "no-public-key.com"
+            parseEnode (mkAddress' Nothing hostname port) `shouldBe` (Nothing, hostname, port)
+
+        it "raises an error when the enode address is unparsable" $ do
+            evaluate (parseEnode "blah") `shouldThrow` errorCall "malformed enode: blah"
