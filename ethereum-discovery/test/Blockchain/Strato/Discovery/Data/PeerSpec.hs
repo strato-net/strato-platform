@@ -1,7 +1,8 @@
 module Blockchain.Strato.Discovery.Data.PeerSpec where
 
-import Test.Hspec
 import Control.Exception (evaluate)
+import Data.Monoid ((<>))
+import Test.Hspec
 
 import Blockchain.Strato.Discovery.Data.Peer
 
@@ -14,11 +15,14 @@ port = 30303
 mkAddress :: String -> String
 mkAddress host = mkAddress' (Just publicKey) host port
 
+mkIPv6Address :: String -> String
+mkIPv6Address host = mkAddress' (Just publicKey) ("[" <> host <> "]") port
+
 mkAddress' :: Maybe String -> String -> Int -> String
 mkAddress' mPubKey host portNum =
     case mPubKey of
-        Nothing -> "enode://" ++ host ++ ":" ++ show portNum
-        (Just key) -> "enode://" ++ key ++ "@" ++ host ++ ":" ++ show portNum
+        Nothing -> "enode://" <> host <> ":" <> show portNum
+        (Just key) -> "enode://" <> key <> "@" <> host <> ":" <> show portNum
 
 spec :: Spec
 spec = do
@@ -34,6 +38,10 @@ spec = do
         it "parses IP addresses like 0.0.0.0" $ do
             let ip = "0.0.0.0"
             parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+
+        it "parses an IPv6 address" $ do
+            let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+            parseEnode (mkIPv6Address ip) `shouldBe` (Just publicKey, ip, port)
 
         it "parses docker-like hostname aliases" $ do
             let hostname = "somedockerhostname"

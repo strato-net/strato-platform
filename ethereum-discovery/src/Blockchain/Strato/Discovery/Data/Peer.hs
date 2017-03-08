@@ -81,7 +81,7 @@ parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of
     publicKey -> Just publicKey
 
 parseHostname :: URIAuth -> String
-parseHostname = URI.uriRegName
+parseHostname uriAuth = filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName uriAuth)
 
 parsePort :: URIAuth -> Int
 parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
