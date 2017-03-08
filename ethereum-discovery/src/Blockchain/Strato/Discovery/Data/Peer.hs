@@ -5,7 +5,7 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-    
+
 module Blockchain.Strato.Discovery.Data.Peer where
 
 import Control.Monad.Logger
@@ -15,7 +15,8 @@ import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Database.Persist.Postgresql as SQL
 import Database.Persist.TH
-import Text.Regex.PCRE
+import Network.URI (URI(..), URIAuth(..))
+import qualified Network.URI as URI
 
 
 import Blockchain.Data.PersistTypes ()
@@ -26,7 +27,7 @@ import Blockchain.DB.SQLDB (createPostgresqlPool')
 import Blockchain.SHA
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-PPeer 
+PPeer
     pubkey Point Maybe
     ip T.Text
     tcpPort Int
@@ -47,7 +48,7 @@ jamshidBirth::UTCTime
 jamshidBirth = posixSecondsToUTCTime 0
 
 createPeer::String->PPeer
-createPeer peerString = 
+createPeer peerString =
   PPeer {
     pPeerPubkey = stringToPoint <$> pubKeyMaybe,
     pPeerIp = T.pack ip,
@@ -66,52 +67,63 @@ createPeer peerString =
   where
     (pubKeyMaybe, ip, port') = parseEnode peerString
 
--- http://stackoverflow.com/questions/106179/regular-expression-to-match-dns-hostname-or-ip-address
--- validIpAddressRegex :: String
--- validIpAddressRegex = "(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])"
--- 
--- validHostnameRegex :: String
--- validHostnameRegex = "(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])"
-
 parseEnode::String->(Maybe String, String, Int)
 parseEnode enode =
-  case (enode =~ ("enode://([a-f0-9]{128}@)?(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)"::String))::(String, String, String, [String]) of
-    ("", _, "", [pubKeyAt, ip, port']) -> (case pubKeyAt of {"" -> Nothing; x -> Just $ init x} , ip, read port')
-    _ -> error $ "malformed enode: " ++ enode
+    case mUriAuth of
+        Nothing -> error $ "malformed enode: " ++ enode
+        (Just uriAuth) -> (parsePublicKey uriAuth, parseHostname uriAuth, parsePort uriAuth)
+    where
+        mUriAuth = URI.parseURI enode >>= validateURIScheme >>= URI.uriAuthority
+
+validateURIScheme :: URI -> Maybe URI
+validateURIScheme uri = case URI.uriScheme uri == "enode:" of
+    True -> Just uri
+    False -> Nothing
+
+parsePublicKey :: URIAuth -> Maybe String
+parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of
+    [] -> Nothing
+    publicKey -> Just publicKey
+
+parseHostname :: URIAuth -> String
+parseHostname uriAuth = filter (\ch -> ch /= '[' && ch /= ']') (URI.uriRegName uriAuth)
+
+parsePort :: URIAuth -> Int
+parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
 
 getAvailablePeers::IO [PPeer]
 getAvailablePeers = do
   currentTime <- getCurrentTime
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO ()
 setPeerBondingState ip port' state = do
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  flip SQL.runSqlPool sqldb $ 
+  flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
   return ()
-  
+
 getBondedPeers::IO [PPeer]
 getBondedPeers = do
   currentTime <- getCurrentTime
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
 getBondedPeersForUDP::IO [PPeer]
 getBondedPeersForUDP = do
   currentTime <- getCurrentTime
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
 getUnbondedPeers::IO [PPeer]
 getUnbondedPeers = do
   currentTime <- getCurrentTime
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
 
 defaultPeer::PPeer
@@ -135,15 +147,15 @@ disablePeerForSeconds::PPeer->Int->IO ()
 disablePeerForSeconds peer seconds = do
   currentTime <- getCurrentTime
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  flip SQL.runSqlPool sqldb $ 
+  flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
-  
+
 disableUDPPeerForSeconds::PPeer->Int->IO ()
 disableUDPPeerForSeconds peer seconds = do
   currentTime <- getCurrentTime
   sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
-  flip SQL.runSqlPool sqldb $ 
+  flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
-  
+
