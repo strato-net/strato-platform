@@ -72,6 +72,9 @@ test-suite ethereum-discover-test
     main-is: Spec.hs
     other-modules:
         Blockchain.Strato.Discovery.Data.PeerSpec
+        Blockchain.Strato.Discovery.UDPSpec
     build-depends: base
+      , blockapps-util
       , hspec
       , ethereum-discovery
+      , network
