@@ -54,7 +54,7 @@ windows:
             - ethereum-discover:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover
             - peers:
-                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/peers | jq '.'"
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/peers | jq -C '.'"
             - p2p-client:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-client
             - p2p-server:
