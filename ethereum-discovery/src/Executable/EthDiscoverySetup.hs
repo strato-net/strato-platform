@@ -4,6 +4,7 @@ module Executable.EthDiscoverySetup (
 
 import Control.Monad
 import Control.Monad.Logger
+import qualified Data.Text as T
 import Database.Persist.Postgresql
 
 import Blockchain.Strato.Discovery.Data.Peer
@@ -14,8 +15,8 @@ setup maybeStratoNodes = do
   runNoLoggingT $ withPostgresqlConn connStr $ runSqlConn $ do
     _ <- runMigrationSilent migrateAll
 
-    let 
-      nodesPubkeys = 
+    let
+      nodesPubkeys =
         case maybeStratoNodes of
           Nothing -> []
           Just [] ->
@@ -36,5 +37,8 @@ setup maybeStratoNodes = do
 
           Just stratoNodes -> zip (repeat "") stratoNodes
 
-    forM_ nodesPubkeys $ \(pubkey, node) ->
-      insert $ createPeer $ "enode://" ++ (if null pubkey then "" else pubkey ++ "@") ++ node ++ ":30303"  
+    forM_ nodesPubkeys $ \(pubkey, node) -> do
+        let peer = createPeer $ "enode://" ++ (if null pubkey then "" else pubkey ++ "@") ++ node ++ ":30303"
+        case peer of
+            (Left err) -> logWarnN (T.pack err)
+            (Right p) -> void $ insert p
