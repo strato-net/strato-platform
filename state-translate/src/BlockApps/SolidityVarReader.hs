@@ -93,7 +93,7 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)
                           ++ ") returns ("
-                          ++ intercalate "," (map show returnTypes)
+                          ++ intercalate "," (map (formatType . snd) returnTypes)
                           ++ ")"
 valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
 
