@@ -85,10 +85,11 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
 
 doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
-    $logInfoS "doConsumer" . T.pack $ "Starting fetching blocks " ++ show offset
+    $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
-    forM_ blocks $ \b ->
+    forM_ blocks $ \b -> do
         liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
+        $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #" ++ (show . blockDataNumber $ blockBlockData b)
     doConsume (offset + fromIntegral (length blocks)) c
 
 stratoAdit :: LoggingT IO ()
