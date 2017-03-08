@@ -58,7 +58,7 @@ data Type
   -- ^ <type>[M]: a fixed-length array of the given fixed-length type.
   -- <type>[]: a variable-length array of the given fixed-length type.
   | TypeMapping Type Type
-  | TypeContract Text
+  | TypeContract
   deriving (Eq, Show)
 
 formatType::Type->String
@@ -72,6 +72,7 @@ data Value
   | ValueUInt Natural
   | ValueInt Integer
   | ValueAddress Address
+  | ValueContract Address
   | ValueFixed Double
   | ValueUFixed Double
   | ValueBytes ByteString
@@ -86,6 +87,8 @@ valueToSolidityValue (ValueInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueUInt v) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (ValueString s) = SolidityValueAsString s
 valueToSolidityValue (ValueAddress (Address addr)) =
+  SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
+valueToSolidityValue (ValueContract (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueArray values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueBytes bytes) = SolidityValueAsString $ T.pack $ BC.unpack bytes
@@ -138,6 +141,12 @@ decodeValue storage offset = \case
       ValueUInt addr = decodeValue storage offset (TypeUInt (Just 160))
     in
       ValueAddress . Address $ fromIntegral addr
+  TypeContract -> 
+    let
+      ValueAddress addr = decodeValue storage offset TypeAddress
+    in
+      ValueContract addr
+
 {-
   TypeFixed (Just (n,m)) ->
     let

@@ -82,7 +82,7 @@ getVariablesAndTypes (ContractName contractName) _ =
    "Consumer" ->
      return
      [
-       ("feed", TypeContract "InfoFeed"),
+       ("feed", TypeContract),
        ("global", TypeUInt Nothing),
        ("setFeed", TypeFunction "55b775ea" [("addr", TypeAddress)] []),
        ("callFeed", TypeFunction "f198f5df" [] [])
