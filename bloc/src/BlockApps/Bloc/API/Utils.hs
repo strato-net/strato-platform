@@ -142,15 +142,15 @@ pollTxResult hash = untilJust $ do
   result <- blocStrato $ getTxResult hash
   return $ listToMaybe result
 
-newtype UserName = UserName Text deriving (Eq,Show,Generic)
+newtype UserName = UserName {getUserName :: Text} deriving (Eq,Show,Generic)
 instance IsString UserName where
   fromString = UserName . Text.pack
 instance ToHttpApiData UserName where
-  toUrlPiece (UserName name) = name
+  toUrlPiece = getUserName
 instance FromHttpApiData UserName where
   parseUrlPiece = Right . UserName
 instance ToJSON UserName where
-  toJSON (UserName name) = toJSON name
+  toJSON = toJSON . getUserName
 instance FromJSON UserName where
   parseJSON = fmap UserName . parseJSON
 instance ToSample UserName where

@@ -826,3 +826,6 @@ instance Default Constant SecretBox.Nonce (Column PGBytea) where
 
 instance Default Constant PubKey (Column PGBytea) where
   def = lmap (exportPubKey False) def
+
+instance Default Constant UserName (Column PGText) where
+  def = lmap getUserName def

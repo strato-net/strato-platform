@@ -20,6 +20,7 @@ import Crypto.Secp256k1
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Map.Strict (Map)
 import Data.Int (Int32)
@@ -88,145 +89,43 @@ instance MonadUsers Bloc where
     when (faucet /= 0) . void $ blocStrato (postFaucet addr)
     return addr
 
-  postUsersSend (UserName userName) addr
-    (PostSendParameters toAddr value password TxParams{..}) = do
-    uIds <- blocQuery $ proc () -> do
-      (uId,name) <- queryTable usersTable -< ()
-      restrict -< name .== constant userName
-      returnA -< uId
-    cryptos <- case listToMaybe uIds of
-      Nothing -> throwError . DBError $
-        "no user found with name: " <> userName
-      Just uId -> blocQuery $ proc () -> do
-        (_,salt,_,nonce,encSecKey,_,addr',uId') <-
-          queryTable keyStoreTable -< ()
-        restrict -< uId' .== constant (uId::Int32)
-          .&& addr' .== constant addr
-        returnA -< (salt,nonce,encSecKey)
-    skMaybe <- case listToMaybe cryptos of
-      Nothing -> throwError . DBError $
-        "address does not exist for user:" <> userName
-      Just (salt,nonce,encSecKey) -> return $
-        decryptSecKey password salt nonce encSecKey
-    case skMaybe of
-      Nothing -> throwError $ UserError "incorrect password"
-      Just sk -> do
-        accts <- blocStrato $ getAccountsFilter
-          accountsFilterParams{qaAddress = Just addr}
-        nonce <- case listToMaybe accts of
-          Nothing -> throwError . UserError $ "strato error: failed to find account"
-          Just acct -> return . incrNonce $ accountNonce acct
-        let
-          unsignedTx = UnsignedTransaction
-            { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
-            , unsignedTransactionGasPrice =
-                fromMaybe (Wei 1000000000000000000) txparamsGasPrice
-            , unsignedTransactionGasLimit =
-                fromMaybe (Gas 3141592) txparamsGasLimit
-            , unsignedTransactionTo = Just toAddr
-            , unsignedTransactionValue = Wei $ fromIntegral value
-            , unsignedTransactionInitOrData = undefined
-            }
-          (kecc,CompactRecSig{..}) = signRLP sk unsignedTx
-          Gas gasLimit = unsignedTransactionGasLimit unsignedTx
-          Wei gasPrice = unsignedTransactionGasPrice unsignedTx
-          Nonce nonce' = unsignedTransactionNonce unsignedTx
-          tx = PostTransaction
-            { posttransactionHash = kecc
-            , posttransactionGasLimit = Strung $ fromIntegral gasLimit
-            , posttransactionCodeOrData = Text.empty
-            , posttransactionGasPrice = Strung $ fromIntegral gasPrice
-            , posttransactionTo = Just toAddr
-            , posttransactionFrom = addr
-            , posttransactionValue = Strung value
-            , posttransactionR = Hex $ fromIntegral getCompactRecSigR
-            , posttransactionS = Hex $ fromIntegral getCompactRecSigS
-            , posttransactionV = Hex getCompactRecSigV
-            , posttransactionNonce = Strung $ fromIntegral nonce'
-            }
-        hash <- blocStrato $ postTx tx
-        void $ pollTxResult hash
-        return tx
+  postUsersSend userName addr
+    (PostSendParameters toAddr value password txParams) = do
+      tx <- prepareTx
+        userName password addr (Just toAddr) txParams
+        (Wei (fromIntegral value)) ByteString.empty
+      hash <- blocStrato $ postTx tx
+      void $ pollTxResult hash
+      return tx
 
-  postUsersContract (UserName userName) addr
-      (PostUsersContractRequest _src password contract args TxParams{..} value) = do
+  postUsersContract userName addr
+    (PostUsersContractRequest _src password contract args txParams value) = do
       -- TODO: compile the contract first
       logNotice $ "constructor arguments: " <> Text.pack (show args)
-      uIds <- blocQuery $ proc () -> do
-        (uId,name) <- queryTable usersTable -< ()
-        restrict -< name .== constant userName
-        returnA -< uId
-      cryptos <- case listToMaybe uIds of
-        Nothing -> throwError . DBError $
-          "no user found with name: " <> userName
-        Just uId -> blocQuery $ proc () -> do
-          (_,salt,_,nonce,encSecKey,_,addr',uId') <-
-            queryTable keyStoreTable -< ()
-          restrict -< uId' .== constant (uId::Int32)
-            .&& addr' .== constant addr
-          returnA -< (salt,nonce,encSecKey)
-      skMaybe <- case listToMaybe cryptos of
-        Nothing -> throwError . DBError $
-          "address does not exist for user:" <> userName
-        Just (salt,nonce,encSecKey) -> return $
-          decryptSecKey password salt nonce encSecKey
-      case skMaybe of
-        Nothing -> throwError $ UserError "incorrect password"
-        Just sk -> do
-          accts <- blocStrato $ getAccountsFilter
-            accountsFilterParams{qaAddress = Just addr}
-          nonce <- case listToMaybe accts of
-            Nothing -> throwError . UserError $ "strato error: failed to find account"
-            Just acct -> return . incrNonce $ accountNonce acct
-          bins <- blocQuery $ proc () -> do
-            (name,bin) <- joinF
-              (\ (_,_,bin,_,_,_) (_,name) -> (name,bin))
-              (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
-              (queryTable contractsMetaDataTable)
-              (queryTable contractsTable) -< ()
-            restrict -< name .== constant contract
-            returnA -< bin
-          bin <- case listToMaybe bins of
-            Nothing -> throwError $ DBError "could not find bin for contract"
-            Just bin -> return (bin::ByteString)
-          -- TODO: get args for constructor
-          let
-            unsignedTx = UnsignedTransaction
-              { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
-              , unsignedTransactionGasPrice =
-                  fromMaybe (Wei 1000000000000000000) txparamsGasPrice
-              , unsignedTransactionGasLimit =
-                  fromMaybe (Gas 3141592) txparamsGasLimit
-              , unsignedTransactionTo = Nothing
-              , unsignedTransactionValue = Wei $ fromIntegral value
-              , unsignedTransactionInitOrData = undefined
-              }
-            (kecc,CompactRecSig{..}) = signRLP sk unsignedTx
-            Gas gasLimit = unsignedTransactionGasLimit unsignedTx
-            Wei gasPrice = unsignedTransactionGasPrice unsignedTx
-            Nonce nonce' = unsignedTransactionNonce unsignedTx
-            tx = PostTransaction
-              { posttransactionHash = kecc
-              , posttransactionGasLimit = Strung $ fromIntegral gasLimit
-              , posttransactionCodeOrData = Text.decodeUtf8 bin -- TODO: add args?
-              , posttransactionGasPrice = Strung $ fromIntegral gasPrice
-              , posttransactionTo = Nothing
-              , posttransactionFrom = addr
-              , posttransactionValue = Strung value
-              , posttransactionR = Hex $ fromIntegral getCompactRecSigR
-              , posttransactionS = Hex $ fromIntegral getCompactRecSigS
-              , posttransactionV = Hex getCompactRecSigV
-              , posttransactionNonce = Strung $ fromIntegral nonce'
-              }
-          hash <- blocStrato $ postTx tx
-          txResult <- pollTxResult hash
-          let
-            addressMaybe = do
-              str <- listToMaybe $ Text.splitOn "," (transactionresultContractsCreated txResult)
-              stringAddress $ Text.unpack str
-          case addressMaybe of
-            Nothing -> throwError $ UserError "could not find txResult address"
-            Just addr' -> return addr'
+      bins <- blocQuery $ proc () -> do
+        (name,bin) <- joinF
+          (\ (_,_,bin,_,_,_) (_,name) -> (name,bin))
+          (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+          (queryTable contractsMetaDataTable)
+          (queryTable contractsTable) -< ()
+        restrict -< name .== constant contract
+        returnA -< bin
+      bin <- case listToMaybe bins of
+        Nothing -> throwError $ DBError "could not find bin for contract"
+        Just bin -> return (bin::ByteString)
+      -- TODO: get args for constructor
+      tx <- prepareTx
+        userName password addr Nothing txParams (Wei (fromIntegral value)) bin
+      hash <- blocStrato $ postTx tx
+      txResult <- pollTxResult hash
+      let
+        addressMaybe = do
+          str <- listToMaybe $
+            Text.splitOn "," (transactionresultContractsCreated txResult)
+          stringAddress $ Text.unpack str
+      case addressMaybe of
+        Nothing -> throwError $ UserError "could not find txResult address"
+        Just addr' -> return addr'
 
   postUsersUploadList = undefined
 
@@ -499,3 +398,80 @@ instance ToJSON MethodCall where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON MethodCall where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+prepareTx
+  :: UserName
+  -> Password
+  -> Address
+  -> Maybe Address
+  -> TxParams
+  -> Wei
+  -> ByteString
+  -> Bloc PostTransaction
+prepareTx userName password addr toAddr TxParams{..} value code = do
+  uIds <- blocQuery $ proc () -> do
+    (uId,name) <- queryTable usersTable -< ()
+    restrict -< name .== constant userName
+    returnA -< uId
+  cryptos <- case listToMaybe uIds of
+    Nothing -> throwError . DBError $
+      "no user found with name: " <> getUserName userName
+    Just uId -> blocQuery $ proc () -> do
+      (_,salt,_,nonce,encSecKey,_,addr',uId') <-
+        queryTable keyStoreTable -< ()
+      restrict -< uId' .== constant (uId::Int32)
+        .&& addr' .== constant addr
+      returnA -< (salt,nonce,encSecKey)
+  skMaybe <- case listToMaybe cryptos of
+    Nothing -> throwError . DBError $
+      "address does not exist for user:" <> getUserName userName
+    Just (salt,nonce,encSecKey) -> return $
+      decryptSecKey password salt nonce encSecKey
+  case skMaybe of
+    Nothing -> throwError $ UserError "incorrect password"
+    Just sk -> do
+      accts <- blocStrato $ getAccountsFilter
+        accountsFilterParams{qaAddress = Just addr}
+      nonce <- case listToMaybe accts of
+        Nothing -> throwError . UserError $ "strato error: failed to find account"
+        Just acct -> return . incrNonce $ accountNonce acct
+      return $ prepareSignedTx sk addr UnsignedTransaction
+        { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
+        , unsignedTransactionGasPrice =
+            fromMaybe (Wei 1000000000000000000) txparamsGasPrice
+        , unsignedTransactionGasLimit =
+            fromMaybe (Gas 3141592) txparamsGasLimit
+        , unsignedTransactionTo = toAddr
+        , unsignedTransactionValue = value
+        , unsignedTransactionInitOrData = code
+        }
+
+prepareSignedTx
+  :: SecKey
+  -> Address
+  -> UnsignedTransaction
+  -> PostTransaction
+prepareSignedTx sk addr unsignedTx = PostTransaction
+  { posttransactionHash = kecc
+  , posttransactionGasLimit = Strung $ fromIntegral gasLimit
+  , posttransactionCodeOrData = code
+  , posttransactionGasPrice = Strung $ fromIntegral gasPrice
+  , posttransactionTo = toAddr
+  , posttransactionFrom = addr
+  , posttransactionValue = Strung $ fromIntegral value
+  , posttransactionR = Hex $ fromIntegral r
+  , posttransactionS = Hex $ fromIntegral s
+  , posttransactionV = Hex v
+  , posttransactionNonce = Strung $ fromIntegral nonce'
+  }
+  where
+    (kecc,sig) = signRLP sk unsignedTx
+    r = getCompactRecSigR sig
+    s = getCompactRecSigS sig
+    v = getCompactRecSigV sig
+    Gas gasLimit = unsignedTransactionGasLimit unsignedTx
+    Wei gasPrice = unsignedTransactionGasPrice unsignedTx
+    Nonce nonce' = unsignedTransactionNonce unsignedTx
+    Wei value = unsignedTransactionValue unsignedTx
+    code = Text.decodeUtf8 $ unsignedTransactionInitOrData unsignedTx
+    toAddr = unsignedTransactionTo unsignedTx
