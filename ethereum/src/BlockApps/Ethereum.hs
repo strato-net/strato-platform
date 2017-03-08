@@ -270,6 +270,8 @@ instance FromJSON Gas where
 instance RLPEncodable Gas where
   rlpEncode (Gas n) = rlpEncode $ toInteger n
   rlpDecode obj = Gas . fromInteger <$> rlpDecode obj
+-- instance ToForm Gas where
+--   toForm (Gas n) = genericToForm n
 
 newtype BloomFilter = BloomFilter
   ( LargeKey

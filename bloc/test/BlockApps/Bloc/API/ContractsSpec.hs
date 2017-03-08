@@ -6,7 +6,6 @@
 module BlockApps.Bloc.API.ContractsSpec where
 
 import Data.Either
-import Network.HTTP.Client
 import Servant.Client
 import Test.Hspec
 

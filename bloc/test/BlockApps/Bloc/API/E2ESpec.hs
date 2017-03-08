@@ -6,10 +6,7 @@
 module BlockApps.Bloc.API.E2ESpec where
 
 import Control.Concurrent
-import qualified Data.Map.Strict as Map
 import Data.Either
-import Network.HTTP.Client
-import Numeric
 import Numeric.Natural
 import Servant.Client
 import Test.Hspec
@@ -17,11 +14,9 @@ import Test.Hspec
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
-import BlockApps.Bloc.API.Addresses
 import BlockApps.Bloc.API.Users
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Ethereum
 
 -- TODO: user/contract methods Addresses may need to be MayBe Named Address
 
@@ -64,7 +59,7 @@ spec = do
       balance2 `shouldBe` initialWei
       let
         etherToSend = 100
-        postSendParameters = PostSendParameters (address2) etherToSend pw
+        postSendParameters = PostSendParameters (address2) etherToSend pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000

@@ -88,10 +88,68 @@ instance MonadUsers Bloc where
     when (faucet /= 0) . void $ blocStrato (postFaucet addr)
     return addr
 
-  postUsersSend = undefined
+  postUsersSend (UserName userName) addr
+    (PostSendParameters toAddr value password TxParams{..}) = do
+    uIds <- blocQuery $ proc () -> do
+      (uId,name) <- queryTable usersTable -< ()
+      restrict -< name .== constant userName
+      returnA -< uId
+    cryptos <- case listToMaybe uIds of
+      Nothing -> throwError . DBError $
+        "no user found with name: " <> userName
+      Just uId -> blocQuery $ proc () -> do
+        (_,salt,_,nonce,encSecKey,_,addr',uId') <-
+          queryTable keyStoreTable -< ()
+        restrict -< uId' .== constant (uId::Int32)
+          .&& addr' .== constant addr
+        returnA -< (salt,nonce,encSecKey)
+    skMaybe <- case listToMaybe cryptos of
+      Nothing -> throwError . DBError $
+        "address does not exist for user:" <> userName
+      Just (salt,nonce,encSecKey) -> return $
+        decryptSecKey password salt nonce encSecKey
+    case skMaybe of
+      Nothing -> throwError $ UserError "incorrect password"
+      Just sk -> do
+        accts <- blocStrato $ getAccountsFilter
+          accountsFilterParams{qaAddress = Just addr}
+        nonce <- case listToMaybe accts of
+          Nothing -> throwError . UserError $ "strato error: failed to find account"
+          Just acct -> return . incrNonce $ accountNonce acct
+        let
+          unsignedTx = UnsignedTransaction
+            { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
+            , unsignedTransactionGasPrice =
+                fromMaybe (Wei 1000000000000000000) txparamsGasPrice
+            , unsignedTransactionGasLimit =
+                fromMaybe (Gas 3141592) txparamsGasLimit
+            , unsignedTransactionTo = Just toAddr
+            , unsignedTransactionValue = Wei $ fromIntegral value
+            , unsignedTransactionInitOrData = undefined
+            }
+          (kecc,CompactRecSig{..}) = signRLP sk unsignedTx
+          Gas gasLimit = unsignedTransactionGasLimit unsignedTx
+          Wei gasPrice = unsignedTransactionGasPrice unsignedTx
+          Nonce nonce' = unsignedTransactionNonce unsignedTx
+          tx = PostTransaction
+            { posttransactionHash = kecc
+            , posttransactionGasLimit = Strung $ fromIntegral gasLimit
+            , posttransactionCodeOrData = Text.empty
+            , posttransactionGasPrice = Strung $ fromIntegral gasPrice
+            , posttransactionTo = Just toAddr
+            , posttransactionFrom = addr
+            , posttransactionValue = Strung value
+            , posttransactionR = Hex $ fromIntegral getCompactRecSigR
+            , posttransactionS = Hex $ fromIntegral getCompactRecSigS
+            , posttransactionV = Hex getCompactRecSigV
+            , posttransactionNonce = Strung $ fromIntegral nonce'
+            }
+        hash <- blocStrato $ postTx tx
+        void $ pollTxResult hash
+        return tx
 
   postUsersContract (UserName userName) addr
-    (PostUsersContractRequest _src password contract args TxParams{..} value) = do
+      (PostUsersContractRequest _src password contract args TxParams{..} value) = do
       -- TODO: compile the contract first
       logNotice $ "constructor arguments: " <> Text.pack (show args)
       uIds <- blocQuery $ proc () -> do
@@ -224,27 +282,26 @@ type PostUsersSend = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "send"
-  :> ReqBody '[FormUrlEncoded] PostSendParameters
+  :> ReqBody '[JSON] PostSendParameters
   :> Post '[HTMLifiedJSON] PostTransaction
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
   , sendPassword :: Password
+  , sendTxParams :: TxParams
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendParameters where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostSendParameters where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToForm PostSendParameters where
-  toForm = genericToForm (FormOptions (camelCase . drop 4))
-instance FromForm PostSendParameters where
-  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
+
 instance ToSample PostSendParameters where
   toSamples _ = singleSample PostSendParameters
     { sendToAddress = Address 0xdeadbeef
     , sendValue = 10
     , sendPassword = "securePassword"
+    , sendTxParams = TxParams Nothing Nothing Nothing
     }
 
 type PostUsersContract = "users"

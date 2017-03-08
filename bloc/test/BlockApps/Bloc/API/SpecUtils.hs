@@ -10,18 +10,11 @@
 module BlockApps.Bloc.API.SpecUtils where
 
 import Data.Text (Text, pack)
-import qualified Data.Text as Text
 import GHC.Generics
 import Servant.Client
-import System.IO
-import Test.QuickCheck
 import Test.QuickCheck.Instances ()
-import Numeric.Natural
 
 import BlockApps.Ethereum
-import BlockApps.Solidity
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 import Network.HTTP.Client

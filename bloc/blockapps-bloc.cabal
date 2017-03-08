@@ -109,7 +109,7 @@ test-suite blockapps-bloc-test
     , text
     -- , servant-aeson-specs
     , servant-client
-    , unordered-containers
+    , containers
 
 source-repository head
   type: git

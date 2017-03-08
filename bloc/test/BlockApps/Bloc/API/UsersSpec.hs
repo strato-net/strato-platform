@@ -38,8 +38,8 @@ spec = do
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters (toUserAddress) 100 pw
-        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345"
+        postSendParameters = PostSendParameters (toUserAddress) 100 pw txParams
+        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345" txParams
       postSendEither <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr blocUrl)
