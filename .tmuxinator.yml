@@ -16,7 +16,7 @@ pre: sudo apt install -y sysstat iftop htop jq ; sudo sh -c "curl -s https://raw
 #tmux_options:  
 
 # Change the command to call tmux.  This can be used by derivatives/wrappers like byobu.
-tmux_command: tmux-next 
+tmux_command: tmux 
 
 # Specifies (by name or index) which window will be selected on project startup. If not set, the first window is used.
 #startup_window: backbone
