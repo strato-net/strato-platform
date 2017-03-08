@@ -173,7 +173,7 @@ runPeer connectedPeers peer myPriv = do
     redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
     runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server ->
         runResourceT $ do
-            let peerString = show (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
+            let peerString = T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
             void $ modifyTVar connectedPeers $ S.insert peerString
             pool <- runNoLoggingT $ SQL.createPostgresqlPool
                     connStr' 20
