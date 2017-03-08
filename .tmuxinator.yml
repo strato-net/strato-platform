@@ -1,7 +1,7 @@
 # ~/.tmuxinator/strato-dashboard.yml
 
 name: strato
-root: ~/
+root: . 
 
 # Optional tmux socket
 # socket_name: foo
@@ -49,18 +49,28 @@ windows:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-statediff-indexer
 
     - network:
-        layout: even-vertical 
+        layout: tiled 
         panes:
             - ethereum-discover:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover
+            - peers:
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/peers | jq -C '.'"
             - p2p-client:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-client
             - p2p-server:
                 - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-server
 
-    - apis:
+    - strato-api:
         layout: tiled
         panes:
+            - strato-api-get:
+                - docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 GET
+            - strato-api-post:
+                - docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 POST
+            
+    - misc-api:
+        layout: tiled
+        panes: 
             - strato-api:
                 - docker logs -ft --tail 1000 silo_strato_1
             - bloc:
@@ -74,34 +84,46 @@ windows:
         layout: tiled 
         panes:
             - bestblock:
-                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq '.'"
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq -C '.'"
             - lasttx:
-                - watch -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq '.'"
-                  #            - graphs:
-                  # - curl -s localhost/strato-api/eth/v1.2/block/last/100| jq '.[] | {blockData}' | grep 'timestamp' | cut -d : -f2,3,4 | cut -d , -f1 | xargs -L1 -I x date -d x +'%s' | awk '{$2 = $1 - prev1; prev1 = $1; print;}' | cut -d ' ' -f2 | tail -n +2 | spark | awk -F":" '{ print $1 "\tblocktimes"}'
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq -C '.'"
             - version:
-                - watch -n 10 "curl -s localhost/strato-api/version | jq '.'"
+                - watch -c -n 60 "curl -s localhost/strato-api/version | jq -C '.'"
             - coinbase:
-                - watch -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
+                - watch -c -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
-    - stream_dumps_1:
+    - graphs:
+        layout: even-vertical
+        panes:
+            - blocktimes:
+                - watch -n 20 ./watcher.sh explorer-blocktimes
+            - numtxs:
+                - watch -n 20 ./watcher.sh explorer-numtxs
+            - numuncles:
+                - watch -n 20 ./watcher.sh explorer-numuncles
+
+    - stream_blocks:
         layout: even-horizontal
         panes:
-            - dumpkafkaunminedblocks:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'
             - dumpkafkablocks:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
-            - dumpkafkastatediff:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
-    - stream_dumps_2:
+            - dumpkafkaunminedblocks:
+                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'
+    - stream_seq:
         layout: even-horizontal
         panes:
             - dumpkafkaunsequencer:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunsequencer'
             - dumpkafkasequencer:
                 - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkasequencer'
-            - dumpkafkaindexevents:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaindexevents'
+            - dumpkafkastatediff:
+                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
+
+    - stream_dbs:
+        layout : even-horizontal
+        panes:
+            - dumpredis:
+                - watch -n 1 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpredis 1'"
 
     - checkpoints:
         layout: even-vertical
@@ -115,6 +137,13 @@ windows:
             - p2p-indexer:
                 - watch -n 1 "docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato checkpoints -s p2pindexer -o get'"
 
+    - cirrus:
+        layout: even-horizontal 
+        panes:
+            - contracts:
+                - watch -c -n 1 "curl -s localhost/cirrus/search/ | jq '.'"
+            - counts:
+                - watch -c -n 1 ./watcher.sh cirrus-count 
     - monitor:
         layout: tiled
         panes:
