@@ -32,53 +32,53 @@ windows:
         layout: even-vertical
         panes:
             - sequencer:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-sequencer
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-sequencer; sleep 2; done 
             - vm:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-vm
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-vm; sleep 2; done
             - adit:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-adit
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-adit; sleep 2; done
 
     - indexers:
         layout: even-vertical
         panes:
             - api-indexer:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-api-indexer
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-api-indexer; sleep 2; done
             - p2p-indexer:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-indexer
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-indexer; sleep 2; done
             - statediff-indexer:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-statediff-indexer
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-statediff-indexer; sleep 2; done
 
     - network:
         layout: tiled 
         panes:
             - ethereum-discover:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover; sleep 2; done
             - peers:
                 - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/peers | jq -C '.'"
             - p2p-client:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-client
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-client; sleep 2; done
             - p2p-server:
-                - docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-server
+                - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-server; sleep 2; done
 
     - strato-api:
         layout: tiled
         panes:
             - strato-api-get:
-                - docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 GET
+                - while true; do docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 GET; sleep 2; done
             - strato-api-post:
-                - docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 POST
+                - while true; do docker logs -ft --tail 1000 silo_strato_1 | grep -A4 -B1 POST; sleep 2; done
             
     - misc-api:
         layout: tiled
         panes: 
             - strato-api:
-                - docker logs -ft --tail 1000 silo_strato_1
+                - while true; do docker logs -ft --tail 1000 silo_strato_1; sleep 2; done
             - bloc:
-                - docker logs -ft --tail 1000 silo_bloc_1
+                - while true; do docker logs -ft --tail 1000 silo_bloc_1; sleep 2; done
             - cirrus:
-                - docker logs -ft --tail 1000 silo_cirrus_1
+                - while true; do docker logs -ft --tail 1000 silo_cirrus_1; sleep 2; done
             - postgrest:
-                - docker logs -ft --tail 1000 silo_postgrest_1
+                - while true; do docker logs -ft --tail 1000 silo_postgrest_1; sleep 2; done
 
     - explorer:
         layout: tiled 
@@ -106,18 +106,18 @@ windows:
         layout: even-horizontal
         panes:
             - dumpkafkablocks:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'
+                - while true; do docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkablocks'; sleep 2; done
             - dumpkafkaunminedblocks:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'
+                - while true; do docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunminedblocks'; sleep 2; done
     - stream_seq:
         layout: even-horizontal
         panes:
             - dumpkafkaunsequencer:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunsequencer'
+                - while true; do docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkaunsequencer'; sleep 2; done
             - dumpkafkasequencer:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkasequencer'
+                - while true; do docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkasequencer'; sleep 2; done
             - dumpkafkastatediff:
-                - docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'
+                - while true; do docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato dumpkafkastatediff'; sleep 2; done
 
     - stream_dbs:
         layout : even-horizontal
@@ -161,9 +161,9 @@ windows:
                 - env ETHDB = docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato psql | cut -d \' \' -f2'
                 - docker exec -it silo_postgres_1 pg_top -d $ETHDB
             - redis:
-                - docker exec -it silo_redis_1 bash -c 'redis-cli info'
+                - while true; do docker exec -it silo_redis_1 bash -c 'redis-cli info'; sleep 2; done
             - postgres-cirrus:
-                - docker exec -it silo_postgres-cirrus_1 bash -c 'su - postgres; pg_top cirrus'
+                - while true; do docker exec -it silo_postgres-cirrus_1 bash -c 'su - postgres; pg_top cirrus'; sleep 2; done
 
     - host:
         layout: tiled
