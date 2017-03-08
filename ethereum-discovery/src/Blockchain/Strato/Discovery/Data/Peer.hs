@@ -15,7 +15,7 @@ import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Database.Persist.Postgresql as SQL
 import Database.Persist.TH
-import Network.URI (URIAuth(..))
+import Network.URI (URI(..), URIAuth(..))
 import qualified Network.URI as URI
 
 
@@ -73,7 +73,12 @@ parseEnode enode =
         Nothing -> error $ "malformed enode: " ++ enode
         (Just uriAuth) -> (parsePublicKey uriAuth, parseHostname uriAuth, parsePort uriAuth)
     where
-        mUriAuth = URI.parseURI enode >>= URI.uriAuthority
+        mUriAuth = URI.parseURI enode >>= validateURIScheme >>= URI.uriAuthority
+
+validateURIScheme :: URI -> Maybe URI
+validateURIScheme uri = case URI.uriScheme uri == "enode:" of
+    True -> Just uri
+    False -> Nothing
 
 parsePublicKey :: URIAuth -> Maybe String
 parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of

@@ -59,5 +59,8 @@ spec = do
             let hostname = "no-public-key.com"
             parseEnode (mkAddress' Nothing hostname port) `shouldBe` (Nothing, hostname, port)
 
+        it "raises an error when the uri scheme is invalid" $ do
+            evaluate (parseEnode "http://google.com") `shouldThrow` errorCall "malformed enode: http://google.com"
+
         it "raises an error when the enode address is unparsable" $ do
             evaluate (parseEnode "blah") `shouldThrow` errorCall "malformed enode: blah"
