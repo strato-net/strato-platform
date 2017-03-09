@@ -18,15 +18,15 @@ main :: IO ()
 main = do
   dbCreateConn <- connectPostgreSQL
     "host=localhost port=5432 user=postgres dbname=postgres"
-  dbExists <- null <$>
+  doesNotExist <- null <$>
     (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
-  unless dbExists $ void
-    (query_ dbCreateConn createDatabase :: IO [Only Int])
+  when doesNotExist $ void $
+    execute_ dbCreateConn createDatabase
   close dbCreateConn
   conn <- connectPostgreSQL
     "host=localhost port=5432 user=postgres dbname=bloc"
   -- TODO: database connection resource management
-  void (query_ conn createTables :: IO [Only Int])
+  void $ execute_ conn createTables
   mgr <- newManager defaultManagerSettings
   let blocEnv = BlocEnv stratoDev mgr conn
   run 8000 (appBloc blocEnv)
