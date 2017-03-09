@@ -5,7 +5,7 @@
 module Main where
 
 import Control.Monad
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map.Strict as Map
 import Network.HTTP.Client
 import Servant.Client
 import Test.Hspec
@@ -16,7 +16,9 @@ import qualified BlockApps.Bloc.API.ContractsSpec as Contracts
 import qualified BlockApps.Bloc.API.SearchSpec as Search
 import BlockApps.Bloc.API.Users
 import qualified BlockApps.Bloc.API.UsersSpec as Users
+import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.API.E2ESpec as E2E
 -- import qualified BlockApps.Bloc.APISpec as API
 
 import BlockApps.Ethereum
@@ -29,16 +31,22 @@ main = hspec $ do
     Contracts.spec
     Search.spec
     Users.spec
+    E2E.spec
 
 setup :: IO TestConfig
 setup = do
   mgr' <- newManager defaultManagerSettings
+  simpleStorageSource <- readSolFile "SimpleStorage.sol"
+  testSource <- readSolFile "Test.sol"
+  simpleMappingSource <- readSolFile "SimpleMapping.sol"
   let
     testConfig = TestConfig
       { mgr = mgr'
-      , userName = UserName "testUser1"
+      , blocUrl = bayar4a
+      , stratoUrl = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+      , userName = "testUser1"
       , userAddress = Address 0x0
-      , toUserName = UserName "testUser2"
+      , toUserName = "testUser2"
       , toUserAddress = Address 0x0
       , pw = "1234"
       , simpleStorageContractName = "SimpleStorage"
@@ -47,132 +55,10 @@ setup = do
       , testContractAddress  = Address 0x0
       , simpleMappingContractName = "SimpleMapping"
       , simpleMappingContractAddress = Address 0x0
-      , txParams = TxParams 10000000000 1
-      , simpleStorageSrc =
-          "contract SimpleStorage {\
-          \    uint storedData;\
-          \    function set(uint x) {\
-          \        storedData = x;\
-          \    }\
-          \    function get() returns (uint retVal) {\
-          \        return storedData;\
-          \    }\
-          \}"
-      , testSrc =
-          "contract EmbeddedContract {\
-            \uint public x;\
-            \function EmbeddedContract(uint _uint) {\
-              \x = _uint;\
-            \}\
-          \}\
-          \contract Test {\
-            \address tAddress;\
-            \uint tUint;\
-            \int tInt;\
-            \bool tBool;\
-            \int256 tInt256;\
-            \uint [] tUintArray;\
-            \string tString;\
-            \byte [] tByteArray;\
-            \byte tByte;\
-            \bytes32 tBytes32;\
-            \mapping(address => uint) tMapping;\
-            \mapping(string => byte[]) tMapping2;\
-            \mapping(int => string) tMapping3;\
-            \EmbeddedContract tEc;\
-            \function Test()\
-            \{\
-              \tAddress = 0x123;\
-              \tUint = 20;\
-              \tInt = 40;\
-              \tBool = true;\
-              \tInt256 = 2173456789;\
-              \tUintArray = new uint[](10);\
-              \for(uint i = 0; i < 10; i++) {\
-                \tUintArray[i] = i;\
-              \}\
-              \tString = \"Hello World\";\
-              \tByteArray = new byte[](10);\
-              \for(uint j= 0; j < 10; j++) {\
-                \tByteArray[j] = 0x01;\
-              \}\
-              \tByte = 0x02;\
-              \tBytes32 = \"test\";\
-              \tMapping[tAddress] = 20;\
-              \tMapping2[\"first\"] = tByteArray;\
-              \tMapping3[0] = \"hello\";\
-              \tMapping3[1] = \"world\";\
-            \}\
-            \function getAddress () returns (address)\
-            \{\
-              \return tAddress;\
-            \}\
-            \function getUInt () returns (uint)\
-            \{\
-              \return tUint;\
-            \}\
-            \function getTInt () returns (int)\
-            \{\
-              \return tInt;\
-            \}\
-            \function getBool () returns (bool)\
-            \{\
-              \return tBool;\
-            \}\
-            \function getInt256 () returns (int256)\
-            \{\
-              \return tInt256;\
-            \}\
-            \function getUIntArray () returns (uint [])\
-            \{\
-              \return tUintArray;\
-            \}\
-            \function getString() returns (string)\
-            \{\
-              \return tString;\
-            \}\
-            \function getByteArrat() returns (byte [])\
-            \{\
-              \return tByteArray;\
-            \}\
-            \function getBytes32() returns (bytes32)\
-            \{\
-              \return tBytes32;\
-            \}\
-            \function getByte() returns (byte)\
-            \{\
-              \return tByte;\
-            \}\
-            \function getMultipleValues() returns (string s, uint i)\
-            \{\
-              \s = tString;\
-              \i = tUint;\
-            \}\
-            \function testFunction (address _address, string _string) returns (byte[])\
-            \{\
-            \}\
-            \function testFunction3(string _string, bytes32 _bytes32, byte[] _byteArray) returns (string stringValue, uint uintValue)\
-            \{\
-            \}\
-            \function test4 () returns (EmbeddedContract)\
-            \{\
-            \}\
-            \function test5 (EmbeddedContract ec) {\
-            \}\
-          \}"
-      , simpleMappingSrc =
-          "contract SimpleMapping {\
-          \  mapping (uint => byte[]) m;\
-          \  mapping (uint => bool) m2;\
-          \  function SimpleMapping() {\
-          \    byte [] memory b = new byte[](10);\
-          \    for(uint i = 0; i < 10; i++) {\
-          \      b[i] = 0x01;\
-          \    }\
-          \    m[1] = b;\
-          \    m2[1] = true;\
-          \  }\
-          \}"
+      , txParams = TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
+      , simpleStorageSrc = simpleStorageSource
+      , testSrc = testSource
+      , simpleMappingSrc = simpleMappingSource
       , delay =
           let second = 1000000
           in 6 * second
@@ -184,17 +70,17 @@ setup = do
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
-      , uploadlistcontractArgs = HashMap.empty
+      , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
       }
     uploadListContract2 = UploadListContract
       { uploadlistcontractContractName = testContractName testConfig
-      , uploadlistcontractArgs = HashMap.empty
+      , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
       }
     uploadListContract3 = UploadListContract
       { uploadlistcontractContractName = simpleMappingContractName testConfig
-      , uploadlistcontractArgs = HashMap.empty
+      , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
       }
     uploadListRequest = UploadListRequest
@@ -226,3 +112,6 @@ setup = do
   case cfgEither of
     Left err -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg
+
+localhost :: BaseUrl
+localhost = BaseUrl Http "localhost" 8000 ""

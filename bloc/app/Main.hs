@@ -5,70 +5,37 @@
 
 module Main where
 
-import Control.Exception
 import Data.String
-import Hasql.Connection
-import qualified Hasql.Session as Session
-import Hasql.Query
-import Hasql.Decoders
 import HFlags
+import Control.Monad
+import Database.PostgreSQL.Simple
 import Network.HTTP.Client
 import Network.Wai.Handler.Warp
 
 import BlockApps.Bloc.API
+import BlockApps.Bloc.Database.Create
 import BlockApps.Bloc.Monad
-import BlockApps.Strato.Client
-import BlockApps.Bloc.Database
 import BlockApps.Bloc.Options
+import BlockApps.Strato.Client
 
-handleErr::Exception e=>
-           (a->e)->Either a b->b
-handleErr typeF (Left e) = throw $ typeF e
-handleErr _ (Right x) = x
-
---TODO: refactor
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup EthereumH DBs"
-
-  dbCreateConn <-
-    fmap (handleErr DBConnectionError) $
-    acquire $ settings (fromString flags_pghost)
-                       5432
-                       (fromString flags_pguser)
-                       (fromString flags_password)
-                       "postgres"
-
-  let
-        queryString' = "SELECT 1 FROM pg_database WHERE datname='bloc';"
-        params = mempty
-        results = maybeRow (value int8)
-        query = statement queryString' params results False
-        
-  session <- fmap (handleErr DBError) $
-             Session.run (Session.query () query) dbCreateConn
-
-  case session of
-   Nothing -> 
-     fmap (handleErr DBError) $
-       Session.run (Session.sql "CREATE DATABASE bloc;") dbCreateConn
-   Just 1 -> return ()
-   Just _ -> putStrLn "Unexpected result from db exists check"
-   
-  release dbCreateConn
-  
-  conn <- fmap (handleErr DBConnectionError) $
-          acquire $ settings (fromString flags_pghost)
-                             5432
-                             (fromString flags_pguser)
-                             (fromString flags_password)
-                             "bloc"
-
+  dbCreateConn <- connectPostgreSQL $ fromString $
+    "host=" ++ flags_pghost ++ " port=5432 user=" ++ flags_pguser ++ " dbname=postgres password=" ++ flags_password
+  dbExists <- null <$>
+    (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
+  unless dbExists $ void
+    (query_ dbCreateConn createDatabase :: IO [Only Int])
+  close dbCreateConn
+  conn <- connectPostgreSQL $ fromString $
+    "host=" ++ flags_pghost ++ " port=5432 user=" ++ flags_pguser ++ " dbname=bloc password=" ++ flags_password
   -- TODO: database connection resource management
-
-  fmap (handleErr DBError) $
-    Session.run (Session.sql createTables) conn
-
-  mgr' <- newManager defaultManagerSettings
-  let blocEnv = BlocEnv stratoDev mgr' conn
+  void (query_ conn createTables :: IO [Only Int])
+  mgr <- newManager defaultManagerSettings
+  let blocEnv = BlocEnv stratoDev mgr conn
   run flags_port (appBloc blocEnv)
+
+dbExistsQuery :: Query
+dbExistsQuery = "SELECT 1 FROM pg_database WHERE datname='bloc';"
+

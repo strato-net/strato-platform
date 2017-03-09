@@ -6,15 +6,12 @@ module DummyContractStorage where
 
 import qualified Data.ByteString as B
 import Data.Text (Text)
+import qualified Data.Text as T
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Queries
 import BlockApps.Ethereum
-import BlockApps.Solidity
 import BlockApps.SolidityVarReader
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
 
 getVariablesAndTypes::ContractName->MaybeNamed Address->Bloc [(Text, Type)]
 getVariablesAndTypes (ContractName contractName) _ =
@@ -99,6 +96,7 @@ getVariablesAndTypes (ContractName contractName) _ =
      [
        ("info", TypeFunction "370158ea" [] [(Just "ret", TypeUInt Nothing)])
      ]
+   x -> error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
 
 {-
 
@@ -235,3 +233,4 @@ getAddress (ContractName "Consumer") _ = Address 0x687f7a384cf998eca6afadb67d76f
 getAddress (ContractName "InfoFeed") _ = Address 0xf503bdf764474ab89130511860229dc0ed9c2bd6
 getAddress (ContractName "SimpleDataFeed") _ = Address 0x3fbbcae9815773e8820bb53a855c2ae8cb75e9c0
 getAddress (ContractName "SimpleStorage") _ = Address 0x12ed0ad1f6838d49502fc34458f1bee7222d4ba3
+getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"

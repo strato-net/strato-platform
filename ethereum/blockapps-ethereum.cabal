@@ -17,7 +17,7 @@ library
   exposed-modules:
     BlockApps.Ethereum
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   build-depends: base
     , aeson
     , base16-bytestring
@@ -29,6 +29,7 @@ library
     , largeword
     , memory
     , QuickCheck
+    , relapse
     , secp256k1
     , servant
     , servant-docs
@@ -39,7 +40,7 @@ test-suite blockapps-ethereum-test
   default-language: Haskell2010
   type: exitcode-stdio-1.0
   hs-source-dirs: test
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   main-is: Spec.hs
   other-modules:
     BlockApps.EthereumSpec

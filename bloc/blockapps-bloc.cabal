@@ -22,13 +22,14 @@ library
     BlockApps.Bloc.API.Users
     BlockApps.Bloc.API.Utils
     BlockApps.Bloc.Crypto
-    BlockApps.Bloc.Database
+    BlockApps.Bloc.Database.Create
+    BlockApps.Bloc.Database.Queries
+    BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Options
-    BlockApps.Bloc.Queries
   other-modules: DummyContractStorage
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   build-depends: base
     , blockapps-ethereum
     , blockapps-solidity
@@ -41,7 +42,6 @@ library
     , cryptonite
     , bytestring
     , generic-random
-    , hasql
     , hflags
     , http-api-data
     , http-client
@@ -49,6 +49,10 @@ library
     , logging-effect
     , monad-loops
     , mtl
+    , opaleye
+    , postgresql-simple
+    , product-profunctors
+    , profunctors
     , QuickCheck
     , quickcheck-instances
     , saltine
@@ -69,14 +73,14 @@ library
 executable blockapps-bloc
   hs-source-dirs: app
   main-is: Main.hs
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
   build-depends: base
     , blockapps-bloc
     , blockapps-strato-api
     , blockapps-strato-client
-    , hasql
     , hflags
     , http-client
+    , postgresql-simple
     , warp
   default-language: Haskell2010
 
@@ -84,23 +88,33 @@ test-suite blockapps-bloc-test
   default-language: Haskell2010
   type: exitcode-stdio-1.0
   hs-source-dirs: test
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   main-is: Spec.hs
   other-modules:
     BlockApps.Bloc.APISpec
     BlockApps.Bloc.API.AddressesSpec
     BlockApps.Bloc.API.ContractsSpec
+    BlockApps.Bloc.API.E2ESpec
     BlockApps.Bloc.API.SearchSpec
     BlockApps.Bloc.API.UsersSpec
+    BlockApps.Bloc.API.SpecUtils
   other-modules:
   build-depends: base >=4 && < 5
     , blockapps-bloc
+    , blockapps-strato-api
+    , blockapps-strato-client
+    , blockapps-solidity
     , blockapps-ethereum
+    , directory
+    , generic-random
     , hspec
     , http-client
+    , QuickCheck
+    , quickcheck-instances
+    , text
     -- , servant-aeson-specs
     , servant-client
-    , unordered-containers
+    , containers
 
 source-repository head
   type: git

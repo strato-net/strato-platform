@@ -14,12 +14,11 @@ module BlockApps.Bloc.API.Search where
 
 import Data.Aeson
 import Data.Aeson.Casing
-import Data.HashMap.Strict (HashMap)
+import Data.Map.Strict (Map)
 import Data.Proxy
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
-import Hasql.Session
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -28,7 +27,7 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Queries
+import BlockApps.Bloc.Database.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
 
@@ -43,7 +42,7 @@ instance MonadSearchContract ClientM where
 instance MonadSearchContract Bloc where
 
   getSearchContract (ContractName contractName) =
-    blocSql $ map Unnamed <$> query contractName getSearchContractQuery
+    map Unnamed <$> blocQuery (getSearchContractQuery contractName)
 
   getSearchContractState = undefined
   getSearchContractStateReduced = undefined
@@ -71,7 +70,7 @@ instance ToParam (QueryParams "props" Text) where
 
 data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
-  , searchcontractstateState :: HashMap Text SolidityValue
+  , searchcontractstateState :: Map Text SolidityValue
   } deriving (Eq, Show, Generic)
 instance ToJSON SearchContractState where
   toJSON = genericToJSON (aesonPrefix camelCase)

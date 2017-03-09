@@ -1,4 +1,4 @@
-resolver: nightly-2017-02-23
+resolver: nightly-2017-03-07
 packages:
 - bloc
 - ethereum
@@ -16,17 +16,12 @@ packages:
     commit: cedbf002b0d5855c17dc91de97e966ee339604fa
   extra-dep: true
 extra-deps:
-  - saltine-0.0.0.4
-  - hasql-0.19.16
-  - bytestring-tree-builder-0.2.7.1
-  - contravariant-extras-0.3.3.1
-  - hashtables-1.2.1.0
-  - tuple-th-0.2.5
-  - vector-0.11.0.0
-  - primitive-0.6.1.0
   - hflags-0.4.2
+  - relapse-0.1.0.1
+  - saltine-0.0.0.4
 flags: {}
 extra-package-dbs: []
 
 ghc-options:
   state-translate:      -Wall -Werror
+  blockapps-bloc: -fsimpl-tick-factor=1000

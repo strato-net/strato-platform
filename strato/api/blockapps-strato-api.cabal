@@ -17,7 +17,7 @@ library
     BlockApps.Strato.API
     BlockApps.Strato.Types
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   build-depends: base
     , blockapps-ethereum
     , blockapps-solidity
@@ -42,7 +42,7 @@ test-suite blockapps-strato-api-test
   default-language: Haskell2010
   type: exitcode-stdio-1.0
   hs-source-dirs: test
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   main-is: Spec.hs
   other-modules:
     BlockApps.Strato.TypesSpec
