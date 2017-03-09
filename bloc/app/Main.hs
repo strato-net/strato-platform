@@ -16,17 +16,25 @@ import BlockApps.Bloc.Database.Create
 
 main :: IO ()
 main = do
+  putStrLn . unlines $
+    [ "██████╗ ██╗      ██████╗  ██████╗"
+    , "██╔══██╗██║     ██╔═══██╗██╔════╝"
+    , "██████╔╝██║     ██║   ██║██║     "
+    , "██╔══██╗██║     ██║   ██║██║     "
+    , "██████╔╝███████╗╚██████╔╝╚██████╗"
+    , "╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝"
+    ]
   dbCreateConn <- connectPostgreSQL
     "host=localhost port=5432 user=postgres dbname=postgres"
   dbExists <- null <$>
     (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
-  unless dbExists $ void
-    (query_ dbCreateConn createDatabase :: IO [Only Int])
+  unless dbExists . void $
+    execute_ dbCreateConn createDatabase
   close dbCreateConn
   conn <- connectPostgreSQL
     "host=localhost port=5432 user=postgres dbname=bloc"
   -- TODO: database connection resource management
-  void (query_ conn createTables :: IO [Only Int])
+  void $ execute_ conn createTables
   mgr <- newManager defaultManagerSettings
   let blocEnv = BlocEnv stratoDev mgr conn
   run 8000 (appBloc blocEnv)

@@ -63,21 +63,18 @@ contractsMetaDataTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
-  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
-  , Column PGBytea
   )
-contractsMetaDataTable = Table "contracts_metadata" $ p6
+contractsMetaDataTable = Table "contracts_metadata" $ p5
   ( optional "id"
   , required "contract_id"
   , required "bin"
   , required "bin_runtime"
-  , required "bin_runtime_hash"
   , required "code_hash"
   )
 
@@ -134,34 +131,31 @@ xabiFunctionsTable = Table "xabi_functions" $ p5
 
 xabiTypesTable :: Table
   ( Maybe (Column PGInt4)
-  , Column PGText
   , Column (Nullable PGText)
-  , Column PGBool
-  , Column PGBool
-  , Column PGBool
+  , Column (Nullable PGText)
+  , Column (Nullable PGBool)
+  , Column (Nullable PGBool)
+  , Column PGInt4
   , Column (Nullable PGInt4)
-  , Column PGInt4
-  , Column PGInt4
-  , Column PGInt4
+  , Column (Nullable PGInt4)
+  , Column (Nullable PGInt4)
   )
   ( Column PGInt4
-  , Column PGText
   , Column (Nullable PGText)
-  , Column PGBool
-  , Column PGBool
-  , Column PGBool
+  , Column (Nullable PGText)
+  , Column (Nullable PGBool)
+  , Column (Nullable PGBool)
+  , Column PGInt4
   , Column (Nullable PGInt4)
-  , Column PGInt4
-  , Column PGInt4
-  , Column PGInt4
+  , Column (Nullable PGInt4)
+  , Column (Nullable PGInt4)
   )
-xabiTypesTable = Table "xabi_types" $ p10
+xabiTypesTable = Table "xabi_types" $ p9
   ( optional "id"
   , required "type"
   , required "typedef"
   , required "is_dynamic"
   , required "is_signed"
-  , required "is_public"
   , required "bytes"
   , required "entry_type_id"
   , required "value_type_id"
@@ -213,17 +207,20 @@ xabiVariablesTable :: Table
   , Column PGInt4
   , Column PGText
   , Column PGInt4
+  , Column PGBool
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGInt4
   , Column PGText
   , Column PGInt4
+  , Column PGBool
   )
-xabiVariablesTable = Table "xabi_variables" $ p5
+xabiVariablesTable = Table "xabi_variables" $ p6
   ( optional "id"
   , required "contract_metadata_id"
   , required "type_id"
   , required "name"
   , required "at_bytes"
+  , required "is_public"
   )

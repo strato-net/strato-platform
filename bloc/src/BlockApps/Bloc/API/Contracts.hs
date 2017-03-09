@@ -36,6 +36,7 @@ import Data.Time.Clock.POSIX
 import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
+import Opaleye
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -45,10 +46,11 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
+import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Solidity
--- import BlockApps.Strato.Client
--- import BlockApps.Strato.Types
+import BlockApps.Strato.Client
+import BlockApps.Strato.Types
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -144,9 +146,9 @@ instance MonadContracts Bloc where
             return Arg
               { argName = name
               , argIndex = index
-              , argType = Just ty
+              , argType = ty
               , argTypedef = tyd
-              , argDynamic = Just dy
+              , argDynamic = dy
               , argBytes = by
               , argEntry = Entry <$> eby <*> ety
               }
@@ -155,10 +157,10 @@ instance MonadContracts Bloc where
           for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
             return $ ("#" <> Text.pack (show index),) Val
               { valIndex = index
-              , valType = Just ty
+              , valType = ty
               , valTypedef = tyd
-              , valDynamic = Just dy
-              , valBytes = by
+              , valDynamic = dy
+              , valBytes = Just by
               , valEntry = Entry <$> eby <*> ety
               }
         let
@@ -175,9 +177,9 @@ instance MonadContracts Bloc where
         return Arg
           { argName = name
           , argIndex = index
-          , argType = Just ty
+          , argType = ty
           , argTypedef = tyd
-          , argDynamic = Just dy
+          , argDynamic = dy
           , argBytes = by
           , argEntry = Entry <$> eby <*> ety
           }
@@ -246,41 +248,45 @@ instance MonadContracts Bloc where
 
   getContractsStates = undefined
 
-  postContractsCompile = undefined
+  -- postContractsCompile = undefined
 
-  -- postContractsCompile = traverse $ \ PostCompileRequest
-  --   { postcompilerequestSearchable = searchable -- TODO: Support Cirrus here
-  --   , postcompilerequestContractName = contractName
-  --   , postcompilerequestSource = source
-  --   } -> do
-  --     (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-  --       (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-  --     let
-  --       contracts = Map.intersectionWith (,) xabis abiBins
-  --     metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
-  --       let
-  --         codeHash = undefined
-  --         binRuntimeHash = undefined
-  --       blocQuery $ do
-  --         contrId <- query contractName createContractQuery
-  --         metaDataId <- query
-  --           (contrId,bin,binRuntime,codeHash,binRuntimeHash)
-  --           upsertContractMetaDataQuery
-  --         for_ xabiFuncs $ \ funcs ->
-  --           forMap_ funcs $ \ funcName Func{..} -> do
-  --             funcId <- query
-  --               (metaDataId,funcName,funcSelector,False)
-  --               insertXabiFunction
-  --             -- flip Map.traverseWithKey funcArgs $ \ argName arg ->
-  --             return ()
-  --         return metaDataId
-  --     for_ metaDataIds $ \ leftMetaDataId ->
-  --       for_ metaDataIds $ \ rightMetaDataId -> blocQuery $
-  --         --  unless (leftMetaDataId == rightMetaDataId) $
-  --         -- TODO: Remove all same name queries and logic
-  --            query (leftMetaDataId,rightMetaDataId) insertContractLookup
-  --     let contractCodeHash = undefined
-  --     return $ PostCompileResponse contractName contractCodeHash
+  postContractsCompile = traverse $ \ PostCompileRequest
+    { postcompilerequestSearchable = _searchable -- TODO: Support Cirrus here
+    , postcompilerequestContractName = contractName
+    , postcompilerequestSource = source
+    } -> do
+      (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+        (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+      let
+        contracts = Map.intersectionWith (,) xabis abiBins
+      metaDataIds <- forMap contracts $ \ _contrName (Xabi{..},AbiBin{..}) -> do
+        let
+          codeHash = undefined -- hash the bin runtime
+        contrId <- blocMaybe "contract id" <=< blocModify $
+          createContractQuery contractName
+        metaDataId <- blocMaybe "metadata id" <=< blocModify $
+          upsertContractMetaDataQuery
+            contrId bin binRuntime codeHash
+        for_ xabiFuncs $ \ funcs ->
+          forMap_ funcs $ \ funcName Func{..} -> do
+            funcId <- blocModify1 $ insertXabiFunction
+              metaDataId funcName funcSelector False
+            blocModify $ insertXabiFunctionArg funcId (toList funcArgs)
+            for_ funcVals $ \ val ->
+              blocModify $ insertXabiFunctionRet funcId val
+        return metaDataId
+      for_ metaDataIds $ \ leftMetaDataId ->
+        for_ metaDataIds $ \ rightMetaDataId -> blocModify $
+          insertContractLookup leftMetaDataId rightMetaDataId
+      codeHash <- blocQuery1 $ proc () -> do
+        (codeHash,name) <- joinF
+          (\ (_,_,_,_,codeHash) (_,name) -> (codeHash,name))
+          (\ (_,contractId,_,_,_) (cId,_) -> cId .== contractId)
+          (queryTable contractsMetaDataTable)
+          (queryTable contractsTable) -< ()
+        restrict -< name .== constant contractName
+        returnA -< codeHash
+      return $ PostCompileResponse contractName codeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt

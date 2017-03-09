@@ -104,8 +104,8 @@ instance MonadUsers Bloc where
       logNotice $ "constructor arguments: " <> Text.pack (show args)
       bins <- blocQuery $ proc () -> do
         (name,bin) <- joinF
-          (\ (_,_,bin,_,_,_) (_,name) -> (name,bin))
-          (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+          (\ (_,_,bin,_,_) (_,name) -> (name,bin))
+          (\ (_,contractId,_,_,_) (cid,_) -> cid .== contractId)
           (queryTable contractsMetaDataTable)
           (queryTable contractsTable) -< ()
         restrict -< name .== constant contract
