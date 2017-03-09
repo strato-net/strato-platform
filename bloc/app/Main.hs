@@ -23,15 +23,15 @@ main = do
   _ <- $initHFlags "Setup EthereumH DBs"
   dbCreateConn <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=5432 user=" ++ flags_pguser ++ " dbname=postgres password=" ++ flags_password
-  dbExists <- null <$>
+  doesNotExist <- null <$>
     (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
-  unless dbExists $ void
-    (query_ dbCreateConn createDatabase :: IO [Only Int])
+  when doesNotExist $ void $
+    execute_ dbCreateConn createDatabase
   close dbCreateConn
   conn <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=5432 user=" ++ flags_pguser ++ " dbname=bloc password=" ++ flags_password
   -- TODO: database connection resource management
-  void (query_ conn createTables :: IO [Only Int])
+  void $ execute_ conn createTables
   mgr <- newManager defaultManagerSettings
   let blocEnv = BlocEnv stratoDev mgr conn
   run flags_port (appBloc blocEnv)
