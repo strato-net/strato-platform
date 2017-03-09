@@ -63,8 +63,7 @@ windows:
             - ethereum-discover:
                 - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/ethereum-discover; sleep 2; done
             - peers:
-                - watch -c -n 1 "./watcher.sh network-best"
-              #- watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/peers | jq -C '.'"
+                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/peers | jq -C '.'; ./watcher.sh network-best"
             - p2p-client:
                 - while true; do docker exec -it silo_strato_1 tail -f -n 1000 /var/lib/strato/logs/strato-p2p-client; sleep 2; done
             - p2p-server:
