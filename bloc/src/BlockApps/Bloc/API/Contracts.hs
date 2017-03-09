@@ -271,9 +271,8 @@ instance MonadContracts Bloc where
           forMap_ funcs $ \ funcName Func{..} -> do
             funcId <- blocModify1 $ insertXabiFunction
               metaDataId funcName funcSelector False
-            blocModify $ do
-              insertXabiFunctionArg funcId (toList funcArgs)
-              insertXabiFunctionRet funcId (toList funcVals)
+            blocModify $ insertXabiFunctionArg funcId (toList funcArgs)
+            blocModify $ insertXabiFunctionRet funcId (toList funcVals)
         return metaDataId
       for_ metaDataIds $ \ leftMetaDataId ->
         for_ metaDataIds $ \ rightMetaDataId -> blocModify $
