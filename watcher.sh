@@ -1,6 +1,15 @@
 #!/bin/bash
 
+function network-best {
+  for i in $(curl -s node3.eastus.cloudapp.azure.com/strato-api/eth/v1.2/peers |
+    jq '.clientPeers' | grep \" | sed 's/  \"//g' | sed 's/\"//g' | cut -d :
+    -f1)
+  do 
+    printf \\n$i\t
+    curl -s $i/eth/v1.2/block/last/1 | jq '.'
+  done
 
+}
 
 
 function cirrus-count {
@@ -24,6 +33,12 @@ function explorer-numuncles {
 }
 
 case $1 in
+
+  "network-best")
+    echo "Network best blocks"
+    network-best
+    ;;
+
   "cirrus-count")
     echo "Cirrus contract counts"
     cirrus-count
