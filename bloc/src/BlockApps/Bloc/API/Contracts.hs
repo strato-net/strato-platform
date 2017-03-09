@@ -160,7 +160,7 @@ instance MonadContracts Bloc where
               , valType = ty
               , valTypedef = tyd
               , valDynamic = dy
-              , valBytes = Just by
+              , valBytes = by
               , valEntry = Entry <$> eby <*> ety
               }
         let

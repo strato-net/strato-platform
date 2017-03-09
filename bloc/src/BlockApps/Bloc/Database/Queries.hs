@@ -341,8 +341,45 @@ insertXabiFunctionRet
   :: Int32
   -> [Val]
   -> Connection -> IO ()
-insertXabiFunctionRet _funcId _val = undefined
-
+insertXabiFunctionRet funcId vals conn = do
+  entryTypeIdss <- for vals $ \ Val{valEntry = valEntry} ->
+    case valEntry of
+      Nothing -> return [Nothing::Maybe Int32]
+      Just Entry{..} -> runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant (Just entryType)
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , constant entryBytes
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (tyId,_,_,_,_,_,_,_,_) -> toNullable tyId)
+  let entryTypeIds = map head entryTypeIdss
+  typeIds <- runInsertManyReturning conn xabiTypesTable
+    [ ( Nothing
+      , constant valType
+      , constant valTypedef
+      , constant valDynamic
+      , Opaleye.null -- How will we know if it is signed?
+      , constant valBytes
+      , constant entryTypeId
+      , Opaleye.null
+      , Opaleye.null
+      )
+    | (entryTypeId,Val{..}) <- zip entryTypeIds vals
+    ]
+    (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
+  void $ runInsertMany conn xabiFunctionReturnsTable
+    [ ( Nothing
+      , constant funcId
+      , constant valIndex
+      , constant (typeId::Int32)
+      )
+    | (typeId,Val{..}) <- zip typeIds vals
+    ]
 {- |
 SELECT CM.id
 FROM contracts_metadata CM

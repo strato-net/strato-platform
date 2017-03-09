@@ -96,7 +96,7 @@ data Val = Val
   , valType :: Maybe Text
   , valTypedef :: Maybe Text
   , valDynamic :: Maybe Bool
-  , valBytes :: Maybe Int32
+  , valBytes :: Int32
   , valEntry :: Maybe Entry
   } deriving (Eq,Show,Generic)
 instance ToJSON Val where
