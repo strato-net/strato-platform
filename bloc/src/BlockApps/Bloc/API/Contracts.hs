@@ -259,11 +259,11 @@ instance MonadContracts Bloc where
         (,) <$> postExtabi (Src source) <*> postSolc (Src source)
       let
         contracts = Map.intersectionWith (,) xabis abiBins
-      metaDataIds <- forMap contracts $ \ _contrName (Xabi{..},AbiBin{..}) -> do
+      metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
         let
-          codeHash = undefined -- hash the bin runtime
+          codeHash = keccak256 (Text.encodeUtf8 binRuntime)
         contrId <- blocMaybe "contract id" <=< blocModify $
-          createContractQuery contractName
+          createContractQuery contrName
         metaDataId <- blocMaybe "metadata id" <=< blocModify $
           upsertContractMetaDataQuery
             contrId bin binRuntime codeHash
@@ -272,8 +272,9 @@ instance MonadContracts Bloc where
             funcId <- blocModify1 $ insertXabiFunction
               metaDataId funcName funcSelector False
             blocModify $ insertXabiFunctionArg funcId (toList funcArgs)
-            for_ funcVals $ \ val ->
-              blocModify $ insertXabiFunctionRet funcId val
+            -- for_ funcVals $ \ val ->
+            --   blocModify $ insertXabiFunctionRet funcId val
+            blocModify $ insertXabiFunctionRet funcId (toList funcVals)
         return metaDataId
       for_ metaDataIds $ \ leftMetaDataId ->
         for_ metaDataIds $ \ rightMetaDataId -> blocModify $

@@ -44,6 +44,7 @@ library
     , http-client
     , http-media
     , logging-effect
+    , memory
     , monad-loops
     , mtl
     , opaleye

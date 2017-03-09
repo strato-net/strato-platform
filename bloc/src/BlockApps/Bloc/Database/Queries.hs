@@ -16,6 +16,7 @@ import Crypto.Hash
 import qualified Crypto.Saltine.Class as Saltine
 import qualified Crypto.Saltine.Core.SecretBox as SecretBox
 import Crypto.Secp256k1
+import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
 import Data.Int (Int32)
@@ -338,7 +339,7 @@ insertXabiFunctionArg funcId args conn = do
 
 insertXabiFunctionRet
   :: Int32
-  -> Val
+  -> [Val]
   -> Connection -> IO ()
 insertXabiFunctionRet _funcId _val = undefined
 
@@ -789,9 +790,8 @@ upsertContractMetaDataQuery
   :: Int32
   -> Text
   -> Text
-  -> ByteString
-  -> Connection
-  -> IO (Maybe Int32)
+  -> Keccak256
+  -> Connection -> IO (Maybe Int32)
 upsertContractMetaDataQuery
   contractId bin binRuntime codeHash conn = do
     ciIds <- runQuery conn $ proc () -> do
@@ -888,3 +888,8 @@ instance QueryRunnerColumnDefault PGBytea Keccak256 where
         = Keccak256
         . fromMaybe (error "could not decode hash")
         . digestFromByteString
+instance Default Constant Keccak256 (Column PGBytea) where
+  def = lmap fromKecc def
+    where
+      fromKecc :: Keccak256 -> ByteString
+      fromKecc (Keccak256 digest) = ByteArray.convert digest
