@@ -1,6 +1,5 @@
 module Blockchain.Strato.Discovery.Data.PeerSpec where
 
-import Control.Exception (evaluate)
 import Data.Monoid ((<>))
 import Test.Hspec
 
@@ -29,38 +28,35 @@ spec = do
     describe "parseEnode" $ do
         it "parses IP addresses like 192.168.1.17" $ do
             let ip = "192.168.1.17"
-            parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+            parseEnode (mkAddress ip) `shouldBe` Right (Just publicKey, ip, port)
 
         it "parses IP addresses like 10.10.1.10" $ do
             let ip = "10.10.1.10"
-            parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+            parseEnode (mkAddress ip) `shouldBe` Right (Just publicKey, ip, port)
 
         it "parses IP addresses like 0.0.0.0" $ do
             let ip = "0.0.0.0"
-            parseEnode (mkAddress ip) `shouldBe` (Just publicKey, ip, port)
+            parseEnode (mkAddress ip) `shouldBe` Right (Just publicKey, ip, port)
 
         it "parses an IPv6 address" $ do
             let ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
-            parseEnode (mkIPv6Address ip) `shouldBe` (Just publicKey, ip, port)
+            parseEnode (mkIPv6Address ip) `shouldBe` Right (Just publicKey, ip, port)
 
         it "parses docker-like hostname aliases" $ do
             let hostname = "somedockerhostname"
-            parseEnode (mkAddress hostname) `shouldBe` (Just publicKey, hostname, port)
+            parseEnode (mkAddress hostname) `shouldBe` Right (Just publicKey, hostname, port)
 
         it "parses domain names" $ do
             let hostname = "cheeseburgers.com"
-            parseEnode (mkAddress hostname) `shouldBe` (Just publicKey, hostname, port)
+            parseEnode (mkAddress hostname) `shouldBe` Right (Just publicKey, hostname, port)
 
         it "parses domain names with subdomains" $ do
             let hostname = "chili.cheeseburgers.com"
-            parseEnode (mkAddress hostname) `shouldBe` (Just publicKey, hostname, port)
+            parseEnode (mkAddress hostname) `shouldBe` Right (Just publicKey, hostname, port)
 
         it "parses addresses without a public key" $ do
             let hostname = "no-public-key.com"
-            parseEnode (mkAddress' Nothing hostname port) `shouldBe` (Nothing, hostname, port)
+            parseEnode (mkAddress' Nothing hostname port) `shouldBe` Right (Nothing, hostname, port)
 
-        it "raises an error when the uri scheme is invalid" $ do
-            evaluate (parseEnode "http://google.com") `shouldThrow` errorCall "malformed enode: http://google.com"
-
-        it "raises an error when the enode address is unparsable" $ do
-            evaluate (parseEnode "blah") `shouldThrow` errorCall "malformed enode: blah"
+        it "returns a Left when the uri scheme is invalid" $ do
+            parseEnode "http://google.com" `shouldBe` Left "Invalid enode: http://google.com"

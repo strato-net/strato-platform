@@ -47,31 +47,32 @@ PPeer
 jamshidBirth::UTCTime
 jamshidBirth = posixSecondsToUTCTime 0
 
-createPeer::String->PPeer
-createPeer peerString =
-  PPeer {
-    pPeerPubkey = stringToPoint <$> pubKeyMaybe,
-    pPeerIp = T.pack ip,
-    pPeerUdpPort = port', --TODO think about this....  Should the UDP port be the same as the TCP port by default?
-    pPeerTcpPort = port',
-    pPeerNumSessions = 0,
-    pPeerLastTotalDifficulty = 0,
-    pPeerLastMsg  = T.pack "msg",
-    pPeerLastMsgTime = jamshidBirth,
-    pPeerEnableTime = jamshidBirth,
-    pPeerUdpEnableTime = jamshidBirth,
-    pPeerLastBestBlockHash = SHA 0,
-    pPeerBondState=0,
-    pPeerVersion = T.pack "61" -- fix
-    }
-  where
-    (pubKeyMaybe, ip, port') = parseEnode peerString
+createPeer :: String -> Either String PPeer
+createPeer peerString = buildPeer <$> parseEnode peerString
 
-parseEnode::String->(Maybe String, String, Int)
+buildPeer :: (Maybe String, String, Int) -> PPeer
+buildPeer (pubKeyMaybe, ip, port') =
+    PPeer {
+        pPeerPubkey = stringToPoint <$> pubKeyMaybe,
+        pPeerIp = T.pack ip,
+        pPeerUdpPort = port', --TODO think about this....  Should the UDP port be the same as the TCP port by default?
+        pPeerTcpPort = port',
+        pPeerNumSessions = 0,
+        pPeerLastTotalDifficulty = 0,
+        pPeerLastMsg  = T.pack "msg",
+        pPeerLastMsgTime = jamshidBirth,
+        pPeerEnableTime = jamshidBirth,
+        pPeerUdpEnableTime = jamshidBirth,
+        pPeerLastBestBlockHash = SHA 0,
+        pPeerBondState=0,
+        pPeerVersion = T.pack "61" -- fix
+        }
+
+parseEnode :: String -> Either String (Maybe String, String, Int)
 parseEnode enode =
     case mUriAuth of
-        Nothing -> error $ "malformed enode: " ++ enode
-        (Just uriAuth) -> (parsePublicKey uriAuth, parseHostname uriAuth, parsePort uriAuth)
+        Nothing -> Left $ "Invalid enode: " ++ enode
+        (Just uriAuth) -> Right (parsePublicKey uriAuth, parseHostname uriAuth, parsePort uriAuth)
     where
         mUriAuth = URI.parseURI enode >>= validateURIScheme >>= URI.uriAuthority
 
