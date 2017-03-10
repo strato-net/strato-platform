@@ -3,7 +3,6 @@ packages:
 - bloc
 - ethereum
 - solidity
-- solidity-abi
 - state-translate
 - strato/api
 - strato/client
