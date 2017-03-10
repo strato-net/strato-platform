@@ -19,6 +19,7 @@ import Data.LargeWord
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as Text
 import Numeric.Natural
 import Text.Printf
 
@@ -157,20 +158,22 @@ decodeValue storage offset = \case
 -}
   TypeBytes (Just 32) -> ValueBytes $ word256ToByteString $ storage offset
   TypeBytes (Just _) -> error "decodeValue not implemented for TypeBytes (Just n)"
-{-
+
   TypeBytes Nothing ->
     let
-      ValueUInt len = decodeValue storage offset (TypeUInt (Just 256))
-      padding = len `mod` 32
+      isLarge = storage offset `testBit` 0
+      len = storage offset .&. 0xfe `div` 2
     in
-      ValueBytes . ByteString.take (fromIntegral (padding + len)) $
-        ByteString.drop offset storage
+      if isLarge
+        then error "missing isLarge case"
+        else ValueBytes $ ByteString.take (fromIntegral len) $ word256ToByteString $ storage offset
+
   TypeString ->
     let
       ValueBytes bytes = decodeValue storage offset (TypeBytes Nothing)
     in
       ValueString $ Text.decodeUtf8 bytes
--}
+
   TypeFunction selector args returns -> ValueFunction selector args returns
 
   TypeArray _ (Just _) -> error "TypeArray Just n is undefined in decodeValue"
