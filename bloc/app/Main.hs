@@ -26,9 +26,9 @@ main = do
     ]
   dbCreateConn <- connectPostgreSQL
     "host=localhost port=5432 user=postgres dbname=postgres"
-  dbExists <- null <$>
+  doesNotExist <- null <$>
     (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
-  unless dbExists . void $
+  when doesNotExist . void $
     execute_ dbCreateConn createDatabase
   close dbCreateConn
   conn <- connectPostgreSQL
