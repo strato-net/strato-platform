@@ -1,5 +1,5 @@
 node ('cd9') {
- 
+   slackSend (color: 'good', message: "Build Started: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})") 
    stage('Code-Checkout') { // for display purposes
     
       withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'blockapps-cd-github', passwordVariable: 'p', usernameVariable: 'u']]) {
@@ -16,6 +16,7 @@ node ('cd9') {
         sh 'echo before stack build'
         sh 'stack build'
       }
+   slackSend (color: 'good', message: "Build Completed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
    }
    
    stage ('Test')
