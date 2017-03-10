@@ -17,7 +17,7 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Arrow
-import Control.Monad
+import Control.Monad.Except
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -36,7 +36,6 @@ import Data.Time.Clock.POSIX
 import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
-import Opaleye
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -46,11 +45,8 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
-import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Solidity
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -212,7 +208,7 @@ instance MonadContracts Bloc where
     return $ contractDetails
       { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
-  getContractsState = undefined
+  getContractsState _ _ = throwError Unimplemented
 
   getContractsFunctions (ContractName contractName) contractId = do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
@@ -229,24 +225,9 @@ instance MonadContracts Bloc where
       returnA -< varName
     return $ map SymbolName vars
 
-  getContractsStateMapping = undefined
-    -- (ContractName contractName) addr (SymbolName mapping) key = do
-    --   conn <- asks dbConnection
-    --   let
-    --     encoder = contramap (\(a,_,_,_) -> a) (Encoders.value Encoders.text)
-    --       <> contramap (\(_,b,_,_) -> b) (Encoders.value addressEncoder)
-    --       <> contramap (\(_,_,c,_) -> c) (Encoders.value Encoders.text)
-    --       <> contramap (\(_,_,_,d) -> d) (Encoders.value Encoders.text)
-    --     decoder = _
-    --     sqlString = "" -- fill in SQL here
-    --     sqlStatement = statement sqlString encoder decoder False
-    --   stateMappingResponseEither <- liftIO $
-    --     run (query (contractName,addr,mapping,key) sqlStatement) conn
-    --   case stateMappingResponseEither of
-    --     Left err -> throwError $ DBError err
-    --     Right stateMappingResponse -> return stateMappingResponse
+  getContractsStateMapping _ _ _ _ = throwError Unimplemented
 
-  getContractsStates = undefined
+  getContractsStates _ = throwError Unimplemented
 
   -- postContractsCompile = undefined
 
@@ -255,36 +236,7 @@ instance MonadContracts Bloc where
     , postcompilerequestContractName = contractName
     , postcompilerequestSource = source
     } -> do
-      (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-        (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-      let
-        contracts = Map.intersectionWith (,) xabis abiBins
-      metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
-        let
-          codeHash = keccak256 (Text.encodeUtf8 binRuntime)
-        contrId <- blocMaybe "contract id" <=< blocModify $
-          createContractQuery contrName
-        metaDataId <- blocMaybe "metadata id" <=< blocModify $
-          upsertContractMetaDataQuery
-            contrId bin binRuntime codeHash
-        for_ xabiFuncs $ \ funcs ->
-          forMap_ funcs $ \ funcName Func{..} -> do
-            funcId <- blocModify1 $ insertXabiFunction
-              metaDataId funcName funcSelector False
-            blocModify $ insertXabiFunctionArg funcId (toList funcArgs)
-            blocModify $ insertXabiFunctionRet funcId (toList funcVals)
-        return metaDataId
-      for_ metaDataIds $ \ leftMetaDataId ->
-        for_ metaDataIds $ \ rightMetaDataId -> blocModify $
-          insertContractLookup leftMetaDataId rightMetaDataId
-      codeHash <- blocQuery1 $ proc () -> do
-        (codeHash,name) <- joinF
-          (\ (_,_,_,_,codeHash) (_,name) -> (codeHash,name))
-          (\ (_,contractId,_,_,_) (cId,_) -> cId .== contractId)
-          (queryTable contractsMetaDataTable)
-          (queryTable contractsTable) -< ()
-        restrict -< name .== constant contractName
-        returnA -< codeHash
+      codeHash <- compileContract contractName source
       return $ PostCompileResponse contractName codeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
@@ -436,10 +388,3 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
-
--- helper functions
-forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)
-forMap m act = Map.traverseWithKey act m
-
-forMap_ :: Applicative m => Map k v -> (k -> v -> m ()) -> m ()
-forMap_ m act = void $ forMap m act

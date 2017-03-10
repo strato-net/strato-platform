@@ -193,11 +193,3 @@ instance ToSample (MaybeNamed Address) where
   toSamples _ = [("Sample", Unnamed (Address 0xdeadbeef))]
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
-
--- upload
---   :: ContractName
---   -> SecKey
---   -> Map Text Text
---   -> TxParams
---   -> Bloc Address
--- upload (ContractName contractName) sk args params = do

@@ -99,20 +99,19 @@ instance MonadUsers Bloc where
       return tx
 
   postUsersContract userName addr
-    (PostUsersContractRequest _src password contract args txParams value) = do
-      -- TODO: compile the contract first
+    (PostUsersContractRequest src password contract args txParams value) = do
+      void $ compileContract contract src
       logNotice $ "constructor arguments: " <> Text.pack (show args)
-      bins <- blocQuery $ proc () -> do
-        (name,bin) <- joinF
-          (\ (_,_,bin,_,_) (_,name) -> (name,bin))
+      cmIds_bins <- blocQuery $ proc () -> do
+        (cmId,name,bin) <- joinF
+          (\ (cmId,_,bin,_,_) (_,name) -> (cmId,name,bin))
           (\ (_,contractId,_,_,_) (cid,_) -> cid .== contractId)
           (queryTable contractsMetaDataTable)
           (queryTable contractsTable) -< ()
         restrict -< name .== constant contract
-        returnA -< bin
-      bin <- case listToMaybe bins of
-        Nothing -> throwError $ DBError "could not find bin for contract"
-        Just bin -> return (bin::ByteString)
+        returnA -< (cmId,bin)
+      (cmId,bin) <-
+        blocMaybe "contractMetaDataId and bin" $ listToMaybe cmIds_bins
       -- TODO: get args for constructor
       tx <- prepareTx
         userName password addr Nothing txParams (Wei (fromIntegral value)) bin
@@ -125,28 +124,19 @@ instance MonadUsers Bloc where
           stringAddress $ Text.unpack str
       case addressMaybe of
         Nothing -> throwError $ UserError "could not find txResult address"
-        Just addr' -> return addr'
+        Just addr' -> do
+          void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+            ( Nothing
+            , constant (cmId::Int32)
+            , constant addr'
+            , Nothing
+            )
+          return addr'
 
-  postUsersUploadList = undefined
-
-  postUsersContractMethod = undefined
-
-  -- postUsersContractMethod
-  --   (UserName userName) addr
-  --   (ContractName contractName) contractAddr
-  --   PostUsersContractMethodRequest
-  --     {
-  --     } = do
-
-      -- return PostUsersContractMethodRequest
-      --   { postuserscontractmethodPassword =
-      --   , postuserscontractmethodMethod =
-      --   , postuserscontractmethodArgs =
-      --   , postuserscontractmethodValue =
-      --   }
-
-  postUsersSendList = undefined
-  postUsersContractMethodList = undefined
+  postUsersUploadList _ _ _ = throwError Unimplemented
+  postUsersContractMethod _ _ _ _ _ = throwError Unimplemented
+  postUsersSendList _ _ _ = throwError Unimplemented
+  postUsersContractMethodList _ _ _ = throwError Unimplemented
 
 type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
 

@@ -19,7 +19,10 @@ import Crypto.Secp256k1
 import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
+import Data.Foldable
 import Data.Int (Int32)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Profunctor
 import Data.Profunctor.Product.Default
@@ -34,7 +37,10 @@ import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.Monad
 import BlockApps.Solidity
+import BlockApps.Strato.Client
+import BlockApps.Strato.Types
 
 {- |
 SELECT address from key_store;
@@ -930,3 +936,45 @@ instance Default Constant Keccak256 (Column PGBytea) where
     where
       fromKecc :: Keccak256 -> ByteString
       fromKecc (Keccak256 digest) = ByteArray.convert digest
+
+
+compileContract :: Text -> Text -> Bloc Keccak256
+compileContract contractName source = do
+  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+    (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  let
+    contracts = Map.intersectionWith (,) xabis abiBins
+  metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
+    let
+      codeHash = keccak256 (Text.encodeUtf8 binRuntime)
+    contrId <- blocMaybe "contract id" <=< blocModify $
+      createContractQuery contrName
+    metaDataId <- blocMaybe "metadata id" <=< blocModify $
+      upsertContractMetaDataQuery
+        contrId bin binRuntime codeHash
+    for_ xabiFuncs $ \ funcs ->
+      forMap_ funcs $ \ funcName Func{..} -> do
+        funcId <- blocModify1 $ insertXabiFunction
+          metaDataId funcName funcSelector False
+        blocModify $ insertXabiFunctionArg funcId (toList funcArgs)
+        blocModify $ insertXabiFunctionRet funcId (toList funcVals)
+    return metaDataId
+  for_ metaDataIds $ \ leftMetaDataId ->
+    for_ metaDataIds $ \ rightMetaDataId -> blocModify $
+      insertContractLookup leftMetaDataId rightMetaDataId
+  codeHash <- blocQuery1 $ proc () -> do
+    (codeHash,name) <- joinF
+      (\ (_,_,_,_,codeHash) (_,name) -> (codeHash,name))
+      (\ (_,contractId,_,_,_) (cId,_) -> cId .== contractId)
+      (queryTable contractsMetaDataTable)
+      (queryTable contractsTable) -< ()
+    restrict -< name .== constant contractName
+    returnA -< codeHash
+  return codeHash
+
+-- helper functions
+forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)
+forMap m act = Map.traverseWithKey act m
+
+forMap_ :: Applicative m => Map k v -> (k -> v -> m ()) -> m ()
+forMap_ m act = void $ forMap m act
