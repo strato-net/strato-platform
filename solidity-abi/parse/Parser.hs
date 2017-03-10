@@ -14,7 +14,6 @@ import Text.Parsec.Pos
 import Declarations
 import Lexer
 import ParserTypes
-import Pragma
 
 parse :: (SourceName -> String) -> SourceName -> String
           -> Either ParseError SolidityFile
@@ -23,8 +22,6 @@ parse importReader sName sCode =
 
 solidityFile :: (SourceName -> String) -> SolidityParser SolidityFile
 solidityFile importReader = do
-  whiteSpace
-  optional pragma
   whiteSpace
   files <- many (solidityImport importReader <|> fmap return solidityContract)
   eof

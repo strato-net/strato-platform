@@ -39,7 +39,6 @@ library
                        Lexer
                        Parser
                        ParserTypes
-                       Pragma
                        Types
   build-depends:       base,
                        containers,
