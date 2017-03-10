@@ -15,6 +15,7 @@ import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC
+--import qualified Data.ByteString.Lazy as BL
 import Data.LargeWord
 import Data.List
 import Data.Text (Text)
@@ -159,14 +160,17 @@ decodeValue storage offset = \case
   TypeBytes (Just 32) -> ValueBytes $ word256ToByteString $ storage offset
   TypeBytes (Just _) -> error "decodeValue not implemented for TypeBytes (Just n)"
 
-  TypeBytes Nothing ->
+  TypeBytes Nothing | storage offset `testBit` 0 -> --large string, 32+ bytes
+    let 
+      len = storage offset `div` 2
+      startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
+    in ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concat $ map (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
+
+  TypeBytes Nothing | storage offset `testBit` 0 -> --small string, less than 32 bytes
     let
-      isLarge = storage offset `testBit` 0
       len = storage offset .&. 0xfe `div` 2
     in
-      if isLarge
-        then error "missing isLarge case"
-        else ValueBytes $ ByteString.take (fromIntegral len) $ word256ToByteString $ storage offset
+      ValueBytes $ ByteString.take (fromIntegral len) $ word256ToByteString $ storage offset
 
   TypeString ->
     let
