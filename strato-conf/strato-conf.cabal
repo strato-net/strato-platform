@@ -12,7 +12,8 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Blockchain.EthConf
+  exposed-modules:     Blockchain.CoreFlags
+                       Blockchain.EthConf
                        Blockchain.PeerUrls
                        Blockchain.KafkaTopics
                        Blockchain.APIFiles
@@ -21,6 +22,7 @@ library
                      , bytestring
                      , directory
                      , filepath
+                     , hflags
                      , network
                      , yaml
                      , postgresql-simple

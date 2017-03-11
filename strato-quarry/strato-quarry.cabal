@@ -38,6 +38,7 @@ library
                        monad-logger,
                        esqueleto,
                        blockapps-util,
+                       strato-conf,
                        strato-sequencer,
                        extra
   exposed-modules:     Blockchain.Bagger
