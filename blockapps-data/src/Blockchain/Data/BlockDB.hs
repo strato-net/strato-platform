@@ -97,9 +97,10 @@ getBlock h = do
                                    E.where_ ( (bdRef E.^. BlockDataRefHash E.==. E.val h ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. block E.^. BlockId ))
                                    return block
 
-nextDifficulty::Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
-nextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
-  max nextDiff' minimumDifficulty + if useTestnet then 0 else expAdjustment
+-- if useDiffBomb is False then the expAdjustment is not added.
+nextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
+nextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime =
+  max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
     where
       nextDiff' =
           if round (utcTimeToPOSIXSeconds newTime) >=
@@ -112,9 +113,10 @@ nextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
         then 2^(periodCount - 2)
         else 0
 
-homesteadNextDifficulty::Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
-homesteadNextDifficulty useTestnet parentNumber oldDifficulty oldTime newTime =
-  max nextDiff' minimumDifficulty + if useTestnet then 0 else expAdjustment
+-- if useDiffBomb is False then the expAdjustment is not added
+homesteadNextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
+homesteadNextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime =
+  max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
     where
       block_timestamp = round (utcTimeToPOSIXSeconds newTime)::Integer
       parent_timestamp = round (utcTimeToPOSIXSeconds oldTime)::Integer

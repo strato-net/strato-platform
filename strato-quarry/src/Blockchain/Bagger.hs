@@ -12,6 +12,7 @@ import Data.Maybe (isJust, fromJust)
 import qualified Data.Text as T
 import Numeric (readHex)
 
+import Blockchain.CoreFlags (flags_difficultyBomb, flags_testnet)
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.HashDB
@@ -360,7 +361,7 @@ buildFromMiningCache = do
     let parentDiff   = DD.blockDataDifficulty parentHeader
     let parentTS     = DD.blockDataTimestamp parentHeader
     let time         = B.startTimestamp cache
-    let nextDiff     = BDB.nextDifficulty False parentNum parentDiff parentTS time
+    let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     previousStateRoot <- getStateRoot
     $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "pre-reward :: (" ++ format stateRoot ++ ")"
     rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
@@ -387,7 +388,7 @@ buildNextBlockHeader parentHeader parentHash uncles stateRoot txs time =
     let parentDiff = DD.blockDataDifficulty parentHeader
         parentNum  = DD.blockDataNumber parentHeader
         parentTS   = DD.blockDataTimestamp parentHeader
-        nextDiff   = BDB.nextDifficulty False parentNum parentDiff parentTS time
+        nextDiff   = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
         in DD.BlockData { DD.blockDataParentHash       = parentHash
                         , DD.blockDataUnclesHash       = V.ommersVerificationValue uncles
                         , DD.blockDataCoinbase         = ourCoinbase
