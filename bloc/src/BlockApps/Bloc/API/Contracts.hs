@@ -39,6 +39,7 @@ import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Numeric
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -240,8 +241,7 @@ instance MonadContracts Bloc where
 
         ret = map (\(position, var) -> fmap (valueToSolidityValue . decodeValue storage position) var) $ zip [0..] vars
 
-    liftIO $ print storage'
-    liftIO $ print storageMap
+    liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     
     return $ Map.fromList ret
 
