@@ -135,9 +135,9 @@ decodeValue storage offset = \case
       ValueInt . sign . sum $
         zipWith shiftL significant' [8*(m-1),8*(m-2)..0]
 -}
-{-
+
   TypeInt Nothing -> decodeValue storage offset (TypeInt (Just 256))
--}
+
   TypeAddress ->
     let
       ValueUInt addr = decodeValue storage offset (TypeUInt (Just 160))
@@ -157,8 +157,7 @@ decodeValue storage offset = \case
       ValueFixed $ fromIntegral x / 2 ** fromIntegral n
   TypeFixed Nothing -> decodeValue storage offset (TypeFixed (Just (128,128)))
 -}
-  TypeBytes (Just 32) -> ValueBytes $ word256ToByteString $ storage offset
-  TypeBytes (Just _) -> error "decodeValue not implemented for TypeBytes (Just n)"
+  TypeBytes (Just n) -> ValueBytes $ ByteString.take n $ word256ToByteString $ storage offset
 
   TypeBytes Nothing | storage offset `testBit` 0 -> --large string, 32+ bytes
     let 
@@ -166,7 +165,7 @@ decodeValue storage offset = \case
       startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
     in ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concat $ map (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
-  TypeBytes Nothing | storage offset `testBit` 0 -> --small string, less than 32 bytes
+  TypeBytes Nothing -> --small string, less than 32 bytes
     let
       len = storage offset .&. 0xfe `div` 2
     in
