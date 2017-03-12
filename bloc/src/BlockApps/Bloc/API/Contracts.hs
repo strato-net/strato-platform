@@ -54,6 +54,7 @@ import BlockApps.Solidity
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
+import qualified BlockApps.Storage as Storage
 
 
 import DummyContractStorage
@@ -239,7 +240,7 @@ instance MonadContracts Bloc where
            Just v -> v
            Nothing -> 0
 
-        ret = map (\(position, var) -> fmap (valueToSolidityValue . decodeValue storage position) var) $ zip [0..] vars
+        ret = map (\(p, var) -> fmap (valueToSolidityValue . decodeValue storage (Storage.positionAt p)) var) $ zip [0..] vars
 
     liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     

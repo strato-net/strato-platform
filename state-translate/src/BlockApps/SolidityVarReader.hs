@@ -1,6 +1,7 @@
 {-# LANGUAGE
     LambdaCase
   , OverloadedStrings
+  , RecordWildCards
 #-}
 
 module BlockApps.SolidityVarReader (
@@ -26,6 +27,8 @@ import Text.Printf
 
 import BlockApps.Ethereum
 import BlockApps.Solidity
+import BlockApps.Storage (Storage)
+import qualified BlockApps.Storage as Storage
 
 data Type
   = TypeBool
@@ -113,15 +116,14 @@ byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) 
 
 
 decodeValue
-  ::(Word256->Word256)
---  :: ByteString
-  -> Word256
+  :: Storage
+  -> Storage.Position
   -> Type
   -> Value
-decodeValue storage offset = \case
+decodeValue storage position@Storage.Position{..} = \case
   TypeBool -> ValueBool $ storage offset /= 0
   TypeUInt (Just _) -> ValueUInt $ fromIntegral $ storage offset --TODO check for error where value too high for type
-  TypeUInt Nothing -> decodeValue storage offset (TypeUInt (Just 256))
+  TypeUInt Nothing -> decodeValue storage position (TypeUInt (Just 256))
   TypeInt (Just _) -> ValueInt $ fromIntegral $ storage offset --TODO clean this up, deal with negatives
 {-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
@@ -136,16 +138,16 @@ decodeValue storage offset = \case
         zipWith shiftL significant' [8*(m-1),8*(m-2)..0]
 -}
 
-  TypeInt Nothing -> decodeValue storage offset (TypeInt (Just 256))
+  TypeInt Nothing -> decodeValue storage position (TypeInt (Just 256))
 
   TypeAddress ->
     let
-      ValueUInt addr = decodeValue storage offset (TypeUInt (Just 160))
+      ValueUInt addr = decodeValue storage position (TypeUInt (Just 160))
     in
       ValueAddress . Address $ fromIntegral addr
   TypeContract -> 
     let
-      ValueAddress addr = decodeValue storage offset TypeAddress
+      ValueAddress addr = decodeValue storage position TypeAddress
     in
       ValueContract addr
 
@@ -173,7 +175,7 @@ decodeValue storage offset = \case
 
   TypeString ->
     let
-      ValueBytes bytes = decodeValue storage offset (TypeBytes Nothing)
+      ValueBytes bytes = decodeValue storage position (TypeBytes Nothing)
     in
       ValueString $ Text.decodeUtf8 bytes
 
@@ -181,7 +183,8 @@ decodeValue storage offset = \case
 
   TypeArray _ (Just _) -> error "TypeArray Just n is undefined in decodeValue"
 
-  TypeArray ty Nothing -> ValueArray $ map (flip (decodeValue storage) ty) $ map (startingKey+) [0..storage offset-1]
+  TypeArray ty Nothing -> ValueArray $ map (flip (decodeValue storage) ty) $ 
+                                  map (Storage.positionAt . (startingKey+)) [0..storage offset-1]
     where
       startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
 
