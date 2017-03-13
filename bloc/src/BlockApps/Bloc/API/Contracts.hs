@@ -17,8 +17,7 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Arrow
-import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad.Except
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
