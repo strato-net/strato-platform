@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
-import BlockApps.SolidityVarReader
+import BlockApps.Types
 
 getVariablesAndTypes::ContractName->MaybeNamed Address->Bloc [(Text, Type)]
 getVariablesAndTypes (ContractName contractName) _ =

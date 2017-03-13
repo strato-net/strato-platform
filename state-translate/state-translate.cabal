@@ -16,6 +16,7 @@ library
   hs-source-dirs:      src
   exposed-modules:     BlockApps.SolidityVarReader
                        BlockApps.Storage
+                       BlockApps.Types
   build-depends:       base >= 4.7 && < 5
                      , blockapps-ethereum
                      , aeson
