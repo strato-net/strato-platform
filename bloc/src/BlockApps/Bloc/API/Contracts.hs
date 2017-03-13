@@ -18,6 +18,7 @@ module BlockApps.Bloc.API.Contracts where
 
 import Control.Arrow
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -36,6 +37,8 @@ import Data.Time.Clock.POSIX
 import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
+import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Numeric
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -47,8 +50,13 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Ethereum
 import BlockApps.Solidity
--- import BlockApps.Strato.Client
--- import BlockApps.Strato.Types
+import BlockApps.SolidityVarReader
+import BlockApps.Strato.Client
+import BlockApps.Strato.Types
+import qualified BlockApps.Storage as Storage
+import BlockApps.Types
+
+import BlockApps.Bloc.DummyContractStorage
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -167,7 +175,7 @@ instance MonadContracts Bloc where
             , funcSelector = Text.decodeUtf8 sel
             , funcVals = Map.fromList vals
             }
-        return $ (funcName,func)
+        return (funcName,func)
     constrId <- blocQuery1 $ getXabiConstrQuery metadataId
     constr <- Map.fromList . argsToPairs <$> do
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
@@ -192,14 +200,14 @@ instance MonadContracts Bloc where
           , varSigned = Just si
           , varBytes = Just by
           , varEntry = Entry <$> Just eby <*> Just ety
-          , varVal = Just $ SimpleVar
+          , varVal = Just SimpleVar
             { simplevarType = vty
             , simplevarBytes = Just vby
             , simplevarDynamic = Just vdy
             , simplevarSigned = Just vsi
             , simplevarEntry = Entry <$> Just veby <*> Just vety
             }
-          , varKey = Just $ SimpleVar
+          , varKey = Just SimpleVar
             { simplevarType = kty
             , simplevarBytes = Just kby
             , simplevarDynamic = Just kdy
@@ -210,7 +218,40 @@ instance MonadContracts Bloc where
     return $ contractDetails
       { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
-  getContractsState = undefined
+  getContractsState contractName contractId = do
+    vars <- getVariablesAndTypes contractName contractId
+
+    let url = BaseUrl Http "strato-ms-dev.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+
+    mgr <- liftIO $ newManager defaultManagerSettings
+
+    storageOrError <-
+      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ getAddress contractName contractId
+
+    let storage' =
+          case storageOrError of
+           Left e -> error $ show e
+           Right x -> x
+
+    let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+    let storage k = fromMaybe 0 $ Map.lookup k storageMap
+
+
+        addPositions::Storage.Position -> [(Text, Type)] -> [(Text, Type, Storage.Position)]
+        addPositions _ [] = []
+        addPositions p0 ((name, theType):rest) =
+          let
+            (position, usedBytes) = getPositionAndSize p0 theType
+          in
+           (name, theType, position):addPositions (Storage.addBytes position usedBytes) rest
+
+
+--        ret = map (\(p, var) -> fmap (valueToSolidityValue . decodeValue storage (Storage.positionAt p)) var) $ zip [0..] vars
+        ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) vars
+
+    liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+
+    return $ Map.fromList ret
 
   getContractsFunctions (ContractName contractName) contractId = do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId

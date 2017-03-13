@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sudo apt-get install autoconf libblas-dev liblapack-dev libsodium-dev 
