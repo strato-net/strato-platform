@@ -1,0 +1,165 @@
+# vim: syntax=yaml tabstop=2 shiftwidth=2 expandtab smarttab :
+metadata:
+  version: 1.0
+  description: Test
+  git_repo: https://github.com/blockapps/silo
+  docker_repo: https://registry-aws.blockapps.net:5000/
+
+deployments:
+  - name: bloc
+    repo: https://github.com/blockapps/bloc.git
+    ref: basil-convert
+    compose:
+      restart: always
+      environment:
+        ssl: "${ssl}"
+        stratoHost: "${stratoHost}"
+        apiUrlOverride: "${apiUrlOverride}"
+
+  - name: redis
+    compose:
+      image: redis:3.2
+      restart: always
+      command: redis-server --appendonly yes
+      ports:
+       - "6379:6379"
+
+  - name: cirrus
+    repo: https://github.com/blockapps/cirrus.git
+    ref: basil-convert
+    compose:
+      restart: always
+      links:
+        - strato:strato
+        - postgres-cirrus:postgres
+
+  - name: strato
+    repo: https://github.com/blockapps/monstrato.git
+    ref: basil-convert
+    hooks:
+      before_build: |
+        if(util.OS.Distribution == "Mac OS X") {
+          deployment.Env["ON_MAC"] = "1"
+        }
+    compose:
+      restart: always
+      ports:
+        - "30303:30303"
+        - "30303:30303/udp"
+      environment:
+        networkID : "${networkID}"
+        genesis: "${genesis}"
+        genesisBlock: "${genesisBlock}"
+        bootnode: "${bootnode}"
+        addBootnodes: "${addBootnodes}"
+        lazyBlocks: "${lazyBlocks}"
+        miningAlgorithm: "${miningAlgorithm}"
+        miningThreads: "${miningThreads}"
+        blockTime: "${blockTime}"
+        minBlockDifficulty: "${minBlockDifficulty}"
+        debugFail: "${debugFail}"
+        backupblocks: "${backupblocks}"
+        redisBDBNumber: "${redisBDBNumber}"
+        useSyncMode: "${useSyncMode}"
+      links:
+        - zookeeper
+        - kafka
+        - postgres
+        - redis
+      depends_on:
+        - zookeeper
+        - kafka
+        - postgres
+        - redis
+
+  - name: postgres-cirrus
+    compose:
+      image: postgres:9.6
+      environment:
+        POSTGRES_DB: cirrus
+        POSTGRES_USER: postgres
+        PG_ENV_POSTGRES_DB: cirrus
+        PG_ENV_POSTGRES_USER: postgres
+      ports:
+        - '5434:5432'
+
+  - name: postgrest
+    repo: https://github.com/blockapps/postgrest-packager.git
+    ref: basil-convert
+    compose:
+      restart: always
+      environment:
+        POSTGRES_DB: cirrus
+        POSTGRES_USER: postgres
+        PG_ENV_POSTGRES_DB: cirrus
+        PG_ENV_POSTGRES_USER: postgres
+        PG_PORT_5433_TCP_PORT: 5432
+      links:
+        - postgres-cirrus:postgres
+      ports:
+        - '3001:3001'
+
+  - name: postgres
+    repo: https://github.com/blockapps/postgres-packager.git
+    ref: basil-convert
+    compose:
+      restart: always
+
+  - name: explorer
+    repo: https://github.com/blockapps/strato-explorer.git
+    ref: basil-convert
+    compose:
+      ports:
+        - 9000:9000
+      restart: always
+      environment:
+        peers: "${peers}"
+      links:
+        - strato:strato
+        - bloc:bloc
+
+  - name: nginx
+    repo: https://github.com/blockapps/nginx-packager.git
+    ref: basil-convert
+    compose:
+      restart: always
+      volumes:
+        - /etc/ssl/private:/etc/ssl/private
+        - /etc/ssl/certs:/etc/ssl/certs
+      ports:
+        - "443:443"
+        - "80:80"
+      depends_on:
+        - strato
+        - bloc
+        - cirrus
+        - postgrest
+        - explorer
+      environment:
+        ssl: "${ssl}"
+
+  - name: zookeeper
+    compose:
+      image: zookeeper:3.4.9
+      restart: always
+      environment:
+        ZOO_MY_ID: 1
+      ports:
+        - "2181:2181"
+
+  - name: kafka
+    repo: https://github.com/blockapps/kafka-packager.git
+    ref: basil-convert
+    compose:
+      restart: always
+      links:
+        - zookeeper
+      environment:
+        KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+        KAFKA_ADVERTISED_HOST_NAME: "kafka"
+        KAFKA_ADVERTISED_PORT: 9092
+        KAFKA_DELETE_TOPIC_ENABLE: "true"
+        KAFKA_LOG_CLEANER_ENABLE: "false"
+        KAFKA_LOG_RETENTION_HOURS: 2147483647
+      ports:
+        - "9092:9092"
