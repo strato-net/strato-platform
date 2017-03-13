@@ -128,7 +128,7 @@ decodeValue storage position@Storage.Position{..} = \case
       ValueFixed $ fromIntegral x / 2 ** fromIntegral n
   TypeFixed Nothing -> decodeValue storage offset (TypeFixed (Just (128,128)))
 -}
-  TypeBytes (Just n) -> ValueBytes $ ByteString.take n $ word256ToByteString $ storage offset
+  TypeBytes (Just n) -> ValueBytes $ ByteString.take n $ ByteString.drop (32 - byte - n) $ word256ToByteString $ storage offset
 
   TypeBytes Nothing | storage offset `testBit` 0 -> --large string, 32+ bytes
     let 

@@ -45,23 +45,24 @@ data Type
   deriving (Eq, Show)
 
 
+getNextAvailablePosition::Storage.Position->Int->Storage.Position
+getNextAvailablePosition p i | 32 - Storage.byte p >= i = p
+getNextAvailablePosition p _ = p{Storage.offset=Storage.offset p+1, Storage.byte=0}
+
 --Given the next available position, return the actual chosen position and the number of primary bytes used
 getPositionAndSize::Storage.Position->Type->(Storage.Position, Int)
 getPositionAndSize p TypeBool = (p,1)
 getPositionAndSize p (TypeInt (Just v)) =
   let
-    nextP =
-      if 32 - Storage.byte p >= v `shiftR` 3
-      then p
-      else p{Storage.offset=Storage.offset p+1, Storage.byte=0}
+    len = v `shiftR` 3
   in
-   (nextP, v `shiftR` 3)
+   (getNextAvailablePosition p len, len)
 getPositionAndSize p (TypeUInt (Just v)) =
   let
-    nextP =
-      if 32 - Storage.byte p >= v `shiftR` 3
-      then p
-      else p{Storage.offset=Storage.offset p+1, Storage.byte=0}
+    len = v `shiftR` 3
   in
-   (nextP, v `shiftR` 3)
+   (getNextAvailablePosition p len, len)
+getPositionAndSize p TypeAddress = (getNextAvailablePosition p 20, 20)
+getPositionAndSize p (TypeBytes Nothing) = (getNextAvailablePosition p 32, 32)
+getPositionAndSize p (TypeBytes (Just v)) = (getNextAvailablePosition p v, v)
 getPositionAndSize p _ = (p,32)
