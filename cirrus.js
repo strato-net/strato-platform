@@ -36,8 +36,15 @@ function startCirrus() {
       }
 
       app.post('/', function (req, res, next) {
-        var schema = toSchemaString(req.body);
-        global.contractMap[req.body.codeHash] = req.body;
+        var contractMetaData = req.body;
+
+        // incase the binaries are attached, remove them so we don't store
+        delete contractMetaData["bin"];
+        delete contractMetaData["bin-runtime"];
+
+        var schema = toSchemaString(contractMetaData);
+
+        global.contractMap[req.body.codeHash] = contractMetaData;
         console.log("global.contractMap: " + JSON.stringify(global.contractMap));
         console.log("Schema: " + schema)
 
