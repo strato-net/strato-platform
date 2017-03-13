@@ -37,7 +37,6 @@ import Data.Time.Clock.POSIX
 import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
-import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Numeric
 import Servant.API
 import Servant.Client
@@ -221,21 +220,11 @@ instance MonadContracts Bloc where
   getContractsState contractName contractId = do
     vars <- getVariablesAndTypes contractName contractId
 
-    let url = BaseUrl Http "strato-ms-dev.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+    storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
 
-    mgr <- liftIO $ newManager defaultManagerSettings
-
-    storageOrError <-
-      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ getAddress contractName contractId
-
-    let storage' =
-          case storageOrError of
-           Left e -> error $ show e
-           Right x -> x
-
+    
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-    let storage k = fromMaybe 0 $ Map.lookup k storageMap
-
+        storage k = fromMaybe 0 $ Map.lookup k storageMap
 
         addPositions::Storage.Position -> [(Text, Type)] -> [(Text, Type, Storage.Position)]
         addPositions _ [] = []
@@ -245,8 +234,6 @@ instance MonadContracts Bloc where
           in
            (name, theType, position):addPositions (Storage.addBytes position usedBytes) rest
 
-
---        ret = map (\(p, var) -> fmap (valueToSolidityValue . decodeValue storage (Storage.positionAt p)) var) $ zip [0..] vars
         ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) vars
 
     liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap

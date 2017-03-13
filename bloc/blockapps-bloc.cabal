@@ -80,6 +80,7 @@ executable blockapps-bloc
     , hflags
     , http-client
     , postgresql-simple
+    , servant-client
     , warp
   default-language: Haskell2010
 

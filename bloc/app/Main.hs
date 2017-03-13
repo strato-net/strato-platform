@@ -11,12 +11,13 @@ import Control.Monad
 import Database.PostgreSQL.Simple
 import Network.HTTP.Client
 import Network.Wai.Handler.Warp
+import Servant.Common.BaseUrl
 
 import BlockApps.Bloc.API
 import BlockApps.Bloc.Database.Create
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Options
-import BlockApps.Strato.Client
+import BlockApps.Strato.StratoURLResolver
 
 main :: IO ()
 main = do
@@ -33,7 +34,9 @@ main = do
   -- TODO: database connection resource management
   void $ execute_ conn createTables
   mgr <- newManager defaultManagerSettings
-  let blocEnv = BlocEnv stratoDev mgr conn
+  baseUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
+  
+  let blocEnv = BlocEnv baseUrl mgr conn
   run flags_port (appBloc blocEnv)
 
 dbExistsQuery :: Query
