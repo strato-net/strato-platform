@@ -11,7 +11,7 @@ FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
-DOCKER_SHELL=docker run -i --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
+DOCKER_SHELL=docker run -it --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
 
 BUILD_HASKELL=stack setup && stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
