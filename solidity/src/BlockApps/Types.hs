@@ -5,7 +5,9 @@ import qualified BlockApps.Storage as Storage
 
 import Data.Bits
 import Data.ByteString (ByteString)
+import Data.LargeWord
 import Data.Text (Text)
+import Data.Word
 
 
 data Type
@@ -65,3 +67,62 @@ getPositionAndSize p (TypeUInt (Just v)) =
   in
    (nextP, v `shiftR` 3)
 getPositionAndSize p _ = (p,32)
+
+data UInt
+  = UInt8 Word8
+  | UInt16 Word16
+  | UInt24 Word24
+  | UInt32 Word32
+  | UInt40 Word40
+  | UInt48 Word48
+  | UInt56 Word56
+  | UInt64 Word64
+  | UInt72 Word72
+  | UInt80 Word80
+  | UInt88 Word88
+  | UInt96 Word96
+  | UInt104 Word104
+  | UInt112 Word112
+  | UInt120 Word120
+  | UInt128 Word128
+  | UInt136 Word136
+  | UInt144 Word144
+  | UInt152 Word152
+  | UInt160 Word160
+  | UInt168 Word168
+  | UInt176 Word176
+  | UInt184 Word184
+  | UInt192 Word192
+  | UInt200 Word200
+  | UInt208 Word208
+  | UInt216 Word216
+  | UInt224 Word224
+  | UInt232 Word232
+  | UInt240 Word240
+  | UInt248 Word248
+  | UInt256 Word256
+  deriving (Eq,Show)
+
+--TODO: make this use some pattern?
+type Word24 = LargeKey Word8 Word16
+type Word40 = LargeKey Word8 Word32
+type Word48 = LargeKey Word16 Word32
+type Word56 = LargeKey Word24 Word32
+type Word72 = LargeKey Word8 Word64
+type Word80 = LargeKey Word16 Word64
+type Word88 = LargeKey Word24 Word64
+type Word104 = LargeKey Word8 Word96
+type Word112 = LargeKey Word16 Word96
+type Word120 = LargeKey Word24 Word96
+type Word136 = LargeKey Word8 Word128
+type Word144 = LargeKey Word16 Word128
+type Word152 = LargeKey Word8 Word144
+type Word168 = LargeKey Word8 Word160
+type Word176 = LargeKey Word8 Word168
+type Word184 = LargeKey Word8 Word176
+type Word200 = LargeKey Word8 Word192
+type Word208 = LargeKey Word8 Word200
+type Word216 = LargeKey Word8 Word208
+type Word232 = LargeKey Word8 Word224
+type Word240 = LargeKey Word8 Word232
+type Word248 = LargeKey Word8 Word240
