@@ -3,7 +3,7 @@ module BlockApps.Types where
 
 import qualified BlockApps.Storage as Storage
 
-
+import Data.Bits
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 
@@ -47,4 +47,21 @@ data Type
 
 --Given the next available position, return the actual chosen position and the number of primary bytes used
 getPositionAndSize::Storage.Position->Type->(Storage.Position, Int)
+getPositionAndSize p TypeBool = (p,1)
+getPositionAndSize p (TypeInt (Just v)) =
+  let
+    nextP =
+      if 32 - Storage.byte p >= v `shiftR` 3
+      then p
+      else p{Storage.offset=Storage.offset p+1, Storage.byte=0}
+  in
+   (nextP, v `shiftR` 3)
+getPositionAndSize p (TypeUInt (Just v)) =
+  let
+    nextP =
+      if 32 - Storage.byte p >= v `shiftR` 3
+      then p
+      else p{Storage.offset=Storage.offset p+1, Storage.byte=0}
+  in
+   (nextP, v `shiftR` 3)
 getPositionAndSize p _ = (p,32)

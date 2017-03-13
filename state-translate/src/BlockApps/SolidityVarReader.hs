@@ -88,9 +88,12 @@ decodeValue
   -> Value
 decodeValue storage position@Storage.Position{..} = \case
   TypeBool -> ValueBool $ storage offset /= 0
-  TypeUInt (Just _) -> ValueUInt $ fromIntegral $ storage offset --TODO check for error where value too high for type
+  TypeUInt (Just v) ->
+    ValueUInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
   TypeUInt Nothing -> decodeValue storage position (TypeUInt (Just 256))
-  TypeInt (Just _) -> ValueInt $ fromIntegral $ storage offset --TODO clean this up, deal with negatives
+  TypeInt (Just v) ->
+     ValueInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset --TODO clean this up, deal with negatives
+    
 {-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
       (sign, significant) =
