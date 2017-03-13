@@ -22,6 +22,7 @@ import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
+import Numeric.Natural
 import Text.Printf
 
 import BlockApps.Ethereum
@@ -40,8 +41,8 @@ formatType x = show x
 
 data Value
   = ValueBool Bool
-  | ValueUInt UInt
-  | ValueInt SInt
+  | ValueUInt Natural
+  | ValueInt Integer
   | ValueAddress Address
   | ValueContract Address
   | ValueFixed Double
@@ -69,9 +70,7 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
                           ++ ") returns ("
                           ++ intercalate "," (map (formatType . snd) returnTypes)
                           ++ ")"
-valueToSolidityValue (ValueFixed _) = error "missing value"
-valueToSolidityValue (ValueUFixed _) = error "missing value"
-
+valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
 
 
 word256ToByteString::Word256->ByteString
@@ -90,83 +89,12 @@ decodeValue
   -> Value
 decodeValue storage position@Storage.Position{..} = \case
   TypeBool -> ValueBool $ storage offset /= 0
-  TypeUInt (Just v) -> ValueUInt $
-    case v of
-      8 -> UInt8 numVal
-      16 -> UInt16 numVal
-      24 -> UInt24 numVal
-      32 -> UInt32 numVal
-      40 -> UInt40 numVal
-      48 -> UInt48 numVal
-      56 -> UInt56 numVal
-      64 -> UInt64 numVal
-      72 -> UInt72 numVal
-      80 -> UInt80 numVal
-      88 -> UInt88 numVal
-      96 -> UInt96 numVal
-      104 -> UInt104 numVal
-      112 -> UInt112 numVal
-      120 -> UInt120 numVal
-      128 -> UInt128 numVal
-      136 -> UInt136 numVal
-      144 -> UInt144 numVal
-      152 -> UInt152 numVal
-      160 -> UInt160 numVal
-      168 -> UInt168 numVal
-      176 -> UInt176 numVal
-      184 -> UInt184 numVal
-      192 -> UInt192 numVal
-      200 -> UInt200 numVal
-      208 -> UInt208 numVal
-      216 -> UInt216 numVal
-      224 -> UInt224 numVal
-      232 -> UInt232 numVal
-      240 -> UInt240 numVal
-      248 -> UInt248 numVal
-      256 -> UInt256 numVal
-      _ -> error "fixme, I hate partial functions"
-      where
-        numVal :: Num n => n
-        numVal = fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
+  TypeUInt (Just v) ->
+    ValueUInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
   TypeUInt Nothing -> decodeValue storage position (TypeUInt (Just 256))
-  TypeInt (Just v) -> ValueInt $
-    case v of
-      8 -> SInt8 numVal
-      16 -> SInt16 numVal
-      24 -> SInt24 numVal
-      32 -> SInt32 numVal
-      40 -> SInt40 numVal
-      48 -> SInt48 numVal
-      56 -> SInt56 numVal
-      64 -> SInt64 numVal
-      72 -> SInt72 numVal
-      80 -> SInt80 numVal
-      88 -> SInt88 numVal
-      96 -> SInt96 numVal
-      104 -> SInt104 numVal
-      112 -> SInt112 numVal
-      120 -> SInt120 numVal
-      128 -> SInt128 numVal
-      136 -> SInt136 numVal
-      144 -> SInt144 numVal
-      152 -> SInt152 numVal
-      160 -> SInt160 numVal
-      168 -> SInt168 numVal
-      176 -> SInt176 numVal
-      184 -> SInt184 numVal
-      192 -> SInt192 numVal
-      200 -> SInt200 numVal
-      208 -> SInt208 numVal
-      216 -> SInt216 numVal
-      224 -> SInt224 numVal
-      232 -> SInt232 numVal
-      240 -> SInt240 numVal
-      248 -> SInt248 numVal
-      256 -> SInt256 numVal
-      _ -> error "fixme, I hate partial functions"
-      where
-        numVal :: Num n => n
-        numVal = fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
+  TypeInt (Just v) ->
+     ValueInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset --TODO clean this up, deal with negatives
+
 {-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
       (sign, significant) =
@@ -184,7 +112,7 @@ decodeValue storage position@Storage.Position{..} = \case
 
   TypeAddress ->
     let
-      ValueUInt (UInt160 addr) = decodeValue storage position (TypeUInt (Just 160))
+      ValueUInt addr = decodeValue storage position (TypeUInt (Just 160))
     in
       ValueAddress . Address $ fromIntegral addr
   TypeContract ->

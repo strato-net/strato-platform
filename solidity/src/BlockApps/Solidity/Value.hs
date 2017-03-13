@@ -1,0 +1,123 @@
+module BlockApps.Solidity.Value where
+
+import Data.ByteString (ByteString)
+import Data.Map.Strict (Map)
+import Data.Text (Text)
+
+import BlockApps.Ethereum
+import BlockApps.Solidity.Int
+
+data Value
+  = SimpleValue SimpleValue
+  | ValueArray [SimpleValue]
+  | ValueMapping (Map SimpleValue Value)
+  -- | ValueFunction
+  -- | ValueStruct
+  -- | ValueEnum
+
+data SimpleValue
+  = ValueBool Bool
+  | ValueUInt8 Word8
+  | ValueUInt16 Word16
+  | ValueUInt24 Word24
+  | ValueUInt32 Word32
+  | ValueUInt40 Word40
+  | ValueUInt48 Word48
+  | ValueUInt56 Word56
+  | ValueUInt64 Word64
+  | ValueUInt72 Word72
+  | ValueUInt80 Word80
+  | ValueUInt88 Word88
+  | ValueUInt96 Word96
+  | ValueUInt104 Word104
+  | ValueUInt112 Word112
+  | ValueUInt120 Word120
+  | ValueUInt128 Word128
+  | ValueUInt136 Word136
+  | ValueUInt144 Word144
+  | ValueUInt152 Word152
+  | ValueUInt160 Word160
+  | ValueUInt168 Word168
+  | ValueUInt176 Word176
+  | ValueUInt184 Word184
+  | ValueUInt192 Word192
+  | ValueUInt200 Word200
+  | ValueUInt208 Word208
+  | ValueUInt216 Word216
+  | ValueUInt224 Word224
+  | ValueUInt232 Word232
+  | ValueUInt240 Word240
+  | ValueUInt248 Word248
+  | ValueUInt256 Word256
+  | ValueUInt Word256
+  | ValueInt8 Int8
+  | ValueInt16 Int16
+  | ValueInt24 Int24
+  | ValueInt32 Int32
+  | ValueInt40 Int40
+  | ValueInt48 Int48
+  | ValueInt56 Int56
+  | ValueInt64 Int64
+  | ValueInt72 Int72
+  | ValueInt80 Int80
+  | ValueInt88 Int88
+  | ValueInt96 Int96
+  | ValueInt104 Int104
+  | ValueInt112 Int112
+  | ValueInt120 Int120
+  | ValueInt128 Int128
+  | ValueInt136 Int136
+  | ValueInt144 Int144
+  | ValueInt152 Int152
+  | ValueInt160 Int160
+  | ValueInt168 Int168
+  | ValueInt176 Int176
+  | ValueInt184 Int184
+  | ValueInt192 Int192
+  | ValueInt200 Int200
+  | ValueInt208 Int208
+  | ValueInt216 Int216
+  | ValueInt224 Int224
+  | ValueInt232 Int232
+  | ValueInt240 Int240
+  | ValueInt248 Int248
+  | ValueInt256 Int256
+  | ValueInt Int256
+  | ValueAddress Address
+  -- | ValueFixed
+  -- | ValueUFixed
+  | ValueBytes1 Word8
+  | ValueBytes2 ByteString
+  | ValueBytes3 ByteString
+  | ValueBytes4 ByteString
+  | ValueBytes5 ByteString
+  | ValueBytes6 ByteString
+  | ValueBytes7 ByteString
+  | ValueBytes8 ByteString
+  | ValueBytes9 ByteString
+  | ValueBytes10 ByteString
+  | ValueBytes11 ByteString
+  | ValueBytes12 ByteString
+  | ValueBytes13 ByteString
+  | ValueBytes14 ByteString
+  | ValueBytes15 ByteString
+  | ValueBytes16 ByteString
+  | ValueBytes17 ByteString
+  | ValueBytes18 ByteString
+  | ValueBytes19 ByteString
+  | ValueBytes20 ByteString
+  | ValueBytes21 ByteString
+  | ValueBytes22 ByteString
+  | ValueBytes23 ByteString
+  | ValueBytes24 ByteString
+  | ValueBytes25 ByteString
+  | ValueBytes26 ByteString
+  | ValueBytes27 ByteString
+  | ValueBytes28 ByteString
+  | ValueBytes29 ByteString
+  | ValueBytes30 ByteString
+  | ValueBytes31 ByteString
+  | ValueBytes32 ByteString
+  | ValueBytes ByteString
+  | ValueString Text
+  -- | ValueContract

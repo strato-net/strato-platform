@@ -16,17 +16,24 @@ library
   hs-source-dirs: src
   exposed-modules:
     BlockApps.Solidity
+    BlockApps.Solidity.Int
+    BlockApps.Solidity.Storage
+    BlockApps.Solidity.Type
+    BlockApps.Solidity.Value
     BlockApps.SolidityVarReader
     BlockApps.Storage
     BlockApps.Types
   default-language: Haskell2010
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   build-depends: base
     , blockapps-ethereum
     , aeson
     , aeson-casing
+    , base16-bytestring
+    , binary
     , bytestring
     , containers
+    , deepseq
     , generic-random
     , http-api-data
     , largeword
@@ -39,7 +46,7 @@ test-suite blockapps-solidity-test
   default-language: Haskell2010
   type: exitcode-stdio-1.0
   hs-source-dirs: test
-  ghc-options: -Wall
+  ghc-options: -Wall -Werror
   main-is: Spec.hs
   other-modules:
     BlockApps.SoliditySpec

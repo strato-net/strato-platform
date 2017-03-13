@@ -1,13 +1,11 @@
+
 module BlockApps.Types where
 
 import qualified BlockApps.Storage as Storage
 
 import Data.Bits
 import Data.ByteString (ByteString)
-import Data.Int
-import Data.LargeWord
 import Data.Text (Text)
-import Data.Word
 
 
 data Type
@@ -67,73 +65,3 @@ getPositionAndSize p (TypeUInt (Just v)) =
   in
    (nextP, v `shiftR` 3)
 getPositionAndSize p _ = (p,32)
-
-data UInt
-  = UInt8 Word8
-  | UInt16 Word16
-  | UInt24 Word24
-  | UInt32 Word32
-  | UInt40 Word40
-  | UInt48 Word48
-  | UInt56 Word56
-  | UInt64 Word64
-  | UInt72 Word72
-  | UInt80 Word80
-  | UInt88 Word88
-  | UInt96 Word96
-  | UInt104 Word104
-  | UInt112 Word112
-  | UInt120 Word120
-  | UInt128 Word128
-  | UInt136 Word136
-  | UInt144 Word144
-  | UInt152 Word152
-  | UInt160 Word160
-  | UInt168 Word168
-  | UInt176 Word176
-  | UInt184 Word184
-  | UInt192 Word192
-  | UInt200 Word200
-  | UInt208 Word208
-  | UInt216 Word216
-  | UInt224 Word224
-  | UInt232 Word232
-  | UInt240 Word240
-  | UInt248 Word248
-  | UInt256 Word256
-  deriving (Eq,Show)
-
-data SInt
-  = SInt8 Int8
-  | SInt16 Int16
-  | SInt24 Int24
-  | SInt32 Int32
-  | SInt40 Int40
-  | SInt48 Int48
-  | SInt56 Int56
-  | SInt64 Int64
-  | SInt72 Int72
-  | SInt80 Int80
-  | SInt88 Int88
-  | SInt96 Int96
-  | SInt104 Int104
-  | SInt112 Int112
-  | SInt120 Int120
-  | SInt128 Int128
-  | SInt136 Int136
-  | SInt144 Int144
-  | SInt152 Int152
-  | SInt160 Int160
-  | SInt168 Int168
-  | SInt176 Int176
-  | SInt184 Int184
-  | SInt192 Int192
-  | SInt200 Int200
-  | SInt208 Int208
-  | SInt216 Int216
-  | SInt224 Int224
-  | SInt232 Int232
-  | SInt240 Int240
-  | SInt248 Int248
-  | SInt256 Int256
-  deriving (Eq,Show)
