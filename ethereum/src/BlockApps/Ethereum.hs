@@ -66,7 +66,8 @@ import Test.QuickCheck
 import Text.Read hiding (String)
 import Web.FormUrlEncoded
 
-newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
+newtype Address = Address { unAddress :: Word160 }
+ deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
 addressString (Address address) = padZeros 40 (showHex address "")
   where
@@ -119,7 +120,7 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
   where
     err = error "could not generate secret key"
 
-newtype Keccak256 = Keccak256 (Digest Keccak_256) deriving (Eq,Show,Generic)
+newtype Keccak256 = Keccak256 { unKeccak256 :: Digest Keccak_256 } deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
 stringKeccak256 :: String -> Maybe Keccak256
