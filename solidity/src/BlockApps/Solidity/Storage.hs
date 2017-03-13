@@ -118,7 +118,7 @@ simpleToStorage =  \case
   ValueBytes30 v -> pad32 v
   ValueBytes31 v -> pad32 v
   ValueBytes32 v -> pad32 v
-  ValueBytes _v -> undefined
+  ValueBytes v -> padRight32 $ ByteString.append (simpleToStorage (ValueUInt (fromIntegral (ByteString.length v)))) v
   ValueString v -> simpleToStorage . ValueBytes $ Text.encodeUtf8 v
   where
     encodeStrict :: Binary x => x -> ByteString
@@ -127,9 +127,16 @@ simpleToStorage =  \case
       let
         len = ByteString.length bs
         lenMod32 = len `mod` 32
-        padding = 32 - lenMod32
+        padding = (32 - lenMod32) `mod` 32
       in
         ByteString.replicate padding 0 `ByteString.append` bs
+    padRight32 bs =
+      let
+        len = ByteString.length bs
+        lenMod32 = len `mod` 32
+        padding = 32 - lenMod32
+      in
+        bs `ByteString.append` ByteString.replicate padding 0
     pad32Signed v bs =
       let
         len = ByteString.length bs
