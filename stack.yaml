@@ -10,6 +10,10 @@ packages:
     commit: 0a6db54f31defdd7a5edecdf6932af3deea6ca57
   extra-dep: true
 - location:
+    git: https://github.com/blockapps/largeword/
+    commit: 578b67ba3dcb47485717b4b384d1d51c94d0fcec
+  extra-dep: true
+- location:
     git: https://github.com/echatav/servant-aeson-specs/
     commit: cedbf002b0d5855c17dc91de97e966ee339604fa
   extra-dep: true

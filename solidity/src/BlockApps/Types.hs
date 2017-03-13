@@ -1,10 +1,10 @@
-
 module BlockApps.Types where
 
 import qualified BlockApps.Storage as Storage
 
 import Data.Bits
 import Data.ByteString (ByteString)
+import Data.Int
 import Data.LargeWord
 import Data.Text (Text)
 import Data.Word
@@ -103,26 +103,37 @@ data UInt
   | UInt256 Word256
   deriving (Eq,Show)
 
---TODO: make this use some pattern?
-type Word24 = LargeKey Word8 Word16
-type Word40 = LargeKey Word8 Word32
-type Word48 = LargeKey Word16 Word32
-type Word56 = LargeKey Word24 Word32
-type Word72 = LargeKey Word8 Word64
-type Word80 = LargeKey Word16 Word64
-type Word88 = LargeKey Word24 Word64
-type Word104 = LargeKey Word8 Word96
-type Word112 = LargeKey Word16 Word96
-type Word120 = LargeKey Word24 Word96
-type Word136 = LargeKey Word8 Word128
-type Word144 = LargeKey Word16 Word128
-type Word152 = LargeKey Word8 Word144
-type Word168 = LargeKey Word8 Word160
-type Word176 = LargeKey Word8 Word168
-type Word184 = LargeKey Word8 Word176
-type Word200 = LargeKey Word8 Word192
-type Word208 = LargeKey Word8 Word200
-type Word216 = LargeKey Word8 Word208
-type Word232 = LargeKey Word8 Word224
-type Word240 = LargeKey Word8 Word232
-type Word248 = LargeKey Word8 Word240
+data SInt
+  = SInt8 Int8
+  | SInt16 Int16
+  | SInt24 Int24
+  | SInt32 Int32
+  | SInt40 Int40
+  | SInt48 Int48
+  | SInt56 Int56
+  | SInt64 Int64
+  | SInt72 Int72
+  | SInt80 Int80
+  | SInt88 Int88
+  | SInt96 Int96
+  | SInt104 Int104
+  | SInt112 Int112
+  | SInt120 Int120
+  | SInt128 Int128
+  | SInt136 Int136
+  | SInt144 Int144
+  | SInt152 Int152
+  | SInt160 Int160
+  | SInt168 Int168
+  | SInt176 Int176
+  | SInt184 Int184
+  | SInt192 Int192
+  | SInt200 Int200
+  | SInt208 Int208
+  | SInt216 Int216
+  | SInt224 Int224
+  | SInt232 Int232
+  | SInt240 Int240
+  | SInt248 Int248
+  | SInt256 Int256
+  deriving (Eq,Show)

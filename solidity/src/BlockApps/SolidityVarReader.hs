@@ -41,7 +41,7 @@ formatType x = show x
 data Value
   = ValueBool Bool
   | ValueUInt UInt
-  | ValueInt Integer
+  | ValueInt SInt
   | ValueAddress Address
   | ValueContract Address
   | ValueFixed Double
@@ -69,7 +69,9 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
                           ++ ") returns ("
                           ++ intercalate "," (map (formatType . snd) returnTypes)
                           ++ ")"
-valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
+valueToSolidityValue (ValueFixed _) = error "missing value"
+valueToSolidityValue (ValueUFixed _) = error "missing value"
+
 
 
 word256ToByteString::Word256->ByteString
@@ -90,46 +92,81 @@ decodeValue storage position@Storage.Position{..} = \case
   TypeBool -> ValueBool $ storage offset /= 0
   TypeUInt (Just v) -> ValueUInt $
     case v of
-      8 -> UInt8 val
-      16 -> UInt16 val
-      24 -> UInt24 val
-      32 -> UInt32 val
-      40 -> UInt40 val
-      48 -> UInt48 val
-      56 -> UInt56 val
-      64 -> UInt64 val
-      72 -> UInt72 val
-      80 -> UInt80 val
-      88 -> UInt88 val
-      96 -> UInt96 val
-      104 -> UInt104 val
-      112 -> UInt112 val
-      120 -> UInt120 val
-      128 -> UInt128 val
-      136 -> UInt136 val
-      144 -> UInt144 val
-      152 -> UInt152 val
-      160 -> UInt160 val
-      168 -> UInt168 val
-      176 -> UInt176 val
-      184 -> UInt184 val
-      192 -> UInt192 val
-      200 -> UInt200 val
-      208 -> UInt208 val
-      216 -> UInt216 val
-      224 -> UInt224 val
-      232 -> UInt232 val
-      240 -> UInt240 val
-      248 -> UInt248 val
-      256 -> UInt256 val
+      8 -> UInt8 numVal
+      16 -> UInt16 numVal
+      24 -> UInt24 numVal
+      32 -> UInt32 numVal
+      40 -> UInt40 numVal
+      48 -> UInt48 numVal
+      56 -> UInt56 numVal
+      64 -> UInt64 numVal
+      72 -> UInt72 numVal
+      80 -> UInt80 numVal
+      88 -> UInt88 numVal
+      96 -> UInt96 numVal
+      104 -> UInt104 numVal
+      112 -> UInt112 numVal
+      120 -> UInt120 numVal
+      128 -> UInt128 numVal
+      136 -> UInt136 numVal
+      144 -> UInt144 numVal
+      152 -> UInt152 numVal
+      160 -> UInt160 numVal
+      168 -> UInt168 numVal
+      176 -> UInt176 numVal
+      184 -> UInt184 numVal
+      192 -> UInt192 numVal
+      200 -> UInt200 numVal
+      208 -> UInt208 numVal
+      216 -> UInt216 numVal
+      224 -> UInt224 numVal
+      232 -> UInt232 numVal
+      240 -> UInt240 numVal
+      248 -> UInt248 numVal
+      256 -> UInt256 numVal
       _ -> error "fixme, I hate partial functions"
       where
-        val :: Num n => n
-        val = fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
+        numVal :: Num n => n
+        numVal = fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
   TypeUInt Nothing -> decodeValue storage position (TypeUInt (Just 256))
-  TypeInt (Just v) ->
-     ValueInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset --TODO clean this up, deal with negatives
-
+  TypeInt (Just v) -> ValueInt $
+    case v of
+      8 -> SInt8 numVal
+      16 -> SInt16 numVal
+      24 -> SInt24 numVal
+      32 -> SInt32 numVal
+      40 -> SInt40 numVal
+      48 -> SInt48 numVal
+      56 -> SInt56 numVal
+      64 -> SInt64 numVal
+      72 -> SInt72 numVal
+      80 -> SInt80 numVal
+      88 -> SInt88 numVal
+      96 -> SInt96 numVal
+      104 -> SInt104 numVal
+      112 -> SInt112 numVal
+      120 -> SInt120 numVal
+      128 -> SInt128 numVal
+      136 -> SInt136 numVal
+      144 -> SInt144 numVal
+      152 -> SInt152 numVal
+      160 -> SInt160 numVal
+      168 -> SInt168 numVal
+      176 -> SInt176 numVal
+      184 -> SInt184 numVal
+      192 -> SInt192 numVal
+      200 -> SInt200 numVal
+      208 -> SInt208 numVal
+      216 -> SInt216 numVal
+      224 -> SInt224 numVal
+      232 -> SInt232 numVal
+      240 -> SInt240 numVal
+      248 -> SInt248 numVal
+      256 -> SInt256 numVal
+      _ -> error "fixme, I hate partial functions"
+      where
+        numVal :: Num n => n
+        numVal = fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
 {-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
       (sign, significant) =
