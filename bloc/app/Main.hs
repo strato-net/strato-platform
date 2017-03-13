@@ -38,4 +38,3 @@ main = do
 
 dbExistsQuery :: Query
 dbExistsQuery = "SELECT 1 FROM pg_database WHERE datname='bloc';"
-

@@ -1,3 +1,0 @@
-contract Contract {
-  uint uintVar;
-}

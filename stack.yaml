@@ -3,7 +3,6 @@ packages:
 - bloc
 - ethereum
 - solidity
-- state-translate
 - strato/api
 - strato/client
 - location:
@@ -22,5 +21,4 @@ flags: {}
 extra-package-dbs: []
 
 ghc-options:
-  state-translate:      -Wall -Werror
   blockapps-bloc: -fsimpl-tick-factor=1000

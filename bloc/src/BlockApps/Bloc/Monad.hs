@@ -6,7 +6,6 @@
 
 module BlockApps.Bloc.Monad where
 
-import Control.Exception (Exception)
 import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
@@ -46,8 +45,6 @@ data BlocError
   | DBError Text
   | UserError Text
   deriving Show
-
-instance Exception BlocError where
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x

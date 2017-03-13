@@ -27,7 +27,7 @@ library
     BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Options
-  other-modules: DummyContractStorage
+  other-modules: BlockApps.Bloc.DummyContractStorage
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
@@ -62,7 +62,6 @@ library
     , servant-docs
     , servant-mock
     , servant-server
-    , state-translate
     , stm
     , text
     , time

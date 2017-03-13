@@ -5,7 +5,6 @@
   , DeriveAnyClass
   , DeriveGeneric
   , FlexibleInstances
-  , LambdaCase
   , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
@@ -57,8 +56,7 @@ import BlockApps.Strato.Types
 import qualified BlockApps.Storage as Storage
 import BlockApps.Types
 
-
-import DummyContractStorage
+import BlockApps.Bloc.DummyContractStorage
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -177,7 +175,7 @@ instance MonadContracts Bloc where
             , funcSelector = Text.decodeUtf8 sel
             , funcVals = Map.fromList vals
             }
-        return $ (funcName,func)
+        return (funcName,func)
     constrId <- blocQuery1 $ getXabiConstrQuery metadataId
     constr <- Map.fromList . argsToPairs <$> do
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
@@ -202,14 +200,14 @@ instance MonadContracts Bloc where
           , varSigned = Just si
           , varBytes = Just by
           , varEntry = Entry <$> Just eby <*> Just ety
-          , varVal = Just $ SimpleVar
+          , varVal = Just SimpleVar
             { simplevarType = vty
             , simplevarBytes = Just vby
             , simplevarDynamic = Just vdy
             , simplevarSigned = Just vsi
             , simplevarEntry = Entry <$> Just veby <*> Just vety
             }
-          , varKey = Just $ SimpleVar
+          , varKey = Just SimpleVar
             { simplevarType = kty
             , simplevarBytes = Just kby
             , simplevarDynamic = Just kdy
@@ -229,17 +227,14 @@ instance MonadContracts Bloc where
 
     storageOrError <-
       liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ getAddress contractName contractId
-      
+
     let storage' =
           case storageOrError of
            Left e -> error $ show e
            Right x -> x
-           
+
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-    let storage k =
-          case Map.lookup k storageMap of
-           Just v -> v
-           Nothing -> 0
+    let storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
         addPositions::Storage.Position -> [(Text, Type)] -> [(Text, Type, Storage.Position)]
@@ -249,13 +244,13 @@ instance MonadContracts Bloc where
             (position, usedBytes) = getPositionAndSize p0 theType
           in
            (name, theType, position):addPositions (Storage.addBytes position usedBytes) rest
-        
-        
+
+
 --        ret = map (\(p, var) -> fmap (valueToSolidityValue . decodeValue storage (Storage.positionAt p)) var) $ zip [0..] vars
         ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) vars
-        
+
     liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-    
+
     return $ Map.fromList ret
 
   getContractsFunctions (ContractName contractName) contractId = do
