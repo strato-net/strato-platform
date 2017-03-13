@@ -7,7 +7,6 @@ import State
 import Block
 import BlockGO
 import Hash
---import Init
 import Code
 import Checkpoints
 import DumpKafkaBlocks
@@ -16,6 +15,7 @@ import DumpKafkaSequencer
 import DumpKafkaUnSequencer
 import DumpKafkaStateDiff
 import DumpKafkaRaw
+import DumpRedis
 import FRawMP
 import Raw
 import RLP
@@ -23,15 +23,9 @@ import RawMP
 import Psql
 import InsertTX
 
---import Debug.Trace
-
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8  as BC
-import qualified Network.Kafka.Protocol as KP
---import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
-
-import Data.Int
-
+import           Data.Int
 import qualified Blockchain.Database.MerklePatricia as MP
 
 data Options = State{root::String, db::String}
@@ -50,6 +44,7 @@ data Options = State{root::String, db::String}
              | DumpKafkaUnminedBlocks{startingBlock::Int}
              | DumpKafkaRaw{streamName::String, startingBlock::Int}
              | DumpKafkaStateDiff{startingBlock::Int}
+             | DumpRedis{databaseNumber::Integer}
              | Psql{}
              | InsertTX{}
              deriving (Show, Data, Typeable)
@@ -60,6 +55,12 @@ stateOptions =
     root := def += typ "StateRoot" += argPos 1,
     db := def += typ "DBSTRING" += argPos 0
     ]
+
+redisOptions :: Annotate Ann
+redisOptions = 
+  record DumpRedis{databaseNumber=undefined} [
+    databaseNumber := def += typ "DatabaseNumber" += argPos 0
+  ]
 
 blockOptions::Annotate Ann
 blockOptions = 
@@ -141,7 +142,7 @@ dumpKafkaUnminedBlocksOptions =
 
 dumpKafkaRawOptions::Annotate Ann
 dumpKafkaRawOptions =
-  record DumpKafkaRaw{startingBlock=undefined} [
+  record DumpKafkaRaw{startingBlock=undefined, streamName=undefined} [
     startingBlock := 0 += typ "INT" += argPos 1,
     streamName := def += typ "DBSTRING" += argPos 0
     ]
@@ -172,6 +173,7 @@ checkpointOptions =
 
 options::Annotate Ann
 options = modes_ [stateOptions
+                , redisOptions
                 , blockOptions
                 , blockGoOptions
                 , hashOptions
@@ -201,6 +203,7 @@ main = do
 
 run::Options->IO ()
 run State{..}                  = let sr = MP.StateRoot $ fst $ B16.decode $ BC.pack root in State.doit db sr
+run DumpRedis{..}              = dumpRedis databaseNumber
 run Block{..}                  = Block.doit db hash
 run BlockGO{..}                = BlockGO.doit hash
 run Hash{..}                   = Hash.doit db hash

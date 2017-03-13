@@ -18,10 +18,10 @@ import Blockchain.Format
 import Blockchain.Data.Wire
 
 prefix::Bool->String->String
-prefix True "" = CL.green "msg>>>>>: "
-prefix False "" = CL.cyan "msg<<<<: "
+prefix True "" = CL.green "msg >>>>>: "
+prefix False "" = CL.cyan "msg <<<<<: "
 prefix True peerName = CL.green $ peerName ++ " >>>>>: "
-prefix False peerName = CL.cyan $ peerName ++ " <<<<: "
+prefix False peerName = CL.cyan $ peerName ++ " <<<<<: "
 
 --This must exist somewhere already
 tap::MonadIO m=>(a->m ())->Conduit a m a

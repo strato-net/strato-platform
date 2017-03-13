@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
@@ -17,7 +16,6 @@ import           Control.Monad.IO.Class
 import qualified Test.HUnit as HUnit
 import           Database.Redis hiding (sortBy)
 import           Test.Hspec
---import qualified Test.Hspec.Core.Spec as SpecM
 import           Test.QuickCheck
 import           Lens.Family2
 
@@ -44,9 +42,7 @@ openConn num = do
     connect connInfo
 
 closeConn :: Connection -> IO ()
-closeConn _ = do
---    liftIO $ putStrLn $ "Closing connection to Redis"
-    return () 
+closeConn _ = ()
 
 withConn :: Integer -> (Connection -> IO ()) -> IO ()
 withConn num = bracket (openConn num) closeConn
@@ -184,8 +180,7 @@ specTest = around (withConn 1) $ do
 
     describe "ReplaceBestBlock" $ do
 
-        forM_ [4..10] $ \n -> do
-            forM_ [3..5] $ \m -> do
+        forM_ [4..10] $ \n -> forM_ [3..5] $ \m -> do
                 flushDB
                 it "Should update canonical chain after switching all branches" $ \conn -> do
                     g <- liftIO makeGenesisBlock
@@ -208,8 +203,7 @@ specTest = around (withConn 1) $ do
                         ("Couldn't get best block iterated from chain (" ++ (show . length $ tree) ++ ", " ++ (show . length . leaves $ tree) ++ ")")
                         (bbs ==  r)
 
-        forM_ [4..10] $ \n -> do
-            forM_ [3..5] $ \m -> do
+        forM_ [4..10] $ \n -> forM_ [3..5] $ \m -> do
                 flushDB
                 it "Should update canonical chainY after switching all branches" $ \conn -> do
                     g <- liftIO makeGenesisBlock
@@ -261,7 +255,7 @@ workChain g chain = forM_ zC f
         zC       = zip (reverse chain) [1..]
 
 workChain' :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis () 
-workChain' g chain = foldM_ f 0 chain
+workChain' g = foldM_ f 0
     where
         f d b = do
             void $ g (blockHeaderHash b) (blockDataNumber b) d

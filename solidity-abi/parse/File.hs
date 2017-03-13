@@ -18,10 +18,13 @@ import Prelude hiding (lookup)
 import Declarations
 import Lexer
 import ParserTypes
+import Pragma
 
 -- | Parses a full Solidity file's contracts and imports
 solidityFile :: SolidityParser SolidityFile
 solidityFile = do
+  whiteSpace
+  optional pragma
   whiteSpace
   toplevel <- many $ do
     let eitherImport = Right <$> solidityImport

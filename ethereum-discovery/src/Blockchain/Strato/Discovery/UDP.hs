@@ -38,6 +38,7 @@ import Data.Maybe
 import qualified Data.Text as T
 import Data.Time.Clock.POSIX
 import qualified Network.Haskoin.Internals as H
+import qualified Network.URI as URI
 import Numeric
 import System.Endian
 import System.Timeout
@@ -71,9 +72,14 @@ instance Format NodeDiscoveryPacket where
   format (FindNeighbors nodeID _) = CL.blue "FindNeighbors " ++ format nodeID
   format (Neighbors neighbors _) = CL.blue "Neighbors" ++ ": \n" ++ unlines (map (("    " ++) . format) neighbors)
 
-data IAddr = IPV4Addr HostAddress | IPV6Addr HostAddress6 deriving (Show, Read, Eq)
+data IAddr = HostName String
+           | IPV4Addr HostAddress
+           | IPV6Addr HostAddress6
+           deriving (Show, Read, Eq)
 
 instance Format IAddr where
+  format (HostName hostName) = hostName
+
   format (IPV4Addr x) =
     show (fromIntegral x::Word8) ++ "." ++
     show (fromIntegral $ x `shiftR` 8::Word8) ++ "." ++
@@ -92,10 +98,14 @@ instance Format IAddr where
 
 -- odd that this doesn't exist, but so says reddit- https://www.reddit.com/r/haskellquestions/comments/331lot/simple_preferably_pure_way_to_create_hostaddress/
 stringToIAddr :: String -> IAddr
-stringToIAddr x =
-  case map read $ splitOn "." x of
-    [a,b,c,d] -> IPV4Addr $ a + (b `shift` 8) + (c `shift` 16) + (d `shift` 24)
-    _ -> error $ "Invalid IPV4: " ++ x
+stringToIAddr x
+    | URI.isIPv4address x = case map read $ splitOn "." x of
+        [a,b,c,d] -> IPV4Addr $ a + (b `shift` 8) + (c `shift` 16) + (d `shift` 24)
+        _ -> error $ "Invalid IPV4: " ++ x
+    | URI.isIPv6address x = case map (read . ("0x" ++)) $ splitOn ":" x of
+        [a,b,c,d,e,f,g,h] -> IPV6Addr $ tupleToHostAddress6 (a,b,c,d,e,f,g,h)
+        _ -> error $ "Invalid IPV6: " ++ x
+    | otherwise = HostName x
 
 instance RLPSerializable IAddr where
   rlpEncode (IPV4Addr x) = rlpEncode $ fromBE32 x
