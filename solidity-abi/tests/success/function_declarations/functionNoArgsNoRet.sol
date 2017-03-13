@@ -1,3 +1,0 @@
-contract Contract {
-  function f () {}
-}

@@ -12,6 +12,7 @@ module BlockApps.SolidityVarReader (
   ) where
 
 import Data.Bits
+import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC
@@ -93,7 +94,7 @@ decodeValue storage position@Storage.Position{..} = \case
   TypeUInt Nothing -> decodeValue storage position (TypeUInt (Just 256))
   TypeInt (Just v) ->
      ValueInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset --TODO clean this up, deal with negatives
-    
+
 {-    let
       Just (byte,bytes) = ByteString.uncons $ slice n
       (sign, significant) =
@@ -114,7 +115,7 @@ decodeValue storage position@Storage.Position{..} = \case
       ValueUInt addr = decodeValue storage position (TypeUInt (Just 160))
     in
       ValueAddress . Address $ fromIntegral addr
-  TypeContract -> 
+  TypeContract ->
     let
       ValueAddress addr = decodeValue storage position TypeAddress
     in
@@ -131,10 +132,10 @@ decodeValue storage position@Storage.Position{..} = \case
   TypeBytes (Just n) -> ValueBytes $ ByteString.take n $ word256ToByteString $ storage offset
 
   TypeBytes Nothing | storage offset `testBit` 0 -> --large string, 32+ bytes
-    let 
+    let
       len = storage offset `div` 2
-      startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
-    in ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concat $ map (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
+      startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
+    in ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   TypeBytes Nothing -> --small string, less than 32 bytes
     let
@@ -152,10 +153,10 @@ decodeValue storage position@Storage.Position{..} = \case
 
   TypeArray _ (Just _) -> error "TypeArray Just n is undefined in decodeValue"
 
-  TypeArray ty Nothing -> ValueArray $ map (flip (decodeValue storage) ty) $ 
-                                  map (Storage.positionAt . (startingKey+)) [0..storage offset-1]
+  TypeArray ty Nothing -> ValueArray $
+    map (flip (decodeValue storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
     where
-      startingKey=byteStringToWord256 $ keccak256ByteString $ keccak256 $ word256ToByteString offset
+      startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
   x -> error $ "Missing case in decodeValue: " ++ show x

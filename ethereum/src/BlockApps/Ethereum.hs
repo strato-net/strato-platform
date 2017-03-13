@@ -21,7 +21,6 @@ module BlockApps.Ethereum
   , keccak256
   , keccak256lazy
   , keccak256String
-  , keccak256ByteString
   , stringKeccak256
     -- * Account States
   , AccountState (..)
@@ -46,7 +45,6 @@ import Crypto.Random.Entropy
 import Crypto.Secp256k1
 import Data.Aeson hiding (Array,String)
 import qualified Data.Binary as Binary
-import qualified Data.ByteArray as ByteArray
 import Data.ByteArray (convert)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
@@ -68,7 +66,8 @@ import Test.QuickCheck
 import Text.Read hiding (String)
 import Web.FormUrlEncoded
 
-newtype Address = Address Word160 deriving (Eq, Ord, Show, Generic)
+newtype Address = Address { unAddress :: Word160 }
+ deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
 addressString (Address address) = padZeros 40 (showHex address "")
   where
@@ -121,11 +120,9 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
   where
     err = error "could not generate secret key"
 
-newtype Keccak256 = Keccak256 (Digest Keccak_256) deriving (Eq,Show,Generic)
+newtype Keccak256 = Keccak256 { unKeccak256 :: Digest Keccak_256 } deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
-keccak256ByteString :: Keccak256 -> ByteString
-keccak256ByteString (Keccak256 digest) = ByteString.pack $ ByteArray.unpack digest
 stringKeccak256 :: String -> Maybe Keccak256
 stringKeccak256 string =
   if ByteString.null r then Keccak256 <$> digestFromByteString bs else Nothing

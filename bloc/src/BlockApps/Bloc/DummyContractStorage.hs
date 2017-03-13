@@ -2,7 +2,7 @@
     OverloadedStrings
 #-}
 
-module DummyContractStorage where
+module BlockApps.Bloc.DummyContractStorage where
 
 import qualified Data.ByteString as B
 import Data.Text (Text)
@@ -100,7 +100,7 @@ getVariablesAndTypes (ContractName contractName) _ =
      return
      [
        ("theBool", TypeBool), --0
-       
+
        ("theInt8", TypeInt (Just 8)), --1
        ("theInt16", TypeInt (Just 16)), --2
        ("theInt24", TypeInt (Just 24)), --4
@@ -133,7 +133,7 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("theInt240", TypeInt (Just 240)), --576
        ("theInt248", TypeInt (Just 248)), --608
        ("theInt256", TypeInt (Just 256)), --640
-       
+
        ("theUInt8", TypeUInt (Just 8)), --672
        ("theUInt16", TypeUInt (Just 16)), --673
        ("theUInt24", TypeUInt (Just 24)), --675
@@ -166,15 +166,15 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("theUInt240", TypeUInt (Just 240)), --1248
        ("theUInt248", TypeUInt (Just 248)), --1280
        ("theUInt256", TypeUInt (Just 256)), --1312
-       
+
        ("theInt", TypeInt Nothing), --1344
-       
+
        ("theUint", TypeInt Nothing), --1376
-       
+
        ("theAddress", TypeAddress), --1408
-       
+
        ("myAddress", TypeAddress), --1440
-       
+
        ("theBytes1", TypeBytes (Just 1)), --1460
        ("theBytes2", TypeBytes (Just 2)), --1461
        ("theBytes3", TypeBytes (Just 3)), --1463
@@ -207,11 +207,11 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("theBytes30", TypeBytes (Just 30)), --2048
        ("theBytes31", TypeBytes (Just 31)), --2080
        ("theBytes32", TypeBytes (Just 32)), --2112
-       
+
        ("theByte", TypeBytes (Just 1)), --2144
-       
+
        ("theBytes", TypeBytes Nothing), --2176
-       
+
        ("theString", TypeString) --2208
 
 --  ("choice", "typedef":"ActionChoices",TypeEnum,"bytes":1,"names":["GoLeft","GoRight","GoStraight","SitStill"]} --2240
@@ -500,7 +500,7 @@ Types-
 
 -}
 
-     
+
 -- TypeBool | TypeUInt (Maybe Int) | TypeInt (Maybe Int)
 --  | TypeAddress | TypeFixed (Maybe (Int,Int)) | TypeUFixed (Maybe (Int,Int))
 --  | TypeBytes (Maybe Int) | TypeString | TypeFunction [Type]
