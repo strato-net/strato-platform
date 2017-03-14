@@ -45,8 +45,9 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
+import BlockApps.Bloc.Monad
+import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.SolidityVarReader
@@ -218,7 +219,7 @@ instance MonadContracts Bloc where
       { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
   getContractsState contractName contractId = do
-    vars <- getVariablesAndTypes contractName contractId
+    contract <- getContract contractName contractId
 
     storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
 
@@ -234,7 +235,7 @@ instance MonadContracts Bloc where
           in
            (name, theType, position):addPositions (Storage.addBytes position usedBytes) rest
 
-        ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) vars
+        ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) $ Map.toList $ storageVars contract
 
     liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
 

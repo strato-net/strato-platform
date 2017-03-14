@@ -7,11 +7,21 @@ module BlockApps.Bloc.DummyContractStorage where
 import qualified Data.ByteString as B
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Map as Map
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
+import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Types
+
+getContract::ContractName->MaybeNamed Address->Bloc Contract
+getContract contractName address = do
+  vars <- getVariablesAndTypes contractName address
+  return Contract {
+    storageVars=Map.fromList vars
+    }
+
 
 getVariablesAndTypes::ContractName->MaybeNamed Address->Bloc [(Text, Type)]
 getVariablesAndTypes (ContractName contractName) _ =
