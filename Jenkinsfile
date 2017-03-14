@@ -1,13 +1,13 @@
 node ('cd9') {
-   slackSend (color: 'good', message: "Build Started: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})") 
-   stage('Code-Checkout') { // for display purposes
-    
-      withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'blockapps-cd-github', passwordVariable: 'p', usernameVariable: 'u']]) {
-    // some block
-    sh 'rm -rf blockapps-haskell'
-    sh 'git clone https://$u:$p@github.com/blockapps/blockapps-haskell'
+   slackSend (color: 'good', message: "Build Started: Job '${env.JOB_NAME} ${env.BRANCH_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})") 
+    stage('Code-Checkout') { // for display purposes
+   
+      checkout scm
+      //withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'blockapps-cd-github', passwordVariable: 'p', usernameVariable: 'u']]) {
+      //sh 'rm -rf blockapps-haskell'
+      //sh 'git clone https://$u:$p@github.com/blockapps/blockapps-haskell'
+      //}
    }
- }
    stage('Build') {
     echo 'doing build'
     sh 'echo $pwd'
