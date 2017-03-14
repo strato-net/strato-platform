@@ -65,5 +65,6 @@ getPositionAndSize p (TypeUInt (Just v)) =
    (getNextAvailablePosition p len, len)
 getPositionAndSize p TypeAddress = (getNextAvailablePosition p 20, 20)
 getPositionAndSize p (TypeBytes Nothing) = (getNextAvailablePosition p 32, 32)
+getPositionAndSize p TypeString = (getNextAvailablePosition p 32, 32)
 getPositionAndSize p (TypeBytes (Just v)) = (getNextAvailablePosition p v, v)
 getPositionAndSize p _ = (p,32)

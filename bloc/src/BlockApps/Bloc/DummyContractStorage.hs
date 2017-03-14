@@ -16,14 +16,27 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Contract
 import BlockApps.Ethereum
+import qualified BlockApps.Storage as Storage
 import BlockApps.Types
+
+
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
   vars <- getVariablesAndTypes contractName address
   return Contract {
-    storageVars=Map.fromList vars
+    storageVars=Map.fromList
+                $ zipWith (\(n, t) p -> (n, (p, t))) vars
+                $ addPositions (Storage.positionAt 0) $ map snd vars
     }
+
+addPositions::Storage.Position -> [Type] -> [Storage.Position]
+addPositions _ [] = []
+addPositions p0 (theType:rest) =
+  let
+    (position, usedBytes) = getPositionAndSize p0 theType
+  in
+   position:addPositions (Storage.addBytes position usedBytes) rest
 
 
 getVariablesAndTypes::ContractName->MaybeNamed Address->Bloc [(Text, Type)]
@@ -218,7 +231,7 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("theBytes28", TypeBytes (Just 28)), --1984
        ("theBytes29", TypeBytes (Just 29)), --2016
        ("theBytes30", TypeBytes (Just 30)), --2048
-
+       ("theBytes31", TypeBytes (Just 31)), --2080
        ("theBytes32", TypeBytes (Just 32)), --2112
 
        ("theByte", TypeBytes (Just 1)), --2144

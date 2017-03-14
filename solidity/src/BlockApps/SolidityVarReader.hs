@@ -6,6 +6,7 @@
 
 module BlockApps.SolidityVarReader (
   decodeValue,
+  decodeValues,
   word256ToByteString,
   byteStringToWord256,
   valueToSolidityValue
@@ -18,6 +19,8 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC
 --import qualified Data.ByteString.Lazy as BL
 import Data.LargeWord
+import qualified Data.Map as Map
+import Data.Maybe
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -25,6 +28,7 @@ import qualified Data.Text.Encoding as Text
 import Numeric.Natural
 import Text.Printf
 
+import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Storage (Storage)
@@ -81,17 +85,40 @@ byteStringToWord256::ByteString->Word256
 byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) $ zip [31,30..0] $ map fromIntegral $ ByteString.unpack x
 
 
+decodeValues
+  :: Contract
+  -> Storage
+  -> [(Text, Value)]
+decodeValues contract storage = 
+  let
+    varNames = Map.keys $ storageVars contract
+  in
+   --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
+   zip varNames $ catMaybes $ map (decodeValue contract storage) $ varNames
 
 decodeValue
-  :: Storage
+  :: Contract
+  -> Storage
+  -> Text
+  -> Maybe Value
+decodeValue contract storage varName = do
+  case Map.lookup varName $ storageVars contract of
+   Nothing -> Nothing
+   Just (position, theType) ->
+     Just $ decodeValue' contract storage position theType
+
+
+decodeValue'
+  :: Contract
+  -> Storage
   -> Storage.Position
   -> Type
   -> Value
-decodeValue storage position@Storage.Position{..} = \case
+decodeValue' contract storage position@Storage.Position{..} = \case
   TypeBool -> ValueBool $ storage offset /= 0
   TypeUInt (Just v) ->
     ValueUInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset
-  TypeUInt Nothing -> decodeValue storage position (TypeUInt (Just 256))
+  TypeUInt Nothing -> decodeValue' contract storage position (TypeUInt (Just 256))
   TypeInt (Just v) ->
      ValueInt $ fromIntegral $ (.&. ((1 `shiftL` v) - 1)) $ (`shiftR` (byte*8)) $ storage offset --TODO clean this up, deal with negatives
 
@@ -108,26 +135,26 @@ decodeValue storage position@Storage.Position{..} = \case
         zipWith shiftL significant' [8*(m-1),8*(m-2)..0]
 -}
 
-  TypeInt Nothing -> decodeValue storage position (TypeInt (Just 256))
+  TypeInt Nothing -> decodeValue' contract storage position (TypeInt (Just 256))
 
   TypeAddress ->
     let
-      ValueUInt addr = decodeValue storage position (TypeUInt (Just 160))
+      ValueUInt addr = decodeValue' contract storage position (TypeUInt (Just 160))
     in
       ValueAddress . Address $ fromIntegral addr
   TypeContract ->
     let
-      ValueAddress addr = decodeValue storage position TypeAddress
+      ValueAddress addr = decodeValue' contract storage position TypeAddress
     in
       ValueContract addr
 
 {-
   TypeFixed (Just (n,m)) ->
     let
-      ValueInt x = decodeValue storage offset (TypeInt (Just 256))
+      ValueInt x = decodeValue' storage offset (TypeInt (Just 256))
     in
       ValueFixed $ fromIntegral x / 2 ** fromIntegral n
-  TypeFixed Nothing -> decodeValue storage offset (TypeFixed (Just (128,128)))
+  TypeFixed Nothing -> decodeValue' storage offset (TypeFixed (Just (128,128)))
 -}
   TypeBytes (Just n) -> ValueBytes $ ByteString.take n $ ByteString.drop (32 - byte - n) $ word256ToByteString $ storage offset
 
@@ -145,18 +172,18 @@ decodeValue storage position@Storage.Position{..} = \case
 
   TypeString ->
     let
-      ValueBytes bytes = decodeValue storage position (TypeBytes Nothing)
+      ValueBytes bytes = decodeValue' contract storage position (TypeBytes Nothing)
     in
       ValueString $ Text.decodeUtf8 bytes
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
-  TypeArray _ (Just _) -> error "TypeArray Just n is undefined in decodeValue"
+  TypeArray _ (Just _) -> error "TypeArray Just n is undefined in decodeValue'"
 
   TypeArray ty Nothing -> ValueArray $
-    map (flip (decodeValue storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
+    map (flip (decodeValue' contract storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
     where
       startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
-  x -> error $ "Missing case in decodeValue: " ++ show x
+  x -> error $ "Missing case in decodeValue': " ++ show x

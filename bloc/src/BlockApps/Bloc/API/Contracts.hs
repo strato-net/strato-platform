@@ -47,14 +47,11 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Monad
-import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
-import qualified BlockApps.Storage as Storage
-import BlockApps.Types
 
 import BlockApps.Bloc.DummyContractStorage
 
@@ -221,21 +218,16 @@ instance MonadContracts Bloc where
   getContractsState contractName contractId = do
     contract <- getContract contractName contractId
 
+    liftIO $ putStrLn $ show contract
+    
     storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
 
     
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
         storage k = fromMaybe 0 $ Map.lookup k storageMap
 
-        addPositions::Storage.Position -> [(Text, Type)] -> [(Text, Type, Storage.Position)]
-        addPositions _ [] = []
-        addPositions p0 ((name, theType):rest) =
-          let
-            (position, usedBytes) = getPositionAndSize p0 theType
-          in
-           (name, theType, position):addPositions (Storage.addBytes position usedBytes) rest
 
-        ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) $ Map.toList $ storageVars contract
+        ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
 
     liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
 
