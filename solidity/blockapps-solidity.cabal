@@ -36,6 +36,7 @@ library
     , deepseq
     , generic-random
     , http-api-data
+    , largeint
     , largeword
     , memory
     , QuickCheck
