@@ -7,6 +7,7 @@ module BlockApps.Solidity.Storage where
 import Data.Binary (Binary)
 import Data.Bool
 import Data.ByteString (ByteString)
+import Data.Maybe      (fromMaybe)
 
 import qualified Data.Binary as Binary
 import qualified Data.ByteString as ByteString
@@ -15,6 +16,35 @@ import qualified Data.Text.Encoding as Text
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Value
+
+
+toStorage :: Value -> ByteString
+toStorage = \case
+  SimpleValue v -> simpleToStorage v
+  ValueArrayDynamic vs -> toStorage (SimpleValue (ValueUInt (fromIntegral (length vs))))
+                          `ByteString.append`
+                          toStorage (ValueArrayFixed 0 vs)
+  ValueArrayFixed _ vs ->
+    let
+      head' = map (\v -> if isDynamic v then Nothing else Just (toStorage v)) vs
+      tail' = map (\v -> if isDynamic v then (toStorage v) else ByteString.empty) vs
+      tailLengths = scanl (\b a -> (ByteString.length a) + b) 0 tail'
+      headLength = sum $ map (maybe 32 ByteString.length) head'
+      head'' =  zipWith f tailLengths  head'
+        where
+          f t = fromMaybe
+                  (toStorage $ SimpleValue $ ValueUInt $ fromIntegral $ t + headLength)
+    in
+      ByteString.concat head'' `ByteString.append` ByteString.concat tail'
+
+
+
+    -- byte array of correctly encoded types in vs
+    -- head  array contains static size Values
+    -- head ends with in order:
+          -- length of head going to each dynamic a value
+
+  ValueMapping _v -> undefined
 
 simpleToStorage :: SimpleValue -> ByteString
 simpleToStorage =  \case
@@ -145,3 +175,16 @@ simpleToStorage =  \case
         padChar = bool 0xff 0 (signum v /= (-1))
       in
         ByteString.replicate padding padChar `ByteString.append` bs
+
+isDynamic :: Value -> Bool
+isDynamic = \case
+  ValueArrayDynamic _ -> True
+  ValueMapping _ -> True
+  ValueArrayFixed _ vs -> any isDynamic vs
+  SimpleValue v -> simpleIsDynamic v
+
+simpleIsDynamic :: SimpleValue -> Bool
+simpleIsDynamic = \case
+  ValueBytes _ -> True
+  ValueString _ -> True
+  _ -> False

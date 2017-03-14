@@ -9,7 +9,8 @@ import BlockApps.Solidity.Int
 
 data Value
   = SimpleValue SimpleValue
-  | ValueArray [SimpleValue]
+  | ValueArrayDynamic [Value]
+  | ValueArrayFixed Word [Value]
   | ValueMapping (Map SimpleValue Value)
   -- | ValueFunction
   -- | ValueStruct

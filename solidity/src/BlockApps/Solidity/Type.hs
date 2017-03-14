@@ -2,8 +2,9 @@ module BlockApps.Solidity.Type where
 
 data Type
   = SimpleType SimpleType
-  | TypeArray SimpleType
-  | Mapping SimpleType Type
+  | TypeArrayDynamic Type
+  | TypeArrayFixed Word Type
+  | TypeMapping SimpleType Type
   -- | TypeFunction [Type] [Type]
   -- | Struct
   -- | Enum
