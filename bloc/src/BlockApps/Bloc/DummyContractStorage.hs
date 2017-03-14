@@ -205,7 +205,7 @@ getVariablesAndTypes (ContractName contractName) _ =
        ("theBytes28", TypeBytes (Just 28)), --1984
        ("theBytes29", TypeBytes (Just 29)), --2016
        ("theBytes30", TypeBytes (Just 30)), --2048
-       ("theBytes31", TypeBytes (Just 31)), --2080
+
        ("theBytes32", TypeBytes (Just 32)), --2112
 
        ("theByte", TypeBytes (Just 1)), --2144
@@ -217,6 +217,15 @@ getVariablesAndTypes (ContractName contractName) _ =
 --  ("choice", "typedef":"ActionChoices",TypeEnum,"bytes":1,"names":["GoLeft","GoRight","GoStraight","SitStill"]} --2240
 
      ]
+
+   "Enums" ->
+     return
+     [
+       ("choice", TypeEnum "ActionChoices"),
+       ("defaultChoice", TypeEnum "ActionChoices")
+     ]
+
+
 
    x -> error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
 
@@ -479,19 +488,15 @@ Types-
 
 
 
+Enums-
+"types":{
+  "ActionChoices":{"names":{"GoLeft":0,"GoRight":1,"GoStraight":2,"SitStill":3},"type":"Enum","bytes":1}
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
+"vars":{
+  "defaultChoice":{"atBytes":1,"typedef":"ActionChoices","type":"Enum","bytes":1,"names":{"GoLeft":0,"GoRight":1,"GoStraight":2,"SitStill":3}},
+  "choice":{"atBytes":0,"typedef":"ActionChoices","type":"Enum","bytes":1,"names":{"GoLeft":0,"GoRight":1,"GoStraight":2,"SitStill":3}}
+}
 
 
 
@@ -520,5 +525,6 @@ getAddress (ContractName "InfoFeed") _ = Address 0xf503bdf764474ab89130511860229
 getAddress (ContractName "SimpleDataFeed") _ = Address 0x3fbbcae9815773e8820bb53a855c2ae8cb75e9c0
 getAddress (ContractName "SimpleStorage") _ = Address 0x12ed0ad1f6838d49502fc34458f1bee7222d4ba3
 getAddress (ContractName "Types") _ = Address 0x3275bd5d58093c5a1a849c797f103a2e2430c0d5
-
+--getAddress (ContractName "Enums") _ = Address 0xbd4d76e9c5923661a92db8064c816b758c85649e
+getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"

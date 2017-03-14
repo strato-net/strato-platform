@@ -42,6 +42,7 @@ data Type
   -- <type>[]: a variable-length array of the given fixed-length type.
   | TypeMapping Type Type
   | TypeContract
+  | TypeEnum Text
   deriving (Eq, Show)
 
 
