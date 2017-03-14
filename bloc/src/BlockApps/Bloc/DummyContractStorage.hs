@@ -2,7 +2,10 @@
     OverloadedStrings
 #-}
 
-module BlockApps.Bloc.DummyContractStorage where
+module BlockApps.Bloc.DummyContractStorage (
+  getContract,
+  getAddress
+  ) where
 
 import qualified Data.ByteString as B
 import Data.Text (Text)
