@@ -7,6 +7,7 @@ module BlockApps.Bloc.DummyContractStorage (
   getAddress
   ) where
 
+import qualified Data.Bimap as Bimap
 import qualified Data.ByteString as B
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -27,7 +28,8 @@ getContract contractName address = do
   return Contract {
     storageVars=Map.fromList
                 $ zipWith (\(n, t) p -> (n, (p, t))) vars
-                $ addPositions (Storage.positionAt 0) $ map snd vars
+                $ addPositions (Storage.positionAt 0) $ map snd vars,
+    enumDefs = Bimap.empty
     }
 
 addPositions::Storage.Position -> [Type] -> [Storage.Position]

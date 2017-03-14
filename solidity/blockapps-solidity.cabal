@@ -26,6 +26,7 @@ library
     , blockapps-ethereum
     , aeson
     , aeson-casing
+    , bimap
     , bytestring
     , containers
     , generic-random
