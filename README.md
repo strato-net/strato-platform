@@ -294,6 +294,8 @@ docker exec -it strato /bin/bash
 
 ### Introduction
 
+With the aid of `tmuxinator` we can get a view of our node(s).
+
 ### Installation
 
 If you don't have `tmux` and `tmuxinator` installed, run 
