@@ -13,20 +13,25 @@ BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
 
-BUILD_HASKELL=stack setup && stack install --local-bin-path=$(FAKEROOT)/usr/bin
 
 SOLCBRANCH=v0.3.6
 SOLCREPOSITORY=https://github.com/ethereum/solidity.git
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
-ifeq ($(ON_MAC),)
-SOLCCMAKE=cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+SOLCCMAKE=cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
 else
 SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
 endif
 SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
 EXTRADEPS=doit.sh mkCoinbase
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+STACKFLAGS=
+else
+STACKFLAGS=--allow-different-user
+endif
+BUILD_HASKELL=stack setup $(STACKFLAGS) --verbose && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
 
 all: build_docker
 
@@ -48,14 +53,14 @@ else
 	mkdir $(SOLCBUILDDIR)
 	$(SOLCCMAKE)
 endif
-ifeq ($(ON_MAC),)
+ifeq ($(USE_DOCKER_BUILD_ENV),)
 	$(SOLCMAKEINSTALL)
 else
 	$(DOCKER_SHELL) "$(SOLCMAKEINSTALL)"
 endif
 
 build_haskell: build_buildbase prebuild
-ifeq ($(ON_MAC),)
+ifeq ($(USE_DOCKER_BUILD_ENV),)
 	$(BUILD_HASKELL)
 else
 	$(DOCKER_SHELL) "$(BUILD_HASKELL)"
@@ -67,8 +72,8 @@ build_deploybase: prebuild
 	rm -f /tmp/docker-dummy/Dockerfile.deploybase
 
 build_buildbase: build_deploybase prebuild
-ifeq ($(ON_MAC),)
-	echo "ON_MAC not set, not building buildbase" ;
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
 else
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
 	docker build -t strato-buildbase:latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
