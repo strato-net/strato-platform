@@ -36,11 +36,6 @@ deployments:
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
     ref: basil-convert
-    hooks:
-      before_build: |
-        if(util.OS.Distribution == "Mac OS X") {
-          deployment.Env["ON_MAC"] = "1"
-        }
     compose:
       restart: always
       ports:
