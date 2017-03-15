@@ -13,6 +13,10 @@ packages:
     git: https://github.com/echatav/servant-aeson-specs/
     commit: cedbf002b0d5855c17dc91de97e966ee339604fa
   extra-dep: true
+- location:
+    git: https://github.com/echatav/largeint/
+    commit: 2702f1e7381e76d32db96cba3b09f32c0210934d
+  extra-dep: true
 extra-deps:
   - hflags-0.4.2
   - relapse-0.1.0.1
