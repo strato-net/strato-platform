@@ -1,0 +1,5 @@
+before_build: |
+  if(util.OS.Distribution == "Mac OS X") {
+    deployment.Env["ON_MAC"] = "1"
+  }
+
