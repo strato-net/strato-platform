@@ -1,9 +1,6 @@
 
 module BlockApps.Types where
 
-import qualified BlockApps.Storage as Storage
-
-import Data.Bits
 import Data.ByteString (ByteString)
 import Data.Text (Text)
 

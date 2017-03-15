@@ -1,6 +1,6 @@
 node ('cd9') {
-   slackSend (color: 'good', message: "Build Started: Job '${env.JOB_NAME} ${env.BRANCH_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})") 
-    stage('Code-Checkout') { // for display purposes
+   slackSend (color: 'good', message: "Build Started: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})") 
+   stage('Code-Checkout') { // for display purposes
    
       checkout scm
       //withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'blockapps-cd-github', passwordVariable: 'p', usernameVariable: 'u']]) {
