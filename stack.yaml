@@ -15,7 +15,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/echatav/largeint/
-    commit: 2702f1e7381e76d32db96cba3b09f32c0210934d
+    commit: 8cce2055e9ffffc89cb1ea2b507f837ff9d1f985
   extra-dep: true
 extra-deps:
   - hflags-0.4.2
