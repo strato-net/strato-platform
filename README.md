@@ -292,9 +292,43 @@ docker exec -it strato /bin/bash
 
 ## Dashboard
 
-If you have `tmux` and `tmuxinator` installed, run `tmuxinator start strato` and
-you will get a dashboard showing detailed information about your running
+### Introduction
+
+### Installation
+
+If you don't have `tmux` and `tmuxinator` installed, run 
+```
+sudo apt-get install -y tmuxinator tmux
+```
+
+### Navigating
+
+Once you have `tmux` and `tmuxinator` installed, run 
+```
+tmuxinator start strato
+``` 
+and you will get a dashboard showing detailed information about your running
 instance.
 
-+ Enable mouse-mode by typing `ctrl+b :set -g mouse`
+With default key-bindings, `ctrl+b` is your control key. You can
+
++ Enable mouse-mode by typing `ctrl+b :set -g mouse` (if not enabled by default already)
 + Quit `tmux` by typing `ctrl+b :kill-session -t strato`
+
+### Specific panes (in-progress)
+
++ host: execute your host commands here, or inside the `strato` docker image
++ backbone: you can see the `strato-sequencer -> ethere-vm -> strato-adit (miner)`
++ indexers: `strato-p2p-indexer` and `strato-api-indexer`
++ network: `ethereum-discover` and a view of the best blocks from all the connected peers. `strato-p2p-client` and `strato-p2p-server`
++ strato-api: a filtered view of `GET` and `POST` requests
++ misc-api: a full view of the logs of `strato-api`, `bloc`, `cirrus` and `postgrest`
++ explorer: last block, last transaction, `strato` version and coinbase distribution
++ graphs: normalized views of blocktimes, number of transactions and number of uncles over the past 100 blocks
++ stream_blocks: views of the kafka streams for `blocks` and `unminedblocks`
++ stream_seq: views of the kafka streams for `unsequenced` and `sequenced` transactions as well as `statediffs`
++ stream_dbs: views of the `redis` best block number, total difficulty and hash
++ checkpoints: all the checkpoints of the kafka streams
++ cirrus: all the tables and the counts of respective contracts
++ monitor: monitor the host machine with `htop`, `iftop`, `iostat` and `ctop` (docker)
++ databases: inspect the postgres database(s) with `pg_top` and view the redis status with `redis-cli info`
