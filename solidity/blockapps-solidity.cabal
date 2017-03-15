@@ -33,7 +33,6 @@ library
     , binary
     , bytestring
     , containers
-    , deepseq
     , generic-random
     , http-api-data
     , largeint
