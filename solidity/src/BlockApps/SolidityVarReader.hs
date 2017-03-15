@@ -12,6 +12,7 @@ module BlockApps.SolidityVarReader (
   valueToSolidityValue
   ) where
 
+import qualified Data.Bimap as Bimap
 import Data.Bits
 import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
@@ -37,12 +38,6 @@ import BlockApps.Types
 
 
 
-formatType::Type->String
-formatType TypeAddress = "Address"
-formatType (TypeInt Nothing) = "Int"
-formatType (TypeUInt Nothing) = "UInt"
-formatType x = show x
-
 data Value
   = ValueBool Bool
   | ValueUInt Natural
@@ -54,6 +49,7 @@ data Value
   | ValueBytes ByteString
   | ValueArray [Value]
   | ValueString Text
+  | ValueEnum Text Text
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   deriving (Eq,Show)
 
@@ -68,6 +64,7 @@ valueToSolidityValue (ValueContract (Address addr)) =
   SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueArray values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueBytes bytes) = SolidityValueAsString $ T.pack $ BC.unpack bytes
+valueToSolidityValue (ValueEnum name value) = SolidityValueAsString $ name `T.append` "." `T.append` value
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)
@@ -186,4 +183,17 @@ decodeValue' contract storage position@Storage.Position{..} = \case
       startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> ValueString $ T.pack $ "mapping (" ++ formatType tyk ++ " => " ++ formatType tyv ++ ")"
+
+  TypeEnum name ->
+    case Map.lookup name $ enumDefs contract of
+     Nothing -> error $ "Solidity contract is using a missing enum: " ++ show name
+     Just enumset ->
+       let
+         len = fromIntegral $ Bimap.size enumset `shiftR` 8 + 1
+         val = fromIntegral $ (.&. ((1 `shiftL` 8*len) - 1)) $ (`shiftR` (byte*8)) $ storage offset
+       in
+        case Bimap.lookup val enumset of
+         Nothing -> error "bad enum value"
+         Just x -> ValueEnum name x
+  
   x -> error $ "Missing case in decodeValue': " ++ show x

@@ -7,6 +7,7 @@ module BlockApps.Bloc.DummyContractStorage (
   getAddress
   ) where
 
+import Control.Monad.IO.Class
 import qualified Data.Bimap as Bimap
 import qualified Data.ByteString as B
 import Data.Text (Text)
@@ -20,238 +21,283 @@ import BlockApps.Ethereum
 import qualified BlockApps.Storage as Storage
 import BlockApps.Types
 
-
-
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
-  vars <- getVariablesAndTypes contractName address
+  (vars, enums) <- getVarsAndEnums contractName address
+  liftIO $ print enums
+  let enumDefs' = Map.fromList $ map (fmap (Bimap.fromList . zip [0..])) enums
   return Contract {
     storageVars=Map.fromList
                 $ zipWith (\(n, t) p -> (n, (p, t))) vars
-                $ addPositions (Storage.positionAt 0) $ map snd vars,
-    enumDefs = Bimap.empty
+                $ addPositions enumDefs' (Storage.positionAt 0) $ map snd vars,
+    enumDefs = enumDefs'
     }
 
-addPositions::Storage.Position -> [Type] -> [Storage.Position]
-addPositions _ [] = []
-addPositions p0 (theType:rest) =
+addPositions::Enums->Storage.Position -> [Type] -> [Storage.Position]
+addPositions _ _ [] = []
+addPositions enums p0 (theType:rest) =
   let
-    (position, usedBytes) = getPositionAndSize p0 theType
+    (position, usedBytes) = getPositionAndSize enums p0 theType
   in
-   position:addPositions (Storage.addBytes position usedBytes) rest
+   position:addPositions enums (Storage.addBytes position usedBytes) rest
 
 
-getVariablesAndTypes::ContractName->MaybeNamed Address->Bloc [(Text, Type)]
-getVariablesAndTypes (ContractName contractName) _ =
+getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])])
+getVarsAndEnums (ContractName contractName) _ =
   case contractName of
-   "x" -> return [("fred", TypeInt Nothing)]
    "Payout" ->
      return
-     [
-       ("Victor", TypeAddress),
-       ("Jim", TypeAddress),
-       ("Kieren", TypeAddress),
-       ("ownershipDistribution", TypeMapping TypeAddress (TypeUInt Nothing)),
-       ("Setup", TypeFunction B.empty [] []),
-       ("Dividend", TypeFunction B.empty [] [])
-     ]
+     (
+       [
+         ("Victor", TypeAddress),
+         ("Jim", TypeAddress),
+         ("Kieren", TypeAddress),
+         ("ownershipDistribution", TypeMapping TypeAddress (TypeUInt Nothing)),
+         ("Setup", TypeFunction B.empty [] []),
+         ("Dividend", TypeFunction B.empty [] [])
+       ],
+       [
+       ]
+     )
    "Stake" ->
      return
-     [
-       ("stake", TypeMapping TypeAddress (TypeUInt Nothing)),
-       ("stakeHolders", TypeArray TypeAddress Nothing),
-       ("holdingTheBag", TypeAddress),
-       ("numStakeHolders", TypeUInt Nothing),
-       ("currentStake", TypeUInt Nothing),
-       ("sumStake", TypeUInt Nothing),
-       ("payout", TypeFunction "63bd1d4a" [] []),
-       ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", TypeAddress)] [])
-     ]
+     (
+       [
+         ("stake", TypeMapping TypeAddress (TypeUInt Nothing)),
+         ("stakeHolders", TypeArray TypeAddress Nothing),
+         ("holdingTheBag", TypeAddress),
+         ("numStakeHolders", TypeUInt Nothing),
+         ("currentStake", TypeUInt Nothing),
+         ("sumStake", TypeUInt Nothing),
+         ("payout", TypeFunction "63bd1d4a" [] []),
+         ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", TypeAddress)] [])
+       ],
+       [
+       ]
+     )
    "SimpleMultiSig" ->
      return
-     [
-       ("alice1", TypeAddress),
-       ("alice2", TypeAddress),
-       ("bob", TypeAddress),
-       ("numSigned", TypeUInt Nothing),
-       ("error", TypeBytes (Just 32)),
-       ("registeredYet", TypeBool),
-       ("signedYet", TypeMapping TypeAddress TypeBool),
-       ("register", TypeFunction "aa677354" [("registerAlice1", TypeAddress), ("registerAlice2", TypeAddress)] []),
-       ("withdraw", TypeFunction "51cff8d9" [("to", TypeAddress)] []),
-       ("addSignature", TypeFunction "5614d3e0" [] [])
-     ]
+     (
+       [
+         ("alice1", TypeAddress),
+         ("alice2", TypeAddress),
+         ("bob", TypeAddress),
+         ("numSigned", TypeUInt Nothing),
+         ("error", TypeBytes (Just 32)),
+         ("registeredYet", TypeBool),
+         ("signedYet", TypeMapping TypeAddress TypeBool),
+         ("register", TypeFunction "aa677354" [("registerAlice1", TypeAddress), ("registerAlice2", TypeAddress)] []),
+         ("withdraw", TypeFunction "51cff8d9" [("to", TypeAddress)] []),
+         ("addSignature", TypeFunction "5614d3e0" [] [])
+       ],
+       [
+       ]
+     )
    "Greeter" ->
      return
-     [
-       ("owner", TypeAddress),
-       ("greeting", TypeString),
-       ("kill", TypeFunction "41c0e1b5" [] []),
-       ("greet", TypeFunction "cfae3217" [] [(Nothing, TypeString)])
-       --Do we include constuctors?
-       -- ("constr", TypeFunction "" [("_greeting", TypeString)] [])
-     ]
+     (
+       [
+         ("owner", TypeAddress),
+         ("greeting", TypeString),
+         ("kill", TypeFunction "41c0e1b5" [] []),
+         ("greet", TypeFunction "cfae3217" [] [(Nothing, TypeString)])
+         --Do we include constuctors?
+         -- ("constr", TypeFunction "" [("_greeting", TypeString)] [])
+       ],
+       [
+       ]
+     )
    "mortal" ->
      return
-     [
-       ("owner", TypeAddress),
-       ("kill", TypeFunction "41c0e1b5" [] [])
-     ]
+     (
+       [
+         ("owner", TypeAddress),
+         ("kill", TypeFunction "41c0e1b5" [] [])
+       ],
+       [
+       ]
+     )
    "SimpleDataFeed" ->
      return
-     [
-       ("lastPrice", TypeUInt Nothing),
-       ("update", TypeFunction "82ab890a" [("newPrice", TypeUInt Nothing)] [])
-     ]
+     (
+       [
+         ("lastPrice", TypeUInt Nothing),
+         ("update", TypeFunction "82ab890a" [("newPrice", TypeUInt Nothing)] [])
+       ],
+       [
+       ]
+     )
    "SimpleStorage" ->
      return
-     [
-       ("storedData", TypeUInt Nothing),
-       ("set", TypeFunction "60fe47b1" [("x", TypeUInt Nothing)] []),
-       ("get", TypeFunction "6d4ce63c" [] [(Just "retVal", TypeUInt Nothing)])
-     ]
+     (
+       [
+         ("storedData", TypeUInt Nothing),
+         ("set", TypeFunction "60fe47b1" [("x", TypeUInt Nothing)] []),
+         ("get", TypeFunction "6d4ce63c" [] [(Just "retVal", TypeUInt Nothing)])
+       ],
+       [
+       ]
+     )
    "Consumer" ->
      return
-     [
-       ("feed", TypeContract),
-       ("global", TypeUInt Nothing),
-       ("setFeed", TypeFunction "55b775ea" [("addr", TypeAddress)] []),
-       ("callFeed", TypeFunction "f198f5df" [] [])
-     ]
+     (
+       [
+         ("feed", TypeContract),
+         ("global", TypeUInt Nothing),
+         ("setFeed", TypeFunction "55b775ea" [("addr", TypeAddress)] []),
+         ("callFeed", TypeFunction "f198f5df" [] [])
+       ],
+       [
+       ]
+     )
 
    "InfoFeed" ->
      return
-     [
-       ("info", TypeFunction "370158ea" [] [(Just "ret", TypeUInt Nothing)])
-     ]
+     (
+       [
+         ("info", TypeFunction "370158ea" [] [(Just "ret", TypeUInt Nothing)])
+       ],
+       [
+       ]
+     )
    "Types" ->
      return
-     [
-       ("theBool", TypeBool), --0
+     (
+       [
+         ("theBool", TypeBool), --0
 
-       ("theInt8", TypeInt (Just 8)), --1
-       ("theInt16", TypeInt (Just 16)), --2
-       ("theInt24", TypeInt (Just 24)), --4
-       ("theInt32", TypeInt (Just 32)), --7
-       ("theInt40", TypeInt (Just 40)), --11
-       ("theInt48", TypeInt (Just 48)), --16
-       ("theInt56", TypeInt (Just 56)), --22
-       ("theInt64", TypeInt (Just 64)), --32
-       ("theInt72", TypeInt (Just 72)), --40
-       ("theInt80", TypeInt (Just 80)), --49
-       ("theInt88", TypeInt (Just 88)), --64
-       ("theInt96", TypeInt (Just 96)), --75
-       ("theInt104", TypeInt (Just 104)), --96
-       ("theInt112", TypeInt (Just 112)), --109
-       ("theInt120", TypeInt (Just 120)), --128
-       ("theInt128", TypeInt (Just 128)), --143
-       ("theInt136", TypeInt (Just 136)), --160
-       ("theInt144", TypeInt (Just 144)), --192
-       ("theInt152", TypeInt (Just 152)), --224
-       ("theInt160", TypeInt (Just 160)), --256
-       ("theInt168", TypeInt (Just 168)), --288
-       ("theInt176", TypeInt (Just 176)), --320
-       ("theInt184", TypeInt (Just 184)), --352
-       ("theInt192", TypeInt (Just 192)), --384
-       ("theInt200", TypeInt (Just 200)), --416
-       ("theInt208", TypeInt (Just 208)), --448
-       ("theInt216", TypeInt (Just 216)), --480
-       ("theInt224", TypeInt (Just 224)), --512
-       ("theInt232", TypeInt (Just 232)), --544
-       ("theInt240", TypeInt (Just 240)), --576
-       ("theInt248", TypeInt (Just 248)), --608
-       ("theInt256", TypeInt (Just 256)), --640
+         ("theInt8", TypeInt (Just 8)), --1
+         ("theInt16", TypeInt (Just 16)), --2
+         ("theInt24", TypeInt (Just 24)), --4
+         ("theInt32", TypeInt (Just 32)), --7
+         ("theInt40", TypeInt (Just 40)), --11
+         ("theInt48", TypeInt (Just 48)), --16
+         ("theInt56", TypeInt (Just 56)), --22
+         ("theInt64", TypeInt (Just 64)), --32
+         ("theInt72", TypeInt (Just 72)), --40
+         ("theInt80", TypeInt (Just 80)), --49
+         ("theInt88", TypeInt (Just 88)), --64
+         ("theInt96", TypeInt (Just 96)), --75
+         ("theInt104", TypeInt (Just 104)), --96
+         ("theInt112", TypeInt (Just 112)), --109
+         ("theInt120", TypeInt (Just 120)), --128
+         ("theInt128", TypeInt (Just 128)), --143
+         ("theInt136", TypeInt (Just 136)), --160
+         ("theInt144", TypeInt (Just 144)), --192
+         ("theInt152", TypeInt (Just 152)), --224
+         ("theInt160", TypeInt (Just 160)), --256
+         ("theInt168", TypeInt (Just 168)), --288
+         ("theInt176", TypeInt (Just 176)), --320
+         ("theInt184", TypeInt (Just 184)), --352
+         ("theInt192", TypeInt (Just 192)), --384
+         ("theInt200", TypeInt (Just 200)), --416
+         ("theInt208", TypeInt (Just 208)), --448
+         ("theInt216", TypeInt (Just 216)), --480
+         ("theInt224", TypeInt (Just 224)), --512
+         ("theInt232", TypeInt (Just 232)), --544
+         ("theInt240", TypeInt (Just 240)), --576
+         ("theInt248", TypeInt (Just 248)), --608
+         ("theInt256", TypeInt (Just 256)), --640
+         
+         ("theUInt8", TypeUInt (Just 8)), --672
+         ("theUInt16", TypeUInt (Just 16)), --673
+         ("theUInt24", TypeUInt (Just 24)), --675
+         ("theUInt32", TypeUInt (Just 32)), --678
+         ("theUInt40", TypeUInt (Just 40)), --682
+         ("theUInt48", TypeUInt (Just 48)), --687
+         ("theUInt56", TypeUInt (Just 56)), --693
+         ("theUInt64", TypeUInt (Just 64)), --704
+         ("theUInt72", TypeUInt (Just 72)), --712
+         ("theUInt80", TypeUInt (Just 80)), --721
+         ("theUInt88", TypeUInt (Just 88)), --736
+         ("theUInt96", TypeUInt (Just 96)), --747
+         ("theUInt104", TypeUInt (Just 104)), --768
+         ("theUInt112", TypeUInt (Just 112)), --781
+         ("theUInt120", TypeUInt (Just 120)), --800
+         ("theUInt128", TypeUInt (Just 128)), --815
+         ("theUInt136", TypeUInt (Just 136)), --832
+         ("theUInt144", TypeUInt (Just 144)), --864
+         ("theUInt152", TypeUInt (Just 152)), --896
+         ("theUInt160", TypeUInt (Just 160)), --928
+         ("theUInt168", TypeUInt (Just 168)), --960
+         ("theUInt176", TypeUInt (Just 176)), --992
+         ("theUInt184", TypeUInt (Just 184)), --1024
+         ("theUInt192", TypeUInt (Just 192)), --1056
+         ("theUInt200", TypeUInt (Just 200)), --1088
+         ("theUInt208", TypeUInt (Just 208)), --1120
+         ("theUInt216", TypeUInt (Just 216)), --1152
+         ("theUInt224", TypeUInt (Just 224)), --1184
+         ("theUInt232", TypeUInt (Just 232)), --1216
+         ("theUInt240", TypeUInt (Just 240)), --1248
+         ("theUInt248", TypeUInt (Just 248)), --1280
+         ("theUInt256", TypeUInt (Just 256)), --1312
 
-       ("theUInt8", TypeUInt (Just 8)), --672
-       ("theUInt16", TypeUInt (Just 16)), --673
-       ("theUInt24", TypeUInt (Just 24)), --675
-       ("theUInt32", TypeUInt (Just 32)), --678
-       ("theUInt40", TypeUInt (Just 40)), --682
-       ("theUInt48", TypeUInt (Just 48)), --687
-       ("theUInt56", TypeUInt (Just 56)), --693
-       ("theUInt64", TypeUInt (Just 64)), --704
-       ("theUInt72", TypeUInt (Just 72)), --712
-       ("theUInt80", TypeUInt (Just 80)), --721
-       ("theUInt88", TypeUInt (Just 88)), --736
-       ("theUInt96", TypeUInt (Just 96)), --747
-       ("theUInt104", TypeUInt (Just 104)), --768
-       ("theUInt112", TypeUInt (Just 112)), --781
-       ("theUInt120", TypeUInt (Just 120)), --800
-       ("theUInt128", TypeUInt (Just 128)), --815
-       ("theUInt136", TypeUInt (Just 136)), --832
-       ("theUInt144", TypeUInt (Just 144)), --864
-       ("theUInt152", TypeUInt (Just 152)), --896
-       ("theUInt160", TypeUInt (Just 160)), --928
-       ("theUInt168", TypeUInt (Just 168)), --960
-       ("theUInt176", TypeUInt (Just 176)), --992
-       ("theUInt184", TypeUInt (Just 184)), --1024
-       ("theUInt192", TypeUInt (Just 192)), --1056
-       ("theUInt200", TypeUInt (Just 200)), --1088
-       ("theUInt208", TypeUInt (Just 208)), --1120
-       ("theUInt216", TypeUInt (Just 216)), --1152
-       ("theUInt224", TypeUInt (Just 224)), --1184
-       ("theUInt232", TypeUInt (Just 232)), --1216
-       ("theUInt240", TypeUInt (Just 240)), --1248
-       ("theUInt248", TypeUInt (Just 248)), --1280
-       ("theUInt256", TypeUInt (Just 256)), --1312
+         ("theInt", TypeInt Nothing), --1344
 
-       ("theInt", TypeInt Nothing), --1344
+         ("theUint", TypeInt Nothing), --1376
 
-       ("theUint", TypeInt Nothing), --1376
+         ("theAddress", TypeAddress), --1408
+         
+         ("myAddress", TypeAddress), --1440
+         
+         ("theBytes1", TypeBytes (Just 1)), --1460
+         ("theBytes2", TypeBytes (Just 2)), --1461
+         ("theBytes3", TypeBytes (Just 3)), --1463
+         ("theBytes4", TypeBytes (Just 4)), --1466
+         ("theBytes5", TypeBytes (Just 5)), --1472
+         ("theBytes6", TypeBytes (Just 6)), --1477
+         ("theBytes7", TypeBytes (Just 7)), --1483
+         ("theBytes8", TypeBytes (Just 8)), --1490
+         ("theBytes9", TypeBytes (Just 9)), --1504
+         ("theBytes10", TypeBytes (Just 10)), --1513
+         ("theBytes11", TypeBytes (Just 11)), --1523
+         ("theBytes12", TypeBytes (Just 12)), --1536
+         ("theBytes13", TypeBytes (Just 13)), --1548
+         ("theBytes14", TypeBytes (Just 14)), --1568
+         ("theBytes15", TypeBytes (Just 15)), --1582
+         ("theBytes16", TypeBytes (Just 16)), --1600
+         ("theBytes17", TypeBytes (Just 17)), --1632
+         ("theBytes18", TypeBytes (Just 18)), --1664
+         ("theBytes19", TypeBytes (Just 19)), --1696
+         ("theBytes20", TypeBytes (Just 20)), --1728
+         ("theBytes21", TypeBytes (Just 21)), --1760
+         ("theBytes22", TypeBytes (Just 22)), --1792
+         ("theBytes23", TypeBytes (Just 23)), --1824
+         ("theBytes24", TypeBytes (Just 24)), --1856
+         ("theBytes25", TypeBytes (Just 25)), --1888
+         ("theBytes26", TypeBytes (Just 26)), --1920
+         ("theBytes27", TypeBytes (Just 27)), --1952
+         ("theBytes28", TypeBytes (Just 28)), --1984
+         ("theBytes29", TypeBytes (Just 29)), --2016
+         ("theBytes30", TypeBytes (Just 30)), --2048
+         ("theBytes31", TypeBytes (Just 31)), --2080
+         ("theBytes32", TypeBytes (Just 32)), --2112
+         
+         ("theByte", TypeBytes (Just 1)), --2144
+         
+         ("theBytes", TypeBytes Nothing), --2176
+         
+         ("theString", TypeString), --2208
 
-       ("theAddress", TypeAddress), --1408
+         ("choice", TypeEnum "ActionChoices")
 
-       ("myAddress", TypeAddress), --1440
-
-       ("theBytes1", TypeBytes (Just 1)), --1460
-       ("theBytes2", TypeBytes (Just 2)), --1461
-       ("theBytes3", TypeBytes (Just 3)), --1463
-       ("theBytes4", TypeBytes (Just 4)), --1466
-       ("theBytes5", TypeBytes (Just 5)), --1472
-       ("theBytes6", TypeBytes (Just 6)), --1477
-       ("theBytes7", TypeBytes (Just 7)), --1483
-       ("theBytes8", TypeBytes (Just 8)), --1490
-       ("theBytes9", TypeBytes (Just 9)), --1504
-       ("theBytes10", TypeBytes (Just 10)), --1513
-       ("theBytes11", TypeBytes (Just 11)), --1523
-       ("theBytes12", TypeBytes (Just 12)), --1536
-       ("theBytes13", TypeBytes (Just 13)), --1548
-       ("theBytes14", TypeBytes (Just 14)), --1568
-       ("theBytes15", TypeBytes (Just 15)), --1582
-       ("theBytes16", TypeBytes (Just 16)), --1600
-       ("theBytes17", TypeBytes (Just 17)), --1632
-       ("theBytes18", TypeBytes (Just 18)), --1664
-       ("theBytes19", TypeBytes (Just 19)), --1696
-       ("theBytes20", TypeBytes (Just 20)), --1728
-       ("theBytes21", TypeBytes (Just 21)), --1760
-       ("theBytes22", TypeBytes (Just 22)), --1792
-       ("theBytes23", TypeBytes (Just 23)), --1824
-       ("theBytes24", TypeBytes (Just 24)), --1856
-       ("theBytes25", TypeBytes (Just 25)), --1888
-       ("theBytes26", TypeBytes (Just 26)), --1920
-       ("theBytes27", TypeBytes (Just 27)), --1952
-       ("theBytes28", TypeBytes (Just 28)), --1984
-       ("theBytes29", TypeBytes (Just 29)), --2016
-       ("theBytes30", TypeBytes (Just 30)), --2048
-       ("theBytes31", TypeBytes (Just 31)), --2080
-       ("theBytes32", TypeBytes (Just 32)), --2112
-
-       ("theByte", TypeBytes (Just 1)), --2144
-
-       ("theBytes", TypeBytes Nothing), --2176
-
-       ("theString", TypeString) --2208
-
---  ("choice", "typedef":"ActionChoices",TypeEnum,"bytes":1,"names":["GoLeft","GoRight","GoStraight","SitStill"]} --2240
-
-     ]
+       ],
+       [
+         ("ActionChoices",["GoLeft","GoRight","GoStraight","SitStill"])
+       ]
+     )
 
    "Enums" ->
      return
-     [
-       ("choice", TypeEnum "ActionChoices"),
-       ("defaultChoice", TypeEnum "ActionChoices")
-     ]
+     (
+       [
+         ("choice", TypeEnum "ActionChoices"),
+         ("defaultChoice", TypeEnum "ActionChoices")
+       ],
+       [
+         ("ActionChoices", ["GoLeft","GoRight","GoStraight","SitStill"])
+       ]
+     )
 
 
 
