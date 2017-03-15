@@ -218,10 +218,7 @@ instance MonadContracts Bloc where
   getContractsState contractName contractId = do
     contract <- getContract contractName contractId
 
-    liftIO $ putStrLn $ show contract
-    
     storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
-
     
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
         storage k = fromMaybe 0 $ Map.lookup k storageMap
@@ -229,7 +226,9 @@ instance MonadContracts Bloc where
 
         ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
 
+    liftIO $ putStrLn "Storage:"
     liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    liftIO $ putStrLn "End of storage"
 
     return $ Map.fromList ret
 
