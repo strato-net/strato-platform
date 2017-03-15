@@ -34,6 +34,7 @@ windows:
             - bash:
                 - bash
                 - echo 'the world is your oyster'
+                - echo 'update interval is <%= @settings["delay"] || 5 %>'
             - strato:
                 - while true; do docker exec -it silo_strato_1 /bin/bash -c 'cd /var/lib/strato'; sleep 2; done
 
@@ -93,13 +94,13 @@ windows:
         layout: tiled 
         panes:
             - bestblock:
-                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq -C '.'"
+                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq -C '.'"
             - lasttx:
-                - watch -c -n 1 "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq -C '.'"
+                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq -C '.'"
             - version:
                 - watch -c -n 60 "curl -s localhost/strato-api/version | jq -C '.'"
             - coinbase:
-                - watch -c -n 5 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
+                - watch -c -n 10 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
     - graphs:
         layout: even-vertical
@@ -150,9 +151,9 @@ windows:
         layout: even-horizontal 
         panes:
             - contracts:
-                - watch -c -n 1 "curl -s localhost/cirrus/search/ | jq '.'"
+                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost/cirrus/search/ | jq '.'"
             - counts:
-                - watch -c -n 1 ./watcher.sh cirrus-count 
+                - watch -c -n <%= @settings["delay"] || 5 %> ./watcher.sh cirrus-count 
     - monitor:
         layout: tiled
         panes:
@@ -162,13 +163,15 @@ windows:
                 - sudo iftop
             - iostat:
                 - iostat -N 1 
+            - ctop:
+                - docker run -ti --name ctop --rm -v /var/run/docker.sock:/var/run/docker.sock quay.io/vektorlab/ctop:latest
 
     - databases:
         layout: tiled
         panes:
             - postgres:
-                - env ETHDB = docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato psql | cut -d \' \' -f2'
-                - docker exec -it silo_postgres_1 pg_top -d $ETHDB
+              #- env ETHDB = docker exec -it silo_strato_1 bash -c 'cd /var/lib/strato; queryStrato psql | cut -d \' \' -f2'
+                - docker exec -it silo_postgres_1 bash -c 'su - postgres; pg_top' # -d $ETHDB
             - redis:
                 - while true; do docker exec -it silo_redis_1 bash -c 'redis-cli info'; sleep 2; done
             - postgres-cirrus:
