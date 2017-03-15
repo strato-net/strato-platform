@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+
+# Variable Declarations
+installDockerCompose=false
+startDocker=false
+killDocker=false
+enableSsl=false
+testDir="repos/monstrato/deployments/test"
+rootDir=$PWD
+
+# Parse command line arguments
+for arg in "$@"
+do
+  echo $arg
+  case "$arg" in
+    "install-docker-compose")
+      installDockerCompose=true
+      ;;
+    "start-docker")
+      startDocker=true
+      ;;
+    "kill-docker")
+      killDocker=true
+      ;;
+    "enable-ssl")
+      enableSsl=true
+      ;;
+    esac
+done
+
+# Check if we need to install docker compose
+if [[ "$installDockerCompose" == true ]]
+then
+  echo "Installing deployment dependencies"
+  sudo ./setup-ubuntu16.04
+fi
+
+# Start docker based on the ssl flag
+if [[ "$startDocker" == true ]]
+then
+  echo "Starting docker containers with ssl=$enableSsl"
+  ssl=$enableSsl docker-compose up -d
+fi
+
+# Install npm packages for testing
+echo "Removing old test dependencies..."
+rm -rf $testDir/node_modules/blockapps-rest
+echo "Installing test dependencies..."
+cd $testDir
+npm install
+
+# Run the tests
+echo "Running vm tests..."
+#stack test ethereum-test
+echo "Running e2e tests..."
+if [[ "$enableSsl" == true ]]
+then
+  node_modules/mocha/bin/mocha --config $rootDir/test-https.config.yaml e2e
+else
+  node_modules/mocha/bin/mocha --config $rootDir/test.config.yaml e2e
+fi
+
+cd $rootDir
+
+# Stop docker if requested
+if [[ "$killDocker" == true ]]
+then
+  echo "Killing docker processes..."
+  docker-compose kill && docker-compose down -v
+fi
