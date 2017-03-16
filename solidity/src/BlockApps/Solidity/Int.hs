@@ -1,7 +1,3 @@
-{-# LANGUAGE
-    ScopedTypeVariables
-#-}
-
 module BlockApps.Solidity.Int
   ( module Data.Int
   , module Data.LargeInt
