@@ -13,12 +13,13 @@ module BlockApps.SolidityVarReader (
   ) where
 
 import qualified Data.Bimap as Bimap
+import Data.Binary
 import Data.Bits
 import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as BC
---import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy as BL
 import Data.LargeWord
 import qualified Data.Map as Map
 import Data.Maybe
@@ -36,28 +37,9 @@ import qualified BlockApps.Storage as Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 
-{-
-
-data Value
-  = ValueBool Bool
-  | ValueUInt Natural
-  | ValueInt Integer
-  | ValueAddress Address
-  | ValueContract Address
-  | ValueFixed Double
-  | ValueUFixed Double
-  | ValueBytes ByteString
-  | ValueArray [Value]
-  | ValueString Text
-  | ValueEnum Text Text
-  | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  deriving (Eq,Show)
--}
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
-
-
 
 valueToSolidityValue (SimpleValue (ValueInt8 v)) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (SimpleValue (ValueInt16 v)) = SolidityValueAsString $ T.pack $ show v
@@ -94,10 +76,6 @@ valueToSolidityValue (SimpleValue (ValueInt232 v)) = SolidityValueAsString $ T.p
 valueToSolidityValue (SimpleValue (ValueInt240 v)) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (SimpleValue (ValueInt248 v)) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (SimpleValue (ValueInt256 v)) = SolidityValueAsString $ T.pack $ show v
-
-
-
-
 
 valueToSolidityValue (SimpleValue (ValueUInt8 v)) = SolidityValueAsString $ T.pack $ show v
 valueToSolidityValue (SimpleValue (ValueUInt16 v)) = SolidityValueAsString $ T.pack $ show v
@@ -157,7 +135,7 @@ valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ sh
 
 
 word256ToByteString::Word256->ByteString
-word256ToByteString x= ByteString.pack $ map (fromIntegral . (x `shiftR`) . (*8)) [31, 30..0]
+word256ToByteString=BL.toStrict . encode
 
 
 byteStringToWord256::ByteString->Word256
