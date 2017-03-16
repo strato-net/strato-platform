@@ -19,7 +19,7 @@ import BlockApps.Bloc.Monad
 import BlockApps.Contract
 import BlockApps.Ethereum
 import qualified BlockApps.Storage as Storage
-import BlockApps.Types
+import BlockApps.Solidity.Type
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
@@ -49,10 +49,10 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("Victor", TypeAddress),
-         ("Jim", TypeAddress),
-         ("Kieren", TypeAddress),
-         ("ownershipDistribution", TypeMapping TypeAddress (TypeUInt Nothing)),
+         ("Victor", SimpleType TypeAddress),
+         ("Jim", SimpleType TypeAddress),
+         ("Kieren", SimpleType TypeAddress),
+         ("ownershipDistribution", TypeMapping TypeAddress (SimpleType TypeUInt)),
          ("Setup", TypeFunction B.empty [] []),
          ("Dividend", TypeFunction B.empty [] [])
        ],
@@ -63,14 +63,14 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("stake", TypeMapping TypeAddress (TypeUInt Nothing)),
-         ("stakeHolders", TypeArray TypeAddress Nothing),
-         ("holdingTheBag", TypeAddress),
-         ("numStakeHolders", TypeUInt Nothing),
-         ("currentStake", TypeUInt Nothing),
-         ("sumStake", TypeUInt Nothing),
+         ("stake", TypeMapping TypeAddress $ SimpleType TypeUInt),
+         ("stakeHolders", TypeArrayDynamic $ SimpleType TypeAddress),
+         ("holdingTheBag", SimpleType TypeAddress),
+         ("numStakeHolders", SimpleType TypeUInt),
+         ("currentStake", SimpleType TypeUInt),
+         ("sumStake", SimpleType TypeUInt),
          ("payout", TypeFunction "63bd1d4a" [] []),
-         ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", TypeAddress)] [])
+         ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", SimpleType TypeAddress)] [])
        ],
        [
        ]
@@ -79,15 +79,15 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("alice1", TypeAddress),
-         ("alice2", TypeAddress),
-         ("bob", TypeAddress),
-         ("numSigned", TypeUInt Nothing),
-         ("error", TypeBytes (Just 32)),
-         ("registeredYet", TypeBool),
-         ("signedYet", TypeMapping TypeAddress TypeBool),
-         ("register", TypeFunction "aa677354" [("registerAlice1", TypeAddress), ("registerAlice2", TypeAddress)] []),
-         ("withdraw", TypeFunction "51cff8d9" [("to", TypeAddress)] []),
+         ("alice1", SimpleType TypeAddress),
+         ("alice2", SimpleType TypeAddress),
+         ("bob", SimpleType TypeAddress),
+         ("numSigned", SimpleType TypeUInt),
+         ("error", SimpleType TypeBytes32),
+         ("registeredYet", SimpleType TypeBool),
+         ("signedYet", TypeMapping TypeAddress $ SimpleType TypeBool),
+         ("register", TypeFunction "aa677354" [("registerAlice1", SimpleType TypeAddress), ("registerAlice2", SimpleType TypeAddress)] []),
+         ("withdraw", TypeFunction "51cff8d9" [("to", SimpleType TypeAddress)] []),
          ("addSignature", TypeFunction "5614d3e0" [] [])
        ],
        [
@@ -97,10 +97,10 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("owner", TypeAddress),
-         ("greeting", TypeString),
+         ("owner", SimpleType TypeAddress),
+         ("greeting", SimpleType TypeString),
          ("kill", TypeFunction "41c0e1b5" [] []),
-         ("greet", TypeFunction "cfae3217" [] [(Nothing, TypeString)])
+         ("greet", TypeFunction "cfae3217" [] [(Nothing, SimpleType TypeString)])
          --Do we include constuctors?
          -- ("constr", TypeFunction "" [("_greeting", TypeString)] [])
        ],
@@ -111,7 +111,7 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("owner", TypeAddress),
+         ("owner", SimpleType TypeAddress),
          ("kill", TypeFunction "41c0e1b5" [] [])
        ],
        [
@@ -121,8 +121,8 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("lastPrice", TypeUInt Nothing),
-         ("update", TypeFunction "82ab890a" [("newPrice", TypeUInt Nothing)] [])
+         ("lastPrice", SimpleType TypeUInt),
+         ("update", TypeFunction "82ab890a" [("newPrice", SimpleType TypeUInt)] [])
        ],
        [
        ]
@@ -131,9 +131,9 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("storedData", TypeUInt Nothing),
-         ("set", TypeFunction "60fe47b1" [("x", TypeUInt Nothing)] []),
-         ("get", TypeFunction "6d4ce63c" [] [(Just "retVal", TypeUInt Nothing)])
+         ("storedData", SimpleType TypeUInt),
+         ("set", TypeFunction "60fe47b1" [("x", SimpleType TypeUInt)] []),
+         ("get", TypeFunction "6d4ce63c" [] [(Just "retVal", SimpleType TypeUInt)])
        ],
        [
        ]
@@ -142,9 +142,9 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("feed", TypeContract),
-         ("global", TypeUInt Nothing),
-         ("setFeed", TypeFunction "55b775ea" [("addr", TypeAddress)] []),
+         ("feed", TypeContract "InfoFeed"),
+         ("global", SimpleType TypeUInt),
+         ("setFeed", TypeFunction "55b775ea" [("addr", SimpleType TypeAddress)] []),
          ("callFeed", TypeFunction "f198f5df" [] [])
        ],
        [
@@ -155,7 +155,7 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("info", TypeFunction "370158ea" [] [(Just "ret", TypeUInt Nothing)])
+         ("info", TypeFunction "370158ea" [] [(Just "ret", SimpleType TypeUInt)])
        ],
        [
        ]
@@ -164,120 +164,120 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-         ("theBool", TypeBool), --0
+         ("theBool", SimpleType TypeBool), --0
 
-         ("theInt8", TypeInt (Just 8)), --1
-         ("theInt16", TypeInt (Just 16)), --2
-         ("theInt24", TypeInt (Just 24)), --4
-         ("theInt32", TypeInt (Just 32)), --7
-         ("theInt40", TypeInt (Just 40)), --11
-         ("theInt48", TypeInt (Just 48)), --16
-         ("theInt56", TypeInt (Just 56)), --22
-         ("theInt64", TypeInt (Just 64)), --32
-         ("theInt72", TypeInt (Just 72)), --40
-         ("theInt80", TypeInt (Just 80)), --49
-         ("theInt88", TypeInt (Just 88)), --64
-         ("theInt96", TypeInt (Just 96)), --75
-         ("theInt104", TypeInt (Just 104)), --96
-         ("theInt112", TypeInt (Just 112)), --109
-         ("theInt120", TypeInt (Just 120)), --128
-         ("theInt128", TypeInt (Just 128)), --143
-         ("theInt136", TypeInt (Just 136)), --160
-         ("theInt144", TypeInt (Just 144)), --192
-         ("theInt152", TypeInt (Just 152)), --224
-         ("theInt160", TypeInt (Just 160)), --256
-         ("theInt168", TypeInt (Just 168)), --288
-         ("theInt176", TypeInt (Just 176)), --320
-         ("theInt184", TypeInt (Just 184)), --352
-         ("theInt192", TypeInt (Just 192)), --384
-         ("theInt200", TypeInt (Just 200)), --416
-         ("theInt208", TypeInt (Just 208)), --448
-         ("theInt216", TypeInt (Just 216)), --480
-         ("theInt224", TypeInt (Just 224)), --512
-         ("theInt232", TypeInt (Just 232)), --544
-         ("theInt240", TypeInt (Just 240)), --576
-         ("theInt248", TypeInt (Just 248)), --608
-         ("theInt256", TypeInt (Just 256)), --640
+         ("theInt8", SimpleType TypeInt8), --1
+         ("theInt16", SimpleType TypeInt16), --2
+         ("theInt24", SimpleType TypeInt24), --4
+         ("theInt32", SimpleType TypeInt32), --7
+         ("theInt40", SimpleType TypeInt40), --11
+         ("theInt48", SimpleType TypeInt48), --16
+         ("theInt56", SimpleType TypeInt56), --22
+         ("theInt64", SimpleType TypeInt64), --32
+         ("theInt72", SimpleType TypeInt72), --40
+         ("theInt80", SimpleType TypeInt80), --49
+         ("theInt88", SimpleType TypeInt88), --64
+         ("theInt96", SimpleType TypeInt96), --75
+         ("theInt104", SimpleType TypeInt104), --96
+         ("theInt112", SimpleType TypeInt112), --109
+         ("theInt120", SimpleType TypeInt120), --128
+         ("theInt128", SimpleType TypeInt128), --143
+         ("theInt136", SimpleType TypeInt136), --160
+         ("theInt144", SimpleType TypeInt144), --192
+         ("theInt152", SimpleType TypeInt152), --224
+         ("theInt160", SimpleType TypeInt160), --256
+         ("theInt168", SimpleType TypeInt168), --288
+         ("theInt176", SimpleType TypeInt176), --320
+         ("theInt184", SimpleType TypeInt184), --352
+         ("theInt192", SimpleType TypeInt192), --384
+         ("theInt200", SimpleType TypeInt200), --416
+         ("theInt208", SimpleType TypeInt208), --448
+         ("theInt216", SimpleType TypeInt216), --480
+         ("theInt224", SimpleType TypeInt224), --512
+         ("theInt232", SimpleType TypeInt232), --544
+         ("theInt240", SimpleType TypeInt240), --576
+         ("theInt248", SimpleType TypeInt248), --608
+         ("theInt256", SimpleType TypeInt256), --640
          
-         ("theUInt8", TypeUInt (Just 8)), --672
-         ("theUInt16", TypeUInt (Just 16)), --673
-         ("theUInt24", TypeUInt (Just 24)), --675
-         ("theUInt32", TypeUInt (Just 32)), --678
-         ("theUInt40", TypeUInt (Just 40)), --682
-         ("theUInt48", TypeUInt (Just 48)), --687
-         ("theUInt56", TypeUInt (Just 56)), --693
-         ("theUInt64", TypeUInt (Just 64)), --704
-         ("theUInt72", TypeUInt (Just 72)), --712
-         ("theUInt80", TypeUInt (Just 80)), --721
-         ("theUInt88", TypeUInt (Just 88)), --736
-         ("theUInt96", TypeUInt (Just 96)), --747
-         ("theUInt104", TypeUInt (Just 104)), --768
-         ("theUInt112", TypeUInt (Just 112)), --781
-         ("theUInt120", TypeUInt (Just 120)), --800
-         ("theUInt128", TypeUInt (Just 128)), --815
-         ("theUInt136", TypeUInt (Just 136)), --832
-         ("theUInt144", TypeUInt (Just 144)), --864
-         ("theUInt152", TypeUInt (Just 152)), --896
-         ("theUInt160", TypeUInt (Just 160)), --928
-         ("theUInt168", TypeUInt (Just 168)), --960
-         ("theUInt176", TypeUInt (Just 176)), --992
-         ("theUInt184", TypeUInt (Just 184)), --1024
-         ("theUInt192", TypeUInt (Just 192)), --1056
-         ("theUInt200", TypeUInt (Just 200)), --1088
-         ("theUInt208", TypeUInt (Just 208)), --1120
-         ("theUInt216", TypeUInt (Just 216)), --1152
-         ("theUInt224", TypeUInt (Just 224)), --1184
-         ("theUInt232", TypeUInt (Just 232)), --1216
-         ("theUInt240", TypeUInt (Just 240)), --1248
-         ("theUInt248", TypeUInt (Just 248)), --1280
-         ("theUInt256", TypeUInt (Just 256)), --1312
+         ("theUInt8", SimpleType TypeUInt8), --672
+         ("theUInt16", SimpleType TypeUInt16), --673
+         ("theUInt24", SimpleType TypeUInt24), --675
+         ("theUInt32", SimpleType TypeUInt32), --678
+         ("theUInt40", SimpleType TypeUInt40), --682
+         ("theUInt48", SimpleType TypeUInt48), --687
+         ("theUInt56", SimpleType TypeUInt56), --693
+         ("theUInt64", SimpleType TypeUInt64), --704
+         ("theUInt72", SimpleType TypeUInt72), --712
+         ("theUInt80", SimpleType TypeUInt80), --721
+         ("theUInt88", SimpleType TypeUInt88), --736
+         ("theUInt96", SimpleType TypeUInt96), --747
+         ("theUInt104", SimpleType TypeUInt104), --768
+         ("theUInt112", SimpleType TypeUInt112), --781
+         ("theUInt120", SimpleType TypeUInt120), --800
+         ("theUInt128", SimpleType TypeUInt128), --815
+         ("theUInt136", SimpleType TypeUInt136), --832
+         ("theUInt144", SimpleType TypeUInt144), --864
+         ("theUInt152", SimpleType TypeUInt152), --896
+         ("theUInt160", SimpleType TypeUInt160), --928
+         ("theUInt168", SimpleType TypeUInt168), --960
+         ("theUInt176", SimpleType TypeUInt176), --992
+         ("theUInt184", SimpleType TypeUInt184), --1024
+         ("theUInt192", SimpleType TypeUInt192), --1056
+         ("theUInt200", SimpleType TypeUInt200), --1088
+         ("theUInt208", SimpleType TypeUInt208), --1120
+         ("theUInt216", SimpleType TypeUInt216), --1152
+         ("theUInt224", SimpleType TypeUInt224), --1184
+         ("theUInt232", SimpleType TypeUInt232), --1216
+         ("theUInt240", SimpleType TypeUInt240), --1248
+         ("theUInt248", SimpleType TypeUInt248), --1280
+         ("theUInt256", SimpleType TypeUInt256), --1312
 
-         ("theInt", TypeInt Nothing), --1344
+         ("theInt", SimpleType TypeInt), --1344
 
-         ("theUint", TypeInt Nothing), --1376
+         ("theUint", SimpleType TypeInt), --1376
 
-         ("theAddress", TypeAddress), --1408
+         ("theAddress", SimpleType TypeAddress), --1408
          
-         ("myAddress", TypeAddress), --1440
+         ("myAddress", SimpleType TypeAddress), --1440
          
-         ("theBytes1", TypeBytes (Just 1)), --1460
-         ("theBytes2", TypeBytes (Just 2)), --1461
-         ("theBytes3", TypeBytes (Just 3)), --1463
-         ("theBytes4", TypeBytes (Just 4)), --1466
-         ("theBytes5", TypeBytes (Just 5)), --1472
-         ("theBytes6", TypeBytes (Just 6)), --1477
-         ("theBytes7", TypeBytes (Just 7)), --1483
-         ("theBytes8", TypeBytes (Just 8)), --1490
-         ("theBytes9", TypeBytes (Just 9)), --1504
-         ("theBytes10", TypeBytes (Just 10)), --1513
-         ("theBytes11", TypeBytes (Just 11)), --1523
-         ("theBytes12", TypeBytes (Just 12)), --1536
-         ("theBytes13", TypeBytes (Just 13)), --1548
-         ("theBytes14", TypeBytes (Just 14)), --1568
-         ("theBytes15", TypeBytes (Just 15)), --1582
-         ("theBytes16", TypeBytes (Just 16)), --1600
-         ("theBytes17", TypeBytes (Just 17)), --1632
-         ("theBytes18", TypeBytes (Just 18)), --1664
-         ("theBytes19", TypeBytes (Just 19)), --1696
-         ("theBytes20", TypeBytes (Just 20)), --1728
-         ("theBytes21", TypeBytes (Just 21)), --1760
-         ("theBytes22", TypeBytes (Just 22)), --1792
-         ("theBytes23", TypeBytes (Just 23)), --1824
-         ("theBytes24", TypeBytes (Just 24)), --1856
-         ("theBytes25", TypeBytes (Just 25)), --1888
-         ("theBytes26", TypeBytes (Just 26)), --1920
-         ("theBytes27", TypeBytes (Just 27)), --1952
-         ("theBytes28", TypeBytes (Just 28)), --1984
-         ("theBytes29", TypeBytes (Just 29)), --2016
-         ("theBytes30", TypeBytes (Just 30)), --2048
-         ("theBytes31", TypeBytes (Just 31)), --2080
-         ("theBytes32", TypeBytes (Just 32)), --2112
+         ("theBytes1", SimpleType TypeBytes1), --1460
+         ("theBytes2", SimpleType TypeBytes2), --1461
+         ("theBytes3", SimpleType TypeBytes3), --1463
+         ("theBytes4", SimpleType TypeBytes4), --1466
+         ("theBytes5", SimpleType TypeBytes5), --1472
+         ("theBytes6", SimpleType TypeBytes6), --1477
+         ("theBytes7", SimpleType TypeBytes7), --1483
+         ("theBytes8", SimpleType TypeBytes8), --1490
+         ("theBytes9", SimpleType TypeBytes9), --1504
+         ("theBytes10", SimpleType TypeBytes10), --1513
+         ("theBytes11", SimpleType TypeBytes11), --1523
+         ("theBytes12", SimpleType TypeBytes12), --1536
+         ("theBytes13", SimpleType TypeBytes13), --1548
+         ("theBytes14", SimpleType TypeBytes14), --1568
+         ("theBytes15", SimpleType TypeBytes15), --1582
+         ("theBytes16", SimpleType TypeBytes16), --1600
+         ("theBytes17", SimpleType TypeBytes17), --1632
+         ("theBytes18", SimpleType TypeBytes18), --1664
+         ("theBytes19", SimpleType TypeBytes19), --1696
+         ("theBytes20", SimpleType TypeBytes20), --1728
+         ("theBytes21", SimpleType TypeBytes21), --1760
+         ("theBytes22", SimpleType TypeBytes22), --1792
+         ("theBytes23", SimpleType TypeBytes23), --1824
+         ("theBytes24", SimpleType TypeBytes24), --1856
+         ("theBytes25", SimpleType TypeBytes25), --1888
+         ("theBytes26", SimpleType TypeBytes26), --1920
+         ("theBytes27", SimpleType TypeBytes27), --1952
+         ("theBytes28", SimpleType TypeBytes28), --1984
+         ("theBytes29", SimpleType TypeBytes29), --2016
+         ("theBytes30", SimpleType TypeBytes30), --2048
+         ("theBytes31", SimpleType TypeBytes31), --2080
+         ("theBytes32", SimpleType TypeBytes32), --2112
          
-         ("theByte", TypeBytes (Just 1)), --2144
+         ("theByte", SimpleType TypeBytes1), --2144
          
-         ("theBytes", TypeBytes Nothing), --2176
+         ("theBytes", SimpleType TypeBytes), --2176
          
-         ("theString", TypeString), --2208
+         ("theString", SimpleType TypeString), --2208
 
          ("choice", TypeEnum "ActionChoices")
 

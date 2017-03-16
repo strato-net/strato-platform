@@ -1,20 +1,22 @@
 module BlockApps.Solidity.Value where
 
 import Data.ByteString (ByteString)
-import Data.Map.Strict (Map)
 import Data.Text (Text)
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Int
+import BlockApps.Solidity.Type
 
 data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic [Value]
   | ValueArrayFixed Word [Value]
-  | ValueMapping (Map SimpleValue Value)
-  -- | ValueFunction
+  | ValueContract Address
+  | ValueEnum Text Text
+  | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
+  -- | ValueMapping (Map SimpleValue Value)
   -- | ValueStruct
-  -- | ValueEnum
+  deriving (Show)
 
 data SimpleValue
   = ValueBool Bool
@@ -122,3 +124,4 @@ data SimpleValue
   | ValueBytes ByteString
   | ValueString Text
   -- | ValueContract
+  deriving (Show)

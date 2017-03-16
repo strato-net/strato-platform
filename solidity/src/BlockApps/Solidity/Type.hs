@@ -1,14 +1,23 @@
 module BlockApps.Solidity.Type where
 
+import Data.ByteString (ByteString)
+import Data.Char
+import Data.List
+import Data.Text (Text)
+import qualified Data.Text as T
+
+
 data Type
   = SimpleType SimpleType
   | TypeArrayDynamic Type
   | TypeArrayFixed Word Type
   | TypeMapping SimpleType Type
-  -- | TypeFunction [Type] [Type]
+  | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- | Struct
-  -- | Enum
-
+  | TypeEnum Text
+  | TypeContract Text
+  deriving (Show)
+    
 data SimpleType
   = TypeBool
   | TypeUInt8
@@ -43,7 +52,6 @@ data SimpleType
   | TypeUInt240
   | TypeUInt248
   | TypeUInt256
-  | TypeUInt264
   | TypeUInt
   | TypeInt8
   | TypeInt16
@@ -77,7 +85,6 @@ data SimpleType
   | TypeInt240
   | TypeInt248
   | TypeInt256
-  | TypeInt264
   | TypeInt
   | TypeAddress
   -- | TypeFixed
@@ -116,4 +123,24 @@ data SimpleType
   | TypeBytes32
   | TypeBytes
   | TypeString
-  -- | TypeContract
+  deriving (Show)
+
+formatSimpleType::SimpleType->String
+formatSimpleType x = map toLower $ drop 4 $ show x
+
+formatType::Type->String
+formatType (SimpleType x) = formatSimpleType x
+--formatType x = show x
+formatType (TypeArrayDynamic t) = formatType t ++ "[] " --TODO- might need some parens
+formatType (TypeArrayFixed len t) = formatType t ++ "[" ++ show len ++ "] " --TODO- might need some parens
+formatType (TypeMapping key val) = "mapping (" ++ formatSimpleType key ++ " => " ++ formatType val ++ ")"
+formatType (TypeFunction _ paramTypes returnTypes) =
+  "function ("
+  ++ intercalate "," (map (formatType . snd) paramTypes)
+  ++ ") returns ("
+  ++ intercalate "," (map (formatType . snd) returnTypes)
+  ++ ")"
+formatType (TypeEnum name) = T.unpack name
+formatType (TypeContract name) = T.unpack name
+
+                                 

@@ -37,14 +37,14 @@ toStorage = \case
     in
       ByteString.concat head'' `ByteString.append` ByteString.concat tail'
 
-
-
     -- byte array of correctly encoded types in vs
     -- head  array contains static size Values
     -- head ends with in order:
           -- length of head going to each dynamic a value
 
-  ValueMapping _v -> undefined
+  ValueContract _ -> error "toStorage for ValueContract not yet defined"
+  ValueFunction _ _ _ -> error "toStorage for ValueFunction not yet defined"
+  ValueEnum _ _ -> error "toStorage for ValueEnum not yet defined"
 
 simpleToStorage :: SimpleValue -> ByteString
 simpleToStorage =  \case
@@ -179,9 +179,12 @@ simpleToStorage =  \case
 isDynamic :: Value -> Bool
 isDynamic = \case
   ValueArrayDynamic _ -> True
-  ValueMapping _ -> True
+  --ValueMapping _ -> True
   ValueArrayFixed _ vs -> any isDynamic vs
   SimpleValue v -> simpleIsDynamic v
+  ValueContract _ -> False
+  ValueFunction _ _ _ -> False
+  ValueEnum _ _ -> False
 
 simpleIsDynamic :: SimpleValue -> Bool
 simpleIsDynamic = \case
