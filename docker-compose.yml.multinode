@@ -1,20 +1,20 @@
 version: '2'
 
 networks:
+  p2p-0:
   p2p-1:
-  p2p-2:
   default-network:
 
 services:
   zookeeper:
-    image: zookeeper-packager
+    image: auth.blockapps.net:5000/blockapps/zookeeper-packager
     restart: always
     ports:
       - "2181:2181"
     networks:
       default-network:
   kafka:
-    image: kafka-packager
+    image: auth.blockapps.net:5000/blockapps/kafka-packager
     restart: always
     links:
       - zookeeper
@@ -30,7 +30,7 @@ services:
     networks:
       default-network:
   postgres:
-    image: postgres-packager
+    image: auth.blockapps.net:5000/blockapps/postgres-packager
     restart: always
     ports:
       - "5432:5432"
@@ -38,8 +38,9 @@ services:
       default-network:
 
   strato:
-    image: monstrato
+    image: auth.blockapps.net:5000/blockapps/monstrato
     networks:
+      p2p-0:
       p2p-1:
       default-network:
     volumes:
@@ -58,26 +59,27 @@ services:
     ports:
       - "30303:30303"
       - "30303:30303/udp"
+      - "33000:3000"
     environment:
       networkID : "${networkID}"
       genesis: "${genesis}"
       genesisBlock: "${genesisBlock}"
-      bootnode: "${bootnode}"
       addBootnodes: "${addBootnodes}"
-      lazyBlocks: "${lazyBlocks}"
-      miningAlgorithm: "${miningAlgorithm}"
+      lazyBlocks: "false"
+      miningAlgorithm: "SHA"
       miningThreads: "${miningThreads}"
       blockTime: "${blockTime}"
       minBlockDifficulty: "${minBlockDifficulty}"
       debugFail: "${debugFail}"
       backupblocks: "${backupblocks}"
-      redisBDBNumber: "1"
+      redisBDBNumber: "0"
       useSyncMode: "false"
 
-  strato-2:
-    image: monstrato
+  strato-1:
+    image: auth.blockapps.net:5000/blockapps/monstrato
     networks:
-      p2p-2:
+      p2p-0:
+      p2p-1:
       default-network:
     volumes:
       - /tmp/backup:/tmp/backup
@@ -95,20 +97,21 @@ services:
     ports:
       - "30304:30303"
       - "30304:30303/udp"
+      - "33001:3000"
     environment:
       networkID : "${networkID}"
       genesis: "${genesis}"
       genesisBlock: "${genesisBlock}"
       bootnode: "strato"
       addBootnodes: "${addBootnodes}"
-      lazyBlocks: "${lazyBlocks}"
-      miningAlgorithm: "${miningAlgorithm}"
+      lazyBlocks: "false"
+      miningAlgorithm: "SHA"
       miningThreads: "${miningThreads}"
       blockTime: "${blockTime}"
       minBlockDifficulty: "${minBlockDifficulty}"
       debugFail: "${debugFail}"
       backupblocks: "${backupblocks}"
-      redisBDBNumber: "2"
+      redisBDBNumber: "1"
       useSyncMode: "true"
 
   redis:
@@ -120,7 +123,7 @@ services:
     networks:
       default-network:
   bloc:
-    image: bloc
+    image: auth.blockapps.net:5000/blockapps/bloc
     restart: always
     environment:
       ssl: "${ssl}"
@@ -144,7 +147,7 @@ services:
     ports:
       - '5434:5432'
   postgrest:
-    image: postgrest-packager
+    image: auth.blockapps.net:5000/blockapps/postgrest-packager
     restart: always
     environment:
       POSTGRES_DB: cirrus
@@ -159,7 +162,7 @@ services:
     networks:
       default-network:
   cirrus:
-    image: cirrus
+    image: auth.blockapps.net:5000/blockapps/cirrus
     links:
       - strato:strato
       - postgres-cirrus:postgres
@@ -167,20 +170,20 @@ services:
     networks:
       default-network:
   explorer:
-    image: strato-explorer
+    image: auth.blockapps.net:5000/blockapps/strato-explorer
     ports:
       - 9000:9000
     restart: always
     environment:
       peers: "${peers}"
     links:
-      - strato:strato
+      - strato-1:strato
       - bloc:bloc
     networks:
       default-network:
 
   nginx:
-    image: nginx-packager
+    image: auth.blockapps.net:5000/blockapps/nginx-packager
     restart: always
     volumes:
       - /etc/ssl/private:/etc/ssl/private
@@ -198,3 +201,6 @@ services:
       ssl: "${ssl}"
     networks:
       default-network:
+      p2p-0:
+      p2p-1:
+ 
