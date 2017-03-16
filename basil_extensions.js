@@ -1,14 +1,29 @@
 util.RegisterCommand({
-  Name: "e2e",
-  Usage: "Run e2e tests",
+  Name: "multinode",
+  Usage: "Make a multinode docker-compose",
   Flags: [
     util.MakeFlag({
-      Name: "the-val,t",
-      Usage: "a val",
-      Value: "asdf"
+      Name: "count,c",
+      Usage: "how many extra stratos to make",
+      Value: "1"
+    }),
+    util.MakeFlag({
+      Name: "release,r",
+      Usage: "Whether or not to use release-tagged images",
+      Value: ""
     })
   ]
 }, function(c) {
-  var flagVal = c.String("the-val")
-  console.log(flagVal)
+  var flagVal = parseInt(c.String("count"))
+  var isRelease = c.String("release") != ""
+  var stratoDeployment = _.first(_.filter(basilfile.Deployments, function(p) { return p.Name == "strato"; }))
+  var makeClone = function () { return _(stratoDeployment).clone(); };
+
+  var newStrato = makeClone();
+  newStrato.Name = "not_strato"
+
+  console.log(basilfile.SetDeployment())
+  console.log("asdasdas")
+  console.log(basilfile.SetDeployment(newStrato))
+  //console.log(api.DoCompose(isRelease))
 })
