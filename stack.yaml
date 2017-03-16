@@ -17,9 +17,12 @@ packages:
     git: https://github.com/echatav/largeint/
     commit: 8cce2055e9ffffc89cb1ea2b507f837ff9d1f985
   extra-dep: true
+- location:
+    git: https://github.com/iostat/relapse
+    commit: 52492ad719649598e3dd676f852e8a6da8b19bed
+  extra-dep: true
 extra-deps:
   - hflags-0.4.2
-  - relapse-0.1.0.1
   - saltine-0.0.0.4
 flags: {}
 extra-package-dbs: []
