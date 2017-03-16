@@ -1,6 +1,6 @@
 # bloc-haskell
 
-Install `make`, `autoconf`, `libtool` and `stack` first.
+Install `make`, `autoconf`, `libtool`, `blas`, `lapack` and `stack` first.
 
 ## testing
 

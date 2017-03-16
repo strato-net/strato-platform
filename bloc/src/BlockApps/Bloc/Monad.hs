@@ -44,6 +44,8 @@ data BlocError
   = StratoError ServantError
   | DBError Text
   | UserError Text
+  | CouldNotFind Text
+  | Unimplemented
   deriving Show
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
@@ -72,9 +74,21 @@ blocModify modify = do
   conn <- asks dbConnection
   liftIO $ withTransaction conn (modify conn)
 
+blocModify1 :: (Connection -> IO [x]) -> Bloc x
+blocModify1 modify = do
+  conn <- asks dbConnection
+  results <- liftIO $ withTransaction conn (modify conn)
+  case results of
+    [] -> throwError $ DBError "No result, expected one row"
+    [y] -> return y
+    _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+
 blocStrato :: ClientM x -> Bloc x
 blocStrato client' = do
   url <- asks urlStrato
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (throwError . StratoError) return resultEither
+
+blocMaybe :: Text -> Maybe x -> Bloc x
+blocMaybe msg = maybe (throwError (CouldNotFind msg)) return

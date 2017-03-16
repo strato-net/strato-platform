@@ -17,8 +17,7 @@
 module BlockApps.Bloc.API.Contracts where
 
 import Control.Arrow
-import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad.Except
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -152,9 +151,9 @@ instance MonadContracts Bloc where
             return Arg
               { argName = name
               , argIndex = index
-              , argType = Just ty
+              , argType = ty
               , argTypedef = tyd
-              , argDynamic = Just dy
+              , argDynamic = dy
               , argBytes = by
               , argEntry = Entry <$> eby <*> ety
               }
@@ -163,9 +162,9 @@ instance MonadContracts Bloc where
           for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
             return $ ("#" <> Text.pack (show index),) Val
               { valIndex = index
-              , valType = Just ty
+              , valType = ty
               , valTypedef = tyd
-              , valDynamic = Just dy
+              , valDynamic = dy
               , valBytes = by
               , valEntry = Entry <$> eby <*> ety
               }
@@ -183,9 +182,9 @@ instance MonadContracts Bloc where
         return Arg
           { argName = name
           , argIndex = index
-          , argType = Just ty
+          , argType = ty
           , argTypedef = tyd
-          , argDynamic = Just dy
+          , argDynamic = dy
           , argBytes = by
           , argEntry = Entry <$> eby <*> ety
           }
@@ -268,60 +267,19 @@ instance MonadContracts Bloc where
       returnA -< varName
     return $ map SymbolName vars
 
-  getContractsStateMapping = undefined
-    -- (ContractName contractName) addr (SymbolName mapping) key = do
-    --   conn <- asks dbConnection
-    --   let
-    --     encoder = contramap (\(a,_,_,_) -> a) (Encoders.value Encoders.text)
-    --       <> contramap (\(_,b,_,_) -> b) (Encoders.value addressEncoder)
-    --       <> contramap (\(_,_,c,_) -> c) (Encoders.value Encoders.text)
-    --       <> contramap (\(_,_,_,d) -> d) (Encoders.value Encoders.text)
-    --     decoder = _
-    --     sqlString = "" -- fill in SQL here
-    --     sqlStatement = statement sqlString encoder decoder False
-    --   stateMappingResponseEither <- liftIO $
-    --     run (query (contractName,addr,mapping,key) sqlStatement) conn
-    --   case stateMappingResponseEither of
-    --     Left err -> throwError $ DBError err
-    --     Right stateMappingResponse -> return stateMappingResponse
+  getContractsStateMapping _ _ _ _ = throwError Unimplemented
 
-  getContractsStates = undefined
+  getContractsStates _ = throwError Unimplemented
 
-  postContractsCompile = undefined
+  -- postContractsCompile = undefined
 
-  -- postContractsCompile = traverse $ \ PostCompileRequest
-  --   { postcompilerequestSearchable = searchable -- TODO: Support Cirrus here
-  --   , postcompilerequestContractName = contractName
-  --   , postcompilerequestSource = source
-  --   } -> do
-  --     (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-  --       (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-  --     let
-  --       contracts = Map.intersectionWith (,) xabis abiBins
-  --     metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
-  --       let
-  --         codeHash = undefined
-  --         binRuntimeHash = undefined
-  --       blocQuery $ do
-  --         contrId <- query contractName createContractQuery
-  --         metaDataId <- query
-  --           (contrId,bin,binRuntime,codeHash,binRuntimeHash)
-  --           upsertContractMetaDataQuery
-  --         for_ xabiFuncs $ \ funcs ->
-  --           forMap_ funcs $ \ funcName Func{..} -> do
-  --             funcId <- query
-  --               (metaDataId,funcName,funcSelector,False)
-  --               insertXabiFunction
-  --             -- flip Map.traverseWithKey funcArgs $ \ argName arg ->
-  --             return ()
-  --         return metaDataId
-  --     for_ metaDataIds $ \ leftMetaDataId ->
-  --       for_ metaDataIds $ \ rightMetaDataId -> blocQuery $
-  --         --  unless (leftMetaDataId == rightMetaDataId) $
-  --         -- TODO: Remove all same name queries and logic
-  --            query (leftMetaDataId,rightMetaDataId) insertContractLookup
-  --     let contractCodeHash = undefined
-  --     return $ PostCompileResponse contractName contractCodeHash
+  postContractsCompile = traverse $ \ PostCompileRequest
+    { postcompilerequestSearchable = _searchable -- TODO: Support Cirrus here
+    , postcompilerequestContractName = contractName
+    , postcompilerequestSource = source
+    } -> do
+      codeHash <- compileContract contractName source
+      return $ PostCompileResponse contractName codeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
@@ -472,10 +430,3 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
-
--- helper functions
-forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)
-forMap m act = Map.traverseWithKey act m
-
-forMap_ :: Applicative m => Map k v -> (k -> v -> m ()) -> m ()
-forMap_ m act = void $ forMap m act

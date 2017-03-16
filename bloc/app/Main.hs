@@ -20,12 +20,20 @@ import BlockApps.Strato.Client
 
 main :: IO ()
 main = do
+  putStrLn . unlines $
+    [ "██████╗ ██╗      ██████╗  ██████╗"
+    , "██╔══██╗██║     ██╔═══██╗██╔════╝"
+    , "██████╔╝██║     ██║   ██║██║     "
+    , "██╔══██╗██║     ██║   ██║██║     "
+    , "██████╔╝███████╗╚██████╔╝╚██████╗"
+    , "╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝"
+    ]
   _ <- $initHFlags "Setup EthereumH DBs"
   dbCreateConn <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=5432 user=" ++ flags_pguser ++ " dbname=postgres password=" ++ flags_password
   doesNotExist <- null <$>
     (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
-  when doesNotExist $ void $
+  when doesNotExist . void $
     execute_ dbCreateConn createDatabase
   close dbCreateConn
   conn <- connectPostgreSQL $ fromString $

@@ -29,6 +29,7 @@ module BlockApps.Ethereum
   , UnsignedTransaction (..)
   , signRLP
   , signTransaction
+  , transactionAddress
     -- * Blocks
   , BlockHeader (..)
     -- * Ethereum Types
@@ -39,7 +40,6 @@ module BlockApps.Ethereum
   , BloomFilter (..)
   ) where
 
-import Control.Applicative
 import Crypto.Hash
 import Crypto.Random.Entropy
 import Crypto.Secp256k1
@@ -180,25 +180,24 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionInitOrData :: ByteString
   } deriving (Eq,Show,Generic)
 instance RLPEncodable UnsignedTransaction where
-  rlpEncode UnsignedTransaction{..} = Array
-    [ rlpEncode unsignedTransactionNonce
-    , rlpEncode unsignedTransactionGasPrice
-    , rlpEncode unsignedTransactionGasLimit
-    , maybe (String ByteString.empty) rlpEncode unsignedTransactionTo
-    , rlpEncode unsignedTransactionValue
-    , rlpEncode unsignedTransactionInitOrData
-    ]
-  rlpDecode = \case
-    Array [ob1,ob2,ob3,ob4,ob5,ob6] -> UnsignedTransaction
-      <$> rlpDecode ob1
-      <*> rlpDecode ob2
-      <*> rlpDecode ob3
-      <*> ((Just <$> rlpDecode ob4) <|> (case ob4 of String "" -> Right Nothing; _ -> Left "aggg")) -- push Maybe rlp upstream
-      <*> rlpDecode ob5
-      <*> rlpDecode ob6
-    rlpObj -> Left $
-      "rlpDecode UnsignedTransaction: Expected Array with 6 elements, Saw "
-      ++ show rlpObj
+  rlpEncode UnsignedTransaction{..} = rlpEncode
+    ( unsignedTransactionNonce
+    , unsignedTransactionGasPrice
+    , unsignedTransactionGasLimit
+    , unsignedTransactionTo
+    , unsignedTransactionValue
+    , unsignedTransactionInitOrData
+    )
+  rlpDecode x = do
+    (nonce, gasPrice, gasLimit, toAddr, value, initOrData) <- rlpDecode x
+    return UnsignedTransaction
+      { unsignedTransactionNonce = nonce
+      , unsignedTransactionGasPrice = gasPrice
+      , unsignedTransactionGasLimit = gasLimit
+      , unsignedTransactionTo = toAddr
+      , unsignedTransactionValue = value
+      , unsignedTransactionInitOrData = initOrData
+      }
 
 signRLP :: RLPEncodable x => SecKey -> x -> (Keccak256,CompactRecSig)
 signRLP sk x =
@@ -221,6 +220,16 @@ signTransaction sk utx@UnsignedTransaction{..} = Transaction
   , transactionSignature = snd (signRLP sk utx)
   , transactionInitOrData = unsignedTransactionInitOrData
   }
+
+-- | Yellow Paper (82)
+transactionAddress :: Transaction -> Address
+transactionAddress Transaction{..}
+  = fromMaybe (error "Could not derive transaction Address")
+  . stringAddress
+  . drop 24
+  . keccak256String
+  . keccak256
+  $ rlpSerialize (transactionTo, transactionNonce)
 
 data BlockHeader = BlockHeader
   { blockHeaderParentHash :: Keccak256
@@ -271,8 +280,6 @@ instance FromJSON Gas where
 instance RLPEncodable Gas where
   rlpEncode (Gas n) = rlpEncode $ toInteger n
   rlpDecode obj = Gas . fromInteger <$> rlpDecode obj
--- instance ToForm Gas where
---   toForm (Gas n) = genericToForm n
 
 newtype BloomFilter = BloomFilter
   ( LargeKey

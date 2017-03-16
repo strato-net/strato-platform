@@ -46,10 +46,12 @@ test-suite blockapps-ethereum-test
     BlockApps.EthereumSpec
   build-depends: base >=4 && < 5
     , blockapps-ethereum
+    , base16-bytestring
     , aeson
     , hspec
     , http-api-data
     , QuickCheck
+    , secp256k1
 
 source-repository head
   type: git
