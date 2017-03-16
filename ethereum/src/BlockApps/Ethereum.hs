@@ -29,6 +29,7 @@ module BlockApps.Ethereum
   , UnsignedTransaction (..)
   , signRLP
   , signTransaction
+  , transactionAddress
     -- * Blocks
   , BlockHeader (..)
     -- * Ethereum Types
@@ -221,6 +222,20 @@ signTransaction sk utx@UnsignedTransaction{..} = Transaction
   , transactionSignature = snd (signRLP sk utx)
   , transactionInitOrData = unsignedTransactionInitOrData
   }
+
+-- | Yellow Paper (82)
+transactionAddress :: Transaction -> Address
+transactionAddress Transaction{..}
+  = fromMaybe (error "Could not derive transaction Address")
+  . stringAddress
+  . drop 24
+  . keccak256String
+  . keccak256
+  . packRLP
+  $ Array
+    [ maybe (String (ByteString.singleton 0x80)) rlpEncode transactionTo
+    , rlpEncode transactionNonce
+    ]
 
 data BlockHeader = BlockHeader
   { blockHeaderParentHash :: Keccak256
