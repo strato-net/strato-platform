@@ -19,11 +19,16 @@ util.RegisterCommand({
   var stratoDeployment = _.first(_.filter(basilfile.Deployments, function(p) { return p.Name == "strato"; }))
   var makeClone = function () { return _(stratoDeployment).clone(); };
 
+  console.log(basilfile.Deployments.length)
+
   var newStrato = makeClone();
   newStrato.Name = "not_strato"
 
-  console.log(basilfile.SetDeployment())
-  console.log("asdasdas")
-  console.log(basilfile.SetDeployment(newStrato))
-  //console.log(api.DoCompose(isRelease))
+  var newStrato2 = makeClone();
+  newStrato2.Name = "also_not_strato";
+
+  api.SetDeployment(newStrato)
+  api.SetDeployment(newStrato2)
+
+  console.log(api.DoCompose(isRelease))
 })
