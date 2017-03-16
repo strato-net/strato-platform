@@ -4,6 +4,8 @@ metadata:
   description: Test
   git_repo: https://github.com/blockapps/silo
   docker_repo: https://registry-aws.blockapps.net:5000/
+  hooks:
+    init: "#include basil_extensions.js"
 
 deployments:
   - name: bloc
@@ -36,11 +38,6 @@ deployments:
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
     ref: basil-convert
-    hooks:
-      before_build: |
-        if(util.OS.Distribution == "Mac OS X") {
-          deployment.Env["ON_MAC"] = "1"
-        }
     compose:
       restart: always
       ports:
