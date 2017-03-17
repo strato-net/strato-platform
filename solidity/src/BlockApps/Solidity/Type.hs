@@ -13,7 +13,7 @@ data Type
   | TypeArrayFixed Word Type
   | TypeMapping SimpleType Type
   | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  -- | Struct
+  -- | Struct Text
   | TypeEnum Text
   | TypeContract Text
   deriving (Show)

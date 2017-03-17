@@ -7,7 +7,6 @@ module BlockApps.Bloc.DummyContractStorage (
   getAddress
   ) where
 
-import Control.Monad.IO.Class
 import qualified Data.Bimap as Bimap
 import qualified Data.ByteString as B
 import Data.Text (Text)
@@ -23,14 +22,14 @@ import BlockApps.Solidity.Type
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
-  (vars, enums) <- getVarsAndEnums contractName address
-  liftIO $ print enums
+  (vars, enums, structs) <- getVarsAndEnums contractName address
   let enumDefs' = Map.fromList $ map (fmap (Bimap.fromList . zip [0..])) enums
   return Contract {
     storageVars=Map.fromList
                 $ zipWith (\(n, t) p -> (n, (p, t))) vars
                 $ addPositions enumDefs' (Storage.positionAt 0) $ map snd vars,
-    enumDefs = enumDefs'
+    enumDefs = enumDefs',
+    structDefs=Map.fromList $ map (fmap Map.fromList) structs
     }
 
 addPositions::Enums->Storage.Position -> [Type] -> [Storage.Position]
@@ -42,7 +41,7 @@ addPositions enums p0 (theType:rest) =
    position:addPositions enums (Storage.addBytes position usedBytes) rest
 
 
-getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])])
+getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])], [(Text, [(Text, Type)])])
 getVarsAndEnums (ContractName contractName) _ =
   case contractName of
    "Payout" ->
@@ -56,8 +55,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("Setup", TypeFunction B.empty [] []),
          ("Dividend", TypeFunction B.empty [] [])
        ],
-       [
-       ]
+       [],
+       []
      )
    "Stake" ->
      return
@@ -72,8 +71,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("payout", TypeFunction "63bd1d4a" [] []),
          ("addStakeHolder", TypeFunction "11a76f37" [("stakeholder", SimpleType TypeAddress)] [])
        ],
-       [
-       ]
+       [],
+       []
      )
    "SimpleMultiSig" ->
      return
@@ -90,8 +89,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("withdraw", TypeFunction "51cff8d9" [("to", SimpleType TypeAddress)] []),
          ("addSignature", TypeFunction "5614d3e0" [] [])
        ],
-       [
-       ]
+       [],
+       []
      )
    "Greeter" ->
      return
@@ -104,8 +103,8 @@ getVarsAndEnums (ContractName contractName) _ =
          --Do we include constuctors?
          -- ("constr", TypeFunction "" [("_greeting", TypeString)] [])
        ],
-       [
-       ]
+       [],
+       []
      )
    "mortal" ->
      return
@@ -114,8 +113,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("owner", SimpleType TypeAddress),
          ("kill", TypeFunction "41c0e1b5" [] [])
        ],
-       [
-       ]
+       [],
+       []
      )
    "SimpleDataFeed" ->
      return
@@ -124,8 +123,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("lastPrice", SimpleType TypeUInt),
          ("update", TypeFunction "82ab890a" [("newPrice", SimpleType TypeUInt)] [])
        ],
-       [
-       ]
+       [],
+       []
      )
    "SimpleStorage" ->
      return
@@ -135,8 +134,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("set", TypeFunction "60fe47b1" [("x", SimpleType TypeUInt)] []),
          ("get", TypeFunction "6d4ce63c" [] [(Just "retVal", SimpleType TypeUInt)])
        ],
-       [
-       ]
+       [],
+       []
      )
    "Consumer" ->
      return
@@ -147,8 +146,8 @@ getVarsAndEnums (ContractName contractName) _ =
          ("setFeed", TypeFunction "55b775ea" [("addr", SimpleType TypeAddress)] []),
          ("callFeed", TypeFunction "f198f5df" [] [])
        ],
-       [
-       ]
+       [],
+       []
      )
 
    "InfoFeed" ->
@@ -157,8 +156,8 @@ getVarsAndEnums (ContractName contractName) _ =
        [
          ("info", TypeFunction "370158ea" [] [(Just "ret", SimpleType TypeUInt)])
        ],
-       [
-       ]
+       [],
+       []
      )
    "Types" ->
      return
@@ -284,6 +283,8 @@ getVarsAndEnums (ContractName contractName) _ =
        ],
        [
          ("ActionChoices",["GoLeft","GoRight","GoStraight","SitStill"])
+       ],
+       [
        ]
      )
 
@@ -296,8 +297,37 @@ getVarsAndEnums (ContractName contractName) _ =
        ],
        [
          ("ActionChoices", ["GoLeft","GoRight","GoStraight","SitStill"])
+       ],
+       [
        ]
      )
+
+
+
+
+   "Struct" ->
+     return
+     (
+       [
+  --       ("sammy", TypeStruct "Pet") --96
+       ],
+       [
+         ("Animals", ["Dog","Cat","Pig"])
+       ],
+       [
+         ("Pet", 
+          [
+            ("animal", TypeEnum "Animals")::(Text, Type), --0
+            ("name", SimpleType TypeString), --32
+            ("age", SimpleType TypeInt8), --64
+            ("fleasAndTicks", SimpleType TypeBool) --65
+          ]) --96 bytes
+       ]
+     )
+
+
+
+
 
 
 
@@ -573,6 +603,16 @@ Enums-
 }
 
 
+Struct-
+"types":{
+  "Animals":{"names":{"Dog":0,"Cat":1,"Pig":2},"type":"Enum","bytes":1},
+
+  "Pet":{"type":"Struct","bytes":96,"fields":{"fleasAndTicks":{"atBytes":65,"type":"Bool"},"age":{"atBytes":64,"signed":true,"type":"Int","bytes":1},"animal":{"atBytes":0,"typedef":"Animals"},"name":{"atBytes":32,"dynamic":true,"type":"String"}}}},
+
+"vars":{
+  "sammy":{"atBytes":0,"typedef":"Pet","type":"Struct","bytes":96}
+}
+
 
 
 
@@ -605,5 +645,10 @@ getAddress (ContractName "Types") _ = Address 0x3a13eb3dd43b62b2ebede388627a0952
 
 --getAddress (ContractName "Enums") _ = Address 0xbd4d76e9c5923661a92db8064c816b758c85649e
 getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
+
+getAddress (ContractName "Struct") _ = Address 0x1e911df022bfd54c2bc341d59cc262a7e2367516
+
+
+
 
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"

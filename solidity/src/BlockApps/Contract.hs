@@ -14,11 +14,14 @@ import BlockApps.Solidity.Type
 
 type EnumSet = Bimap Int Text
 type Enums = Map Text EnumSet
+type Structs = Map Text (Map Text Type)
+
 
 data Contract =
   Contract{
     storageVars::Map Text (Storage.Position, Type),
-    enumDefs::Enums
+    enumDefs::Enums,
+    structDefs::Structs
     } deriving (Show)
   
 

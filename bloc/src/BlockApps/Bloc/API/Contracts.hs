@@ -18,6 +18,7 @@ module BlockApps.Bloc.API.Contracts where
 
 import Control.Arrow
 import Control.Monad.Except
+import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -225,9 +226,9 @@ instance MonadContracts Bloc where
 
         ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
 
-    liftIO $ putStrLn "Storage:"
-    liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-    liftIO $ putStrLn "End of storage"
+    logNotice "Storage:"
+    logNotice $ Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    logNotice "End of storage"
 
     return $ Map.fromList ret
 

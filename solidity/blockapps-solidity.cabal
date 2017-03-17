@@ -38,6 +38,7 @@ library
     , http-api-data
     , largeint
     , largeword
+    , logging-effect
     , memory
     , QuickCheck
     , quickcheck-instances
