@@ -15,6 +15,7 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
+    BlockApps.Contract
     BlockApps.Solidity
     BlockApps.Solidity.Int
     BlockApps.Solidity.Storage
@@ -22,7 +23,6 @@ library
     BlockApps.Solidity.Value
     BlockApps.SolidityVarReader
     BlockApps.Storage
-    BlockApps.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
@@ -30,6 +30,7 @@ library
     , aeson
     , aeson-casing
     , base16-bytestring
+    , bimap
     , binary
     , bytestring
     , containers
@@ -37,6 +38,7 @@ library
     , http-api-data
     , largeint
     , largeword
+    , logging-effect
     , memory
     , QuickCheck
     , quickcheck-instances

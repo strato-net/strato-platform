@@ -17,6 +17,7 @@ import Network.HTTP.Client
 import Opaleye
 import Servant
 import Servant.Client
+import qualified Text.PrettyPrint.Leijen.Text as Leijen
 
 newtype Bloc x = Bloc
   { runBloc ::
@@ -52,7 +53,7 @@ enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
   = Handler
   $ withExceptT (\err -> err500{errBody = Lazy.Char8.pack (show err)})
-  $ flip runLoggingT (liftIO . print)
+  $ flip runLoggingT (liftIO . print . renderWithSeverity Leijen.textStrict)
   $ flip runReaderT env $ runBloc x
 
 blocQuery :: Default QueryRunner x y => Query x -> Bloc [y]

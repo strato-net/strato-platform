@@ -18,6 +18,7 @@ module BlockApps.Bloc.API.Contracts where
 
 import Control.Arrow
 import Control.Monad.Except
+import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
@@ -36,7 +37,6 @@ import Data.Time.Clock.POSIX
 import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
-import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Numeric
 import Servant.API
 import Servant.Client
@@ -45,15 +45,13 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
+import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
-import qualified BlockApps.Storage as Storage
-import BlockApps.Types
 
 import BlockApps.Bloc.DummyContractStorage
 
@@ -218,37 +216,19 @@ instance MonadContracts Bloc where
       { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
 
   getContractsState contractName contractId = do
-    vars <- getVariablesAndTypes contractName contractId
+    contract <- getContract contractName contractId
 
-    let url = BaseUrl Http "strato-ms-dev.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
-
-    mgr <- liftIO $ newManager defaultManagerSettings
-
-    storageOrError <-
-      liftIO $ flip runClientM (ClientEnv mgr url) $ getStorage $ Just $ getAddress contractName contractId
-
-    let storage' =
-          case storageOrError of
-           Left e -> error $ show e
-           Right x -> x
-
+    storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
+    
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-    let storage k = fromMaybe 0 $ Map.lookup k storageMap
+        storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
-        addPositions::Storage.Position -> [(Text, Type)] -> [(Text, Type, Storage.Position)]
-        addPositions _ [] = []
-        addPositions p0 ((name, theType):rest) =
-          let
-            (position, usedBytes) = getPositionAndSize p0 theType
-          in
-           (name, theType, position):addPositions (Storage.addBytes position usedBytes) rest
+        ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
 
-
---        ret = map (\(p, var) -> fmap (valueToSolidityValue . decodeValue storage (Storage.positionAt p)) var) $ zip [0..] vars
-        ret = map (\(name, t, p) -> (name, valueToSolidityValue . decodeValue storage p $ t)) $ addPositions (Storage.positionAt 0) vars
-
-    liftIO $ putStrLn $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    logNotice "Storage:"
+    logNotice $ Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    logNotice "End of storage"
 
     return $ Map.fromList ret
 
