@@ -3,7 +3,9 @@
 
 module BlockApps.EthereumSpec where
 
+import Crypto.Secp256k1
 import Data.Aeson
+import qualified Data.ByteString.Base16 as Base16
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
@@ -29,6 +31,15 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse Form Url decode/encode" $ formProp @ Keccak256
     prop "has inverse String decode/encode" $ \ hash ->
       stringKeccak256 (keccak256String hash) === Just hash
+
+  describe "deriveAddress" $
+    it
+      "correctly derives the address corresponding to an example secret key" $ do
+      let
+        Just sk = secKey . fst $ Base16.decode
+          "cd244b3015703ddf545595da06ada5516628c5feadbf49dc66049c4b370cc5d8"
+      deriveAddress (derivePubKey sk) `shouldBe`
+        Address 0x89b44e4d3c81ede05d0f5de8d1a68f754d73d997
 
 -- helpers
 

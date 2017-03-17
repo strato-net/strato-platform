@@ -1,7 +1,3 @@
-{-# LANGUAGE
-    ScopedTypeVariables
-#-}
-
 module BlockApps.Solidity.Int
   ( module Data.Int
   , module Data.LargeInt
@@ -70,36 +66,36 @@ type Word112 = LargeKey Word16 Word96
 type Word120 = LargeKey Word24 Word96
 type Word136 = LargeKey Word8 Word128
 type Word144 = LargeKey Word16 Word128
-type Word152 = LargeKey Word8 Word144
+type Word152 = LargeKey Word24 Word128
 type Word168 = LargeKey Word8 Word160
-type Word176 = LargeKey Word8 Word168
-type Word184 = LargeKey Word8 Word176
+type Word176 = LargeKey Word16 Word160
+type Word184 = LargeKey Word24 Word160
 type Word200 = LargeKey Word8 Word192
-type Word208 = LargeKey Word8 Word200
-type Word216 = LargeKey Word8 Word208
+type Word208 = LargeKey Word16 Word192
+type Word216 = LargeKey Word24 Word192
 type Word232 = LargeKey Word8 Word224
-type Word240 = LargeKey Word8 Word232
-type Word248 = LargeKey Word8 Word240
+type Word240 = LargeKey Word16 Word224
+type Word248 = LargeKey Word24 Word224
 
-type Int24 = TwosComplement Word24
-type Int40 = TwosComplement Word40
-type Int48 = TwosComplement Word48
-type Int56 = TwosComplement Word56
-type Int72 = TwosComplement Word72
-type Int80 = TwosComplement Word80
-type Int88 = TwosComplement Word88
-type Int104 = TwosComplement Word104
-type Int112 = TwosComplement Word112
-type Int120 = TwosComplement Word120
-type Int136 = TwosComplement Word136
-type Int144 = TwosComplement Word144
-type Int152 = TwosComplement Word152
-type Int168 = TwosComplement Word168
-type Int176 = TwosComplement Word176
-type Int184 = TwosComplement Word184
-type Int200 = TwosComplement Word200
-type Int208 = TwosComplement Word208
-type Int216 = TwosComplement Word216
-type Int232 = TwosComplement Word232
-type Int240 = TwosComplement Word240
-type Int248 = TwosComplement Word248
+type Int24 = Two'sComplement Word24
+type Int40 = Two'sComplement Word40
+type Int48 = Two'sComplement Word48
+type Int56 = Two'sComplement Word56
+type Int72 = Two'sComplement Word72
+type Int80 = Two'sComplement Word80
+type Int88 = Two'sComplement Word88
+type Int104 = Two'sComplement Word104
+type Int112 = Two'sComplement Word112
+type Int120 = Two'sComplement Word120
+type Int136 = Two'sComplement Word136
+type Int144 = Two'sComplement Word144
+type Int152 = Two'sComplement Word152
+type Int168 = Two'sComplement Word168
+type Int176 = Two'sComplement Word176
+type Int184 = Two'sComplement Word184
+type Int200 = Two'sComplement Word200
+type Int208 = Two'sComplement Word208
+type Int216 = Two'sComplement Word216
+type Int232 = Two'sComplement Word232
+type Int240 = Two'sComplement Word240
+type Int248 = Two'sComplement Word248

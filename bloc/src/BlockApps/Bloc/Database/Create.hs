@@ -51,9 +51,8 @@ CREATE TABLE IF NOT EXISTS contracts_metadata(
   contract_id int NOT NULL REFERENCES contracts(id),
   bin bytea NOT NULL,
   bin_runtime bytea NOT NULL,
-  bin_runtime_hash bytea NOT NULL,
   code_hash bytea NOT NULL,
-  UNIQUE (bin_runtime_hash, code_hash),
+  UNIQUE (code_hash),
   FOREIGN KEY (contract_id) REFERENCES contracts(id)
 );
 |]
@@ -64,7 +63,7 @@ CREATE TABLE IF NOT EXISTS contracts_instance(
   id serial PRIMARY KEY,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
   address bytea NOT NULL UNIQUE,
-  timestamp timestamptz NOT NULL,
+  timestamp timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]
@@ -100,7 +99,6 @@ CREATE TABLE IF NOT EXISTS xabi_types(
   typedef varchar(512),
   is_dynamic boolean NOT NULL,
   is_signed boolean NOT NULL,
-  is_public boolean NOT NULL,
   bytes integer NULL,
   entry_type_id int REFERENCES xabi_types(id),
   value_type_id int REFERENCES xabi_types(id),
@@ -144,6 +142,7 @@ CREATE TABLE IF NOT EXISTS xabi_variables(
   type_id int NOT NULL REFERENCES xabi_types(id),
   name varchar(512) NOT NULL,
   at_bytes integer NOT NULL,
+  is_public boolean NOT NULL,
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
   FOREIGN KEY (type_id) REFERENCES xabi_types(id)
 );
