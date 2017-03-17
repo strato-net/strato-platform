@@ -84,7 +84,7 @@ simpleToStorage =  \case
   ValueUInt240 v -> pad32 $ encodeStrict v
   ValueUInt248 v -> pad32 $ encodeStrict v
   ValueUInt256 v -> pad32 $ encodeStrict v
-  ValueUInt v -> pad32 $ encodeStrict v
+  ValueUInt v -> simpleToStorage $ ValueUInt256 v
   ValueInt8 v -> pad32Signed v $ encodeStrict v
   ValueInt16 v -> pad32Signed v $ encodeStrict v
   ValueInt24 v -> pad32Signed v $ encodeStrict v
@@ -117,7 +117,7 @@ simpleToStorage =  \case
   ValueInt240 v -> pad32Signed v $ encodeStrict v
   ValueInt248 v -> pad32Signed v $ encodeStrict v
   ValueInt256 v -> pad32Signed v $ encodeStrict v
-  ValueInt v -> encodeStrict v
+  ValueInt v -> simpleToStorage $ ValueInt256 v
   ValueAddress v -> simpleToStorage . ValueUInt160 $ unAddress v
   ValueBytes1 v -> padRight32 $ ByteString.singleton v
   ValueBytes2 v -> padRight32 v
