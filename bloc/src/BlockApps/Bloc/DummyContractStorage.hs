@@ -639,9 +639,8 @@ getAddress (ContractName "InfoFeed") _ = Address 0xf503bdf764474ab89130511860229
 getAddress (ContractName "SimpleDataFeed") _ = Address 0x3fbbcae9815773e8820bb53a855c2ae8cb75e9c0
 getAddress (ContractName "SimpleStorage") _ = Address 0x12ed0ad1f6838d49502fc34458f1bee7222d4ba3
 
---getAddress (ContractName "Types") _ = Address 0x3275bd5d58093c5a1a849c797f103a2e2430c0d5
---getAddress (ContractName "Types") _ = Address 0xf45a7a56f4294fb300e7ba0dd7b9ec8cfeb42ea7
-getAddress (ContractName "Types") _ = Address 0x3a13eb3dd43b62b2ebede388627a09527d1f91f5
+getAddress (ContractName "Types") _ = Address 0xc810525ea1837cdb297d2694a0f796364d9ef772
+
 
 --getAddress (ContractName "Enums") _ = Address 0xbd4d76e9c5923661a92db8064c816b758c85649e
 getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
