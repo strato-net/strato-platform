@@ -32,14 +32,19 @@ spec = modifyMaxSuccess (const 10) $ do
     prop "has inverse String decode/encode" $ \ hash ->
       stringKeccak256 (keccak256String hash) === Just hash
 
+  let
+    Just sk1 = secKey . fst $ Base16.decode
+      "c85ef7d79691fe79573b1a7064c19c1a9819ebdbd1faaab1a8ec92344438aaf4"
+    Just sk2 = secKey . fst $ Base16.decode
+      "c87f65ff3f271bf5dc8643484f66b200109caffe4bf98c4cb393dc35740b28c0"
+
   describe "deriveAddress" $
     it
-      "correctly derives the address corresponding to an example secret key" $ do
-      let
-        Just sk = secKey . fst $ Base16.decode
-          "cd244b3015703ddf545595da06ada5516628c5feadbf49dc66049c4b370cc5d8"
-      deriveAddress (derivePubKey sk) `shouldBe`
-        Address 0x89b44e4d3c81ede05d0f5de8d1a68f754d73d997
+      "correctly derives address from key" $ do
+      deriveAddress (derivePubKey sk1) `shouldBe`
+        Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826
+      deriveAddress (derivePubKey sk2) `shouldBe`
+        Address 0x13978aee95f38490e9769c39b2773ed763d9cd5f
 
 -- helpers
 
