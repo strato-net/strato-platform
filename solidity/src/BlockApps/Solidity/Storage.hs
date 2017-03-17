@@ -21,9 +21,12 @@ import BlockApps.Solidity.Value
 toStorage :: Value -> ByteString
 toStorage = \case
   SimpleValue v -> simpleToStorage v
-  ValueArrayDynamic vs -> toStorage (SimpleValue (ValueUInt (fromIntegral (length vs))))
+  ValueArrayDynamic vs -> toStorage (SimpleValue (ValueUInt k))
                           `ByteString.append`
-                          toStorage (ValueArrayFixed 0 vs)
+                          toStorage (ValueArrayFixed k vs)
+    where
+      k :: Num n => n
+      k = fromIntegral (length vs)
   ValueArrayFixed _ vs ->
     let
       head' = map (\v -> if isDynamic v then Nothing else Just (toStorage v)) vs
@@ -116,38 +119,38 @@ simpleToStorage =  \case
   ValueInt256 v -> pad32Signed v $ encodeStrict v
   ValueInt v -> encodeStrict v
   ValueAddress v -> simpleToStorage . ValueUInt160 $ unAddress v
-  ValueBytes1 v -> pad32 $ ByteString.singleton v
-  ValueBytes2 v -> pad32 v
-  ValueBytes3 v -> pad32 v
-  ValueBytes4 v -> pad32 v
-  ValueBytes5 v -> pad32 v
-  ValueBytes6 v -> pad32 v
-  ValueBytes7 v -> pad32 v
-  ValueBytes8 v -> pad32 v
-  ValueBytes9 v -> pad32 v
-  ValueBytes10 v -> pad32 v
-  ValueBytes11 v -> pad32 v
-  ValueBytes12 v -> pad32 v
-  ValueBytes13 v -> pad32 v
-  ValueBytes14 v -> pad32 v
-  ValueBytes15 v -> pad32 v
-  ValueBytes16 v -> pad32 v
-  ValueBytes17 v -> pad32 v
-  ValueBytes18 v -> pad32 v
-  ValueBytes19 v -> pad32 v
-  ValueBytes20 v -> pad32 v
-  ValueBytes21 v -> pad32 v
-  ValueBytes22 v -> pad32 v
-  ValueBytes23 v -> pad32 v
-  ValueBytes24 v -> pad32 v
-  ValueBytes25 v -> pad32 v
-  ValueBytes26 v -> pad32 v
-  ValueBytes27 v -> pad32 v
-  ValueBytes28 v -> pad32 v
-  ValueBytes29 v -> pad32 v
-  ValueBytes30 v -> pad32 v
-  ValueBytes31 v -> pad32 v
-  ValueBytes32 v -> pad32 v
+  ValueBytes1 v -> padRight32 $ ByteString.singleton v
+  ValueBytes2 v -> padRight32 v
+  ValueBytes3 v -> padRight32 v
+  ValueBytes4 v -> padRight32 v
+  ValueBytes5 v -> padRight32 v
+  ValueBytes6 v -> padRight32 v
+  ValueBytes7 v -> padRight32 v
+  ValueBytes8 v -> padRight32 v
+  ValueBytes9 v -> padRight32 v
+  ValueBytes10 v -> padRight32 v
+  ValueBytes11 v -> padRight32 v
+  ValueBytes12 v -> padRight32 v
+  ValueBytes13 v -> padRight32 v
+  ValueBytes14 v -> padRight32 v
+  ValueBytes15 v -> padRight32 v
+  ValueBytes16 v -> padRight32 v
+  ValueBytes17 v -> padRight32 v
+  ValueBytes18 v -> padRight32 v
+  ValueBytes19 v -> padRight32 v
+  ValueBytes20 v -> padRight32 v
+  ValueBytes21 v -> padRight32 v
+  ValueBytes22 v -> padRight32 v
+  ValueBytes23 v -> padRight32 v
+  ValueBytes24 v -> padRight32 v
+  ValueBytes25 v -> padRight32 v
+  ValueBytes26 v -> padRight32 v
+  ValueBytes27 v -> padRight32 v
+  ValueBytes28 v -> padRight32 v
+  ValueBytes29 v -> padRight32 v
+  ValueBytes30 v -> padRight32 v
+  ValueBytes31 v -> padRight32 v
+  ValueBytes32 v -> padRight32 v
   ValueBytes v -> padRight32 $ ByteString.append (simpleToStorage (ValueUInt (fromIntegral (ByteString.length v)))) v
   ValueString v -> simpleToStorage . ValueBytes $ Text.encodeUtf8 v
   where
