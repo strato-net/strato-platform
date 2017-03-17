@@ -197,7 +197,7 @@ getCanonicalChain :: Integer
                   -> Int
                   -> Redis [SHA]
 getCanonicalChain start limit = do
-    let chain = forM (take (limit+1) [start..]) getCanonical
+    let chain = forM (take (limit) [start..]) getCanonical
     catMaybes <$> chain
 
 getZippedCanonicalChain :: (SHA -> Redis (Maybe t))

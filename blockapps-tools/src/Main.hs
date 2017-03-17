@@ -59,7 +59,7 @@ stateOptions =
 redisOptions :: Annotate Ann
 redisOptions = 
   record DumpRedis{databaseNumber=undefined} [
-    databaseNumber := def += typ "DatabaseNumber" += argPos 0
+    databaseNumber := 0 += typ "INT"
   ]
 
 blockOptions::Annotate Ann

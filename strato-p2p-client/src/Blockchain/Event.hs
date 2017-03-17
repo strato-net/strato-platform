@@ -167,8 +167,10 @@ handleEvents mode peer = awaitForever $ \case
                 neededHashes = map headerHash neededHeaders
                 neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
                 unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
-            unless (null unfoundParents) $
-                error $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
+            unless (null unfoundParents) $ do
+                logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
+                logInfoN . T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
+                logInfoN "### calling syncFetch again" >> syncFetch
             lift $ putBlockHeaders neededHeaders
             logInfoN $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
             yield $ GetBlockBodies neededHashes

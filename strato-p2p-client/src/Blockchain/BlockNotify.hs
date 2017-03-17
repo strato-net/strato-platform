@@ -62,7 +62,7 @@ blockNotificationSource name = do
     _ <- liftIO $ PS.execute_ conn $ fromString $ "LISTEN new_" ++ name ++ ";"
     logInfoN "about to listen for new block notifications"
     rowId <- liftIO $ fmap (byteStringToSHA . notificationData) $ getNotification conn
-    logInfoN $ T.pack $ "########### block has been added: rowId=" ++ show rowId
+    logInfoN $ T.pack $ "########### block has been added: rowId=" ++ shaToHex rowId
     maybeBlock <- lift $ getBlockFromKey pool rowId
     case maybeBlock of
      Nothing -> error "wow, item was removed in notificationSource before I could get it....  This didn't seem like a likely occurence when I was programming, you should probably deal with this possibility now"
