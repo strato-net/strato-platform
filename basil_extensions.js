@@ -17,14 +17,11 @@ util.RegisterCommand({
   var flagVal = parseInt(c.String("count"))
   var isRelease = c.String("release") != ""
   var stratoDeployment = _.first(_.filter(basilfile.Deployments, function(p) { return p.Name == "strato"; }))
-  var makeClone = function () { return _(stratoDeployment).clone(); };
 
-  console.log(basilfile.Deployments.length)
+  var newStrato = api.CloneDeployment(stratoDeployment);
+  newStrato.ComposeArgs["environment"]["addBootnodes"] = 21123
 
-  var newStrato = makeClone();
-  newStrato.Name = "not_strato"
-
-  var newStrato2 = makeClone();
+  var newStrato2 = api.CloneDeployment(stratoDeployment);
   newStrato2.Name = "also_not_strato";
 
   api.SetDeployment(newStrato)
