@@ -225,7 +225,7 @@ instance MonadContracts Bloc where
         storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
-        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract) (mainStruct contract) storage
+        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract) (mainStruct contract) storage 0
 
     logNotice "Storage:"
     logNotice $ Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap

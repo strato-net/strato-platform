@@ -149,25 +149,27 @@ decodeValues
   :: TypeDefs
   -> Struct
   -> Storage
+  -> Word256
   -> [(Text, Value)]
-decodeValues typeDefs' struct'@Struct{..} storage = 
+decodeValues typeDefs' struct'@Struct{..} storage offset = 
   let
     varNames = Map.keys fields
   in
    --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
-   zip varNames $ catMaybes $ map (decodeValue typeDefs' storage struct') varNames
+   zip varNames $ catMaybes $ map (decodeValue typeDefs' storage offset struct') varNames
 
 decodeValue
   :: TypeDefs
   -> Storage
+  -> Word256
   -> Struct
   -> Text
   -> Maybe Value
-decodeValue typeDefs' storage Struct{..} varName = do
+decodeValue typeDefs' storage offset Struct{..} varName = do
   case Map.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
-     Just $ decodeValue' typeDefs' storage position theType
+     Just $ decodeValue' typeDefs' storage (position `Storage.addBytes` (fromIntegral $ 32*offset)) theType
 
 
 decodeValue'
@@ -369,7 +371,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
   TypeStruct name ->
     case Map.lookup name structDefs of
      Nothing -> error ""
-     Just theStruct -> ValueStruct $ decodeValues typeDefs' theStruct storage
+     Just theStruct -> ValueStruct $ decodeValues typeDefs' theStruct storage (Storage.alignedByte position)
 
 
 

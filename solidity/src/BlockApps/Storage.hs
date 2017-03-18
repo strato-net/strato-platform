@@ -22,3 +22,7 @@ addBytes::Position->Int->Position
 addBytes position 32 = position{offset=offset position + 1}
 addBytes position v | v+byte position < 32 = position{byte=byte position+v}
 addBytes x y = error $ "addBytes called for value not defined yet: " ++ show x ++ ", " ++ show y
+
+alignedByte::Position->Word256
+alignedByte Position{byte=0, offset=o} = o
+alignedByte Position{offset=o} = o+1
