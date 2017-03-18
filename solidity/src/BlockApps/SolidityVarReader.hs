@@ -29,13 +29,13 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Text.Printf
 
-import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Storage (Storage)
 import qualified BlockApps.Storage as Storage
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 
 
@@ -364,7 +364,10 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
          Nothing -> error "bad enum value"
          Just x -> ValueEnum name x
 
-  TypeStruct _ -> error "decodeValue' undefined for TypeStruct"
+  TypeStruct name ->
+    case Map.lookup name structDefs of
+     Nothing -> error ""
+     Just theStruct -> ValueStruct $ decodeValues typeDefs' theStruct storage
 
 
 

@@ -45,6 +45,7 @@ toStorage = \case
   ValueContract _ -> error "toStorage for ValueContract not yet defined"
   ValueFunction _ _ _ -> error "toStorage for ValueFunction not yet defined"
   ValueEnum _ _ -> error "toStorage for ValueEnum not yet defined"
+  ValueStruct _ -> error "toStorage for ValueStruct not yet defined"
 
 simpleToStorage :: SimpleValue -> ByteString
 simpleToStorage =  \case
@@ -179,12 +180,13 @@ simpleToStorage =  \case
 isDynamic :: Value -> Bool
 isDynamic = \case
   ValueArrayDynamic _ -> True
-  --ValueMapping _ -> True
+  -- ValueMapping _ -> True
   ValueArrayFixed _ vs -> any isDynamic vs
   SimpleValue v -> simpleIsDynamic v
   ValueContract _ -> False
   ValueFunction _ _ _ -> False
   ValueEnum _ _ -> False
+  ValueStruct _ -> True -- Is this really True?
 
 simpleIsDynamic :: SimpleValue -> Bool
 simpleIsDynamic = \case

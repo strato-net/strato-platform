@@ -21,6 +21,7 @@ library
     BlockApps.Solidity.Storage
     BlockApps.Solidity.Struct
     BlockApps.Solidity.Type
+    BlockApps.Solidity.TypeDefs
     BlockApps.Solidity.Value
     BlockApps.SolidityVarReader
     BlockApps.Storage

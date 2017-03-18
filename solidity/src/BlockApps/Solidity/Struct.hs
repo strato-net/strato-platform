@@ -13,9 +13,3 @@ data Struct =
     size::Int
     } deriving (Show)
 
-fieldsToStruct::[(Text, Type)]->Struct
-fieldsToStruct _ =
-  Struct {
-    fields=undefined,
-    size=32
-    }

@@ -20,26 +20,31 @@ import BlockApps.Ethereum
 import qualified BlockApps.Storage as Storage
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
+
+fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
+fieldsToStruct typeDefs' vars =
+  Struct {
+    fields=Map.fromList
+           $ zipWith (\(n, t) p -> (n, (p, t))) vars
+           $ addPositions typeDefs' (Storage.positionAt 0)
+           $ map snd vars,
+    size = 32
+    }
+
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
   (vars, enums, structs) <- getVarsAndEnums contractName address
   let enumDefs' = Map.fromList $ map (fmap (Bimap.fromList . zip [0..])) enums
-      structDefs' = Map.fromList $ map (fmap fieldsToStruct) structs
+      structDefs' = Map.fromList $ map (fmap $ fieldsToStruct typeDefs') structs
       typeDefs' =
         TypeDefs {
           enumDefs = enumDefs',
           structDefs=structDefs'
           }
   return Contract {
-    mainStruct=
-       Struct {
-         fields=Map.fromList
-                $ zipWith (\(n, t) p -> (n, (p, t))) vars
-                $ addPositions typeDefs' (Storage.positionAt 0)
-                $ map snd vars,
-         size = 32
-         },
+    mainStruct=fieldsToStruct typeDefs' vars,
     typeDefs=typeDefs'
     }
 

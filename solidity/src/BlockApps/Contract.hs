@@ -4,28 +4,17 @@
 #-}
 module BlockApps.Contract where
 
-import Data.Bimap (Bimap)
 import qualified Data.Bimap as Bimap
 import Data.Bits
-import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import qualified BlockApps.Storage as Storage
 import BlockApps.Solidity.Struct (Struct)
 import qualified BlockApps.Solidity.Struct as Struct
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
 
-type EnumSet = Bimap Int Text
-type EnumDefs = Map Text EnumSet
-type StructDefs = Map Text Struct
-
-data TypeDefs =
-  TypeDefs {
-    enumDefs::EnumDefs,
-    structDefs::StructDefs
-    } deriving (Show)  
 
 data Contract =
   Contract{
