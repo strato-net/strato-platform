@@ -26,21 +26,30 @@ getContract contractName address = do
   (vars, enums, structs) <- getVarsAndEnums contractName address
   let enumDefs' = Map.fromList $ map (fmap (Bimap.fromList . zip [0..])) enums
       structDefs' = Map.fromList $ map (fmap fieldsToStruct) structs
+      typeDefs' =
+        TypeDefs {
+          enumDefs = enumDefs',
+          structDefs=structDefs'
+          }
   return Contract {
-    storageVars=Map.fromList
+    mainStruct=
+       Struct {
+         fields=Map.fromList
                 $ zipWith (\(n, t) p -> (n, (p, t))) vars
-                $ addPositions structDefs' enumDefs' (Storage.positionAt 0) $ map snd vars,
-    enumDefs = enumDefs',
-    structDefs=structDefs'
+                $ addPositions typeDefs' (Storage.positionAt 0)
+                $ map snd vars,
+         size = 32
+         },
+    typeDefs=typeDefs'
     }
 
-addPositions::Structs->Enums->Storage.Position -> [Type] -> [Storage.Position]
-addPositions _ _ _ [] = []
-addPositions structs enums p0 (theType:rest) =
+addPositions::TypeDefs->Storage.Position -> [Type] -> [Storage.Position]
+addPositions _ _ [] = []
+addPositions typeDefs' p0 (theType:rest) =
   let
-    (position, usedBytes) = getPositionAndSize structs enums p0 theType
+    (position, usedBytes) = getPositionAndSize typeDefs' p0 theType
   in
-   position:addPositions structs enums (Storage.addBytes position usedBytes) rest
+   position:addPositions typeDefs' (Storage.addBytes position usedBytes) rest
 
 
 getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])], [(Text, [(Text, Type)])])

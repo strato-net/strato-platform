@@ -34,6 +34,7 @@ import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Storage (Storage)
 import qualified BlockApps.Storage as Storage
+import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 
@@ -143,39 +144,41 @@ byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) 
 
 
 decodeValues
-  :: Contract
+  :: TypeDefs
+  -> Struct
   -> Storage
   -> [(Text, Value)]
-decodeValues contract storage = 
+decodeValues typeDefs' struct'@Struct{..} storage = 
   let
-    varNames = Map.keys $ storageVars contract
+    varNames = Map.keys fields
   in
    --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
-   zip varNames $ catMaybes $ map (decodeValue contract storage) $ varNames
+   zip varNames $ catMaybes $ map (decodeValue typeDefs' storage struct') varNames
 
 decodeValue
-  :: Contract
+  :: TypeDefs
   -> Storage
+  -> Struct
   -> Text
   -> Maybe Value
-decodeValue contract storage varName = do
-  case Map.lookup varName $ storageVars contract of
+decodeValue typeDefs' storage Struct{..} varName = do
+  case Map.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
-     Just $ decodeValue' contract storage position theType
+     Just $ decodeValue' typeDefs' storage position theType
 
 
 decodeValue'
-  :: Contract
+  :: TypeDefs
   -> Storage
   -> Storage.Position
   -> Type
   -> Value
-decodeValue' contract storage position@Storage.Position{..} = \case
+decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \case
   SimpleType TypeBool -> SimpleValue $ ValueBool $ storage offset /= 0
 --  SimpleType TypeUInt8 ->
 --    SimpleValue $ ValueUInt $ fromIntegral $ (.&. ((1 `shiftL` 8) - 1)) $ (`shiftR` (byte*8)) $ storage offset
-  SimpleType TypeUInt -> decodeValue' contract storage position $ SimpleType $ TypeUInt256
+  SimpleType TypeUInt -> decodeValue' typeDefs' storage position $ SimpleType $ TypeUInt256
 
   
   SimpleType TypeInt8 -> decodeInt storage offset byte ValueInt8
@@ -256,16 +259,16 @@ decodeValue' contract storage position@Storage.Position{..} = \case
 
 
 
-  SimpleType TypeInt -> decodeValue' contract storage position $ SimpleType TypeInt256
+  SimpleType TypeInt -> decodeValue' typeDefs' storage position $ SimpleType TypeInt256
 
   SimpleType TypeAddress ->
     let
-      SimpleValue (ValueUInt160 addr) = decodeValue' contract storage position $ SimpleType TypeUInt160
+      SimpleValue (ValueUInt160 addr) = decodeValue' typeDefs' storage position $ SimpleType TypeUInt160
     in
       SimpleValue . ValueAddress . Address $ fromIntegral addr
   TypeContract _ ->
     let
-      SimpleValue (ValueAddress addr) = decodeValue' contract storage position $ SimpleType TypeAddress
+      SimpleValue (ValueAddress addr) = decodeValue' typeDefs' storage position $ SimpleType TypeAddress
     in
       ValueContract addr
 
@@ -334,7 +337,7 @@ decodeValue' contract storage position@Storage.Position{..} = \case
 
   SimpleType TypeString ->
     let
-      SimpleValue (ValueBytes bytes) = decodeValue' contract storage position $ SimpleType TypeBytes
+      SimpleValue (ValueBytes bytes) = decodeValue' typeDefs' storage position $ SimpleType TypeBytes
     in
       SimpleValue $ ValueString $ Text.decodeUtf8 bytes
 
@@ -344,13 +347,13 @@ decodeValue' contract storage position@Storage.Position{..} = \case
 
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where
-      theList = map (flip (decodeValue' contract storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
+      theList = map (flip (decodeValue' typeDefs' storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
       startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
   TypeEnum name ->
-    case Map.lookup name $ enumDefs contract of
+    case Map.lookup name enumDefs of
      Nothing -> error $ "Solidity contract is using a missing enum: " ++ show name
      Just enumset ->
        let

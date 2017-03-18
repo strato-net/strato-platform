@@ -47,6 +47,7 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Monad
+import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.SolidityVarReader
@@ -224,7 +225,7 @@ instance MonadContracts Bloc where
         storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
-        ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
+        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract) (mainStruct contract) storage
 
     logNotice "Storage:"
     logNotice $ Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap

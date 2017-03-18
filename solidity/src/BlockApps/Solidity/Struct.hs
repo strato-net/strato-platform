@@ -1,13 +1,15 @@
 
 module BlockApps.Solidity.Struct where
 
+import Data.Map (Map)
 import Data.Text (Text)
 
+import qualified BlockApps.Storage as Storage
 import BlockApps.Solidity.Type
 
 data Struct =
   Struct {
-    fields::[(Text, Type)],
+    fields::Map Text (Storage.Position, Type),
     size::Int
     } deriving (Show)
 
