@@ -126,6 +126,8 @@ valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSol
 valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (SimpleValue (ValueBytes bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
 valueToSolidityValue (ValueEnum name value) = SolidityValueAsString $ name `T.append` "." `T.append` value
+valueToSolidityValue (ValueStruct namedItems) =
+  SolidityObject $ map (fmap valueToSolidityValue) namedItems
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)

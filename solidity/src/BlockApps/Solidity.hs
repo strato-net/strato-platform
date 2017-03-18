@@ -23,6 +23,7 @@ data SolidityValue
   | SolidityBool Bool
   | SolidityArray [SolidityValue]
   | SolidityBytes  ByteString
+  | SolidityObject [(Text, SolidityValue)]
   deriving (Eq,Show,Generic)
 instance ToJSON SolidityValue where
   toJSON (SolidityValueAsString str) = toJSON str
@@ -32,10 +33,13 @@ instance ToJSON SolidityValue where
     [ "type" .= ("Buffer" :: Text)
     , "data" .= ByteString.unpack bytes
     ]
+  toJSON (SolidityObject namedItems) =
+    object $ map (\(name, value) -> name .= value) namedItems
 instance FromJSON SolidityValue where
   parseJSON (String str) = return $ SolidityValueAsString str
   parseJSON (Bool boolean) = return $ SolidityBool boolean
   parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
+  --TODO - figure out how to decode a struct....  it looks to me like it could conflict with thie SolidityBytes thing
   parseJSON (Object obj) = do
     ty <- obj .: "type"
     if ty == ("Buffer" :: Text)
