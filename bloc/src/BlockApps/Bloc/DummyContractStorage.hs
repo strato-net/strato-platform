@@ -337,16 +337,34 @@ getVarsAndEnums (ContractName contractName) _ =
             ("name", SimpleType TypeString), --32
             ("age", SimpleType TypeInt8), --64
             ("fleasAndTicks", SimpleType TypeBool) --65
-          ]) --96 bytes
+          ]
+         ) --96 bytes
        ]
      )
 
 
 
 
-
-
-
+   "Struct2" ->
+     return
+     (
+       [
+         ("x", SimpleType TypeInt),
+         ("sammy", TypeStruct "Pet")
+       ],
+       [],
+       [
+         ("Pet",
+          [
+            ("animal", SimpleType TypeString),
+            ("name", SimpleType TypeString),
+            ("age", SimpleType TypeInt8),
+            ("fleasAndTicks", SimpleType TypeBool)
+          ] 
+         ) -- 96 bytes
+       ]
+     )
+     
    x -> error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
 
 
@@ -632,6 +650,18 @@ Struct-
 
 
 
+Struct2-
+"vars":{
+  "x":{"atBytes":0,"signed":true,"type":"Int","bytes":32}
+  "sammy":{"atBytes":32,"typedef":"Pet","type":"Struct","bytes":96},
+}
+"types":{
+  "Pet":{"type":"Struct","bytes":96,"fields":{"fleasAndTicks":{"atBytes":65,"type":"Bool"},"age":{"atBytes":64,"signed":true,"type":"Int","bytes":1},"animal":{"atBytes":0,"dynamic":true,"type":"String"},"name":{"atBytes":32,"dynamic":true,"type":"String"}}}
+}
+
+
+
+
 
 -}
 
@@ -662,6 +692,6 @@ getAddress (ContractName "Types") _ = Address 0xc810525ea1837cdb297d2694a0f79636
 getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
 
 getAddress (ContractName "Struct") _ = Address 0x658ba3447ca8a4b6668233d0fa70b8b083a4f3f2
-
+getAddress (ContractName "Struct2") _ = Address 0xc95129dfce7e115d7e2f7f658456d3191af91ac8
 
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
