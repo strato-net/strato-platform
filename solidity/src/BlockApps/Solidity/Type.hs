@@ -13,7 +13,7 @@ data Type
   | TypeArrayFixed Word Type
   | TypeMapping SimpleType Type
   | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  -- | Struct Text
+  | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
   deriving (Show)
@@ -142,5 +142,6 @@ formatType (TypeFunction _ paramTypes returnTypes) =
   ++ ")"
 formatType (TypeEnum name) = T.unpack name
 formatType (TypeContract name) = T.unpack name
+formatType (TypeStruct name) = T.unpack name
 
                                  

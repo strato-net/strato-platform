@@ -360,6 +360,11 @@ decodeValue' contract storage position@Storage.Position{..} = \case
         case Bimap.lookup val enumset of
          Nothing -> error "bad enum value"
          Just x -> ValueEnum name x
+
+  TypeStruct _ -> error "decodeValue' undefined for TypeStruct"
+
+
+
   
 --  x -> error $ "Missing case in decodeValue': " ++ show x
 

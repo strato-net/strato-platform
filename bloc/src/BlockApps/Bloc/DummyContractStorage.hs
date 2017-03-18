@@ -18,27 +18,29 @@ import BlockApps.Bloc.Monad
 import BlockApps.Contract
 import BlockApps.Ethereum
 import qualified BlockApps.Storage as Storage
+import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
   (vars, enums, structs) <- getVarsAndEnums contractName address
   let enumDefs' = Map.fromList $ map (fmap (Bimap.fromList . zip [0..])) enums
+      structDefs' = Map.fromList $ map (fmap fieldsToStruct) structs
   return Contract {
     storageVars=Map.fromList
                 $ zipWith (\(n, t) p -> (n, (p, t))) vars
-                $ addPositions enumDefs' (Storage.positionAt 0) $ map snd vars,
+                $ addPositions structDefs' enumDefs' (Storage.positionAt 0) $ map snd vars,
     enumDefs = enumDefs',
-    structDefs=Map.fromList $ map (fmap Map.fromList) structs
+    structDefs=structDefs'
     }
 
-addPositions::Enums->Storage.Position -> [Type] -> [Storage.Position]
-addPositions _ _ [] = []
-addPositions enums p0 (theType:rest) =
+addPositions::Structs->Enums->Storage.Position -> [Type] -> [Storage.Position]
+addPositions _ _ _ [] = []
+addPositions structs enums p0 (theType:rest) =
   let
-    (position, usedBytes) = getPositionAndSize enums p0 theType
+    (position, usedBytes) = getPositionAndSize structs enums p0 theType
   in
-   position:addPositions enums (Storage.addBytes position usedBytes) rest
+   position:addPositions structs enums (Storage.addBytes position usedBytes) rest
 
 
 getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])], [(Text, [(Text, Type)])])
@@ -309,7 +311,7 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-  --       ("sammy", TypeStruct "Pet") --96
+         ("sammy", TypeStruct "Pet") --96
        ],
        [
          ("Animals", ["Dog","Cat","Pig"])
@@ -645,9 +647,7 @@ getAddress (ContractName "Types") _ = Address 0xc810525ea1837cdb297d2694a0f79636
 --getAddress (ContractName "Enums") _ = Address 0xbd4d76e9c5923661a92db8064c816b758c85649e
 getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
 
-getAddress (ContractName "Struct") _ = Address 0x1e911df022bfd54c2bc341d59cc262a7e2367516
-
-
+getAddress (ContractName "Struct") _ = Address 0x658ba3447ca8a4b6668233d0fa70b8b083a4f3f2
 
 
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
