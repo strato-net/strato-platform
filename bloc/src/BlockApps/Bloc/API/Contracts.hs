@@ -227,9 +227,11 @@ instance MonadContracts Bloc where
 
         ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract) (mainStruct contract) storage 0
 
-    logNotice "Storage:"
-    logNotice $ Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-    logNotice "End of storage"
+    logNotice $
+      Text.pack $
+      "Storage:\n"
+      ++ unlines (map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap)
+      ++ "\nEnd of storage\n"
 
     return $ Map.fromList ret
 
