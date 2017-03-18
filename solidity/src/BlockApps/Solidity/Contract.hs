@@ -2,7 +2,7 @@
   LANGUAGE
     RecordWildCards
 #-}
-module BlockApps.Contract where
+module BlockApps.Solidity.Contract where
 
 import qualified Data.Bimap as Bimap
 import Data.Bits

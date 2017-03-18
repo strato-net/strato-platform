@@ -15,8 +15,8 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Contract
     BlockApps.Solidity
+    BlockApps.Solidity.Contract
     BlockApps.Solidity.Int
     BlockApps.Solidity.Storage
     BlockApps.Solidity.Struct

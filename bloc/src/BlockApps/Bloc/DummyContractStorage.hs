@@ -15,9 +15,9 @@ import qualified Data.Map as Map
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Contract
 import BlockApps.Ethereum
 import qualified BlockApps.Storage as Storage
+import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
@@ -29,7 +29,7 @@ fieldsToStruct typeDefs' vars =
            $ zipWith (\(n, t) p -> (n, (p, t))) vars
            $ addPositions typeDefs' (Storage.positionAt 0)
            $ map snd vars,
-    size = 32
+    size = 96
     }
 
 

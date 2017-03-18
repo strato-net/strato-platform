@@ -47,9 +47,9 @@ import Test.QuickCheck.Instances ()
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Monad
-import BlockApps.Contract
 import BlockApps.Ethereum
 import BlockApps.Solidity
+import BlockApps.Solidity.Contract
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
