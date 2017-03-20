@@ -312,7 +312,7 @@ insertXabiFunctionArg funcId args conn = do
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        , constant entryBytes
+        , constant (Just entryBytes)
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
@@ -357,7 +357,7 @@ insertXabiFunctionRet funcId vals conn = do
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
-        , constant entryBytes
+        , constant (Just entryBytes)
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
@@ -659,7 +659,7 @@ getXabiFunctionsArgsQuery
     , Column (Nullable PGText)
     , Column (Nullable PGText)
     , Column (Nullable PGBool)
-    , Column PGInt4
+    , Column (Nullable PGInt4)
     , Column (Nullable PGText)
     , Column (Nullable PGInt4)
     )
@@ -672,7 +672,7 @@ getXabiFunctionsArgsQuery funcId = proc () -> do
       (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index,ty,tyd,dy,by,ety,eby))
       (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionArgumentsTable) $ leftJoinF
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,ety,toNullable eby))
+        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,ety,eby))
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
         (\ (_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_) -> toNullable xteId .== entryTypeId)
         (queryTable xabiTypesTable)
@@ -702,7 +702,7 @@ getXabiFunctionsReturnValuesQuery
     , Column (Nullable PGText)
     , Column (Nullable PGText)
     , Column (Nullable PGBool)
-    , Column PGInt4
+    , Column (Nullable PGInt4)
     , Column (Nullable PGText)
     , Column (Nullable PGInt4)
     )
@@ -715,7 +715,7 @@ getXabiFunctionsReturnValuesQuery funcId = proc () -> do
       (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index,ty,tyd,dy,by,ety,eby))
       (\ (_,_,_,typeId) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionReturnsTable) $ leftJoinF
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,ety,toNullable eby))
+        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,ety,eby))
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
         (\ (_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_) -> toNullable xteId .== entryTypeId)
         (queryTable xabiTypesTable)

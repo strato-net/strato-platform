@@ -74,7 +74,7 @@ data Arg = Arg
   , argType :: Maybe Text
   , argTypedef :: Maybe Text
   , argDynamic :: Maybe Bool
-  , argBytes :: Int32
+  , argBytes :: Maybe Int32
   , argEntry :: Maybe Entry
   } deriving (Eq,Show,Generic)
 instance ToJSON Arg where
@@ -96,7 +96,7 @@ data Val = Val
   , valType :: Maybe Text
   , valTypedef :: Maybe Text
   , valDynamic :: Maybe Bool
-  , valBytes :: Int32
+  , valBytes :: Maybe Int32
   , valEntry :: Maybe Entry
   } deriving (Eq,Show,Generic)
 instance ToJSON Val where
