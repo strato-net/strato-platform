@@ -41,7 +41,6 @@ services:
     image: auth.blockapps.net:5000/blockapps/monstrato
     networks:
       p2p-0:
-      p2p-1:
       default-network:
     volumes:
       - /tmp/backup:/tmp/backup
@@ -78,7 +77,6 @@ services:
   strato-1:
     image: auth.blockapps.net:5000/blockapps/monstrato
     networks:
-      p2p-0:
       p2p-1:
       default-network:
     volumes:
@@ -201,6 +199,3 @@ services:
       ssl: "${ssl}"
     networks:
       default-network:
-      p2p-0:
-      p2p-1:
- 

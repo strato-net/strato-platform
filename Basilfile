@@ -43,6 +43,7 @@ deployments:
       ports:
         - "30303:30303"
         - "30303:30303/udp"
+        - "33000:3000"
       environment:
         networkID : "${networkID}"
         genesis: "${genesis}"

@@ -39,7 +39,7 @@ windows:
                 - echo "backup is <%= @settings['port'] %>"
                 - echo 'update interval is <%= @settings["delay"] || 5 %>'
             - strato:
-                - while true; do docker exec -it <%= @settings['strato'] %> bash -c 'cd /var/lib/strato; head -10000 | strato-ez-restore'; sleep 2; done
+                - docker exec -it <%= @settings['strato'] %> bash # -c 'cd /var/lib/strato; head -10000 | strato-ez-restore';
 
     - backbone:
         layout: even-vertical
@@ -97,23 +97,13 @@ windows:
         layout: tiled 
         panes:
             - bestblock:
-<<<<<<< HEAD
-                - watch -c -n 1 "curl -s localhost:<%= @settings['port'] %>/eth/v1.2/block/last/1 | jq -C '.'"
+                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost:<%= @settings['port'] %>/eth/v1.2/block/last/1 | jq -C '.'"
             - lasttx:
-                - watch -c -n 1 "curl -s localhost:<%= @settings['port'] %>/eth/v1.2/transaction/last/1 | jq -C '.'"
-=======
-                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost/strato-api/eth/v1.2/block/last/1 | jq -C '.'"
-            - lasttx:
-                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost/strato-api/eth/v1.2/transaction/last/1 | jq -C '.'"
->>>>>>> b95fe5cf5b3d8242df6f0573980811450730d6c3
+                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost:<%= @settings['port'] %>/eth/v1.2/transaction/last/1 | jq -C '.'"
             - version:
                 - watch -c -n 60 "curl -s localhost:<%= @settings['port'] %>/version | jq -C '.'"
             - coinbase:
-<<<<<<< HEAD
-                - watch -c -n 5 "curl -s localhost:<%= @settings['port'] %>/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
-=======
-                - watch -c -n 10 "curl -s localhost/strato-api/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
->>>>>>> b95fe5cf5b3d8242df6f0573980811450730d6c3
+                - watch -c -n <%= @settings["delay"] || 5 %> "curl -s localhost:<%= @settings['port'] %>/eth/v1.2/block/last/100 | jq -C '.[] | {blockData}| .[].coinbase' | sort | uniq -c"
 
     - graphs:
         layout: even-vertical
@@ -177,7 +167,7 @@ windows:
             - iostat:
                 - iostat -N 1 
             - ctop:
-                - docker run -ti --name ctop --rm -v /var/run/docker.sock:/var/run/docker.sock quay.io/vektorlab/ctop:latest
+                - docker run -ti --name ctop-<%= @settings['strato'] || strato %> --rm -v /var/run/docker.sock:/var/run/docker.sock quay.io/vektorlab/ctop:latest
 
     - databases:
         layout: tiled
