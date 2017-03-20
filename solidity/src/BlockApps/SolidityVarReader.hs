@@ -179,9 +179,12 @@ decodeValue'
   -> Type
   -> Value
 decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \case
-  SimpleType TypeBool -> SimpleValue $ ValueBool $ storage offset /= 0
---  SimpleType TypeUInt8 ->
---    SimpleValue $ ValueUInt $ fromIntegral $ (.&. ((1 `shiftL` 8) - 1)) $ (`shiftR` (byte*8)) $ storage offset
+  SimpleType TypeBool ->
+    let
+      SimpleValue (ValueInt8 word8) = decodeValue' typeDefs' storage position (SimpleType TypeInt8)
+    in
+     SimpleValue $ ValueBool $ word8 /= 0
+     
   SimpleType TypeUInt -> decodeValue' typeDefs' storage position $ SimpleType $ TypeUInt256
 
   
