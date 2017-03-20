@@ -69,7 +69,7 @@ instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 data Arg = Arg
-  { argName :: Maybe Text
+  { argName :: Text
   , argIndex :: Int32
   , argType :: Maybe Text
   , argTypedef :: Maybe Text

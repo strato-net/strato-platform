@@ -140,7 +140,7 @@ instance MonadContracts Bloc where
         [ (funcId, funcName, sel)
         | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
         ]
-      argsToPairs = map (\ arg -> (fromMaybe "arggg" (argName arg), arg))
+      argsToPairs = map (\ arg -> (argName arg, arg))
     funcs <- fmap Map.fromList $
       for funcIdNameSels $ \ (funcId,funcName,sel) -> do
         args <- do
@@ -219,7 +219,7 @@ instance MonadContracts Bloc where
     contract <- getContract contractName contractId
 
     storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
-    
+
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
         storage k = fromMaybe 0 $ Map.lookup k storageMap
 

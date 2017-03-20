@@ -6,6 +6,7 @@
   , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
+  , ScopedTypeVariables
   , TypeApplications
   , TypeOperators
   , GeneralizedNewtypeDeriving
@@ -22,8 +23,9 @@ import Data.Aeson.Casing
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.Map.Strict (Map)
 import Data.Int (Int32)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
@@ -112,7 +114,14 @@ instance MonadUsers Bloc where
         returnA -< (cmId,bin)
       (cmId,bin) <-
         blocMaybe "contractMetaDataId and bin" $ listToMaybe cmIds_bins
-      -- TODO: get args for constructor
+      _argNamesTypes :: Map Text (Maybe Text) <- fmap Map.fromList . blocQuery $ joinF
+        (\ (_,_,_,_,_) (_,ty,name) ->(name,ty))
+        (\ (xfId,contractMetaDataId,isConstr,_,_) (functionId,_,_) -> xfId .== functionId .&& isConstr .&& contractMetaDataId .== constant cmId)
+        (queryTable xabiFunctionsTable) $ joinF
+          (\ (_,functionId,_,name,_) (_,ty,_,_,_,_,_,_,_) -> (functionId,ty,name))
+          (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_,_,_) -> typeId .== xtId)
+          (queryTable xabiFunctionArgumentsTable)
+          (queryTable xabiTypesTable)
       tx <- prepareTx
         userName password addr Nothing txParams (Wei (fromIntegral value)) bin
       hash <- blocStrato $ postTx tx
