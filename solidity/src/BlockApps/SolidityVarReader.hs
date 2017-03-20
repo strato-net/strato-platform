@@ -32,6 +32,7 @@ import Text.Printf
 import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Storage (Storage)
+import BlockApps.Solidity.Contract
 import qualified BlockApps.Storage as Storage
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
@@ -352,7 +353,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
 
   TypeArrayFixed size ty -> ValueArrayFixed size theList
     where
-      theList = map (flip (decodeValue' typeDefs' storage) ty . Storage.positionAt . (offset+)) [0..fromIntegral size - 1]
+      (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addBytes` fromIntegral (32*offset)) . arrayPosition elementSize) [0..fromIntegral size - 1]
 
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where
@@ -393,3 +395,13 @@ decodeInt::Num t=>
            Storage->Word256->Int->(t->SimpleValue)->Value
 decodeInt storage offset byte constructor =
   SimpleValue $ constructor $ fromIntegral $ (`shiftR` (byte*8)) $ storage offset
+
+
+
+arrayPosition::Int->Int->Storage.Position
+arrayPosition elementSize x =
+  let
+    itemsPerWord = 32 `quot` elementSize
+    (o, b) = x `quotRem` itemsPerWord
+  in
+   Storage.Position{offset=fromIntegral o, byte=b}

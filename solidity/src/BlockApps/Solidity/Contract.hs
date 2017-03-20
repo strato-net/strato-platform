@@ -176,7 +176,19 @@ getPositionAndSize TypeDefs{..} p (TypeStruct name) =
    Just struct -> nextAvail p $ Struct.size struct
 
 getPositionAndSize _ p (TypeArrayDynamic _) = (p,32)
-getPositionAndSize _ p (TypeArrayFixed size _) = (p, fromIntegral $ 32*size)
+getPositionAndSize typeDefs' p (TypeArrayFixed size ty) = 
+  let
+    (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+    itemsPerWord = 32 `quot` elementSize
+    divRoundUp x y =
+      let
+        (d, r) = x `quotRem` y
+      in
+       if r == 0
+       then d
+       else d+1
+  in
+   (p, fromIntegral $ 32*size `divRoundUp` fromIntegral itemsPerWord)
 getPositionAndSize _ p (TypeMapping _ _) = (p,32)
 getPositionAndSize _ p (TypeFunction _ _ _) = (p,32)
 getPositionAndSize _ p (TypeContract _) = nextAvail p 20
