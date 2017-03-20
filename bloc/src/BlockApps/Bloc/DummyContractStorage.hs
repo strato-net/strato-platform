@@ -383,6 +383,21 @@ getVarsAndEnums (ContractName contractName) _ =
      )
 
 
+   "Array" ->
+     return
+     (
+       [
+         ("fixedUIntArray", TypeArrayFixed 8 (SimpleType TypeUInt)),
+         
+         ("fixedUInt8Array", TypeArrayFixed 8 (SimpleType TypeUInt8)),
+         ("int32Array", TypeArrayDynamic (SimpleType TypeInt32)),
+         ("uintArray", TypeArrayDynamic (SimpleType TypeInt)),
+         ("notice", SimpleType TypeString)
+       ],
+       [],
+       []
+     )
+
 
 
 
@@ -697,6 +712,14 @@ FixedArray-
 }
 
 
+Array-
+"vars":{
+  "fixedUIntArray":{"atBytes":0,"length":8,"entry":{"type":"Int","bytes":32},"type":"Array"}
+  "fixedUInt8Array":{"atBytes":256,"length":8,"entry":{"type":"Int","bytes":1},"type":"Array"},
+  "int32Array":{"atBytes":288,"dynamic":true,"entry":{"signed":true,"type":"Int","bytes":4},"type":"Array"},
+  "uintArray":{"atBytes":320,"dynamic":true,"entry":{"type":"Int","bytes":32},"type":"Array"},
+  "notice":{"atBytes":352,"dynamic":true,"type":"String"},
+}
 
 
 
@@ -733,5 +756,7 @@ getAddress (ContractName "Struct") _ = Address 0x658ba3447ca8a4b6668233d0fa70b8b
 getAddress (ContractName "Struct2") _ = Address 0x58ec24fdfb75c2124f659f96748d208529716f80
 
 getAddress (ContractName "FixedArray") _ = Address 0xf450d26fcfa6f40c0e27ad7d46695f5e9efbc2f5
+
+getAddress (ContractName "Array") _ = Address 0xdafe84df446f0975af4821952e7a05a4d7904d25
 
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
