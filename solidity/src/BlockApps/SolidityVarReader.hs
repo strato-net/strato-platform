@@ -350,7 +350,9 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
-  TypeArrayFixed _ _ -> error "TypeArrayFixed is undefined in decodeValue'"
+  TypeArrayFixed size ty -> ValueArrayFixed size theList
+    where
+      theList = map (flip (decodeValue' typeDefs' storage) ty . Storage.positionAt . (offset+)) [0..fromIntegral size - 1]
 
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where

@@ -176,7 +176,7 @@ getPositionAndSize TypeDefs{..} p (TypeStruct name) =
    Just struct -> nextAvail p $ Struct.size struct
 
 getPositionAndSize _ p (TypeArrayDynamic _) = (p,32)
-getPositionAndSize _ p (TypeArrayFixed _ _) = (p,32)
+getPositionAndSize _ p (TypeArrayFixed size _) = (p, fromIntegral $ 32*size)
 getPositionAndSize _ p (TypeMapping _ _) = (p,32)
 getPositionAndSize _ p (TypeFunction _ _ _) = (p,32)
 getPositionAndSize _ p (TypeContract _) = nextAvail p 20
