@@ -167,9 +167,34 @@ data Transaction = Transaction
   , transactionGasLimit :: Gas
   , transactionTo :: Maybe Address
   , transactionValue :: Wei
-  , transactionSignature :: CompactRecSig
   , transactionInitOrData :: ByteString
+  , transactionSignature :: CompactRecSig
   } deriving (Eq,Show,Generic)
+instance RLPEncodable Transaction where
+  rlpEncode Transaction{..} = rlpEncode
+    ( transactionNonce
+    , transactionGasPrice
+    , transactionGasLimit
+    , transactionTo
+    , transactionValue
+    , transactionInitOrData
+    , toInteger (getCompactRecSigV transactionSignature)
+    , toInteger (getCompactRecSigR transactionSignature)
+    , toInteger (getCompactRecSigS transactionSignature)
+    )
+  rlpDecode x = do
+    (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
+      <- rlpDecode x
+    return Transaction
+      { transactionNonce = nonce
+      , transactionGasPrice = gasPrice
+      , transactionGasLimit = gasLimit
+      , transactionTo = toAddr
+      , transactionValue = value
+      , transactionInitOrData = initOrData
+      , transactionSignature = CompactRecSig
+          (fromInteger r) (fromInteger s) (fromInteger v)
+      }
 
 data UnsignedTransaction = UnsignedTransaction
   { unsignedTransactionNonce :: Nonce
