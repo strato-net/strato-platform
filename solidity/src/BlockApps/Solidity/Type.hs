@@ -1,3 +1,7 @@
+{-# LANGUAGE
+    OverloadedStrings
+#-}
+
 module BlockApps.Solidity.Type where
 
 import Data.ByteString (ByteString)
@@ -143,6 +147,11 @@ formatType (TypeFunction _ paramTypes returnTypes) =
 formatType (TypeEnum name) = Text.unpack name
 formatType (TypeContract name) = Text.unpack name
 
-textToSimpleType :: Text -> Maybe SimpleType
-textToSimpleType str = if Text.null str then Nothing
+textToSimpleArgType :: Text -> Maybe SimpleType
+textToSimpleArgType str = if Text.null str then Nothing
   else readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack (Text.toLower (Text.tail str))))
+
+textToArgType :: Text -> Bool -> Text -> Maybe Type
+textToArgType "Array" True str = TypeArrayDynamic . SimpleType <$> textToSimpleArgType str
+textToArgType "Array" False str = TypeArrayFixed 0 . SimpleType <$> textToSimpleArgType str
+textToArgType str _ _ = SimpleType <$> textToSimpleArgType str
