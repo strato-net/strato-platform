@@ -167,9 +167,34 @@ data Transaction = Transaction
   , transactionGasLimit :: Gas
   , transactionTo :: Maybe Address
   , transactionValue :: Wei
-  , transactionSignature :: CompactRecSig
   , transactionInitOrData :: ByteString
+  , transactionSignature :: CompactRecSig
   } deriving (Eq,Show,Generic)
+instance RLPEncodable Transaction where
+  rlpEncode Transaction{..} = rlpEncode
+    ( transactionNonce
+    , transactionGasPrice
+    , transactionGasLimit
+    , transactionTo
+    , transactionValue
+    , transactionInitOrData
+    , toInteger (getCompactRecSigV transactionSignature)
+    , toInteger (getCompactRecSigR transactionSignature)
+    , toInteger (getCompactRecSigS transactionSignature)
+    )
+  rlpDecode x = do
+    (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
+      <- rlpDecode x
+    return Transaction
+      { transactionNonce = nonce
+      , transactionGasPrice = gasPrice
+      , transactionGasLimit = gasLimit
+      , transactionTo = toAddr
+      , transactionValue = value
+      , transactionInitOrData = initOrData
+      , transactionSignature = CompactRecSig
+          (fromInteger r) (fromInteger s) (fromInteger v)
+      }
 
 data UnsignedTransaction = UnsignedTransaction
   { unsignedTransactionNonce :: Nonce
@@ -180,23 +205,24 @@ data UnsignedTransaction = UnsignedTransaction
   , unsignedTransactionInitOrData :: ByteString
   } deriving (Eq,Show,Generic)
 instance RLPEncodable UnsignedTransaction where
-  rlpEncode UnsignedTransaction{..} = rlpEncode
-    ( unsignedTransactionNonce
-    , unsignedTransactionGasPrice
-    , unsignedTransactionGasLimit
-    , unsignedTransactionTo
-    , unsignedTransactionValue
-    , unsignedTransactionInitOrData
-    )
+  rlpEncode UnsignedTransaction{..} = rlpEncode Transaction
+    { transactionNonce = unsignedTransactionNonce
+    , transactionGasPrice = unsignedTransactionGasPrice
+    , transactionGasLimit = unsignedTransactionGasLimit
+    , transactionTo = unsignedTransactionTo
+    , transactionValue = unsignedTransactionValue
+    , transactionInitOrData = unsignedTransactionInitOrData
+    , transactionSignature = CompactRecSig 0 0 0
+    }
   rlpDecode x = do
-    (nonce, gasPrice, gasLimit, toAddr, value, initOrData) <- rlpDecode x
+    Transaction{..} <- rlpDecode x
     return UnsignedTransaction
-      { unsignedTransactionNonce = nonce
-      , unsignedTransactionGasPrice = gasPrice
-      , unsignedTransactionGasLimit = gasLimit
-      , unsignedTransactionTo = toAddr
-      , unsignedTransactionValue = value
-      , unsignedTransactionInitOrData = initOrData
+      { unsignedTransactionNonce = transactionNonce
+      , unsignedTransactionGasPrice = transactionGasPrice
+      , unsignedTransactionGasLimit = transactionGasLimit
+      , unsignedTransactionTo = transactionTo
+      , unsignedTransactionValue = transactionValue
+      , unsignedTransactionInitOrData = transactionInitOrData
       }
 
 signRLP :: RLPEncodable x => SecKey -> x -> (Keccak256,CompactRecSig)
