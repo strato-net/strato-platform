@@ -14,7 +14,6 @@ module Blockchain.EthConf (
       PrivKey(..),
       ethConf,
       connStr,
-      connStr'
     ) where
 
 import Control.Monad.Except (ExceptT(..))
@@ -172,9 +171,6 @@ ethConf = unsafePerformIO $ do
 
 connStr :: B.ByteString
 connStr = postgreSQLConnectionString . sqlConfig $ ethConf
-
-connStr' :: B.ByteString
-connStr' = postgreSQLConnectionString . sqlConfig $ ethConf
 
 runKafkaConfigured :: KafkaClientId -> StateT KafkaState (ExceptT KafkaClientError IO) a -> IO (Either KafkaClientError a)
 runKafkaConfigured name = runKafka (mkConfiguredKafkaState name)

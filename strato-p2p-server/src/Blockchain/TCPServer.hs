@@ -58,9 +58,9 @@ theCurve::Curve
 theCurve = getCurveByName SEC_p256k1
 
 runEthServer::(MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)=>
-              TVar (S.Set String)->SQL.ConnectionString->PrivateNumber->Int->m ()
-runEthServer connectedPeers connStr myPriv listenPort = do  
-    cxt <- initContextLite connStr
+              TVar (S.Set String)->PrivateNumber->Int->m ()
+runEthServer connectedPeers  myPriv listenPort = do  
+    cxt <- initContextLite 
 
     let myPubkey = calculatePublic theCurve myPriv
 
@@ -82,33 +82,33 @@ runEthServer connectedPeers connStr myPriv listenPort = do
             appSink app
 
       runEthCryptMLite cxt $ do
-        let rSource = appSource app
-            txSource = txNotificationSource "tx"
-                      =$= CL.map NewTX
-            blockSource = blockNotificationSource "p2p_block"
-                      =$= CL.map (uncurry NewBL)
+        let rSource  = appSource app
+--             txSource = txNotificationSource "tx"
+--                      =$= CL.map NewTX
+--             blockSource = blockNotificationSource "p2p_block"
+--                      =$= CL.map (uncurry NewBL)
 
         eventSource <- mergeSourcesCloseForAny [
-          rSource =$=
-          appSource app =$=
-          ethDecrypt inCxt =$=
-          transPipe liftIO bytesToMessages =$=
-          transPipe lift (tap (displayMessage False (show $ appSockAddr app))) =$=
-          CL.map MsgEvt,
-          blockSource,
-          txSource
+              rSource 
+                =$= appSource app
+                =$= ethDecrypt inCxt
+                =$= transPipe liftIO bytesToMessages
+                =$= transPipe lift (tap (displayMessage False (show $ appSockAddr app)))
+                =$= CL.map MsgEvt 
+--               , blockSource
+--               , txSource
           ] 2
 
 
         logInfoN "server session starting"
 
         (_::Either SomeException ()) <- try $ 
-                 eventSource =$=
-                   handleMsgConduit myPubkey unwrappedPeer =$=
-                   transPipe lift (tap (displayMessage True (show $ appSockAddr app))) =$=
-                   messagesToBytes =$=
-                   ethEncrypt outCxt $$
-                   transPipe liftIO (appSink app)
+              eventSource
+                =$= handleMsgConduit myPubkey unwrappedPeer
+                =$= transPipe lift (tap (displayMessage True (show $ appSockAddr app)))
+                =$= messagesToBytes
+                =$= ethEncrypt outCxt
+                 $$ transPipe liftIO (appSink app)
 
         logInfoN "server session ended"
 

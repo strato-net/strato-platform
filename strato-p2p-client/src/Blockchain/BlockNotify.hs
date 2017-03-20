@@ -55,7 +55,7 @@ blockNotificationSource name = do
   conn <- liftIO $ PS.connectPostgreSQL connStr
   _ <- register $ PS.close conn
 
-  pool <- liftIO $ runNoLoggingT $ SQL.createPostgresqlPool connStr' 20
+  pool <- liftIO $ runNoLoggingT $ SQL.createPostgresqlPool connStr 20
   createBlockTrigger name
 
   forever $ do

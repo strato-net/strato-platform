@@ -55,6 +55,7 @@ import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thi
 
 data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | TimerEvt deriving (Show)
 
+-- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
@@ -168,7 +169,7 @@ handleEvents mode peer = awaitForever $ \case
                 neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
                 unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
             unless (null unfoundParents) $ do
-                logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
+                -- logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
                 logInfoN . T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
                 logInfoN "### calling syncFetch again" >> syncFetch
             lift $ putBlockHeaders neededHeaders

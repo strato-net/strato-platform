@@ -12,6 +12,7 @@ module Blockchain.Strato.RedisBlockDB
     , getParentChain, getHeaderChain, getBlockChain
     , getCanonical, getCanonicalHeader, getCanonicalChain, getCanonicalHeaderChain
     , getChildren
+    , getGenesisHash
     , putHeader, putHeaders, putBlock, putBlocks
     , getBestBlockInfo, putBestBlockInfo, forceBestBlockInfo
     , HasRedisBlockDB(..), withRedisBlockDB
@@ -68,6 +69,9 @@ inNamespace ns k = ns' `S8.append` toKey k
 bestBlockInfoKey :: S8.ByteString
 bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
+
+getGenesisHash :: Redis (Maybe SHA)
+getGenesisHash = getCanonical 0 
 
 getInNamespace :: (RedisDBKeyable key)
                => BlockDBNamespace

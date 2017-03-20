@@ -19,11 +19,14 @@ getPeersR = do
         case serverResponse of
          Left err -> Object $ H.fromList [("error", String $ T.pack $ show (err::SomeException))]
          Right (Just (Object o)) -> fromMaybe (String "qqqq") $ lookup "result" o
-         
+         Right _ -> ""
+
   clientResponse <- try $ liftIO $ getPeers 14001
   let clientVal = case clientResponse of
         Left err -> Object $ H.fromList [("error", String $ T.pack $ show (err::SomeException))]
         Right (Just (Object o)) -> fromMaybe (String "qqqq") $ lookup "result" o
+        Right _ -> ""
+
   return $ object ["serverPeers" .= serverVal, "clientPeers" .= clientVal]
 
 getPeers::Int->IO (Maybe Value)
@@ -31,6 +34,7 @@ getPeers port = do
   runTCPClient (clientSettings port "127.0.0.1") $ \appData -> do
     appSource appData $$ getPeersRPC `fuseUpstream` appSink appData
 
+getPeersRPC :: ConduitM ByteString ByteString IO (Maybe Value) 
 getPeersRPC = do
   yield "{\"jsonrpc\": \"2.0\", \"method\": \"getPeers\", \"id\": 1}"
   response <- await

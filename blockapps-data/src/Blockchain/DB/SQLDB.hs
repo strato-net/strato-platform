@@ -34,7 +34,5 @@ runPostgresConn :: (MonadBaseControl IO m, MonadIO m, MonadLogger m, backend ~ S
 runPostgresConn pgConn = SQL.withPostgresqlConn pgConn . runReaderT
 
 createPostgresqlPool' :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, backend ~ SQL.SqlBackend)
-                      => SQL.ConnectionString
-                      -> Int
-                      -> m SQLDB
-createPostgresqlPool' = SQL.createPostgresqlPool
+                      => SQL.ConnectionString -> Int -> m SQLDB
+createPostgresqlPool' = SQL.createPostgresqlPool            

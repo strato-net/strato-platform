@@ -7,7 +7,7 @@ import Control.Monad.Trans.Resource
 
 import qualified Database.Persist.Postgresql as SQL
 
-import Blockchain.EthConf (connStr', mkConfiguredKafkaState)
+import Blockchain.EthConf (connStr, mkConfiguredKafkaState)
 import Blockchain.DB.SQLDB
 import Network.Kafka
 
@@ -30,5 +30,5 @@ instance HasSQLDB AditM where
 runAditT :: Int -> AditM a -> LoggingT IO a
 runAditT pgPoolSize m = do
     let initKafkaState = mkConfiguredKafkaState "strato-adit"
-    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr' pgPoolSize
+    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr pgPoolSize
     runResourceT $ evalStateT m (AditState sqldb initKafkaState)

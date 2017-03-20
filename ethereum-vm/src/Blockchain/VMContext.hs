@@ -133,7 +133,7 @@ runContextM f = do
         hdb <- DB.open (dbDir "h" ++ hashDBPath)  ldbOptions
         cdb <- DB.open (dbDir "h" ++ codeDBPath)  ldbOptions
         blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-        conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr' 20
+        conn <- liftIO $ runNoLoggingT  $ SQL.createPostgresqlPool connStr 20
         redisPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
         let initialKafkaState = mkConfiguredKafkaState "ethereum-vm"
         runStateT f (Context
