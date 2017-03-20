@@ -57,7 +57,7 @@ doBlock minerNumber n newNonce = do
         theMinedBlock = n{blockBlockData = theblockData}
         coinbase = format . blockDataCoinbase . blockBlockData $ n
         theHash = blockHash theMinedBlock
-    toLog "doBlock" minerNumber $ "Miner success for " ++ format (blockHash n) ++ " -> " ++ show newNonce ++ "(" ++ coinbase ++ ")" --(format $ n)
+    toLog "doBlock" minerNumber $ "Coinbase " ++ coinbase ++ " success for " ++ format (blockHash n) ++ " -> " ++ show newNonce 
     toLog "doBlock" minerNumber $ "New block hash is " ++ format theHash ++ "!"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
