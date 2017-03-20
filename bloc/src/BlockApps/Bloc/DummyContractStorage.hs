@@ -370,6 +370,16 @@ getVarsAndEnums (ContractName contractName) _ =
      )
 
 
+   "FixedArray" ->
+     return
+     (
+       [
+         ("x", TypeArrayFixed 8 (SimpleType TypeUInt8)),
+         ("notice", SimpleType TypeString)
+       ],
+       [],
+       []
+     )
 
 
      
@@ -672,6 +682,11 @@ Struct2-
 
 
 
+FixedArray-
+"vars":{
+  "x":{"atBytes":0,"length":8,"entry":{"type":"Int","bytes":32},"type":"Array"}
+  "notice":{"atBytes":256,"dynamic":true,"type":"String"},
+}
 
 
 
@@ -708,5 +723,7 @@ getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22
 getAddress (ContractName "Struct") _ = Address 0x658ba3447ca8a4b6668233d0fa70b8b083a4f3f2
 --getAddress (ContractName "Struct2") _ = Address 0xc95129dfce7e115d7e2f7f658456d3191af91ac8
 getAddress (ContractName "Struct2") _ = Address 0x58ec24fdfb75c2124f659f96748d208529716f80
+
+getAddress (ContractName "FixedArray") _ = Address 0x8bcb85705bc8cf4485fd414cc1e9030c7dd74d55
 
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
