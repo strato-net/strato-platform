@@ -15,7 +15,6 @@ import qualified BlockApps.Solidity.Struct as Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 
-
 data Contract =
   Contract{
     mainStruct::Struct,
@@ -24,6 +23,7 @@ data Contract =
   
 
 getNextAvailablePosition::Storage.Position->Int->Storage.Position
+getNextAvailablePosition p _ | Storage.byte p == 0 = p
 getNextAvailablePosition p i | 32 - Storage.byte p >= i = p
 getNextAvailablePosition p _ = p{Storage.offset=Storage.offset p+1, Storage.byte=0}
 
