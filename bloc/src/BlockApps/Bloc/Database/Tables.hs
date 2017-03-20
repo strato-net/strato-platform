@@ -135,7 +135,7 @@ xabiTypesTable :: Table
   , Column (Nullable PGText)
   , Column (Nullable PGBool)
   , Column (Nullable PGBool)
-  , Column PGInt4
+  , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
@@ -145,7 +145,7 @@ xabiTypesTable :: Table
   , Column (Nullable PGText)
   , Column (Nullable PGBool)
   , Column (Nullable PGBool)
-  , Column PGInt4
+  , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)

@@ -4,7 +4,6 @@
 
 module Main where
 
-import Control.Monad
 import qualified Data.Map.Strict as Map
 import Network.HTTP.Client
 import Servant.Client
@@ -43,7 +42,7 @@ setup = do
     testConfig = TestConfig
       { mgr = mgr'
       , blocUrl = bayar4a
-      , stratoUrl = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+      , stratoUrl = strato
       , userName = "testUser1"
       , userAddress = Address 0x0
       , toUserName = "testUser2"
@@ -91,7 +90,7 @@ setup = do
     clients = do
       addr1 <- postUsersUser (userName testConfig) (PostUsersUserRequest 1 (pw testConfig))
       addr2 <- postUsersUser (toUserName testConfig) (PostUsersUserRequest 1 (pw testConfig))
-      void $ postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
+      _ <- postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
       PostUsersUploadListResponse simpleStorageDetails
         : PostUsersUploadListResponse testDetails
         : PostUsersUploadListResponse simpleMappingDetails

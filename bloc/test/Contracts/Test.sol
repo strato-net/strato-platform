@@ -91,7 +91,7 @@ contract Test {
 
     function testFunction(address _address, string _string) returns(byte[]) {}
 
-    function testFunction3(string _string, bytes32 _bytes32, byte[] _byteArray) returns(string stringValue, uint uintValue) {}
+    //function testFunction3(string _string, bytes32 _bytes32, byte[] _byteArray) returns(string stringValue, uint uintValue) {}
 
     function test4() returns(EmbeddedContract) {}
 
