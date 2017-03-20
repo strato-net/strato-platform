@@ -24,13 +24,15 @@ import BlockApps.Solidity.TypeDefs
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
 fieldsToStruct typeDefs' vars =
-  Struct {
-    fields=Map.fromList
-           $ zipWith (\(n, t) p -> (n, (p, t))) vars
-           $ addPositions typeDefs' (Storage.positionAt 0)
-           $ map snd vars,
-    size = 96
-    }
+  let
+    (positionAfter, positions) = addPositions typeDefs' (Storage.positionAt 0)
+                                 $ map snd vars
+  in
+   Struct {
+     fields=Map.fromList
+            $ zipWith (\(n, t) p -> (n, (p, t))) vars positions,
+     size = fromIntegral $ 32 * Storage.offset positionAfter + fromIntegral (Storage.byte positionAfter)
+     }
 
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
@@ -48,13 +50,13 @@ getContract contractName address = do
     typeDefs=typeDefs'
     }
 
-addPositions::TypeDefs->Storage.Position -> [Type] -> [Storage.Position]
-addPositions _ _ [] = []
+addPositions::TypeDefs->Storage.Position -> [Type] -> (Storage.Position, [Storage.Position])
+addPositions _ p [] = (p, [])
 addPositions typeDefs' p0 (theType:rest) =
   let
     (position, usedBytes) = getPositionAndSize typeDefs' p0 theType
   in
-   position:addPositions typeDefs' (Storage.addBytes position usedBytes) rest
+   fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
 
 
 getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])], [(Text, [(Text, Type)])])
