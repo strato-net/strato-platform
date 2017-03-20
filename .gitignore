@@ -1,5 +1,6 @@
 *~
 .stack-work
+.basil-work
 .ethereumH/
 work
 sftp-config.json
@@ -10,3 +11,4 @@ sftp-config.json
 .idea/
 *.iml
 *.swp
+.DS_Store
