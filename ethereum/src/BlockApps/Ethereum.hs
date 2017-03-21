@@ -189,7 +189,7 @@ instance RLPEncodable Transaction where
       { transactionNonce = nonce
       , transactionGasPrice = gasPrice
       , transactionGasLimit = gasLimit
-      , transactionTo = toAddr
+      , transactionTo = if toAddr == Just (Address 0) then Nothing else toAddr
       , transactionValue = value
       , transactionInitOrData = initOrData
       , transactionSignature = CompactRecSig
