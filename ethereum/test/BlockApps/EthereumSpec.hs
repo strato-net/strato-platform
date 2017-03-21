@@ -59,8 +59,10 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionInitOrData = ""
           }
         signed = signTransaction key unsigned
-      Base16.encode (rlpSerialize unsigned) `shouldBe` "eb8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc1000080808080"
-      Base16.encode (rlpSerialize signed) `shouldBe` "f86b8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc10000801ba0eab47c1a49bf2fe5d40e01d313900e19ca485867d462fe06e139e3a536c6d4f4a014a569d327dcda4b29f74f93c0e9729d2f49ad726e703f9cd90dbb0fbf6649f1"
+        unsigned' = rlpDeserialize . fst $ Base16.decode "eb8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc1000080808080"
+        signed' = rlpDeserialize . fst $ Base16.decode "f86b8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc10000801ba0eab47c1a49bf2fe5d40e01d313900e19ca485867d462fe06e139e3a536c6d4f4a014a569d327dcda4b29f74f93c0e9729d2f49ad726e703f9cd90dbb0fbf6649f1"
+      Right unsigned `shouldBe` unsigned'
+      Right signed `shouldBe` signed'
     it "correctly signs transaction (2)" $ do
       let
         Just key = secKey . fst $ Base16.decode "c87f65ff3f271bf5dc8643484f66b200109caffe4bf98c4cb393dc35740b28c0"
@@ -73,8 +75,10 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionInitOrData = fst $ Base16.decode "6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2"
           }
         signed = signTransaction key unsigned
-      Base16.encode (rlpSerialize unsigned) `shouldBe` "f83f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2808080"
-      Base16.encode (rlpSerialize signed) `shouldBe` "f87f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f21ba05afed0244d0da90b67cf8979b0f246432a5112c0d31e8d5eedd2bc17b171c694a0bb1035c834677c2e1185b8dc90ca6d1fa585ab3d7ef23707e1a497a98e752d1b"
+        unsigned' = rlpDeserialize . fst $ Base16.decode "f83f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2808080"
+        signed' = rlpDeserialize . fst $ Base16.decode "f87f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f21ba05afed0244d0da90b67cf8979b0f246432a5112c0d31e8d5eedd2bc17b171c694a0bb1035c834677c2e1185b8dc90ca6d1fa585ab3d7ef23707e1a497a98e752d1b"
+      Right unsigned `shouldBe` unsigned'
+      Right signed `shouldBe` signed'
 
 -- helpers
 
