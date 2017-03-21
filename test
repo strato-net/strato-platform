@@ -6,7 +6,7 @@ installDockerCompose=false
 startDocker=false
 killDocker=false
 enableSsl=false
-testDir="monstrato/deployments/test"
+testDir="e2e"
 rootDir=$PWD
 
 # Parse command line arguments

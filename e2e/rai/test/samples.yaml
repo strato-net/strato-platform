@@ -1,0 +1,35 @@
+# // function Sample(
+# //   address sampleFsmAddr,
+# //   uint sampleId,
+# //   string wellname,
+# //   string sampletype,
+# //   string currentlocationtype,
+# //   string currentvendor,
+# //   uint startdepthfeet,
+# //   uint enddepthfeet,
+# //   uint startdepthmeter,
+# //   uint enddepthmeter
+# // ) {
+
+
+samples:
+  - sampleFsmAddr: 1234
+    sampleId: 5678
+    wellname: 'well9'
+    sampletype: 'sampletype1'
+    currentlocationtype: 'locationtype1'
+    currentvendor: 'vendor1'
+    startdepthfeet: 3000
+    enddepthfeet: 6000
+    startdepthmeter: 1000
+    enddepthmeter: 2000
+  - sampleFsmAddr: 1234
+    sampleId: 5678
+    wellname: 'well9'
+    sampletype: 'sampletype1'
+    currentlocationtype: 'locationtype1'
+    currentvendor: 'vendor1'
+    startdepthfeet: 3000
+    enddepthfeet: 6000
+    startdepthmeter: 1000
+    enddepthmeter: 2000
