@@ -6,6 +6,7 @@ module BlockApps.EthereumSpec where
 import Crypto.Secp256k1
 import Data.Aeson
 import qualified Data.ByteString.Base16 as Base16
+import Data.RLP
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
@@ -39,12 +40,41 @@ spec = modifyMaxSuccess (const 10) $ do
       "c87f65ff3f271bf5dc8643484f66b200109caffe4bf98c4cb393dc35740b28c0"
 
   describe "deriveAddress" $
-    it
-      "correctly derives address from key" $ do
+    it "correctly derives address from key" $ do
       deriveAddress (derivePubKey sk1) `shouldBe`
         Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826
       deriveAddress (derivePubKey sk2) `shouldBe`
         Address 0x13978aee95f38490e9769c39b2773ed763d9cd5f
+
+  describe "sign transaction" $ do
+    it "correctly signs transaction (1)" $ do
+      let
+        Just key = secKey . fst $ Base16.decode "c85ef7d79691fe79573b1a7064c19c1a9819ebdbd1faaab1a8ec92344438aaf4"
+        unsigned = UnsignedTransaction
+          { unsignedTransactionNonce = Nonce 0
+          , unsignedTransactionGasPrice = Wei 1000000000000
+          , unsignedTransactionGasLimit = Gas 10000
+          , unsignedTransactionTo = Just (Address 0x13978aee95f38490e9769c39b2773ed763d9cd5f)
+          , unsignedTransactionValue = Wei 10000000000000000
+          , unsignedTransactionInitOrData = ""
+          }
+        signed = signTransaction key unsigned
+      Base16.encode (rlpSerialize unsigned) `shouldBe` "eb8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc1000080808080"
+      Base16.encode (rlpSerialize signed) `shouldBe` "f86b8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc10000801ba0eab47c1a49bf2fe5d40e01d313900e19ca485867d462fe06e139e3a536c6d4f4a014a569d327dcda4b29f74f93c0e9729d2f49ad726e703f9cd90dbb0fbf6649f1"
+    it "correctly signs transaction (2)" $ do
+      let
+        Just key = secKey . fst $ Base16.decode "c87f65ff3f271bf5dc8643484f66b200109caffe4bf98c4cb393dc35740b28c0"
+        unsigned = UnsignedTransaction
+          { unsignedTransactionNonce = Nonce 0
+          , unsignedTransactionGasPrice = Wei 1000000000000
+          , unsignedTransactionGasLimit = Gas 10000
+          , unsignedTransactionTo = Nothing
+          , unsignedTransactionValue = Wei 0
+          , unsignedTransactionInitOrData = fst $ Base16.decode "6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2"
+          }
+        signed = signTransaction key unsigned
+      Base16.encode (rlpSerialize unsigned) `shouldBe` "f83f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2808080"
+      Base16.encode (rlpSerialize signed) `shouldBe` "f87f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f21ba05afed0244d0da90b67cf8979b0f246432a5112c0d31e8d5eedd2bc17b171c694a0bb1035c834677c2e1185b8dc90ca6d1fa585ab3d7ef23707e1a497a98e752d1b"
 
 -- helpers
 
