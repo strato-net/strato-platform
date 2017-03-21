@@ -40,7 +40,9 @@ function newnode {
   runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting ethereum-vm"
-  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1
+  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm
+  --diffPublish=true --createTransactionResults=true
+  --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb >> logs/ethereum-vm 2>&1
 
   if $initialize
   then doRegister
@@ -57,7 +59,8 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
+                    --difficultyBomb=$difficultyBomb"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
   if [[ ${backupblocks} ]] ; then
@@ -65,7 +68,8 @@ function doInit {
                        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                        --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                        --addBootnodes=$addBootnodes $stratoBootnode \
-                       --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
+                       --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --difficultyBomb=$difficultyBomb \
+                       --backupblocks=true"
      echo $cmd
      echo "# of lines in block-backup-file: `cat /tmp/backup/backup_strato_block | wc -l`"
      $cmd < /tmp/backup/backup_strato_block
@@ -140,6 +144,7 @@ setEnv receiveBlocks true
 setEnv addBootnodes false
 setEnv noMinPeers false
 setEnv useSyncMode false
+setEnv difficultyBomb false
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
