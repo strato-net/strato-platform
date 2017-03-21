@@ -27,9 +27,13 @@ module BlockApps.Ethereum
     -- * Transactions
   , Transaction (..)
   , UnsignedTransaction (..)
+  , rlpMsg
   , signRLP
   , signTransaction
-  , transactionAddress
+  , verifyTransaction
+  , recoverTransaction
+  , transactionFrom
+  , newAccountAddress
     -- * Blocks
   , BlockHeader (..)
     -- * Ethereum Types
@@ -45,7 +49,7 @@ import Crypto.Random.Entropy
 import Crypto.Secp256k1
 import Data.Aeson hiding (Array,String)
 import qualified Data.Binary as Binary
-import Data.ByteArray (convert)
+import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
@@ -57,6 +61,7 @@ import Data.Monoid
 import Data.RLP
 import qualified Data.Text as Text
 import Data.Time
+import Data.Word
 import GHC.Generics
 import Numeric
 import Numeric.Natural
@@ -171,7 +176,9 @@ data Transaction = Transaction
   , transactionTo :: Maybe Address
   , transactionValue :: Wei
   , transactionInitOrData :: ByteString
-  , transactionSignature :: CompactRecSig
+  , transactionV :: Word8
+  , transactionR :: Word256
+  , transactionS :: Word256
   } deriving (Eq,Show,Generic)
 instance RLPEncodable Transaction where
   rlpEncode Transaction{..} = rlpEncode
@@ -181,9 +188,9 @@ instance RLPEncodable Transaction where
     , transactionTo
     , transactionValue
     , transactionInitOrData
-    , toInteger (getCompactRecSigV transactionSignature)
-    , toInteger (getCompactRecSigR transactionSignature)
-    , toInteger (getCompactRecSigS transactionSignature)
+    , toInteger transactionV
+    , toInteger transactionR
+    , toInteger transactionS
     )
   rlpDecode x = do
     (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
@@ -192,11 +199,12 @@ instance RLPEncodable Transaction where
       { transactionNonce = nonce
       , transactionGasPrice = gasPrice
       , transactionGasLimit = gasLimit
-      , transactionTo = if toAddr == Just (Address 0) then Nothing else toAddr
+      , transactionTo = toAddr
       , transactionValue = value
       , transactionInitOrData = initOrData
-      , transactionSignature = CompactRecSig
-          (fromInteger r) (fromInteger s) (fromInteger v)
+      , transactionV = fromInteger v
+      , transactionR = fromInteger r
+      , transactionS = fromInteger s
       }
 
 data UnsignedTransaction = UnsignedTransaction
@@ -215,10 +223,13 @@ instance RLPEncodable UnsignedTransaction where
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionInitOrData = unsignedTransactionInitOrData
-    , transactionSignature = CompactRecSig 0 0 0
+    , transactionV = 0
+    , transactionR = 0
+    , transactionS = 0
     }
   rlpDecode x = do
     Transaction{..} <- rlpDecode x
+    -- TODO: throw error when r,s,v /= 0
     return UnsignedTransaction
       { unsignedTransactionNonce = transactionNonce
       , unsignedTransactionGasPrice = transactionGasPrice
@@ -228,6 +239,17 @@ instance RLPEncodable UnsignedTransaction where
       , unsignedTransactionInitOrData = transactionInitOrData
       }
 
+rlpMsg :: RLPEncodable x => x -> Msg
+rlpMsg
+  = fromMaybe (error "rlpMsg failure")
+  . msg
+  . ByteArray.convert
+  . unKeccak256
+  . keccak256
+  . packRLP
+  . rlpEncode
+
+-- TODO: remove this
 signRLP :: RLPEncodable x => SecKey -> x -> (Keccak256,CompactRecSig)
 signRLP sk x =
   let
@@ -235,7 +257,7 @@ signRLP sk x =
     kecc = keccak256 rlp
     Keccak256 dig = keccak256 rlp
     err = error "signRLP failure"
-    message = fromMaybe err (msg (convert dig))
+    message = fromMaybe err (msg (ByteArray.convert dig))
   in
     (kecc,exportCompactRecSig $ signRecMsg sk message)
 
@@ -246,13 +268,53 @@ signTransaction sk utx@UnsignedTransaction{..} = Transaction
   , transactionGasLimit = unsignedTransactionGasLimit
   , transactionTo = unsignedTransactionTo
   , transactionValue = unsignedTransactionValue
-  , transactionSignature = snd (signRLP sk utx)
+  , transactionV = testV + 27
+  , transactionR = r
+  , transactionS = s
   , transactionInitOrData = unsignedTransactionInitOrData
   }
+  where
+    CompactRecSig r s testV =
+      exportCompactRecSig . signRecMsg sk $ rlpMsg utx
+
+verifyTransaction :: PubKey -> Transaction -> Bool
+verifyTransaction pk Transaction{..} =
+  let
+    message = rlpMsg UnsignedTransaction
+      { unsignedTransactionNonce = transactionNonce
+      , unsignedTransactionGasPrice = transactionGasPrice
+      , unsignedTransactionGasLimit = transactionGasLimit
+      , unsignedTransactionTo = transactionTo
+      , unsignedTransactionValue = transactionValue
+      , unsignedTransactionInitOrData = transactionInitOrData
+      }
+  in
+    case importCompactSig (CompactSig transactionR transactionS) of
+      Nothing -> False
+      Just sig -> verifySig pk sig message
+
+recoverTransaction :: Transaction -> Maybe PubKey
+recoverTransaction Transaction{..} =
+  let
+    message = rlpMsg UnsignedTransaction
+      { unsignedTransactionNonce = transactionNonce
+      , unsignedTransactionGasPrice = transactionGasPrice
+      , unsignedTransactionGasLimit = transactionGasLimit
+      , unsignedTransactionTo = transactionTo
+      , unsignedTransactionValue = transactionValue
+      , unsignedTransactionInitOrData = transactionInitOrData
+      }
+    testV = transactionV - 27
+    compactRecSig = CompactRecSig transactionR transactionS testV
+  in
+    recover <$> importCompactRecSig compactRecSig <*> pure message
+
+transactionFrom :: Transaction -> Maybe Address
+transactionFrom = fmap deriveAddress . recoverTransaction
 
 -- | Yellow Paper (82)
-transactionAddress :: Transaction -> Address
-transactionAddress Transaction{..}
+newAccountAddress :: Transaction -> Address
+newAccountAddress Transaction{..}
   = fromMaybe (error "Could not derive transaction Address")
   . stringAddress
   . drop 24
