@@ -6,6 +6,7 @@
   , MultiParamTypeClasses
   , OverloadedStrings
   , RecordWildCards
+  , ScopedTypeVariables
   , TypeApplications
   , TypeOperators
   , GeneralizedNewtypeDeriving
@@ -22,14 +23,17 @@ import Data.Aeson.Casing
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.Map.Strict (Map)
+import Data.Foldable
 import Data.Int (Int32)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
+import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import Numeric.Natural
@@ -47,6 +51,9 @@ import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Solidity
+import BlockApps.Solidity.Storage
+import BlockApps.Solidity.Type
+import BlockApps.Solidity.Value
 import BlockApps.Strato.Types
 import BlockApps.Strato.Client
 
@@ -100,6 +107,7 @@ instance MonadUsers Bloc where
 
   postUsersContract userName addr
     (PostUsersContractRequest src password contract args txParams value) = do
+      --TODO: check what happens with mismatching args
       void $ compileContract contract src
       logNotice $ "constructor arguments: " <> Text.pack (show args)
       cmIds_bins <- blocQuery $ proc () -> do
@@ -112,9 +120,35 @@ instance MonadUsers Bloc where
         returnA -< (cmId,bin)
       (cmId,bin) <-
         blocMaybe "contractMetaDataId and bin" $ listToMaybe cmIds_bins
-      -- TODO: get args for constructor
+      functionIds <- blocQuery $ proc () -> do
+        (xfId,contractMetaDataId,isConstr,_,_)
+          <- queryTable xabiFunctionsTable -< ()
+        restrict -< contractMetaDataId .== constant cmId .&& isConstr
+        returnA -< xfId
+      functionId <- blocMaybe "functionId" $ listToMaybe functionIds
+      argsBin <- case args of
+        Nothing -> return ByteString.empty
+        Just argsMap -> do
+          argNamesTypes <- fmap Map.fromList . blocQuery $ proc () -> do
+            (name,_,ty,_,dy,_,ety,_) <- getXabiFunctionsArgsQuery functionId -< ()
+            returnA -< (name,(ty,dy,ety))
+          let
+            determineValue valStr (tyM,dyM,etyM) =
+              let
+                typeM = textToArgType
+                  (fromMaybe "bytes" tyM)
+                  (fromMaybe False dyM)
+                  (fromMaybe "bytes" etyM)
+              in
+                textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
+          argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
+            then throwError $ AnError "argument names don't match"
+            else return $ Map.intersectionWith determineValue argsMap argNamesTypes
+          vals <- for (toList argsVals) $
+            maybe (throwError $ AnError "couldn't decode argument value") return
+          return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
       tx <- prepareTx
-        userName password addr Nothing txParams (Wei (fromIntegral value)) bin
+        userName password addr Nothing txParams (Wei (fromIntegral value)) (bin <> argsBin)
       hash <- blocStrato $ postTx tx
       txResult <- pollTxResult hash
       let

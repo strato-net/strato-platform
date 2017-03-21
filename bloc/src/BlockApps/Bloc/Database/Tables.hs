@@ -166,13 +166,13 @@ xabiFunctionArgumentsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4
   , Column PGInt4
-  , Column (Nullable PGText)
+  , Column PGText -- do all Solidity function arguments have names?
   , Column PGInt4
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGInt4
-  , Column (Nullable PGText)
+  , Column PGText -- do all Solidity function arguments have names?
   , Column PGInt4
   )
 xabiFunctionArgumentsTable = Table "xabi_function_arguments" $ p5
