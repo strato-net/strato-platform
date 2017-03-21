@@ -354,11 +354,12 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
   TypeArrayFixed size ty -> ValueArrayFixed size theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addBytes` fromIntegral (32*offset)) . arrayPosition elementSize) [0..fromIntegral size - 1]
+      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [0..fromIntegral size - 1]
 
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where
-      theList = map (flip (decodeValue' typeDefs' storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
+      (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize) [0..fromIntegral $ storage offset-1]
       startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
@@ -398,10 +399,10 @@ decodeInt storage offset byte constructor =
 
 
 
-arrayPosition::Int->Int->Storage.Position
+arrayPosition::Word256->Word256->Storage.Position
 arrayPosition elementSize x =
   let
     itemsPerWord = 32 `quot` elementSize
     (o, b) = x `quotRem` itemsPerWord
   in
-   Storage.Position{offset=fromIntegral o, byte=b}
+   Storage.Position{offset=o, byte=fromIntegral $ elementSize * b}

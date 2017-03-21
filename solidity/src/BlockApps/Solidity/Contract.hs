@@ -6,6 +6,7 @@ module BlockApps.Solidity.Contract where
 
 import qualified Data.Bimap as Bimap
 import Data.Bits
+import Data.LargeWord
 import qualified Data.Map as Map
 import qualified Data.Text as T
 
@@ -22,13 +23,13 @@ data Contract =
     } deriving (Show)
   
 
-getNextAvailablePosition::Storage.Position->Int->Storage.Position
+getNextAvailablePosition::Storage.Position->Word256->Storage.Position
 getNextAvailablePosition p _ | Storage.byte p == 0 = p
-getNextAvailablePosition p i | 32 - Storage.byte p >= i = p
+getNextAvailablePosition p i | 32 - fromIntegral (Storage.byte p) >= i = p
 getNextAvailablePosition p _ = p{Storage.offset=Storage.offset p+1, Storage.byte=0}
 
 --Given the next available position, return the actual chosen position and the number of primary bytes used (this doesn't include bytes used at other memory locations, like the content of a large string)
-getPositionAndSize::TypeDefs->Storage.Position->Type->(Storage.Position, Int)
+getPositionAndSize::TypeDefs->Storage.Position->Type->(Storage.Position, Word256)
 getPositionAndSize _ p (SimpleType TypeBool) = (p,1)
 
 getPositionAndSize _ p (SimpleType TypeInt8)=(getNextAvailablePosition p 1, 1)
@@ -167,7 +168,7 @@ getPositionAndSize TypeDefs{..} p (TypeEnum name) =
   case Map.lookup name enumDefs of
    Nothing -> error $ "Contract is using an enum that wasn't defined: " ++ T.unpack name ++ "\nenums is " ++ show enumDefs
    Just enumset ->
-     let len = Bimap.size enumset `shiftR` 8 + 1
+     let len = fromIntegral $ Bimap.size enumset `shiftR` 8 + 1
      in (getNextAvailablePosition p len, len)
 
 getPositionAndSize TypeDefs{..} p (TypeStruct name) =
@@ -193,7 +194,7 @@ getPositionAndSize _ p (TypeMapping _ _) = (p,32)
 getPositionAndSize _ p (TypeFunction _ _ _) = (p,32)
 getPositionAndSize _ p (TypeContract _) = nextAvail p 20
 
-nextAvail::Storage.Position->Int->(Storage.Position, Int)
+nextAvail::Storage.Position->Word256->(Storage.Position, Word256)
 nextAvail p x = (getNextAvailablePosition p x, x)
 
 --getPositionAndSize _ p _ = (p,32)

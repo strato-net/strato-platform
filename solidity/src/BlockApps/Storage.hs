@@ -21,12 +21,15 @@ positionAt p =
     byte=0
     }
 
-addBytes::Position->Int->Position
+addBytes::Position->Word256->Position
 addBytes position@Position{..} v =
   let
-    (extraOffset, byte') = (byte+v) `quotRem` 32
+    (extraOffset, byte') = (fromIntegral byte+v) `quotRem` 32
   in
-   position{offset=offset + fromIntegral extraOffset, byte=byte'}
+   position{offset=offset + extraOffset, byte=fromIntegral byte'}
+
+addOffset::Position->Word256->Position
+addOffset position@Position{..} v = position{offset=offset + v}
 
 alignedByte::Position->Word256
 alignedByte Position{byte=0, offset=o} = o
