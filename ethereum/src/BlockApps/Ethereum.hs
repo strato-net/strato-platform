@@ -101,6 +101,9 @@ instance ToCapture (Capture "contractAddress" Address) where
 instance RLPEncodable Address where
   rlpEncode (Address addr) = rlpEncode $ toInteger addr
   rlpDecode obj = Address . fromInteger <$> rlpDecode obj
+instance RLPEncodable (Maybe Address) where
+  rlpEncode = maybe rlp0 rlpEncode
+  rlpDecode x = if x == rlp0 then return Nothing else Just <$> rlpDecode x
 
 instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"

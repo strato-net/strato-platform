@@ -19,7 +19,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/iostat/relapse
-    commit: 2c29b3f107f2402a46692c625f1c3f316ba78106
+    commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
   extra-dep: true
 extra-deps:
   - hflags-0.4.2
