@@ -75,6 +75,7 @@ spec = do
         balance2AS = unStrung (accountBalance account2AS)
       balance2AS `shouldBe` (initialWei + (etherToWei etherToSend))
 
+<<<<<<< HEAD
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
       -- create Users
 
