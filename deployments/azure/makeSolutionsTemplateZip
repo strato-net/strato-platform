@@ -1,9 +1,0 @@
-#!/bin/bash
-
-if [[ $# -ne 1 ]]
-then echo >&2 "Usage: $0 <offer name>"
-     exit 1
-fi
-
-cd $1
-zip azure.zip createUiDefinition.json mainTemplate.json

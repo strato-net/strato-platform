@@ -1,3 +1,0 @@
-#!/bin/bash
-sudo oc login -u system:admin -n default
-sudo oadm router blockapps-openshift --replicas 1 --credentials='/etc/origin/master/openshift-router.kubeconfig' --service-account=router
