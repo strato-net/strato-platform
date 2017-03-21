@@ -83,7 +83,7 @@ describe('Bloc - TX load', function() {
     // })
 
 
-    const batches = [Array(batchCount).keys()];
+    const batches = Array.from(Array(batchCount).keys());
     Promise.each(batches, function(batch) {
         // console.log('-------------------- batch', batch, batchCount);
         const endTime = new Date();
@@ -93,7 +93,7 @@ describe('Bloc - TX load', function() {
         const tps = (txCount / elapsedTime) * 1000;
         // console.log( 'count', txCount,'elapsed', elapsedTime, 'delay', batchDelay, 'tps', tps);
         return processBatch(aliceName, bobName, batch, batchSize, batchValue, uid)(scope)
-          .then(DelayPromise(batchDelay)) // wait for cirrus to catch up
+          .then(rest.waitNextBlock()) // wait for cirrus to catch up
           .then(rest.getBalance(aliceAddress))
           .then(rest.getBalance(bobAddress))
       })
