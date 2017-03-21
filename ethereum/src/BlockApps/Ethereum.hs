@@ -67,7 +67,7 @@ import Text.Read hiding (String)
 import Web.FormUrlEncoded
 
 newtype Address = Address { unAddress :: Word160 }
- deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Show, Generic)
 addressString :: Address -> String
 addressString (Address address) = padZeros 40 (showHex address "")
   where
