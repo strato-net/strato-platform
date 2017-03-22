@@ -69,8 +69,8 @@ function doInit {
                        --addBootnodes=$addBootnodes $stratoBootnode \
                        --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
      echo $cmd
-     echo "# of lines in block-backup-file: `cat /tmp/backup/backup_strato_block | wc -l`"
-     $cmd < /tmp/backup/backup_strato_block
+     echo "# of lines in block-backup-file: `cat /var/lib/strato/backup_strato_block | wc -l`"
+     $cmd < /var/lib/strato/backup_strato_block
   else
      echo $cmd
      $cmd
