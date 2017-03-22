@@ -307,8 +307,9 @@ recoverTransaction Transaction{..} =
       }
     testV = transactionV - 27
     compactRecSig = CompactRecSig transactionR transactionS testV
-  in
-    recover <$> importCompactRecSig compactRecSig <*> pure message
+  in do
+    recSig <- importCompactRecSig compactRecSig
+    recover recSig message
 
 transactionFrom :: Transaction -> Maybe Address
 transactionFrom = fmap deriveAddress . recoverTransaction
