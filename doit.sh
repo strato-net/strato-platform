@@ -40,9 +40,9 @@ function newnode {
   runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting ethereum-vm"
-  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm
-  --diffPublish=true --createTransactionResults=true
-  --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb >> logs/ethereum-vm 2>&1
+  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
+                         --diffPublish=true --createTransactionResults=true \
+                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb >> logs/ethereum-vm 2>&1
 
   if $initialize
   then doRegister
