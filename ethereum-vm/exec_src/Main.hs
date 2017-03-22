@@ -11,5 +11,5 @@ import Executable.EVMFlags
 main :: IO ()
 main = do
   s <- $initHFlags "Ethereum VM"
-  putStrLn $ "ethereum-vm runs with flags: " ++ unlines s
+  putStrLn $ "ethereum-vm runs with flags: " ++ unlines s 
   runLoggingT ethereumVM (printLogMsg' True True)

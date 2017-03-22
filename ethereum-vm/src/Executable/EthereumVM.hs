@@ -44,6 +44,9 @@ uncurry3 f (a, b, c) = f a b c
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
+ 
+    $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
+
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
     (cpOffset, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
