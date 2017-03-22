@@ -230,15 +230,16 @@ instance RLPEncodable UnsignedTransaction where
     }
   rlpDecode x = do
     Transaction{..} <- rlpDecode x
-    -- TODO: throw error when r,s,v /= 0
-    return UnsignedTransaction
-      { unsignedTransactionNonce = transactionNonce
-      , unsignedTransactionGasPrice = transactionGasPrice
-      , unsignedTransactionGasLimit = transactionGasLimit
-      , unsignedTransactionTo = transactionTo
-      , unsignedTransactionValue = transactionValue
-      , unsignedTransactionInitOrData = transactionInitOrData
-      }
+    if (transactionV,transactionR,transactionS) /= (0,0,0)
+      then Left "rlpDecode UnsignedTransaction: expected v,r,s = 0"
+      else return UnsignedTransaction
+        { unsignedTransactionNonce = transactionNonce
+        , unsignedTransactionGasPrice = transactionGasPrice
+        , unsignedTransactionGasLimit = transactionGasLimit
+        , unsignedTransactionTo = transactionTo
+        , unsignedTransactionValue = transactionValue
+        , unsignedTransactionInitOrData = transactionInitOrData
+        }
 
 rlpMsg :: RLPEncodable x => x -> Msg
 rlpMsg
@@ -263,7 +264,7 @@ signRLP sk x =
     (kecc,exportCompactRecSig $ signRecMsg sk message)
 
 signTransaction :: SecKey -> UnsignedTransaction -> Transaction
-signTransaction sk utx@UnsignedTransaction{..} = Transaction
+signTransaction sk UnsignedTransaction{..} = Transaction
   { transactionNonce = unsignedTransactionNonce
   , transactionGasPrice = unsignedTransactionGasPrice
   , transactionGasLimit = unsignedTransactionGasLimit
@@ -276,40 +277,46 @@ signTransaction sk utx@UnsignedTransaction{..} = Transaction
   }
   where
     CompactRecSig r s testV =
-      exportCompactRecSig . signRecMsg sk $ rlpMsg utx
+      exportCompactRecSig . signRecMsg sk $ rlpMsg
+        ( unsignedTransactionNonce
+        , unsignedTransactionGasPrice
+        , unsignedTransactionGasLimit
+        , unsignedTransactionTo
+        , unsignedTransactionValue
+        , unsignedTransactionInitOrData
+        )
 
 verifyTransaction :: PubKey -> Transaction -> Bool
 verifyTransaction pk Transaction{..} =
   let
-    message = rlpMsg UnsignedTransaction
-      { unsignedTransactionNonce = transactionNonce
-      , unsignedTransactionGasPrice = transactionGasPrice
-      , unsignedTransactionGasLimit = transactionGasLimit
-      , unsignedTransactionTo = transactionTo
-      , unsignedTransactionValue = transactionValue
-      , unsignedTransactionInitOrData = transactionInitOrData
-      }
+    message = rlpMsg
+      ( transactionNonce
+      , transactionGasPrice
+      , transactionGasLimit
+      , transactionTo
+      , transactionValue
+      , transactionInitOrData
+      )
   in
     case importCompactSig (CompactSig transactionR transactionS) of
       Nothing -> False
       Just sig -> verifySig pk sig message
 
 recoverTransaction :: Transaction -> Maybe PubKey
-recoverTransaction Transaction{..} =
+recoverTransaction Transaction{..} = do
   let
-    message = rlpMsg UnsignedTransaction
-      { unsignedTransactionNonce = transactionNonce
-      , unsignedTransactionGasPrice = transactionGasPrice
-      , unsignedTransactionGasLimit = transactionGasLimit
-      , unsignedTransactionTo = transactionTo
-      , unsignedTransactionValue = transactionValue
-      , unsignedTransactionInitOrData = transactionInitOrData
-      }
+    message = rlpMsg
+      ( transactionNonce
+      , transactionGasPrice
+      , transactionGasLimit
+      , transactionTo
+      , transactionValue
+      , transactionInitOrData
+      )
     testV = transactionV - 27
     compactRecSig = CompactRecSig transactionR transactionS testV
-  in do
-    recSig <- importCompactRecSig compactRecSig
-    recover recSig message
+  recSig <- importCompactRecSig compactRecSig
+  recover recSig message
 
 transactionFrom :: Transaction -> Maybe Address
 transactionFrom = fmap deriveAddress . recoverTransaction
