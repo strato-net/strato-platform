@@ -4,4 +4,4 @@ WORKDIR /workspace
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442 && \
     echo "deb http://download.fpcomplete.com/ubuntu $(lsb_release -s -c) main" > /etc/apt/sources.list.d/fpco.list && \
     apt-get update && \
-    apt-get -y --allow-unauthenticated install stack git cmake
+    apt-get -y --allow-unauthenticated install stack git make autoconf libtool libblas-dev liblapack-dev libsodium-dev 
