@@ -308,10 +308,10 @@ insertXabiFunctionArg funcId args conn = do
       Nothing -> return [Nothing::Maybe Int32]
       Just Entry{..} -> runInsertReturning conn xabiTypesTable
         ( Nothing
-        , constant (Just entryType)
+        , constant entryType
         , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
+        , constant False
+        , constant False
         , constant (Just entryBytes)
         , Opaleye.null
         , Opaleye.null
@@ -323,8 +323,8 @@ insertXabiFunctionArg funcId args conn = do
     [ ( Nothing
       , constant argType
       , constant argTypedef
-      , constant argDynamic
-      , Opaleye.null
+      , constant (fromMaybe False argDynamic)
+      , constant False
       , constant argBytes
       , constant entryTypeId
       , Opaleye.null
@@ -353,10 +353,10 @@ insertXabiFunctionRet funcId vals conn = do
       Nothing -> return [Nothing::Maybe Int32]
       Just Entry{..} -> runInsertReturning conn xabiTypesTable
         ( Nothing
-        , constant (Just entryType)
+        , constant entryType
         , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
+        , constant False
+        , constant False
         , constant (Just entryBytes)
         , Opaleye.null
         , Opaleye.null
@@ -368,8 +368,8 @@ insertXabiFunctionRet funcId vals conn = do
     [ ( Nothing
       , constant valType
       , constant valTypedef
-      , constant valDynamic
-      , Opaleye.null -- How will we know if it is signed?
+      , constant (fromMaybe False valDynamic)
+      , constant False -- How will we know if it is signed? A: `Val` type may need another field for `signed`
       , constant valBytes
       , constant entryTypeId
       , Opaleye.null
@@ -654,11 +654,11 @@ WHERE XFA.function_id = $1;
 getXabiFunctionsArgsQuery
   :: Int32
   -> Query
-    ( Column (Nullable PGText)
+    ( Column PGText
     , Column PGInt4
+    , Column PGText
     , Column (Nullable PGText)
-    , Column (Nullable PGText)
-    , Column (Nullable PGBool)
+    , Column (Nullable PGBool) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
     , Column (Nullable PGInt4)
     , Column (Nullable PGText)
     , Column (Nullable PGInt4)
@@ -669,10 +669,10 @@ getXabiFunctionsArgsQuery funcId = proc () -> do
   returnA -< (name,index,ty,tyd,dy,by,ety,eby)
   where
     joinTable = joinF
-      (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index,ty,tyd,dy,by,ety,eby))
+      (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index,ty,tyd, toNullable dy,by,ety,eby))
       (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionArgumentsTable) $ leftJoinF
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,ety,eby))
+        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
         (\ (_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_) -> toNullable xteId .== entryTypeId)
         (queryTable xabiTypesTable)
@@ -699,9 +699,9 @@ getXabiFunctionsReturnValuesQuery
   -> Query
     ( Column PGInt4
     , Column PGInt4
+    , Column PGText
     , Column (Nullable PGText)
-    , Column (Nullable PGText)
-    , Column (Nullable PGBool)
+    , Column (Nullable PGBool) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
     , Column (Nullable PGInt4)
     , Column (Nullable PGText)
     , Column (Nullable PGInt4)
@@ -712,10 +712,10 @@ getXabiFunctionsReturnValuesQuery funcId = proc () -> do
   returnA -< (xfrId,index,ty,tyd,dy,by,ety,eby)
   where
     joinTable = joinF
-      (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index,ty,tyd,dy,by,ety,eby))
+      (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index,ty,tyd, toNullable dy,by,ety,eby))
       (\ (_,_,_,typeId) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionReturnsTable) $ leftJoinF
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by,ety,eby))
+        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
         (\ (_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_) -> toNullable xteId .== entryTypeId)
         (queryTable xabiTypesTable)

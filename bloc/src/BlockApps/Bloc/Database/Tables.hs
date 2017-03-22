@@ -131,20 +131,20 @@ xabiFunctionsTable = Table "xabi_functions" $ p5
 
 xabiTypesTable :: Table
   ( Maybe (Column PGInt4)
+  , Column PGText
   , Column (Nullable PGText)
-  , Column (Nullable PGText)
-  , Column (Nullable PGBool)
-  , Column (Nullable PGBool)
+  , Column PGBool
+  , Column PGBool
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   )
   ( Column PGInt4
+  , Column PGText
   , Column (Nullable PGText)
-  , Column (Nullable PGText)
-  , Column (Nullable PGBool)
-  , Column (Nullable PGBool)
+  , Column PGBool
+  , Column PGBool
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
@@ -166,13 +166,13 @@ xabiFunctionArgumentsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4
   , Column PGInt4
-  , Column (Nullable PGText)
+  , Column PGText
   , Column PGInt4
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGInt4
-  , Column (Nullable PGText)
+  , Column PGText
   , Column PGInt4
   )
 xabiFunctionArgumentsTable = Table "xabi_function_arguments" $ p5
