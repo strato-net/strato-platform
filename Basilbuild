@@ -1,0 +1,57 @@
+ifeq ($(BASIL_DOCKER_TAG),)
+  $(error BASIL_DOCKER_TAG is not set)
+endif
+
+BASILWORK=.basil-work
+BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
+STACKWORK=$(BASILWORK)/stack
+FAKEROOT=$(BASILWORK)/fakeroot
+BLOCHOME=$(FAKEROOT)/usr/local/bin
+BUILDER_HOME=$(BASILWORK_ABS)/builder_home
+DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
+DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root bloc-buildbase:latest bash -c
+
+
+EXTRADEPS=doit.sh mkCoinbase
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+STACKFLAGS=
+else
+STACKFLAGS=--allow-different-user
+endif
+BUILD_HASKELL=stack setup $(STACKFLAGS) --verbose && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
+
+all: build_docker
+
+prebuild:
+	mkdir -p $(BASILWORK)
+	mkdir -p $(STACKWORK)
+	mkdir -p $(FAKEROOT)/usr/lib
+	mkdir -p $(FAKEROOT)/usr/bin
+	mkdir -p $(BLOCHOME)
+	mkdir -p /tmp/docker-dummy
+
+build_haskell: build_buildbase prebuild
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	$(BUILD_HASKELL)
+else
+	$(DOCKER_SHELL) "$(BUILD_HASKELL)"
+endif
+
+build_deploybase: prebuild
+	cp -f Dockerfile.deploybase /tmp/docker-dummy
+	docker build -t bloc-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
+	rm -f /tmp/docker-dummy/Dockerfile.deploybase
+
+build_buildbase: build_deploybase prebuild
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
+else
+	cp -f Dockerfile.buildbase /tmp/docker-dummy
+	docker build -t bloc-buildbase:latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+	rm -f /tmp/docker-dummy/Dockerfile.buildbase
+endif
+
+build_docker: build_deploybase build_haskell 
+	cp -f Dockerfile $(FAKEROOT)
+	cp -f $(EXTRADEPS) $(BLOCHOME)
+	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
