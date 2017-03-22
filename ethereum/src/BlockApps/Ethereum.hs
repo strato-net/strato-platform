@@ -189,9 +189,9 @@ instance RLPEncodable Transaction where
     , transactionTo
     , transactionValue
     , transactionInitOrData
-    , toInteger transactionV
-    , toInteger transactionR
-    , toInteger transactionS
+    , transactionV
+    , transactionR
+    , transactionS
     )
   rlpDecode x = do
     (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
@@ -203,9 +203,9 @@ instance RLPEncodable Transaction where
       , transactionTo = toAddr
       , transactionValue = value
       , transactionInitOrData = initOrData
-      , transactionV = fromInteger v
-      , transactionR = fromInteger r
-      , transactionS = fromInteger s
+      , transactionV = v
+      , transactionR = r
+      , transactionS = s
       }
 
 data UnsignedTransaction = UnsignedTransaction
