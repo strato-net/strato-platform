@@ -363,6 +363,7 @@ buildFromMiningCache = do
     let time         = B.startTimestamp cache
     let nextDiff     = BDB.nextDifficulty flags_difficultyBomb flags_testnet parentNum parentDiff parentTS time
     previousStateRoot <- getStateRoot
+    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "Baggin' with difficultyBomb = " ++ show flags_difficultyBomb
     $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "pre-reward :: (" ++ format stateRoot ++ ")"
     rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
     $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
