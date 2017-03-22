@@ -10,6 +10,7 @@ import Executable.StratoAdit
 
 main :: IO ()
 main = do
-  _ <- $initHFlags "Pluggable mining module for Strato"
+  s <- $initHFlags "Pluggable mining module for Strato"
+  putStrLn $ "strato-adit runs with arguments: " ++ unlines s
   runLoggingT stratoAdit (printLogMsg' True True)
 

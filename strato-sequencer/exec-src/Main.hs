@@ -17,7 +17,8 @@ import qualified Network.Kafka.Protocol as KP
 
 main :: IO ()
 main = do
-  _ <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
+  s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
+  putStrLn $ "strato-sequencer with flags: " ++ unlines s
   let kafkaClientId = KP.KString $ C8.pack flags_kafkaclientid
   let cfg = SequencerConfig {
       depBlockDBCacheSize   = flags_depblockcachesize

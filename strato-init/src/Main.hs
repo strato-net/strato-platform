@@ -9,6 +9,6 @@ $(return []) --see https://github.com/nilcons/hflags/issues/8
 
 main::IO ()
 main = do
-  _ <- $initHFlags "Setup EthereumH DBs"
-  
+  s <- $initHFlags "Setup EthereumH DBs"
+  putStrLn $ "strato-init with args: " ++ unlines s 
   oneTimeSetup flags_genesisBlockName
