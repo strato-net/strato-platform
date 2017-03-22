@@ -321,7 +321,7 @@ insertXabiFunctionArg funcId args conn = do
   let entryTypeIds = map head entryTypeIdss
   typeIds <- runInsertManyReturning conn xabiTypesTable
     [ ( Nothing
-      , constant argType
+      , constant (fromMaybe "Contract" argType) -- Type is missing from Val when the variable is a contract
       , constant argTypedef
       , constant (fromMaybe False argDynamic)
       , constant False
@@ -337,7 +337,7 @@ insertXabiFunctionArg funcId args conn = do
     [ ( Nothing
       , constant funcId
       , constant (typeId::Int32)
-      , constant argName
+      , constant argName 
       , constant argIndex
       )
     | (typeId,Arg{..}) <- zip typeIds args
@@ -366,7 +366,7 @@ insertXabiFunctionRet funcId vals conn = do
   let entryTypeIds = map head entryTypeIdss
   typeIds <- runInsertManyReturning conn xabiTypesTable
     [ ( Nothing
-      , constant valType
+      , constant (fromMaybe "Contract" valType) -- Type is missing from Val when the variable is a contract
       , constant valTypedef
       , constant (fromMaybe False valDynamic)
       , constant False -- How will we know if it is signed? A: `Val` type may need another field for `signed`
@@ -656,7 +656,7 @@ getXabiFunctionsArgsQuery
   -> Query
     ( Column PGText
     , Column PGInt4
-    , Column PGText
+    , Column (Nullable PGText)
     , Column (Nullable PGText)
     , Column (Nullable PGBool) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
     , Column (Nullable PGInt4)
@@ -669,7 +669,7 @@ getXabiFunctionsArgsQuery funcId = proc () -> do
   returnA -< (name,index,ty,tyd,dy,by,ety,eby)
   where
     joinTable = joinF
-      (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index,ty,tyd, toNullable dy,by,ety,eby))
+      (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index, toNullable ty,tyd, toNullable dy,by,ety,eby))
       (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionArgumentsTable) $ leftJoinF
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))
@@ -699,7 +699,7 @@ getXabiFunctionsReturnValuesQuery
   -> Query
     ( Column PGInt4
     , Column PGInt4
-    , Column PGText
+    , Column (Nullable PGText) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
     , Column (Nullable PGText)
     , Column (Nullable PGBool) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
     , Column (Nullable PGInt4)
@@ -712,7 +712,7 @@ getXabiFunctionsReturnValuesQuery funcId = proc () -> do
   returnA -< (xfrId,index,ty,tyd,dy,by,ety,eby)
   where
     joinTable = joinF
-      (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index,ty,tyd, toNullable dy,by,ety,eby))
+      (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index, toNullable ty,tyd, toNullable dy,by,ety,eby))
       (\ (_,_,_,typeId) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionReturnsTable) $ leftJoinF
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))

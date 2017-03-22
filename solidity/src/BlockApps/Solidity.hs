@@ -71,7 +71,7 @@ instance Arbitrary Func where arbitrary = genericArbitrary uniform
 data Arg = Arg
   { argName :: Text
   , argIndex :: Int32
-  , argType :: Text
+  , argType :: Maybe Text
   , argTypedef :: Maybe Text
   , argDynamic :: Maybe Bool
   , argBytes :: Maybe Int32
@@ -93,7 +93,7 @@ instance FromJSON Entry where
 instance Arbitrary Entry where arbitrary = genericArbitrary uniform
 data Val = Val
   { valIndex :: Int32
-  , valType :: Text
+  , valType :: Maybe Text
   , valTypedef :: Maybe Text
   , valDynamic :: Maybe Bool
   , valBytes :: Maybe Int32
