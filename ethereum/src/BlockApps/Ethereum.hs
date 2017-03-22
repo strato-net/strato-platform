@@ -128,7 +128,8 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
   where
     err = error "could not generate secret key"
 
-newtype Keccak256 = Keccak256 { unKeccak256 :: Digest Keccak_256 } deriving (Eq,Show,Generic)
+newtype Keccak256 = Keccak256 { unKeccak256 :: Digest Keccak_256 }
+  deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
 stringKeccak256 :: String -> Maybe Keccak256
