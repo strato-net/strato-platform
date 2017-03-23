@@ -32,7 +32,7 @@ import           System.Random
 import           Blockchain.Frame
 import           Blockchain.RLPx
 
---import           Blockchain.BlockNotify
+import           Blockchain.BlockNotify
 import qualified Blockchain.Colors                     as C
 import           Blockchain.Constants
 import           Blockchain.Context
@@ -52,7 +52,7 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.PeerUrls
---import           Blockchain.RawTXNotify
+import           Blockchain.RawTXNotify
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
@@ -188,8 +188,8 @@ runPeer connectedPeers peer myPriv = do
                       =$= bytesToMessages
                       =$= tap (displayMessage False "")
                       =$= CL.map MsgEvt
---                   , txNotificationSource "client_tx" =$= CL.map NewTX
---                   , blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst)
+                  , txNotificationSource "client_tx" =$= CL.map NewTX
+                  , blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst)
                   , timerSource
                   ] 2
 
