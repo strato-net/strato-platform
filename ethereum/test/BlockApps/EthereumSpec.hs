@@ -66,6 +66,7 @@ spec = modifyMaxSuccess (const 10) $ do
         signed1' = signTransaction key1 unsigned1'
       unsigned1' `shouldBe` unsigned1
       signed1' `shouldSatisfy` verifyTransaction (derivePubKey key1)
+      recoverTransaction signed1' `shouldBe` Just (derivePubKey key1)
       recoverTransaction signed1' `shouldBe` recoverTransaction signed1
     it "correctly signs transaction (2)" $ do
       let
@@ -80,6 +81,7 @@ spec = modifyMaxSuccess (const 10) $ do
         signed2' = signTransaction key2 unsigned2'
       unsigned2' `shouldBe` unsigned2
       signed2' `shouldSatisfy` verifyTransaction (derivePubKey key2)
+      recoverTransaction signed2' `shouldBe` Just (derivePubKey key2)
       recoverTransaction signed2' `shouldBe` recoverTransaction signed2
 
 -- helpers
