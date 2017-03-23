@@ -247,13 +247,14 @@ handleEvents mode peer = awaitForever $ \case
 
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
-syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m) => Conduit Event m Message
+syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m) => Conduit Event m Message
 syncFetch = do
-    blockHeaders' <- lift getBlockHeaders
+    blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
         let fetchNumber = case bestBlock of
-                              Nothing          -> 0
+                              Nothing                       -> 0
                               Just (RedisBestBlock _ num _) -> num
+        logInfoN . T.pack $ "fetchNumber is " ++ show fetchNumber
         yield $ GetBlockHeaders (BlockNumber fetchNumber) maxReturnedHeaders 0 Forward
         stampActionTimestamp
