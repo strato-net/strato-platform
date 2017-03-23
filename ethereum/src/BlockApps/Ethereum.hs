@@ -128,7 +128,7 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
   where
     err = error "could not generate secret key"
 
-newtype Keccak256 = Keccak256 { unKeccak256 :: Digest Keccak_256 }
+newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
   deriving (Eq,Show,Generic)
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
@@ -246,7 +246,7 @@ rlpMsg
   = fromMaybe (error "rlpMsg failure")
   . msg
   . ByteArray.convert
-  . unKeccak256
+  . digestKeccak256
   . keccak256
   . packRLP
   . rlpEncode
@@ -324,7 +324,7 @@ transactionFrom = fmap deriveAddress . recoverTransaction
 -- | Yellow Paper (82)
 newAccountAddress :: Transaction -> Address
 newAccountAddress Transaction{..}
-  = fromMaybe (error "Could not derive transaction Address")
+  = fromMaybe (error "Could not derive new account Address")
   . stringAddress
   . drop 24
   . keccak256String
