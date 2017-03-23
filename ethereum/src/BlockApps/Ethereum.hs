@@ -20,15 +20,17 @@ module BlockApps.Ethereum
   , Keccak256 (..)
   , keccak256
   , keccak256lazy
+  , keccak256ByteString
+  , byteStringKeccak256
   , keccak256String
   , stringKeccak256
+  , keccak256Address
     -- * Account States
   , AccountState (..)
     -- * Transactions
   , Transaction (..)
   , UnsignedTransaction (..)
   , rlpMsg
-  , signRLP
   , signTransaction
   , verifyTransaction
   , recoverTransaction
@@ -54,7 +56,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Lazy as Lazy (ByteString)
+import qualified Data.ByteString.Lazy as Lazy
 import Data.LargeWord
 import Data.Maybe
 import Data.Monoid
@@ -114,14 +116,7 @@ instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
 
 deriveAddress :: PubKey -> Address
-deriveAddress
-  = fromMaybe (error "Could not derive Address")
-  . stringAddress
-  . drop 24
-  . keccak256String
-  . keccak256
-  . ByteString.drop 1
-  . exportPubKey False
+deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 
 newSecKey :: IO SecKey
 newSecKey = fromMaybe err . secKey <$> getEntropy 32
@@ -130,6 +125,10 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
   deriving (Eq,Show,Generic)
+keccak256ByteString :: Keccak256 -> ByteString
+keccak256ByteString = ByteArray.convert . digestKeccak256
+byteStringKeccak256 :: ByteString -> Maybe Keccak256
+byteStringKeccak256 = fmap Keccak256 . digestFromByteString
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
 stringKeccak256 :: String -> Maybe Keccak256
@@ -162,6 +161,15 @@ keccak256lazy = Keccak256 . hashlazy
 instance ToSample Keccak256 where
   toSamples _ =
     samples [keccak256lazy (Binary.encode @ Integer n) | n <- [1..10]]
+keccak256Address :: ByteString -> Address
+keccak256Address
+  = Address
+  . Binary.decode
+  . Lazy.fromStrict
+  . ByteString.drop 12
+  . ByteArray.convert
+  . digestKeccak256
+  . keccak256
 
 data AccountState = AccountState
   { accountStateNonce :: Nonce
@@ -251,18 +259,6 @@ rlpMsg
   . packRLP
   . rlpEncode
 
--- TODO: remove this
-signRLP :: RLPEncodable x => SecKey -> x -> (Keccak256,CompactRecSig)
-signRLP sk x =
-  let
-    rlp = packRLP $ rlpEncode x
-    kecc = keccak256 rlp
-    Keccak256 dig = keccak256 rlp
-    err = error "signRLP failure"
-    message = fromMaybe err (msg (ByteArray.convert dig))
-  in
-    (kecc,exportCompactRecSig $ signRecMsg sk message)
-
 signTransaction :: SecKey -> UnsignedTransaction -> Transaction
 signTransaction sk UnsignedTransaction{..} = Transaction
   { transactionNonce = unsignedTransactionNonce
@@ -324,12 +320,7 @@ transactionFrom = fmap deriveAddress . recoverTransaction
 -- | Yellow Paper (82)
 newAccountAddress :: Transaction -> Address
 newAccountAddress Transaction{..}
-  = fromMaybe (error "Could not derive new account Address")
-  . stringAddress
-  . drop 24
-  . keccak256String
-  . keccak256
-  $ rlpSerialize (transactionTo, transactionNonce)
+  = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
 
 data BlockHeader = BlockHeader
   { blockHeaderParentHash :: Keccak256

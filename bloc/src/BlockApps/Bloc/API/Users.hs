@@ -30,6 +30,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
+import Data.RLP
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -54,7 +55,7 @@ import BlockApps.Solidity
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
-import BlockApps.Strato.Types
+import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
@@ -489,13 +490,14 @@ prepareSignedTx sk addr unsignedTx = PostTransaction
   , posttransactionNonce = Strung $ fromIntegral nonce'
   }
   where
-    (kecc,sig) = signRLP sk unsignedTx
-    r = getCompactRecSigR sig
-    s = getCompactRecSigS sig
-    v = getCompactRecSigV sig
-    Gas gasLimit = unsignedTransactionGasLimit unsignedTx
-    Wei gasPrice = unsignedTransactionGasPrice unsignedTx
-    Nonce nonce' = unsignedTransactionNonce unsignedTx
-    Wei value = unsignedTransactionValue unsignedTx
-    code = Text.decodeUtf8 $ unsignedTransactionInitOrData unsignedTx
-    toAddr = unsignedTransactionTo unsignedTx
+    tx = signTransaction sk unsignedTx
+    kecc = keccak256 (rlpSerialize tx)
+    r = transactionR tx
+    s = transactionS tx
+    v = transactionV tx
+    Gas gasLimit = transactionGasLimit tx
+    Wei gasPrice = transactionGasPrice tx
+    Nonce nonce' = transactionNonce tx
+    Wei value = transactionValue tx
+    code = Text.decodeUtf8 $ transactionInitOrData tx
+    toAddr = transactionTo tx

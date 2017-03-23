@@ -57,6 +57,7 @@ library
     , profunctors
     , QuickCheck
     , quickcheck-instances
+    , relapse
     , saltine
     , secp256k1
     , servant
