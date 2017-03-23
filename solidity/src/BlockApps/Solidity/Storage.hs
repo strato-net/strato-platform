@@ -167,14 +167,14 @@ simpleToStorage =  \case
       let
         len = ByteString.length bs
         lenMod32 = len `mod` 32
-        padding = 32 - lenMod32
+        padding = (32 - lenMod32) `mod` 32
       in
         bs `ByteString.append` ByteString.replicate padding 0
     pad32Signed v bs =
       let
         len = ByteString.length bs
         lenMod32 = len `mod` 32
-        padding = 32 - lenMod32
+        padding = (32 - lenMod32) `mod` 32
         padChar = bool 0xff 0 (signum v /= (-1))
       in
         ByteString.replicate padding padChar `ByteString.append` bs

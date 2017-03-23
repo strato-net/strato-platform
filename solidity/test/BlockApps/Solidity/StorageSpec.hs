@@ -103,7 +103,7 @@ spec =
                     , SimpleValue $ ValueUInt 3
                     ]
                   ]
-          (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000001"
+          (dataBytestring,_) = Base16.decode "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"
         toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type enum" $ do
         pendingWith "enum has not been implemented for toStorage"
