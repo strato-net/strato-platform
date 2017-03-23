@@ -34,23 +34,28 @@ spec = modifyMaxSuccess (const 10) $ do
       stringKeccak256 (keccak256String hash) === Just hash
 
   let
-    Just sk1 = secKey . fst $ Base16.decode
+    Just key1 = secKey . fst $ Base16.decode
       "c85ef7d79691fe79573b1a7064c19c1a9819ebdbd1faaab1a8ec92344438aaf4"
-    Just sk2 = secKey . fst $ Base16.decode
+    Just key2 = secKey . fst $ Base16.decode
       "c87f65ff3f271bf5dc8643484f66b200109caffe4bf98c4cb393dc35740b28c0"
 
   describe "deriveAddress" $
     it "correctly derives address from key" $ do
-      deriveAddress (derivePubKey sk1) `shouldBe`
+      deriveAddress (derivePubKey key1) `shouldBe`
         Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826
-      deriveAddress (derivePubKey sk2) `shouldBe`
+      deriveAddress (derivePubKey key2) `shouldBe`
         Address 0x13978aee95f38490e9769c39b2773ed763d9cd5f
+
+  let
+    Right unsigned1 = rlpDeserialize . fst $ Base16.decode "eb8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc1000080808080"
+    Right signed1 = rlpDeserialize . fst $ Base16.decode "f86b8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc10000801ba0eab47c1a49bf2fe5d40e01d313900e19ca485867d462fe06e139e3a536c6d4f4a014a569d327dcda4b29f74f93c0e9729d2f49ad726e703f9cd90dbb0fbf6649f1"
+    Right unsigned2 = rlpDeserialize . fst $ Base16.decode "f83f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2808080"
+    Right signed2 = rlpDeserialize . fst $ Base16.decode "f87f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f21ba05afed0244d0da90b67cf8979b0f246432a5112c0d31e8d5eedd2bc17b171c694a0bb1035c834677c2e1185b8dc90ca6d1fa585ab3d7ef23707e1a497a98e752d1b"
 
   describe "sign transaction" $ do
     it "correctly signs transaction (1)" $ do
       let
-        Just key = secKey . fst $ Base16.decode "c85ef7d79691fe79573b1a7064c19c1a9819ebdbd1faaab1a8ec92344438aaf4"
-        unsigned = UnsignedTransaction
+        unsigned1' = UnsignedTransaction
           { unsignedTransactionNonce = Nonce 0
           , unsignedTransactionGasPrice = Wei 1000000000000
           , unsignedTransactionGasLimit = Gas 10000
@@ -58,15 +63,14 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionValue = Wei 10000000000000000
           , unsignedTransactionInitOrData = ""
           }
-        signed = signTransaction key unsigned
-        unsigned' = rlpDeserialize . fst $ Base16.decode "eb8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc1000080808080"
-        signed' = rlpDeserialize . fst $ Base16.decode "f86b8085e8d4a510008227109413978aee95f38490e9769c39b2773ed763d9cd5f872386f26fc10000801ba0eab47c1a49bf2fe5d40e01d313900e19ca485867d462fe06e139e3a536c6d4f4a014a569d327dcda4b29f74f93c0e9729d2f49ad726e703f9cd90dbb0fbf6649f1"
-      Right unsigned `shouldBe` unsigned'
-      Right signed `shouldBe` signed'
+        signed1' = signTransaction key1 unsigned1'
+      unsigned1' `shouldBe` unsigned1
+      signed1' `shouldSatisfy` verifyTransaction (derivePubKey key1)
+      recoverTransaction signed1' `shouldBe` Just (derivePubKey key1)
+      recoverTransaction signed1' `shouldBe` recoverTransaction signed1
     it "correctly signs transaction (2)" $ do
       let
-        Just key = secKey . fst $ Base16.decode "c87f65ff3f271bf5dc8643484f66b200109caffe4bf98c4cb393dc35740b28c0"
-        unsigned = UnsignedTransaction
+        unsigned2' = UnsignedTransaction
           { unsignedTransactionNonce = Nonce 0
           , unsignedTransactionGasPrice = Wei 1000000000000
           , unsignedTransactionGasLimit = Gas 10000
@@ -74,11 +78,11 @@ spec = modifyMaxSuccess (const 10) $ do
           , unsignedTransactionValue = Wei 0
           , unsignedTransactionInitOrData = fst $ Base16.decode "6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2"
           }
-        signed = signTransaction key unsigned
-        unsigned' = rlpDeserialize . fst $ Base16.decode "f83f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f2808080"
-        signed' = rlpDeserialize . fst $ Base16.decode "f87f8085e8d4a510008227108080af6025515b525b600a37f260003556601b596020356000355760015b525b54602052f260255860005b525b54602052f21ba05afed0244d0da90b67cf8979b0f246432a5112c0d31e8d5eedd2bc17b171c694a0bb1035c834677c2e1185b8dc90ca6d1fa585ab3d7ef23707e1a497a98e752d1b"
-      Right unsigned `shouldBe` unsigned'
-      Right signed `shouldBe` signed'
+        signed2' = signTransaction key2 unsigned2'
+      unsigned2' `shouldBe` unsigned2
+      signed2' `shouldSatisfy` verifyTransaction (derivePubKey key2)
+      recoverTransaction signed2' `shouldBe` Just (derivePubKey key2)
+      recoverTransaction signed2' `shouldBe` recoverTransaction signed2
 
 -- helpers
 

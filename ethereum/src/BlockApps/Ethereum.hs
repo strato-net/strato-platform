@@ -20,16 +20,22 @@ module BlockApps.Ethereum
   , Keccak256 (..)
   , keccak256
   , keccak256lazy
+  , keccak256ByteString
+  , byteStringKeccak256
   , keccak256String
   , stringKeccak256
+  , keccak256Address
     -- * Account States
   , AccountState (..)
     -- * Transactions
   , Transaction (..)
   , UnsignedTransaction (..)
-  , signRLP
+  , rlpMsg
   , signTransaction
-  , transactionAddress
+  , verifyTransaction
+  , recoverTransaction
+  , transactionFrom
+  , newAccountAddress
     -- * Blocks
   , BlockHeader (..)
     -- * Ethereum Types
@@ -45,18 +51,19 @@ import Crypto.Random.Entropy
 import Crypto.Secp256k1
 import Data.Aeson hiding (Array,String)
 import qualified Data.Binary as Binary
-import Data.ByteArray (convert)
+import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Lazy as Lazy (ByteString)
+import qualified Data.ByteString.Lazy as Lazy
 import Data.LargeWord
 import Data.Maybe
 import Data.Monoid
 import Data.RLP
 import qualified Data.Text as Text
 import Data.Time
+import Data.Word
 import GHC.Generics
 import Numeric
 import Numeric.Natural
@@ -109,21 +116,19 @@ instance ToCapture (Capture "userAddress" Address) where
   toCapture _ = DocCapture "userAddress" "an Ethereum address"
 
 deriveAddress :: PubKey -> Address
-deriveAddress
-  = fromMaybe (error "Could not derive Address")
-  . stringAddress
-  . drop 24
-  . keccak256String
-  . keccak256
-  . ByteString.drop 1
-  . exportPubKey False
+deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
 
 newSecKey :: IO SecKey
 newSecKey = fromMaybe err . secKey <$> getEntropy 32
   where
     err = error "could not generate secret key"
 
-newtype Keccak256 = Keccak256 { unKeccak256 :: Digest Keccak_256 } deriving (Eq,Show,Generic)
+newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
+  deriving (Eq,Show,Generic)
+keccak256ByteString :: Keccak256 -> ByteString
+keccak256ByteString = ByteArray.convert . digestKeccak256
+byteStringKeccak256 :: ByteString -> Maybe Keccak256
+byteStringKeccak256 = fmap Keccak256 . digestFromByteString
 keccak256String :: Keccak256 -> String
 keccak256String (Keccak256 digest) = show digest
 stringKeccak256 :: String -> Maybe Keccak256
@@ -156,6 +161,15 @@ keccak256lazy = Keccak256 . hashlazy
 instance ToSample Keccak256 where
   toSamples _ =
     samples [keccak256lazy (Binary.encode @ Integer n) | n <- [1..10]]
+keccak256Address :: ByteString -> Address
+keccak256Address
+  = Address
+  . Binary.decode
+  . Lazy.fromStrict
+  . ByteString.drop 12
+  . ByteArray.convert
+  . digestKeccak256
+  . keccak256
 
 data AccountState = AccountState
   { accountStateNonce :: Nonce
@@ -171,7 +185,9 @@ data Transaction = Transaction
   , transactionTo :: Maybe Address
   , transactionValue :: Wei
   , transactionInitOrData :: ByteString
-  , transactionSignature :: CompactRecSig
+  , transactionV :: Word8
+  , transactionR :: Word256
+  , transactionS :: Word256
   } deriving (Eq,Show,Generic)
 instance RLPEncodable Transaction where
   rlpEncode Transaction{..} = rlpEncode
@@ -181,9 +197,9 @@ instance RLPEncodable Transaction where
     , transactionTo
     , transactionValue
     , transactionInitOrData
-    , toInteger (getCompactRecSigV transactionSignature)
-    , toInteger (getCompactRecSigR transactionSignature)
-    , toInteger (getCompactRecSigS transactionSignature)
+    , transactionV
+    , transactionR
+    , transactionS
     )
   rlpDecode x = do
     (nonce, gasPrice, gasLimit, toAddr, value, initOrData, v, r, s)
@@ -192,11 +208,12 @@ instance RLPEncodable Transaction where
       { transactionNonce = nonce
       , transactionGasPrice = gasPrice
       , transactionGasLimit = gasLimit
-      , transactionTo = if toAddr == Just (Address 0) then Nothing else toAddr
+      , transactionTo = toAddr
       , transactionValue = value
       , transactionInitOrData = initOrData
-      , transactionSignature = CompactRecSig
-          (fromInteger r) (fromInteger s) (fromInteger v)
+      , transactionV = v
+      , transactionR = r
+      , transactionS = s
       }
 
 data UnsignedTransaction = UnsignedTransaction
@@ -215,50 +232,95 @@ instance RLPEncodable UnsignedTransaction where
     , transactionTo = unsignedTransactionTo
     , transactionValue = unsignedTransactionValue
     , transactionInitOrData = unsignedTransactionInitOrData
-    , transactionSignature = CompactRecSig 0 0 0
+    , transactionV = 0
+    , transactionR = 0
+    , transactionS = 0
     }
   rlpDecode x = do
     Transaction{..} <- rlpDecode x
-    return UnsignedTransaction
-      { unsignedTransactionNonce = transactionNonce
-      , unsignedTransactionGasPrice = transactionGasPrice
-      , unsignedTransactionGasLimit = transactionGasLimit
-      , unsignedTransactionTo = transactionTo
-      , unsignedTransactionValue = transactionValue
-      , unsignedTransactionInitOrData = transactionInitOrData
-      }
+    if (transactionV,transactionR,transactionS) /= (0,0,0)
+      then Left "rlpDecode UnsignedTransaction: expected v,r,s = 0"
+      else return UnsignedTransaction
+        { unsignedTransactionNonce = transactionNonce
+        , unsignedTransactionGasPrice = transactionGasPrice
+        , unsignedTransactionGasLimit = transactionGasLimit
+        , unsignedTransactionTo = transactionTo
+        , unsignedTransactionValue = transactionValue
+        , unsignedTransactionInitOrData = transactionInitOrData
+        }
 
-signRLP :: RLPEncodable x => SecKey -> x -> (Keccak256,CompactRecSig)
-signRLP sk x =
-  let
-    rlp = packRLP $ rlpEncode x
-    kecc = keccak256 rlp
-    Keccak256 dig = keccak256 rlp
-    err = error "signRLP failure"
-    message = fromMaybe err (msg (convert dig))
-  in
-    (kecc,exportCompactRecSig $ signRecMsg sk message)
+rlpMsg :: RLPEncodable x => x -> Msg
+rlpMsg
+  = fromMaybe (error "rlpMsg failure")
+  . msg
+  . ByteArray.convert
+  . digestKeccak256
+  . keccak256
+  . packRLP
+  . rlpEncode
 
 signTransaction :: SecKey -> UnsignedTransaction -> Transaction
-signTransaction sk utx@UnsignedTransaction{..} = Transaction
+signTransaction sk UnsignedTransaction{..} = Transaction
   { transactionNonce = unsignedTransactionNonce
   , transactionGasPrice = unsignedTransactionGasPrice
   , transactionGasLimit = unsignedTransactionGasLimit
   , transactionTo = unsignedTransactionTo
   , transactionValue = unsignedTransactionValue
-  , transactionSignature = snd (signRLP sk utx)
+  , transactionV = testV + 27
+  , transactionR = r
+  , transactionS = s
   , transactionInitOrData = unsignedTransactionInitOrData
   }
+  where
+    CompactRecSig r s testV =
+      exportCompactRecSig . signRecMsg sk $ rlpMsg
+        ( unsignedTransactionNonce
+        , unsignedTransactionGasPrice
+        , unsignedTransactionGasLimit
+        , unsignedTransactionTo
+        , unsignedTransactionValue
+        , unsignedTransactionInitOrData
+        )
+
+verifyTransaction :: PubKey -> Transaction -> Bool
+verifyTransaction pk Transaction{..} =
+  let
+    message = rlpMsg
+      ( transactionNonce
+      , transactionGasPrice
+      , transactionGasLimit
+      , transactionTo
+      , transactionValue
+      , transactionInitOrData
+      )
+  in
+    case importCompactSig (CompactSig transactionR transactionS) of
+      Nothing -> False
+      Just sig -> verifySig pk sig message
+
+recoverTransaction :: Transaction -> Maybe PubKey
+recoverTransaction Transaction{..} = do
+  let
+    message = rlpMsg
+      ( transactionNonce
+      , transactionGasPrice
+      , transactionGasLimit
+      , transactionTo
+      , transactionValue
+      , transactionInitOrData
+      )
+    testV = transactionV - 27
+    compactRecSig = CompactRecSig transactionR transactionS testV
+  recSig <- importCompactRecSig compactRecSig
+  recover recSig message
+
+transactionFrom :: Transaction -> Maybe Address
+transactionFrom = fmap deriveAddress . recoverTransaction
 
 -- | Yellow Paper (82)
-transactionAddress :: Transaction -> Address
-transactionAddress Transaction{..}
-  = fromMaybe (error "Could not derive transaction Address")
-  . stringAddress
-  . drop 24
-  . keccak256String
-  . keccak256
-  $ rlpSerialize (transactionTo, transactionNonce)
+newAccountAddress :: Transaction -> Address
+newAccountAddress Transaction{..}
+  = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
 
 data BlockHeader = BlockHeader
   { blockHeaderParentHash :: Keccak256
