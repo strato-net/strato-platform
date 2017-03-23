@@ -6,8 +6,8 @@ packages:
 - strato/api
 - strato/client
 - location:
-    git: https://github.com/blockapps/secp256k1-haskell/
-    commit: b4604c10fc0ef110d4bfc9bac92b3ac5d67c1b9c
+    git: https://github.com/echatav/secp256k1-haskell/
+    commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
   extra-dep: true
 - location:
     git: https://github.com/echatav/servant-aeson-specs/
