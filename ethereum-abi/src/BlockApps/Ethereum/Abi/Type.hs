@@ -1,25 +1,23 @@
 module BlockApps.Ethereum.Abi.Type
   ( Type(..)
-  , TypeFixed(..)
+  , TypeStatic(..)
   , TypeDynamic(..)
   , typeIsDynamic
-  , typeFixedByteSize
-  , typeFixedBitSize
+  , typeStaticByteSize
+  , typeStaticBitSize
   ) where
 
-import BlockApps.Ethereum.Abi.Int
-
 data Type
-  = TypeFixed TypeFixed
+  = TypeStatic TypeStatic
   | TypeDynamic TypeDynamic
   deriving (Eq,Read,Show)
 
 typeIsDynamic :: Type -> Bool
 typeIsDynamic = \case
-  TypeFixed _ -> False
+  TypeStatic _ -> False
   TypeDynamic _ -> True
 
-data TypeFixed
+data TypeStatic
   = TypeBool
   | TypeUInt8
   | TypeUInt16
@@ -88,8 +86,8 @@ data TypeFixed
   | TypeInt256
   | TypeInt
   | TypeAddress
-  -- | TypeFixed
-  -- | TypeUFixed
+  -- | TypeStatic
+  -- | TypeUStatic
   | TypeBytes1
   | TypeBytes2
   | TypeBytes3
@@ -122,11 +120,11 @@ data TypeFixed
   | TypeBytes30
   | TypeBytes31
   | TypeBytes32
-  | TypeArrayFixed Word256 TypeFixed
+  | TypeArrayStatic Word256 TypeStatic
   deriving (Eq,Read,Show)
 
-typeFixedByteSize :: TypeFixed -> Word256
-typeFixedByteSize = \case
+typeStaticByteSize :: TypeStatic -> Word256
+typeStaticByteSize = \case
   TypeBool -> 1
   TypeUInt8 -> 1
   TypeUInt16 -> 2
@@ -227,14 +225,14 @@ typeFixedByteSize = \case
   TypeBytes30 -> 30
   TypeBytes31 -> 31
   TypeBytes32 -> 32
-  TypeArrayFixed len ty -> len * typeFixedByteSize ty
+  TypeArrayStatic len ty -> len * typeStaticByteSize ty
   deriving (Eq,Read,Show)
 
-typeFixedBitSize :: TypeFixed -> Word256
-typeFixedBitSize = (* 8) . typeFixedByteSize
+typeStaticBitSize :: TypeStatic -> Word256
+typeStaticBitSize = (* 8) . typeStaticByteSize
 
 data TypeDynamic
-  = Bytes
-  | String
-  | TypeArrayDynamic TypeFixed
+  = TypeBytes
+  | TypeString
+  | TypeArrayDynamic TypeStatic
   deriving (Eq,Read,Show)
