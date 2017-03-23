@@ -14,18 +14,31 @@ spec :: Spec
 spec =
   describe "toStorage" $ do
     describe "convert an array of arguments into a bytestring" $ do
-      it "should convert 4 args with types: Uint256, UInt32 Array fixed, Bytes10 and Bytes to ByteString " $ do
-        let
-          args = ValueArrayFixed 4
-                  [ SimpleValue (ValueUInt256 291)
-                  , ValueArrayDynamic [ SimpleValue (ValueUInt32 1110)
-                                      , SimpleValue (ValueUInt32 1929)
-                                      ]
-                  , SimpleValue (ValueBytes10 "1234567890")
-                  , SimpleValue (ValueBytes "Hello, world!")
-                  ]
-          (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000001230000000000000000000000000000000000000000000000000000000000000080313233343536373839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000004560000000000000000000000000000000000000000000000000000000000000789000000000000000000000000000000000000000000000000000000000000000d48656c6c6f2c20776f726c642100000000000000000000000000000000000000"
-        toStorage args `shouldBe` dataBytestring
+      context "official Ethereum ABI Tests: found at https://github.com/ethereum/tests/blob/develop/ABITests/basic_abi_tests.json" $ do
+        it "should convert 4 args with types: uint256, uint32[], bytes10, and bytes" $ do
+          let
+            args = ValueArrayFixed 4
+                    [ SimpleValue (ValueUInt256 291)
+                    , ValueArrayDynamic [ SimpleValue (ValueUInt32 1110)
+                                        , SimpleValue (ValueUInt32 1929)
+                                        ]
+                    , SimpleValue (ValueBytes10 "1234567890")
+                    , SimpleValue (ValueBytes "Hello, world!")
+                    ]
+            (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000001230000000000000000000000000000000000000000000000000000000000000080313233343536373839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000004560000000000000000000000000000000000000000000000000000000000000789000000000000000000000000000000000000000000000000000000000000000d48656c6c6f2c20776f726c642100000000000000000000000000000000000000"
+          toStorage args `shouldBe` dataBytestring
+        it "should convert 1 arg with type uint256" $ do
+          let
+            args = ValueArrayFixed 1
+                    [ SimpleValue (ValueUInt256 98127491) ]
+            (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000005d94e83"
+          toStorage args `shouldBe` dataBytestring
+        it "should convert 2 arg with type uint256, addresss" $ do
+          let
+            args = ValueArrayFixed 2
+                    [ SimpleValue (ValueUInt256 324124), SimpleValue (ValueAddress (Address 0xcd2a3d9f938e13cd947ec05abc7fe734df8dd826))]
+            (dataBytestring,_) = Base16.decode "000000000000000000000000000000000000000000000000000000000004f21c000000000000000000000000cd2a3d9f938e13cd947ec05abc7fe734df8dd826"
+          toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type uint" $ do
         let
           args = ValueArrayFixed 1
