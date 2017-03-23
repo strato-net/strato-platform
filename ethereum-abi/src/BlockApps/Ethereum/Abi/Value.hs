@@ -4,12 +4,16 @@ module BlockApps.Ethereum.Abi.Value
   , ValueDynamic(..)
   ) where
 
+import Data.ByteString (ByteString)
+import Data.Text (Text)
+
+import BlockApps.Ethereum
 import BlockApps.Ethereum.Abi.Int
 
 data Value
   = ValueStatic ValueStatic
   | ValueDynamic ValueDynamic
-  deriving (Eq,Read,Show)
+  deriving (Eq,Show)
 
 data ValueStatic
   = ValueBool Bool
@@ -115,9 +119,10 @@ data ValueStatic
   | ValueBytes31 ByteString
   | ValueBytes32 ByteString
   | ValueArrayStatic [ValueStatic]
-  deriving (Eq,Read,Show)
+  deriving (Eq,Show)
 
 data ValueDynamic
   = ValueBytes ByteString
   | ValueString Text
   | TypeArrayDynamic [ValueStatic]
+  deriving (Eq,Show)

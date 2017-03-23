@@ -1,8 +1,8 @@
-name: blockapps-ethereum
+name: blockapps-ethereum-abi
 version: 0.1.0.0
 synopsis: Ethereum datatypes
 description: Ethereum datatypes
-homepage: https://github.com/blockapps/blockapps-haskell/blockapps-ethereum
+homepage: https://github.com/blockapps/blockapps-haskell/blockapps-ethereum-abi
 license: BSD3
 license-file: LICENSE
 author: Eitan Chatav
@@ -15,45 +15,18 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Ethereum
+    BlockApps.Ethereum.Abi.Int
+    BlockApps.Ethereum.Abi.Type
+    BlockApps.Ethereum.Abi.Value
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
-    , aeson
-    , base16-bytestring
-    , binary
-    , bytestring
-    , cryptonite
-    , hashable
-    , http-api-data
-    , largeword
-    , memory
-    , QuickCheck
-    , relapse
-    , secp256k1
-    , servant
-    , servant-docs
-    , text
-    , time
-
-test-suite blockapps-ethereum-test
-  default-language: Haskell2010
-  type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  ghc-options: -Wall -Werror
-  main-is: Spec.hs
-  other-modules:
-    BlockApps.EthereumSpec
-  build-depends: base >=4 && < 5
     , blockapps-ethereum
-    , base16-bytestring
-    , aeson
-    , hspec
-    , http-api-data
-    , QuickCheck
-    , relapse
-    , secp256k1
+    , bytestring
+    , largeint
+    , largeword
+    , text
 
 source-repository head
   type: git
-  location: https://github.com/blockapps/blockapps-haskell/blockapps-ethereum
+  location: https://github.com/blockapps/blockapps-haskell/blockapps-ethereum-abi

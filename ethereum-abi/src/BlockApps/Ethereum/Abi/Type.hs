@@ -1,3 +1,7 @@
+{-# LANGUAGE
+    LambdaCase
+#-}
+
 module BlockApps.Ethereum.Abi.Type
   ( Type(..)
   , TypeStatic(..)
@@ -7,10 +11,12 @@ module BlockApps.Ethereum.Abi.Type
   , typeStaticBitSize
   ) where
 
+import BlockApps.Ethereum.Abi.Int
+
 data Type
   = TypeStatic TypeStatic
   | TypeDynamic TypeDynamic
-  deriving (Eq,Read,Show)
+  deriving (Eq,Show)
 
 typeIsDynamic :: Type -> Bool
 typeIsDynamic = \case
@@ -121,7 +127,7 @@ data TypeStatic
   | TypeBytes31
   | TypeBytes32
   | TypeArrayStatic Word256 TypeStatic
-  deriving (Eq,Read,Show)
+  deriving (Eq,Show)
 
 typeStaticByteSize :: TypeStatic -> Word256
 typeStaticByteSize = \case
@@ -226,7 +232,6 @@ typeStaticByteSize = \case
   TypeBytes31 -> 31
   TypeBytes32 -> 32
   TypeArrayStatic len ty -> len * typeStaticByteSize ty
-  deriving (Eq,Read,Show)
 
 typeStaticBitSize :: TypeStatic -> Word256
 typeStaticBitSize = (* 8) . typeStaticByteSize
@@ -235,4 +240,4 @@ data TypeDynamic
   = TypeBytes
   | TypeString
   | TypeArrayDynamic TypeStatic
-  deriving (Eq,Read,Show)
+  deriving (Eq,Show)
