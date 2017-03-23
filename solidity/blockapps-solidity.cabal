@@ -52,7 +52,10 @@ test-suite blockapps-solidity-test
   main-is: Spec.hs
   other-modules:
     BlockApps.SoliditySpec
+    BlockApps.Solidity.StorageSpec
   build-depends: base >=4 && < 5
+    , base16-bytestring
+    , blockapps-ethereum
     , blockapps-solidity
     , hspec
 
