@@ -83,10 +83,10 @@ runEthServer connectedPeers  myPriv listenPort = do
 
       runEthCryptMLite cxt $ do
         let rSource  = appSource app
---             txSource = txNotificationSource "tx"
---                      =$= CL.map NewTX
---             blockSource = blockNotificationSource "p2p_block"
---                      =$= CL.map (uncurry NewBL)
+            txSource = txNotificationSource "tx"
+                     =$= CL.map NewTX
+            blockSource = blockNotificationSource "p2p_block"
+                      =$= CL.map (uncurry NewBL)
 
         eventSource <- mergeSourcesCloseForAny [
               rSource 
@@ -95,8 +95,8 @@ runEthServer connectedPeers  myPriv listenPort = do
                 =$= transPipe liftIO bytesToMessages
                 =$= transPipe lift (tap (displayMessage False (show $ appSockAddr app)))
                 =$= CL.map MsgEvt 
---               , blockSource
---               , txSource
+            , blockSource
+            , txSource
           ] 2
 
 
