@@ -84,8 +84,8 @@ data ValueStatic
   | ValueInt256 Int256
   | ValueInt Int256
   | ValueAddress Address
-  -- | ValueStatic
-  -- | ValueUStatic
+  -- | ValueFixed
+  -- | ValueUFixed
   | ValueBytes1 Word8
   | ValueBytes2 ByteString
   | ValueBytes3 ByteString

@@ -92,8 +92,8 @@ data TypeStatic
   | TypeInt256
   | TypeInt
   | TypeAddress
-  -- | TypeStatic
-  -- | TypeUStatic
+  -- | TypeFixed
+  -- | TypeUFixed
   | TypeBytes1
   | TypeBytes2
   | TypeBytes3
