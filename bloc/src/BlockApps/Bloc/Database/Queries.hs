@@ -952,12 +952,11 @@ compileContract contractName source = do
     metaDataId <- blocMaybe "metadata id" <=< blocModify $
       upsertContractMetaDataQuery
         contrId bin binRuntime codeHash
-    for_ xabiFuncs $ \ funcs ->
-      forMap_ funcs $ \ funcName Func{..} -> do
-        funcId <- blocModify1 $ insertXabiFunction
-          metaDataId funcName funcSelector False
-        blocModify $ insertXabiFunctionArg funcId funcArgs
-        blocModify $ insertXabiFunctionRet funcId (toList funcVals)
+    forMap_ xabiFuncs $ \ funcName Func{..} -> do
+      funcId <- blocModify1 $ insertXabiFunction
+        metaDataId funcName funcSelector False
+      blocModify $ insertXabiFunctionArg funcId funcArgs
+      blocModify $ insertXabiFunctionRet funcId (toList funcVals)
     return metaDataId
   for_ metaDataIds $ \ leftMetaDataId ->
     for_ metaDataIds $ \ rightMetaDataId -> blocModify $
