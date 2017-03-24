@@ -757,6 +757,6 @@ getAddress (ContractName "Struct2") _ = Address 0x58ec24fdfb75c2124f659f96748d20
 
 getAddress (ContractName "FixedArray") _ = Address 0xf450d26fcfa6f40c0e27ad7d46695f5e9efbc2f5
 
-getAddress (ContractName "Array") _ = Address 0xdafe84df446f0975af4821952e7a05a4d7904d25
+getAddress (ContractName "Array") _ = Address 0xd92575a5525384ff9cc5601071d9de48dc756f12
 
 getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
