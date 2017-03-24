@@ -323,7 +323,7 @@ decodeValue' contract storage position@Storage.Position{..} = \case
   SimpleType TypeBytes | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
       len = storage offset `div` 2
-      startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
+      startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
     in SimpleValue $ ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType TypeBytes -> --small string, less than 32 bytes
@@ -345,7 +345,7 @@ decodeValue' contract storage position@Storage.Position{..} = \case
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where
       theList = map (flip (decodeValue' contract storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
-      startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
+      startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
