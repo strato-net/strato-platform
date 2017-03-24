@@ -51,6 +51,7 @@ test-suite blockapps-ethereum-test
     , hspec
     , http-api-data
     , QuickCheck
+    , relapse
     , secp256k1
 
 source-repository head

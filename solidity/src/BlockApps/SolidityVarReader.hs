@@ -39,7 +39,6 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 
-
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
 
@@ -334,7 +333,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
   SimpleType TypeBytes | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
       len = storage offset `div` 2
-      startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
+      startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
     in SimpleValue $ ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType TypeBytes -> --small string, less than 32 bytes
@@ -359,8 +358,9 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize) [0..fromIntegral $ storage offset-1]
-      startingKey=byteStringToWord256 $ ByteArray.convert $ unKeccak256 $ keccak256 $ word256ToByteString offset
+      --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
+      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize) $ map fromIntegral [0..fromIntegral (storage offset-1)::Int]
+      startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 

@@ -6,8 +6,8 @@ packages:
 - strato/api
 - strato/client
 - location:
-    git: https://github.com/blockapps/secp256k1-haskell/
-    commit: 0a6db54f31defdd7a5edecdf6932af3deea6ca57
+    git: https://github.com/echatav/secp256k1-haskell/
+    commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
   extra-dep: true
 - location:
     git: https://github.com/echatav/servant-aeson-specs/
@@ -19,7 +19,7 @@ packages:
   extra-dep: true
 - location:
     git: https://github.com/iostat/relapse
-    commit: 2c29b3f107f2402a46692c625f1c3f316ba78106
+    commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
   extra-dep: true
 extra-deps:
   - hflags-0.4.2

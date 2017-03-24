@@ -1,11 +1,15 @@
+{-# LANGUAGE
+    OverloadedStrings
+#-}
+
 module BlockApps.Solidity.Type where
 
 import Data.ByteString (ByteString)
 import Data.Char
 import Data.List
 import Data.Text (Text)
-import qualified Data.Text as T
-
+import qualified Data.Text as Text
+import Text.Read
 
 data Type
   = SimpleType SimpleType
@@ -17,7 +21,7 @@ data Type
   | TypeEnum Text
   | TypeContract Text
   deriving (Show)
-    
+
 data SimpleType
   = TypeBool
   | TypeUInt8
@@ -123,7 +127,7 @@ data SimpleType
   | TypeBytes32
   | TypeBytes
   | TypeString
-  deriving (Show)
+  deriving (Show,Read)
 
 formatSimpleType::SimpleType->String
 formatSimpleType x = map toLower $ drop 4 $ show x
@@ -140,8 +144,15 @@ formatType (TypeFunction _ paramTypes returnTypes) =
   ++ ") returns ("
   ++ intercalate "," (map (formatType . snd) returnTypes)
   ++ ")"
-formatType (TypeEnum name) = T.unpack name
-formatType (TypeContract name) = T.unpack name
-formatType (TypeStruct name) = T.unpack name
+formatType (TypeEnum name) = Text.unpack name
+formatType (TypeContract name) = Text.unpack name
+formatType (TypeStruct name) = Text.unpack name
 
-                                 
+textToSimpleArgType :: Text -> Maybe SimpleType
+textToSimpleArgType str = if Text.null str then Nothing
+  else readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack (Text.toLower (Text.tail str))))
+
+textToArgType :: Text -> Bool -> Text -> Maybe Type
+textToArgType "Array" True str = TypeArrayDynamic . SimpleType <$> textToSimpleArgType str
+textToArgType "Array" False str = TypeArrayFixed 0 . SimpleType <$> textToSimpleArgType str
+textToArgType str _ _ = SimpleType <$> textToSimpleArgType str

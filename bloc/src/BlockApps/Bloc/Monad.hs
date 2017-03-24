@@ -46,6 +46,7 @@ data BlocError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
+  | AnError Text
   | Unimplemented
   deriving Show
 
