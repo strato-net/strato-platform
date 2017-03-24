@@ -69,8 +69,7 @@ instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 data Arg = Arg
-  { argName :: Text -- TODO: Name is not given for arguments that are of type Contract
-  , argIndex :: Int32
+  { argIndex :: Int32
   , argType :: Maybe Text
   , argTypedef :: Maybe Text
   , argDynamic :: Maybe Bool
