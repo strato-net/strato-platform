@@ -89,6 +89,7 @@ library
                    Blockchain.ExtMergeSources
                    Blockchain.Options
                    Blockchain.RawTXNotify
+                   Blockchain.SeqEventNotify
                    Blockchain.TCPClientWithTimeout
                    Executable.StratoP2PClient
     other-modules:

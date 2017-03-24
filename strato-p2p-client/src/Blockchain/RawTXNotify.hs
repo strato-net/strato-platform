@@ -60,3 +60,4 @@ txNotificationSource name = do
 getTransaction::(MonadBaseControl IO m, MonadResource m)=>
                 SQLDB->SQL.Key RawTransaction->m (Maybe RawTransaction)
 getTransaction pool row = SQL.runSqlPool (SQL.get row) pool
+

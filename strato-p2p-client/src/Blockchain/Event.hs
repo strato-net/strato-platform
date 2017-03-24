@@ -42,7 +42,7 @@ import Blockchain.Verification
 import Blockchain.DBM
 import Blockchain.Data.PubKey
 
-import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock)
+import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock, OutputEvent(..))
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 
 import Blockchain.Util (getCurrentMicrotime)
@@ -53,7 +53,7 @@ import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thing that ill really want to know one day
 
-data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | TimerEvt deriving (Show)
+data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | NewSeqEvent OutputEvent | TimerEvt deriving (Show)
 
 -- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m) => [Block] -> m Int
@@ -221,6 +221,9 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
 
     MsgEvt (Disconnect _) -> throwIO PeerDisconnected
+    
+    NewSeqEvent _ -> error "Got a new OutputEvent"
+
     NewTX tx -> when shouldSend . yield $ Transactions [rawTX2TX tx]
         where shouldSend = case rawTransactionOrigin tx of
                 Origin.PeerString ps -> ps /= peerString peer
