@@ -35,7 +35,6 @@ newtype Bloc x = Bloc
   , Monad
   , MonadIO
   , MonadReader BlocEnv
-  -- , MonadError BlocError
   , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
   )
 
@@ -43,7 +42,9 @@ instance MonadError BlocError Bloc where
   throwError err = do
     logError . withCallStack =<< timestamp (Text.pack (show err))
     Bloc $ throwError err
-  catchError m handle = Bloc $ catchError (runBloc m) (runBloc . handle)
+  catchError m handle = do
+    logError . withCallStack =<< timestamp "catching error"
+    Bloc $ catchError (runBloc m) (runBloc . handle)
 
 data BlocEnv = BlocEnv
   { urlStrato :: BaseUrl
