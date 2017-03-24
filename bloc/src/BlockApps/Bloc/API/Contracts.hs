@@ -140,15 +140,13 @@ instance MonadContracts Bloc where
         [ (funcId, funcName, sel)
         | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
         ]
-      argsToPairs = map (\ arg -> (argName arg, arg))
     funcs <- fmap Map.fromList $
       for funcIdNameSels $ \ (funcId,funcName,sel) -> do
         args <- do
           tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
           for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-            return Arg
-              { argName = name
-              , argIndex = index
+            return $ (name, ) Arg
+              { argIndex = index
               , argType = ty
               , argTypedef = tyd
               , argDynamic = dy
@@ -168,18 +166,17 @@ instance MonadContracts Bloc where
               }
         let
           func = Func
-            { funcArgs = Map.fromList (argsToPairs args)
+            { funcArgs = Map.fromList args
             , funcSelector = Text.decodeUtf8 sel
             , funcVals = Map.fromList vals
             }
         return (funcName,func)
     constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-    constr <- Map.fromList . argsToPairs <$> do
+    constr <- Map.fromList <$> do
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
       for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-        return Arg
-          { argName = name
-          , argIndex = index
+        return $ (name, ) Arg
+          { argIndex = index
           , argType = ty
           , argTypedef = tyd
           , argDynamic = dy

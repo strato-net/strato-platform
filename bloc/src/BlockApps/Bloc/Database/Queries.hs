@@ -300,10 +300,10 @@ getContractsMetaDataId contractName = \case
 
 insertXabiFunctionArg
   :: Int32
-  -> [Arg]
+  -> Map Text Arg
   -> Connection -> IO ()
 insertXabiFunctionArg funcId args conn = do
-  entryTypeIdss <- for args $ \ Arg{argEntry = argEntry} ->
+  entryTypeIdss <- for (toList args) $ \ Arg{argEntry = argEntry} ->
     case argEntry of
       Nothing -> return [Nothing::Maybe Int32]
       Just Entry{..} -> runInsertReturning conn xabiTypesTable
@@ -330,17 +330,17 @@ insertXabiFunctionArg funcId args conn = do
       , Opaleye.null
       , Opaleye.null
       )
-    | (entryTypeId,Arg{..}) <- zip entryTypeIds args
+    | (entryTypeId,Arg{..}) <- zip entryTypeIds (toList args)
     ]
     (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
   void $ runInsertMany conn xabiFunctionArgumentsTable
     [ ( Nothing
       , constant funcId
       , constant (typeId::Int32)
-      , constant argName 
+      , constant name --TODO: this could end up reordered. Revisit
       , constant argIndex
       )
-    | (typeId,Arg{..}) <- zip typeIds args
+    | (typeId,(name,Arg{..})) <- zip typeIds (Map.toList args)
     ]
 
 insertXabiFunctionRet
@@ -956,7 +956,7 @@ compileContract contractName source = do
       forMap_ funcs $ \ funcName Func{..} -> do
         funcId <- blocModify1 $ insertXabiFunction
           metaDataId funcName funcSelector False
-        blocModify $ insertXabiFunctionArg funcId (toList funcArgs)
+        blocModify $ insertXabiFunctionArg funcId funcArgs
         blocModify $ insertXabiFunctionRet funcId (toList funcVals)
     return metaDataId
   for_ metaDataIds $ \ leftMetaDataId ->
