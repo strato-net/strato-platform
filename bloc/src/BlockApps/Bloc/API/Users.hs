@@ -126,10 +126,11 @@ instance MonadUsers Bloc where
           <- queryTable xabiFunctionsTable -< ()
         restrict -< contractMetaDataId .== constant cmId .&& isConstr
         returnA -< xfId
-      functionId <- blocMaybe "functionId" $ listToMaybe functionIds
+      logNotice . withCallStack =<< timestamp ("functionIds: " <> Text.pack (show functionIds))
       argsBin <- case args of
         Nothing -> return ByteString.empty
         Just argsMap -> do
+          functionId <- blocMaybe "functionId" $ listToMaybe functionIds
           argNamesTypes <- fmap Map.fromList . blocQuery $ proc () -> do
             (name,_,ty,_,dy,_,ety,_) <- getXabiFunctionsArgsQuery functionId -< ()
             returnA -< (name,(ty,dy,ety))
@@ -150,6 +151,7 @@ instance MonadUsers Bloc where
           return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
       tx <- prepareTx
         userName password addr Nothing txParams (Wei (fromIntegral value)) (bin <> argsBin)
+      logNotice . withCallStack =<< timestamp ("tx is: " <> Text.pack (show tx))
       hash <- blocStrato $ postTx tx
       txResult <- pollTxResult hash
       let
@@ -459,7 +461,7 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
         accountsFilterParams{qaAddress = Just addr}
       nonce <- case listToMaybe accts of
         Nothing -> throwError . UserError $ "strato error: failed to find account"
-        Just acct -> return . incrNonce $ accountNonce acct
+        Just acct -> return $ accountNonce acct
       return $ prepareSignedTx sk addr UnsignedTransaction
         { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
         , unsignedTransactionGasPrice =

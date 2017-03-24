@@ -30,13 +30,16 @@ spec :: SpecWith TestConfig
 spec = do
   describe "Integration Tests" $ do
     it "should send Ether between two users" $ \ TestConfig {..} -> do
+      pendingWith "Skipping until contract E2E works"
       let
           userName1 = UserName "blockapps1"
           userName2 = UserName "blockapps2"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
           postUsersUserRequest2 = PostUsersUserRequest 1 pw
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      threadDelay 3000000
       postUsersEither2 <- runClientM (postUsersUser userName2 postUsersUserRequest2) (ClientEnv mgr blocUrl)
+      threadDelay 3000000
       postUsersEither1 `shouldSatisfy` isRight
       postUsersEither2 `shouldSatisfy` isRight
       let
@@ -60,9 +63,10 @@ spec = do
         balance2 = unStrung (accountBalance account2)
       balance1 `shouldBe` initialWei
       balance2 `shouldBe` initialWei
+      threadDelay 4000000
       let
         etherToSend = 100
-        postSendParameters = PostSendParameters (address2) etherToSend pw txParams
+        postSendParameters = PostSendParameters (address2) (etherToWei etherToSend) pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
@@ -77,15 +81,15 @@ spec = do
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
       -- create Users
-
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
-
+      threadDelay 4000000
       let
         Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageSrc
           , postuserscontractrequestPassword = pw
@@ -94,6 +98,14 @@ spec = do
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = 0
           }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      print (show accts1)
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
       let

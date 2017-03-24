@@ -837,21 +837,28 @@ upsertContractMetaDataQuery
   -> Connection -> IO (Maybe Int32)
 upsertContractMetaDataQuery
   contractId bin binRuntime codeHash conn = do
-    ciIds <- runQuery conn $ proc () -> do
-      (ciId,contractMetaDataId,_,_) <- queryTable contractsInstanceTable -< ()
-      restrict -< contractMetaDataId .== ciId
-      returnA -< ciId
-    listToMaybe <$>
-      if null (ciIds::[Int32])
-        then
-          runInsertReturning conn contractsMetaDataTable
-            writeColumns
-            (\ (contractMetaDataId,_,_,_,_) -> contractMetaDataId)
-        else
-          runUpdateReturning conn contractsMetaDataTable
-            (\ _ -> writeColumns)
-            (\ (_,cId,_,_,_) -> cId .== constant contractId)
-            (\ (contractMetaDataId,_,_,_,_) -> contractMetaDataId)
+    cmIds <- runQuery conn $ proc () -> do
+      (cmId,_,_,_,ch) <- queryTable contractsMetaDataTable -< ()
+      restrict -< ch .== constant codeHash
+      returnA -< cmId
+    case listToMaybe cmIds of
+      Just cmId -> return $ Just cmId
+      Nothing -> do
+        ciIds <- runQuery conn $ proc () -> do
+          (ciId,contractMetaDataId,_,_) <- queryTable contractsInstanceTable -< ()
+          restrict -< contractMetaDataId .== ciId
+          returnA -< ciId
+        listToMaybe <$>
+          if null (ciIds::[Int32])
+            then
+              runInsertReturning conn contractsMetaDataTable
+                writeColumns
+                (\ (contractMetaDataId,_,_,_,_) -> contractMetaDataId)
+            else
+              runUpdateReturning conn contractsMetaDataTable
+                (\ _ -> writeColumns)
+                (\ (_,cId,_,_,_) -> cId .== constant contractId)
+                (\ (contractMetaDataId,_,_,_,_) -> contractMetaDataId)
   where
     writeColumns =
       ( Nothing
