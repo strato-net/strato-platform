@@ -53,7 +53,7 @@ import BlockApps.Solidity.Contract
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
---import BlockApps.XAbiConverter
+import BlockApps.XAbiConverter
 
 import BlockApps.Bloc.DummyContractStorage
 
@@ -215,11 +215,16 @@ instance MonadContracts Bloc where
       { contractdetailsXabi = Xabi funcs constr vars }
 
   getContractsState contractName contractId = do
-    contract <- getContract contractName contractId
+    --contract <- getContract contractName contractId
 
-    --let contractXAbi = Xabi{xabiFuncs=undefined, xabiConstr=undefined, xabiVars=undefined}
 
-    --    contract = xAbiToContract contractXAbi
+
+    let arrayXabiString = "{\"vars\":{\"int32Array\":{\"atBytes\":288,\"dynamic\":true,\"entry\":{\"signed\":true,\"type\":\"Int\",\"bytes\":4},\"type\":\"Array\"},\"fixedUInt8Array\":{\"atBytes\":256,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":1},\"type\":\"Array\"},\"uintArray\":{\"atBytes\":320,\"dynamic\":true,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"},\"notice\":{\"atBytes\":352,\"dynamic\":true,\"type\":\"String\"},\"fixedUIntArray\":{\"atBytes\":0,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"}}}"
+
+        contractXAbi = fromMaybe (error "xabi alert!") $ decode arrayXabiString
+        --contractXAbi = Xabi{xabiFuncs=undefined, xabiConstr=undefined, xabiVars=Map.empty}
+
+        contract = xAbiToContract contractXAbi
 
     storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
 
