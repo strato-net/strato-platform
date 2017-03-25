@@ -7,6 +7,8 @@
 
 module BlockApps.XAbiConverter where
 
+import Data.Function
+import Data.List
 import qualified Data.Map as Map
 import Data.Text (Text)
 
@@ -89,7 +91,8 @@ xAbiToContract Xabi{..} =
     typeDefs' = TypeDefs{enumDefs=Map.fromList [], structDefs=Map.fromList []}
   in
    Contract{
-     mainStruct=fieldsToStruct typeDefs' $ map (fmap varToType) $ Map.toList xabiVars, --  Struct{fields=Map.fromList [], size=0},
+     mainStruct=
+        fieldsToStruct typeDefs' $ map (fmap varToType) $ sortBy (compare `on` (varAtBytes . snd)) $ Map.toList xabiVars, --  Struct{fields=Map.fromList [], size=0},
      typeDefs=typeDefs'
      }
 
