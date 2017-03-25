@@ -191,6 +191,7 @@ instance MonadContracts Bloc where
         return $ (name,) Var
           { varAtBytes = atBy
           , varType = Just ty
+          , varLength = Nothing -- TODO figure out what this should be....
           , varTypedef = Just tyd
           , varDynamic = Just dy
           , varSigned = Just si
@@ -220,6 +221,21 @@ instance MonadContracts Bloc where
 
 
     let arrayXabiString = "{\"vars\":{\"int32Array\":{\"atBytes\":288,\"dynamic\":true,\"entry\":{\"signed\":true,\"type\":\"Int\",\"bytes\":4},\"type\":\"Array\"},\"fixedUInt8Array\":{\"atBytes\":256,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":1},\"type\":\"Array\"},\"uintArray\":{\"atBytes\":320,\"dynamic\":true,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"},\"notice\":{\"atBytes\":352,\"dynamic\":true,\"type\":\"String\"},\"fixedUIntArray\":{\"atBytes\":0,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"}}}"
+
+
+{-
+{\"vars\":{
+  \"int32Array\":{\"atBytes\":288,\"dynamic\":true,\"entry\":{\"signed\":true,\"type\":\"Int\",\"bytes\":4},\"type\":\"Array\"},
+
+  \"fixedUInt8Array\":{\"atBytes\":256,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":1},\"type\":\"Array\"},
+
+  \"uintArray\":{\"atBytes\":320,\"dynamic\":true,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"},
+
+  \"notice\":{\"atBytes\":352,\"dynamic\":true,\"type\":\"String\"},
+
+  \"fixedUIntArray\":{\"atBytes\":0,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"}}}"
+-}
+    
 
         contractXAbi = fromMaybe (error "xabi alert!") $ decode arrayXabiString
         --contractXAbi = Xabi{xabiFuncs=undefined, xabiConstr=undefined, xabiVars=Map.empty}

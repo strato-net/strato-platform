@@ -46,9 +46,42 @@ addPositions typeDefs' p0 (theType:rest) =
 
 
 varToType::Var->Type
-varToType Var { varType=Just "Array" } = TypeArrayDynamic undefined undefined
-varToType Var { varType=Just "Array" } = TypeArrayFixed undefined undefined
-varToType v = error $ "undefined var in varToType: " ++ show v
+varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just Entry{entryType=entryType, entryBytes=b} } =
+  TypeArrayFixed len $ varToType Var{ --I think Entry should just be Var, and this messy undefined thing could be avoided
+    varType=Just entryType,
+    varAtBytes=undefined,
+    varLength=undefined,
+    varTypedef=undefined,
+    varDynamic=undefined,
+    varSigned=undefined,
+    varBytes=Just b,
+    varEntry=undefined,
+    varVal=undefined,
+    varKey=undefined
+    }
+varToType Var { varType=Just "Array", varEntry=Just Entry{entryType=entryType, entryBytes=b} } =
+  TypeArrayDynamic $ varToType Var{
+    varType=Just entryType,
+    varAtBytes=undefined,
+    varLength=undefined,
+    varTypedef=undefined,
+    varDynamic=undefined,
+    varSigned=undefined,
+    varBytes=Just b,
+    varEntry=undefined,
+    varVal=undefined,
+    varKey=undefined
+    }
+
+
+
+
+
+varToType Var { varType=Just "String" } = SimpleType TypeString
+varToType Var { varType=Just "Int", varBytes=Just 1 } = SimpleType TypeInt8
+varToType Var { varType=Just "Int", varBytes=Just 4 } = SimpleType TypeInt32
+varToType Var { varType=Just "Int", varBytes=Just 32 } = SimpleType TypeInt256
+varToType v = error $ "undefined var in varToType: " ++ show (varType v) ++ ":" ++ show (varBytes v)
 
 xAbiToContract::Xabi->Contract
 xAbiToContract Xabi{..} =

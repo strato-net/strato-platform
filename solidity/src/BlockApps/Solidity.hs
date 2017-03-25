@@ -115,6 +115,7 @@ instance Arbitrary Val where arbitrary = genericArbitrary uniform
 data Var = Var
   { varAtBytes :: Int32
   , varType :: Maybe Text
+  , varLength :: Maybe Word
   , varTypedef :: Maybe Text
   , varDynamic :: Maybe Bool
   , varSigned :: Maybe Bool
