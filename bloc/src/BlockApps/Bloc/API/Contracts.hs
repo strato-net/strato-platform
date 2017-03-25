@@ -105,7 +105,7 @@ instance MonadContracts Bloc where
 
   getContractsContract (ContractName contractName) contractId = do
     let
-      noXabi = Xabi Nothing Nothing Nothing
+      noXabi = Xabi Map.empty Map.empty Map.empty
       detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
@@ -141,15 +141,13 @@ instance MonadContracts Bloc where
         [ (funcId, funcName, sel)
         | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
         ]
-      argsToPairs = map (\ arg -> (argName arg, arg))
     funcs <- fmap Map.fromList $
       for funcIdNameSels $ \ (funcId,funcName,sel) -> do
         args <- do
           tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
           for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-            return Arg
-              { argName = name
-              , argIndex = index
+            return $ (name, ) Arg
+              { argIndex = index
               , argType = ty
               , argTypedef = tyd
               , argDynamic = dy
@@ -169,18 +167,17 @@ instance MonadContracts Bloc where
               }
         let
           func = Func
-            { funcArgs = Map.fromList (argsToPairs args)
+            { funcArgs = Map.fromList args
             , funcSelector = Text.decodeUtf8 sel
             , funcVals = Map.fromList vals
             }
         return (funcName,func)
     constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-    constr <- Map.fromList . argsToPairs <$> do
+    constr <- Map.fromList <$> do
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
       for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-        return Arg
-          { argName = name
-          , argIndex = index
+        return $ (name, ) Arg
+          { argIndex = index
           , argType = ty
           , argTypedef = tyd
           , argDynamic = dy
@@ -214,7 +211,7 @@ instance MonadContracts Bloc where
             }
           }
     return $ contractDetails
-      { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
+      { contractdetailsXabi = Xabi funcs constr vars }
 
   getContractsState contractName contractId = do
     contract <- getContract contractName contractId
@@ -227,11 +224,13 @@ instance MonadContracts Bloc where
 
         ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract) (mainStruct contract) storage 0
 
-    logNotice $
-      Text.pack $
-      "Storage:\n"
-      ++ unlines (map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap)
-      ++ "\nEnd of storage\n"
+    logNotice . withCallStack =<< timestamp
+      ( Text.unlines
+        [ "Storage:"
+        , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+        , "End of storage"
+        ]
+      )
 
     return $ Map.fromList ret
 

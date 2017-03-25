@@ -12,6 +12,7 @@ import qualified Data.ByteString as ByteString
 import Data.Foldable
 import Data.Int (Int32)
 import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
@@ -53,14 +54,18 @@ instance Arbitrary SolidityValue where
   arbitrary = return (SolidityBool True)
 
 data Xabi = Xabi
-  { xabiFuncs :: Maybe (Map Text Func)
-  , xabiConstr :: Maybe (Map Text Arg)
-  , xabiVars :: Maybe (Map Text Var)
+  { xabiFuncs :: Map Text Func
+  , xabiConstr :: Map Text Arg
+  , xabiVars :: Map Text Var
   } deriving (Eq,Show,Generic)
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Xabi where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON =
+    withObject "xabi" $ \v ->
+    Xabi <$> v .:? "funcs" .!= Map.empty
+         <*> v .:? "constr" .!= Map.empty
+         <*> v .:? "vars" .!= Map.empty
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 data Func = Func
   { funcArgs :: Map Text Arg
@@ -73,8 +78,7 @@ instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 data Arg = Arg
-  { argName :: Text -- TODO: Name is not given for arguments that are of type Contract
-  , argIndex :: Int32
+  { argIndex :: Int32
   , argType :: Maybe Text
   , argTypedef :: Maybe Text
   , argDynamic :: Maybe Bool
