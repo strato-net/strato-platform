@@ -53,6 +53,7 @@ import BlockApps.Solidity.Contract
 import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
+--import BlockApps.XAbiConverter
 
 import BlockApps.Bloc.DummyContractStorage
 
@@ -215,6 +216,10 @@ instance MonadContracts Bloc where
 
   getContractsState contractName contractId = do
     contract <- getContract contractName contractId
+
+    --let contractXAbi = Xabi{xabiFuncs=undefined, xabiConstr=undefined, xabiVars=undefined}
+
+    --    contract = xAbiToContract contractXAbi
 
     storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
 
