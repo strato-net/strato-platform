@@ -113,14 +113,14 @@ instance FromJSON Val where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Val where arbitrary = genericArbitrary uniform
 data Var = Var
-  { varAtBytes :: Int32
+  { varAtBytes :: Maybe Int32
   , varType :: Maybe Text
   , varLength :: Maybe Word
   , varTypedef :: Maybe Text
   , varDynamic :: Maybe Bool
   , varSigned :: Maybe Bool
   , varBytes :: Maybe Int32
-  , varEntry :: Maybe Entry
+  , varEntry :: Maybe Var
   , varVal :: Maybe SimpleVar
   , varKey :: Maybe SimpleVar
   } deriving (Eq,Show,Generic)

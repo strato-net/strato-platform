@@ -48,28 +48,28 @@ addPositions typeDefs' p0 (theType:rest) =
 
 
 varToType::Var->Type
-varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just Entry{entryType=entryType, entryBytes=b} } =
+varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just Var{varType=entryType, varBytes=b} } =
   TypeArrayFixed len $ varToType Var{ --I think Entry should just be Var, and this messy undefined thing could be avoided
-    varType=Just entryType,
+    varType=entryType,
     varAtBytes=undefined,
     varLength=undefined,
     varTypedef=undefined,
     varDynamic=undefined,
     varSigned=undefined,
-    varBytes=Just b,
+    varBytes=b,
     varEntry=undefined,
     varVal=undefined,
     varKey=undefined
     }
-varToType Var { varType=Just "Array", varEntry=Just Entry{entryType=entryType, entryBytes=b} } =
+varToType Var { varType=Just "Array", varEntry=Just Var{varType=entryType, varBytes=b} } =
   TypeArrayDynamic $ varToType Var{
-    varType=Just entryType,
+    varType=entryType,
     varAtBytes=undefined,
     varLength=undefined,
     varTypedef=undefined,
     varDynamic=undefined,
     varSigned=undefined,
-    varBytes=Just b,
+    varBytes=b,
     varEntry=undefined,
     varVal=undefined,
     varKey=undefined
@@ -92,7 +92,7 @@ xAbiToContract Xabi{..} =
   in
    Contract{
      mainStruct=
-        fieldsToStruct typeDefs' $ map (fmap varToType) $ sortBy (compare `on` (varAtBytes . snd)) $ Map.toList xabiVars, --  Struct{fields=Map.fromList [], size=0},
+        fieldsToStruct typeDefs' $ map (fmap varToType) $ sortBy (compare `on` (varAtBytes . snd)) $ Map.toList xabiVars,
      typeDefs=typeDefs'
      }
 

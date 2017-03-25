@@ -189,14 +189,25 @@ instance MonadContracts Bloc where
       tuples <- blocQuery (getXabiVariablesQuery metadataId)
       for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
         return $ (name,) Var
-          { varAtBytes = atBy
+          { varAtBytes = Just atBy
           , varType = Just ty
           , varLength = Nothing -- TODO figure out what this should be....
           , varTypedef = Just tyd
           , varDynamic = Just dy
           , varSigned = Just si
           , varBytes = Just by
-          , varEntry = Entry <$> Just eby <*> Just ety
+          , varEntry = Just Var{
+                            varBytes=Just eby, 
+                            varType=Just ety,  
+                            varAtBytes=Nothing,
+                            varLength=Nothing,
+                            varTypedef=Nothing,
+                            varDynamic=Nothing,
+                            varSigned=Nothing,
+                            varEntry=Nothing,
+                            varVal=Nothing,
+                            varKey=Nothing
+                           }
           , varVal = Just SimpleVar
             { simplevarType = vty
             , simplevarBytes = Just vby
