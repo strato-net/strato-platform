@@ -22,6 +22,7 @@ import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
+import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Foldable
 import Data.Int
 import Data.Maybe
@@ -55,6 +56,7 @@ import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.XAbiConverter
 
+import BlockApps.Bloc.DummierContractStorage
 import BlockApps.Bloc.DummyContractStorage
 
 class Monad m => MonadContracts m where
@@ -226,34 +228,12 @@ instance MonadContracts Bloc where
     return $ contractDetails
       { contractdetailsXabi = Xabi funcs constr vars }
 
-  getContractsState contractName contractId = do
-    --contract <- getContract contractName contractId
-
-
-
-    let arrayXabiString = "{\"vars\":{\"int32Array\":{\"atBytes\":288,\"dynamic\":true,\"entry\":{\"signed\":true,\"type\":\"Int\",\"bytes\":4},\"type\":\"Array\"},\"fixedUInt8Array\":{\"atBytes\":256,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":1},\"type\":\"Array\"},\"uintArray\":{\"atBytes\":320,\"dynamic\":true,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"},\"notice\":{\"atBytes\":352,\"dynamic\":true,\"type\":\"String\"},\"fixedUIntArray\":{\"atBytes\":0,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"}}}"
-
-
-{-
-{\"vars\":{
-  \"int32Array\":{\"atBytes\":288,\"dynamic\":true,\"entry\":{\"signed\":true,\"type\":\"Int\",\"bytes\":4},\"type\":\"Array\"},
-
-  \"fixedUInt8Array\":{\"atBytes\":256,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":1},\"type\":\"Array\"},
-
-  \"uintArray\":{\"atBytes\":320,\"dynamic\":true,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"},
-
-  \"notice\":{\"atBytes\":352,\"dynamic\":true,\"type\":\"String\"},
-
-  \"fixedUIntArray\":{\"atBytes\":0,\"length\":8,\"entry\":{\"type\":\"Int\",\"bytes\":32},\"type\":\"Array\"}}}"
--}
-    
-
-        contractXAbi = fromMaybe (error "xabi alert!") $ decode arrayXabiString
-        --contractXAbi = Xabi{xabiFuncs=undefined, xabiConstr=undefined, xabiVars=Map.empty}
-
+  getContractsState (ContractName contractName) contractId = do
+    let arrayXabiString = getContractXabiString $ Text.unpack contractName
+        contractXAbi = fromMaybe (error "xabi alert!") $ decode $ BLC.pack arrayXabiString
         contract = xAbiToContract contractXAbi
 
-    storage' <- blocStrato $ getStorage $ Just $ getAddress contractName contractId
+    storage' <- blocStrato $ getStorage $ Just $ getAddress (ContractName contractName) contractId
 
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
         storage k = fromMaybe 0 $ Map.lookup k storageMap
