@@ -31,10 +31,85 @@ getContractXabiString name =
 
 |]
 
+   "Consumer" -> [r|
+{"funcs":{"setFeed":{"args":{"addr":{"type":"Address","index":0}},"selector":"55b775ea","vals":{}},"callFeed":{"args":{},"selector":"f198f5df","vals":{}}},"vars":{"feed":{"atBytes":0,"typedef":"InfoFeed","type":"Contract","bytes":20},"global":{"atBytes":32,"type":"Int","bytes":32}}}
+|]
 
+   "FixedArray" -> [r|
+{"vars":{"x8":{"atBytes":256,"length":8,"entry":{"type":"Int","bytes":1},"type":"Array"},"notice":{"atBytes":288,"dynamic":true,"type":"String"},"x":{"atBytes":0,"length":8,"entry":{"type":"Int","bytes":32},"type":"Array"}}}
+|]
 
+   "mortal" -> [r|
 
+{"funcs":{"kill":{"args":{},"selector":"41c0e1b5","vals":{}}},"vars":{"owner":{"atBytes":0,"type":"Address"}}}
 
+|]
+
+   "SimpleMultiSig" -> [r|
+
+{"funcs":{"register":{"args":{"registerAlice1":{"type":"Address","index":0},"registerAlice2":{"type":"Address","index":1}},"selector":"aa677354","vals":{}},"withdraw":{"args":{"to":{"type":"Address","index":0}},"selector":"51cff8d9","vals":{}},"addSignature":{"args":{},"selector":"5614d3e0","vals":{}}},"vars":{"bob":{"atBytes":64,"type":"Address"},"signedYet":{"atBytes":192,"dynamic":true,"value":{"type":"Bool"},"key":{"type":"Address"},"type":"Mapping"},"error":{"atBytes":128,"type":"Bytes","bytes":32},"alice1":{"atBytes":0,"type":"Address"},"numSigned":{"atBytes":96,"type":"Int","bytes":32},"alice2":{"atBytes":32,"type":"Address"},"registeredYet":{"atBytes":160,"type":"Bool"}}}
+
+|]
+
+   "Struct" -> [r|
+
+{"types":{"Animals":{"names":{"Dog":0,"Cat":1,"Pig":2},"type":"Enum","bytes":1},"Pet":{"type":"Struct","bytes":96,"fields":{"fleasAndTicks":{"atBytes":65,"type":"Bool"},"age":{"atBytes":64,"signed":true,"type":"Int","bytes":1},"animal":{"atBytes":0,"typedef":"Animals"},"name":{"atBytes":32,"dynamic":true,"type":"String"}}}},"vars":{"sammy":{"atBytes":0,"typedef":"Pet","type":"Struct","bytes":96}}}
+
+|]
+
+   "Enums" -> [r|
+
+{"types":{"ActionChoices":{"names":{"GoLeft":0,"GoRight":1,"GoStraight":2,"SitStill":3},"type":"Enum","bytes":1}},"vars":{"defaultChoice":{"atBytes":1,"typedef":"ActionChoices","type":"Enum","bytes":1,"names":{"GoLeft":0,"GoRight":1,"GoStraight":2,"SitStill":3}},"choice":{"atBytes":0,"typedef":"ActionChoices","type":"Enum","bytes":1,"names":{"GoLeft":0,"GoRight":1,"GoStraight":2,"SitStill":3}}}}
+
+|]
+
+   "Greeter" -> [r|
+
+{"funcs":{"kill":{"args":{},"selector":"41c0e1b5","vals":{}},"greet":{"args":{},"selector":"cfae3217","vals":{"#0":{"dynamic":true,"type":"String","index":0}}}},"constr":{"_greeting":{"dynamic":true,"type":"String","index":0}},"vars":{"owner":{"atBytes":0,"type":"Address"},"greeting":{"atBytes":32,"dynamic":true,"type":"String"}}}
+
+|]
+
+   "Payout" -> [r|
+
+{"funcs":{"Setup":{"args":{},"selector":"58793050","vals":{}},"Dividend":{"args":{},"selector":"8df554b3","vals":{}}},"vars":{"Victor":{"atBytes":0,"type":"Address"},"Jim":{"atBytes":32,"type":"Address"},"Kieren":{"atBytes":64,"type":"Address"},"ownershipDistribution":{"atBytes":96,"dynamic":true,"value":{"type":"Int","bytes":32},"key":{"type":"Address"},"type":"Mapping"}}}
+
+|]
+
+   "SimpleStorage" -> [r|
+
+{"funcs":{"set":{"args":{"x":{"type":"Int","index":0,"bytes":32}},"selector":"60fe47b1","vals":{}},"get":{"args":{},"selector":"6d4ce63c","vals":{"retVal":{"type":"Int","index":0,"bytes":32}}}},"vars":{"storedData":{"atBytes":0,"type":"Int","bytes":32}}}
+
+|]
+
+   "Struct2" -> [r|
+
+{"types":{"Pet":{"type":"Struct","bytes":96,"fields":{"fleasAndTicks":{"atBytes":65,"type":"Bool"},"age":{"atBytes":64,"signed":true,"type":"Int","bytes":1},"animal":{"atBytes":0,"dynamic":true,"type":"String"},"name":{"atBytes":32,"dynamic":true,"type":"String"}}}},"vars":{"proclamation":{"atBytes":128,"dynamic":true,"type":"String"},"sammy":{"atBytes":32,"typedef":"Pet","type":"Struct","bytes":96},"x":{"atBytes":0,"signed":true,"type":"Int","bytes":32},"I":{"atBytes":160,"typedef":"Pet","type":"Struct","bytes":96}}}
+
+|]
+
+   "ErrorCodes" -> [r|
+
+{"types":{"ErrorCodesEnum":{"names":{"NULL":0,"SUCCESS":1,"ERROR":2,"NOT_FOUND":3,"EXISTS":4,"RECURSIVE":5,"USERNAME_EXISTS":6,"STOREITEM_EXISTS":7,"INSUFFICIENT_BALANCE":8},"type":"Enum","bytes":1}},"vars":{"x":{"atBytes":0,"typedef":"ErrorCodesEnum","type":"Enum","bytes":1,"names":{"NULL":0,"SUCCESS":1,"ERROR":2,"NOT_FOUND":3,"EXISTS":4,"RECURSIVE":5,"USERNAME_EXISTS":6,"STOREITEM_EXISTS":7,"INSUFFICIENT_BALANCE":8}}}}
+
+|]
+
+   "InfoFeed" -> [r|
+
+{"funcs":{"info":{"args":{},"selector":"370158ea","vals":{"ret":{"type":"Int","index":0,"bytes":32}}}}}
+
+|]
+
+   "SimpleDataFeed" -> [r|
+
+{"funcs":{"update":{"args":{"newPrice":{"type":"Int","index":0,"bytes":32}},"selector":"82ab890a","vals":{}}},"vars":{"lastPrice":{"atBytes":0,"type":"Int","bytes":32}}}
+
+|]
+
+   "Stake" -> [r|
+
+{"funcs":{"payout":{"args":{},"selector":"63bd1d4a","vals":{}},"addStakeHolder":{"args":{"stakeholder":{"type":"Address","index":0}},"selector":"11a76f37","vals":{}}},"vars":{"holdingTheBag":{"atBytes":64,"type":"Address"},"numStakeHolders":{"atBytes":96,"type":"Int","bytes":32},"stake":{"atBytes":0,"dynamic":true,"value":{"type":"Int","bytes":32},"key":{"type":"Address"},"type":"Mapping"},"sumStake":{"atBytes":160,"type":"Int","bytes":32},"stakeHolders":{"atBytes":32,"dynamic":true,"entry":{"type":"Address"},"type":"Array"},"currentStake":{"atBytes":128,"type":"Int","bytes":32}}}
+
+|]
 
 
    x -> error $ "no contract is named " ++ x
