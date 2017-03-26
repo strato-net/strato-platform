@@ -9,6 +9,7 @@ module BlockApps.XAbiConverter where
 
 import Data.Function
 import Data.List
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 
@@ -83,12 +84,19 @@ varToType Var { varType=Just "String" } = SimpleType TypeString
 varToType Var { varType=Just "Int", varBytes=Just 1 } = SimpleType TypeInt8
 varToType Var { varType=Just "Int", varBytes=Just 4 } = SimpleType TypeInt32
 varToType Var { varType=Just "Int", varBytes=Just 32 } = SimpleType TypeInt256
+varToType Var { varType=Just "Enum", varTypedef=Just enumName } = TypeEnum enumName
 varToType v = error $ "undefined var in varToType: " ++ show (varType v) ++ ":" ++ show (varBytes v)
+
+getEnumDefs::Map Text Var->Map Text EnumSet
+getEnumDefs _ = Map.empty
 
 xAbiToContract::Xabi->Contract
 xAbiToContract Xabi{..} =
   let
-    typeDefs' = TypeDefs{enumDefs=Map.fromList [], structDefs=Map.fromList []}
+    typeDefs' = TypeDefs{
+      enumDefs=getEnumDefs xabiVars,
+      structDefs=Map.fromList []
+      }
   in
    Contract{
      mainStruct=
