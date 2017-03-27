@@ -138,7 +138,7 @@ waitNewBlock = do
 pollTxResult :: Text -> Bloc TransactionResult
 pollTxResult hash = untilJust $ do
   liftIO $ threadDelay 1000000
-  logNotice . withCallStack =<< timestamp ("Looking up " <> hash)
+  logWith logNotice $ "Looking up " <> hash
   result <- blocStrato $ getTxResult hash
   return $ listToMaybe result
 

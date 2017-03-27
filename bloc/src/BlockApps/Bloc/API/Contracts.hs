@@ -223,13 +223,11 @@ instance MonadContracts Bloc where
 
         ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
 
-    logNotice . withCallStack =<< timestamp
-      ( Text.unlines
-        [ "Storage:"
-        , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-        , "End of storage"
-        ]
-      )
+    logWith logNotice $ Text.unlines
+      [ "Storage:"
+      , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+      , "End of storage"
+      ]
 
     return $ Map.fromList ret
 
