@@ -210,12 +210,28 @@ instance MonadContracts Bloc where
                             varVal=Nothing,
                             varKey=Nothing
                            }
-          , varVal = Just SimpleVar
-            { simplevarType = vty
-            , simplevarBytes = Just vby
-            , simplevarDynamic = Just vdy
-            , simplevarSigned = Just vsi
-            , simplevarEntry = Entry <$> Just veby <*> Just vety
+          , varVal = Just Var
+            { varType = Just vty
+            , varBytes = Just vby
+            , varDynamic = Just vdy
+            , varSigned = Just vsi
+            , varEntry = Just Var{
+                            varBytes=Just veby, 
+                            varType=Just vety,  
+                            varAtBytes=Nothing,
+                            varLength=Nothing,
+                            varTypedef=Nothing,
+                            varDynamic=Nothing,
+                            varSigned=Nothing,
+                            varEntry=Nothing,
+                            varVal=Nothing,
+                            varKey=Nothing
+                           }
+            , varAtBytes = Nothing
+            , varLength = Nothing
+            , varTypedef = Nothing
+            , varVal = Nothing
+            , varKey = Nothing
             }
           , varKey = Just SimpleVar
             { simplevarType = kty
@@ -429,3 +445,9 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
+
+
+
+
+
+

@@ -759,4 +759,4 @@ getAddress (ContractName "FixedArray") _ = Address 0xf450d26fcfa6f40c0e27ad7d466
 
 getAddress (ContractName "Array") _ = Address 0xd92575a5525384ff9cc5601071d9de48dc756f12
 
-getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
+getAddress (ContractName x) _ = error $ "Error in getAddress: You fool, there is no '" ++ T.unpack x ++ "' contract"

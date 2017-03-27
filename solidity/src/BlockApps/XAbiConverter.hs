@@ -48,6 +48,21 @@ addPositions typeDefs' p0 (theType:rest) =
    fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
 
 
+
+
+
+simplevarToSimpleType::SimpleVar->SimpleType
+simplevarToSimpleType SimpleVar { simplevarType="String" } = TypeString
+simplevarToSimpleType SimpleVar { simplevarType="Address" } = TypeAddress
+simplevarToSimpleType SimpleVar { simplevarType="Int", simplevarBytes=Just 1 } = TypeInt8
+simplevarToSimpleType SimpleVar { simplevarType="Int", simplevarBytes=Just 4 } = TypeInt32
+simplevarToSimpleType SimpleVar { simplevarType="Int", simplevarBytes=Just 32 } = TypeInt256
+
+simplevarToSimpleType v = error $ "undefined var in varToSimpleType: " ++ show (simplevarType v) ++ ":" ++ show (simplevarBytes v)
+
+
+
+
 varToType::Var->Type
 varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just Var{varType=entryType, varBytes=b} } =
   TypeArrayFixed len $ varToType Var{ --I think Entry should just be Var, and this messy undefined thing could be avoided
@@ -58,7 +73,7 @@ varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just Var{varT
     varDynamic=undefined,
     varSigned=undefined,
     varBytes=b,
-    varEntry=undefined,
+    varEntry=Nothing,
     varVal=undefined,
     varKey=undefined
     }
@@ -71,7 +86,7 @@ varToType Var { varType=Just "Array", varEntry=Just Var{varType=entryType, varBy
     varDynamic=undefined,
     varSigned=undefined,
     varBytes=b,
-    varEntry=undefined,
+    varEntry=Nothing,
     varVal=undefined,
     varKey=undefined
     }
@@ -79,13 +94,36 @@ varToType Var { varType=Just "Array", varEntry=Just Var{varType=entryType, varBy
 
 
 
+varToType Var { varType=Just "Contract", varTypedef=Just name } = TypeContract name
+varToType Var { varType=Just "Mapping", varKey=Just k, varVal=Just v } = TypeMapping (simplevarToSimpleType k) (varToType v)
 
-varToType Var { varType=Just "String" } = SimpleType TypeString
-varToType Var { varType=Just "Int", varBytes=Just 1 } = SimpleType TypeInt8
-varToType Var { varType=Just "Int", varBytes=Just 4 } = SimpleType TypeInt32
-varToType Var { varType=Just "Int", varBytes=Just 32 } = SimpleType TypeInt256
 varToType Var { varType=Just "Enum", varTypedef=Just enumName } = TypeEnum enumName
-varToType v = error $ "undefined var in varToType: " ++ show (varType v) ++ ":" ++ show (varBytes v)
+varToType v = SimpleType $ simplevarToSimpleType $ varAsSimpleVar v
+
+
+
+varAsSimpleVar::Var->SimpleVar
+varAsSimpleVar Var{varType=Just varType, varBytes=varBytes, varDynamic=varDynamic, varSigned=varSigned, varEntry=Nothing} =
+  SimpleVar{
+    simplevarType=varType,
+    simplevarBytes=varBytes,
+    simplevarDynamic=varDynamic,
+    simplevarSigned=varSigned,
+    simplevarEntry=Nothing
+    }
+varAsSimpleVar Var{varType=Just varType, varBytes=varBytes, varDynamic=varDynamic, varSigned=varSigned, varEntry=Just Var{varType=Just innerType, varBytes=Just innerBytes}} =
+  SimpleVar{
+    simplevarType=varType,
+    simplevarBytes=varBytes,
+    simplevarDynamic=varDynamic,
+    simplevarSigned=varSigned,
+    simplevarEntry=Just Entry{
+      entryType=innerType,
+      entryBytes=innerBytes
+      }
+    }
+varAsSimpleVar x = error $ "Oops, varAsSimpleVar cannot convert " ++ show x
+
 
 getEnumDefs::Map Text Var->Map Text EnumSet
 getEnumDefs _ = Map.empty

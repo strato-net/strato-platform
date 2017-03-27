@@ -121,7 +121,7 @@ data Var = Var
   , varSigned :: Maybe Bool
   , varBytes :: Maybe Int32
   , varEntry :: Maybe Var
-  , varVal :: Maybe SimpleVar
+  , varVal :: Maybe Var
   , varKey :: Maybe SimpleVar
   } deriving (Eq,Show,Generic)
 instance ToJSON Var where
