@@ -1,6 +1,7 @@
 {-# LANGUAGE
     DeriveGeneric
   , OverloadedStrings
+  , RecordWildCards
 #-}
 
 module BlockApps.Solidity where
@@ -101,20 +102,91 @@ data IndexedXabiType =
     } deriving (Eq, Show, Generic)
 
 instance FromJSON IndexedXabiType where
-  parseJSON _ = undefined
+  parseJSON = 
+    withObject "xabi" $ \v -> do
+      index <-  v .: "index"
+      theType <- v .:? "type"
+      typedef <- v .:? "typedef"
+      dynamic <- v .:? "dynamic"
+      signed <- v .:? "signed"
+      bytes <- v .:? "bytes"
+      entry <- v .:? "entry"
+      val <- v .:? "val"
+      key <- v .:? "key"
+      return $ IndexedXabiType index
+        XabiType {
+        xabiTypeType = theType,
+        xabiTypeTypedef = typedef, 
+        xabiTypeDynamic = dynamic, 
+        xabiTypeSigned = signed, 
+        xabiTypeBytes = bytes, 
+        xabiTypeEntry = entry, 
+        xabiTypeVal = val, 
+        xabiTypeKey = key
+        }
+ 
+         
 instance ToJSON IndexedXabiType where
-  toJSON = undefined
+  toJSON (IndexedXabiType index XabiType{..}) = object
+    [ "index" .= index
+    , "type" .= xabiTypeType
+    , "typedef" .= xabiTypeTypedef
+    , "dynamic" .= xabiTypeDynamic
+    , "signed" .= xabiTypeSigned
+    , "bytes" .= xabiTypeBytes
+    , "entry" .= xabiTypeEntry
+    , "val" .= xabiTypeVal
+    , "key" .= xabiTypeKey
+    ]
+
+    
 instance Arbitrary IndexedXabiType where arbitrary = genericArbitrary uniform
   
 data VarType =
   VarType {
-    varTypeType::XabiType
-  , varTypeAtBytes::Int32
+    varTypeAtBytes::Int32
+  , varTypeType::XabiType
     } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
-  parseJSON _ = undefined
+  parseJSON =
+    withObject "xabi" $ \v -> do
+      atBytes <-  v .: "atbytes"
+      theType <- v .:? "type"
+      typedef <- v .:? "typedef"
+      dynamic <- v .:? "dynamic"
+      signed <- v .:? "signed"
+      bytes <- v .:? "bytes"
+      entry <- v .:? "entry"
+      val <- v .:? "val"
+      key <- v .:? "key"
+      return $ VarType atBytes
+        XabiType {
+        xabiTypeType = theType,
+        xabiTypeTypedef = typedef, 
+        xabiTypeDynamic = dynamic, 
+        xabiTypeSigned = signed, 
+        xabiTypeBytes = bytes, 
+        xabiTypeEntry = entry, 
+        xabiTypeVal = val, 
+        xabiTypeKey = key
+        }
+
 instance ToJSON VarType where
-  toJSON = undefined
+  toJSON (VarType varTypeAtBytes XabiType{..}) = object
+    [ "atbytes" .= varTypeAtBytes
+    , "type" .= xabiTypeType
+    , "typedef" .= xabiTypeTypedef
+    , "dynamic" .= xabiTypeDynamic
+    , "signed" .= xabiTypeSigned
+    , "bytes" .= xabiTypeBytes
+    , "entry" .= xabiTypeEntry
+    , "val" .= xabiTypeVal
+    , "key" .= xabiTypeKey
+    ]
+
+
+
+
 instance Arbitrary VarType where arbitrary = genericArbitrary uniform
 
