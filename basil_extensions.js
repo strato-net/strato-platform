@@ -21,9 +21,9 @@ util.RegisterCommand({
   _.map(_.range(1, flagVal), function (i){
     //  console.log("Configuring node " + i)
       var stratoPeer = api.CloneDeployment(stratoDeployment)
-      stratoPeer.ComposeArgs["environment"]["bootnode"] = stratoDeployment.Name;
-      stratoPeer.ComposeArgs["environment"]["useSyncMode"] = "true";
-      stratoPeer.ComoiseArgs["environment"]["redisBDBNumber"] = i;      
+      stratoPeer.ComposeArgs.Environment["bootnode"] = stratoDeployment.Name;
+      stratoPeer.ComposeArgs.Environment["useSyncMode"] = "true";
+      stratoPeer.ComposeArgs.Environment["redisBDBNumber"] = i;
 
       stratoPeer.Name = "strato-"+i;
       api.SetDeployment(stratoPeer)
