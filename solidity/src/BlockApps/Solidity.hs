@@ -51,7 +51,7 @@ instance Arbitrary SolidityValue where
 
 data Xabi = Xabi
   { xabiFuncs :: Map Text Func
-  , xabiConstr :: Map Text Arg
+  , xabiConstr :: Map Text IndexedXabiType
   , xabiVars :: Map Text Var
   } deriving (Eq,Show,Generic)
 instance ToJSON Xabi where
@@ -112,19 +112,6 @@ data VarType =
 
 
 
-data Arg = Arg
-  { argIndex :: Int32
-  , argType :: Maybe Text
-  , argTypedef :: Maybe Text
-  , argDynamic :: Maybe Bool
-  , argBytes :: Maybe Int32
-  , argEntry :: Maybe Entry
-  } deriving (Eq,Show,Generic)
-instance ToJSON Arg where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Arg where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Arg where arbitrary = genericArbitrary uniform
 data Entry = Entry
   { entryBytes :: Int32
   , entryType :: Text

@@ -207,13 +207,29 @@ instance MonadContracts Bloc where
     constr <- Map.fromList <$> do
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
       for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-        return $ (name, ) Arg
-          { argIndex = index
-          , argType = ty
-          , argTypedef = tyd
-          , argDynamic = dy
-          , argBytes = by
-          , argEntry = Entry <$> eby <*> ety
+        return $ (name, ) IndexedXabiType
+          { indexedXabiTypeIndex = index,
+            indexedXabiTypeType =
+              XabiType {
+                xabiTypeType = ty
+              , xabiTypeTypedef = tyd
+              , xabiTypeDynamic = dy
+              , xabiTypeBytes = by
+              , xabiTypeSigned = Nothing
+              , xabiTypeVal = Nothing
+              , xabiTypeKey = Nothing
+              , xabiTypeEntry = Just
+                   XabiType{
+                     xabiTypeBytes=eby
+                   , xabiTypeType=ety
+                   , xabiTypeTypedef=Nothing
+                   , xabiTypeDynamic=Nothing
+                   , xabiTypeSigned=Nothing
+                   , xabiTypeEntry=Nothing
+                   , xabiTypeVal=Nothing
+                   , xabiTypeKey=Nothing
+                   }
+              }
           }
     vars <- Map.fromList <$> do
       tuples <- blocQuery (getXabiVariablesQuery metadataId)
