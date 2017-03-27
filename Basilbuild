@@ -31,7 +31,7 @@ STACKFLAGS=
 else
 STACKFLAGS=--allow-different-user
 endif
-BUILD_HASKELL=stack setup $(STACKFLAGS) --verbose && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
+BUILD_HASKELL=stack setup $(STACKFLAGS) && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
 
 all: build_docker
 
@@ -49,8 +49,12 @@ build_solidity: prebuild
 ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
 	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
 else
+ifneq ("$(wildcard $(SOLCWORK)/solidity/.git)","")
+	echo "solidity already cloned, will skip"
+else
 	git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY)
-	mkdir $(SOLCBUILDDIR)
+endif
+	mkdir -p $(SOLCBUILDDIR)
 	$(SOLCCMAKE)
 endif
 ifeq ($(USE_DOCKER_BUILD_ENV),)
