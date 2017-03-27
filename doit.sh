@@ -51,6 +51,8 @@ function newnode {
 }
 
 function doInit {
+  cp -r /var/lib/node_modules /var/lib/strato/.
+  cp  /var/lib/mkCoinbase  /var/lib/strato/.
   export blockTime=${blockTime:-13}
   export minBlockDifficulty=${minBlockDifficulty:-131072}
   cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
@@ -67,8 +69,8 @@ function doInit {
                        --addBootnodes=$addBootnodes $stratoBootnode \
                        --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
      echo $cmd
-     echo "# of lines in block-backup-file: `cat /tmp/backup/backup_strato_block | wc -l`"
-     $cmd < /tmp/backup/backup_strato_block
+     echo "# of lines in block-backup-file: `cat /var/lib/strato/backup_strato_block | wc -l`"
+     $cmd < /var/lib/strato/backup_strato_block
   else
      echo $cmd
      $cmd
@@ -102,7 +104,7 @@ function rmEthereumH {
   rm -rf .ethereumH/
 }
 
-trap rmEthereumH EXIT
+#trap rmEthereumH EXIT
 
 function setEnv {
   [[ -n ${!1} ]] || eval $1=$2
