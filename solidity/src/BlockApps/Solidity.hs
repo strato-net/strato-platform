@@ -64,15 +64,54 @@ instance FromJSON Xabi where
          <*> v .:? "vars" .!= Map.empty
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 data Func = Func
-  { funcArgs :: Map Text Arg
+  { funcArgs :: Map Text IndexedXabiType
   , funcSelector :: Text
-  , funcVals :: Map Text Val
+  , funcVals :: Map Text IndexedXabiType
   } deriving (Eq,Show,Generic)
 instance ToJSON Func where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
+
+data XabiType =
+  XabiType {
+    xabiTypeType::Maybe Text
+  , xabiTypeTypedef::Maybe Text
+  , xabiTypeDynamic::Maybe Bool
+  , xabiTypeSigned::Maybe Bool
+  , xabiTypeBytes::Maybe Int32
+  , xabiTypeEntry::Maybe XabiType
+  , xabiTypeVal::Maybe XabiType
+  , xabiTypeKey::Maybe XabiType
+    } deriving (Eq, Show, Generic)
+
+instance Arbitrary XabiType where arbitrary = genericArbitrary uniform
+
+
+data IndexedXabiType =
+  IndexedXabiType {
+    indexedXabiTypeIndex::Int32,
+    indexedXabiTypeType::XabiType
+    } deriving (Eq, Show, Generic)
+
+instance FromJSON IndexedXabiType where
+  parseJSON _ = undefined
+instance ToJSON IndexedXabiType where
+  toJSON = undefined
+instance Arbitrary IndexedXabiType where arbitrary = genericArbitrary uniform
+  
+data VarType =
+  VarType {
+    varTypeType::XabiType
+  , varTypeAtBytes::Int32
+    }
+
+
+
+
+
+
 data Arg = Arg
   { argIndex :: Int32
   , argType :: Maybe Text

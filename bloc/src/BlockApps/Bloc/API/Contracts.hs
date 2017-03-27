@@ -145,24 +145,56 @@ instance MonadContracts Bloc where
         args <- do
           tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
           for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-            return $ (name, ) Arg
-              { argIndex = index
-              , argType = ty
-              , argTypedef = tyd
-              , argDynamic = dy
-              , argBytes = by
-              , argEntry = Entry <$> eby <*> ety
+            return $ (name, ) IndexedXabiType
+              { indexedXabiTypeIndex = index,
+                indexedXabiTypeType =
+                  XabiType {
+                    xabiTypeType = ty
+                  , xabiTypeTypedef = tyd
+                  , xabiTypeDynamic = dy
+                  , xabiTypeBytes = by
+                  , xabiTypeSigned = Nothing
+                  , xabiTypeVal = Nothing
+                  , xabiTypeKey = Nothing
+                  , xabiTypeEntry = Just
+                    XabiType {
+                      xabiTypeBytes = eby
+                    , xabiTypeType = ety
+                    , xabiTypeTypedef = Nothing
+                    , xabiTypeDynamic = Nothing
+                    , xabiTypeSigned = Nothing
+                    , xabiTypeEntry = Nothing
+                    , xabiTypeVal = Nothing
+                    , xabiTypeKey = Nothing
+                    }
+                  }
               }
         vals <- do
           tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
           for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
-            return $ ("#" <> Text.pack (show index),) Val
-              { valIndex = index
-              , valType = ty
-              , valTypedef = tyd
-              , valDynamic = dy
-              , valBytes = by
-              , valEntry = Entry <$> eby <*> ety
+            return $ ("#" <> Text.pack (show index),) IndexedXabiType
+              { indexedXabiTypeIndex = index,
+                indexedXabiTypeType=
+                  XabiType{
+                    xabiTypeType = ty
+                  , xabiTypeTypedef = tyd
+                  , xabiTypeDynamic = dy
+                  , xabiTypeBytes = by
+                  , xabiTypeSigned = Nothing
+                  , xabiTypeVal = Nothing
+                  , xabiTypeKey = Nothing
+                  , xabiTypeEntry = Just
+                    XabiType {
+                      xabiTypeBytes = eby
+                    , xabiTypeType = ety
+                    , xabiTypeTypedef = Nothing
+                    , xabiTypeDynamic = Nothing
+                    , xabiTypeSigned = Nothing
+                    , xabiTypeEntry = Nothing
+                    , xabiTypeVal = Nothing
+                    , xabiTypeKey = Nothing
+                    }
+                  }
               }
         let
           func = Func

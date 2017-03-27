@@ -300,19 +300,19 @@ getContractsMetaDataId contractName = \case
 
 insertXabiFunctionArg
   :: Int32
-  -> Map Text Arg
+  -> Map Text IndexedXabiType
   -> Connection -> IO ()
 insertXabiFunctionArg funcId args conn = do
-  entryTypeIdss <- for (toList args) $ \ Arg{argEntry = argEntry} ->
+  entryTypeIdss <- for (toList args) $ \ IndexedXabiType{indexedXabiTypeType=XabiType{xabiTypeEntry = argEntry}} ->
     case argEntry of
       Nothing -> return [Nothing::Maybe Int32]
-      Just Entry{..} -> runInsertReturning conn xabiTypesTable
+      Just XabiType{..} -> runInsertReturning conn xabiTypesTable
         ( Nothing
-        , constant entryType
+        , constant $ fromMaybe (error "xabiTypeType was Nothing") xabiTypeType
         , Opaleye.null
         , constant False
         , constant False
-        , constant (Just entryBytes)
+        , constant xabiTypeBytes
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
@@ -321,16 +321,16 @@ insertXabiFunctionArg funcId args conn = do
   let entryTypeIds = map head entryTypeIdss
   typeIds <- runInsertManyReturning conn xabiTypesTable
     [ ( Nothing
-      , constant (fromMaybe "Contract" argType) -- Type is missing from Val when the variable is a contract
-      , constant argTypedef
-      , constant (fromMaybe False argDynamic)
+      , constant (fromMaybe "Contract" xabiTypeType) -- Type is missing from Val when the variable is a contract
+      , constant xabiTypeTypedef
+      , constant (fromMaybe False xabiTypeDynamic)
       , constant False
-      , constant argBytes
+      , constant xabiTypeBytes
       , constant entryTypeId
       , Opaleye.null
       , Opaleye.null
       )
-    | (entryTypeId,Arg{..}) <- zip entryTypeIds (toList args)
+    | (entryTypeId,IndexedXabiType{indexedXabiTypeType=XabiType{..}}) <- zip entryTypeIds (toList args)
     ]
     (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
   void $ runInsertMany conn xabiFunctionArgumentsTable
@@ -338,26 +338,26 @@ insertXabiFunctionArg funcId args conn = do
       , constant funcId
       , constant (typeId::Int32)
       , constant name --TODO: this could end up reordered. Revisit
-      , constant argIndex
+      , constant indexedXabiTypeIndex
       )
-    | (typeId,(name,Arg{..})) <- zip typeIds (Map.toList args)
+    | (typeId,(name,IndexedXabiType{..})) <- zip typeIds (Map.toList args)
     ]
 
 insertXabiFunctionRet
   :: Int32
-  -> [Val]
+  -> [IndexedXabiType]
   -> Connection -> IO ()
 insertXabiFunctionRet funcId vals conn = do
-  entryTypeIdss <- for vals $ \ Val{valEntry = valEntry} ->
+  entryTypeIdss <- for vals $ \ IndexedXabiType{indexedXabiTypeType=XabiType{xabiTypeEntry = valEntry}} ->
     case valEntry of
       Nothing -> return [Nothing::Maybe Int32]
-      Just Entry{..} -> runInsertReturning conn xabiTypesTable
+      Just XabiType{..} -> runInsertReturning conn xabiTypesTable
         ( Nothing
-        , constant entryType
+        , constant $ fromMaybe (error "xabiTypeType is missing") xabiTypeType
         , Opaleye.null
         , constant False
         , constant False
-        , constant (Just entryBytes)
+        , constant xabiTypeBytes
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
@@ -366,25 +366,25 @@ insertXabiFunctionRet funcId vals conn = do
   let entryTypeIds = map head entryTypeIdss
   typeIds <- runInsertManyReturning conn xabiTypesTable
     [ ( Nothing
-      , constant (fromMaybe "Contract" valType) -- Type is missing from Val when the variable is a contract
-      , constant valTypedef
-      , constant (fromMaybe False valDynamic)
+      , constant (fromMaybe "Contract" xabiTypeType) -- Type is missing from Val when the variable is a contract
+      , constant xabiTypeTypedef
+      , constant (fromMaybe False xabiTypeDynamic)
       , constant False -- How will we know if it is signed? A: `Val` type may need another field for `signed`
-      , constant valBytes
+      , constant xabiTypeBytes
       , constant entryTypeId
       , Opaleye.null
       , Opaleye.null
       )
-    | (entryTypeId,Val{..}) <- zip entryTypeIds vals
+    | (entryTypeId,IndexedXabiType{indexedXabiTypeType=XabiType{..}}) <- zip entryTypeIds vals
     ]
     (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
   void $ runInsertMany conn xabiFunctionReturnsTable
     [ ( Nothing
       , constant funcId
-      , constant valIndex
+      , constant indexedXabiTypeIndex
       , constant (typeId::Int32)
       )
-    | (typeId,Val{..}) <- zip typeIds vals
+    | (typeId,IndexedXabiType{..}) <- zip typeIds vals
     ]
 {- |
 SELECT CM.id
