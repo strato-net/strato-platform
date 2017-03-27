@@ -207,10 +207,10 @@ instance MonadContracts Bloc where
                             varDynamic=Nothing,
                             varSigned=Nothing,
                             varEntry=Nothing,
-                            varVal=Nothing,
+                            varValue=Nothing,
                             varKey=Nothing
                            }
-          , varVal = Just Var
+          , varValue = Just Var
             { varType = Just vty
             , varBytes = Just vby
             , varDynamic = Just vdy
@@ -224,13 +224,13 @@ instance MonadContracts Bloc where
                             varDynamic=Nothing,
                             varSigned=Nothing,
                             varEntry=Nothing,
-                            varVal=Nothing,
+                            varValue=Nothing,
                             varKey=Nothing
                            }
             , varAtBytes = Nothing
             , varLength = Nothing
             , varTypedef = Nothing
-            , varVal = Nothing
+            , varValue = Nothing
             , varKey = Nothing
             }
           , varKey = Just SimpleVar

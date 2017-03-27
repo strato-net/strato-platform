@@ -136,7 +136,7 @@ varToType Var { varType=Just "Array", varEntry=Just var } =
 
 
 varToType Var { varType=Just "Contract", varTypedef=Just name } = TypeContract name
-varToType Var { varType=Just "Mapping", varKey=Just k, varVal=Just v } = TypeMapping (simplevarToSimpleType k) (varToType v)
+varToType Var { varType=Just "Mapping", varKey=Just k, varValue=Just v } = TypeMapping (simplevarToSimpleType k) (varToType v)
 
 varToType Var { varType=Just "Enum", varTypedef=Just enumName } = TypeEnum enumName
 varToType v = SimpleType $ simplevarToSimpleType $ varAsSimpleVar v
