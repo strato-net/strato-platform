@@ -252,12 +252,15 @@ instance MonadContracts Bloc where
                    , xabiTypeVal=Nothing
                    , xabiTypeKey=Nothing
                    }
-          , varVal = Just SimpleVar
-            { simplevarType = vty
-            , simplevarBytes = Just vby
-            , simplevarDynamic = Just vdy
-            , simplevarSigned = Just vsi
-            , simplevarEntry = Just
+          , varVal = Just XabiType
+            { xabiTypeType = Just vty
+            , xabiTypeBytes = Just vby
+            , xabiTypeDynamic = Just vdy
+            , xabiTypeSigned = Just vsi
+            , xabiTypeTypedef=Nothing
+            , xabiTypeVal=Nothing
+            , xabiTypeKey=Nothing
+            , xabiTypeEntry = Just
                XabiType{
                      xabiTypeBytes=Just veby
                    , xabiTypeType=Just vety

@@ -114,8 +114,19 @@ data VarType =
 
 
 
-
-
+{-
+data XabiType =
+  XabiType {
+    xabiTypeType::Maybe Text
+  , xabiTypeTypedef::Maybe Text
+  , xabiTypeDynamic::Maybe Bool
+  , xabiTypeSigned::Maybe Bool
+  , xabiTypeBytes::Maybe Int32
+  , xabiTypeEntry::Maybe XabiType
+  , xabiTypeVal::Maybe XabiType
+  , xabiTypeKey::Maybe XabiType
+    } deriving (Eq, Show, Generic)
+-}
 
 data Var = Var
   { varAtBytes :: Int32
@@ -125,9 +136,12 @@ data Var = Var
   , varSigned :: Maybe Bool
   , varBytes :: Maybe Int32
   , varEntry :: Maybe XabiType
-  , varVal :: Maybe SimpleVar
+  , varVal :: Maybe XabiType
   , varKey :: Maybe SimpleVar
   } deriving (Eq,Show,Generic)
+
+
+             
 instance ToJSON Var where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Var where
