@@ -104,7 +104,7 @@ instance MonadContracts Bloc where
 
   getContractsContract (ContractName contractName) contractId = do
     let
-      noXabi = Xabi Nothing Nothing Nothing
+      noXabi = Xabi Map.empty Map.empty Map.empty
       detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
@@ -210,7 +210,7 @@ instance MonadContracts Bloc where
             }
           }
     return $ contractDetails
-      { contractdetailsXabi = Xabi (Just funcs) (Just constr) (Just vars) }
+      { contractdetailsXabi = Xabi funcs constr vars }
 
   getContractsState contractName contractId = do
     contract <- getContract contractName contractId
@@ -223,13 +223,11 @@ instance MonadContracts Bloc where
 
         ret = map (fmap valueToSolidityValue) $ decodeValues contract storage
 
-    logNotice . withCallStack =<< timestamp
-      ( Text.unlines
-        [ "Storage:"
-        , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-        , "End of storage"
-        ]
-      )
+    logWith logNotice $ Text.unlines
+      [ "Storage:"
+      , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+      , "End of storage"
+      ]
 
     return $ Map.fromList ret
 
