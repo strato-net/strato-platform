@@ -18,11 +18,9 @@ module Blockchain.EthConf (
 
 import Control.Monad.Except (ExceptT(..))
 import Control.Monad.Trans.State
-import Control.Monad.State.Class (MonadState)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as B8
-import Data.Time.Clock (NominalDiffTime)
 import Data.Yaml
 import Database.PostgreSQL.Simple (ConnectInfo(..))
 import qualified Database.PostgreSQL.Simple as PS (postgreSQLConnectionString)
@@ -33,7 +31,6 @@ import Data.String
 import Network.Kafka
 import qualified Network.Kafka.Protocol as KP
 
-import Data.Coerce (coerce)
 import Data.Ratio ((%))
 
 import Blockchain.PrivateKeyConf

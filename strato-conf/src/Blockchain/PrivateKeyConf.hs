@@ -19,10 +19,8 @@ import Crypto.Random
 import Data.Bifunctor
 import Data.Yaml
 import GHC.Generics
-import System.Random
 
 import Numeric
-import Blockchain.Format
 
 newtype PrivKey = PrivKey { unPrivKey :: PrivateNumber } deriving (Eq, Generic)
 

@@ -7,6 +7,7 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Network.HTTP.Client
 
+apiBaseUrl::String
 apiBaseUrl="http://localhost:3000/eth/v1.2/"
 
 call::String->IO String
