@@ -79,7 +79,6 @@ library
                  , hedis
 
     exposed-modules:
-                   Blockchain.BlockNotify
                    Blockchain.Context
                    Blockchain.Data.Wire
                    Blockchain.Display
@@ -88,7 +87,6 @@ library
                    Blockchain.NewEvent
                    Blockchain.ExtMergeSources
                    Blockchain.Options
-                   Blockchain.RawTXNotify
                    Blockchain.SeqEventNotify
                    Blockchain.TCPClientWithTimeout
                    Executable.StratoP2PClient

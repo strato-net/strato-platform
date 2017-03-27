@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase, ScopedTypeVariables, TemplateHaskell #-}
 
 module Blockchain.Event (
   Event(..),
@@ -42,7 +42,10 @@ import Blockchain.Verification
 import Blockchain.DBM
 import Blockchain.Data.PubKey
 
-import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock, OutputEvent(..))
+import Blockchain.Sequencer.Event ( IngestTx(..), IngestEvent(..), OutputEvent(..), OutputTx(..)
+                                  , blockToIngestBlock, obTotalDifficulty, outputBlockToBlock
+                                  , otBaseTx
+                                  )
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 
 import Blockchain.Util (getCurrentMicrotime)
@@ -222,19 +225,27 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (Disconnect _) -> throwIO PeerDisconnected
     
-    NewSeqEvent _ -> error "Got a new OutputEvent"
+    NewSeqEvent oe -> case oe of 
+            OEBlock b  -> do
+                $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+                yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
+            OETx ts tx -> do
+                $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ format tx ++ " at " ++ show ts
+                when (shouldSend peer tx) . yield $ Transactions [tx'] where
+                    tx' = otBaseTx $ tx
+            _          -> return () -- shouldn't happen but our types don't prohibit us 
 
-    NewTX tx -> when shouldSend . yield $ Transactions [rawTX2TX tx]
-        where shouldSend = case rawTransactionOrigin tx of
-                Origin.PeerString ps -> ps /= peerString peer
-                Origin.API           -> True
-                Origin.BlockHash _   -> False
-                Origin.Direct        -> True
-                Origin.Quarry        -> False -- this should never reach this far anyway
-                Origin.Morphism      -> -- probably means it was converted, see if this is a problem
-                    trace "NewTx of type Morphism came in. Should this even happen?" True
-
-    NewBL b d -> yield (NewBlock b d)
+--     NewTX tx -> when shouldSend' . yield $ Transactions [rawTX2TX tx]
+--         where shouldSend' = case rawTransactionOrigin tx of
+--                 Origin.PeerString ps -> ps /= peerString peer
+--                 Origin.API           -> True
+--                 Origin.BlockHash _   -> False
+--                 Origin.Direct        -> True
+--                 Origin.Quarry        -> False -- this should never reach this far anyway
+--                 Origin.Morphism      ->       -- probably means it was converted, see if this is a problem
+--                     trace "NewTx of type Morphism came in. Should this even happen?" True
+-- 
+--     NewBL b d -> yield (NewBlock b d)
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
@@ -261,3 +272,14 @@ syncFetch = do
         logInfoN . T.pack $ "fetchNumber is " ++ show fetchNumber
         yield $ GetBlockHeaders (BlockNumber fetchNumber) maxReturnedHeaders 0 Forward
         stampActionTimestamp
+
+shouldSend :: PPeer -> OutputTx -> Bool 
+shouldSend peer tx = case otOrigin tx of
+    Origin.PeerString ps -> ps /= peerString peer
+    Origin.API           -> True
+    Origin.BlockHash _   -> False
+    Origin.Direct        -> True
+    Origin.Quarry        -> False -- this should never reach this far anyway
+    Origin.Morphism      -> -- probably means it was converted, see if this is a problem
+        trace "NewTx of type Morphism came in. Should this even happen?" True
+

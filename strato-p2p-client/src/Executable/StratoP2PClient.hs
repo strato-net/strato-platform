@@ -32,7 +32,6 @@ import           System.Random
 import           Blockchain.Frame
 import           Blockchain.RLPx
 
-import           Blockchain.BlockNotify
 import qualified Blockchain.Colors                     as C
 import           Blockchain.Constants
 import           Blockchain.Context
@@ -52,7 +51,6 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.PeerUrls
-import           Blockchain.RawTXNotify
 import           Blockchain.SeqEventNotify
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TCPClientWithTimeout
@@ -164,7 +162,7 @@ runPeer connectedPeers peer myPriv = do
     let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
     logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
     logInfoN . T.pack $ C.blue "============================"
-    logInfoN . T.pack $ C.blue "now on steroids ¯\_(ツ)_/¯  "
+    logInfoN . T.pack $ C.blue "now on steroids too "
     logInfoN . T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
 
     let myPublic = calculatePublic theCurve myPriv
@@ -191,8 +189,6 @@ runPeer connectedPeers peer myPriv = do
                       =$= tap (displayMessage False "")
                       =$= CL.map MsgEvt
                   , seqEventNotifictationSource =$= CL.map NewSeqEvent
-                  , txNotificationSource "client_tx" =$= CL.map NewTX
-                  , blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst)
                   , timerSource
                   ] 2
 

@@ -26,7 +26,7 @@ seqEventNotifictationSource = do
     loop ofs'
     where loop nextOffset = do
               events <- K.withKafkaViolently $ readSeqEvents nextOffset 
-              $logInfoS "" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
+              $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
               forM_ events $ \e -> do
                   yield $ e
               loop . (nextOffset +) . KP.Offset . fromIntegral $ length events
