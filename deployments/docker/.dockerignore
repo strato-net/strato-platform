@@ -1,9 +1,0 @@
-#*#
-*~
-usr/lib/strato/bin/populate.sh
-.dockerignore
-build
-Dockerfile*
-docker-compose.yml
-cleanup
-startup

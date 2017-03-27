@@ -1,9 +1,0 @@
-{
-	"main": {
-		"B.sol": "import \"C.sol\"; contract B is C{ function B(){} }"
-	}, 
-	"import": { 
-		"C.sol" : "contract C{ function C(){}}"
-	}, 
-	"options": {}
-}
