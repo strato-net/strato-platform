@@ -58,6 +58,8 @@ test-suite blockapps-solidity-test
     , blockapps-ethereum
     , blockapps-solidity
     , hspec
+    , aeson
+    , bytestring
 
 source-repository head
   type: git
