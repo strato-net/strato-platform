@@ -6,11 +6,9 @@ import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.Model.SHA
 
-import Blockchain.EthConf (lookupRedisBlockDBConfig)
-
 dumpRedis :: Integer -> IO ()
 dumpRedis num = do
-    conn <- checkedConnect lookupRedisBlockDBConfig
+    conn <- checkedConnect connInfo
     bb <- runRedis conn getBestBlockInfo 
     case bb of
         Nothing -> putStrLn "No best block in Redis"

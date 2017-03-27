@@ -87,7 +87,7 @@ lookupByBits bits@(clientId, consumerId, topicName) =
         Left err -> error $ "Failed to fetch checkpoint: " ++ show err
         Right (Left KP.UnknownTopicOrPartition) -> lookupByBits bits
         Right (Left err) -> error $ "Unexpected response when fetching checkpoint: " ++ show err
-        Right (Right ret@(ofs, md)) -> return ret
+        Right (Right ret) -> return ret
 
 
 showOffset :: CPTuple -> IO ()
