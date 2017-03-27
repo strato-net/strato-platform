@@ -234,64 +234,67 @@ instance MonadContracts Bloc where
     vars <- Map.fromList <$> do
       tuples <- blocQuery (getXabiVariablesQuery metadataId)
       for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
-        return $ (name,) Var
-          { varAtBytes = atBy
-          , varType = Just ty
-          , varTypedef = Just tyd
-          , varDynamic = Just dy
-          , varSigned = Just si
-          , varBytes = Just by
-          , varEntry = Just
-               XabiType{
-                     xabiTypeBytes=Just eby
-                   , xabiTypeType=Just ety
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeDynamic=Nothing
-                   , xabiTypeSigned=Nothing
-                   , xabiTypeEntry=Nothing
-                   , xabiTypeVal=Nothing
-                   , xabiTypeKey=Nothing
-                   }
-          , varVal = Just XabiType
-            { xabiTypeType = Just vty
-            , xabiTypeBytes = Just vby
-            , xabiTypeDynamic = Just vdy
-            , xabiTypeSigned = Just vsi
-            , xabiTypeTypedef=Nothing
-            , xabiTypeVal=Nothing
-            , xabiTypeKey=Nothing
-            , xabiTypeEntry = Just
-               XabiType{
-                     xabiTypeBytes=Just veby
-                   , xabiTypeType=Just vety
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeDynamic=Nothing
-                   , xabiTypeSigned=Nothing
-                   , xabiTypeEntry=Nothing
-                   , xabiTypeVal=Nothing
-                   , xabiTypeKey=Nothing
-                   }
-            }
-          , varKey = Just XabiType
-            { xabiTypeType = Just kty
-            , xabiTypeBytes = Just kby
-            , xabiTypeDynamic = Just kdy
-            , xabiTypeSigned = Just ksi
-            , xabiTypeTypedef=Nothing
-            , xabiTypeVal=Nothing
-            , xabiTypeKey=Nothing
-            , xabiTypeEntry = Just
-               XabiType{
-                     xabiTypeBytes=Just keby
-                   , xabiTypeType=Just kety
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeDynamic=Nothing
-                   , xabiTypeSigned=Nothing
-                   , xabiTypeEntry=Nothing
-                   , xabiTypeVal=Nothing
-                   , xabiTypeKey=Nothing
-                   }
-            }
+        return $ (name,) VarType
+          { varTypeAtBytes = atBy,
+            varTypeType =
+              XabiType {
+                xabiTypeType = Just ty
+              , xabiTypeTypedef = Just tyd
+              , xabiTypeDynamic = Just dy
+              , xabiTypeSigned = Just si
+              , xabiTypeBytes = Just by
+              , xabiTypeEntry = Just
+                     XabiType{
+                       xabiTypeBytes=Just eby
+                     , xabiTypeType=Just ety
+                     , xabiTypeTypedef=Nothing
+                     , xabiTypeDynamic=Nothing
+                     , xabiTypeSigned=Nothing
+                     , xabiTypeEntry=Nothing
+                     , xabiTypeVal=Nothing
+                     , xabiTypeKey=Nothing
+                     }
+              , xabiTypeVal = Just XabiType
+                     { xabiTypeType = Just vty
+                     , xabiTypeBytes = Just vby
+                     , xabiTypeDynamic = Just vdy
+                     , xabiTypeSigned = Just vsi
+                     , xabiTypeTypedef=Nothing
+                     , xabiTypeVal=Nothing
+                     , xabiTypeKey=Nothing
+                     , xabiTypeEntry = Just
+                           XabiType{
+                             xabiTypeBytes=Just veby
+                           , xabiTypeType=Just vety
+                           , xabiTypeTypedef=Nothing
+                           , xabiTypeDynamic=Nothing
+                           , xabiTypeSigned=Nothing
+                           , xabiTypeEntry=Nothing
+                           , xabiTypeVal=Nothing
+                           , xabiTypeKey=Nothing
+                           }
+                     }
+              , xabiTypeKey = Just XabiType
+                     { xabiTypeType = Just kty
+                     , xabiTypeBytes = Just kby
+                     , xabiTypeDynamic = Just kdy
+                     , xabiTypeSigned = Just ksi
+                     , xabiTypeTypedef=Nothing
+                     , xabiTypeVal=Nothing
+                     , xabiTypeKey=Nothing
+                     , xabiTypeEntry = Just
+                           XabiType{
+                             xabiTypeBytes=Just keby
+                           , xabiTypeType=Just kety
+                           , xabiTypeTypedef=Nothing
+                           , xabiTypeDynamic=Nothing
+                           , xabiTypeSigned=Nothing
+                           , xabiTypeEntry=Nothing
+                           , xabiTypeVal=Nothing
+                           , xabiTypeKey=Nothing
+                           }
+                     }
+              }
           }
     return $ contractDetails
       { contractdetailsXabi = Xabi funcs constr vars }
