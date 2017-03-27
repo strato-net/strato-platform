@@ -22,6 +22,7 @@ library
   ghc-options: -Wall -Werror
   build-depends: base
     , blockapps-ethereum
+    , binary
     , bytestring
     , largeint
     , largeword
