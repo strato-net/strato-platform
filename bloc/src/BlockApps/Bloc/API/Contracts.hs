@@ -241,20 +241,50 @@ instance MonadContracts Bloc where
           , varDynamic = Just dy
           , varSigned = Just si
           , varBytes = Just by
-          , varEntry = Entry <$> Just eby <*> Just ety
+          , varEntry = Just
+               XabiType{
+                     xabiTypeBytes=Just eby
+                   , xabiTypeType=Just ety
+                   , xabiTypeTypedef=Nothing
+                   , xabiTypeDynamic=Nothing
+                   , xabiTypeSigned=Nothing
+                   , xabiTypeEntry=Nothing
+                   , xabiTypeVal=Nothing
+                   , xabiTypeKey=Nothing
+                   }
           , varVal = Just SimpleVar
             { simplevarType = vty
             , simplevarBytes = Just vby
             , simplevarDynamic = Just vdy
             , simplevarSigned = Just vsi
-            , simplevarEntry = Entry <$> Just veby <*> Just vety
+            , simplevarEntry = Just
+               XabiType{
+                     xabiTypeBytes=Just veby
+                   , xabiTypeType=Just vety
+                   , xabiTypeTypedef=Nothing
+                   , xabiTypeDynamic=Nothing
+                   , xabiTypeSigned=Nothing
+                   , xabiTypeEntry=Nothing
+                   , xabiTypeVal=Nothing
+                   , xabiTypeKey=Nothing
+                   }
             }
           , varKey = Just SimpleVar
             { simplevarType = kty
             , simplevarBytes = Just kby
             , simplevarDynamic = Just kdy
             , simplevarSigned = Just ksi
-            , simplevarEntry = Entry <$> Just keby <*> Just kety
+            , simplevarEntry = Just
+               XabiType{
+                     xabiTypeBytes=Just keby
+                   , xabiTypeType=Just kety
+                   , xabiTypeTypedef=Nothing
+                   , xabiTypeDynamic=Nothing
+                   , xabiTypeSigned=Nothing
+                   , xabiTypeEntry=Nothing
+                   , xabiTypeVal=Nothing
+                   , xabiTypeKey=Nothing
+                   }
             }
           }
     return $ contractDetails

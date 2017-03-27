@@ -86,6 +86,11 @@ data XabiType =
   , xabiTypeKey::Maybe XabiType
     } deriving (Eq, Show, Generic)
 
+instance FromJSON XabiType where
+  parseJSON _ = undefined
+instance ToJSON XabiType where
+  toJSON = undefined
+
 instance Arbitrary XabiType where arbitrary = genericArbitrary uniform
 
 
@@ -112,15 +117,6 @@ data VarType =
 
 
 
-data Entry = Entry
-  { entryBytes :: Int32
-  , entryType :: Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON Entry where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Entry where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Entry where arbitrary = genericArbitrary uniform
 data Var = Var
   { varAtBytes :: Int32
   , varType :: Maybe Text
@@ -128,7 +124,7 @@ data Var = Var
   , varDynamic :: Maybe Bool
   , varSigned :: Maybe Bool
   , varBytes :: Maybe Int32
-  , varEntry :: Maybe Entry
+  , varEntry :: Maybe XabiType
   , varVal :: Maybe SimpleVar
   , varKey :: Maybe SimpleVar
   } deriving (Eq,Show,Generic)
@@ -143,7 +139,7 @@ data SimpleVar = SimpleVar
   -- , simplevarTypedef :: Maybe Text -- TODO: Do we need this?
   , simplevarDynamic :: Maybe Bool
   , simplevarSigned :: Maybe Bool
-  , simplevarEntry :: Maybe Entry
+  , simplevarEntry :: Maybe XabiType
   } deriving (Eq,Show,Generic)
 instance ToJSON SimpleVar where
   toJSON = genericToJSON (aesonPrefix camelCase)
