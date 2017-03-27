@@ -137,7 +137,7 @@ data Var = Var
   , varBytes :: Maybe Int32
   , varEntry :: Maybe XabiType
   , varVal :: Maybe XabiType
-  , varKey :: Maybe SimpleVar
+  , varKey :: Maybe XabiType
   } deriving (Eq,Show,Generic)
 
 
