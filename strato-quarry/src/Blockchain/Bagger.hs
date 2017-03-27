@@ -8,7 +8,6 @@ import Control.Monad.Logger
 import Control.Arrow ((&&&)) -- yes. very yes.
 
 import Data.Time.Clock
-import Data.Maybe (isJust, fromJust)
 import qualified Data.Text as T
 import Numeric (readHex)
 
@@ -19,24 +18,18 @@ import Blockchain.DB.HashDB
 
 import Blockchain.Data.Address
 import Blockchain.Database.MerklePatricia (StateRoot(..))
-import Blockchain.SHA
-import Blockchain.Sequencer.Event (OutputTx(..), OutputBlock(..), outputBlockHash)
+import Blockchain.SHA hiding (hash)
+import Blockchain.Sequencer.Event (OutputTx(..), OutputBlock(..))
 import qualified Blockchain.Data.BlockDB as BDB
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TransactionDef as TD
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Verification as V
 import qualified Blockchain.EthConf as Conf
-
 import qualified Blockchain.Bagger.BaggerState as B
-import Blockchain.Bagger.TransactionList
 
 import qualified Data.Map as M
-import qualified Data.Set as S
 import Blockchain.Format
-
-import Debug.Trace (traceIO, traceShow)
-
 
 data RunAttemptError = CantFindStateRoot
                      | GasLimitReached [OutputTx] [OutputTx] StateRoot Integer -- ran, unran, new stateroot, remgas
@@ -108,7 +101,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
         time  <- liftIO getCurrentTime
-        let oldCache       = B.miningCache state
         let newMiningCache = B.MiningCache { B.bestBlockSHA          = blockHash
                                            , B.bestBlockHeader       = bd
                                            , B.bestBlockTxHashes     = txShas
@@ -133,7 +125,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let lastExecLen = length lastExec
         let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
-        -- $logDebugS "Bagger.makeNewBlock/sanity" . T.pack $ (show lastExecLen) ++ " =?= " ++ (show lastExecGuardLen)
         if noCachedTxsCulled then do
             $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
             if null $ B.promotedTransactions cache then do
@@ -155,7 +146,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let (newSR, newGas, newExec, newUnexec) = case run of
                             Left (GasLimitReached rtx urtx nsr nbg) -> (nsr, nbg, lastExec ++ rtx, urtx)
                             Left CantFindStateRoot                  -> error $ "Cant find StateRoot " ++ show lastSR
-                            Right (newSR, newGas)                   -> (newSR, newGas, lastExec ++ promoted, [])
+                            Right (newSR', newGas')                 -> (newSR', newGas', lastExec ++ promoted, [])
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
                                                 , B.remainingGas          = newGas
@@ -332,9 +323,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
                 return $ Right ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
-addToSeen t@OutputTx{otHash=sha} = do
-    -- $logDebugS "Bagger.addToSeen" . T.pack $ "addToSeen " ++ show sha
-    updateBaggerState (B.addToSeen t)
+addToSeen t = updateBaggerState (B.addToSeen t)
 
 removeFromSeen :: MonadBagger m => OutputTx -> m ()
 removeFromSeen t = updateBaggerState (B.removeFromSeen t)

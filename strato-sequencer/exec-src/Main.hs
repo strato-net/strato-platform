@@ -19,12 +19,12 @@ main :: IO ()
 main = do
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
   putStrLn $ "strato-sequencer with flags: " ++ unlines s
-  let kafkaClientId = KP.KString $ C8.pack flags_kafkaclientid
+  let kafkaClientId' = KP.KString $ C8.pack flags_kafkaclientid
   let cfg = SequencerConfig {
       depBlockDBCacheSize   = flags_depblockcachesize
     , depBlockDBPath        = flags_depblockdbpath
-    , kafkaClientId         = kafkaClientId
-    , kafkaConsumerGroup    = lookupConsumerGroup kafkaClientId
+    , kafkaClientId         = kafkaClientId'
+    , kafkaConsumerGroup    = lookupConsumerGroup kafkaClientId'
     , seenTransactionDBSize = flags_txdedupwindow
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True

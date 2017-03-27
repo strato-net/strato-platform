@@ -3,17 +3,13 @@ module Blockchain.Sequencer.DB.DependentBlockDB where
 
 import Control.Monad (join)
 import Data.Binary
-import Data.Text (pack)
 
 import Control.Monad.Logger
 import Control.Monad.Trans.Resource
 
-import qualified Blockchain.Data.DataDefs as DD
-import qualified Database.LevelDB as LDB
 import qualified GHC.Generics as GHCG
-
+import qualified Database.LevelDB as LDB
 import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString      as BS
 
 import Blockchain.SHA
 import Blockchain.Sequencer.Event
@@ -41,10 +37,10 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
         LDB.write db writeOptions ops
 
     bootstrapGenesisBlock :: SHA -> Integer -> m ()
-    bootstrapGenesisBlock hash difficulty = do
+    bootstrapGenesisBlock hash' difficulty = do
         db           <- getDependentBlockDB
         writeOptions <- getWriteOptions
-        encodedHash  <- return . B.toStrict . encode $ hash
+        encodedHash  <- return . B.toStrict . encode $ hash'
         encodedEmit  <- return . B.toStrict . encode $ Emitted difficulty
         LDB.put db writeOptions encodedHash encodedEmit
 
@@ -65,15 +61,14 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
 
     enqueueIfParentNotEmitted :: SequencedBlock -> m EmissionReadiness
     enqueueIfParentNotEmitted b = do
---         (logInfo) . pack $ "enqueueIfParentNotEmitted :: " ++ sequencedBlockShortName b
         let parentHash = parentHashBS b
         db                  <- getDependentBlockDB
         readOptions         <- getReadOptions
         writeOptions        <- getWriteOptions
         maybeExistingParent <- LDB.get db readOptions parentHash
         case (decode . B.fromStrict) <$> maybeExistingParent of
-            Just (Emitted totalDifficulty) ->
-                return $ ReadyToEmit totalDifficulty
+            Just (Emitted totalDifficulty') ->
+                return $ ReadyToEmit totalDifficulty'
             Just (DependentBlocks existingDeps) | b `elem` existingDeps -> return NotReadyToEmit -- case of duplicate seen
             Just (DependentBlocks existingDeps) -> do
                 LDB.put db writeOptions parentHash $ B.toStrict . encode $ DependentBlocks (b:existingDeps)
@@ -84,19 +79,18 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
 
     buildEmissionChain :: SequencedBlock -> Integer -> m [(Maybe LDB.BatchOp, OutputEvent)]
     buildEmissionChain b lastTotalDifficulty = do
---         (logInfo) . pack $ "buildEmissionChain :: " ++ sequencedBlockShortName b ++ " // " ++ (show lastTotalDifficulty)
         db           <- getDependentBlockDB
         readOptions  <- getReadOptions
         children     <- LDB.get db readOptions thisBlockHash
         case (decode . B.fromStrict) <$> children of
             Nothing -> return [theRet]
             Just (Emitted _) -> return [] -- we already emitted this hash somehow? wtf???
-            Just (DependentBlocks blocks) -> do
-                subChains <- sequence $ flip buildEmissionChain totalDifficulty <$> blocks
+            Just (DependentBlocks blocks') -> do
+                subChains <- sequence $ flip buildEmissionChain totalDifficulty' <$> blocks'
                 return $ theRet : join subChains
         where
-            thisBlockHash   = blockHashBS b
-            totalDifficulty = lastTotalDifficulty + sequencedBlockDifficulty b
-            thePutOperation = Just . LDB.Put thisBlockHash . B.toStrict . encode $ Emitted totalDifficulty
-            theBlock        = sequencedBlockToOutputBlock b totalDifficulty
-            theRet          = (thePutOperation, OEBlock theBlock)
+            thisBlockHash    = blockHashBS b
+            totalDifficulty' = lastTotalDifficulty + sequencedBlockDifficulty b
+            thePutOperation  = Just . LDB.Put thisBlockHash . B.toStrict . encode $ Emitted totalDifficulty'
+            theBlock         = sequencedBlockToOutputBlock b totalDifficulty'
+            theRet           = (thePutOperation, OEBlock theBlock)

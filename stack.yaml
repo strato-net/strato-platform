@@ -80,3 +80,5 @@ ghc-options:
   strato-api:              -fno-warn-orphans
   blockapps-tools:         -Wall -Werror
   strato-index:            -Wall -Werror -fno-warn-warnings-deprecations
+  strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
+  strato-quarry:           -Wall -Werror -fno-warn-warnings-deprecations
