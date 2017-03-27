@@ -64,32 +64,10 @@ simplevarToSimpleType v = error $ "undefined var in varToSimpleType: " ++ show (
 
 
 varToType::Var->Type
-varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just Var{varType=entryType, varBytes=b} } =
-  TypeArrayFixed len $ varToType Var{ --I think Entry should just be Var, and this messy undefined thing could be avoided
-    varType=entryType,
-    varAtBytes=undefined,
-    varLength=undefined,
-    varTypedef=undefined,
-    varDynamic=undefined,
-    varSigned=undefined,
-    varBytes=b,
-    varEntry=Nothing,
-    varVal=undefined,
-    varKey=undefined
-    }
-varToType Var { varType=Just "Array", varEntry=Just Var{varType=entryType, varBytes=b} } =
-  TypeArrayDynamic $ varToType Var{
-    varType=entryType,
-    varAtBytes=undefined,
-    varLength=undefined,
-    varTypedef=undefined,
-    varDynamic=undefined,
-    varSigned=undefined,
-    varBytes=b,
-    varEntry=Nothing,
-    varVal=undefined,
-    varKey=undefined
-    }
+varToType Var { varType=Just "Array", varLength=Just len, varEntry=Just var } =
+  TypeArrayFixed len $ varToType var
+varToType Var { varType=Just "Array", varEntry=Just var } =
+  TypeArrayDynamic $ varToType var
 
 
 
