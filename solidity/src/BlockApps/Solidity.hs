@@ -134,19 +134,6 @@ instance ToJSON Entry where
 instance FromJSON Entry where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Entry where arbitrary = genericArbitrary uniform
-data Val = Val
-  { valIndex :: Int32
-  , valType :: Maybe Text
-  , valTypedef :: Maybe Text
-  , valDynamic :: Maybe Bool
-  , valBytes :: Maybe Int32
-  , valEntry :: Maybe Entry
-  } deriving (Eq,Show,Generic)
-instance ToJSON Val where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Val where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Val where arbitrary = genericArbitrary uniform
 data Var = Var
   { varAtBytes :: Int32
   , varType :: Maybe Text
