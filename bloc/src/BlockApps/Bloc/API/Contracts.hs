@@ -246,9 +246,9 @@ instance MonadContracts Bloc where
       returnA -< varName
     return $ map SymbolName vars
 
-  getContractsStateMapping _ _ _ _ = throwError Unimplemented
+  getContractsStateMapping _ _ _ _ = throwError $ Unimplemented "getContractsStateMapping"
 
-  getContractsStates _ = throwError Unimplemented
+  getContractsStates _ = throwError $ Unimplemented "getContractsStates"
 
   -- postContractsCompile = undefined
 

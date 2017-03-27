@@ -58,7 +58,7 @@ data BlocError
   | UserError Text
   | CouldNotFind Text
   | AnError Text
-  | Unimplemented
+  | Unimplemented Text
   deriving Show
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
