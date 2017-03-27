@@ -166,6 +166,8 @@ handleEvents mode peer = awaitForever $ \case
             let headerHashes = S.fromList $ map headerHash headers
                 parentHashes = S.fromList $ map parentHash headers
                 allNeeded = headerHashes `S.union` parentHashes
+            -- check if blockheaders s we recieved have parents. do check in
+            -- redis instead of in  
             blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
                 neededHashes = map headerHash neededHeaders
