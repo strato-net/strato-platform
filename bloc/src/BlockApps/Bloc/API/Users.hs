@@ -110,7 +110,8 @@ instance MonadUsers Bloc where
     (PostUsersContractRequest src password contract args txParams value) = do
       --TODO: check what happens with mismatching args
       void $ compileContract contract src
-      logNotice $ "constructor arguments: " <> Text.pack (show args)
+      logWith logNotice $
+        "constructor arguments: " <> Text.pack (show args)
       cmIds_bins <- blocQuery $ proc () -> do
         (cmId,name,bin) <- joinF
           (\ (cmId,_,bin,_,_) (_,name) -> (cmId,name,bin))
