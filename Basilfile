@@ -1,6 +1,7 @@
 # vim: syntax=yaml tabstop=2 shiftwidth=2 expandtab smarttab :
 metadata:
   name: silo
+  min_basil: "0.9.0"
   version: 1.0
   description: Test
   git_repo: https://github.com/blockapps/silo
