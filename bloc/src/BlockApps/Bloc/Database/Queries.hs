@@ -669,7 +669,7 @@ getXabiFunctionsArgsQuery funcId = proc () -> do
   returnA -< (name,index,ty,tyd,dy,by,ety,eby)
   where
     joinTable = joinF
-      (\ (functionId,_,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index, toNullable ty,tyd, toNullable dy,by,ety,eby))
+      (\ (_,functionId,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index, toNullable ty,tyd, toNullable dy,by,ety,eby))
       (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
       (queryTable xabiFunctionArgumentsTable) $ leftJoinF
         (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))
@@ -956,14 +956,23 @@ compileContract contractName source = do
       codeHash = keccak256 (Text.encodeUtf8 binRuntime)
     contrId <- blocMaybe "contract id" <=< blocModify $
       createContractQuery contrName
+
+
     metaDataId <- blocMaybe "metadata id" <=< blocModify $
       upsertContractMetaDataQuery
         contrId bin binRuntime codeHash
+
     forMap_ xabiFuncs $ \ funcName Func{..} -> do
       funcId <- blocModify1 $ insertXabiFunction
         metaDataId funcName funcSelector False
       blocModify $ insertXabiFunctionArg funcId funcArgs
       blocModify $ insertXabiFunctionRet funcId (toList funcVals)
+
+    constructorFuncId <- blocModify1 $ insertXabiFunction
+      metaDataId contractName "" True
+    blocModify $ insertXabiFunctionArg constructorFuncId xabiConstr
+    blocModify $ insertXabiFunctionRet constructorFuncId []
+
     return metaDataId
   for_ metaDataIds $ \ leftMetaDataId ->
     for_ metaDataIds $ \ rightMetaDataId -> blocModify $

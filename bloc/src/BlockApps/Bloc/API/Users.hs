@@ -111,7 +111,7 @@ instance MonadUsers Bloc where
     (PostUsersContractRequest src password contract args txParams value) = do
       --TODO: check what happens with mismatching args
       void $ compileContract contract src
-      logNotice . withCallStack =<< timestamp ("constructor arguments: " <> Text.pack (show args))
+      logWith logNotice ("constructor arguments: " <> Text.pack (show args))
       (cmId, bin16) <- getContractMetadataAndBin contract
       let
         (bin,leftOver) = Base16.decode $ bin16
@@ -120,9 +120,7 @@ instance MonadUsers Bloc where
       argsBin <- buildArgumentByteString args mFunctionId
       tx <- prepareTx
         userName password addr Nothing txParams (Wei (fromIntegral value)) (bin <> argsBin)
-      logNotice . withCallStack =<< timestamp ("tx is: " <> Text.pack (show tx))
-
-
+      logWith logNotice ("tx is: " <> Text.pack (show tx))
       hash <- blocStrato $ postTx tx
       txResult <- pollTxResult hash
       let
@@ -487,25 +485,6 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
       nonce <- case listToMaybe accts of
         Nothing -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
-
-      let
-        tx = signTransaction sk UnsignedTransaction
-          { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
-          , unsignedTransactionGasPrice =
-              fromMaybe (Wei 1000000000000000000) txparamsGasPrice
-          , unsignedTransactionGasLimit =
-              fromMaybe (Gas 3141592) txparamsGasLimit
-          , unsignedTransactionTo = toAddr
-          , unsignedTransactionValue = value
-          , unsignedTransactionInitOrData = code
-          }
-
-        pubKey = recoverTransaction tx
-        derivedAddr = deriveAddress $ fromMaybe (error "failed to derive pubKey") pubKey
-      logNotice . withCallStack =<< timestamp ("signedTx is :  " <> Text.pack (show tx))
-      if derivedAddr /= addr
-        then logNotice . withCallStack =<< timestamp ("derivedAddr is:  " <> Text.pack (show derivedAddr))
-        else logNotice . withCallStack =<< timestamp ("derivedAddr is equal to fromAddr: " <> Text.pack (show derivedAddr))
       return $ prepareSignedTx sk addr UnsignedTransaction
         { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
         , unsignedTransactionGasPrice =

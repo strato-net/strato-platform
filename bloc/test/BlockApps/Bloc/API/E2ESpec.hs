@@ -80,7 +80,7 @@ spec = do
       balance2AS `shouldBe` (initialWei + (etherToWei etherToSend))
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
-      -- create Users
+      pendingWith "Pending until contract method calls is implemented"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -176,3 +176,103 @@ spec = do
       let
         Just storedData' = mStoredData'
       storedData' `shouldBe` SolidityValueAsString "3"
+
+    it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
+      pendingWith "until state route is implemented"
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          simpleConstructorName = "SimpleConstructor"
+      simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleConstructorSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = simpleConstructorName
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" "3"
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = 0
+          }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName simpleConstructorName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mStoredData = Map.lookup "storedData" contractStateMap
+      mStoredData `shouldSatisfy` isJust
+      let
+        Just storedData = mStoredData
+      storedData `shouldBe` SolidityValueAsString "3"
+
+    it "should create TestArrayStatCons contract and check state after constructor" $ \ TestConfig {..} -> do
+
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          testArrayStatName = "TestArrayStatCons"
+      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleConstructorSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" "[3,2,3]"
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = 0
+          }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName testArrayStatName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mStoredData = Map.lookup "storedData" contractStateMap
+      mStoredData `shouldSatisfy` isJust
+      let
+        Just storedData = mStoredData
+      storedData `shouldBe` SolidityValueAsString "3"
