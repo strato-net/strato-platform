@@ -7,11 +7,14 @@
 
 module BlockApps.XAbiConverter where
 
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BC
 import Data.Function
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 import BlockApps.Solidity
 import BlockApps.Solidity.Contract
@@ -19,11 +22,6 @@ import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage as Storage
-
---xabiFuncs=undefined
---xabiConstr=undefined
---xabiVars=undefined
-
 
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
@@ -46,11 +44,7 @@ addPositions typeDefs' p0 (theType:rest) =
     (position, usedBytes) = getPositionAndSize typeDefs' p0 theType
   in
    fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
-
-
-
-
-
+   
 xabiTypeToSimpleType::XabiType->SimpleType
 xabiTypeToSimpleType XabiType{ xabiTypeType=Just "String" } = TypeString
 xabiTypeToSimpleType XabiType{ xabiTypeType=Just "Address" } = TypeAddress
@@ -120,8 +114,8 @@ xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 29 }
 xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 30 } = TypeUInt240
 xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 31 } = TypeUInt248
 xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 32 } = TypeUInt256
-
 xabiTypeToSimpleType v = error $ "undefined var in varToSimpleType: " ++ show (xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
+
 
 
 xabiTypeToType::XabiType->Type
@@ -131,36 +125,30 @@ xabiTypeToType XabiType { xabiTypeType=Just "Array", xabiTypeEntry=Just var } =
   TypeArrayDynamic $ xabiTypeToType var
 xabiTypeToType XabiType { xabiTypeType=Just "Contract", xabiTypeTypedef=Just name } = TypeContract name
 xabiTypeToType XabiType { xabiTypeType=Just "Mapping", xabiTypeKey=Just k, xabiTypeValue=Just v } = TypeMapping (xabiTypeToSimpleType k) (xabiTypeToType v)
-
 xabiTypeToType XabiType { xabiTypeType=Just "Enum", xabiTypeTypedef=Just enumName } = TypeEnum enumName
 xabiTypeToType v = SimpleType $ xabiTypeToSimpleType v
 
-{-
-varAsxabiType::Var->xabiType
-varAsxabiType Var{varType=Just varType, varBytes=varBytes, varDynamic=varDynamic, varSigned=varSigned, varEntry=Nothing} =
-  xabiType{
-    xabiTypeType=varType,
-    xabiTypeBytes=varBytes,
-    xabiTypeDynamic=varDynamic,
-    xabiTypeSigned=varSigned,
-    xabiTypeEntry=Nothing
-    }
-varAsxabiType Var{varType=Just varType, varBytes=varBytes, varDynamic=varDynamic, varSigned=varSigned, varEntry=Just Var{varType=Just innerType, varBytes=Just innerBytes}} =
-  xabiType{
-    xabiTypeType=varType,
-    xabiTypeBytes=varBytes,
-    xabiTypeDynamic=varDynamic,
-    xabiTypeSigned=varSigned,
-    xabiTypeEntry=Just Entry{
-      entryType=innerType,
-      entryBytes=innerBytes
-      }
-    }
-varAsxabiType x = error $ "Oops, varAsxabiType cannot convert " ++ show x
--}
+
+
+funcToType::Func->Type
+funcToType Func{..} =
+  let
+    selector =
+      case B16.decode $ BC.pack $ Text.unpack funcSelector of
+       (val, "") -> val
+       _ -> error "selector in function is bad"
+  in
+   TypeFunction
+       selector
+       (Map.toList $ fmap (xabiTypeToType . indexedXabiTypeType) funcArgs)
+       (map (\(name, val) -> (Just name, xabiTypeToType $ indexedXabiTypeType val)) $ Map.toList funcVals)
+
+
 
 getEnumDefs::Map Text VarType->Map Text EnumSet
 getEnumDefs _ = Map.empty
+
+
 
 xAbiToContract::Xabi->Contract
 xAbiToContract Xabi{..} =
@@ -172,7 +160,10 @@ xAbiToContract Xabi{..} =
   in
    Contract{
      mainStruct=
-        fieldsToStruct typeDefs' $ map (fmap (xabiTypeToType . varTypeType)) $ sortBy (compare `on` (varTypeAtBytes . snd)) $ Map.toList xabiVars,
+        fieldsToStruct typeDefs' $
+            (map (fmap (xabiTypeToType . varTypeType)) $ sortBy (compare `on` (varTypeAtBytes . snd)) $ Map.toList xabiVars)
+            ++ map (fmap funcToType) (Map.toList xabiFuncs)
+     ,
      typeDefs=typeDefs'
      }
 
