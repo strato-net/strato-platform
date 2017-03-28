@@ -102,7 +102,7 @@ instance FromJSON XabiType where
       bytes <- v .:? "bytes"
       entry <- v .:? "entry"
       length' <- v .:? "length"
-      val <- v .:? "val"
+      val <- v .:? "value"
       key <- v .:? "key"
       return
         XabiType {
@@ -125,7 +125,7 @@ instance ToJSON XabiType where
     , "signed" .= xabiTypeSigned
     , "bytes" .= xabiTypeBytes
     , "entry" .= xabiTypeEntry
-    , "val" .= xabiTypeValue
+    , "value" .= xabiTypeValue
     , "key" .= xabiTypeKey
     ]
 
@@ -149,7 +149,7 @@ instance FromJSON IndexedXabiType where
       bytes <- v .:? "bytes"
       entry <- v .:? "entry"
       length' <- v .:? "length"
-      val <- v .:? "val"
+      val <- v .:? "value"
       key <- v .:? "key"
       return $ IndexedXabiType index
         XabiType {
@@ -174,7 +174,7 @@ instance ToJSON IndexedXabiType where
     , "signed" .= xabiTypeSigned
     , "bytes" .= xabiTypeBytes
     , "entry" .= xabiTypeEntry
-    , "val" .= xabiTypeValue
+    , "value" .= xabiTypeValue
     , "key" .= xabiTypeKey
     ]
 
@@ -198,7 +198,7 @@ instance FromJSON VarType where
       bytes <- v .:? "bytes"
       entry <- v .:? "entry"
       length' <- v .:? "length"
-      val <- v .:? "val"
+      val <- v .:? "value"
       key <- v .:? "key"
       return $ VarType atBytes
         XabiType {
@@ -222,7 +222,7 @@ instance ToJSON VarType where
     , "signed" .= xabiTypeSigned
     , "bytes" .= xabiTypeBytes
     , "entry" .= xabiTypeEntry
-    , "val" .= xabiTypeValue
+    , "value" .= xabiTypeValue
     , "key" .= xabiTypeKey
     ]
 
