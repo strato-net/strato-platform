@@ -149,24 +149,60 @@ instance MonadContracts Bloc where
         args <- do
           tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
           for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-            return $ (name, ) Arg
-              { argIndex = index
-              , argType = ty
-              , argTypedef = tyd
-              , argDynamic = dy
-              , argBytes = by
-              , argEntry = Entry <$> eby <*> ety
+            return $ (name, ) IndexedXabiType
+              { indexedXabiTypeIndex = index,
+                indexedXabiTypeType =
+                  XabiType {
+                    xabiTypeType = ty
+                  , xabiTypeTypedef = tyd
+                  , xabiTypeDynamic = dy
+                  , xabiTypeBytes = by
+                  , xabiTypeSigned = Nothing
+                  , xabiTypeLength=Nothing
+                  , xabiTypeValue = Nothing
+                  , xabiTypeKey = Nothing
+                  , xabiTypeEntry = Just
+                    XabiType {
+                      xabiTypeBytes = eby
+                    , xabiTypeType = ety
+                    , xabiTypeTypedef = Nothing
+                    , xabiTypeDynamic = Nothing
+                    , xabiTypeSigned = Nothing
+                    , xabiTypeEntry = Nothing
+                    , xabiTypeLength=Nothing
+                    , xabiTypeValue = Nothing
+                    , xabiTypeKey = Nothing
+                    }
+                  }
               }
         vals <- do
           tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
           for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
-            return $ ("#" <> Text.pack (show index),) Val
-              { valIndex = index
-              , valType = ty
-              , valTypedef = tyd
-              , valDynamic = dy
-              , valBytes = by
-              , valEntry = Entry <$> eby <*> ety
+            return $ ("#" <> Text.pack (show index),) IndexedXabiType
+              { indexedXabiTypeIndex = index,
+                indexedXabiTypeType=
+                  XabiType{
+                    xabiTypeType = ty
+                  , xabiTypeTypedef = tyd
+                  , xabiTypeDynamic = dy
+                  , xabiTypeBytes = by
+                  , xabiTypeSigned = Nothing
+                  , xabiTypeLength=Nothing
+                  , xabiTypeValue = Nothing
+                  , xabiTypeKey = Nothing
+                  , xabiTypeEntry = Just
+                    XabiType {
+                      xabiTypeBytes = eby
+                    , xabiTypeType = ety
+                    , xabiTypeTypedef = Nothing
+                    , xabiTypeDynamic = Nothing
+                    , xabiTypeSigned = Nothing
+                    , xabiTypeEntry = Nothing
+                    , xabiTypeLength=Nothing
+                    , xabiTypeValue = Nothing
+                    , xabiTypeKey = Nothing
+                    }
+                  }
               }
         let
           func = Func
@@ -179,93 +215,102 @@ instance MonadContracts Bloc where
     constr <- Map.fromList <$> do
       tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
       for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-        return $ (name, ) Arg
-          { argIndex = index
-          , argType = ty
-          , argTypedef = tyd
-          , argDynamic = dy
-          , argBytes = by
-          , argEntry = Entry <$> eby <*> ety
+        return $ (name, ) IndexedXabiType
+          { indexedXabiTypeIndex = index,
+            indexedXabiTypeType =
+              XabiType {
+                xabiTypeType = ty
+              , xabiTypeTypedef = tyd
+              , xabiTypeDynamic = dy
+              , xabiTypeBytes = by
+              , xabiTypeSigned = Nothing
+              , xabiTypeLength=Nothing
+              , xabiTypeValue = Nothing
+              , xabiTypeKey = Nothing
+              , xabiTypeEntry = Just
+                   XabiType{
+                     xabiTypeBytes=eby
+                   , xabiTypeType=ety
+                   , xabiTypeTypedef=Nothing
+                   , xabiTypeDynamic=Nothing
+                   , xabiTypeSigned=Nothing
+                   , xabiTypeEntry=Nothing
+                   , xabiTypeLength=Nothing
+                   , xabiTypeValue=Nothing
+                   , xabiTypeKey=Nothing
+                   }
+              }
           }
     vars <- Map.fromList <$> do
       tuples <- blocQuery (getXabiVariablesQuery metadataId)
       for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
-        return $ (name,) Var
-          { varAtBytes = Just atBy
-          , varType = Just ty
--- <<<<<<< HEAD
-          , varLength = Nothing -- TODO figure out what this should be....
-          , varTypedef = tyd
-          , varDynamic = Just dy
-          , varSigned = Just si
-          , varBytes = by
-          , varEntry = Just Var{
-                            varBytes=eby, 
-                            varType=ety,  
-                            varAtBytes=Nothing,
-                            varLength=Nothing,
-                            varTypedef=Nothing,
-                            varDynamic=Nothing,
-                            varSigned=Nothing,
-                            varEntry=Nothing,
-                            varValue=Nothing,
-                            varKey=Nothing
+        return $ (name,) VarType
+          { varTypeAtBytes = atBy,
+            varTypeType =
+              XabiType {
+                xabiTypeType = Just ty
+              , xabiTypeTypedef = tyd
+              , xabiTypeDynamic = Just dy
+              , xabiTypeSigned = Just si
+              , xabiTypeBytes = by
+              , xabiTypeEntry = Just
+                     XabiType{
+                       xabiTypeBytes = eby
+                     , xabiTypeType = ety
+                     , xabiTypeTypedef=Nothing
+                     , xabiTypeDynamic=Nothing
+                     , xabiTypeSigned=Nothing
+                     , xabiTypeEntry=Nothing
+                     , xabiTypeLength=Nothing
+                     , xabiTypeValue=Nothing
+                     , xabiTypeKey=Nothing
+                     }
+              , xabiTypeLength=Nothing
+              , xabiTypeValue = Just XabiType
+                     { xabiTypeType = vty
+                     , xabiTypeBytes = vby
+                     , xabiTypeDynamic = vdy
+                     , xabiTypeSigned = vsi
+                     , xabiTypeTypedef=Nothing
+                     , xabiTypeLength=Nothing
+                     , xabiTypeValue=Nothing
+                     , xabiTypeKey=Nothing
+                     , xabiTypeEntry = Just
+                           XabiType{
+                             xabiTypeBytes= veby
+                           , xabiTypeType= vety
+                           , xabiTypeTypedef=Nothing
+                           , xabiTypeDynamic=Nothing
+                           , xabiTypeSigned=Nothing
+                           , xabiTypeEntry=Nothing
+                           , xabiTypeLength=Nothing
+                           , xabiTypeValue=Nothing
+                           , xabiTypeKey=Nothing
                            }
-          , varValue = Just Var
-            { varType = vty
-            , varBytes = vby
-            , varDynamic = vdy
-            , varSigned = vsi
-            , varEntry = Just Var{
-                            varBytes=veby, 
-                            varType=vety,  
-                            varAtBytes=Nothing,
-                            varLength=Nothing,
-                            varTypedef=Nothing,
-                            varDynamic=Nothing,
-                            varSigned=Nothing,
-                            varEntry=Nothing,
-                            varValue=Nothing,
-                            varKey=Nothing
+                     }
+              , xabiTypeKey = Just XabiType
+                     { xabiTypeType = kty
+                     , xabiTypeBytes = kby
+                     , xabiTypeDynamic = kdy
+                     , xabiTypeSigned = ksi
+                     , xabiTypeTypedef=Nothing
+                     , xabiTypeLength=Nothing
+                     , xabiTypeValue=Nothing
+                     , xabiTypeKey=Nothing
+                     , xabiTypeEntry = Just
+                           XabiType{
+                             xabiTypeBytes = keby
+                           , xabiTypeType = kety
+                           , xabiTypeTypedef=Nothing
+                           , xabiTypeDynamic=Nothing
+                           , xabiTypeSigned=Nothing
+                           , xabiTypeEntry=Nothing
+                           , xabiTypeLength=Nothing
+                           , xabiTypeValue=Nothing
+                           , xabiTypeKey=Nothing
                            }
-            , varAtBytes = Nothing
-            , varLength = Nothing
-            , varTypedef = Nothing
-            , varValue = Nothing
-            , varKey = Nothing
-            }
-          , varKey = Just SimpleVar
-            { simplevarType = kty
-            , simplevarBytes = kby
-            , simplevarDynamic = kdy
-            , simplevarSigned = ksi
-            , simplevarEntry = Entry <$> keby <*> kety
-            }
-{- =======
-          , varTypedef = tyd
-          , varDynamic = Just dy
-          , varSigned = Just si
-          , varBytes = by
-          , varEntry = Entry <$> eby <*> ety
-          , varVal = case vty of
-              Nothing -> Nothing
-              Just vty' -> Just SimpleVar
-                { simplevarType = vty'
-                , simplevarBytes = vby
-                , simplevarDynamic = vdy
-                , simplevarSigned = vsi
-                , simplevarEntry = Entry <$> veby <*> vety
-                }
-          , varKey = case kty of
-              Nothing -> Nothing
-              Just kty' -> Just SimpleVar
-                { simplevarType = kty'
-                , simplevarBytes = kby
-                , simplevarDynamic = kdy
-                , simplevarSigned = ksi
-                , simplevarEntry = Entry <$> keby <*> kety
-                }
->>>>>>> master -}
+                     }
+              }
           }
     return $ contractDetails
       { contractdetailsXabi = Xabi funcs constr vars }
