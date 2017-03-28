@@ -27,14 +27,12 @@ import Data.Int
 import Data.Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Monoid
 import Data.Proxy
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
-import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import Numeric
@@ -102,9 +100,9 @@ instance MonadContracts Bloc where
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract (ContractName contractName) contractId = do
+  getContractsContract contract@(ContractName contractName) contractId = do
+    xabi <- getContractXabi contract contractId
     let
-      noXabi = Xabi Map.empty Map.empty Map.empty
       detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
@@ -112,9 +110,9 @@ instance MonadContracts Bloc where
           , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
           , contractdetailsCodeHash = Text.decodeUtf8 codeHash
           , contractdetailsName = name
-          , contractdetailsXabi = noXabi
+          , contractdetailsXabi = xabi
           }
-    contractDetails <- case contractId of
+    case contractId of
       Named "Latest" -> do
         tuple <- blocQuery1 $
           getContractsContractLatestQuery contractName
@@ -132,85 +130,6 @@ instance MonadContracts Bloc where
           tuple <- blocQuery1 $
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) tuple
-    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
-    funcIdNameSelsMaybe <- blocQuery $ getXabiFunctionsQuery metadataId
-    let
-      -- TODO: fix this in next API iteration
-      funcIdNameSels =
-        [ (funcId, funcName, sel)
-        | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
-        ]
-    funcs <- fmap Map.fromList $
-      for funcIdNameSels $ \ (funcId,funcName,sel) -> do
-        args <- do
-          tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
-          for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-            return $ (name, ) Arg
-              { argIndex = index
-              , argType = ty
-              , argTypedef = tyd
-              , argDynamic = dy
-              , argBytes = by
-              , argEntry = Entry <$> eby <*> ety
-              }
-        vals <- do
-          tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
-          for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
-            return $ ("#" <> Text.pack (show index),) Val
-              { valIndex = index
-              , valType = ty
-              , valTypedef = tyd
-              , valDynamic = dy
-              , valBytes = by
-              , valEntry = Entry <$> eby <*> ety
-              }
-        let
-          func = Func
-            { funcArgs = Map.fromList args
-            , funcSelector = Text.decodeUtf8 sel
-            , funcVals = Map.fromList vals
-            }
-        return (funcName,func)
-    constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-    constr <- Map.fromList <$> do
-      tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
-      for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-        return $ (name, ) Arg
-          { argIndex = index
-          , argType = ty
-          , argTypedef = tyd
-          , argDynamic = dy
-          , argBytes = by
-          , argEntry = Entry <$> eby <*> ety
-          }
-    vars <- Map.fromList <$> do
-      tuples <- blocQuery (getXabiVariablesQuery metadataId)
-      for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
-        return $ (name,) Var
-          { varAtBytes = atBy
-          , varType = Just ty
-          , varTypedef = Just tyd
-          , varDynamic = Just dy
-          , varSigned = Just si
-          , varBytes = Just by
-          , varEntry = Entry <$> Just eby <*> Just ety
-          , varVal = Just SimpleVar
-            { simplevarType = vty
-            , simplevarBytes = Just vby
-            , simplevarDynamic = Just vdy
-            , simplevarSigned = Just vsi
-            , simplevarEntry = Entry <$> Just veby <*> Just vety
-            }
-          , varKey = Just SimpleVar
-            { simplevarType = kty
-            , simplevarBytes = Just kby
-            , simplevarDynamic = Just kdy
-            , simplevarSigned = Just ksi
-            , simplevarEntry = Entry <$> Just keby <*> Just kety
-            }
-          }
-    return $ contractDetails
-      { contractdetailsXabi = Xabi funcs constr vars }
 
   getContractsState contractName contractId = do
     contract <- getContract contractName contractId

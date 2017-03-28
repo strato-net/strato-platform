@@ -1,6 +1,7 @@
 {-# LANGUAGE
     DeriveGeneric
   , OverloadedStrings
+  , RecordWildCards
 #-}
 
 module BlockApps.Solidity where
@@ -51,8 +52,8 @@ instance Arbitrary SolidityValue where
 
 data Xabi = Xabi
   { xabiFuncs :: Map Text Func
-  , xabiConstr :: Map Text Arg
-  , xabiVars :: Map Text Var
+  , xabiConstr :: Map Text IndexedXabiType
+  , xabiVars :: Map Text VarType
   } deriving (Eq,Show,Generic)
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -64,76 +65,158 @@ instance FromJSON Xabi where
          <*> v .:? "vars" .!= Map.empty
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 data Func = Func
-  { funcArgs :: Map Text Arg
+  { funcArgs :: Map Text IndexedXabiType
   , funcSelector :: Text
-  , funcVals :: Map Text Val
+  , funcVals :: Map Text IndexedXabiType
   } deriving (Eq,Show,Generic)
 instance ToJSON Func where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
-data Arg = Arg
-  { argIndex :: Int32
-  , argType :: Maybe Text
-  , argTypedef :: Maybe Text
-  , argDynamic :: Maybe Bool
-  , argBytes :: Maybe Int32
-  , argEntry :: Maybe Entry
-  } deriving (Eq,Show,Generic)
-instance ToJSON Arg where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Arg where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Arg where arbitrary = genericArbitrary uniform
-data Entry = Entry
-  { entryBytes :: Int32
-  , entryType :: Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON Entry where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Entry where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Entry where arbitrary = genericArbitrary uniform
-data Val = Val
-  { valIndex :: Int32
-  , valType :: Maybe Text
-  , valTypedef :: Maybe Text
-  , valDynamic :: Maybe Bool
-  , valBytes :: Maybe Int32
-  , valEntry :: Maybe Entry
-  } deriving (Eq,Show,Generic)
-instance ToJSON Val where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Val where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Val where arbitrary = genericArbitrary uniform
-data Var = Var
-  { varAtBytes :: Int32
-  , varType :: Maybe Text
-  , varTypedef :: Maybe Text
-  , varDynamic :: Maybe Bool
-  , varSigned :: Maybe Bool
-  , varBytes :: Maybe Int32
-  , varEntry :: Maybe Entry
-  , varVal :: Maybe SimpleVar
-  , varKey :: Maybe SimpleVar
-  } deriving (Eq,Show,Generic)
-instance ToJSON Var where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON Var where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary Var where arbitrary = genericArbitrary uniform
-data SimpleVar = SimpleVar
-  { simplevarType :: Text
-  , simplevarBytes :: Maybe Int32
-  -- , simplevarTypedef :: Maybe Text -- TODO: Do we need this?
-  , simplevarDynamic :: Maybe Bool
-  , simplevarSigned :: Maybe Bool
-  , simplevarEntry :: Maybe Entry
-  } deriving (Eq,Show,Generic)
-instance ToJSON SimpleVar where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON SimpleVar where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance Arbitrary SimpleVar where arbitrary = genericArbitrary uniform
+
+data XabiType =
+  XabiType {
+    xabiTypeType::Maybe Text
+  , xabiTypeTypedef::Maybe Text
+  , xabiTypeDynamic::Maybe Bool
+  , xabiTypeSigned::Maybe Bool
+  , xabiTypeBytes::Maybe Int32
+  , xabiTypeEntry::Maybe XabiType
+  , xabiTypeVal::Maybe XabiType
+  , xabiTypeKey::Maybe XabiType
+    } deriving (Eq, Show, Generic)
+
+instance FromJSON XabiType where
+  parseJSON =
+    withObject "xabi" $ \v -> do
+      theType <- v .:? "type"
+      typedef <- v .:? "typedef"
+      dynamic <- v .:? "dynamic"
+      signed <- v .:? "signed"
+      bytes <- v .:? "bytes"
+      entry <- v .:? "entry"
+      val <- v .:? "val"
+      key <- v .:? "key"
+      return
+        XabiType {
+        xabiTypeType = theType,
+        xabiTypeTypedef = typedef, 
+        xabiTypeDynamic = dynamic, 
+        xabiTypeSigned = signed, 
+        xabiTypeBytes = bytes, 
+        xabiTypeEntry = entry, 
+        xabiTypeVal = val, 
+        xabiTypeKey = key
+        }
+    
+instance ToJSON XabiType where
+  toJSON XabiType{..} = object
+    [ "type" .= xabiTypeType
+    , "typedef" .= xabiTypeTypedef
+    , "dynamic" .= xabiTypeDynamic
+    , "signed" .= xabiTypeSigned
+    , "bytes" .= xabiTypeBytes
+    , "entry" .= xabiTypeEntry
+    , "val" .= xabiTypeVal
+    , "key" .= xabiTypeKey
+    ]
+
+instance Arbitrary XabiType where arbitrary = genericArbitrary uniform
+
+
+data IndexedXabiType =
+  IndexedXabiType {
+    indexedXabiTypeIndex::Int32,
+    indexedXabiTypeType::XabiType
+    } deriving (Eq, Show, Generic)
+
+instance FromJSON IndexedXabiType where
+  parseJSON = 
+    withObject "xabi" $ \v -> do
+      index <-  v .: "index"
+      theType <- v .:? "type"
+      typedef <- v .:? "typedef"
+      dynamic <- v .:? "dynamic"
+      signed <- v .:? "signed"
+      bytes <- v .:? "bytes"
+      entry <- v .:? "entry"
+      val <- v .:? "val"
+      key <- v .:? "key"
+      return $ IndexedXabiType index
+        XabiType {
+        xabiTypeType = theType,
+        xabiTypeTypedef = typedef, 
+        xabiTypeDynamic = dynamic, 
+        xabiTypeSigned = signed, 
+        xabiTypeBytes = bytes, 
+        xabiTypeEntry = entry, 
+        xabiTypeVal = val, 
+        xabiTypeKey = key
+        }
+ 
+         
+instance ToJSON IndexedXabiType where
+  toJSON (IndexedXabiType index XabiType{..}) = object
+    [ "index" .= index
+    , "type" .= xabiTypeType
+    , "typedef" .= xabiTypeTypedef
+    , "dynamic" .= xabiTypeDynamic
+    , "signed" .= xabiTypeSigned
+    , "bytes" .= xabiTypeBytes
+    , "entry" .= xabiTypeEntry
+    , "val" .= xabiTypeVal
+    , "key" .= xabiTypeKey
+    ]
+
+    
+instance Arbitrary IndexedXabiType where arbitrary = genericArbitrary uniform
+  
+data VarType =
+  VarType {
+    varTypeAtBytes::Int32
+  , varTypeType::XabiType
+    } deriving (Eq, Show, Generic)
+
+instance FromJSON VarType where
+  parseJSON =
+    withObject "xabi" $ \v -> do
+      atBytes <-  v .: "atBytes"
+      theType <- v .:? "type"
+      typedef <- v .:? "typedef"
+      dynamic <- v .:? "dynamic"
+      signed <- v .:? "signed"
+      bytes <- v .:? "bytes"
+      entry <- v .:? "entry"
+      val <- v .:? "val"
+      key <- v .:? "key"
+      return $ VarType atBytes
+        XabiType {
+        xabiTypeType = theType,
+        xabiTypeTypedef = typedef, 
+        xabiTypeDynamic = dynamic, 
+        xabiTypeSigned = signed, 
+        xabiTypeBytes = bytes, 
+        xabiTypeEntry = entry, 
+        xabiTypeVal = val, 
+        xabiTypeKey = key
+        }
+
+instance ToJSON VarType where
+  toJSON (VarType varTypeAtBytes XabiType{..}) = object
+    [ "atBytes" .= varTypeAtBytes
+    , "type" .= xabiTypeType
+    , "typedef" .= xabiTypeTypedef
+    , "dynamic" .= xabiTypeDynamic
+    , "signed" .= xabiTypeSigned
+    , "bytes" .= xabiTypeBytes
+    , "entry" .= xabiTypeEntry
+    , "val" .= xabiTypeVal
+    , "key" .= xabiTypeKey
+    ]
+
+
+
+
+instance Arbitrary VarType where arbitrary = genericArbitrary uniform
+
