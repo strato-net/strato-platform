@@ -1020,6 +1020,28 @@ compileContract contractName source = do
     returnA -< codeHash
   return codeHash
 
+getXabiType :: Int32 -> Bloc XabiType
+getXabiType typeId = do
+  (xtty,xttd,xtdy,xtsi,xtby,xtetid,xtvtid,xtktid)
+    <- blocQuery1 $ proc () -> do
+      (xtid,xtty,xttd,xtdy,xtsi,xtby,xtet,xtvt,xtkt)
+        <- queryTable xabiTypesTable -< ()
+      restrict -< xtid .== constant typeId
+      returnA -< (xtty,xttd,xtdy,xtsi,xtby,xtet,xtvt,xtkt)
+  xtet <- traverse getXabiType xtetid
+  xtvt <- traverse getXabiType xtvtid
+  xtkt <- traverse getXabiType xtktid
+  return XabiType
+    { xabiTypeType = Just xtty
+    , xabiTypeTypedef = xttd
+    , xabiTypeDynamic = Just xtdy
+    , xabiTypeSigned = Just xtsi
+    , xabiTypeBytes = xtby
+    , xabiTypeEntry = xtet
+    , xabiTypeVal = xtvt
+    , xabiTypeKey = xtkt
+    }
+
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
