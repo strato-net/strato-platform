@@ -755,9 +755,9 @@ LEFT OUTER JOIN
 LEFT OUTER JOIN
   xabi_types XTK ON XTK.id = XT.key_type_id
 LEFT OUTER JOIN
-  xabi_types XTVE ON XTVE.id = XT.entry_type_id
+  xabi_types XTVE ON XTVE.id = XTV.entry_type_id
 LEFT OUTER JOIN
-  xabi_types XTKE ON XTKE.id = XT.entry_type_id
+  xabi_types XTKE ON XTKE.id = XTK.entry_type_id
 WHERE XV.contract_metadata_id = $1;
 -}
 getXabiVariablesQuery
@@ -766,27 +766,72 @@ getXabiVariablesQuery
     ( Column PGText
     , Column PGInt4
     , Column PGText
-    , Column PGText
+    , Column (Nullable PGText)
     , Column PGBool
     , Column PGBool
-    , Column PGInt4
-    , Column PGText
-    , Column PGInt4
-    , Column PGText
-    , Column PGInt4
-    , Column PGBool
-    , Column PGBool
-    , Column PGText
-    , Column PGInt4
-    , Column PGText
-    , Column PGInt4
-    , Column PGBool
-    , Column PGBool
-    , Column PGText
-    , Column PGInt4
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGBool)
+    , Column (Nullable PGBool)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
+    , Column (Nullable PGBool)
+    , Column (Nullable PGBool)
+    , Column (Nullable PGText)
+    , Column (Nullable PGInt4)
     )
-getXabiVariablesQuery = undefined
-
+getXabiVariablesQuery cmId = proc () -> do
+  (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,xtketyp,xtkeby)
+    <- joinTable -< ()
+  restrict -< cmid .== constant cmId
+  returnA -< (vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,xtketyp,xtkeby)
+  where
+    joinTable = rightJoinF
+      (\ (_,xtketyp,_,_,_,xtkeby,_,_,_)
+         (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,_)
+         -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,toNullable xtketyp,xtkeby))
+      (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,_)
+         -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,Opaleye.null,Opaleye.null))
+      (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,xtkeid) -> toNullable xtId .== xtkeid )
+      (queryTable xabiTypesTable) $ rightJoinF
+        (\ (_,xtvetyp,_,_,_,xtveby,_,_,_)
+           (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,_,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid)
+           -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,toNullable xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid))
+        (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,_,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid)
+           -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,Opaleye.null,Opaleye.null,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid))
+        (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,_,_,_,_,_,_,xtveid,_,_,_,_,_) -> toNullable xtId .== xtveid)
+        (queryTable xabiTypesTable) $ rightJoinF
+          (\ (_,xtktyp,_,xtkisdy,xtkissi,xtkby,xtkeid,_,_)
+             (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid)
+             -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid,toNullable xtktyp,xtkby,toNullable xtkisdy,toNullable xtkissi,xtkeid))
+          (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid)
+             -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null))
+          (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,ktyid,_,_,_,_,_,_,_) -> toNullable xtId .== ktyid)
+          (queryTable xabiTypesTable) $ rightJoinF
+            (\ (_,xtvtyp,_,xtvisdy,xtvissi,xtvby,xtveid,_,_)
+               (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,ktyid,xtetyp,xteby)
+               -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,ktyid,xtetyp,xteby,toNullable xtvtyp, xtvby,toNullable xtvisdy,toNullable xtvissi,xtveid))
+            (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,ktyid,xtetyp,xteby)
+               -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,ktyid,xtetyp,xteby,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null))
+            (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,vtyid,_,_,_) -> toNullable xtId .== vtyid)
+            (queryTable xabiTypesTable) $ rightJoinF
+              (\ (_,xtetyp,_,_,_,xteby,_,_,_)
+                 (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,vtyid,ktyid)
+                 -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,vtyid,ktyid,toNullable xtetyp,xteby))
+              (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,vtyid,ktyid)
+                 -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,vtyid,ktyid,Opaleye.null,Opaleye.null) )
+              (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,etyid,_,_) -> toNullable xtId .== etyid)
+              (queryTable xabiTypesTable) $ joinF
+                (\ (_,cmid,_,vname,vbytes,_) (_,typ,typdef,isdy,issi,by,etyid,vtyid,ktyid)
+                  -> (cmid,vname,vbytes,typ,typdef,isdy,issi,by,etyid,vtyid,ktyid))
+                (\ (_,_,typeId,_,_,_) (xtId,_,_,_,_,_,_,_,_) -> typeId .== xtId)
+                (queryTable xabiVariablesTable)
+                (queryTable xabiTypesTable)
 {- |
 WITH contract_id AS (
  SELECT id FROM contracts WHERE name = $1)

@@ -239,14 +239,14 @@ instance MonadContracts Bloc where
             varTypeType =
               XabiType {
                 xabiTypeType = Just ty
-              , xabiTypeTypedef = Just tyd
+              , xabiTypeTypedef = tyd
               , xabiTypeDynamic = Just dy
               , xabiTypeSigned = Just si
-              , xabiTypeBytes = Just by
+              , xabiTypeBytes = by
               , xabiTypeEntry = Just
                      XabiType{
-                       xabiTypeBytes=Just eby
-                     , xabiTypeType=Just ety
+                       xabiTypeBytes = eby
+                     , xabiTypeType = ety
                      , xabiTypeTypedef=Nothing
                      , xabiTypeDynamic=Nothing
                      , xabiTypeSigned=Nothing
@@ -255,17 +255,17 @@ instance MonadContracts Bloc where
                      , xabiTypeKey=Nothing
                      }
               , xabiTypeVal = Just XabiType
-                     { xabiTypeType = Just vty
-                     , xabiTypeBytes = Just vby
-                     , xabiTypeDynamic = Just vdy
-                     , xabiTypeSigned = Just vsi
+                     { xabiTypeType = vty
+                     , xabiTypeBytes = vby
+                     , xabiTypeDynamic = vdy
+                     , xabiTypeSigned = vsi
                      , xabiTypeTypedef=Nothing
                      , xabiTypeVal=Nothing
                      , xabiTypeKey=Nothing
                      , xabiTypeEntry = Just
                            XabiType{
-                             xabiTypeBytes=Just veby
-                           , xabiTypeType=Just vety
+                             xabiTypeBytes= veby
+                           , xabiTypeType= vety
                            , xabiTypeTypedef=Nothing
                            , xabiTypeDynamic=Nothing
                            , xabiTypeSigned=Nothing
@@ -275,17 +275,17 @@ instance MonadContracts Bloc where
                            }
                      }
               , xabiTypeKey = Just XabiType
-                     { xabiTypeType = Just kty
-                     , xabiTypeBytes = Just kby
-                     , xabiTypeDynamic = Just kdy
-                     , xabiTypeSigned = Just ksi
+                     { xabiTypeType = kty
+                     , xabiTypeBytes = kby
+                     , xabiTypeDynamic = kdy
+                     , xabiTypeSigned = ksi
                      , xabiTypeTypedef=Nothing
                      , xabiTypeVal=Nothing
                      , xabiTypeKey=Nothing
                      , xabiTypeEntry = Just
                            XabiType{
-                             xabiTypeBytes=Just keby
-                           , xabiTypeType=Just kety
+                             xabiTypeBytes = keby
+                           , xabiTypeType = kety
                            , xabiTypeTypedef=Nothing
                            , xabiTypeDynamic=Nothing
                            , xabiTypeSigned=Nothing
