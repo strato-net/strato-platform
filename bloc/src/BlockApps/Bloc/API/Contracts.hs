@@ -189,25 +189,29 @@ instance MonadContracts Bloc where
         return $ (name,) Var
           { varAtBytes = atBy
           , varType = Just ty
-          , varTypedef = Just tyd
+          , varTypedef = tyd
           , varDynamic = Just dy
           , varSigned = Just si
-          , varBytes = Just by
-          , varEntry = Entry <$> Just eby <*> Just ety
-          , varVal = Just SimpleVar
-            { simplevarType = vty
-            , simplevarBytes = Just vby
-            , simplevarDynamic = Just vdy
-            , simplevarSigned = Just vsi
-            , simplevarEntry = Entry <$> Just veby <*> Just vety
-            }
-          , varKey = Just SimpleVar
-            { simplevarType = kty
-            , simplevarBytes = Just kby
-            , simplevarDynamic = Just kdy
-            , simplevarSigned = Just ksi
-            , simplevarEntry = Entry <$> Just keby <*> Just kety
-            }
+          , varBytes = by
+          , varEntry = Entry <$> eby <*> ety
+          , varVal = case vty of
+              Nothing -> Nothing
+              Just vty' -> Just SimpleVar
+                { simplevarType = vty'
+                , simplevarBytes = vby
+                , simplevarDynamic = vdy
+                , simplevarSigned = vsi
+                , simplevarEntry = Entry <$> veby <*> vety
+                }
+          , varKey = case kty of
+              Nothing -> Nothing
+              Just kty' -> Just SimpleVar
+                { simplevarType = kty'
+                , simplevarBytes = kby
+                , simplevarDynamic = kdy
+                , simplevarSigned = ksi
+                , simplevarEntry = Entry <$> keby <*> kety
+                }
           }
     return $ contractDetails
       { contractdetailsXabi = Xabi funcs constr vars }

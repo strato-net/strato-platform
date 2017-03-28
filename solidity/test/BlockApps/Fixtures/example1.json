@@ -1,0 +1,70 @@
+{
+  "funcs": {
+    "testFunction3": {
+      "args": {
+        "a": {
+          "signed": true,
+          "type": "Int",
+          "index": 0,
+          "bytes": 32,
+          "name": "a"
+        }
+      },
+      "selector": "f0ecc46e",
+      "vals": {}
+    },
+    "testFunction2": {
+      "args": {
+        "a": {
+          "signed": true,
+          "type": "Int",
+          "index": 0,
+          "bytes": 32,
+          "name": "a"
+        }
+      },
+      "selector": "6b64add8",
+      "vals": {}
+    }
+  },
+  "vars": {
+    "m2": {
+      "atBytes": 32,
+      "dynamic": true,
+      "value": {
+        "type": "Bool"
+      },
+      "key": {
+        "type": "Int",
+        "bytes": 32
+      },
+      "type": "Mapping"
+    },
+    "bl": {
+      "atBytes": 64,
+      "type": "Bool",
+      "public": true
+    },
+    "m1": {
+      "atBytes": 0,
+      "dynamic": true,
+      "value": {
+        "dynamic": true,
+        "value": {
+          "type": "Int",
+          "bytes": 32
+        },
+        "key": {
+          "type": "Int",
+          "bytes": 32
+        },
+        "type": "Mapping"
+      },
+      "key": {
+        "type": "Int",
+        "bytes": 32
+      },
+      "type": "Mapping"
+    }
+  }
+}
