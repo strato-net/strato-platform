@@ -108,7 +108,7 @@ instance MonadContracts Bloc where
 
   getContractsContract (ContractName contractName) contractId = do
     let
-      noXabi = Xabi Map.empty Map.empty Map.empty
+      noXabi = Xabi Map.empty Map.empty Map.empty Map.empty -- TODO fill in the xabiTypes
       detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
@@ -313,11 +313,16 @@ instance MonadContracts Bloc where
               }
           }
     return $ contractDetails
-      { contractdetailsXabi = Xabi funcs constr vars }
+      { contractdetailsXabi = Xabi funcs constr vars Map.empty } --TODO - fill this in
 
   getContractsState (ContractName contractName) contractId = do
     let arrayXabiString = getContractXabiString $ Text.unpack contractName
-        contractXAbi = fromMaybe (error "xabi alert!") $ decode $ BLC.pack arrayXabiString
+        xabiOrError = eitherDecode $ BLC.pack arrayXabiString
+        contractXAbi =
+          case xabiOrError of
+           Left e -> error $ show e ++ "\nxabi is:\n" ++ arrayXabiString
+           Right val -> val
+           
         contract = xAbiToContract contractXAbi
 
     storage' <- blocStrato $ getStorage $ Just $ getAddress (ContractName contractName) contractId

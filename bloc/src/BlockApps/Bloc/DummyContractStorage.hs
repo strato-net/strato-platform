@@ -750,7 +750,7 @@ getAddress (ContractName "Types") _ = Address 0xc810525ea1837cdb297d2694a0f79636
 
 
 --getAddress (ContractName "Enums") _ = Address 0xbd4d76e9c5923661a92db8064c816b758c85649e
-getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
+getAddress (ContractName "Enums") _ = Address 0x86df6d5e6a491d373c897f22985dd40c3ca18f0e
 
 getAddress (ContractName "Struct") _ = Address 0x658ba3447ca8a4b6668233d0fa70b8b083a4f3f2
 --getAddress (ContractName "Struct2") _ = Address 0xc95129dfce7e115d7e2f7f658456d3191af91ac8

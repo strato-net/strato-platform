@@ -54,10 +54,23 @@ instance FromJSON SolidityValue where
 instance Arbitrary SolidityValue where
   arbitrary = return (SolidityBool True)
 
+data ContractType =
+  ContractType {
+    contracttypeNames::Map Text Int,
+    contracttypeType::Text,
+    contracttypeBytes::Word
+    } deriving (Eq, Show, Generic)
+instance Arbitrary ContractType where arbitrary = genericArbitrary uniform
+instance ToJSON ContractType where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON ContractType where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+    
 data Xabi = Xabi
   { xabiFuncs :: Map Text Func
   , xabiConstr :: Map Text IndexedXabiType
   , xabiVars :: Map Text VarType
+  , xabiTypes :: Map Text ContractType
   } deriving (Eq,Show,Generic)
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -67,6 +80,7 @@ instance FromJSON Xabi where
     Xabi <$> v .:? "funcs" .!= Map.empty
          <*> v .:? "constr" .!= Map.empty
          <*> v .:? "vars" .!= Map.empty
+         <*> v .:? "types" .!= Map.empty
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 data Func = Func
   { funcArgs :: Map Text IndexedXabiType

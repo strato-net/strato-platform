@@ -7,14 +7,15 @@
 
 module BlockApps.XAbiConverter where
 
+import qualified Data.Bimap as Bimap
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Function
 import Data.List
-import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Tuple
 
 import BlockApps.Solidity
 import BlockApps.Solidity.Contract
@@ -144,17 +145,19 @@ funcToType Func{..} =
        (map (\(name, val) -> (Just name, xabiTypeToType $ indexedXabiTypeType val)) $ Map.toList funcVals)
 
 
-
-getEnumDefs::Map Text VarType->Map Text EnumSet
-getEnumDefs _ = Map.empty
-
+{-
+getEnumDef::VarType->Maybe EnumSet
+getEnumDef VarType{varTypeType=XabiType{xabiTypeType=Just "Enum", xabiTypeNames=names}} = names
+getEnumDef _ = Nothing
+-}
 
 
 xAbiToContract::Xabi->Contract
 xAbiToContract Xabi{..} =
   let
     typeDefs' = TypeDefs{
-      enumDefs=getEnumDefs xabiVars,
+      enumDefs=
+          fmap (Bimap.fromList . map swap . Map.toList . contracttypeNames) xabiTypes,
       structDefs=Map.fromList []
       }
   in
