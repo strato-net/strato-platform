@@ -130,7 +130,7 @@ data SimpleType
   deriving (Show,Read)
 
 formatSimpleType::SimpleType->String
-formatSimpleType x = map toLower $ drop 4 $ show x
+formatSimpleType x = drop 4 $ show x
 
 formatType::Type->String
 formatType (SimpleType x) = formatSimpleType x
