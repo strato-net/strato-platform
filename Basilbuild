@@ -2,6 +2,12 @@ ifeq ($(BASIL_DOCKER_TAG),)
   $(error BASIL_DOCKER_TAG is not set)
 endif
 
+ifneq ($(USE_DOCKER_BUILD_ENV),)
+ifeq ($(BASIL_HOME),)
+  $(error USE_DOCKER_BUILD_ENV is set, but BASIL_HOME is not)
+endif
+endif
+
 BASILWORK=.basil-work
 BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
 STACKWORK=$(BASILWORK)/stack
@@ -10,10 +16,9 @@ NPMWORK=$(BASILWORK)/npm
 FAKEROOT=$(BASILWORK)/fakeroot
 STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
-BUILDER_HOME=$(BASILWORK_ABS)/builder_home
+BUILDER_HOME=$(BASIL_HOME)/blockapps/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
-
 
 SOLCBRANCH=v0.3.6
 SOLCREPOSITORY=https://github.com/ethereum/solidity.git
@@ -83,6 +88,8 @@ else
 	cp -f Dockerfile.buildbase /tmp/docker-dummy
 	docker build -t strato-buildbase:latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
 	rm -f /tmp/docker-dummy/Dockerfile.buildbase
+	mkdir -p $(BUILDER_HOME)
+	$(DOCKER_SHELL) "chown root:root /root" || true
 endif
 
 pull_blockapps_js: prebuild
