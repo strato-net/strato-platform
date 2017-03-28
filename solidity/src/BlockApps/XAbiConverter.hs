@@ -145,13 +145,6 @@ funcToType Func{..} =
        (map (\(name, val) -> (Just name, xabiTypeToType $ indexedXabiTypeType val)) $ Map.toList funcVals)
 
 
-{-
-getEnumDef::VarType->Maybe EnumSet
-getEnumDef VarType{varTypeType=XabiType{xabiTypeType=Just "Enum", xabiTypeNames=names}} = names
-getEnumDef _ = Nothing
--}
-
-
 xAbiToContract::Xabi->Contract
 xAbiToContract Xabi{..} =
   let
