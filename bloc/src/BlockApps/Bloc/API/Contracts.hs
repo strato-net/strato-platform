@@ -193,14 +193,15 @@ instance MonadContracts Bloc where
         return $ (name,) Var
           { varAtBytes = Just atBy
           , varType = Just ty
+-- <<<<<<< HEAD
           , varLength = Nothing -- TODO figure out what this should be....
-          , varTypedef = Just tyd
+          , varTypedef = tyd
           , varDynamic = Just dy
           , varSigned = Just si
-          , varBytes = Just by
+          , varBytes = by
           , varEntry = Just Var{
-                            varBytes=Just eby, 
-                            varType=Just ety,  
+                            varBytes=eby, 
+                            varType=ety,  
                             varAtBytes=Nothing,
                             varLength=Nothing,
                             varTypedef=Nothing,
@@ -211,13 +212,13 @@ instance MonadContracts Bloc where
                             varKey=Nothing
                            }
           , varValue = Just Var
-            { varType = Just vty
-            , varBytes = Just vby
-            , varDynamic = Just vdy
-            , varSigned = Just vsi
+            { varType = vty
+            , varBytes = vby
+            , varDynamic = vdy
+            , varSigned = vsi
             , varEntry = Just Var{
-                            varBytes=Just veby, 
-                            varType=Just vety,  
+                            varBytes=veby, 
+                            varType=vety,  
                             varAtBytes=Nothing,
                             varLength=Nothing,
                             varTypedef=Nothing,
@@ -235,11 +236,36 @@ instance MonadContracts Bloc where
             }
           , varKey = Just SimpleVar
             { simplevarType = kty
-            , simplevarBytes = Just kby
-            , simplevarDynamic = Just kdy
-            , simplevarSigned = Just ksi
-            , simplevarEntry = Entry <$> Just keby <*> Just kety
+            , simplevarBytes = kby
+            , simplevarDynamic = kdy
+            , simplevarSigned = ksi
+            , simplevarEntry = Entry <$> keby <*> kety
             }
+{- =======
+          , varTypedef = tyd
+          , varDynamic = Just dy
+          , varSigned = Just si
+          , varBytes = by
+          , varEntry = Entry <$> eby <*> ety
+          , varVal = case vty of
+              Nothing -> Nothing
+              Just vty' -> Just SimpleVar
+                { simplevarType = vty'
+                , simplevarBytes = vby
+                , simplevarDynamic = vdy
+                , simplevarSigned = vsi
+                , simplevarEntry = Entry <$> veby <*> vety
+                }
+          , varKey = case kty of
+              Nothing -> Nothing
+              Just kty' -> Just SimpleVar
+                { simplevarType = kty'
+                , simplevarBytes = kby
+                , simplevarDynamic = kdy
+                , simplevarSigned = ksi
+                , simplevarEntry = Entry <$> keby <*> kety
+                }
+>>>>>>> master -}
           }
     return $ contractDetails
       { contractdetailsXabi = Xabi funcs constr vars }
