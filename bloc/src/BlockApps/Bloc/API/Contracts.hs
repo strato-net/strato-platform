@@ -22,6 +22,7 @@ import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
+import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.Int
 import Data.Maybe
@@ -103,7 +104,7 @@ instance MonadContracts Bloc where
   getContractsContract contract@(ContractName contractName) contractId = do
     xabi <- getContractXabi contract contractId
     let
-      detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
+      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = detailsAddr

@@ -148,8 +148,8 @@ getContractMetadataAndBin :: Text ->  Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = do
   cmIds_bins <- blocQuery $ proc () -> do
     (cmId,name,bin) <- joinF
-      (\ (cmId,_,bin,_,_) (_,name) -> (cmId,name,bin))
-      (\ (_,contractId,_,_,_) (cid,_) -> cid .== contractId)
+      (\ (cmId,_,bin,_,_,_) (_,name) -> (cmId,name,bin))
+      (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
       (queryTable contractsMetaDataTable)
       (queryTable contractsTable) -< ()
     restrict -< name .== constant contract
