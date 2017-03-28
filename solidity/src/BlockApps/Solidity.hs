@@ -88,9 +88,39 @@ data XabiType =
     } deriving (Eq, Show, Generic)
 
 instance FromJSON XabiType where
-  parseJSON _ = undefined
+  parseJSON =
+    withObject "xabi" $ \v -> do
+      theType <- v .:? "type"
+      typedef <- v .:? "typedef"
+      dynamic <- v .:? "dynamic"
+      signed <- v .:? "signed"
+      bytes <- v .:? "bytes"
+      entry <- v .:? "entry"
+      val <- v .:? "val"
+      key <- v .:? "key"
+      return
+        XabiType {
+        xabiTypeType = theType,
+        xabiTypeTypedef = typedef, 
+        xabiTypeDynamic = dynamic, 
+        xabiTypeSigned = signed, 
+        xabiTypeBytes = bytes, 
+        xabiTypeEntry = entry, 
+        xabiTypeVal = val, 
+        xabiTypeKey = key
+        }
+    
 instance ToJSON XabiType where
-  toJSON = undefined
+  toJSON XabiType{..} = object
+    [ "type" .= xabiTypeType
+    , "typedef" .= xabiTypeTypedef
+    , "dynamic" .= xabiTypeDynamic
+    , "signed" .= xabiTypeSigned
+    , "bytes" .= xabiTypeBytes
+    , "entry" .= xabiTypeEntry
+    , "val" .= xabiTypeVal
+    , "key" .= xabiTypeKey
+    ]
 
 instance Arbitrary XabiType where arbitrary = genericArbitrary uniform
 
@@ -151,7 +181,7 @@ data VarType =
 instance FromJSON VarType where
   parseJSON =
     withObject "xabi" $ \v -> do
-      atBytes <-  v .: "atbytes"
+      atBytes <-  v .: "atBytes"
       theType <- v .:? "type"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
@@ -174,7 +204,7 @@ instance FromJSON VarType where
 
 instance ToJSON VarType where
   toJSON (VarType varTypeAtBytes XabiType{..}) = object
-    [ "atbytes" .= varTypeAtBytes
+    [ "atBytes" .= varTypeAtBytes
     , "type" .= xabiTypeType
     , "typedef" .= xabiTypeTypedef
     , "dynamic" .= xabiTypeDynamic
