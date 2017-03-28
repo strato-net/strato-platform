@@ -114,7 +114,7 @@ xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 29 }
 xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 30 } = TypeUInt240
 xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 31 } = TypeUInt248
 xabiTypeToSimpleType XabiType { xabiTypeType=Just "Int", xabiTypeBytes=Just 32 } = TypeUInt256
-xabiTypeToSimpleType v = error $ "undefined var in varToSimpleType: " ++ show (xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
+xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
 
