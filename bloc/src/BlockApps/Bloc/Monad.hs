@@ -40,7 +40,7 @@ newtype Bloc x = Bloc
 
 instance MonadError BlocError Bloc where
   throwError err = do
-    logError . withCallStack =<< timestamp (Text.pack (show err))
+    logWith logError (Text.pack (show err))
     Bloc $ throwError err
   catchError m handle = do
     logError . withCallStack =<< timestamp "catching error"
@@ -75,13 +75,15 @@ enterBloc env x
       . renderWithTimestamp
           (formatTime defaultTimeLocale rfc822DateFormat)
 
+logWith :: (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
+logWith logFn x = logFn . withCallStack =<< timestamp x
+
 blocQuery
   :: (Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> Bloc [y]
 blocQuery q = do
-  for_ (showSql q) $ \ sql ->
-    logNotice . withCallStack =<< timestamp (Text.pack sql)
+  traverse_ (logWith logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
   liftIO . withTransaction conn $ runQuery conn q
 
@@ -90,8 +92,7 @@ blocQuery1
   => Query x
   -> Bloc y
 blocQuery1 q = do
-  for_ (showSql q) $ \ sql ->
-    logNotice . withCallStack =<< timestamp (Text.pack sql)
+  traverse_ (logWith logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
   results <- liftIO . withTransaction conn $ runQuery conn q
   case results of
@@ -101,11 +102,13 @@ blocQuery1 q = do
 
 blocModify :: (Connection -> IO x) -> Bloc x
 blocModify modify = do
+  logWith logNotice "Updating the database"
   conn <- asks dbConnection
   liftIO $ withTransaction conn (modify conn)
 
 blocModify1 :: (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
+  logWith logNotice "Updating the database"
   conn <- asks dbConnection
   results <- liftIO $ withTransaction conn (modify conn)
   case results of
@@ -115,6 +118,7 @@ blocModify1 modify = do
 
 blocStrato :: ClientM x -> Bloc x
 blocStrato client' = do
+  logWith logNotice "Querying Strato"
   url <- asks urlStrato
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
