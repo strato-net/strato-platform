@@ -17,6 +17,7 @@ import BlockApps.Bloc.API.Users
 import BlockApps.Bloc.API.Contracts
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.API.SpecUtils
+import BlockApps.Ethereum
 import BlockApps.Solidity
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
@@ -228,7 +229,7 @@ spec = do
       storedData `shouldBe` SolidityValueAsString "3"
 
     it "should create TestArrayStatCons contract and check state after constructor" $ \ TestConfig {..} -> do
-
+      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -257,22 +258,141 @@ spec = do
       length accts1 `shouldBe` 1
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
-      let
-        Right contractAddr = postUsersContractEither
 
-      -- get contract state
 
-      contractStateEither <- runClientM
-        (getContractsState
-          (ContractName testArrayStatName)
-          (Unnamed contractAddr)
-        )
-        (ClientEnv mgr blocUrl)
-      contractStateEither `shouldSatisfy` isRight
+    it "should create TestArrayDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
+      pendingWith "pending until we can check state"
       let
-        Right contractStateMap = contractStateEither
-        mStoredData = Map.lookup "storedData" contractStateMap
-      mStoredData `shouldSatisfy` isJust
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          testArrayStatName = "TestArrayDynCons"
+      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      threadDelay 4000000
       let
-        Just storedData = mStoredData
-      storedData `shouldBe` SolidityValueAsString "3"
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleConstructorSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" "[1,2,3,4,5,6,7,8]"
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = 0
+          }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+    it "should create TestBytesDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
+      pendingWith "pending until we can check state"
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          testArrayStatName = "TestBytesDynCons"
+      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleConstructorSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = 0
+          }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+    it "should create TestAddressBytesCons contract and check state after constructor" $ \ TestConfig {..} -> do
+      pendingWith "pending until we can check state"
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          testArrayStatName = "TestAddressBytesCons"
+      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleConstructorSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestArgs = Just $ Map.fromList
+          [ ("x", "deadbeef")
+          , ( "y", "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
+            )
+          ]
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = 0
+          }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+    it "should create TestLessComplexCons contract and check state after constructor" $ \ TestConfig {..} -> do
+
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          testArrayStatName = "TestLessComplexCons"
+      simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        txParamsComplex = TxParams (Just (Gas 100000000000000)) (Just (Wei 1)) Nothing
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleConstructorSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestArgs = Just $ Map.fromList
+          [ ("_uint", "102344")
+          , ("_int", "-444444")
+          , ("_address", "deadbeef")
+          , ("_bool", "true")
+          , ("_string", "One Ring to rule them all, One Ring to find them. One Ring to bring them all, and in the darkenss bind them.")
+          , ("_bytes32St", "6af83ccf1dabb1a6117ff5ef95a7d3677e4c4cf047dbd3fd8bfccf5e8b1872fb")
+          , ("_uintArrSt", "[1,2,3]")
+          ]
+          , postuserscontractrequestTxParams = txParamsComplex
+          , postuserscontractrequestValue = 0
+          }
+      eAccts1 <- runClientM
+        (getAccountsFilter params1)
+        (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight

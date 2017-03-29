@@ -886,7 +886,7 @@ insertContractMetaDataQuery
       returnA -< cmId
     case listToMaybe cmIds of
       Just cmId -> return $ Just cmId
-      Nothing -> 
+      Nothing ->
         listToMaybe <$> runInsertReturning conn contractsMetaDataTable
           writeColumns
           (\ (contractMetaDataId,_,_,_,_,_) -> contractMetaDataId)
