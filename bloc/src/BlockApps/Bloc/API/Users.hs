@@ -172,16 +172,15 @@ buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteStri
 buildArgumentByteString args mFunctionId = case mFunctionId of
   Nothing -> return ByteString.empty
   Just functionId -> do
-    argNamesTypes <- fmap Map.fromList . blocQuery $ proc () -> do
-      (name,_,ty,_,dy,_,ety,_) <- getXabiFunctionsArgsQuery functionId -< ()
-      returnA -< (name,(ty,dy,ety))
+    argNamesTypes <- getXabiFunctionsArgsQuery functionId
     let
-      determineValue valStr (tyM,dyM,etyM) =
+      determineValue valStr (IndexedXabiType _ xabiType) =
         let
-          typeM = textToArgType
-            (fromMaybe "bytes" tyM)
-            (fromMaybe False dyM)
-            (fromMaybe "bytes" etyM)
+          ty = xabiTypeType xabiType
+          dy = fromMaybe False $ xabiTypeDynamic xabiType
+          ety = xabiTypeEntry xabiType
+          etyty = fromMaybe "" $ fmap xabiTypeType ety
+          typeM = textToArgType ty dy etyty
         in
           textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
     case args of

@@ -22,7 +22,7 @@ import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Char8
 import Data.Foldable
-import Data.Int (Int32)
+import Data.Int (Int32,Int64)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -35,7 +35,7 @@ import qualified Data.Text.Encoding as Text
 import Data.Traversable
 import Database.PostgreSQL.Simple (Connection)
 import Opaleye hiding (not,null)
-import qualified Opaleye as Opaleye (not,null)
+import qualified Opaleye as Opaleye (not)
 
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Database.Tables
@@ -128,7 +128,7 @@ contractsJoinTable :: Query
   )
 contractsJoinTable = joinF
   (\ (_,_,a,ts) (cmId,n,b,br,ch,xch) -> (cmId,n,a,ts,b,br,ch,xch))
-  (\ (_,contractMetaDataId,_,_) (cmId,_,_,_,_,_) -> cmId .== contractMetaDataId)
+  (\ (_,contractmetadataId,_,_) (cmId,_,_,_,_,_) -> cmId .== contractmetadataId)
   (queryTable contractsInstanceTable) $ joinF
     (\ (cmId,_,b,br,ch,xch) (_,n) -> (cmId,n,b,br,ch,xch))
     (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
@@ -168,10 +168,10 @@ linkedContractsJoinTable = joinF
   (\ (c2Id,_) (_,_,contractId2,_,_,_,_) -> c2Id .== contractId2)
   (queryTable contractsTable) $ joinF
     (\ (cm2Id,contractId2,_,_,_,_) (name,_,b,br,ch,xch) -> (name,cm2Id,contractId2,b,br,ch,xch))
-    (\ (cm2Id,_,_,_,_,_) (_,linkedMetadataId,_,_,_,_) -> cm2Id .== linkedMetadataId)
+    (\ (cm2Id,_,_,_,_,_) (_,linkedmetadataId,_,_,_,_) -> cm2Id .== linkedmetadataId)
     (queryTable contractsMetaDataTable) $ joinF
-      (\ (_,linkedMetadataId) (name,_,b,br,ch,xch) -> (name,linkedMetadataId,b,br,ch,xch))
-      (\ (contractMetaDataId,_) (_,cmId,_,_,_,_) -> contractMetaDataId .== cmId)
+      (\ (_,linkedmetadataId) (name,_,b,br,ch,xch) -> (name,linkedmetadataId,b,br,ch,xch))
+      (\ (contractmetadataId,_) (_,cmId,_,_,_,_) -> contractmetadataId .== cmId)
       (queryTable contractsLookupTable) $ joinF
         (\ (_,name) (cmId,_,b,br,ch,xch) -> (name,cmId,b,br,ch,xch))
         (\ (cid,_) (_,contractId,_,_,_,_) -> cid .== contractId)
@@ -236,7 +236,7 @@ getContractsNamesAsAddressesQuery :: Query
   )
 getContractsNamesAsAddressesQuery = joinF
   (\ (_,_,_,timestamp) (_,_,_,_,name,name2,_) -> (name,name2,timestamp))
-  (\ (_,contractMetaDataId,_,_) (_,_,_,_,_,_,cm2Id) -> contractMetaDataId .== cm2Id)
+  (\ (_,contractmetadataId,_,_) (_,_,_,_,_,_,cm2Id) -> contractmetadataId .== cm2Id)
   (queryTable contractsInstanceTable)
   linkedContractsJoinTable
 
@@ -308,91 +308,40 @@ getContractsMetaDataId contractName = \case
 insertXabiFunctionArg
   :: Int32
   -> Map Text IndexedXabiType
-  -> Connection -> IO ()
-insertXabiFunctionArg funcId args conn = do
-  entryTypeIdss <- for (toList args) $ \ IndexedXabiType{indexedXabiTypeType=XabiType{xabiTypeEntry = argEntry}} ->
-    case argEntry of
-      Nothing -> return [Nothing::Maybe Int32]
-      Just XabiType{..} -> runInsertReturning conn xabiTypesTable
-        ( Nothing
-        , constant $ fromMaybe (error "xabiTypeType was Nothing") xabiTypeType
-        , Opaleye.null
-        , constant False
-        , constant False
-        , constant xabiTypeBytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
+  -> Bloc Int64
+insertXabiFunctionArg funcId args = do
+  argsWithIds <- for args $ \ (IndexedXabiType index xt) -> do
+    xtid <- insertXabiType xt
+    return (index,xtid)
+  blocModify $ \ conn -> do
+    runInsertMany conn xabiFunctionArgumentsTable
+      [ ( Nothing
+        , constant funcId
+        , constant xtid
+        , constant name
+        , constant index
         )
-        (\ (tyId,_,_,_,_,_,_,_,_) -> toNullable tyId)
-  let entryTypeIds = map head entryTypeIdss
-  typeIds <- runInsertManyReturning conn xabiTypesTable
-    [ ( Nothing
-      , constant (fromMaybe "Contract" xabiTypeType) -- Type is missing from Val when the variable is a contract
-      , constant xabiTypeTypedef
-      , constant (fromMaybe False xabiTypeDynamic)
-      , constant False
-      , constant xabiTypeBytes
-      , constant entryTypeId
-      , Opaleye.null
-      , Opaleye.null
-      )
-    | (entryTypeId,IndexedXabiType{indexedXabiTypeType=XabiType{..}}) <- zip entryTypeIds (toList args)
-    ]
-    (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
-  void $ runInsertMany conn xabiFunctionArgumentsTable
-    [ ( Nothing
-      , constant funcId
-      , constant (typeId::Int32)
-      , constant name --TODO: this could end up reordered. Revisit
-      , constant indexedXabiTypeIndex
-      )
-    | (typeId,(name,IndexedXabiType{..})) <- zip typeIds (Map.toList args)
-    ]
+      | (name,(index,xtid)) <- Map.toList argsWithIds
+      ]
 
 insertXabiFunctionRet
   :: Int32
   -> [IndexedXabiType]
-  -> Connection -> IO ()
-insertXabiFunctionRet funcId vals conn = do
-  entryTypeIdss <- for vals $ \ IndexedXabiType{indexedXabiTypeType=XabiType{xabiTypeEntry = valEntry}} ->
-    case valEntry of
-      Nothing -> return [Nothing::Maybe Int32]
-      Just XabiType{..} -> runInsertReturning conn xabiTypesTable
-        ( Nothing
-        , constant $ fromMaybe (error "xabiTypeType is missing") xabiTypeType
-        , Opaleye.null
-        , constant False
-        , constant False
-        , constant xabiTypeBytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
+  -> Bloc Int64
+insertXabiFunctionRet funcId vals = do
+  valIds <- for vals $ \ (IndexedXabiType index xt) -> do
+    xtid <- insertXabiType xt
+    return (index,xtid)
+  blocModify $ \ conn -> do
+    runInsertMany conn xabiFunctionReturnsTable
+      [ ( Nothing
+        , constant funcId
+        , constant index
+        , constant xtid
         )
-        (\ (tyId,_,_,_,_,_,_,_,_) -> toNullable tyId)
-  let entryTypeIds = map head entryTypeIdss
-  typeIds <- runInsertManyReturning conn xabiTypesTable
-    [ ( Nothing
-      , constant (fromMaybe "Contract" xabiTypeType) -- Type is missing from Val when the variable is a contract
-      , constant xabiTypeTypedef
-      , constant (fromMaybe False xabiTypeDynamic)
-      , constant False -- How will we know if it is signed? A: `Val` type may need another field for `signed`
-      , constant xabiTypeBytes
-      , constant entryTypeId
-      , Opaleye.null
-      , Opaleye.null
-      )
-    | (entryTypeId,IndexedXabiType{indexedXabiTypeType=XabiType{..}}) <- zip entryTypeIds vals
-    ]
-    (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
-  void $ runInsertMany conn xabiFunctionReturnsTable
-    [ ( Nothing
-      , constant funcId
-      , constant indexedXabiTypeIndex
-      , constant (typeId::Int32)
-      )
-    | (typeId,IndexedXabiType{..}) <- zip typeIds vals
-    ]
+      | (index,xtid) <- valIds
+      ]
+
 {- |
 SELECT CM.id
 FROM contracts_metadata CM
@@ -622,16 +571,29 @@ WHERE XF.is_constructor = false AND XF.contract_metadata_id = $1;
 -}
 getXabiFunctionsQuery
   :: Int32
-  -> Query
-    ( Column PGInt4
-    , Column (Nullable PGText)
-    , Column (Nullable PGBytea)
-    )
-getXabiFunctionsQuery cmId = proc () -> do
-  (xfId,contractMetaDataId,isConstr,name,selector) <-
+  -> Bloc (Map Text Func)
+getXabiFunctionsQuery cmId = do
+  funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (xfId,contractmetadataId,isConstr,name,selector) <-
+      queryTable xabiFunctionsTable -< ()
+    restrict -< contractmetadataId .== constant cmId .&& Opaleye.not isConstr
+    returnA -< (name,(selector,xfId))
+  for funcsWithIds $ \ (selector,xfId) -> do
+    args <- getXabiFunctionsArgsQuery xfId
+    let
+      valMap valList = Map.fromList
+        [ ( "#" <> Text.pack (show (indexedXabiTypeIndex val)), val)
+        | val <- valList
+        ]
+    vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
+    return $ Func args (Text.decodeUtf8 selector) vals
+
+getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
+getXabiFunctionNamesQuery metadataId = proc () -> do
+  (_,cmid,isc,name,_) <-
     queryTable xabiFunctionsTable -< ()
-  restrict -< contractMetaDataId .== constant cmId .&& Opaleye.not isConstr
-  returnA -< (xfId,name,selector)
+  restrict -< cmid .== constant metadataId .&& Opaleye.not isc
+  returnA -< name
 
 {- |
 SELECT XF.id
@@ -640,9 +602,9 @@ WHERE XF.is_constructor = true AND XF.contract_metadata_id = $1;
 -}
 getXabiConstrQuery :: Int32 -> Query (Column PGInt4)
 getXabiConstrQuery cmId = proc () -> do
-  (xfId,contractMetaDataId,isConstr,_,_) <-
+  (xfId,contractmetadataId,isConstr,_,_) <-
     queryTable xabiFunctionsTable -< ()
-  restrict -< contractMetaDataId .== constant cmId .&& isConstr
+  restrict -< contractmetadataId .== constant cmId .&& isConstr
   returnA -< xfId
 
 {- |
@@ -664,30 +626,17 @@ WHERE XFA.function_id = $1;
 -}
 getXabiFunctionsArgsQuery
   :: Int32
-  -> Query
-    ( Column PGText
-    , Column PGInt4
-    , Column (Nullable PGText)
-    , Column (Nullable PGText)
-    , Column (Nullable PGBool) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    )
-getXabiFunctionsArgsQuery funcId = proc () -> do
-  (functionId,name,index,ty,tyd,dy,by,ety,eby) <- joinTable -< ()
-  restrict -< functionId .== constant funcId
-  returnA -< (name,index,ty,tyd,dy,by,ety,eby)
-  where
-    joinTable = joinF
-      (\ (_,functionId,_,name,index) (_,ty,tyd,dy,by,ety,eby) -> (functionId,name,index, toNullable ty,tyd, toNullable dy,by,ety,eby))
-      (\ (_,_,typeId,_,_) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
-      (queryTable xabiFunctionArgumentsTable) $ leftJoinF
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
-        (\ (_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_) -> toNullable xteId .== entryTypeId)
-        (queryTable xabiTypesTable)
-        (queryTable xabiTypesTable)
+  -> Bloc (Map Text IndexedXabiType)
+getXabiFunctionsArgsQuery funcId = do
+  argsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (_,functionId,tyid,name,index) <-
+      queryTable xabiFunctionArgumentsTable -< ()
+    restrict -< functionId .== constant funcId
+    returnA -< (name,(index,tyid))
+  for argsWithIds $ \ (index,tyid) -> do
+    ty <- getXabiType tyid
+    return $ IndexedXabiType index ty
+
 {- |
 SELECT
   (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name
@@ -707,142 +656,45 @@ WHERE XFR.function_id = $1;"
 -}
 getXabiFunctionsReturnValuesQuery
   :: Int32
-  -> Query
-    ( Column PGInt4
-    , Column PGInt4
-    , Column (Nullable PGText) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
-    , Column (Nullable PGText)
-    , Column (Nullable PGBool) --TO REVIEW: Had to make this nullable because of Ln 147 @ API/Contract.hs
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    )
-getXabiFunctionsReturnValuesQuery funcId = proc () -> do
-  (functionId,xfrId,index,ty,tyd,dy,by,ety,eby) <- joinTable -< ()
-  restrict -< functionId .== constant funcId
-  returnA -< (xfrId,index,ty,tyd,dy,by,ety,eby)
-  where
-    joinTable = joinF
-      (\ (xfrId,functionId,index,_) (_,ty,tyd,dy,by,ety,eby) -> (functionId,xfrId,index, toNullable ty,tyd, toNullable dy,by,ety,eby))
-      (\ (_,_,_,typeId) (xtId,_,_,_,_,_,_) -> xtId .== typeId)
-      (queryTable xabiFunctionReturnsTable) $ leftJoinF
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) (_,ety,_,_,_,eby,_,_,_) -> (xtId,ty,tyd,dy,by, toNullable ety,eby))
-        (\ (xtId,ty,tyd,dy,_,by,_,_,_) -> (xtId,ty,tyd,dy,by,Opaleye.null,Opaleye.null))
-        (\ (_,_,_,_,_,_,entryTypeId,_,_) (xteId,_,_,_,_,_,_,_,_) -> toNullable xteId .== entryTypeId)
-        (queryTable xabiTypesTable)
-        (queryTable xabiTypesTable)
+  -> Bloc [IndexedXabiType]
+getXabiFunctionsReturnValuesQuery funcId = do
+  valsWithIds <- blocQuery $ proc () -> do
+    (_,functionId,tyid,index) <-
+      queryTable xabiFunctionReturnsTable -< ()
+    restrict -< functionId .== constant funcId
+    returnA -< (index,tyid)
+  for valsWithIds $ \ (index,tyid) -> do
+    ty <- getXabiType tyid
+    return $ IndexedXabiType index ty
 
 {- |
 SELECT
    XV.name
   ,XV.at_bytes
-  ,XT.type
-  ,XT.typedef
-  ,XT.is_dynamic
-  ,XT.is_signed
-  ,XT.bytes
-  ,XTE.type as entry_type
-  ,XTE.bytes as entry_bytes
-  ,XTV.type as value_type
-  ,XTV.bytes as values_bytes
-  ,XTV.is_dynamic as value_is_dynamic
-  ,XTV.is_signed as value_is_signed
-  ,XTVE.type as value_entry_type
-  ,XTVE.bytes as value_entry_bytes
-  ,XTK.type as key_type
-  ,XTK.bytes as key_bytes
-  ,XTK.is_dynamic as key_is_dynamic
-  ,XTK.is_signed as key_is_signed
-  ,XTVK.type as key_entry_type
-  ,XTVK.bytes as key_entry_bytes
+  ,XV.type_id
 FROM
   xabi_variables XV
-LEFT OUTER JOIN
-  xabi_types XT ON XT.id = XV.type_id
-LEFT OUTER JOIN
-  xabi_types XTE ON XTE.id = XT.entry_type_id
-LEFT OUTER JOIN
-  xabi_types XTV ON XTV.id = XT.value_type_id
-LEFT OUTER JOIN
-  xabi_types XTK ON XTK.id = XT.key_type_id
-LEFT OUTER JOIN
-  xabi_types XTVE ON XTVE.id = XTV.entry_type_id
-LEFT OUTER JOIN
-  xabi_types XTKE ON XTKE.id = XTK.entry_type_id
 WHERE XV.contract_metadata_id = $1;
 -}
-getXabiVariablesQuery
-  :: Int32
-  -> Query
-    ( Column PGText
-    , Column PGInt4
-    , Column PGText
-    , Column (Nullable PGText)
-    , Column PGBool
-    , Column PGBool
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGBool)
-    , Column (Nullable PGBool)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    , Column (Nullable PGBool)
-    , Column (Nullable PGBool)
-    , Column (Nullable PGText)
-    , Column (Nullable PGInt4)
-    )
-getXabiVariablesQuery cmId = proc () -> do
-  (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,xtketyp,xtkeby)
-    <- joinTable -< ()
-  restrict -< cmid .== constant cmId
-  returnA -< (vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,xtketyp,xtkeby)
-  where
-    joinTable = rightJoinF
-      (\ (_,xtketyp,_,_,_,xtkeby,_,_,_)
-         (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,_)
-         -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,toNullable xtketyp,xtkeby))
-      (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,_)
-         -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,Opaleye.null,Opaleye.null))
-      (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,xtkeid) -> toNullable xtId .== xtkeid )
-      (queryTable xabiTypesTable) $ rightJoinF
-        (\ (_,xtvetyp,_,_,_,xtveby,_,_,_)
-           (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,_,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid)
-           -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,toNullable xtvetyp,xtveby,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid))
-        (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,_,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid)
-           -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,Opaleye.null,Opaleye.null,xtktyp,xtkby,xtkisdy,xtkissi,xtkeid))
-        (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,_,_,_,_,_,_,xtveid,_,_,_,_,_) -> toNullable xtId .== xtveid)
-        (queryTable xabiTypesTable) $ rightJoinF
-          (\ (_,xtktyp,_,xtkisdy,xtkissi,xtkby,xtkeid,_,_)
-             (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid)
-             -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid,toNullable xtktyp,xtkby,toNullable xtkisdy,toNullable xtkissi,xtkeid))
-          (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid)
-             -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,xtetyp,xteby,xtvtyp,xtvby,xtvisdy,xtvissi,xtveid,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null))
-          (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,ktyid,_,_,_,_,_,_,_) -> toNullable xtId .== ktyid)
-          (queryTable xabiTypesTable) $ rightJoinF
-            (\ (_,xtvtyp,_,xtvisdy,xtvissi,xtvby,xtveid,_,_)
-               (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,ktyid,xtetyp,xteby)
-               -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,ktyid,xtetyp,xteby,toNullable xtvtyp, xtvby,toNullable xtvisdy,toNullable xtvissi,xtveid))
-            (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,ktyid,xtetyp,xteby)
-               -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,ktyid,xtetyp,xteby,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null,Opaleye.null))
-            (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,vtyid,_,_,_) -> toNullable xtId .== vtyid)
-            (queryTable xabiTypesTable) $ rightJoinF
-              (\ (_,xtetyp,_,_,_,xteby,_,_,_)
-                 (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,vtyid,ktyid)
-                 -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,vtyid,ktyid,toNullable xtetyp,xteby))
-              (\ (cmid,vname,vbytes,typ,typedef,isdy,issi,by,_,vtyid,ktyid)
-                 -> (cmid,vname,vbytes,typ,typedef,isdy,issi,by,vtyid,ktyid,Opaleye.null,Opaleye.null) )
-              (\ (xtId,_,_,_,_,_,_,_,_) (_,_,_,_,_,_,_,_,etyid,_,_) -> toNullable xtId .== etyid)
-              (queryTable xabiTypesTable) $ joinF
-                (\ (_,cmid,_,vname,vbytes,_) (_,typ,typdef,isdy,issi,by,etyid,vtyid,ktyid)
-                  -> (cmid,vname,vbytes,typ,typdef,isdy,issi,by,etyid,vtyid,ktyid))
-                (\ (_,_,typeId,_,_,_) (xtId,_,_,_,_,_,_,_,_) -> typeId .== xtId)
-                (queryTable xabiVariablesTable)
-                (queryTable xabiTypesTable)
+getXabiVariablesQuery :: Int32 -> Bloc (Map Text VarType)
+getXabiVariablesQuery cmId = do
+  varsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (_,cmid,typeid,name,atbytes,ispublic)
+      <- queryTable xabiVariablesTable -< ()
+    restrict -< cmid .== constant cmId
+    returnA -< (name,(atbytes,ispublic,typeid))
+  for varsWithIds $ \ (atbytes,ispublic,typeid) -> do
+    ty <- getXabiType typeid
+    return $ VarType atbytes (Just ispublic) ty
+
+
+getXabiVariableNamesQuery :: Int32 -> Query ( Column PGText )
+getXabiVariableNamesQuery metadataId = proc () -> do
+  (_,cmid,_,varName,_,_) <-
+    queryTable xabiVariablesTable -< ()
+  restrict -< cmid .== constant metadataId
+  returnA -< varName
+
 {- |
 WITH contract_id AS (
  SELECT id FROM contracts WHERE name = $1)
@@ -854,18 +706,17 @@ WITH contract_id AS (
  )
 SELECT id FROM contract_id UNION SELECT id FROM new_contract_id;
 -}
-createContractQuery :: Text -> Connection -> IO (Maybe Int32)
-createContractQuery contractName conn = do
-  cIds <- runQuery conn $ proc () -> do
+createContractQuery :: Text -> Bloc Int32
+createContractQuery contractName = do
+  cIds <- blocQuery $ proc () -> do
     (cId,name) <- queryTable contractsTable -< ()
     restrict -< name .== constant contractName
     returnA -< cId
-  cIds' <- case listToMaybe cIds of
-    Just cId -> return [cId]
-    Nothing -> runInsertReturning conn contractsTable
+  case listToMaybe cIds of
+    Just cId -> return cId
+    Nothing -> blocModify1 $ \ conn -> runInsertReturning conn contractsTable
       (Nothing, constant contractName)
       (\ (cId, _) -> cId)
-  return $ listToMaybe cIds'
 
 {- |
 Insert metadata into contract metadata table if metadata table does not contain codehash
@@ -877,19 +728,20 @@ insertContractMetaDataQuery
   -> Text
   -> Keccak256
   -> Keccak256
-  -> Connection -> IO (Maybe Int32)
+  -> Bloc Int32
 insertContractMetaDataQuery
-  contractId bin binRuntime codeHash xcodeHash conn = do
+  contractId bin binRuntime codeHash xcodeHash = blocModify1 $ \ conn -> do
     cmIds <- runQuery conn $ proc () -> do
       (cmId,_,_,_,ch,xch) <- queryTable contractsMetaDataTable -< ()
       restrict -< ch .== constant codeHash .&& xch .== constant xcodeHash
       returnA -< cmId
     case listToMaybe cmIds of
-      Just cmId -> return $ Just cmId
+
+      Just cmId -> return [cmId]
       Nothing ->
-        listToMaybe <$> runInsertReturning conn contractsMetaDataTable
+        runInsertReturning conn contractsMetaDataTable
           writeColumns
-          (\ (contractMetaDataId,_,_,_,_,_) -> contractMetaDataId)
+          (\ (contractmetadataId,_,_,_,_,_) -> contractmetadataId)
   where
     writeColumns =
       ( Nothing
@@ -907,39 +759,18 @@ SELECT $1,$2  WHERE NOT EXISTS
 WHERE contract_metadata_id = $1 AND linked_metadata_id = $2);
 -}
 insertContractLookup :: Int32 -> Int32 -> Connection -> IO ()
-insertContractLookup metaDataId linkedId conn = do
+insertContractLookup metadataId linkedId conn = do
   rows <- runQuery conn $ proc () -> do
-    row@(contractMetaDataId,linkedMetadataId) <-
+    row@(contractmetadataId,linkedmetadataId) <-
       queryTable contractsLookupTable -< ()
-    restrict -< contractMetaDataId .== constant metaDataId
-      .&& linkedMetadataId .== constant linkedId
+    restrict -< contractmetadataId .== constant metadataId
+      .&& linkedmetadataId .== constant linkedId
     returnA -< row
   when (null (rows::[(Int32,Int32)])) . void $
     runInsert conn contractsLookupTable
-      (constant metaDataId,constant linkedId)
+      (constant metadataId,constant linkedId)
 
-{- |
-INSERT INTO xabi_functions
-  (contract_metadata_id,name,selector,is_constructor)
-  VALUES ($1,$2,$3,$4) RETURNING id;
--}
-insertXabiFunction
-  :: Int32
-  -> Text
-  -> Text
-  -> Bool
-  -> Connection
-  -> IO [Int32]
-insertXabiFunction contractMetaDataId name selector isConstr conn = do
-  runInsertReturning conn
-    xabiFunctionsTable
-    ( Nothing
-    , constant contractMetaDataId
-    , constant isConstr
-    , toNullable (constant name)
-    , toNullable (constant (Text.encodeUtf8 selector))
-    )
-    (\ (xfId,_,_,_,_) -> xfId)
+
 
 instance QueryRunnerColumnDefault PGBytea Address where
   queryRunnerColumnDefault = queryRunnerColumn id
@@ -977,39 +808,90 @@ instance Default Constant Keccak256 (Column PGBytea) where
       fromKecc (Keccak256 digest) = ByteArray.convert digest
 
 
+insertXabiVariables
+  :: Int32
+  -> Map Text VarType
+  -> Bloc Int64
+insertXabiVariables metadataId vars = do
+  varsWithIds <- for vars $ \ (VarType atBytes ispublic xt) -> do
+    xtid <- insertXabiType xt
+    return (atBytes,ispublic,xtid)
+  blocModify $ \ conn -> do
+    runInsertMany conn xabiVariablesTable
+      [ ( Nothing
+        , constant metadataId
+        , constant xtid
+        , constant name
+        , constant atBytes
+        , constant (fromMaybe False ispublic)
+        )
+      | (name,(atBytes,ispublic,xtid)) <- Map.toList varsWithIds
+      ]
+
+{- |
+INSERT INTO xabi_functions
+  (contract_metadata_id,name,selector,is_constructor)
+  VALUES ($1,$2,$3,$4) RETURNING id;
+-}
+insertXabiFunction
+  :: Int32
+  -> (Text, Func)
+  -> Bloc ()
+insertXabiFunction metadataId (name,Func{..}) = do
+  funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
+    ( Nothing
+    , constant metadataId
+    , constant False
+    , constant name
+    , constant (Text.encodeUtf8 funcSelector)
+    )
+    (\ (xfId,_,_,_,_) -> xfId)
+  void $ insertXabiFunctionArg funcId funcArgs
+  void $ insertXabiFunctionRet funcId (toList funcVals)
+
+insertXabiConstr
+  :: Int32
+  -> Text
+  -> Map Text IndexedXabiType
+  -> Bloc ()
+insertXabiConstr metadataId contractName constrArgs = do
+  funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
+    ( Nothing
+    , constant metadataId
+    , constant False
+    , constant contractName
+    , constant (Text.encodeUtf8 "")
+    )
+    (\ (xfId,_,_,_,_) -> xfId)
+  void $ insertXabiFunctionArg funcId constrArgs
+
+insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
+insertXabi metadataId contractName Xabi{..} = do
+  traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
+  insertXabiConstr metadataId contractName xabiConstr
+  void $ insertXabiVariables metadataId xabiVars
+
+
+
 compileContract :: Text -> Text -> Bloc Keccak256
 compileContract contractName source = do
   (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   let
     contracts = Map.intersectionWith (,) xabis abiBins
-  metaDataIds <- forMap contracts $ \ contrName (Xabi{..},AbiBin{..}) -> do
+  metadataIds <- forMap contracts $ \ contrName (xabi,AbiBin{..}) -> do
     let
       codeHash = keccak256 (Text.encodeUtf8 binRuntime)
       xcodeHash = keccak256 (Text.encodeUtf8 bin)
-    contrId <- blocMaybe "contract id" <=< blocModify $
-      createContractQuery contrName
+    contrId <- createContractQuery contrName
+    metadataId <- insertContractMetaDataQuery
+      contrId bin binRuntime codeHash xcodeHash
+    insertXabi metadataId contractName xabi
+    return metadataId
 
-
-    metaDataId <- blocMaybe "metadata id" <=< blocModify $
-      insertContractMetaDataQuery
-        contrId bin binRuntime codeHash xcodeHash
-
-    forMap_ xabiFuncs $ \ funcName Func{..} -> do
-      funcId <- blocModify1 $ insertXabiFunction
-        metaDataId funcName funcSelector False
-      blocModify $ insertXabiFunctionArg funcId funcArgs
-      blocModify $ insertXabiFunctionRet funcId (toList funcVals)
-
-    constructorFuncId <- blocModify1 $ insertXabiFunction
-      metaDataId contractName "" True
-    blocModify $ insertXabiFunctionArg constructorFuncId xabiConstr
-    blocModify $ insertXabiFunctionRet constructorFuncId []
-
-    return metaDataId
-  for_ metaDataIds $ \ leftMetaDataId ->
-    for_ metaDataIds $ \ rightMetaDataId -> blocModify $
-      insertContractLookup leftMetaDataId rightMetaDataId
+  for_ metadataIds $ \ leftmetadataId ->
+    for_ metadataIds $ \ rightmetadataId -> blocModify $
+      insertContractLookup leftmetadataId rightmetadataId
   blocQuery1 $ proc () -> do
     (codeHash,name) <- joinF
       (\ (_,_,_,_,codeHash,_) (_,name) -> (codeHash,name))
@@ -1018,6 +900,25 @@ compileContract contractName source = do
       (queryTable contractsTable) -< ()
     restrict -< name .== constant contractName
     returnA -< codeHash
+
+insertXabiType :: XabiType -> Bloc Int32
+insertXabiType xt = do
+  entryId <- traverse insertXabiType (xabiTypeEntry xt)
+  keyId <- traverse insertXabiType (xabiTypeKey xt)
+  valueId <- traverse insertXabiType (xabiTypeVal xt)
+  blocModify1 $ \ conn -> do
+    runInsertReturning conn xabiTypesTable
+      ( Nothing
+      , constant $ xabiTypeType xt
+      , constant $ xabiTypeTypedef xt
+      , constant . fromMaybe False $ xabiTypeDynamic xt
+      , constant . fromMaybe False $ xabiTypeSigned xt
+      , constant $ xabiTypeBytes xt
+      , constant $ entryId
+      , constant $ valueId
+      , constant $ keyId
+      )
+      (\ (xtid,_,_,_,_,_,_,_,_) -> xtid)
 
 getXabiType :: Int32 -> Bloc XabiType
 getXabiType typeId = do
@@ -1031,7 +932,7 @@ getXabiType typeId = do
   xtvt <- traverse getXabiType xtvtid
   xtkt <- traverse getXabiType xtktid
   return XabiType
-    { xabiTypeType = Just xtty
+    { xabiTypeType = xtty
     , xabiTypeTypedef = xttd
     , xabiTypeDynamic = Just xtdy
     , xabiTypeSigned = Just xtsi
@@ -1044,174 +945,12 @@ getXabiType typeId = do
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
-  funcIdNameSelsMaybe <- blocQuery $ getXabiFunctionsQuery metadataId
-  let
-    -- TODO: fix this in next API iteration
-    funcIdNameSels =
-      [ (funcId, funcName, sel)
-      | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
-      ]
-  funcs <- fmap Map.fromList $
-    for funcIdNameSels $ \ (funcId,funcName,sel) -> do
-      args <- do
-        tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
-        for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-          return $ (name, ) IndexedXabiType
-            { indexedXabiTypeIndex = index,
-              indexedXabiTypeType =
-                XabiType {
-                  xabiTypeType = ty
-                , xabiTypeTypedef = tyd
-                , xabiTypeDynamic = dy
-                , xabiTypeBytes = by
-                , xabiTypeSigned = Nothing
-                , xabiTypeVal = Nothing
-                , xabiTypeKey = Nothing
-                , xabiTypeEntry = Just
-                  XabiType {
-                    xabiTypeBytes = eby
-                  , xabiTypeType = ety
-                  , xabiTypeTypedef = Nothing
-                  , xabiTypeDynamic = Nothing
-                  , xabiTypeSigned = Nothing
-                  , xabiTypeEntry = Nothing
-                  , xabiTypeVal = Nothing
-                  , xabiTypeKey = Nothing
-                  }
-                }
-            }
-      vals <- do
-        tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
-        for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
-          return $ ("#" <> Text.pack (show index),) IndexedXabiType
-            { indexedXabiTypeIndex = index,
-              indexedXabiTypeType=
-                XabiType{
-                  xabiTypeType = ty
-                , xabiTypeTypedef = tyd
-                , xabiTypeDynamic = dy
-                , xabiTypeBytes = by
-                , xabiTypeSigned = Nothing
-                , xabiTypeVal = Nothing
-                , xabiTypeKey = Nothing
-                , xabiTypeEntry = Just
-                  XabiType {
-                    xabiTypeBytes = eby
-                  , xabiTypeType = ety
-                  , xabiTypeTypedef = Nothing
-                  , xabiTypeDynamic = Nothing
-                  , xabiTypeSigned = Nothing
-                  , xabiTypeEntry = Nothing
-                  , xabiTypeVal = Nothing
-                  , xabiTypeKey = Nothing
-                  }
-                }
-            }
-      let
-        func = Func
-          { funcArgs = Map.fromList args
-          , funcSelector = Text.decodeUtf8 sel
-          , funcVals = Map.fromList vals
-          }
-      return (funcName,func)
+  funcs <- getXabiFunctionsQuery metadataId
   constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-  constr <- Map.fromList <$> do
-    tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
-    for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-      return $ (name, ) IndexedXabiType
-        { indexedXabiTypeIndex = index,
-          indexedXabiTypeType =
-            XabiType {
-              xabiTypeType = ty
-            , xabiTypeTypedef = tyd
-            , xabiTypeDynamic = dy
-            , xabiTypeBytes = by
-            , xabiTypeSigned = Nothing
-            , xabiTypeVal = Nothing
-            , xabiTypeKey = Nothing
-            , xabiTypeEntry = Just
-                 XabiType{
-                   xabiTypeBytes=eby
-                 , xabiTypeType=ety
-                 , xabiTypeTypedef=Nothing
-                 , xabiTypeDynamic=Nothing
-                 , xabiTypeSigned=Nothing
-                 , xabiTypeEntry=Nothing
-                 , xabiTypeVal=Nothing
-                 , xabiTypeKey=Nothing
-                 }
-            }
-        }
-  vars <- Map.fromList <$> do
-    tuples <- blocQuery (getXabiVariablesQuery metadataId)
-    for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
-      return $ (name,) VarType
-        { varTypeAtBytes = atBy,
-          varTypeType =
-            XabiType {
-              xabiTypeType = Just ty
-            , xabiTypeTypedef = tyd
-            , xabiTypeDynamic = Just dy
-            , xabiTypeSigned = Just si
-            , xabiTypeBytes = by
-            , xabiTypeEntry = Just
-                   XabiType{
-                     xabiTypeBytes = eby
-                   , xabiTypeType = ety
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeDynamic=Nothing
-                   , xabiTypeSigned=Nothing
-                   , xabiTypeEntry=Nothing
-                   , xabiTypeVal=Nothing
-                   , xabiTypeKey=Nothing
-                   }
-            , xabiTypeVal = Just XabiType
-                   { xabiTypeType = vty
-                   , xabiTypeBytes = vby
-                   , xabiTypeDynamic = vdy
-                   , xabiTypeSigned = vsi
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeVal=Nothing
-                   , xabiTypeKey=Nothing
-                   , xabiTypeEntry = Just
-                         XabiType{
-                           xabiTypeBytes= veby
-                         , xabiTypeType= vety
-                         , xabiTypeTypedef=Nothing
-                         , xabiTypeDynamic=Nothing
-                         , xabiTypeSigned=Nothing
-                         , xabiTypeEntry=Nothing
-                         , xabiTypeVal=Nothing
-                         , xabiTypeKey=Nothing
-                         }
-                   }
-            , xabiTypeKey = Just XabiType
-                   { xabiTypeType = kty
-                   , xabiTypeBytes = kby
-                   , xabiTypeDynamic = kdy
-                   , xabiTypeSigned = ksi
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeVal=Nothing
-                   , xabiTypeKey=Nothing
-                   , xabiTypeEntry = Just
-                         XabiType{
-                           xabiTypeBytes = keby
-                         , xabiTypeType = kety
-                         , xabiTypeTypedef=Nothing
-                         , xabiTypeDynamic=Nothing
-                         , xabiTypeSigned=Nothing
-                         , xabiTypeEntry=Nothing
-                         , xabiTypeVal=Nothing
-                         , xabiTypeKey=Nothing
-                         }
-                   }
-            }
-        }
+  constr <- getXabiFunctionsArgsQuery constrId
+  vars <- getXabiVariablesQuery metadataId
   return $ Xabi funcs constr vars
 
 -- helper functions
 forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)
 forMap m act = Map.traverseWithKey act m
-
-forMap_ :: Applicative m => Map k v -> (k -> v -> m ()) -> m ()
-forMap_ m act = void $ forMap m act
