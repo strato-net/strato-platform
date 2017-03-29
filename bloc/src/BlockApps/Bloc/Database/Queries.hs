@@ -42,7 +42,7 @@ import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Xabi.Type
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types

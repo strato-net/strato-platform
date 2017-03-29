@@ -17,7 +17,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Tuple
 
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type

@@ -15,14 +15,15 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Solidity
     BlockApps.Solidity.Contract
     BlockApps.Solidity.Int
+    BlockApps.Solidity.SolidityValue
     BlockApps.Solidity.Storage
     BlockApps.Solidity.Struct
     BlockApps.Solidity.Type
     BlockApps.Solidity.TypeDefs
     BlockApps.Solidity.Value
+    BlockApps.Solidity.Xabi
     BlockApps.Solidity.Xabi.Defs
     BlockApps.Solidity.Xabi.Type
     BlockApps.SolidityVarReader

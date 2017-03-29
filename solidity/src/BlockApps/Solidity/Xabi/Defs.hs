@@ -26,7 +26,7 @@ data Defs =
     bytes::Word
     }
   | Struct {
-    field::Map Text XabiType,
+    fields::Map Text XabiType,
     bytes::Word
     } deriving (Eq, Show, Generic)
                

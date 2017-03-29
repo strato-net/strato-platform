@@ -30,7 +30,7 @@ import qualified Data.Text.Encoding as Text
 import Text.Printf
 
 import BlockApps.Ethereum
-import BlockApps.Solidity
+import BlockApps.Solidity.SolidityValue
 import BlockApps.Storage (Storage)
 import BlockApps.Solidity.Contract
 import qualified BlockApps.Storage as Storage
