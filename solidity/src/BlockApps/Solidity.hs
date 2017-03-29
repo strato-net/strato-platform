@@ -39,7 +39,7 @@ instance FromJSON SolidityValue where
   parseJSON (Bool boolean) = return $ SolidityBool boolean
   parseJSON (Array array) = SolidityArray <$> traverse parseJSON (toList array)
   parseJSON (Object obj) = do
-    ty <- obj .: "type"
+    ty <- obj .:? "type" .!= "Contract"
     if ty == ("Buffer" :: Text)
     then do
       bytes <- obj .: "data"
@@ -76,21 +76,21 @@ instance FromJSON Func where
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 
 data XabiType =
-  XabiType {
-    xabiTypeType::Maybe Text
-  , xabiTypeTypedef::Maybe Text
-  , xabiTypeDynamic::Maybe Bool
-  , xabiTypeSigned::Maybe Bool
-  , xabiTypeBytes::Maybe Int32
-  , xabiTypeEntry::Maybe XabiType
-  , xabiTypeVal::Maybe XabiType
-  , xabiTypeKey::Maybe XabiType
-    } deriving (Eq, Show, Generic)
+  XabiType
+  { xabiTypeType :: Text
+  , xabiTypeTypedef :: Maybe Text
+  , xabiTypeDynamic :: Maybe Bool
+  , xabiTypeSigned :: Maybe Bool
+  , xabiTypeBytes :: Maybe Int32
+  , xabiTypeEntry :: Maybe XabiType
+  , xabiTypeVal :: Maybe XabiType
+  , xabiTypeKey :: Maybe XabiType
+  } deriving (Eq, Show, Generic)
 
 instance FromJSON XabiType where
   parseJSON =
     withObject "xabi" $ \v -> do
-      theType <- v .:? "type"
+      theType <- v .:? "type" .!= "Contract"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
       signed <- v .:? "signed"
@@ -135,7 +135,7 @@ instance FromJSON IndexedXabiType where
   parseJSON =
     withObject "xabi" $ \v -> do
       index <-  v .: "index"
-      theType <- v .:? "type"
+      theType <- v .:? "type" .!= "Contract"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
       signed <- v .:? "signed"
@@ -184,7 +184,7 @@ instance FromJSON VarType where
     withObject "xabi" $ \v -> do
       atBytes <-  v .: "atBytes"
       public <- v .:? "public"
-      theType <- v .:? "type"
+      theType <- v .:? "type" .!= "Contract"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
       signed <- v .:? "signed"

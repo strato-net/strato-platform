@@ -115,14 +115,14 @@ xabiFunctionsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4
   , Column PGBool
-  , Column (Nullable PGText)
-  , Column (Nullable PGBytea)
+  , Column PGText
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBool
-  , Column (Nullable PGText)
-  , Column (Nullable PGBytea)
+  , Column PGText
+  , Column PGBytea
   )
 xabiFunctionsTable = Table "xabi_functions" $ p5
   ( optional "id"
