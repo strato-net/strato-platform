@@ -154,7 +154,8 @@ xAbiToContract Xabi{..} =
       enumDefs=
           fmap (Bimap.fromList . map swap . Map.toList . Xabi.names) xabiTypes,
       structDefs=Map.empty
---          xabiTypes
+--      flip Struct (Storage.positionAt 0) $ Map.fromList
+--         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]
       }
   in
    Contract{
