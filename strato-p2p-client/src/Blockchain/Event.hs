@@ -57,7 +57,6 @@ import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thing that ill really want to know one day
 
 data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt deriving (Show)
-data SyncDirection = Forwards | Backwards
 
 -- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m) => [Block] -> m Int
@@ -126,13 +125,21 @@ handleEvents mode peer = awaitForever $ \case
         (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
         void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff) -- todo handle the result
         case redisParentHeader of
-            Nothing -> logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forwards 0 -- todo: replace with bestblock
+            Nothing -> do
+                bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+                let fetchNumber = numFromRedis bestBlock
+                logInfoN . T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+                logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber 
             Just _  -> do
                 void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                 lift . void $ setTitleAndProduceBlocks [block']
                 void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
-    MsgEvt (NewBlockHashes _) -> syncFetch Forwards 0 -- todo: replace with bestblock
+    MsgEvt (NewBlockHashes _) -> do
+        bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+        let fetchNumber = numFromRedis bestBlock
+        logInfoN . T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
+        syncFetch Forward fetchNumber
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> case dir of
         Reverse -> do
@@ -173,8 +180,11 @@ handleEvents mode peer = awaitForever $ \case
             let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
             let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
             unless (null missingParents) $ do
+                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+                 let fetchNumber = numFromRedis bestBlock
+                 logInfoN . T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
                  let lastParent = head . sort $ blockHeaderBlockNumber . snd <$> existingParents
-                 (logInfoN $ T.pack $ "missing blocks" ++ (unlines $ show <$> missingParents)) >> syncFetch Backwards lastParent
+                 (logInfoN $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)) >> syncFetch Reverse lastParent
            
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
@@ -266,19 +276,19 @@ handleEvents mode peer = awaitForever $ \case
 
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
+numFromRedis :: Maybe RedisBestBlock -> Integer
+numFromRedis = \case
+    Nothing                     -> 0
+    Just (RedisBestBlock _ n _) -> n
+
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
 syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m) 
-          => SyncDirection -> Integer -> Conduit Event m Message
-syncFetch _ _ = do
+          => Direction -> Integer -> Conduit Event m Message
+syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        let fetchNumber = case bestBlock of
-                              Nothing                       -> 0
-                              Just (RedisBestBlock _ num _) -> num
-        logInfoN . T.pack $ "fetchNumber is " ++ show fetchNumber
-        yield $ GetBlockHeaders (BlockNumber fetchNumber) maxReturnedHeaders 0 Forward
+        yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d 
         stampActionTimestamp
 
 shouldSend :: PPeer -> OutputTx -> Bool 
