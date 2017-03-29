@@ -42,7 +42,8 @@ import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
+import BlockApps.Solidity.Xabi.Type
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
@@ -905,7 +906,7 @@ insertXabiType :: XabiType -> Bloc Int32
 insertXabiType xt = do
   entryId <- traverse insertXabiType (xabiTypeEntry xt)
   keyId <- traverse insertXabiType (xabiTypeKey xt)
-  valueId <- traverse insertXabiType (xabiTypeVal xt)
+  valueId <- traverse insertXabiType (xabiTypeValue xt)
   blocModify1 $ \ conn -> do
     runInsertReturning conn xabiTypesTable
       ( Nothing
@@ -938,7 +939,8 @@ getXabiType typeId = do
     , xabiTypeSigned = Just xtsi
     , xabiTypeBytes = xtby
     , xabiTypeEntry = xtet
-    , xabiTypeVal = xtvt
+    , xabiTypeLength= Nothing --TODO add real value of xabiType
+    , xabiTypeValue = xtvt
     , xabiTypeKey = xtkt
     }
 
@@ -949,7 +951,7 @@ getContractXabi (ContractName contractName) contractId = do
   constrId <- blocQuery1 $ getXabiConstrQuery metadataId
   constr <- getXabiFunctionsArgsQuery constrId
   vars <- getXabiVariablesQuery metadataId
-  return $ Xabi funcs constr vars
+  return $ Xabi funcs constr vars $ error "Eitan, you gotta fix this!"
 
 -- helper functions
 forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)

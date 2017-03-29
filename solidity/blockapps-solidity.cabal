@@ -15,14 +15,20 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Contract
-    BlockApps.Solidity
+    BlockApps.Solidity.Contract
     BlockApps.Solidity.Int
+    BlockApps.Solidity.SolidityValue
     BlockApps.Solidity.Storage
+    BlockApps.Solidity.Struct
     BlockApps.Solidity.Type
+    BlockApps.Solidity.TypeDefs
     BlockApps.Solidity.Value
+    BlockApps.Solidity.Xabi
+    BlockApps.Solidity.Xabi.Def
+    BlockApps.Solidity.Xabi.Type
     BlockApps.SolidityVarReader
     BlockApps.Storage
+    BlockApps.XAbiConverter
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
