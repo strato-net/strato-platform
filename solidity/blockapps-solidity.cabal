@@ -24,7 +24,7 @@ library
     BlockApps.Solidity.TypeDefs
     BlockApps.Solidity.Value
     BlockApps.Solidity.Xabi
-    BlockApps.Solidity.Xabi.Defs
+    BlockApps.Solidity.Xabi.Def
     BlockApps.Solidity.Xabi.Type
     BlockApps.SolidityVarReader
     BlockApps.Storage

@@ -4,7 +4,7 @@
   , RecordWildCards
 #-}
 
-module BlockApps.Solidity.Xabi.Defs where
+module BlockApps.Solidity.Xabi.Def where
 
 import Data.Aeson
 import Data.Aeson.TH
@@ -17,10 +17,10 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Solidity.Xabi.Type
 
-defsAesonOptions::Options
-defsAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
+defAesonOptions::Options
+defAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
-data Defs =
+data Def =
   Enum {
     names::Map Text Int,
     bytes::Word
@@ -30,11 +30,11 @@ data Defs =
     bytes::Word
     } deriving (Eq, Show, Generic)
                
-instance Arbitrary Defs where arbitrary = genericArbitrary uniform
-instance ToJSON Defs where
-  toJSON = genericToJSON defsAesonOptions
-instance FromJSON Defs where
-  parseJSON = genericParseJSON defsAesonOptions
+instance Arbitrary Def where arbitrary = genericArbitrary uniform
+instance ToJSON Def where
+  toJSON = genericToJSON defAesonOptions
+instance FromJSON Def where
+  parseJSON = genericParseJSON defAesonOptions
 
 
 

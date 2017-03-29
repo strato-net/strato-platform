@@ -16,7 +16,7 @@ import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-import qualified BlockApps.Solidity.Xabi.Defs as Xabi
+import qualified BlockApps.Solidity.Xabi.Def as Xabi
 import BlockApps.Solidity.Xabi.Type
 
               
@@ -24,7 +24,7 @@ data Xabi = Xabi
   { xabiFuncs :: Map Text Func
   , xabiConstr :: Map Text IndexedXabiType
   , xabiVars :: Map Text VarType
-  , xabiTypes :: Map Text Xabi.Defs
+  , xabiTypes :: Map Text Xabi.Def
   } deriving (Eq,Show,Generic)
 instance ToJSON Xabi where
   toJSON = genericToJSON (aesonPrefix camelCase)

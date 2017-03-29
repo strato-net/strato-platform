@@ -23,7 +23,7 @@ import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage as Storage
-import qualified BlockApps.Solidity.Xabi.Defs as Xabi
+import qualified BlockApps.Solidity.Xabi.Def as Xabi
 import BlockApps.Solidity.Xabi.Type
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
@@ -128,6 +128,7 @@ xabiTypeToType XabiType { xabiTypeType=Just "Array", xabiTypeEntry=Just var } =
 xabiTypeToType XabiType { xabiTypeType=Just "Contract", xabiTypeTypedef=Just name } = TypeContract name
 xabiTypeToType XabiType { xabiTypeType=Just "Mapping", xabiTypeKey=Just k, xabiTypeValue=Just v } = TypeMapping (xabiTypeToSimpleType k) (xabiTypeToType v)
 xabiTypeToType XabiType { xabiTypeType=Just "Enum", xabiTypeTypedef=Just enumName } = TypeEnum enumName
+xabiTypeToType XabiType { xabiTypeType=Just "Struct", xabiTypeTypedef=Just name } = TypeStruct name
 xabiTypeToType v = SimpleType $ xabiTypeToSimpleType v
 
 
@@ -152,7 +153,8 @@ xAbiToContract Xabi{..} =
     typeDefs' = TypeDefs{
       enumDefs=
           fmap (Bimap.fromList . map swap . Map.toList . Xabi.names) xabiTypes,
-      structDefs=Map.fromList []
+      structDefs=Map.empty
+--          xabiTypes
       }
   in
    Contract{
