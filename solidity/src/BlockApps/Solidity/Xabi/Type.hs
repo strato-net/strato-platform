@@ -14,16 +14,9 @@ import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-
-
-
-
-
-              
-
 data XabiType =
   XabiType {
-    xabiTypeType::Maybe Text
+    xabiTypeType::Text
   , xabiTypeTypedef::Maybe Text
   , xabiTypeDynamic::Maybe Bool
   , xabiTypeSigned::Maybe Bool
@@ -37,7 +30,7 @@ data XabiType =
 instance FromJSON XabiType where
   parseJSON =
     withObject "xabi" $ \v -> do
-      theType <- v .:? "type"
+      theType <- v .:? "type" .!= "Contract"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
       signed <- v .:? "signed"
@@ -58,7 +51,7 @@ instance FromJSON XabiType where
         xabiTypeValue = val, 
         xabiTypeKey = key
         }
-    
+
 instance ToJSON XabiType where
   toJSON XabiType{..} = object
     [ "type" .= xabiTypeType
@@ -81,10 +74,10 @@ data IndexedXabiType =
     } deriving (Eq, Show, Generic)
 
 instance FromJSON IndexedXabiType where
-  parseJSON = 
+  parseJSON =
     withObject "xabi" $ \v -> do
       index <-  v .: "index"
-      theType <- v .:? "type"
+      theType <- v .:? "type" .!= "Contract"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
       signed <- v .:? "signed"
@@ -105,8 +98,8 @@ instance FromJSON IndexedXabiType where
         xabiTypeValue = val, 
         xabiTypeKey = key
         }
- 
-         
+
+
 instance ToJSON IndexedXabiType where
   toJSON (IndexedXabiType index XabiType{..}) = object
     [ "index" .= index
@@ -120,20 +113,22 @@ instance ToJSON IndexedXabiType where
     , "key" .= xabiTypeKey
     ]
 
-    
+
 instance Arbitrary IndexedXabiType where arbitrary = genericArbitrary uniform
-  
+
 data VarType =
-  VarType {
-    varTypeAtBytes::Int32
-  , varTypeType::XabiType
-    } deriving (Eq, Show, Generic)
+  VarType
+  { varTypeAtBytes :: Int32
+  , varTypePublic :: Maybe Bool
+  , varTypeType :: XabiType
+  } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
   parseJSON =
     withObject "xabi" $ \v -> do
       atBytes <-  v .: "atBytes"
-      theType <- v .:? "type"
+      public <- v .:? "public"
+      theType <- v .:? "type" .!= "Contract"
       typedef <- v .:? "typedef"
       dynamic <- v .:? "dynamic"
       signed <- v .:? "signed"
@@ -142,7 +137,7 @@ instance FromJSON VarType where
       length' <- v .:? "length"
       val <- v .:? "value"
       key <- v .:? "key"
-      return $ VarType atBytes
+      return $ VarType atBytes public
         XabiType {
         xabiTypeType = theType,
         xabiTypeTypedef = typedef, 
@@ -156,8 +151,9 @@ instance FromJSON VarType where
         }
 
 instance ToJSON VarType where
-  toJSON (VarType varTypeAtBytes XabiType{..}) = object
+  toJSON (VarType varTypeAtBytes varTypePublic XabiType{..}) = object
     [ "atBytes" .= varTypeAtBytes
+    , "public" .= varTypePublic
     , "type" .= xabiTypeType
     , "typedef" .= xabiTypeTypedef
     , "dynamic" .= xabiTypeDynamic
@@ -172,4 +168,3 @@ instance ToJSON VarType where
 
 
 instance Arbitrary VarType where arbitrary = genericArbitrary uniform
-

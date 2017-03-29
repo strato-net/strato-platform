@@ -86,8 +86,8 @@ CREATE TABLE IF NOT EXISTS xabi_functions(
   id serial PRIMARY KEY,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
   is_constructor boolean NOT NULL,
-  name varchar(512),
-  selector bytea,
+  name varchar(512) NOT NULL,
+  selector bytea NOT NULL,
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]
