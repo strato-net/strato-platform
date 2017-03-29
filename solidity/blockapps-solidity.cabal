@@ -23,6 +23,8 @@ library
     BlockApps.Solidity.Type
     BlockApps.Solidity.TypeDefs
     BlockApps.Solidity.Value
+    BlockApps.Solidity.Xabi.Defs
+    BlockApps.Solidity.Xabi.Type
     BlockApps.SolidityVarReader
     BlockApps.Storage
     BlockApps.XAbiConverter

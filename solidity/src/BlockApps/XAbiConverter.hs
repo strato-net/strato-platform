@@ -23,7 +23,8 @@ import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage as Storage
-
+import qualified BlockApps.Solidity.Xabi.Defs as Xabi
+import BlockApps.Solidity.Xabi.Type
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
 fieldsToStruct typeDefs' vars =
@@ -150,7 +151,7 @@ xAbiToContract Xabi{..} =
   let
     typeDefs' = TypeDefs{
       enumDefs=
-          fmap (Bimap.fromList . map swap . Map.toList . contracttypeNames) xabiTypes,
+          fmap (Bimap.fromList . map swap . Map.toList . Xabi.names) xabiTypes,
       structDefs=Map.fromList []
       }
   in
