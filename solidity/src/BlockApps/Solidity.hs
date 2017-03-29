@@ -205,7 +205,7 @@ instance FromJSON VarType where
         }
 
 instance ToJSON VarType where
-  toJSON (VarType varTypeAtBytes XabiType{..}) = object
+  toJSON (VarType varTypeAtBytes varTypePublic XabiType{..}) = object
     [ "atBytes" .= varTypeAtBytes
     , "public" .= varTypePublic
     , "type" .= xabiTypeType
