@@ -370,6 +370,7 @@ topics = [ "unminedblock"
          , "unseqevents"
          , "jsonrpcresponse"
          , "indexevents"
+         , "block" -- todo: delet this.
          ]
 
 genesisFiles::[(FilePath, B.ByteString)]
