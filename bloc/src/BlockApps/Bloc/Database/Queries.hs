@@ -35,7 +35,7 @@ import qualified Data.Text.Encoding as Text
 import Data.Traversable
 import Database.PostgreSQL.Simple (Connection)
 import Opaleye hiding (not,null)
-import qualified Opaleye as Opaleye (not,null)
+import qualified Opaleye as Opaleye (not)
 
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Database.Tables
@@ -326,46 +326,20 @@ insertXabiFunctionArg funcId args = do
 insertXabiFunctionRet
   :: Int32
   -> [IndexedXabiType]
-  -> Connection -> IO ()
-insertXabiFunctionRet funcId vals conn = do
-  entryTypeIdss <- for vals $ \ IndexedXabiType{indexedXabiTypeType=XabiType{xabiTypeEntry = valEntry}} ->
-    case valEntry of
-      Nothing -> return [Nothing::Maybe Int32]
-      Just XabiType{..} -> runInsertReturning conn xabiTypesTable
+  -> Bloc ()
+insertXabiFunctionRet funcId vals = do
+  valIds <- for vals $ \ (IndexedXabiType index xt) -> do
+    xtid <- insertXabiType xt
+    return (index,xtid)
+  for_ valIds $ \ (index,xtid) -> do
+    blocModify $ \ conn -> do
+      runInsert conn xabiFunctionReturnsTable
         ( Nothing
-        , constant xabiTypeType
-        , Opaleye.null
-        , constant False
-        , constant False
-        , constant xabiTypeBytes
-        , Opaleye.null
-        , Opaleye.null
-        , Opaleye.null
+        , constant funcId
+        , constant index
+        , constant xtid
         )
-        (\ (tyId,_,_,_,_,_,_,_,_) -> toNullable tyId)
-  let entryTypeIds = map head entryTypeIdss
-  typeIds <- runInsertManyReturning conn xabiTypesTable
-    [ ( Nothing
-      , constant xabiTypeType
-      , constant xabiTypeTypedef
-      , constant (fromMaybe False xabiTypeDynamic)
-      , constant False -- How will we know if it is signed? A: `Val` type may need another field for `signed`
-      , constant xabiTypeBytes
-      , constant entryTypeId
-      , Opaleye.null
-      , Opaleye.null
-      )
-    | (entryTypeId,IndexedXabiType{indexedXabiTypeType=XabiType{..}}) <- zip entryTypeIds vals
-    ]
-    (\ (tyId,_,_,_,_,_,_,_,_) -> tyId)
-  void $ runInsertMany conn xabiFunctionReturnsTable
-    [ ( Nothing
-      , constant funcId
-      , constant indexedXabiTypeIndex
-      , constant (typeId::Int32)
-      )
-    | (typeId,IndexedXabiType{..}) <- zip typeIds vals
-    ]
+
 {- |
 SELECT CM.id
 FROM contracts_metadata CM
@@ -875,12 +849,12 @@ compileContract contractName source = do
       funcId <- blocModify1 $ insertXabiFunction
         metaDataId funcName funcSelector False
       insertXabiFunctionArg funcId funcArgs
-      blocModify $ insertXabiFunctionRet funcId (toList funcVals)
+      insertXabiFunctionRet funcId (toList funcVals)
 
     constructorFuncId <- blocModify1 $ insertXabiFunction
       metaDataId contractName "" True
     insertXabiFunctionArg constructorFuncId xabiConstr
-    blocModify $ insertXabiFunctionRet constructorFuncId []
+    insertXabiFunctionRet constructorFuncId []
 
     return metaDataId
   for_ metaDataIds $ \ leftMetaDataId ->
