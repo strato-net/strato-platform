@@ -85,11 +85,12 @@ instance MonadUsers ClientM where
   postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 instance MonadUsers Bloc where
 
-  getUsers = map UserName <$> blocQuery getUsersQuery
+  getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
-  getUsersUser (UserName name) = blocQuery $ getUsersUserQuery name
+  getUsersUser (UserName name) = blocTransaction $
+    blocQuery $ getUsersUserQuery name
 
-  postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
+  postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransaction $ do
     keyStore <- newKeyStore pass
     createdUser <- blocModify $ postUsersUserQuery name keyStore
     unless createdUser (throwError (DBError "failed to create user"))
@@ -108,7 +109,7 @@ instance MonadUsers Bloc where
       return tx
 
   postUsersContract userName addr
-    (PostUsersContractRequest src password contract args txParams value) = do
+    (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
       --TODO: check what happens with mismatching args
       void $ compileContract contract src
       logWith logNotice ("constructor arguments: " <> Text.pack (show args))
@@ -145,7 +146,7 @@ instance MonadUsers Bloc where
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
 getContractMetadataAndBin :: Text ->  Bloc (Int32, ByteString)
-getContractMetadataAndBin contract = do
+getContractMetadataAndBin contract = blocTransaction $ do
   cmIds_bins <- blocQuery $ proc () -> do
     (cmId,name,bin) <- joinF
       (\ (cmId,_,bin,_,_,_) (_,name) -> (cmId,name,bin))
@@ -160,7 +161,7 @@ getContractMetadataAndBin contract = do
   return (cmId,bin)
 
 getConstructorId :: Int32 -> Bloc (Maybe Int32)
-getConstructorId cmId = do
+getConstructorId cmId = blocTransaction $ do
   functionIds <- blocQuery $ proc () -> do
     (xfId,contractMetaDataId,isConstr,_,_)
       <- queryTable xabiFunctionsTable -< ()

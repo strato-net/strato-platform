@@ -75,7 +75,7 @@ instance MonadContracts ClientM where
   postContractsCompile = client (Proxy @ PostContractsCompile)
 
 instance MonadContracts Bloc where
-  getContracts = do
+  getContracts = blocTransaction $ do
     let
       -- current bloc returns milliseconds
       -- TODO: get those extra 3 significant figures of accuracy
@@ -95,12 +95,12 @@ instance MonadContracts Bloc where
       `Map.union`
       namesToMap contractsNamesAsAddresses
 
-  getContractsData (ContractName contractName) = do
+  getContractsData (ContractName contractName) = blocTransaction $ do
     addresses <- blocQuery $ getContractsDataAddressesQuery contractName
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract contract@(ContractName contractName) contractId = do
+  getContractsContract contract@(ContractName contractName) contractId = blocTransaction $ do
     xabi <- getContractXabi contract contractId
     let
       detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name) =
@@ -150,12 +150,12 @@ instance MonadContracts Bloc where
 
     return $ Map.fromList ret
 
-  getContractsFunctions (ContractName contractName) contractId = do
+  getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
     funcs <- blocQuery $ getXabiFunctionNamesQuery metadataId
     return $ map FunctionName funcs
 
-  getContractsSymbols (ContractName contractName) contractId = do
+  getContractsSymbols (ContractName contractName) contractId = blocTransaction $ do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
     vars <- blocQuery $ getXabiVariableNamesQuery metadataId
     return $ map SymbolName vars
@@ -166,13 +166,13 @@ instance MonadContracts Bloc where
 
   -- postContractsCompile = undefined
 
-  postContractsCompile = traverse $ \ PostCompileRequest
-    { postcompilerequestSearchable = _searchable -- TODO: Support Cirrus here
-    , postcompilerequestContractName = contractName
-    , postcompilerequestSource = source
-    } -> do
-      codeHash <- compileContract contractName source
-      return $ PostCompileResponse contractName codeHash
+  postContractsCompile = blocTransaction . traverse compileOneContract
+    where
+      compileOneContract PostCompileRequest{..} = do
+        codeHash <- compileContract
+          postcompilerequestContractName
+          postcompilerequestSource
+        return $ PostCompileResponse postcompilerequestContractName codeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
