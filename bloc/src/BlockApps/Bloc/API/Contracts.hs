@@ -16,7 +16,6 @@
 
 module BlockApps.Bloc.API.Contracts where
 
-import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.Log
 import Data.Aeson
@@ -153,17 +152,12 @@ instance MonadContracts Bloc where
 
   getContractsFunctions (ContractName contractName) contractId = do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
-    funcNames <- blocQuery $ proc () -> do
-      (_,funcName,_) <- getXabiFunctionsQuery metadataId -< ()
-      returnA -< funcName
-    return [FunctionName funcName | Just funcName <- funcNames]
+    funcs <- blocQuery $ getXabiFunctionNamesQuery metadataId
+    return $ map FunctionName funcs
 
   getContractsSymbols (ContractName contractName) contractId = do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
-    vars <- blocQuery $ proc () -> do
-      (varName,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_,_) <-
-        getXabiVariablesQuery metadataId -< ()
-      returnA -< varName
+    vars <- blocQuery $ getXabiVariableNamesQuery metadataId
     return $ map SymbolName vars
 
   getContractsStateMapping _ _ _ _ = throwError $ Unimplemented "getContractsStateMapping"
