@@ -95,7 +95,7 @@ blocQuery
 blocQuery q = do
   traverse_ (logWith logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
-  liftIO . withTransaction conn $ runQuery conn q
+  liftIO $ runQuery conn q
 
 blocQuery1
   :: (Default Unpackspec x x, Default QueryRunner x y)
@@ -104,7 +104,7 @@ blocQuery1
 blocQuery1 q = do
   traverse_ (logWith logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
-  results <- liftIO . withTransaction conn $ runQuery conn q
+  results <- liftIO $ runQuery conn q
   case results of
     [] -> throwError $ DBError "No result, expected one row"
     [y] -> return y
@@ -114,17 +114,22 @@ blocModify :: (Connection -> IO x) -> Bloc x
 blocModify modify = do
   logWith logNotice "Updating the database"
   conn <- asks dbConnection
-  liftIO $ withTransaction conn (modify conn)
+  liftIO $ modify conn
 
 blocModify1 :: (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
   logWith logNotice "Updating the database"
   conn <- asks dbConnection
-  results <- liftIO $ withTransaction conn (modify conn)
+  results <- liftIO $ modify conn
   case results of
     [] -> throwError $ DBError "No result, expected one row"
     [y] -> return y
     _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+
+blocTransaction :: Bloc x -> Bloc x
+blocTransaction bloc = do
+  conn <- asks dbConnection
+  liftBaseOp_ (withTransaction conn) bloc
 
 blocStrato :: ClientM x -> Bloc x
 blocStrato client' = do
