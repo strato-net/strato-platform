@@ -3,13 +3,17 @@
   , GeneralizedNewtypeDeriving
   , MultiParamTypeClasses
   , OverloadedStrings
+  , TypeFamilies
+  , UndecidableInstances
 #-}
 
 module BlockApps.Bloc.Monad where
 
+import Control.Monad.Base
 import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Foldable
 import Data.Text (Text)
@@ -34,6 +38,7 @@ newtype Bloc x = Bloc
   , Applicative
   , Monad
   , MonadIO
+  , MonadBase IO
   , MonadReader BlocEnv
   , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
   )
@@ -45,6 +50,11 @@ instance MonadError BlocError Bloc where
   catchError m handle = do
     logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
+
+instance MonadBaseControl IO Bloc where
+  type StM Bloc x = Either BlocError x
+  liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
+  restoreM = Bloc . restoreM
 
 data BlocEnv = BlocEnv
   { urlStrato :: BaseUrl
