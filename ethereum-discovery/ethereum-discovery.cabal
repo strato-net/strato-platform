@@ -40,6 +40,7 @@ library
                      , text
                      , time
                      , transformers
+                     , monad-control
   exposed-modules:  Blockchain.Strato.Discovery.Data.Peer
                   , Blockchain.Strato.Discovery.UDP
                   , Executable.EthereumDiscovery

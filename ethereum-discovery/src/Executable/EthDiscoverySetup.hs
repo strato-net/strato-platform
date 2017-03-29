@@ -1,19 +1,22 @@
+{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
 module Executable.EthDiscoverySetup (
   setup
   ) where
 
 import Control.Monad
 import Control.Monad.Logger
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Control
 import qualified Data.Text as T
 import Database.Persist.Postgresql
 
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.EthConf
 
-setup:: Maybe [String] ->LoggingT IO ()
+setup :: (MonadLogger m, MonadBaseControl IO m, MonadIO m) => Maybe [String] -> m ()
 setup maybeStratoNodes = do
-  runNoLoggingT $ withPostgresqlConn connStr $ runSqlConn $ do
-    _ <- runMigrationSilent migrateAll
+  withPostgresqlConn connStr $ runSqlConn $ do
+    runMigration migrateAll
 
     let
       nodesPubkeys =
