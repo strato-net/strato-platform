@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS contracts_metadata(
   bin bytea NOT NULL,
   bin_runtime bytea NOT NULL,
   code_hash bytea NOT NULL,
-  UNIQUE (code_hash),
+  xcode_hash bytea NOT NULL,
+  UNIQUE (code_hash, xcode_hash),
   FOREIGN KEY (contract_id) REFERENCES contracts(id)
 );
 |]

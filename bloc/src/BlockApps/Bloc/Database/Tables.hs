@@ -63,19 +63,22 @@ contractsMetaDataTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
-contractsMetaDataTable = Table "contracts_metadata" $ p5
+contractsMetaDataTable = Table "contracts_metadata" $ p6
   ( optional "id"
   , required "contract_id"
   , required "bin"
   , required "bin_runtime"
   , required "code_hash"
+  , required "xcode_hash"
   )
 
 contractsInstanceTable :: Table

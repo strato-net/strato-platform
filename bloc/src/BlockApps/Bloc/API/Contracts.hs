@@ -22,20 +22,19 @@ import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Foldable
 import Data.Int
 import Data.Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Monoid
 import Data.Proxy
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
-import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import Numeric
@@ -106,19 +105,19 @@ instance MonadContracts Bloc where
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract (ContractName contractName) contractId = do
+  getContractsContract contract@(ContractName contractName) contractId = do
+    xabi <- getContractXabi contract contractId
     let
-      noXabi = Xabi Map.empty Map.empty Map.empty Map.empty -- TODO fill in the xabiTypes
-      detailsWith detailsAddr (bin,binRuntime,codeHash,name) =
+      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = detailsAddr
           , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
           , contractdetailsCodeHash = Text.decodeUtf8 codeHash
           , contractdetailsName = name
-          , contractdetailsXabi = noXabi
+          , contractdetailsXabi = xabi
           }
-    contractDetails <- case contractId of
+    case contractId of
       Named "Latest" -> do
         tuple <- blocQuery1 $
           getContractsContractLatestQuery contractName
@@ -136,184 +135,6 @@ instance MonadContracts Bloc where
           tuple <- blocQuery1 $
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) tuple
-    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
-    funcIdNameSelsMaybe <- blocQuery $ getXabiFunctionsQuery metadataId
-    let
-      -- TODO: fix this in next API iteration
-      funcIdNameSels =
-        [ (funcId, funcName, sel)
-        | (funcId, Just funcName, Just sel) <- funcIdNameSelsMaybe
-        ]
-    funcs <- fmap Map.fromList $
-      for funcIdNameSels $ \ (funcId,funcName,sel) -> do
-        args <- do
-          tuples <- blocQuery (getXabiFunctionsArgsQuery funcId)
-          for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-            return $ (name, ) IndexedXabiType
-              { indexedXabiTypeIndex = index,
-                indexedXabiTypeType =
-                  XabiType {
-                    xabiTypeType = ty
-                  , xabiTypeTypedef = tyd
-                  , xabiTypeDynamic = dy
-                  , xabiTypeBytes = by
-                  , xabiTypeSigned = Nothing
-                  , xabiTypeLength=Nothing
-                  , xabiTypeValue = Nothing
-                  , xabiTypeKey = Nothing
-                  , xabiTypeEntry = Just
-                    XabiType {
-                      xabiTypeBytes = eby
-                    , xabiTypeType = ety
-                    , xabiTypeTypedef = Nothing
-                    , xabiTypeDynamic = Nothing
-                    , xabiTypeSigned = Nothing
-                    , xabiTypeEntry = Nothing
-                    , xabiTypeLength=Nothing
-                    , xabiTypeValue = Nothing
-                    , xabiTypeKey = Nothing
-                    }
-                  }
-              }
-        vals <- do
-          tuples <- blocQuery (getXabiFunctionsReturnValuesQuery funcId)
-          for tuples $ \ (_::Int32,index,ty,tyd,dy,by,ety,eby) ->
-            return $ ("#" <> Text.pack (show index),) IndexedXabiType
-              { indexedXabiTypeIndex = index,
-                indexedXabiTypeType=
-                  XabiType{
-                    xabiTypeType = ty
-                  , xabiTypeTypedef = tyd
-                  , xabiTypeDynamic = dy
-                  , xabiTypeBytes = by
-                  , xabiTypeSigned = Nothing
-                  , xabiTypeLength=Nothing
-                  , xabiTypeValue = Nothing
-                  , xabiTypeKey = Nothing
-                  , xabiTypeEntry = Just
-                    XabiType {
-                      xabiTypeBytes = eby
-                    , xabiTypeType = ety
-                    , xabiTypeTypedef = Nothing
-                    , xabiTypeDynamic = Nothing
-                    , xabiTypeSigned = Nothing
-                    , xabiTypeEntry = Nothing
-                    , xabiTypeLength=Nothing
-                    , xabiTypeValue = Nothing
-                    , xabiTypeKey = Nothing
-                    }
-                  }
-              }
-        let
-          func = Func
-            { funcArgs = Map.fromList args
-            , funcSelector = Text.decodeUtf8 sel
-            , funcVals = Map.fromList vals
-            }
-        return (funcName,func)
-    constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-    constr <- Map.fromList <$> do
-      tuples <- blocQuery (getXabiFunctionsArgsQuery constrId)
-      for tuples $ \ (name,index,ty,tyd,dy,by,ety,eby) ->
-        return $ (name, ) IndexedXabiType
-          { indexedXabiTypeIndex = index,
-            indexedXabiTypeType =
-              XabiType {
-                xabiTypeType = ty
-              , xabiTypeTypedef = tyd
-              , xabiTypeDynamic = dy
-              , xabiTypeBytes = by
-              , xabiTypeSigned = Nothing
-              , xabiTypeLength=Nothing
-              , xabiTypeValue = Nothing
-              , xabiTypeKey = Nothing
-              , xabiTypeEntry = Just
-                   XabiType{
-                     xabiTypeBytes=eby
-                   , xabiTypeType=ety
-                   , xabiTypeTypedef=Nothing
-                   , xabiTypeDynamic=Nothing
-                   , xabiTypeSigned=Nothing
-                   , xabiTypeEntry=Nothing
-                   , xabiTypeLength=Nothing
-                   , xabiTypeValue=Nothing
-                   , xabiTypeKey=Nothing
-                   }
-              }
-          }
-    vars <- Map.fromList <$> do
-      tuples <- blocQuery (getXabiVariablesQuery metadataId)
-      for tuples $ \ (name,atBy,ty,tyd,dy,si,by,ety,eby,vty,vby,vdy,vsi,vety,veby,kty,kby,kdy,ksi,kety,keby) ->
-        return $ (name,) VarType
-          { varTypeAtBytes = atBy,
-            varTypeType =
-              XabiType {
-                xabiTypeType = Just ty
-              , xabiTypeTypedef = tyd
-              , xabiTypeDynamic = Just dy
-              , xabiTypeSigned = Just si
-              , xabiTypeBytes = by
-              , xabiTypeEntry = Just
-                     XabiType{
-                       xabiTypeBytes = eby
-                     , xabiTypeType = ety
-                     , xabiTypeTypedef=Nothing
-                     , xabiTypeDynamic=Nothing
-                     , xabiTypeSigned=Nothing
-                     , xabiTypeEntry=Nothing
-                     , xabiTypeLength=Nothing
-                     , xabiTypeValue=Nothing
-                     , xabiTypeKey=Nothing
-                     }
-              , xabiTypeLength=Nothing
-              , xabiTypeValue = Just XabiType
-                     { xabiTypeType = vty
-                     , xabiTypeBytes = vby
-                     , xabiTypeDynamic = vdy
-                     , xabiTypeSigned = vsi
-                     , xabiTypeTypedef=Nothing
-                     , xabiTypeLength=Nothing
-                     , xabiTypeValue=Nothing
-                     , xabiTypeKey=Nothing
-                     , xabiTypeEntry = Just
-                           XabiType{
-                             xabiTypeBytes= veby
-                           , xabiTypeType= vety
-                           , xabiTypeTypedef=Nothing
-                           , xabiTypeDynamic=Nothing
-                           , xabiTypeSigned=Nothing
-                           , xabiTypeEntry=Nothing
-                           , xabiTypeLength=Nothing
-                           , xabiTypeValue=Nothing
-                           , xabiTypeKey=Nothing
-                           }
-                     }
-              , xabiTypeKey = Just XabiType
-                     { xabiTypeType = kty
-                     , xabiTypeBytes = kby
-                     , xabiTypeDynamic = kdy
-                     , xabiTypeSigned = ksi
-                     , xabiTypeTypedef=Nothing
-                     , xabiTypeLength=Nothing
-                     , xabiTypeValue=Nothing
-                     , xabiTypeKey=Nothing
-                     , xabiTypeEntry = Just
-                           XabiType{
-                             xabiTypeBytes = keby
-                           , xabiTypeType = kety
-                           , xabiTypeTypedef=Nothing
-                           , xabiTypeDynamic=Nothing
-                           , xabiTypeSigned=Nothing
-                           , xabiTypeEntry=Nothing
-                           , xabiTypeLength=Nothing
-                           , xabiTypeValue=Nothing
-                           , xabiTypeKey=Nothing
-                           }
-                     }
-              }
-          }
-    return $ contractDetails
-      { contractdetailsXabi = Xabi funcs constr vars Map.empty } --TODO - fill this in
 
   getContractsState (ContractName contractName) contractId = do
     let arrayXabiString = getContractXabiString $ Text.unpack contractName
@@ -356,9 +177,9 @@ instance MonadContracts Bloc where
       returnA -< varName
     return $ map SymbolName vars
 
-  getContractsStateMapping _ _ _ _ = throwError Unimplemented
+  getContractsStateMapping _ _ _ _ = throwError $ Unimplemented "getContractsStateMapping"
 
-  getContractsStates _ = throwError Unimplemented
+  getContractsStates _ = throwError $ Unimplemented "getContractsStates"
 
   -- postContractsCompile = undefined
 
