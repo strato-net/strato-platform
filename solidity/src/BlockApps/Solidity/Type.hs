@@ -17,7 +17,7 @@ data Type
   | TypeArrayFixed Word Type
   | TypeMapping SimpleType Type
   | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  -- | Struct Text
+  | TypeStruct Text
   | TypeEnum Text
   | TypeContract Text
   deriving (Show)
@@ -130,7 +130,7 @@ data SimpleType
   deriving (Show,Read)
 
 formatSimpleType::SimpleType->String
-formatSimpleType x = map toLower $ drop 4 $ show x
+formatSimpleType x = drop 4 $ show x
 
 formatType::Type->String
 formatType (SimpleType x) = formatSimpleType x
@@ -146,6 +146,7 @@ formatType (TypeFunction _ paramTypes returnTypes) =
   ++ ")"
 formatType (TypeEnum name) = Text.unpack name
 formatType (TypeContract name) = Text.unpack name
+formatType (TypeStruct name) = Text.unpack name
 
 textToSimpleArgType :: Text -> Maybe SimpleType
 textToSimpleArgType str = if Text.null str then Nothing

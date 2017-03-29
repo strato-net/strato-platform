@@ -34,7 +34,7 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 

@@ -29,14 +29,15 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Text.Printf
 
-import BlockApps.Contract
 import BlockApps.Ethereum
-import BlockApps.Solidity
+import BlockApps.Solidity.SolidityValue
 import BlockApps.Storage (Storage)
+import BlockApps.Solidity.Contract
 import qualified BlockApps.Storage as Storage
+import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
-
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
@@ -125,6 +126,8 @@ valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSol
 valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (SimpleValue (ValueBytes bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
 valueToSolidityValue (ValueEnum name value) = SolidityValueAsString $ name `T.append` "." `T.append` value
+valueToSolidityValue (ValueStruct namedItems) =
+  SolidityObject $ map (fmap valueToSolidityValue) namedItems
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
   SolidityValueAsString $ T.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)
@@ -143,39 +146,46 @@ byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) 
 
 
 decodeValues
-  :: Contract
+  :: TypeDefs
+  -> Struct
   -> Storage
+  -> Word256
   -> [(Text, Value)]
-decodeValues contract storage = 
+decodeValues typeDefs' struct'@Struct{..} storage offset = 
   let
-    varNames = Map.keys $ storageVars contract
+    varNames = Map.keys fields
   in
    --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
-   zip varNames $ catMaybes $ map (decodeValue contract storage) $ varNames
+   zip varNames $ catMaybes $ map (decodeValue typeDefs' storage offset struct') varNames
 
 decodeValue
-  :: Contract
+  :: TypeDefs
   -> Storage
+  -> Word256
+  -> Struct
   -> Text
   -> Maybe Value
-decodeValue contract storage varName = do
-  case Map.lookup varName $ storageVars contract of
+decodeValue typeDefs' storage offset Struct{..} varName = do
+  case Map.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
-     Just $ decodeValue' contract storage position theType
+     Just $ decodeValue' typeDefs' storage (position `Storage.addBytes` (fromIntegral $ 32*offset)) theType
 
 
 decodeValue'
-  :: Contract
+  :: TypeDefs
   -> Storage
   -> Storage.Position
   -> Type
   -> Value
-decodeValue' contract storage position@Storage.Position{..} = \case
-  SimpleType TypeBool -> SimpleValue $ ValueBool $ storage offset /= 0
---  SimpleType TypeUInt8 ->
---    SimpleValue $ ValueUInt $ fromIntegral $ (.&. ((1 `shiftL` 8) - 1)) $ (`shiftR` (byte*8)) $ storage offset
-  SimpleType TypeUInt -> decodeValue' contract storage position $ SimpleType $ TypeUInt256
+decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \case
+  SimpleType TypeBool ->
+    let
+      SimpleValue (ValueInt8 word8) = decodeValue' typeDefs' storage position (SimpleType TypeInt8)
+    in
+     SimpleValue $ ValueBool $ word8 /= 0
+     
+  SimpleType TypeUInt -> decodeValue' typeDefs' storage position $ SimpleType $ TypeUInt256
 
   
   SimpleType TypeInt8 -> decodeInt storage offset byte ValueInt8
@@ -256,16 +266,16 @@ decodeValue' contract storage position@Storage.Position{..} = \case
 
 
 
-  SimpleType TypeInt -> decodeValue' contract storage position $ SimpleType TypeInt256
+  SimpleType TypeInt -> decodeValue' typeDefs' storage position $ SimpleType TypeInt256
 
   SimpleType TypeAddress ->
     let
-      SimpleValue (ValueUInt160 addr) = decodeValue' contract storage position $ SimpleType TypeUInt160
+      SimpleValue (ValueUInt160 addr) = decodeValue' typeDefs' storage position $ SimpleType TypeUInt160
     in
       SimpleValue . ValueAddress . Address $ fromIntegral addr
   TypeContract _ ->
     let
-      SimpleValue (ValueAddress addr) = decodeValue' contract storage position $ SimpleType TypeAddress
+      SimpleValue (ValueAddress addr) = decodeValue' typeDefs' storage position $ SimpleType TypeAddress
     in
       ValueContract addr
 
@@ -334,23 +344,28 @@ decodeValue' contract storage position@Storage.Position{..} = \case
 
   SimpleType TypeString ->
     let
-      SimpleValue (ValueBytes bytes) = decodeValue' contract storage position $ SimpleType TypeBytes
+      SimpleValue (ValueBytes bytes) = decodeValue' typeDefs' storage position $ SimpleType TypeBytes
     in
       SimpleValue $ ValueString $ Text.decodeUtf8 bytes
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
-  TypeArrayFixed _ _ -> error "TypeArrayFixed is undefined in decodeValue'"
+  TypeArrayFixed size ty -> ValueArrayFixed size theList
+    where
+      (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [0..fromIntegral size - 1]
 
   TypeArrayDynamic ty -> ValueArrayDynamic theList
     where
-      theList = map (flip (decodeValue' contract storage) ty . Storage.positionAt . (startingKey+)) [0..storage offset-1]
+      (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+      --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
+      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize) $ map fromIntegral [0..fromIntegral (storage offset-1)::Int]
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
   TypeEnum name ->
-    case Map.lookup name $ enumDefs contract of
+    case Map.lookup name enumDefs of
      Nothing -> error $ "Solidity contract is using a missing enum: " ++ show name
      Just enumset ->
        let
@@ -360,6 +375,14 @@ decodeValue' contract storage position@Storage.Position{..} = \case
         case Bimap.lookup val enumset of
          Nothing -> error "bad enum value"
          Just x -> ValueEnum name x
+
+  TypeStruct name ->
+    case Map.lookup name structDefs of
+     Nothing -> error ""
+     Just theStruct -> ValueStruct $ decodeValues typeDefs' theStruct storage (Storage.alignedByte position)
+
+
+
   
 --  x -> error $ "Missing case in decodeValue': " ++ show x
 
@@ -373,3 +396,13 @@ decodeInt::Num t=>
            Storage->Word256->Int->(t->SimpleValue)->Value
 decodeInt storage offset byte constructor =
   SimpleValue $ constructor $ fromIntegral $ (`shiftR` (byte*8)) $ storage offset
+
+
+
+arrayPosition::Word256->Word256->Storage.Position
+arrayPosition elementSize x =
+  let
+    itemsPerWord = 32 `quot` elementSize
+    (o, b) = x `quotRem` itemsPerWord
+  in
+   Storage.Position{offset=o, byte=fromIntegral $ elementSize * b}

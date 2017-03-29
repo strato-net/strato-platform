@@ -52,10 +52,11 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
-import BlockApps.Solidity
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
+import BlockApps.Solidity.SolidityValue
+import BlockApps.Solidity.Xabi.Type
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 

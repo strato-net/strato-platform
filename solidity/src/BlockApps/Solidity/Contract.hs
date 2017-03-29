@@ -1,36 +1,35 @@
+{-#
+  LANGUAGE
+    RecordWildCards
+#-}
+module BlockApps.Solidity.Contract where
 
-module BlockApps.Contract where
-
-import Data.Bimap (Bimap)
 import qualified Data.Bimap as Bimap
 import Data.Bits
-import Data.Map (Map)
+import Data.LargeWord
 import qualified Data.Map as Map
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import qualified BlockApps.Storage as Storage
+import BlockApps.Solidity.Struct (Struct)
+import qualified BlockApps.Solidity.Struct as Struct
 import BlockApps.Solidity.Type
-
-type EnumSet = Bimap Int Text
-type Enums = Map Text EnumSet
-type Structs = Map Text (Map Text Type)
-
+import BlockApps.Solidity.TypeDefs
 
 data Contract =
   Contract{
-    storageVars::Map Text (Storage.Position, Type),
-    enumDefs::Enums,
-    structDefs::Structs
+    mainStruct::Struct,
+    typeDefs::TypeDefs
     } deriving (Show)
   
 
-getNextAvailablePosition::Storage.Position->Int->Storage.Position
-getNextAvailablePosition p i | 32 - Storage.byte p >= i = p
+getNextAvailablePosition::Storage.Position->Word256->Storage.Position
+getNextAvailablePosition p _ | Storage.byte p == 0 = p
+getNextAvailablePosition p i | 32 - fromIntegral (Storage.byte p) >= i = p
 getNextAvailablePosition p _ = p{Storage.offset=Storage.offset p+1, Storage.byte=0}
 
 --Given the next available position, return the actual chosen position and the number of primary bytes used (this doesn't include bytes used at other memory locations, like the content of a large string)
-getPositionAndSize::Enums->Storage.Position->Type->(Storage.Position, Int)
+getPositionAndSize::TypeDefs->Storage.Position->Type->(Storage.Position, Word256)
 getPositionAndSize _ p (SimpleType TypeBool) = (p,1)
 
 getPositionAndSize _ p (SimpleType TypeInt8)=(getNextAvailablePosition p 1, 1)
@@ -46,7 +45,7 @@ getPositionAndSize _ p (SimpleType TypeInt72)=(getNextAvailablePosition p 9, 9)
 getPositionAndSize _ p (SimpleType TypeInt80)=(getNextAvailablePosition p 10, 10)
 getPositionAndSize _ p (SimpleType TypeInt88)=(getNextAvailablePosition p 11, 11)
 getPositionAndSize _ p (SimpleType TypeInt96)=(getNextAvailablePosition p 12, 12)
-getPositionAndSize _ p (SimpleType TypeInt104)=(getNextAvailablePosition p 13, 13)
+getPositionAndSize _ p (SimpleType TypeInt104)=(getNextAvailablePosition p 13, 13) 
 getPositionAndSize _ p (SimpleType TypeInt112)=(getNextAvailablePosition p 14, 14)
 getPositionAndSize _ p (SimpleType TypeInt120)=(getNextAvailablePosition p 15, 15)
 getPositionAndSize _ p (SimpleType TypeInt128)=(getNextAvailablePosition p 16, 16)
@@ -165,20 +164,37 @@ getPositionAndSize _ p (SimpleType TypeBytes32) = (getNextAvailablePosition p 32
 
 
 
-getPositionAndSize enums p (TypeEnum name) =
-  case Map.lookup name enums of
-   Nothing -> error $ "Contract is using an enum that wasn't defined: " ++ T.unpack name ++ "\nenums is " ++ show enums
+getPositionAndSize TypeDefs{..} p (TypeEnum name) =
+  case Map.lookup name enumDefs of
+   Nothing -> error $ "Contract is using an enum that wasn't defined: " ++ T.unpack name ++ "\nenums is " ++ show enumDefs
    Just enumset ->
-     let len = Bimap.size enumset `shiftR` 8 + 1
+     let len = fromIntegral $ Bimap.size enumset `shiftR` 8 + 1
      in (getNextAvailablePosition p len, len)
 
+getPositionAndSize TypeDefs{..} p (TypeStruct name) =
+  case Map.lookup name structDefs of
+   Nothing -> error $ "Contract is using an struct that wasn't defined: " ++ T.unpack name ++ "\nstructs is " ++ show structDefs
+   Just struct -> nextAvail p $ Struct.size struct
 
 getPositionAndSize _ p (TypeArrayDynamic _) = (p,32)
-getPositionAndSize _ p (TypeArrayFixed _ _) = (p,32)
+getPositionAndSize typeDefs' p (TypeArrayFixed size ty) = 
+  let
+    (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
+    itemsPerWord = 32 `quot` elementSize
+    divRoundUp x y =
+      let
+        (d, r) = x `quotRem` y
+      in
+       if r == 0
+       then d
+       else d+1
+  in
+   (p, fromIntegral $ 32*size `divRoundUp` fromIntegral itemsPerWord)
 getPositionAndSize _ p (TypeMapping _ _) = (p,32)
 getPositionAndSize _ p (TypeFunction _ _ _) = (p,32)
-getPositionAndSize _ p (TypeContract _) = (getNextAvailablePosition p 20, 20)
+getPositionAndSize _ p (TypeContract _) = nextAvail p 20
 
-
+nextAvail::Storage.Position->Word256->(Storage.Position, Word256)
+nextAvail p x = (getNextAvailablePosition p x, x)
 
 --getPositionAndSize _ p _ = (p,32)
