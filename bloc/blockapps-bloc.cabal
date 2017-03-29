@@ -42,6 +42,7 @@ library
     , contravariant
     , cryptonite
     , bytestring
+    , base16-bytestring
     , generic-random
     , hflags
     , http-api-data

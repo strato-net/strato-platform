@@ -43,7 +43,7 @@ instance MonadError BlocError Bloc where
     logWith logError (Text.pack (show err))
     Bloc $ throwError err
   catchError m handle = do
-    logError . withCallStack =<< timestamp "catching error"
+    logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
 
 data BlocEnv = BlocEnv
@@ -58,7 +58,7 @@ data BlocError
   | UserError Text
   | CouldNotFind Text
   | AnError Text
-  | Unimplemented
+  | Unimplemented Text
   deriving Show
 
 enterBloc :: BlocEnv -> Bloc x -> Handler x
