@@ -25,7 +25,7 @@ data Value
   | ValueEnum Text Text
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- | ValueMapping (Map SimpleValue Value)
-  -- | ValueStruct
+  | ValueStruct [(Text, Value)]
   deriving (Show)
 
 data SimpleValue
@@ -149,6 +149,7 @@ textToValue str = \case
   TypeFunction _ _ _ -> Nothing -- TODO: Fixme
   TypeContract _ -> ValueContract <$> stringAddress (Text.unpack str)
   TypeEnum _ -> Nothing -- TODO: Fixme
+  TypeStruct _ -> Nothing  -- TODO: Fixme
 
 textToSimpleValue :: Text -> SimpleType -> Maybe SimpleValue
 textToSimpleValue str = \case

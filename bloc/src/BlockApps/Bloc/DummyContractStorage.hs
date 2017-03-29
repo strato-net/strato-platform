@@ -15,30 +15,48 @@ import qualified Data.Map as Map
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
-import BlockApps.Contract
 import BlockApps.Ethereum
 import qualified BlockApps.Storage as Storage
+import BlockApps.Solidity.Contract
+import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
+import BlockApps.Solidity.TypeDefs
+
+fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
+fieldsToStruct typeDefs' vars =
+  let
+    (positionAfter, positions) = addPositions typeDefs' (Storage.positionAt 0)
+                                 $ map snd vars
+  in
+   Struct {
+     fields=Map.fromList
+            $ zipWith (\(n, t) p -> (n, (p, t))) vars positions,
+     size = fromIntegral $ 32 * Storage.offset positionAfter + fromIntegral (Storage.byte positionAfter)
+     }
+
 
 getContract::ContractName->MaybeNamed Address->Bloc Contract
 getContract contractName address = do
   (vars, enums, structs) <- getVarsAndEnums contractName address
   let enumDefs' = Map.fromList $ map (fmap (Bimap.fromList . zip [0..])) enums
+      structDefs' = Map.fromList $ map (fmap $ fieldsToStruct typeDefs') structs
+      typeDefs' =
+        TypeDefs {
+          enumDefs = enumDefs',
+          structDefs=structDefs'
+          }
   return Contract {
-    storageVars=Map.fromList
-                $ zipWith (\(n, t) p -> (n, (p, t))) vars
-                $ addPositions enumDefs' (Storage.positionAt 0) $ map snd vars,
-    enumDefs = enumDefs',
-    structDefs=Map.fromList $ map (fmap Map.fromList) structs
+    mainStruct=fieldsToStruct typeDefs' vars,
+    typeDefs=typeDefs'
     }
 
-addPositions::Enums->Storage.Position -> [Type] -> [Storage.Position]
-addPositions _ _ [] = []
-addPositions enums p0 (theType:rest) =
+addPositions::TypeDefs->Storage.Position -> [Type] -> (Storage.Position, [Storage.Position])
+addPositions _ p [] = (p, [])
+addPositions typeDefs' p0 (theType:rest) =
   let
-    (position, usedBytes) = getPositionAndSize enums p0 theType
+    (position, usedBytes) = getPositionAndSize typeDefs' p0 theType
   in
-   position:addPositions enums (Storage.addBytes position usedBytes) rest
+   fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
 
 
 getVarsAndEnums::ContractName->MaybeNamed Address->Bloc ([(Text, Type)], [(Text, [Text])], [(Text, [(Text, Type)])])
@@ -309,7 +327,7 @@ getVarsAndEnums (ContractName contractName) _ =
      return
      (
        [
-  --       ("sammy", TypeStruct "Pet") --96
+         ("sammy", TypeStruct "Pet") --96
        ],
        [
          ("Animals", ["Dog","Cat","Pig"])
@@ -321,8 +339,63 @@ getVarsAndEnums (ContractName contractName) _ =
             ("name", SimpleType TypeString), --32
             ("age", SimpleType TypeInt8), --64
             ("fleasAndTicks", SimpleType TypeBool) --65
-          ]) --96 bytes
+          ]
+         ) --96 bytes
        ]
+     )
+
+
+
+
+   "Struct2" ->
+     return
+     (
+       [
+         ("x", SimpleType TypeInt),
+         ("sammy", TypeStruct "Pet"),
+         ("proclamation", SimpleType TypeString),
+         ("I", TypeStruct "Pet")
+       ],
+       [],
+       [
+         ("Pet",
+          [
+            ("animal", SimpleType TypeString),
+            ("name", SimpleType TypeString),
+            ("age", SimpleType TypeInt8),
+            ("fleasAndTicks", SimpleType TypeBool)
+          ]
+         ) -- 96 bytes
+       ]
+     )
+
+
+   "FixedArray" ->
+     return
+     (
+       [
+         ("x", TypeArrayFixed 8 (SimpleType TypeUInt)),
+         ("x8", TypeArrayFixed 8 (SimpleType TypeUInt8)),
+         ("notice", SimpleType TypeString)
+       ],
+       [],
+       []
+     )
+
+
+   "Array" ->
+     return
+     (
+       [
+         ("fixedUIntArray", TypeArrayFixed 8 (SimpleType TypeUInt)),
+         
+         ("fixedUInt8Array", TypeArrayFixed 8 (SimpleType TypeUInt8)),
+         ("int32Array", TypeArrayDynamic (SimpleType TypeInt32)),
+         ("uintArray", TypeArrayDynamic (SimpleType TypeInt)),
+         ("notice", SimpleType TypeString)
+       ],
+       [],
+       []
      )
 
 
@@ -331,6 +404,7 @@ getVarsAndEnums (ContractName contractName) _ =
 
 
 
+     
    x -> error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
 
 
@@ -617,6 +691,38 @@ Struct-
 
 
 
+Struct2-
+"vars":{
+  "x":{"atBytes":0,"signed":true,"type":"Int","bytes":32},
+  "sammy":{"atBytes":32,"typedef":"Pet","type":"Struct","bytes":96},
+  "proclamation":{"atBytes":128,"dynamic":true,"type":"String"},
+  "I":{"atBytes":160,"typedef":"Pet","type":"Struct","bytes":96}
+}
+"types":{
+  "Pet":{"type":"Struct","bytes":96,"fields":{"fleasAndTicks":{"atBytes":65,"type":"Bool"},"age":{"atBytes":64,"signed":true,"type":"Int","bytes":1},"animal":{"atBytes":0,"dynamic":true,"type":"String"},"name":{"atBytes":32,"dynamic":true,"type":"String"}}}
+}
+
+
+
+FixedArray-
+"vars":{
+  "x":{"atBytes":0,"length":8,"entry":{"type":"Int","bytes":32},"type":"Array"}
+  "x8":{"atBytes":256,"length":8,"entry":{"type":"Int","bytes":1},"type":"Array"},
+  "notice":{"atBytes":288,"dynamic":true,"type":"String"},
+}
+
+
+Array-
+"vars":{
+  "fixedUIntArray":{"atBytes":0,"length":8,"entry":{"type":"Int","bytes":32},"type":"Array"}
+  "fixedUInt8Array":{"atBytes":256,"length":8,"entry":{"type":"Int","bytes":1},"type":"Array"},
+  "int32Array":{"atBytes":288,"dynamic":true,"entry":{"signed":true,"type":"Int","bytes":4},"type":"Array"},
+  "uintArray":{"atBytes":320,"dynamic":true,"entry":{"type":"Int","bytes":32},"type":"Array"},
+  "notice":{"atBytes":352,"dynamic":true,"type":"String"},
+}
+
+
+
 -}
 
 
@@ -627,7 +733,8 @@ Struct-
 
 
 getAddress::ContractName->MaybeNamed Address->Address
-getAddress (ContractName "Payout") _ = Address 0x953ac16faebbe2ce2136814cee884d82f0ecb1aa
+getAddress (ContractName "Payout") _ = Address 0x93c163ebb25ef841e051ee162feaf936893d8d51
+
 getAddress (ContractName "Stake") _ = Address 0xbcca0649c1c41486e95ca1a8287e2a5f7000a8aa
 getAddress (ContractName "SimpleMultiSig") _ = Address 0x944368b7c7dbf16e97236e2ecf80df7f7c30ae88
 getAddress (ContractName "Consumer") _ = Address 0x687f7a384cf998eca6afadb67d76f3ffa9e0741d
@@ -643,11 +750,14 @@ getAddress (ContractName "Types") _ = Address 0xc810525ea1837cdb297d2694a0f79636
 
 
 --getAddress (ContractName "Enums") _ = Address 0xbd4d76e9c5923661a92db8064c816b758c85649e
-getAddress (ContractName "Enums") _ = Address 0xe5abb969f22ecfad07a4c25264b7de22a641a1ef
+getAddress (ContractName "Enums") _ = Address 0x86df6d5e6a491d373c897f22985dd40c3ca18f0e
 
-getAddress (ContractName "Struct") _ = Address 0x1e911df022bfd54c2bc341d59cc262a7e2367516
+getAddress (ContractName "Struct") _ = Address 0x658ba3447ca8a4b6668233d0fa70b8b083a4f3f2
+--getAddress (ContractName "Struct2") _ = Address 0xc95129dfce7e115d7e2f7f658456d3191af91ac8
+getAddress (ContractName "Struct2") _ = Address 0x58ec24fdfb75c2124f659f96748d208529716f80
 
+getAddress (ContractName "FixedArray") _ = Address 0xf450d26fcfa6f40c0e27ad7d46695f5e9efbc2f5
 
+getAddress (ContractName "Array") _ = Address 0xd92575a5525384ff9cc5601071d9de48dc756f12
 
-
-getAddress (ContractName x) _ = error $ "You fool, there is no '" ++ T.unpack x ++ "' contract"
+getAddress (ContractName x) _ = error $ "Error in getAddress: You fool, there is no '" ++ T.unpack x ++ "' contract"

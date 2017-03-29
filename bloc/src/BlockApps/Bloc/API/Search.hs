@@ -29,7 +29,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Ethereum
-import BlockApps.Solidity
+import BlockApps.Solidity.SolidityValue
 
 class Monad m => MonadSearchContract m where
   getSearchContract :: ContractName -> m [MaybeNamed Address]
