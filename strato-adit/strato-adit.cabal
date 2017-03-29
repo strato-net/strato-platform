@@ -23,11 +23,7 @@ library
   default-language:    Haskell2010
   build-depends:       base >=4.9 && <4.10,
                        bytestring,
-                       esqueleto,
                        monad-logger,
-                       persistent,
-                       persistent-postgresql,
-                       postgresql-simple,
                        blockapps-data,
                        merkle-patricia-db,
                        random,
@@ -64,7 +60,6 @@ library
                        Blockchain.Mining.Options
                        Executable.StratoAdit
   other-modules:       Executable.AditM
-                       Executable.SQLMonad
 
 executable strato-adit
   main-is:             Main.hs
@@ -73,11 +68,7 @@ executable strato-adit
   other-extensions:    OverloadedStrings
   build-depends:       base >=4.9 && <4.10,
                        bytestring,
-                       esqueleto,
                        monad-logger,
-                       persistent,
-                       persistent-postgresql,
-                       postgresql-simple,
                        blockapps-data,
                        merkle-patricia-db,
                        random,

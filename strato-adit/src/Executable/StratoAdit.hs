@@ -20,10 +20,8 @@ import           Blockchain.Mining.SHA
 import           Blockchain.Mining.Normal
 import           Blockchain.Mining.Instant
 import           Blockchain.Stream.UnminedBlock
-import           Blockchain.Stream.VMEvent
 import           Blockchain.Format
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.NewBlk
 import           Blockchain.Data.DataDefs()
 import           Blockchain.KafkaTopics
 import           Blockchain.Stream.Raw (setDefaultKafkaState)
@@ -61,9 +59,8 @@ doBlock minerNumber n newNonce = do
     toLog "doBlock" minerNumber $ "New block hash is " ++ format theHash ++ "!"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
-    _ <- produceVMEventsM [ChainBlock theMinedBlock]
     _ <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
-    putNewBlk $ blockToNewBlk theMinedBlock
+    return ()
 
 mineBlock :: TMVar Block -> Integer -> Integer -> (Miner, Int) -> AditM ()
 mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
@@ -93,7 +90,7 @@ doConsume offset c = do
     doConsume (offset + fromIntegral (length blocks)) c
 
 stratoAdit :: LoggingT IO ()
-stratoAdit = runAditT flags_pgPoolSize $ do
+stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" "Starting adit"
     $logInfoS "stratoAdit" "Before STM op in mining loop"
 
