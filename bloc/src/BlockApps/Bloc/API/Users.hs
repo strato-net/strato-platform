@@ -56,7 +56,7 @@ import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi.Type
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 
@@ -175,12 +175,12 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
   Just functionId -> do
     argNamesTypes <- getXabiFunctionsArgsQuery functionId
     let
-      determineValue valStr (IndexedXabiType _ xabiType) =
+      determineValue valStr (Xabi.IndexedXabiType _ xabiType) =
         let
-          ty = xabiTypeType xabiType
-          dy = fromMaybe False $ xabiTypeDynamic xabiType
-          ety = xabiTypeEntry xabiType
-          etyty = fromMaybe "" $ fmap xabiTypeType ety
+          ty = Xabi.xabiTypeType xabiType
+          dy = fromMaybe False $ Xabi.xabiTypeDynamic xabiType
+          ety = Xabi.xabiTypeEntry xabiType
+          etyty = fromMaybe "" $ fmap Xabi.xabiTypeType ety
           typeM = textToArgType ty dy etyty
         in
           textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
