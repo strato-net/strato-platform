@@ -22,13 +22,13 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 
 data Type
-  = Int {signed::Maybe Bool, bytes::Maybe Integer}
+  = Int {signed::Maybe Bool, bytes::Maybe Int32}
   | String {dynamic::Maybe Bool}
-  | Bytes {dynamic::Maybe Bool, bytes:: Maybe Integer}
+  | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
   | Bool
   | Address
-  | Struct {fields::Map Text FieldType, bytes::Maybe Integer, typedef::Text}
-  | Enum {names::Map Text Int, bytes::Maybe Integer, typedef::Text}
+  | Struct {fields::Map Text FieldType, bytes::Maybe Int32, typedef::Text}
+  | Enum {names::Map Text Int, bytes::Maybe Int32, typedef::Text}
   | Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
   | Contract {typedef::Text}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic)
