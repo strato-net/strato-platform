@@ -227,3 +227,42 @@ xabiVariablesTable = Table "xabi_variables" $ p6
   , required "at_bytes"
   , required "is_public"
   )
+
+xabiEnumNamesTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+xabiEnumNamesTable = Table "xabi_enum_names" $ p4
+  ( optional "id"
+  , required "name"
+  , required "value"
+  , required "type_id"
+  )
+
+xabiStructFieldsTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  , Column PGInt4
+  )
+xabiStructFieldsTable = Table "xabi_struct_fields" $ p5
+  ( optional "id"
+  , required "name"
+  , required "at_bytes"
+  , required "parent_type_id"
+  , required "field_type_id"
+  )

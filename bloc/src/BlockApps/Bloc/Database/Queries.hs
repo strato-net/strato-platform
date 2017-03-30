@@ -737,6 +737,7 @@ insertContractMetaDataQuery
       restrict -< ch .== constant codeHash .&& xch .== constant xcodeHash
       returnA -< cmId
     case listToMaybe cmIds of
+
       Just cmId -> return [cmId]
       Nothing ->
         runInsertReturning conn contractsMetaDataTable
