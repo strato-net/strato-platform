@@ -142,6 +142,7 @@ xabiTypesTable :: Table
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
+  , Column (Nullable PGInt4)
   )
   ( Column PGInt4
   , Column PGText
@@ -152,14 +153,16 @@ xabiTypesTable :: Table
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
+  , Column (Nullable PGInt4)
   )
-xabiTypesTable = Table "xabi_types" $ p9
+xabiTypesTable = Table "xabi_types" $ p10
   ( optional "id"
   , required "type"
   , required "typedef"
   , required "is_dynamic"
   , required "is_signed"
   , required "bytes"
+  , required "length"
   , required "entry_type_id"
   , required "value_type_id"
   , required "key_type_id"

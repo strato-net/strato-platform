@@ -903,7 +903,6 @@ compileContract contractName source = do
     returnA -< codeHash
 
 insertXabiType :: Xabi.Type -> Bloc Int32
--- insertXabiType _ = undefined
 insertXabiType = \case
   Xabi.Int signed bytes ->
     blocModify1 $ \ conn -> do
@@ -917,35 +916,169 @@ insertXabiType = \case
         , Opaleye.null
         , Opaleye.null
         , Opaleye.null
+        , Opaleye.null
         )
-        (\ (xtid,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.String dynamic -> undefined
-  Xabi.Bytes dynamic bytes -> undefined
-  Xabi.Bool -> undefined
-  Xabi.Address -> undefined
-  Xabi.Struct fields bytes typedef -> undefined
-  Xabi.Enum names bytes typedef -> undefined
-  Xabi.Array dynamic len entry -> undefined
-  Xabi.Contract typedef -> undefined
-  Xabi.Mapping dynamic key value -> undefined
-{-
-insertXabiType xt = do
-  entryId <- traverse insertXabiType (xabiTypeEntry xt)
-  keyId <- traverse insertXabiType (xabiTypeKey xt)
-  valueId <- traverse insertXabiType (xabiTypeValue xt)
-  blocModify1 $ \ conn -> do
-    runInsertReturning conn xabiTypesTable
-      ( Nothing
-      , constant $ undefined -- Xabi.Type xt
-      , constant $ Xabi.typedef xt
-      , constant . fromMaybe False $ Xabi.dynamic xt
-      , constant . fromMaybe False $ Xabi.signed xt
-      , constant $ Xabi.bytes xt
-      , constant $ entryId
-      , constant $ valueId
-      , constant $ keyId
-      )
-      (\ (xtid,_,_,_,_,_,_,_,_) -> xtid) -}
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.String dynamic ->
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("String"::Text)
+        , Opaleye.null
+        , constant $ fromMaybe False dynamic
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Bytes dynamic bytes ->
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Bytes"::Text)
+        , Opaleye.null
+        , constant $ fromMaybe False dynamic
+        , constant False
+        , constant bytes
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Bool ->
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Bool"::Text)
+        , Opaleye.null
+        , constant False
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Address ->
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Address"::Text)
+        , Opaleye.null
+        , constant False
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Struct fields bytes typedef -> do
+    fieldsWithIds <- flip Map.traverseWithKey fields $ \ _ (Xabi.FieldType atby ty) -> do
+      tyid <- insertXabiType ty
+      return (atby,tyid)
+    parentTypeId <- blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Struct"::Text)
+        , constant $ Just typedef
+        , constant False
+        , constant False
+        , constant bytes
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+    void $ blocModify $ \ conn -> do
+      runInsertMany conn xabiStructFieldsTable
+        [ ( Nothing
+          , constant name
+          , constant atby
+          , constant parentTypeId
+          , constant tyid
+          )
+        | (name,(atby,tyid)) <- Map.toList fieldsWithIds]
+    return parentTypeId
+  Xabi.Enum names bytes typedef -> do
+    tyid <- blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Enum"::Text)
+        , constant $ Just typedef
+        , constant False
+        , constant False
+        , constant bytes
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+    void $ blocModify $ \ conn -> do
+      runInsertMany conn xabiEnumNamesTable
+        [ ( Nothing
+          , constant name
+          , constant value
+          , constant tyid
+          )
+        | (name,value) <- Map.toList names]
+    return tyid
+  Xabi.Array dynamic len entry -> do
+    entryId <- insertXabiType entry
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Array"::Text)
+        , Opaleye.null
+        , constant $ fromMaybe False dynamic
+        , constant False
+        , Opaleye.null
+        , constant (fmap fromIntegral len :: Maybe Int32)
+        , constant $ Just entryId
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Contract typedef -> do
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Contract"::Text)
+        , constant $ Just typedef
+        , constant False
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Mapping dynamic key value -> do
+    keyId <- insertXabiType key
+    valueId <- insertXabiType value
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Mapping"::Text)
+        , Opaleye.null
+        , constant $ fromMaybe False dynamic
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , constant $ Just valueId
+        , constant $ Just keyId
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
 
 getXabiType :: Int32 -> Bloc Xabi.Type
 getXabiType _ = undefined
