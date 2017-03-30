@@ -8,6 +8,7 @@ import Control.Concurrent
 import Data.Random.Normal
 import Control.Monad.IO.Class
 
+import Blockchain.EthConf
 import Blockchain.Mining.Options
 
 normalMiner :: Miner
@@ -15,8 +16,7 @@ normalMiner = Miner mineNormal verifyNormal
 
 mineNormal :: Block -> IO (Maybe Integer)
 mineNormal _ = do
-            r <- liftIO $ randomDelay flags_blocktime flags_variance
-            --printf "Sleeping for %6.2fs\n" (r / 1000) :: Double
+            r <- liftIO $ randomDelay (fromIntegral . (1000 *) . blockTime $ blockConfig ethConf) flags_variance
             putStrLn $ "Sleeping for " ++ (show r) ++ " milliseconds"
             return $ Just 6
 

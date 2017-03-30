@@ -127,7 +127,7 @@ handleEvents mode peer = awaitForever $ \case
         case redisParentHeader of
             Nothing -> do
                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-                let fetchNumber = numFromRedis bestBlock
+                let fetchNumber = numFromRedis bestBlock - 1
                 logInfoN . T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
                 logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber 
             Just _  -> do
@@ -137,7 +137,7 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (NewBlockHashes _) -> do
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        let fetchNumber = numFromRedis bestBlock
+        let fetchNumber = numFromRedis bestBlock -1
         logInfoN . T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
 
@@ -181,9 +181,11 @@ handleEvents mode peer = awaitForever $ \case
             let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
             unless (null missingParents) $ do
                  bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-                 let fetchNumber = numFromRedis bestBlock
+                 let fetchNumber = numFromRedis bestBlock + 1
                  logInfoN . T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
-                 let lastParent = head . sort $ blockHeaderBlockNumber . snd <$> existingParents
+                 let lastParent = case length existingParents of
+                                      0 -> fetchNumber
+                                      _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
                  (logInfoN $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)) >> syncFetch Reverse lastParent
            
             -- todo: try with (&&&)
