@@ -19,7 +19,7 @@ import Test.QuickCheck.Instances ()
 import qualified BlockApps.Solidity.Xabi.Def as Xabi
 import BlockApps.Solidity.Xabi.Type
 
-              
+
 data Xabi = Xabi
   { xabiFuncs :: Map Text Func
   , xabiConstr :: Map Text IndexedType
@@ -46,4 +46,3 @@ instance ToJSON Func where
 instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
-

@@ -867,6 +867,7 @@ insertXabiConstr metadataId contractName constrArgs = do
     (\ (xfId,_,_,_,_) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
+-- TODO: Add insert types
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
 insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
