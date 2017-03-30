@@ -4,7 +4,6 @@
   , MultiParamTypeClasses
   , OverloadedStrings
   , TypeFamilies
-  , UndecidableInstances
 #-}
 
 module BlockApps.Bloc.Monad where
