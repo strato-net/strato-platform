@@ -24,10 +24,10 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.Foldable
+--import Data.Foldable
 import Data.Int (Int32)
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
+--import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
@@ -35,7 +35,7 @@ import Data.RLP
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import Data.Traversable
+--import Data.Traversable
 import Generic.Random.Generic
 import GHC.Generics
 import Numeric.Natural
@@ -52,11 +52,11 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
-import BlockApps.Solidity.Storage
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.Value
+--import BlockApps.Solidity.Storage
+--import BlockApps.Solidity.Type
+--import BlockApps.Solidity.Value
 import BlockApps.Solidity.SolidityValue
-import qualified BlockApps.Solidity.Xabi.Type as Xabi
+--import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 
@@ -170,12 +170,14 @@ getConstructorId cmId = do
   return $ listToMaybe functionIds
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
+buildArgumentByteString _ _ = undefined
+{-
 buildArgumentByteString args mFunctionId = case mFunctionId of
   Nothing -> return ByteString.empty
   Just functionId -> do
     argNamesTypes <- getXabiFunctionsArgsQuery functionId
     let
-      determineValue valStr (Xabi.IndexedXabiType _ xabiType) =
+      determineValue valStr (Xabi.IndexedType _ xabiType) =
         let
           ty = Xabi.xabiTypeType xabiType
           dy = fromMaybe False $ Xabi.xabiTypeDynamic xabiType
@@ -197,6 +199,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
           maybe (throwError $ AnError "couldn't decode argument value") return
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
+-}
 
 type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
 
