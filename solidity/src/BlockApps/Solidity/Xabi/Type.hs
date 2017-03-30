@@ -7,6 +7,7 @@
 module BlockApps.Solidity.Xabi.Type where
 
 import Data.Aeson
+import Data.Aeson.TH
 import qualified Data.HashMap.Lazy as HashMap
 import Data.Int (Int32)
 import Data.Map (Map)
@@ -16,6 +17,8 @@ import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
+typeAesonOptions::Options
+typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
 
 data Type =
@@ -29,8 +32,10 @@ data Type =
   | Array {dynamic::Bool, length::Maybe Word, entry::Type}
   | Contract {typedef::Text} deriving (Eq, Show, Generic)
 
-instance FromJSON Type where
 instance ToJSON Type where
+  toJSON = genericToJSON typeAesonOptions
+instance FromJSON Type where
+  parseJSON = genericParseJSON typeAesonOptions
 instance Arbitrary Type where arbitrary = genericArbitrary uniform
 
 {-
