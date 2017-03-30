@@ -16,6 +16,8 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Tuple
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector
 
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Contract
@@ -47,75 +49,39 @@ addPositions typeDefs' p0 (theType:rest) =
   in
    fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
 
+intTypes::Vector SimpleType
+intTypes=Vector.fromList
+  [
+    TypeInt8, TypeInt16, TypeInt24, TypeInt32,
+    TypeInt40, TypeInt48, TypeInt56, TypeInt64,
+    TypeInt72, TypeInt80, TypeInt88, TypeInt96,
+    TypeInt104, TypeInt112, TypeInt120, TypeInt128,
+    TypeInt136, TypeInt144, TypeInt152, TypeInt160,
+    TypeInt168, TypeInt176, TypeInt184, TypeInt192,
+    TypeInt200, TypeInt208, TypeInt216, TypeInt224,
+    TypeInt232, TypeInt240, TypeInt248, TypeInt256
+  ]
+
+uintTypes::Vector SimpleType
+uintTypes= Vector.fromList
+  [
+    TypeUInt8, TypeUInt16, TypeUInt24, TypeUInt32,
+    TypeUInt40, TypeUInt48, TypeUInt56, TypeUInt64,
+    TypeUInt72, TypeUInt80, TypeUInt88, TypeUInt96,
+    TypeUInt104, TypeUInt112, TypeUInt120, TypeUInt128,
+    TypeUInt136, TypeUInt144, TypeUInt152, TypeUInt160,
+    TypeUInt168, TypeUInt176, TypeUInt184, TypeUInt192,
+    TypeUInt200, TypeUInt208, TypeUInt216, TypeUInt224,
+    TypeUInt232, TypeUInt240, TypeUInt248, TypeUInt256
+  ]
+
 xabiTypeToSimpleType::Xabi.Type->SimpleType
 xabiTypeToSimpleType Xabi.String{} = TypeString
 xabiTypeToSimpleType Xabi.Address = TypeAddress
-
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 1 } = TypeInt8
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 2 } = TypeInt16
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 3 } = TypeInt24
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 4 } = TypeInt32
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 5 } = TypeInt40
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 6 } = TypeInt48
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 7 } = TypeInt56
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 8 } = TypeInt64
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 9 } = TypeInt72
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 10 } = TypeInt80
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 11 } = TypeInt88
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 12 } = TypeInt96
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 13 } = TypeInt104
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 14 } = TypeInt112
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 15 } = TypeInt120
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 16 } = TypeInt128
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 17 } = TypeInt136
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 18 } = TypeInt144
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 19 } = TypeInt152
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 20 } = TypeInt160
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 21 } = TypeInt168
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 22 } = TypeInt176
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 23 } = TypeInt184
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 24 } = TypeInt192
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 25 } = TypeInt200
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 26 } = TypeInt208
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 27 } = TypeInt216
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 28 } = TypeInt224
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 29 } = TypeInt232
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 30 } = TypeInt240
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 31 } = TypeInt248
-xabiTypeToSimpleType Xabi.Int { Xabi.signed=Just True, Xabi.bytes=Just 32 } = TypeInt256
-
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 1 } = TypeUInt8
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 2 } = TypeUInt16
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 3 } = TypeUInt24
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 4 } = TypeUInt32
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 5 } = TypeUInt40
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 6 } = TypeUInt48
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 7 } = TypeUInt56
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 8 } = TypeUInt64
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 9 } = TypeUInt72
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 10 } = TypeUInt80
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 11 } = TypeUInt88
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 12 } = TypeUInt96
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 13 } = TypeUInt104
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 14 } = TypeUInt112
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 15 } = TypeUInt120
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 16 } = TypeUInt128
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 17 } = TypeUInt136
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 18 } = TypeUInt144
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 19 } = TypeUInt152
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 20 } = TypeUInt160
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 21 } = TypeUInt168
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 22 } = TypeUInt176
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 23 } = TypeUInt184
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 24 } = TypeUInt192
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 25 } = TypeUInt200
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 26 } = TypeUInt208
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 27 } = TypeUInt216
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 28 } = TypeUInt224
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 29 } = TypeUInt232
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 30 } = TypeUInt240
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 31 } = TypeUInt248
-xabiTypeToSimpleType Xabi.Int { Xabi.bytes=Just 32 } = TypeUInt256
+xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=b} =
+  case signed of
+   Just True -> intTypes Vector.! fromIntegral (b-1)
+   _ -> uintTypes Vector.! fromIntegral (b-1)
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
@@ -143,10 +109,8 @@ funcToType Func{..} =
   in
    TypeFunction
        selector
-       undefined
---       (Map.toList $ fmap (xabiTypeToType . Xabi.indexedXabiTypeType) funcArgs)
-       undefined
---       (map (\(name, val) -> (Just name, xabiTypeToType $ Xabi.indexedXabiTypeType val)) $ Map.toList funcVals)
+       (Map.toList $ fmap (xabiTypeToType . Xabi.indexedTypeType) funcArgs)
+       (map (\(name, val) -> (Just name, xabiTypeToType $ Xabi.indexedTypeType val)) $ Map.toList funcVals)
 
 
 xAbiToContract::Xabi->Contract

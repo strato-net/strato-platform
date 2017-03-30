@@ -50,6 +50,7 @@ library
     , quickcheck-instances
     , text
     , unordered-containers
+    , vector
 
 test-suite blockapps-solidity-test
   default-language: Haskell2010
