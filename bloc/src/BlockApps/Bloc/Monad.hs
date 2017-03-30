@@ -3,13 +3,16 @@
   , GeneralizedNewtypeDeriving
   , MultiParamTypeClasses
   , OverloadedStrings
+  , TypeFamilies
 #-}
 
 module BlockApps.Bloc.Monad where
 
+import Control.Monad.Base
 import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
+import Control.Monad.Trans.Control
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Foldable
 import Data.Text (Text)
@@ -34,6 +37,7 @@ newtype Bloc x = Bloc
   , Applicative
   , Monad
   , MonadIO
+  , MonadBase IO
   , MonadReader BlocEnv
   , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
   )
@@ -45,6 +49,11 @@ instance MonadError BlocError Bloc where
   catchError m handle = do
     logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
+
+instance MonadBaseControl IO Bloc where
+  type StM Bloc x = Either BlocError x
+  liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
+  restoreM = Bloc . restoreM
 
 data BlocEnv = BlocEnv
   { urlStrato :: BaseUrl
@@ -85,7 +94,7 @@ blocQuery
 blocQuery q = do
   traverse_ (logWith logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
-  liftIO . withTransaction conn $ runQuery conn q
+  liftIO $ runQuery conn q
 
 blocQuery1
   :: (Default Unpackspec x x, Default QueryRunner x y)
@@ -94,7 +103,7 @@ blocQuery1
 blocQuery1 q = do
   traverse_ (logWith logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
-  results <- liftIO . withTransaction conn $ runQuery conn q
+  results <- liftIO $ runQuery conn q
   case results of
     [] -> throwError $ DBError "No result, expected one row"
     [y] -> return y
@@ -104,17 +113,22 @@ blocModify :: (Connection -> IO x) -> Bloc x
 blocModify modify = do
   logWith logNotice "Updating the database"
   conn <- asks dbConnection
-  liftIO $ withTransaction conn (modify conn)
+  liftIO $ modify conn
 
 blocModify1 :: (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
   logWith logNotice "Updating the database"
   conn <- asks dbConnection
-  results <- liftIO $ withTransaction conn (modify conn)
+  results <- liftIO $ modify conn
   case results of
     [] -> throwError $ DBError "No result, expected one row"
     [y] -> return y
     _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+
+blocTransaction :: Bloc x -> Bloc x
+blocTransaction bloc = do
+  conn <- asks dbConnection
+  liftBaseOp_ (withTransaction conn) bloc
 
 blocStrato :: ClientM x -> Bloc x
 blocStrato client' = do

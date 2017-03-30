@@ -41,7 +41,7 @@ instance MonadSearchContract ClientM where
   getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
 instance MonadSearchContract Bloc where
 
-  getSearchContract (ContractName contractName) =
+  getSearchContract (ContractName contractName) = blocTransaction $
     map Unnamed <$> blocQuery (getSearchContractQuery contractName)
 
   getSearchContractState = undefined

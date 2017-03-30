@@ -51,6 +51,7 @@ library
     , http-media
     , logging-effect
     , memory
+    , monad-control
     , monad-loops
     , mtl
     , opaleye
@@ -71,6 +72,7 @@ library
     , stm
     , text
     , time
+    , transformers-base
     , unordered-containers
     , warp
     , wl-pprint-text
