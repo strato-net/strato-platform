@@ -35,7 +35,7 @@ import qualified Data.Text.Encoding as Text
 import Data.Traversable
 import Database.PostgreSQL.Simple (Connection)
 import Opaleye hiding (not,null)
-import qualified Opaleye as Opaleye (not)
+import qualified Opaleye as Opaleye (not,null)
 
 import BlockApps.Bloc.Crypto
 import BlockApps.Bloc.Database.Tables
@@ -905,7 +905,20 @@ compileContract contractName source = do
 insertXabiType :: Xabi.Type -> Bloc Int32
 -- insertXabiType _ = undefined
 insertXabiType = \case
-  Xabi.Int signed bytes -> undefined
+  Xabi.Int signed bytes ->
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Int"::Text)
+        , Opaleye.null
+        , constant False
+        , constant $ fromMaybe False signed
+        , constant bytes
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.String dynamic -> undefined
   Xabi.Bytes dynamic bytes -> undefined
   Xabi.Bool -> undefined
