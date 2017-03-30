@@ -903,7 +903,18 @@ compileContract contractName source = do
     returnA -< codeHash
 
 insertXabiType :: Xabi.Type -> Bloc Int32
-insertXabiType _ = undefined
+-- insertXabiType _ = undefined
+insertXabiType = \case
+  Xabi.Int signed bytes -> undefined
+  Xabi.String dynamic -> undefined
+  Xabi.Bytes dynamic bytes -> undefined
+  Xabi.Bool -> undefined
+  Xabi.Address -> undefined
+  Xabi.Struct fields bytes typedef -> undefined
+  Xabi.Enum names bytes typedef -> undefined
+  Xabi.Array dynamic len entry -> undefined
+  Xabi.Contract typedef -> undefined
+  Xabi.Mapping dynamic key value -> undefined
 {-
 insertXabiType xt = do
   entryId <- traverse insertXabiType (xabiTypeEntry xt)
