@@ -26,6 +26,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Foldable
 import Data.Int (Int32)
+import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -59,6 +60,7 @@ import BlockApps.Solidity.SolidityValue
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
+import BlockApps.XAbiConverter (xabiTypeToType)
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
@@ -185,11 +187,56 @@ instance MonadUsers Bloc where
         (sel <> argsBin)
       logWith logNotice ("tx is: " <> Text.pack (show tx))
       hash <- blocStrato $ postTx tx
+      resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+      let
+        orderedResultIndexedXT = sortBy
+            (\x y -> compare (indexedXabiTypeIndex x) (indexedXabiTypeIndex y))
+            resultXabiTypes
+        orderedResultTypes = map
+          (\IndexedXabiType{..} -> xabiTypeToType indexedXabiTypeType)
+          orderedResultIndexedXT
       txResult <- pollTxResult hash
-      return . PostUsersContractMethodResponse $ transactionresultResponse txResult
+      let
+        formattedResponse = Text.concat $
+          convertResultResToTexts
+            (transactionresultResponse txResult)
+            orderedResultTypes
+
+      return $ PostUsersContractMethodResponse formattedResponse
 
   postUsersSendList _ _ _ = throwError $ Unimplemented "postUsersSendList"
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
+
+convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
+-- convertResultResToTexts = undefined
+convertResultResToTexts txResp responseTypes = do
+  byteResp <- Text.encodeUtf8 txResp
+  return $ convertBytesToTextVals byteResp responseTypes
+
+  where
+    convertBytesToTextVals b [] | ByteString.null b = Just []
+    convertBytesToTextVals b (x:xs) | ByteString.null b = Nothing
+    convertBytesToTextVals b types = do
+      let
+        headType = head types
+        tailTypes = tail types
+      case getTypeByteLength (headType) of
+        Just size -> do
+          (typeBytes, restOfBytes) <- ByteString.splitAt size
+          return $
+            [valueToText $ bytesToValue typeBytes headType]
+            ++
+            (convertBytesToTextVals restOfBytes )
+        Nothing -> undefined
+
+      -- let
+      --   typeSize = head types
+      --
+      --   tailTypes = tail types
+      --   (typeBytes, restOfBytes) = ByteString.splitAt headType
+
+
+
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
 buildArgumentByteString args mFunctionId = case mFunctionId of

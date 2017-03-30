@@ -136,6 +136,13 @@ data SimpleValue
   -- | ValueContract
   deriving (Show)
 
+
+bytesToValue :: ByteString -> Type -> Value
+bytesToValue = undefined
+
+valueToText :: Value -> Text
+valueToText = undefined
+
 textToValue :: Text -> Type -> Maybe Value
 textToValue str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
