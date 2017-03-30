@@ -18,16 +18,17 @@ import Test.QuickCheck.Instances ()
 
 
 
-data Type =
-  Int {signed::Bool, bytes::Integer}
-  | String {dynamic::Bool}
-  | Bytes
+data Type
+  = Int {signed::Maybe Bool, bytes::Maybe Integer}
+  | String {dynamic::Maybe Bool}
+  | Bytes {dynamic::Maybe Bool, bytes:: Maybe Integer}
   | Bool
   | Address
-  | Struct {fields::Map Text Type, bytes::Integer, typedef::Text}
-  | Enum {names::Map Text Int, bytes::Integer, typedef::Text}
-  | Array {dynamic::Bool, length::Maybe Word, entry::Type}
-  | Contract {typedef::Text} deriving (Eq, Show, Generic)
+  | Struct {fields::Map Text FieldType, bytes::Maybe Integer, typedef::Text}
+  | Enum {names::Map Text Int, bytes::Maybe Integer, typedef::Text}
+  | Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
+  | Contract {typedef::Text}
+  | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic)
 
 instance FromJSON Type where
 instance ToJSON Type where
@@ -62,13 +63,13 @@ instance FromJSON XabiType where
       return
         XabiType {
         xabiTypeType = theType,
-        xabiTypeTypedef = typedef, 
-        xabiTypeDynamic = dynamic, 
-        xabiTypeSigned = signed, 
-        xabiTypeBytes = bytes, 
-        xabiTypeEntry = entry, 
+        xabiTypeTypedef = typedef,
+        xabiTypeDynamic = dynamic,
+        xabiTypeSigned = signed,
+        xabiTypeBytes = bytes,
+        xabiTypeEntry = entry,
         xabiTypeLength = length',
-        xabiTypeValue = val, 
+        xabiTypeValue = val,
         xabiTypeKey = key
         }
 
@@ -124,13 +125,13 @@ instance FromJSON IndexedXabiType where
       return $ IndexedXabiType index
         XabiType {
         xabiTypeType = theType,
-        xabiTypeTypedef = typedef, 
-        xabiTypeDynamic = dynamic, 
-        xabiTypeSigned = signed, 
-        xabiTypeBytes = bytes, 
-        xabiTypeEntry = entry, 
+        xabiTypeTypedef = typedef,
+        xabiTypeDynamic = dynamic,
+        xabiTypeSigned = signed,
+        xabiTypeBytes = bytes,
+        xabiTypeEntry = entry,
         xabiTypeLength = length',
-        xabiTypeValue = val, 
+        xabiTypeValue = val,
         xabiTypeKey = key
         }
 
@@ -179,6 +180,27 @@ instance ToJSON VarType where
      HashMap.insert "public" (toJSON varTypePublic)
      theMap
 
-
-
 instance Arbitrary VarType where arbitrary = genericArbitrary uniform
+
+data FieldType = FieldType
+  { fieldTypeAtBytes :: Int32
+  , fieldTypeType :: Type
+  } deriving (Eq, Show, Generic)
+
+instance FromJSON FieldType where
+  parseJSON =
+    withObject "xabi" $ \v -> do
+      atBytes <-  v .: "atBytes"
+      theType <- parseJSON $ Object v
+      return $ FieldType atBytes theType
+
+instance ToJSON FieldType where
+  toJSON (FieldType fieldTypeAtBytes theType) =
+    let
+      Object theMap = toJSON theType
+    in
+      Object $
+      HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) $
+      theMap
+
+instance Arbitrary FieldType where arbitrary = genericArbitrary uniform
