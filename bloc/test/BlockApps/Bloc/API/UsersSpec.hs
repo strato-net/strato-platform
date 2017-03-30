@@ -92,6 +92,7 @@ spec = do
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEither <- runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
