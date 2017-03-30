@@ -43,7 +43,7 @@ import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Solidity.Xabi
-import BlockApps.Solidity.Xabi.Type
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
@@ -308,10 +308,10 @@ getContractsMetaDataId contractName = \case
 
 insertXabiFunctionArg
   :: Int32
-  -> Map Text IndexedXabiType
+  -> Map Text Xabi.IndexedType
   -> Bloc Int64
 insertXabiFunctionArg funcId args = do
-  argsWithIds <- for args $ \ (IndexedXabiType index xt) -> do
+  argsWithIds <- for args $ \ (Xabi.IndexedType index xt) -> do
     xtid <- insertXabiType xt
     return (index,xtid)
   blocModify $ \ conn -> do
@@ -327,10 +327,10 @@ insertXabiFunctionArg funcId args = do
 
 insertXabiFunctionRet
   :: Int32
-  -> [IndexedXabiType]
+  -> [Xabi.IndexedType]
   -> Bloc Int64
 insertXabiFunctionRet funcId vals = do
-  valIds <- for vals $ \ (IndexedXabiType index xt) -> do
+  valIds <- for vals $ \ (Xabi.IndexedType index xt) -> do
     xtid <- insertXabiType xt
     return (index,xtid)
   blocModify $ \ conn -> do
@@ -583,7 +583,7 @@ getXabiFunctionsQuery cmId = do
     args <- getXabiFunctionsArgsQuery xfId
     let
       valMap valList = Map.fromList
-        [ ( "#" <> Text.pack (show (indexedXabiTypeIndex val)), val)
+        [ ( "#" <> Text.pack (show (Xabi.indexedTypeIndex val)), val)
         | val <- valList
         ]
     vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
@@ -627,7 +627,7 @@ WHERE XFA.function_id = $1;
 -}
 getXabiFunctionsArgsQuery
   :: Int32
-  -> Bloc (Map Text IndexedXabiType)
+  -> Bloc (Map Text Xabi.IndexedType)
 getXabiFunctionsArgsQuery funcId = do
   argsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
     (_,functionId,tyid,name,index) <-
@@ -636,7 +636,7 @@ getXabiFunctionsArgsQuery funcId = do
     returnA -< (name,(index,tyid))
   for argsWithIds $ \ (index,tyid) -> do
     ty <- getXabiType tyid
-    return $ IndexedXabiType index ty
+    return $ Xabi.IndexedType index ty
 
 {- |
 SELECT
@@ -657,7 +657,7 @@ WHERE XFR.function_id = $1;"
 -}
 getXabiFunctionsReturnValuesQuery
   :: Int32
-  -> Bloc [IndexedXabiType]
+  -> Bloc [Xabi.IndexedType]
 getXabiFunctionsReturnValuesQuery funcId = do
   valsWithIds <- blocQuery $ proc () -> do
     (_,functionId,tyid,index) <-
@@ -666,7 +666,7 @@ getXabiFunctionsReturnValuesQuery funcId = do
     returnA -< (index,tyid)
   for valsWithIds $ \ (index,tyid) -> do
     ty <- getXabiType tyid
-    return $ IndexedXabiType index ty
+    return $ Xabi.IndexedType index ty
 
 {- |
 SELECT
@@ -677,7 +677,7 @@ FROM
   xabi_variables XV
 WHERE XV.contract_metadata_id = $1;
 -}
-getXabiVariablesQuery :: Int32 -> Bloc (Map Text VarType)
+getXabiVariablesQuery :: Int32 -> Bloc (Map Text Xabi.VarType)
 getXabiVariablesQuery cmId = do
   varsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
     (_,cmid,typeid,name,atbytes,ispublic)
@@ -686,7 +686,7 @@ getXabiVariablesQuery cmId = do
     returnA -< (name,(atbytes,ispublic,typeid))
   for varsWithIds $ \ (atbytes,ispublic,typeid) -> do
     ty <- getXabiType typeid
-    return $ VarType atbytes (Just ispublic) ty
+    return $ Xabi.VarType atbytes (Just ispublic) ty
 
 
 getXabiVariableNamesQuery :: Int32 -> Query ( Column PGText )
@@ -811,10 +811,10 @@ instance Default Constant Keccak256 (Column PGBytea) where
 
 insertXabiVariables
   :: Int32
-  -> Map Text VarType
+  -> Map Text Xabi.VarType
   -> Bloc Int64
 insertXabiVariables metadataId vars = do
-  varsWithIds <- for vars $ \ (VarType atBytes ispublic xt) -> do
+  varsWithIds <- for vars $ \ (Xabi.VarType atBytes ispublic xt) -> do
     xtid <- insertXabiType xt
     return (atBytes,ispublic,xtid)
   blocModify $ \ conn -> do
@@ -853,7 +853,7 @@ insertXabiFunction metadataId (name,Func{..}) = do
 insertXabiConstr
   :: Int32
   -> Text
-  -> Map Text IndexedXabiType
+  -> Map Text Xabi.IndexedType
   -> Bloc ()
 insertXabiConstr metadataId contractName constrArgs = do
   funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
@@ -902,7 +902,9 @@ compileContract contractName source = do
     restrict -< name .== constant contractName
     returnA -< codeHash
 
-insertXabiType :: XabiType -> Bloc Int32
+insertXabiType :: Xabi.Type -> Bloc Int32
+insertXabiType _ = undefined
+{-
 insertXabiType xt = do
   entryId <- traverse insertXabiType (xabiTypeEntry xt)
   keyId <- traverse insertXabiType (xabiTypeKey xt)
@@ -910,18 +912,20 @@ insertXabiType xt = do
   blocModify1 $ \ conn -> do
     runInsertReturning conn xabiTypesTable
       ( Nothing
-      , constant $ xabiTypeType xt
-      , constant $ xabiTypeTypedef xt
-      , constant . fromMaybe False $ xabiTypeDynamic xt
-      , constant . fromMaybe False $ xabiTypeSigned xt
-      , constant $ xabiTypeBytes xt
+      , constant $ undefined -- Xabi.Type xt
+      , constant $ Xabi.typedef xt
+      , constant . fromMaybe False $ Xabi.dynamic xt
+      , constant . fromMaybe False $ Xabi.signed xt
+      , constant $ Xabi.bytes xt
       , constant $ entryId
       , constant $ valueId
       , constant $ keyId
       )
-      (\ (xtid,_,_,_,_,_,_,_,_) -> xtid)
+      (\ (xtid,_,_,_,_,_,_,_,_) -> xtid) -}
 
-getXabiType :: Int32 -> Bloc XabiType
+getXabiType :: Int32 -> Bloc Xabi.Type
+getXabiType _ = undefined
+{-
 getXabiType typeId = do
   (xtty,xttd,xtdy,xtsi,xtby,xtetid,xtvtid,xtktid)
     <- blocQuery1 $ proc () -> do
@@ -932,17 +936,18 @@ getXabiType typeId = do
   xtet <- traverse getXabiType xtetid
   xtvt <- traverse getXabiType xtvtid
   xtkt <- traverse getXabiType xtktid
-  return XabiType
-    { xabiTypeType = xtty
-    , xabiTypeTypedef = xttd
-    , xabiTypeDynamic = Just xtdy
-    , xabiTypeSigned = Just xtsi
-    , xabiTypeBytes = xtby
-    , xabiTypeEntry = xtet
-    , xabiTypeLength= Nothing --TODO add real value of xabiType
-    , xabiTypeValue = xtvt
-    , xabiTypeKey = xtkt
-    }
+  return undefined {- XabiType
+    { -- Xabi.Type = xtty
+      Xabi.typedef = xttd
+    , Xabi.dynamic = Just xtdy
+    , Xabi.signed = Just xtsi
+    , Xabi.bytes = xtby
+    , Xabi.entry = xtet
+    , Xabi.length= Nothing --TODO add real value of xabiType
+    , Xabi.value = xtvt
+    , Xabi.key = xtkt
+    } -}
+-}
 
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do

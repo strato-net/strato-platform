@@ -15,7 +15,7 @@ import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-import BlockApps.Solidity.Xabi.Type
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 
 defAesonOptions::Options
 defAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
@@ -26,7 +26,7 @@ data Def =
     bytes::Word
     }
   | Struct {
-    fields::Map Text XabiType,
+    fields::Map Text Xabi.Type,
     bytes::Word
     } deriving (Eq, Show, Generic)
                

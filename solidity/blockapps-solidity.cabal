@@ -49,6 +49,7 @@ library
     , QuickCheck
     , quickcheck-instances
     , text
+    , unordered-containers
 
 test-suite blockapps-solidity-test
   default-language: Haskell2010

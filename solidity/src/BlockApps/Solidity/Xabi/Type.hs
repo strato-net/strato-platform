@@ -7,13 +7,33 @@
 module BlockApps.Solidity.Xabi.Type where
 
 import Data.Aeson
+import qualified Data.HashMap.Lazy as HashMap
 import Data.Int (Int32)
+import Data.Map (Map)
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
+
+
+data Type =
+  Int {signed::Bool, bytes::Integer}
+  | String {dynamic::Bool}
+  | Bytes
+  | Bool
+  | Address
+  | Struct {fields::Map Text Type, bytes::Integer, typedef::Text}
+  | Enum {names::Map Text Int, bytes::Integer, typedef::Text}
+  | Array {dynamic::Bool, length::Maybe Word, entry::Type}
+  | Contract {typedef::Text} deriving (Eq, Show, Generic)
+
+instance FromJSON Type where
+instance ToJSON Type where
+instance Arbitrary Type where arbitrary = genericArbitrary uniform
+
+{-
 data XabiType =
   XabiType {
     xabiTypeType::Text
@@ -66,7 +86,22 @@ instance ToJSON XabiType where
 
 instance Arbitrary XabiType where arbitrary = genericArbitrary uniform
 
+-}
 
+data IndexedType =
+  IndexedType {
+    indexedTypeIndex::Int32,
+    indexedTypeType::Type
+    } deriving (Eq, Show, Generic)
+
+instance FromJSON IndexedType where
+  parseJSON = undefined
+instance ToJSON IndexedType where
+  toJSON (IndexedType _ _) = undefined
+
+instance Arbitrary IndexedType where arbitrary = genericArbitrary uniform
+
+{-
 data IndexedXabiType =
   IndexedXabiType {
     indexedXabiTypeIndex::Int32,
@@ -116,11 +151,13 @@ instance ToJSON IndexedXabiType where
 
 instance Arbitrary IndexedXabiType where arbitrary = genericArbitrary uniform
 
+-}
+
 data VarType =
   VarType
   { varTypeAtBytes :: Int32
   , varTypePublic :: Maybe Bool
-  , varTypeType :: XabiType
+  , varTypeType :: Type
   } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
@@ -128,42 +165,19 @@ instance FromJSON VarType where
     withObject "xabi" $ \v -> do
       atBytes <-  v .: "atBytes"
       public <- v .:? "public"
-      theType <- v .:? "type" .!= "Contract"
-      typedef <- v .:? "typedef"
-      dynamic <- v .:? "dynamic"
-      signed <- v .:? "signed"
-      bytes <- v .:? "bytes"
-      entry <- v .:? "entry"
-      length' <- v .:? "length"
-      val <- v .:? "value"
-      key <- v .:? "key"
+      theType <- parseJSON $ Object v
       return $ VarType atBytes public
-        XabiType {
-        xabiTypeType = theType,
-        xabiTypeTypedef = typedef, 
-        xabiTypeDynamic = dynamic, 
-        xabiTypeSigned = signed, 
-        xabiTypeBytes = bytes, 
-        xabiTypeEntry = entry, 
-        xabiTypeLength = length',
-        xabiTypeValue = val, 
-        xabiTypeKey = key
-        }
+        theType
 
 instance ToJSON VarType where
-  toJSON (VarType varTypeAtBytes varTypePublic XabiType{..}) = object
-    [ "atBytes" .= varTypeAtBytes
-    , "public" .= varTypePublic
-    , "type" .= xabiTypeType
-    , "typedef" .= xabiTypeTypedef
-    , "dynamic" .= xabiTypeDynamic
-    , "signed" .= xabiTypeSigned
-    , "bytes" .= xabiTypeBytes
-    , "entry" .= xabiTypeEntry
-    , "value" .= xabiTypeValue
-    , "key" .= xabiTypeKey
-    ]
-
+  toJSON (VarType varTypeAtBytes varTypePublic theType) =
+    let
+      Object theMap = toJSON theType
+    in
+     Object $
+     HashMap.insert "atBytes" (toJSON varTypeAtBytes) $
+     HashMap.insert "public" (toJSON varTypePublic)
+     theMap
 
 
 
