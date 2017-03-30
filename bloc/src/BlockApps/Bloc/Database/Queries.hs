@@ -14,6 +14,7 @@ module BlockApps.Bloc.Database.Queries where
 
 import Control.Arrow
 import Control.Monad
+import Control.Monad.Except
 import Crypto.Hash
 import qualified Crypto.Saltine.Class as Saltine
 import qualified Crypto.Saltine.Core.SecretBox as SecretBox
@@ -1081,30 +1082,55 @@ insertXabiType = \case
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
 
 getXabiType :: Int32 -> Bloc Xabi.Type
-getXabiType _ = undefined
-{-
 getXabiType typeId = do
-  (xtty,xttd,xtdy,xtsi,xtby,xtetid,xtvtid,xtktid)
+  (xtty,xttd,xtdy,xtsi,xtby,xtlen,xtetid,xtvtid,xtktid)
     <- blocQuery1 $ proc () -> do
-      (xtid,xtty,xttd,xtdy,xtsi,xtby,xtet,xtvt,xtkt)
+      (xtid,xtty,xttd,xtdy,xtsi,xtby,xtlen,xtet,xtvt,xtkt)
         <- queryTable xabiTypesTable -< ()
       restrict -< xtid .== constant typeId
-      returnA -< (xtty,xttd,xtdy,xtsi,xtby,xtet,xtvt,xtkt)
-  xtet <- traverse getXabiType xtetid
-  xtvt <- traverse getXabiType xtvtid
-  xtkt <- traverse getXabiType xtktid
-  return undefined {- XabiType
-    { -- Xabi.Type = xtty
-      Xabi.typedef = xttd
-    , Xabi.dynamic = Just xtdy
-    , Xabi.signed = Just xtsi
-    , Xabi.bytes = xtby
-    , Xabi.entry = xtet
-    , Xabi.length= Nothing --TODO add real value of xabiType
-    , Xabi.value = xtvt
-    , Xabi.key = xtkt
-    } -}
--}
+      returnA -< (xtty,xttd,xtdy,xtsi,xtby,xtlen,xtet,xtvt,xtkt)
+  case xtty::Text of
+    "Int" ->
+      return $ Xabi.Int (Just xtsi) xtby
+    "String" ->
+      return $ Xabi.String (Just xtdy)
+    "Bytes" ->
+      return $ Xabi.Bytes (Just xtdy) xtby
+    "Bool" ->
+      return Xabi.Bool
+    "Address" ->
+      return Xabi.Address
+    "Struct" -> do
+      fieldWithTypes <- blocQuery $ proc()  -> do
+        (_,name,atby,pty,fty) <- queryTable xabiStructFieldsTable -< ()
+        restrict -< pty .== constant typeId
+        returnA -< (name,(atby,fty))
+      fields <- for (Map.fromList fieldWithTypes) $ \ (atby,fty) -> do
+        Xabi.FieldType atby <$> getXabiType fty
+      xttd' <- blocMaybe "Missing typedef in type Struct" xttd
+      return $ Xabi.Struct fields xtby xttd'
+    "Enum" -> do
+      nameVals <- blocQuery $ proc()  -> do
+        (_,name,value,etid) <- queryTable xabiEnumNamesTable -< ()
+        restrict -< etid .== constant typeId
+        returnA -< (name,value)
+      xttd' <- blocMaybe "Missing typedef in type Enum" xttd
+      return $ Xabi.Enum (Map.fromList nameVals) xtby xttd'
+    "Array" -> do
+      xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
+      xtet <- getXabiType xtetid'
+      return $ Xabi.Array (Just xtdy) (fmap fromIntegral (xtlen :: Maybe Int32))  xtet
+    "Contract" -> do
+      xttd' <- blocMaybe "Missing typedef in type Struct" xttd
+      return $ Xabi.Contract xttd'
+    "Mapping" -> do
+      xtktid' <- blocMaybe "Missing key type id in type Mapping" xtktid
+      xtvtid' <- blocMaybe "Missing value type id in type Mapping" xtvtid
+      xtkt <- getXabiType xtktid'
+      xtvt <- getXabiType xtvtid'
+      return $ Xabi.Mapping (Just xtdy) xtkt xtvt
+    _ -> throwError $ DBError "Could not match type"
+
 
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
