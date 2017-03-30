@@ -150,7 +150,10 @@ instance MonadUsers Bloc where
     contractAddr
     (PostUsersContractMethodRequest password funcName args value txParams) = do
       cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
-      (functionId,sel) <- getFunctionIdSel cmId funcName
+      (functionId,sel16) <- getFunctionIdSel cmId funcName
+      let
+        (sel,leftOver) = Base16.decode $ sel16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
       argsBin <- buildArgumentByteString (Just args) (Just functionId)
       tx <- prepareTx
         userName
