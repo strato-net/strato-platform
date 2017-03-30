@@ -29,16 +29,9 @@ data Def =
     fields::Map Text Xabi.Type,
     bytes::Word
     } deriving (Eq, Show, Generic)
-               
+
 instance Arbitrary Def where arbitrary = genericArbitrary uniform
 instance ToJSON Def where
   toJSON = genericToJSON defAesonOptions
 instance FromJSON Def where
   parseJSON = genericParseJSON defAesonOptions
-
-
-
-
-
-
-              
