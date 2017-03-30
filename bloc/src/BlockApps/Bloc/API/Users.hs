@@ -142,33 +142,31 @@ instance MonadUsers Bloc where
           return addr'
 
   postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
-  postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
+
+  postUsersContractMethod
+    userName
+    userAddr
+    (ContractName contractName)
+    contractAddr
+    (PostUsersContractMethodRequest password funcName args value txParams) = do
+      cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
+      (functionId,sel) <- getFunctionIdSel cmId funcName
+      argsBin <- buildArgumentByteString (Just args) (Just functionId)
+      tx <- prepareTx
+        userName
+        password
+        userAddr
+        (Just contractAddr)
+        txParams
+        (Wei (fromIntegral value))
+        (sel <> argsBin)
+      logWith logNotice ("tx is: " <> Text.pack (show tx))
+      hash <- blocStrato $ postTx tx
+      txResult <- pollTxResult hash
+      return . PostUsersContractMethodResponse $ transactionresultResponse txResult
+
   postUsersSendList _ _ _ = throwError $ Unimplemented "postUsersSendList"
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
-
-getContractMetadataAndBin :: Text ->  Bloc (Int32, ByteString)
-getContractMetadataAndBin contract = blocTransaction $ do
-  cmIds_bins <- blocQuery $ proc () -> do
-    (cmId,name,bin) <- joinF
-      (\ (cmId,_,bin,_,_,_) (_,name) -> (cmId,name,bin))
-      (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
-      (queryTable contractsMetaDataTable)
-      (queryTable contractsTable) -< ()
-    restrict -< name .== constant contract
-    returnA -< (cmId,bin)
-  (cmId,bin) <- blocMaybe
-                  "No contract metadata id found. Likely, contract did not compile successfully"
-                  (listToMaybe cmIds_bins)
-  return (cmId,bin)
-
-getConstructorId :: Int32 -> Bloc (Maybe Int32)
-getConstructorId cmId = blocTransaction $ do
-  functionIds <- blocQuery $ proc () -> do
-    (xfId,contractMetaDataId,isConstr,_,_)
-      <- queryTable xabiFunctionsTable -< ()
-    restrict -< contractMetaDataId .== constant cmId .&& isConstr
-    returnA -< xfId
-  return $ listToMaybe functionIds
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
 buildArgumentByteString args mFunctionId = case mFunctionId of
@@ -343,8 +341,9 @@ type PostUsersContractMethod = "users"
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
-  , postuserscontractmethodArgs :: Map Text SolidityValue
+  , postuserscontractmethodArgs :: Map Text Text
   , postuserscontractmethodValue :: Natural
+  , postuserscontractmethodTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
