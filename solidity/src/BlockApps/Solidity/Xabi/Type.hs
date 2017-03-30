@@ -22,7 +22,7 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 
 data Type =
-  Int {signed::Bool, bytes::Integer}
+  Int {signed::Maybe Bool, bytes::Integer}
   | String {dynamic::Bool}
   | Bytes
   | Bool
@@ -46,9 +46,19 @@ data IndexedType =
     } deriving (Eq, Show, Generic)
 
 instance FromJSON IndexedType where
-  parseJSON = undefined
+  parseJSON = 
+    withObject "xabi" $ \v -> do
+      index <-  v .: "index"
+      theType <- parseJSON $ Object $ HashMap.insertWith (const id) "type" "Contract" v
+      return $ IndexedType index theType
 instance ToJSON IndexedType where
-  toJSON (IndexedType _ _) = undefined
+  toJSON (IndexedType indexedTypeIndex theType) =
+    let
+      Object theMap = toJSON theType
+    in
+     Object $
+     HashMap.insert "index" (toJSON indexedTypeIndex)
+     theMap
 
 instance Arbitrary IndexedType where arbitrary = genericArbitrary uniform
 
