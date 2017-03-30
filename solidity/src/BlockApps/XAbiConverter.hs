@@ -16,6 +16,8 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Tuple
+import Data.Vector (Vector)
+import qualified Data.Vector as Vector
 
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Contract
@@ -46,11 +48,42 @@ addPositions typeDefs' p0 (theType:rest) =
     (position, usedBytes) = getPositionAndSize typeDefs' p0 theType
   in
    fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
+
+intTypes::Vector SimpleType
+intTypes=Vector.fromList
+  [
+    TypeInt8, TypeInt16, TypeInt24, TypeInt32,
+    TypeInt40, TypeInt48, TypeInt56, TypeInt64,
+    TypeInt72, TypeInt80, TypeInt88, TypeInt96,
+    TypeInt104, TypeInt112, TypeInt120, TypeInt128,
+    TypeInt136, TypeInt144, TypeInt152, TypeInt160,
+    TypeInt168, TypeInt176, TypeInt184, TypeInt192,
+    TypeInt200, TypeInt208, TypeInt216, TypeInt224,
+    TypeInt232, TypeInt240, TypeInt248, TypeInt256
+  ]
+
+uintTypes::Vector SimpleType
+uintTypes= Vector.fromList
+  [
+    TypeUInt8, TypeUInt16, TypeUInt24, TypeUInt32,
+    TypeUInt40, TypeUInt48, TypeUInt56, TypeUInt64,
+    TypeUInt72, TypeUInt80, TypeUInt88, TypeUInt96,
+    TypeUInt104, TypeUInt112, TypeUInt120, TypeUInt128,
+    TypeUInt136, TypeUInt144, TypeUInt152, TypeUInt160,
+    TypeUInt168, TypeUInt176, TypeUInt184, TypeUInt192,
+    TypeUInt200, TypeUInt208, TypeUInt216, TypeUInt224,
+    TypeUInt232, TypeUInt240, TypeUInt248, TypeUInt256
+  ]
    
 xabiTypeToSimpleType::Xabi.Type->SimpleType
 xabiTypeToSimpleType Xabi.String{} = TypeString
 xabiTypeToSimpleType Xabi.Address = TypeAddress
 
+xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=b} =
+  case signed of
+   Just True -> intTypes Vector.! fromIntegral (b-1)
+   _ -> uintTypes Vector.! fromIntegral (b-1)
+{-
 xabiTypeToSimpleType Xabi.Int { Xabi.signed=True, Xabi.bytes=1 } = TypeInt8
 xabiTypeToSimpleType Xabi.Int { Xabi.signed=True, Xabi.bytes=2 } = TypeInt16
 xabiTypeToSimpleType Xabi.Int { Xabi.signed=True, Xabi.bytes=3 } = TypeInt24
@@ -116,6 +149,7 @@ xabiTypeToSimpleType Xabi.Int { Xabi.bytes=29 } = TypeUInt232
 xabiTypeToSimpleType Xabi.Int { Xabi.bytes=30 } = TypeUInt240
 xabiTypeToSimpleType Xabi.Int { Xabi.bytes=31 } = TypeUInt248
 xabiTypeToSimpleType Xabi.Int { Xabi.bytes=32 } = TypeUInt256
+-}
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
@@ -143,10 +177,8 @@ funcToType Func{..} =
   in
    TypeFunction
        selector
-       undefined
---       (Map.toList $ fmap (xabiTypeToType . Xabi.indexedXabiTypeType) funcArgs)
-       undefined
---       (map (\(name, val) -> (Just name, xabiTypeToType $ Xabi.indexedXabiTypeType val)) $ Map.toList funcVals)
+       (Map.toList $ fmap (xabiTypeToType . Xabi.indexedTypeType) funcArgs)
+       (map (\(name, val) -> (Just name, xabiTypeToType $ Xabi.indexedTypeType val)) $ Map.toList funcVals)
 
 
 xAbiToContract::Xabi->Contract
