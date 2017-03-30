@@ -23,13 +23,13 @@ typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="ty
 
 data Type =
   Int {signed::Maybe Bool, bytes::Integer}
-  | String {dynamic::Bool}
+  | String {dynamic::Maybe Bool}
   | Bytes
   | Bool
   | Address
   | Struct {fields::Map Text Type, bytes::Integer, typedef::Text}
   | Enum {names::Map Text Int, bytes::Integer, typedef::Text}
-  | Array {dynamic::Bool, length::Maybe Word, entry::Type}
+  | Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
   | Contract {typedef::Text} deriving (Eq, Show, Generic)
 
 instance ToJSON Type where
