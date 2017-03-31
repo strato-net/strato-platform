@@ -4,7 +4,7 @@ import Test.Hspec
 import Data.Aeson
 import Data.Maybe
 import qualified Data.ByteString.Lazy as ByteString
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
 
 spec :: Spec
 spec = do
