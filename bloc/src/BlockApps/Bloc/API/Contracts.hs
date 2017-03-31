@@ -16,13 +16,13 @@
 
 module BlockApps.Bloc.API.Contracts where
 
+import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Foldable
 import Data.Int
 import Data.Maybe
@@ -37,6 +37,7 @@ import Data.Time.Clock.POSIX
 import Generic.Random.Generic
 import GHC.Generics
 import Numeric
+import Opaleye
 import Servant.API
 import Servant.Client
 import Servant.Docs
@@ -45,6 +46,7 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
+import BlockApps.Bloc.Database.Tables
 import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
@@ -53,9 +55,6 @@ import BlockApps.SolidityVarReader
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.XAbiConverter
-
-import BlockApps.Bloc.DummierContractStorage
-import BlockApps.Bloc.DummyContractStorage
 
 class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
@@ -135,23 +134,23 @@ instance MonadContracts Bloc where
             getContractsContractByNameQuery contractName name
           return $ detailsWith (Just (Named name)) tuple
 
-  getContractsState (ContractName contractName) contractId = do
-    let arrayXabiString = getContractXabiString $ Text.unpack contractName
-        xabiOrError = eitherDecode $ BLC.pack arrayXabiString
-        contractXAbi =
-          case xabiOrError of
-           Left e -> error $ show e ++ "\nxabi is:\n" ++ arrayXabiString
-           Right val -> val
-           
-        contract = xAbiToContract contractXAbi
+  getContractsState contract@(ContractName contractName) contractId = do
+    contract' <- xAbiToContract <$> getContractXabi contract contractId
 
-    storage' <- blocStrato $ getStorage $ Just $ getAddress (ContractName contractName) contractId
+    metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+
+    address <- blocQuery1 $ proc () -> do
+      (_,cmId,addr,_) <- queryTable contractsInstanceTable -< ()
+      restrict -< cmId .== constant (metadataId::Int32)
+      returnA -< addr
+
+    storage' <- blocStrato $ getStorage $ Just address
 
     let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
         storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
-        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract) (mainStruct contract) storage 0
+        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
 
     logWith logNotice $ Text.unlines
       [ "Storage:"
@@ -334,9 +333,3 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
-
-
-
-
-
-
