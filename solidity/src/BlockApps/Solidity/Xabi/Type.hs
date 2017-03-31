@@ -10,7 +10,6 @@ import Data.Aeson
 import Data.Aeson.TH
 import qualified Data.HashMap.Lazy as HashMap
 import Data.Int (Int32)
-import Data.Map (Map)
 import Data.Text (Text)
 import Generic.Random.Generic
 import GHC.Generics
@@ -27,8 +26,8 @@ data Type
   | Bytes {dynamic::Maybe Bool, bytes:: Maybe Int32}
   | Bool
   | Address
-  | Struct {fields::Map Text FieldType, bytes::Maybe Int32, typedef::Text}
-  | Enum {names::Map Text Int, bytes::Maybe Int32, typedef::Text}
+  | Struct { bytes::Maybe Int32, typedef::Text}
+  | Enum { bytes::Maybe Int32, typedef::Text}
   | Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
   | Contract {typedef::Text}
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic)

@@ -231,6 +231,24 @@ xabiVariablesTable = Table "xabi_variables" $ p6
   , required "is_public"
   )
 
+xabiTypeDefsTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+xabiTypeDefsTable = Table "xabi_type_defs" $ p4
+  ( optional "id"
+  , required "name"
+  , required "contract_metadata_id"
+  , required "type_id"
+  )
+
 xabiEnumNamesTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText
@@ -246,7 +264,7 @@ xabiEnumNamesTable = Table "xabi_enum_names" $ p4
   ( optional "id"
   , required "name"
   , required "value"
-  , required "type_id"
+  , required "type_def_id"
   )
 
 xabiStructFieldsTable :: Table
@@ -254,18 +272,15 @@ xabiStructFieldsTable :: Table
   , Column PGText
   , Column PGInt4
   , Column PGInt4
-  , Column PGInt4
   )
   ( Column PGInt4
   , Column PGText
   , Column PGInt4
   , Column PGInt4
-  , Column PGInt4
   )
-xabiStructFieldsTable = Table "xabi_struct_fields" $ p5
+xabiStructFieldsTable = Table "xabi_struct_fields" $ p4
   ( optional "id"
   , required "name"
   , required "at_bytes"
-  , required "parent_type_id"
-  , required "field_type_id"
+  , required "type_def_id"
   )

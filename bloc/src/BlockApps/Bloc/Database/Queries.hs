@@ -867,9 +867,10 @@ insertXabiConstr metadataId contractName constrArgs = do
     (\ (xfId,_,_,_,_) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
--- TODO: Add insert types
+
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
 insertXabi metadataId contractName Xabi{..} = do
+  --insertXabiContractTypes xabiTypes
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
@@ -903,6 +904,9 @@ compileContract contractName source = do
       (queryTable contractsTable) -< ()
     restrict -< name .== constant contractName
     returnA -< codeHash
+
+-- insertXabiContractTypes ::  Map Text Xabi.Def-> Bloc Int32
+-- insertXabiContractTypes types =
 
 insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case
@@ -981,11 +985,8 @@ insertXabiType = \case
         , Opaleye.null
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Struct fields bytes typedef -> do
-    fieldsWithIds <- flip Map.traverseWithKey fields $ \ _ (Xabi.FieldType atby ty) -> do
-      tyid <- insertXabiType ty
-      return (atby,tyid)
-    parentTypeId <- blocModify1 $ \ conn -> do
+  Xabi.Struct bytes typedef -> do
+    blocModify1 $ \ conn -> do
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Struct"::Text)
@@ -999,18 +1000,32 @@ insertXabiType = \case
         , Opaleye.null
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-    void $ blocModify $ \ conn -> do
-      runInsertMany conn xabiStructFieldsTable
-        [ ( Nothing
-          , constant name
-          , constant atby
-          , constant parentTypeId
-          , constant tyid
-          )
-        | (name,(atby,tyid)) <- Map.toList fieldsWithIds]
-    return parentTypeId
-  Xabi.Enum names bytes typedef -> do
-    tyid <- blocModify1 $ \ conn -> do
+    -- parentTypeId <- blocModify1 $ \ conn -> do
+    --   runInsertReturning conn xabiTypesTable
+    --     ( Nothing
+    --     , constant ("Struct"::Text)
+    --     , constant $ Just typedef
+    --     , constant False
+    --     , constant False
+    --     , constant bytes
+    --     , Opaleye.null
+    --     , Opaleye.null
+    --     , Opaleye.null
+    --     , Opaleye.null
+    --     )
+    --     (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+    -- void $ blocModify $ \ conn -> do
+    --   runInsertMany conn xabiStructFieldsTable
+    --     [ ( Nothing
+    --       , constant name
+    --       , constant atby
+    --       , constant parentTypeId
+    --       , constant tyid
+    --       )
+    --     | (name,(atby,tyid)) <- Map.toList fieldsWithIds]
+    -- return parentTypeId
+  Xabi.Enum bytes typedef -> do
+    blocModify1 $ \ conn -> do
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Enum"::Text)
@@ -1024,15 +1039,15 @@ insertXabiType = \case
         , Opaleye.null
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-    void $ blocModify $ \ conn -> do
-      runInsertMany conn xabiEnumNamesTable
-        [ ( Nothing
-          , constant name
-          , constant value
-          , constant tyid
-          )
-        | (name,value) <- Map.toList names]
-    return tyid
+    -- void $ blocModify $ \ conn -> do
+    --   runInsertMany conn xabiEnumNamesTable
+    --     [ ( Nothing
+    --       , constant name
+    --       , constant value
+    --       , constant tyid
+    --       )
+    --     | (name,value) <- zip names [(0::Int32)..]]
+    -- return tyid
   Xabi.Array dynamic len entry -> do
     entryId <- insertXabiType entry
     blocModify1 $ \ conn -> do
@@ -1102,21 +1117,22 @@ getXabiType typeId = do
     "Address" ->
       return Xabi.Address
     "Struct" -> do
-      fieldWithTypes <- blocQuery $ proc()  -> do
-        (_,name,atby,pty,fty) <- queryTable xabiStructFieldsTable -< ()
-        restrict -< pty .== constant typeId
-        returnA -< (name,(atby,fty))
-      fields <- for (Map.fromList fieldWithTypes) $ \ (atby,fty) -> do
-        Xabi.FieldType atby <$> getXabiType fty
+      -- fieldWithTypes <- blocQuery $ proc()  -> do
+      --   (_,name,atby,pty,fty) <- queryTable xabiStructFieldsTable -< ()
+      --   restrict -< pty .== constant typeId
+      --   returnA -< (name,(atby,fty))
+      -- fields <- for (Map.fromList fieldWithTypes) $ \ (atby,fty) -> do
+      --   Xabi.FieldType atby <$> getXabiType fty
       xttd' <- blocMaybe "Missing typedef in type Struct" xttd
-      return $ Xabi.Struct fields xtby xttd'
+      return $ Xabi.Struct xtby xttd'
     "Enum" -> do
-      nameVals <- blocQuery $ proc()  -> do
-        (_,name,value,etid) <- queryTable xabiEnumNamesTable -< ()
-        restrict -< etid .== constant typeId
-        returnA -< (name,value)
+      -- nameVals <- blocQuery . orderBy (asc (\(_,value) -> value)) $ proc()  -> do
+      --   (_,name,value,etid) <- queryTable xabiEnumNamesTable -< ()
+      --   restrict -< etid .== constant typeId
+      --   returnA -< (name,value)
       xttd' <- blocMaybe "Missing typedef in type Enum" xttd
-      return $ Xabi.Enum (Map.fromList nameVals) xtby xttd'
+      return $ Xabi.Enum xtby xttd'
+      -- return $ Xabi.Enum (map fst (nameVals :: [(Text,Int32)])) xtby xttd'
     "Array" -> do
       xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
       xtet <- getXabiType xtetid'
