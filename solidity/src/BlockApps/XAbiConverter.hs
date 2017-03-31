@@ -74,14 +74,15 @@ uintTypes= Vector.fromList
     TypeUInt200, TypeUInt208, TypeUInt216, TypeUInt224,
     TypeUInt232, TypeUInt240, TypeUInt248, TypeUInt256
   ]
-   
+
 xabiTypeToSimpleType::Xabi.Type->SimpleType
 xabiTypeToSimpleType Xabi.String{} = TypeString
 xabiTypeToSimpleType Xabi.Address = TypeAddress
-xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=b} =
+xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
   case signed of
    Just True -> intTypes Vector.! fromIntegral (b-1)
    _ -> uintTypes Vector.! fromIntegral (b-1)
+
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
@@ -92,7 +93,7 @@ xabiTypeToType Xabi.Array { Xabi.length=Just len, Xabi.entry=var } =
 xabiTypeToType Xabi.Array { Xabi.entry=var } =
   TypeArrayDynamic $ xabiTypeToType var
 xabiTypeToType Xabi.Contract { Xabi.typedef=name } = TypeContract name
---xabiTypeToType Xabi.Mapping { Xabi.key=k, Xabi.value=v } = TypeMapping (xabiTypeToSimpleType k) (xabiTypeToType v)
+xabiTypeToType Xabi.Mapping { Xabi.key=k, Xabi.value=v } = TypeMapping (xabiTypeToSimpleType k) (xabiTypeToType v)
 xabiTypeToType Xabi.Enum { Xabi.typedef=enumName } = TypeEnum enumName
 xabiTypeToType Xabi.Struct { Xabi.typedef=name } = TypeStruct name
 xabiTypeToType v = SimpleType $ xabiTypeToSimpleType v
@@ -132,4 +133,3 @@ xAbiToContract Xabi{..} =
      ,
      typeDefs=typeDefs'
      }
-
