@@ -193,9 +193,22 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
               textToArgType "Struct" False ""
             Xabi.Enum _ _ ->
               textToArgType "Enum" False ""
-            Xabi.Array dy _ _ ->
-              --TODO: another case statement on ety
-              textToArgType "Array" (fromMaybe False dy) "Int"
+            Xabi.Array dy _ ety ->
+              let
+                ettyty = case ety of
+                  Xabi.Int _ _ -> "Int"
+                  Xabi.String _ -> "String"
+                  Xabi.Bytes _ _ -> "Bytes"
+                  Xabi.Bool -> "Bool"
+                  Xabi.Address -> "Address"
+                  Xabi.Struct _ _ -> "Struct"
+                  Xabi.Enum _ _ -> "Enum"
+                  Xabi.Array _ _ _ ->
+                    error "Array of array not supported"
+                  Xabi.Contract _ -> "Contract"
+                  Xabi.Mapping _ _ _ -> "Mapping"
+              in
+                textToArgType "Array" (fromMaybe False dy) ettyty
             Xabi.Contract _ ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
