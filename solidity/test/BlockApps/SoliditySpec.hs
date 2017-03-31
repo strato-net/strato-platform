@@ -9,14 +9,17 @@ import BlockApps.Solidity.Xabi
 spec :: Spec
 spec = do
   describe "Xabi" $ do
-    it "should decode xabi json correctly" $ do
+    it "should decode simple xabi json correctly" $ do
       decodeXabi "test/BlockApps/Fixtures/example1.json"
 
     it "should decode xabi json with contract array correctly" $ do
       decodeXabi "test/BlockApps/Fixtures/example4.json"
 
-    it "should decode xabi json with enum and structs correctly" $ do
+    it "should decode xabi json with structs correctly" $ do
       decodeXabi "test/BlockApps/Fixtures/example5.json"
+
+    it "should decode xabi json with enums correctly" $ do
+      decodeXabi "test/BlockApps/Fixtures/example6.json"
 
 decodeXabi :: FilePath -> Expectation
 decodeXabi filePath = do
