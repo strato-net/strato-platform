@@ -25,38 +25,15 @@
       }
     },
     "types": {
-      "Well": {
-        "type": "Struct",
-        "bytes": 96,
-        "fields": {
-          "name": {
-            "atBytes": 0,
-            "dynamic": true,
-            "type": "String"
-          },
-          "wellHeadBUID": {
-            "atBytes": 32,
-            "dynamic": true,
-            "type": "String"
-          },
-          "internalEvent": {
-            "atBytes": 96,
-            "typedef": "AnalysisEventEnum",
-            "type": "Enum",
-            "bytes": 1,
-            "names": [
-              "NULL",
-              "PLAN",
-              "UPLOAD",
-              "FINALIZE"
-            ]
-          },
-          "boreHoleBUID": {
-            "atBytes": 64,
-            "dynamic": true,
-            "type": "String"
-          }
-        }
+      "AnalysisEventEnum": {
+        "names": [
+          "NULL",
+          "PLAN",
+          "UPLOAD",
+          "FINALIZE"
+        ],
+        "type": "Enum",
+        "bytes": 1
       }
     },
     "vars": {
@@ -64,16 +41,17 @@
         "atBytes": 372,
         "type": "Bool"
       },
-      "data": {
-        "atBytes": 448,
-        "dynamic": true,
-        "entry": {
-          "typedef": "Well",
-          "type": "Struct",
-          "bytes": 96
-        },
-        "type": "Array",
-        "public": true
+      "contractEvent": {
+        "atBytes": 480,
+        "typedef": "AnalysisEventEnum",
+        "type": "Enum",
+        "bytes": 1,
+        "names": [
+          "NULL",
+          "PLAN",
+          "UPLOAD",
+          "FINALIZE"
+        ]
       },
       "a": {
         "atBytes": 352,
