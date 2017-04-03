@@ -81,12 +81,12 @@ enterBloc env x
   where
     reThrowError
       = \case
+          StratoError err -> err500{errBody = Lazy.Char8.pack (show err)}
           DBError err -> err500{errBody = Lazy.Char8.pack (show err)}
           UserError err -> err422{errBody = Lazy.Char8.pack (show err)}
           CouldNotFind err -> err404{errBody = Lazy.Char8.pack (show err)}
           AnError err -> err500{errBody = Lazy.Char8.pack (show err)}
           Unimplemented err -> err501{errBody = Lazy.Char8.pack (show err)}
-          _ -> err500
     render
       = renderWithSeverity
       . renderWithCallStack
