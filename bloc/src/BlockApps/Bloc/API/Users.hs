@@ -131,7 +131,9 @@ instance MonadUsers Bloc where
             Text.splitOn "," (transactionresultContractsCreated txResult)
           stringAddress $ Text.unpack str
       case addressMaybe of
-        Nothing -> throwError $ UserError "could not find txResult address"
+        Nothing -> case (transactionresultMessage txResult) of
+          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+          stratoMsg -> throwError $ UserError stratoMsg
         Just addr' -> do
           void . blocModify $ \conn -> runInsert conn contractsInstanceTable
             ( Nothing
