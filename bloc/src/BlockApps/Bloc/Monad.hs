@@ -21,6 +21,7 @@ import qualified Data.Text as Text
 import Data.Time.Format
 import Database.PostgreSQL.Simple (Connection,withTransaction)
 import Data.Profunctor.Product.Default
+import GHC.Stack
 import Network.HTTP.Client
 import Opaleye
 import Servant
@@ -93,24 +94,31 @@ enterBloc env x
       . renderWithTimestamp
           (formatTime defaultTimeLocale rfc822DateFormat)
 
-logWith :: (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
-logWith logFn x = logFn . withCallStack =<< timestamp x
+logWithCallStack
+  :: CallStack
+  -> (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
+logWithCallStack stack logFn x = logFn . WithCallStack stack =<< timestamp x
+
+logWith
+  :: HasCallStack
+  => (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
+logWith = logWithCallStack callStack
 
 blocQuery
-  :: (Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> Bloc [y]
 blocQuery q = do
-  traverse_ (logWith logNotice . Text.pack) (showSql q)
+  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
   liftIO $ runQuery conn q
 
 blocQuery1
-  :: (Default Unpackspec x x, Default QueryRunner x y)
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> Bloc y
 blocQuery1 q = do
-  traverse_ (logWith logNotice . Text.pack) (showSql q)
+  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
   conn <- asks dbConnection
   results <- liftIO $ runQuery conn q
   case results of
@@ -118,15 +126,15 @@ blocQuery1 q = do
     [y] -> return y
     _:_:_ -> throwError $ DBError "Multiple results, expected one row"
 
-blocModify :: (Connection -> IO x) -> Bloc x
+blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
 blocModify modify = do
-  logWith logNotice "Updating the database"
+  logWithCallStack callStack logNotice "Updating the database"
   conn <- asks dbConnection
   liftIO $ modify conn
 
-blocModify1 :: (Connection -> IO [x]) -> Bloc x
+blocModify1 :: HasCallStack => (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
-  logWith logNotice "Updating the database"
+  logWithCallStack callStack logNotice "Updating the database"
   conn <- asks dbConnection
   results <- liftIO $ modify conn
   case results of
@@ -139,9 +147,9 @@ blocTransaction bloc = do
   conn <- asks dbConnection
   liftBaseOp_ (withTransaction conn) bloc
 
-blocStrato :: ClientM x -> Bloc x
+blocStrato :: HasCallStack => ClientM x -> Bloc x
 blocStrato client' = do
-  logWith logNotice "Querying Strato"
+  logWithCallStack callStack logNotice "Querying Strato"
   url <- asks urlStrato
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
