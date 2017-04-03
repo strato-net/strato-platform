@@ -168,8 +168,8 @@ CREATE TABLE IF NOT EXISTS xabi_enum_names(
   id serial PRIMARY KEY,
   name varchar(512) NOT NULL,
   value int NOT NULL,
-  type_def_id int NOT NULL REFERENCES xabi_type_def(id),
-  FOREIGN KEY (type_def_id) REFERENCES xabi_type_def(id)
+  type_def_id int NOT NULL REFERENCES xabi_type_defs(id),
+  FOREIGN KEY (type_def_id) REFERENCES xabi_type_defs(id)
 );
 |]
 
@@ -179,8 +179,8 @@ CREATE TABLE IF NOT EXISTS xabi_struct_fields(
   id serial PRIMARY KEY,
   name varchar(512) NOT NULL,
   at_bytes int NOT NULL,
-  type_def_id int NOT NULL REFERENCES xabi_type_def(id),
-  FOREIGN KEY (type_def_id) REFERENCES xabi_type_def(id)
+  type_def_id int NOT NULL REFERENCES xabi_type_defs(id),
+  FOREIGN KEY (type_def_id) REFERENCES xabi_type_defs(id)
 );
 |]
 
