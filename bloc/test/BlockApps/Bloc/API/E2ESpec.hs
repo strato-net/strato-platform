@@ -18,7 +18,7 @@ import BlockApps.Bloc.API.Contracts
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Ethereum
-import BlockApps.Solidity
+import BlockApps.Solidity.SolidityValue
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
