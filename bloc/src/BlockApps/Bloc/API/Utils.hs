@@ -135,6 +135,10 @@ waitNewBlock = do
       . withoutNext
       . head <$> getBlocksLast 0
 
+waitNewAccount :: Address -> ClientM Account
+waitNewAccount addr = untilJust $ listToMaybe <$>
+  getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+
 pollTxResult :: Text -> Bloc TransactionResult
 pollTxResult hash = untilJust $ do
   liftIO $ threadDelay 1000000
