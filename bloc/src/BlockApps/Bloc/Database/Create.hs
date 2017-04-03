@@ -150,14 +150,26 @@ CREATE TABLE IF NOT EXISTS xabi_variables(
 );
 |]
 
+xabiTypeDefsTables :: Query
+xabiTypeDefsTables = [sql|
+CREATE TABLE IF NOT EXISTS xabi_type_defs(
+  id serial PRIMARY KEY,
+  name varchar(12) NOT NULL,
+  contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
+  type_id int NOT NULL REFERENCES xabi_types(id),
+  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
+  FOREIGN KEY (type_id) REFERENCES xabi_types(id)
+);
+|]
+
 xabiEnumNamesTable :: Query
 xabiEnumNamesTable = [sql|
 CREATE TABLE IF NOT EXISTS xabi_enum_names(
   id serial PRIMARY KEY,
   name varchar(512) NOT NULL,
   value int NOT NULL,
-  type_id int NOT NULL REFERENCES xabi_types(id),
-  FOREIGN KEY (type_id) REFERENCES xabi_types(id)
+  type_def_id int NOT NULL REFERENCES xabi_type_def(id),
+  FOREIGN KEY (type_def_id) REFERENCES xabi_type_def(id)
 );
 |]
 
@@ -167,10 +179,8 @@ CREATE TABLE IF NOT EXISTS xabi_struct_fields(
   id serial PRIMARY KEY,
   name varchar(512) NOT NULL,
   at_bytes int NOT NULL,
-  parent_type_id int NOT NULL REFERENCES xabi_types(id),
-  field_type_id int NOT NULL REFERENCES xabi_types(id),
-  FOREIGN KEY (parent_type_id) REFERENCES xabi_types(id),
-  FOREIGN KEY (field_type_id) REFERENCES xabi_types(id)
+  type_def_id int NOT NULL REFERENCES xabi_type_def(id),
+  FOREIGN KEY (type_def_id) REFERENCES xabi_type_def(id)
 );
 |]
 
@@ -187,6 +197,7 @@ createTables = mconcat
   , xabiFunctionArgumentsTable
   , xabiFunctionReturnsTable
   , xabiVariablesTable
+  , xabiTypeDefsTables
   , xabiEnumNamesTable
   , xabiStructFieldsTable
   ]

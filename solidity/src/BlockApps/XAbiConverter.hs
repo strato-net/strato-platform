@@ -15,7 +15,6 @@ import Data.List
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Tuple
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 
@@ -119,7 +118,8 @@ xAbiToContract Xabi{..} =
   let
     typeDefs' = TypeDefs{
       enumDefs=
-          fmap (Bimap.fromList . map swap . Map.toList . XabiDef.names) xabiTypes,
+          -- fmap (Bimap.fromList . map swap . Map.toList . XabiDef.names) xabiTypes,
+          fmap (Bimap.fromList . zip [0..] . XabiDef.names) xabiTypes,
       structDefs=Map.empty
 --      flip Struct (Storage.positionAt 0) $ Map.fromList
 --         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]

@@ -22,11 +22,11 @@ defAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="typ
 
 data Def =
   Enum {
-    names::Map Text Int,
+    names::[Text],
     bytes::Word
     }
   | Struct {
-    fields::Map Text Xabi.Type,
+    fields::Map Text Xabi.FieldType,
     bytes::Word
     } deriving (Eq, Show, Generic)
 
