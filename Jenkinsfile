@@ -2,7 +2,7 @@ githubCredentials = [[$class: 'UsernamePasswordMultiBinding', usernameVariable: 
 ansiColor('xterm') {
     node('strato-integration') {
         withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
-            stage('DeployBootnode') {
+            stage('DeployMultinode') {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                     sh '''#!/bin/bash -l
                     docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
