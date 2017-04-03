@@ -97,7 +97,11 @@ instance MonadUsers Bloc where
     unless createdUser (throwError (DBError "failed to create user"))
     let
       addr = keystoreAcctAddress keyStore
-    when (faucet /= 0) . void $ blocStrato (postFaucet addr)
+    when (faucet /= 0) $ do
+      logWith logNotice "Waiting for faucet transaction to be mined"
+      blocStrato $ do
+        void $ postFaucet addr
+        void $ waitNewAccount addr
     return addr
 
   postUsersSend userName addr
