@@ -17,6 +17,7 @@ import Control.Monad.Trans.Control
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Foldable
 import Data.Text (Text)
+import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as Text
 import Data.Time.Format
 import Database.PostgreSQL.Simple (Connection,withTransaction)
@@ -83,11 +84,11 @@ enterBloc env x
     reThrowError
       = \case
           StratoError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          DBError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          UserError err -> err422{errBody = Lazy.Char8.pack (show err)}
-          CouldNotFind err -> err404{errBody = Lazy.Char8.pack (show err)}
-          AnError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          Unimplemented err -> err501{errBody = Lazy.Char8.pack (show err)}
+          DBError err -> err500{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
+          UserError err -> err422{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
+          CouldNotFind err -> err404{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
+          AnError err -> err500{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
+          Unimplemented err -> err501{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
     render
       = renderWithSeverity
       . renderWithCallStack
