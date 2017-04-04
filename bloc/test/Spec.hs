@@ -107,7 +107,7 @@ setup = do
           , simpleMappingContractAddress = smcAddr
           }
       return config
-  cfgEither <- runClientM clients (ClientEnv mgr' bayar4a)
+  cfgEither <- runClientM clients (ClientEnv mgr' localhost)
   case cfgEither of
     Left err -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg
