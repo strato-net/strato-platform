@@ -149,7 +149,17 @@ instance MonadUsers Bloc where
 
   postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
   postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
-  postUsersSendList _ _ _ = throwError $ Unimplemented "postUsersSendList"
+
+  postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
+    for txs $ \ (SendTransaction toAddr value txParams) -> do
+      tx <- prepareTx
+        userName pw addr (Just toAddr) txParams
+        (Wei (fromIntegral value)) ByteString.empty
+      hash <- blocStrato $ postTx tx
+      PostSendListResponse <$> if resolve
+        then transactionresultResponse <$> pollTxResult hash
+        else return hash
+
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
 getContractMetadataAndBin :: Text ->  Bloc (Int32, ByteString)
