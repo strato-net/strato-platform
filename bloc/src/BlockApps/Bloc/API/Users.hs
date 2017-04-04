@@ -58,7 +58,7 @@ import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi.Type
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 import BlockApps.XAbiConverter (xabiTypeToType)
@@ -100,7 +100,11 @@ instance MonadUsers Bloc where
     unless createdUser (throwError (DBError "failed to create user"))
     let
       addr = keystoreAcctAddress keyStore
-    when (faucet /= 0) . void $ blocStrato (postFaucet addr)
+    when (faucet /= 0) $ do
+      logWith logNotice "Waiting for faucet transaction to be mined"
+      blocStrato $ do
+        void $ postFaucet addr
+        void $ waitNewAccount addr
     return addr
 
   postUsersSend userName addr
@@ -134,7 +138,9 @@ instance MonadUsers Bloc where
             Text.splitOn "," (transactionresultContractsCreated txResult)
           stringAddress $ Text.unpack str
       case addressMaybe of
-        Nothing -> throwError $ UserError "could not find txResult address"
+        Nothing -> case (transactionresultMessage txResult) of
+          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+          stratoMsg -> throwError $ UserError stratoMsg
         Just addr' -> do
           void . blocModify $ \conn -> runInsert conn contractsInstanceTable
             ( Nothing
@@ -184,10 +190,20 @@ instance MonadUsers Bloc where
             orderedResultTypes
 
       formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
-      
+
       return $ PostUsersContractMethodResponse formattedResponse
 
-  postUsersSendList _ _ _ = throwError $ Unimplemented "postUsersSendList"
+
+  postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
+    for txs $ \ (SendTransaction toAddr value txParams) -> do
+      tx <- prepareTx
+        userName pw addr (Just toAddr) txParams
+        (Wei (fromIntegral value)) ByteString.empty
+      hash <- blocStrato $ postTx tx
+      PostSendListResponse <$> if resolve
+        then transactionresultResponse <$> pollTxResult hash
+        else return hash
+
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
@@ -205,13 +221,43 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
   Just functionId -> do
     argNamesTypes <- getXabiFunctionsArgsQuery functionId
     let
-      determineValue valStr (IndexedXabiType _ xabiType) =
+      determineValue valStr (Xabi.IndexedType _ xabiType) =
         let
-          ty = xabiTypeType xabiType
-          dy = fromMaybe False $ xabiTypeDynamic xabiType
-          ety = xabiTypeEntry xabiType
-          etyty = fromMaybe "" $ fmap xabiTypeType ety
-          typeM = textToArgType ty dy etyty
+          typeM = case xabiType of
+            Xabi.Int _ _ ->
+              textToArgType "Int" False ""
+            Xabi.String dy ->
+              textToArgType "String" (fromMaybe False dy) ""
+            Xabi.Bytes dy _ ->
+              textToArgType "Bytes" (fromMaybe False dy) ""
+            Xabi.Bool ->
+              textToArgType "Bool" False ""
+            Xabi.Address ->
+              textToArgType "Address" False ""
+            Xabi.Struct _ _ ->
+              textToArgType "Struct" False ""
+            Xabi.Enum _ _ ->
+              textToArgType "Enum" False ""
+            Xabi.Array dy _ ety ->
+              let
+                ettyty = case ety of
+                  Xabi.Int _ _ -> "Int"
+                  Xabi.String _ -> "String"
+                  Xabi.Bytes _ _ -> "Bytes"
+                  Xabi.Bool -> "Bool"
+                  Xabi.Address -> "Address"
+                  Xabi.Struct _ _ -> "Struct"
+                  Xabi.Enum _ _ -> "Enum"
+                  Xabi.Array _ _ _ ->
+                    error "Array of array not supported"
+                  Xabi.Contract _ -> "Contract"
+                  Xabi.Mapping _ _ _ -> "Mapping"
+              in
+                textToArgType "Array" (fromMaybe False dy) ettyty
+            Xabi.Contract _ ->
+              textToArgType "Contract" False ""
+            Xabi.Mapping dy _ _ ->
+              textToArgType "Mapping" (fromMaybe False dy) ""
         in
           textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
     case args of

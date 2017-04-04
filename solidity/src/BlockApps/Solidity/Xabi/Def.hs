@@ -15,30 +15,23 @@ import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
-import BlockApps.Solidity.Xabi.Type
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 
 defAesonOptions::Options
 defAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
 data Def =
   Enum {
-    names::Map Text Int,
+    names::[Text],
     bytes::Word
     }
   | Struct {
-    fields::Map Text XabiType,
+    fields::Map Text Xabi.FieldType,
     bytes::Word
     } deriving (Eq, Show, Generic)
-               
+
 instance Arbitrary Def where arbitrary = genericArbitrary uniform
 instance ToJSON Def where
   toJSON = genericToJSON defAesonOptions
 instance FromJSON Def where
   parseJSON = genericParseJSON defAesonOptions
-
-
-
-
-
-
-              
