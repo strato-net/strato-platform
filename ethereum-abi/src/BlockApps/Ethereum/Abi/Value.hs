@@ -13,6 +13,7 @@ module BlockApps.Ethereum.Abi.Value
 import Data.Binary (Binary)
 import Data.Bool (bool)
 import Data.ByteString (ByteString)
+import Data.Monoid
 import Data.Text (Text)
 
 import qualified Data.Binary as Binary
@@ -151,130 +152,123 @@ abiEncodeSingle = \case
   where
 
     abiEncodeStatic = \case
-      ValueBool value -> pad32 $ ByteString.singleton $ bool 0 1 value
-      ValueUInt8 value -> pad32 $ encodeStrict value
-      ValueUInt16 value -> pad32 $ encodeStrict value
-      ValueUInt24 value -> pad32 $ encodeStrict value
-      ValueUInt32 value -> pad32 $ encodeStrict value
-      ValueUInt40 value -> pad32 $ encodeStrict value
-      ValueUInt48 value -> pad32 $ encodeStrict value
-      ValueUInt56 value -> pad32 $ encodeStrict value
-      ValueUInt64 value -> pad32 $ encodeStrict value
-      ValueUInt72 value -> pad32 $ encodeStrict value
-      ValueUInt80 value -> pad32 $ encodeStrict value
-      ValueUInt88 value -> pad32 $ encodeStrict value
-      ValueUInt96 value -> pad32 $ encodeStrict value
-      ValueUInt104 value -> pad32 $ encodeStrict value
-      ValueUInt112 value -> pad32 $ encodeStrict value
-      ValueUInt120 value -> pad32 $ encodeStrict value
-      ValueUInt128 value -> pad32 $ encodeStrict value
-      ValueUInt136 value -> pad32 $ encodeStrict value
-      ValueUInt144 value -> pad32 $ encodeStrict value
-      ValueUInt152 value -> pad32 $ encodeStrict value
-      ValueUInt160 value -> pad32 $ encodeStrict value
-      ValueUInt168 value -> pad32 $ encodeStrict value
-      ValueUInt176 value -> pad32 $ encodeStrict value
-      ValueUInt184 value -> pad32 $ encodeStrict value
-      ValueUInt192 value -> pad32 $ encodeStrict value
-      ValueUInt200 value -> pad32 $ encodeStrict value
-      ValueUInt208 value -> pad32 $ encodeStrict value
-      ValueUInt216 value -> pad32 $ encodeStrict value
-      ValueUInt224 value -> pad32 $ encodeStrict value
-      ValueUInt232 value -> pad32 $ encodeStrict value
-      ValueUInt240 value -> pad32 $ encodeStrict value
-      ValueUInt248 value -> pad32 $ encodeStrict value
-      ValueUInt256 value -> pad32 $ encodeStrict value
+      ValueBool value -> pad32Left0 $ ByteString.singleton $ bool 0 1 value
+      ValueUInt8 value -> pad32Left0 $ encodeStrict value
+      ValueUInt16 value -> pad32Left0 $ encodeStrict value
+      ValueUInt24 value -> pad32Left0 $ encodeStrict value
+      ValueUInt32 value -> pad32Left0 $ encodeStrict value
+      ValueUInt40 value -> pad32Left0 $ encodeStrict value
+      ValueUInt48 value -> pad32Left0 $ encodeStrict value
+      ValueUInt56 value -> pad32Left0 $ encodeStrict value
+      ValueUInt64 value -> pad32Left0 $ encodeStrict value
+      ValueUInt72 value -> pad32Left0 $ encodeStrict value
+      ValueUInt80 value -> pad32Left0 $ encodeStrict value
+      ValueUInt88 value -> pad32Left0 $ encodeStrict value
+      ValueUInt96 value -> pad32Left0 $ encodeStrict value
+      ValueUInt104 value -> pad32Left0 $ encodeStrict value
+      ValueUInt112 value -> pad32Left0 $ encodeStrict value
+      ValueUInt120 value -> pad32Left0 $ encodeStrict value
+      ValueUInt128 value -> pad32Left0 $ encodeStrict value
+      ValueUInt136 value -> pad32Left0 $ encodeStrict value
+      ValueUInt144 value -> pad32Left0 $ encodeStrict value
+      ValueUInt152 value -> pad32Left0 $ encodeStrict value
+      ValueUInt160 value -> pad32Left0 $ encodeStrict value
+      ValueUInt168 value -> pad32Left0 $ encodeStrict value
+      ValueUInt176 value -> pad32Left0 $ encodeStrict value
+      ValueUInt184 value -> pad32Left0 $ encodeStrict value
+      ValueUInt192 value -> pad32Left0 $ encodeStrict value
+      ValueUInt200 value -> pad32Left0 $ encodeStrict value
+      ValueUInt208 value -> pad32Left0 $ encodeStrict value
+      ValueUInt216 value -> pad32Left0 $ encodeStrict value
+      ValueUInt224 value -> pad32Left0 $ encodeStrict value
+      ValueUInt232 value -> pad32Left0 $ encodeStrict value
+      ValueUInt240 value -> pad32Left0 $ encodeStrict value
+      ValueUInt248 value -> pad32Left0 $ encodeStrict value
+      ValueUInt256 value -> pad32Left0 $ encodeStrict value
       ValueUInt value -> abiEncodeStatic $ ValueUInt256 value
-      ValueInt8 value -> pad32Signed value $ encodeStrict value
-      ValueInt16 value -> pad32Signed value $ encodeStrict value
-      ValueInt24 value -> pad32Signed value $ encodeStrict value
-      ValueInt32 value -> pad32Signed value $ encodeStrict value
-      ValueInt40 value -> pad32Signed value $ encodeStrict value
-      ValueInt48 value -> pad32Signed value $ encodeStrict value
-      ValueInt56 value -> pad32Signed value $ encodeStrict value
-      ValueInt64 value -> pad32Signed value $ encodeStrict value
-      ValueInt72 value -> pad32Signed value $ encodeStrict value
-      ValueInt80 value -> pad32Signed value $ encodeStrict value
-      ValueInt88 value -> pad32Signed value $ encodeStrict value
-      ValueInt96 value -> pad32Signed value $ encodeStrict value
-      ValueInt104 value -> pad32Signed value $ encodeStrict value
-      ValueInt112 value -> pad32Signed value $ encodeStrict value
-      ValueInt120 value -> pad32Signed value $ encodeStrict value
-      ValueInt128 value -> pad32Signed value $ encodeStrict value
-      ValueInt136 value -> pad32Signed value $ encodeStrict value
-      ValueInt144 value -> pad32Signed value $ encodeStrict value
-      ValueInt152 value -> pad32Signed value $ encodeStrict value
-      ValueInt160 value -> pad32Signed value $ encodeStrict value
-      ValueInt168 value -> pad32Signed value $ encodeStrict value
-      ValueInt176 value -> pad32Signed value $ encodeStrict value
-      ValueInt184 value -> pad32Signed value $ encodeStrict value
-      ValueInt192 value -> pad32Signed value $ encodeStrict value
-      ValueInt200 value -> pad32Signed value $ encodeStrict value
-      ValueInt208 value -> pad32Signed value $ encodeStrict value
-      ValueInt216 value -> pad32Signed value $ encodeStrict value
-      ValueInt224 value -> pad32Signed value $ encodeStrict value
-      ValueInt232 value -> pad32Signed value $ encodeStrict value
-      ValueInt240 value -> pad32Signed value $ encodeStrict value
-      ValueInt248 value -> pad32Signed value $ encodeStrict value
-      ValueInt256 value -> pad32Signed value $ encodeStrict value
+      ValueInt8 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt16 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt24 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt32 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt40 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt48 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt56 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt64 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt72 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt80 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt88 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt96 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt104 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt112 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt120 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt128 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt136 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt144 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt152 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt160 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt168 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt176 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt184 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt192 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt200 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt208 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt216 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt224 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt232 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt240 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt248 value -> pad32LeftSign value $ encodeStrict value
+      ValueInt256 value -> pad32LeftSign value $ encodeStrict value
       ValueInt value -> abiEncodeStatic $ ValueInt256 value
       ValueAddress value -> abiEncodeStatic . ValueUInt160 $ unAddress value
-      ValueBytes1 value -> padRight32 $ ByteString.singleton value
-      ValueBytes2 value -> padRight32 value
-      ValueBytes3 value -> padRight32 value
-      ValueBytes4 value -> padRight32 value
-      ValueBytes5 value -> padRight32 value
-      ValueBytes6 value -> padRight32 value
-      ValueBytes7 value -> padRight32 value
-      ValueBytes8 value -> padRight32 value
-      ValueBytes9 value -> padRight32 value
-      ValueBytes10 value -> padRight32 value
-      ValueBytes11 value -> padRight32 value
-      ValueBytes12 value -> padRight32 value
-      ValueBytes13 value -> padRight32 value
-      ValueBytes14 value -> padRight32 value
-      ValueBytes15 value -> padRight32 value
-      ValueBytes16 value -> padRight32 value
-      ValueBytes17 value -> padRight32 value
-      ValueBytes18 value -> padRight32 value
-      ValueBytes19 value -> padRight32 value
-      ValueBytes20 value -> padRight32 value
-      ValueBytes21 value -> padRight32 value
-      ValueBytes22 value -> padRight32 value
-      ValueBytes23 value -> padRight32 value
-      ValueBytes24 value -> padRight32 value
-      ValueBytes25 value -> padRight32 value
-      ValueBytes26 value -> padRight32 value
-      ValueBytes27 value -> padRight32 value
-      ValueBytes28 value -> padRight32 value
-      ValueBytes29 value -> padRight32 value
-      ValueBytes30 value -> padRight32 value
-      ValueBytes31 value -> padRight32 value
-      ValueBytes32 value -> padRight32 value
+      ValueBytes1 value -> pad32Right0 $ ByteString.singleton value
+      ValueBytes2 value -> pad32Right0 value
+      ValueBytes3 value -> pad32Right0 value
+      ValueBytes4 value -> pad32Right0 value
+      ValueBytes5 value -> pad32Right0 value
+      ValueBytes6 value -> pad32Right0 value
+      ValueBytes7 value -> pad32Right0 value
+      ValueBytes8 value -> pad32Right0 value
+      ValueBytes9 value -> pad32Right0 value
+      ValueBytes10 value -> pad32Right0 value
+      ValueBytes11 value -> pad32Right0 value
+      ValueBytes12 value -> pad32Right0 value
+      ValueBytes13 value -> pad32Right0 value
+      ValueBytes14 value -> pad32Right0 value
+      ValueBytes15 value -> pad32Right0 value
+      ValueBytes16 value -> pad32Right0 value
+      ValueBytes17 value -> pad32Right0 value
+      ValueBytes18 value -> pad32Right0 value
+      ValueBytes19 value -> pad32Right0 value
+      ValueBytes20 value -> pad32Right0 value
+      ValueBytes21 value -> pad32Right0 value
+      ValueBytes22 value -> pad32Right0 value
+      ValueBytes23 value -> pad32Right0 value
+      ValueBytes24 value -> pad32Right0 value
+      ValueBytes25 value -> pad32Right0 value
+      ValueBytes26 value -> pad32Right0 value
+      ValueBytes27 value -> pad32Right0 value
+      ValueBytes28 value -> pad32Right0 value
+      ValueBytes29 value -> pad32Right0 value
+      ValueBytes30 value -> pad32Right0 value
+      ValueBytes31 value -> pad32Right0 value
+      ValueBytes32 value -> pad32Right0 value
       ValueArrayStatic _ -> undefined
 
     encodeStrict :: Binary x => x -> ByteString
     encodeStrict = ByteString.Lazy.toStrict . Binary.encode
 
-    pad32 bs =
+    pad size dir ch bs =
       let
         len = ByteString.length bs
-        lenMod32 = len `mod` 32
-        padding = (32 - lenMod32) `mod` 32
-      in
-        ByteString.replicate padding 0 `ByteString.append` bs
-    padRight32 bs =
-      let
-        len = ByteString.length bs
-        lenMod32 = len `mod` 32
-        padding = (32 - lenMod32) `mod` 32
-      in
-        bs `ByteString.append` ByteString.replicate padding 0
-    pad32Signed value bs =
-      let
-        len = ByteString.length bs
-        lenMod32 = len `mod` 32
-        padding = (32 - lenMod32) `mod` 32
-        padChar = bool 0xff 0 (signum value /= (-1))
-      in
-        ByteString.replicate padding padChar `ByteString.append` bs
+        padSize = (size - (len `mod` size)) `mod` size
+        padding = ByteString.replicate padSize ch
+      in case dir of
+        Left _ -> padding <> bs
+        Right _ -> bs <> padding
+
+    sign :: Integral a => a -> Word8
+    sign = fromIntegral . signum
+
+    pad32Left0 = pad 32 (Left ()) 0
+    pad32Right0 = pad 32 (Right ()) 0
+    pad32LeftSign = pad 32 (Left ()) . sign
