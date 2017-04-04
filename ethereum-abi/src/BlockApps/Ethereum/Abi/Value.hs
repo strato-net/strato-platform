@@ -308,4 +308,4 @@ encodeValues values =
       . (headLength +)
     head'' = zipWith resolveHead tailLengths head'
   in
-    ByteString.concat head'' <> ByteString.concat tail'
+    ByteString.concat $ head'' <> tail'
