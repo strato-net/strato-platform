@@ -5,6 +5,7 @@
 
 module BlockApps.Solidity.Value where
 
+
 import Control.Monad (sequence)
 import Data.Binary (Binary)
 import qualified Data.Binary as Binary
@@ -144,9 +145,9 @@ data SimpleValue
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
 bytesToSimpleValue b = \case
-  TypeBool -> if (bytesToNum :: Int) == 0
-    then Just $ ValueBool False
-    else Just $ ValueBool True
+  TypeBool -> if (bytesToNum::Int) == 1
+    then Just $ ValueBool True
+    else Just $ ValueBool False
   TypeUInt8 -> Just $ ValueUInt8 bytesToNum
   TypeUInt16 -> Just $ ValueUInt16 bytesToNum
   TypeUInt24 -> Just $ ValueUInt24 bytesToNum
@@ -213,7 +214,7 @@ bytesToSimpleValue b = \case
   TypeInt248 -> Just $ ValueInt248 bytesToNum
   TypeInt256 -> Just $ ValueInt256 bytesToNum
   TypeInt -> Just $ ValueInt bytesToNum
-  TypeAddress -> ValueAddress <$>  stringAddress (Text.unpack . Text.decodeUtf8 $ b)
+  TypeAddress -> ValueAddress <$>  stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode b)
   TypeBytes1 -> Just $ ValueBytes1 $ ByteString.head b
   TypeBytes2 -> Just $ ValueBytes2 b
   TypeBytes3 -> Just $ ValueBytes3 b
@@ -249,8 +250,8 @@ bytesToSimpleValue b = \case
   TypeBytes -> Just $ ValueBytes b
   TypeString -> Just $ ValueString (Text.decodeUtf8 b)
   where
-    bytesToNum :: Binary x => x
-    bytesToNum = Binary.decode (ByteString.Lazy.fromStrict b)
+    bytesToNum :: (Binary x, Num x) => x
+    bytesToNum = fromIntegral (Binary.decode (ByteString.Lazy.fromStrict b)::Int256)
 
 bytesToValue :: ByteString -> Type -> Maybe Value
 bytesToValue b = \case

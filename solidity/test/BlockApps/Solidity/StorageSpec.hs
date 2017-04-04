@@ -4,14 +4,16 @@
 module BlockApps.Solidity.StorageSpec where
 
 import qualified Data.ByteString.Base16 as Base16
+import Data.Maybe (isJust)
 import Test.Hspec
 
 import BlockApps.Ethereum
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Value
+import BlockApps.Solidity.Type
 
 spec :: Spec
-spec =
+spec = do
   describe "toStorage" $ do
     describe "convert an array of arguments into a bytestring" $ do
       context "official Ethereum ABI Tests: found at https://github.com/ethereum/tests/blob/develop/ABITests/basic_abi_tests.json" $ do
@@ -124,3 +126,65 @@ spec =
           args = undefined
           (dataBytestring,_) = undefined
         toStorage args `shouldBe` dataBytestring
+  describe "bytestringToValues and toStorage" $ do
+    it "should decode and encode: uint" $ do
+      let
+        types = [ SimpleType TypeUInt ]
+        (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000003"
+        mBytes = toStorage <$> ValueArrayFixed 1 <$> (bytestringToValues dataBytestring types)
+      mBytes `shouldSatisfy` isJust
+      let
+        Just bytes = mBytes
+      dataBytestring `shouldBe` bytes
+    it "should decode and encode: int" $ do
+      let
+        types = [ SimpleType TypeInt ]
+        (dataBytestring,_) = Base16.decode "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0ff"
+        mBytes = toStorage <$> ValueArrayFixed 1 <$> (bytestringToValues dataBytestring types)
+      mBytes `shouldSatisfy` isJust
+      let
+        Just bytes = mBytes
+      dataBytestring `shouldBe` bytes
+    it "should decode and encode: address" $ do
+      let
+        types = [ SimpleType TypeAddress ]
+        (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000deadbeef"
+        mBytes = toStorage <$> ValueArrayFixed 1 <$> (bytestringToValues dataBytestring types)
+      mBytes `shouldSatisfy` isJust
+      let
+        Just bytes = mBytes
+      dataBytestring `shouldBe` bytes
+    it "should decode and encode: uint, int, uint[], bytes" $ do
+      let
+        types = [ SimpleType TypeUInt, SimpleType TypeInt, TypeArrayDynamic (SimpleType TypeUInt), SimpleType TypeBytes ]
+        (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000005b303132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738390000000000"
+        mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+      mBytes `shouldSatisfy` isJust
+      let
+        Just bytes = mBytes
+      dataBytestring `shouldBe` bytes
+    it "should decode and encode: uint256, uint32[], bytes10, and bytes" $ do
+      let
+        types =
+          [ SimpleType TypeUInt256
+          , TypeArrayDynamic (SimpleType TypeUInt32)
+          , SimpleType TypeBytes10
+          , SimpleType TypeBytes
+          ]
+        (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000001230000000000000000000000000000000000000000000000000000000000000080313233343536373839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000004560000000000000000000000000000000000000000000000000000000000000789000000000000000000000000000000000000000000000000000000000000000d48656c6c6f2c20776f726c642100000000000000000000000000000000000000"
+        -- mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+      mBytes `shouldSatisfy` isJust
+      let
+        Just bytes = mBytes
+      dataBytestring `shouldBe` bytes
+    it "should decode and encode: bool" $ do
+      let
+        types =
+          [ SimpleType TypeBool ]
+        (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000001"
+        mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+      mBytes `shouldSatisfy` isJust
+      let
+        Just bytes = mBytes
+      dataBytestring `shouldBe` bytes
