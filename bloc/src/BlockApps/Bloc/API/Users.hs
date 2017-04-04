@@ -157,11 +157,8 @@ instance MonadUsers Bloc where
         (Wei (fromIntegral value)) ByteString.empty
       hash <- blocStrato $ postTx tx
       PostSendListResponse <$> if resolve
-        then do
-          txResult <- pollTxResult hash
-          return $ transactionresultResponse txResult
-        else
-          return $ hash
+        then transactionresultResponse <$> pollTxResult hash
+        else return hash
 
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
