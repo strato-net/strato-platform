@@ -52,6 +52,7 @@ import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.SolidityValue
 import BlockApps.SolidityVarReader
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.XAbiConverter
