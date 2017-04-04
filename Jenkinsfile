@@ -2,11 +2,19 @@ githubCredentials = [[$class: 'UsernamePasswordMultiBinding', usernameVariable: 
 ansiColor('xterm') {
     node('strato-integration') {
         withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+            stage('CleanupRunningInstance') {
+                sh '''#!/bin/bash -l    
+                cd silo
+                docker-compose kill && docker-compose -v down
+                docker ps
+                cd ../
+                sudo rm -rf silo
+                '''
+            }
             stage('DeployMultinode') {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                     sh '''#!/bin/bash -l
                     docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                    rm -rf silo
                     git config --global credential.helper store
                     git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                     cd silo
