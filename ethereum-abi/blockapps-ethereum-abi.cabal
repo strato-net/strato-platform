@@ -28,6 +28,20 @@ library
     , largeword
     , text
 
+test-suite blockapps-ethereum-abi-test
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  ghc-options: -Wall -Werror
+  main-is: Spec.hs
+  other-modules:
+    BlockApps.Ethereum.Abi.ValueSpec
+  build-depends: base >=4 && < 5
+    , blockapps-ethereum
+    , blockapps-ethereum-abi
+    , base16-bytestring
+    , hspec
+
 source-repository head
   type: git
   location: https://github.com/blockapps/blockapps-haskell/blockapps-ethereum-abi
