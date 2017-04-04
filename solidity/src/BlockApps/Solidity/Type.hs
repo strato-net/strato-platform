@@ -248,9 +248,6 @@ getSimpleTypeByteLength = \case
   TypeBytes -> Nothing
   TypeString -> Nothing
 
-
-
-
 formatSimpleType::SimpleType->String
 formatSimpleType x = drop 4 $ show x
 

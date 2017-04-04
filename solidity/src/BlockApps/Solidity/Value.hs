@@ -5,9 +5,14 @@
 
 module BlockApps.Solidity.Value where
 
+import Control.Monad (sequence)
+import Data.Binary (Binary)
+import qualified Data.Binary as Binary
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Lazy as ByteString.Lazy
+import Data.List (intersperse)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -137,11 +142,348 @@ data SimpleValue
   deriving (Show)
 
 
-bytesToValue :: ByteString -> Type -> Value
-bytesToValue = undefined
+bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
+bytesToSimpleValue b = \case
+  TypeBool -> if (bytesToNum :: Int) == 0
+    then Just $ ValueBool False
+    else Just $ ValueBool True
+  TypeUInt8 -> Just $ ValueUInt8 bytesToNum
+  TypeUInt16 -> Just $ ValueUInt16 bytesToNum
+  TypeUInt24 -> Just $ ValueUInt24 bytesToNum
+  TypeUInt32 -> Just $ ValueUInt32 bytesToNum
+  TypeUInt40 -> Just $ ValueUInt40 bytesToNum
+  TypeUInt48 -> Just $ ValueUInt48 bytesToNum
+  TypeUInt56 -> Just $ ValueUInt56 bytesToNum
+  TypeUInt64 -> Just $ ValueUInt64 bytesToNum
+  TypeUInt72 -> Just $ ValueUInt72 bytesToNum
+  TypeUInt80 -> Just $ ValueUInt80 bytesToNum
+  TypeUInt88 -> Just $ ValueUInt88 bytesToNum
+  TypeUInt96 -> Just $ ValueUInt96 bytesToNum
+  TypeUInt104 -> Just $ ValueUInt104 bytesToNum
+  TypeUInt112 -> Just $ ValueUInt112 bytesToNum
+  TypeUInt120 -> Just $ ValueUInt120 bytesToNum
+  TypeUInt128 -> Just $ ValueUInt128 bytesToNum
+  TypeUInt136 -> Just $ ValueUInt136 bytesToNum
+  TypeUInt144 -> Just $ ValueUInt144 bytesToNum
+  TypeUInt152 -> Just $ ValueUInt152 bytesToNum
+  TypeUInt160 -> Just $ ValueUInt160 bytesToNum
+  TypeUInt168 -> Just $ ValueUInt168 bytesToNum
+  TypeUInt176 -> Just $ ValueUInt176 bytesToNum
+  TypeUInt184 -> Just $ ValueUInt184 bytesToNum
+  TypeUInt192 -> Just $ ValueUInt192 bytesToNum
+  TypeUInt200 -> Just $ ValueUInt200 bytesToNum
+  TypeUInt208 -> Just $ ValueUInt208 bytesToNum
+  TypeUInt216 -> Just $ ValueUInt216 bytesToNum
+  TypeUInt224 -> Just $ ValueUInt224 bytesToNum
+  TypeUInt232 -> Just $ ValueUInt232 bytesToNum
+  TypeUInt240 -> Just $ ValueUInt240 bytesToNum
+  TypeUInt248 -> Just $ ValueUInt248 bytesToNum
+  TypeUInt256 -> Just $ ValueUInt256 bytesToNum
+  TypeUInt -> Just $ ValueUInt bytesToNum
+  TypeInt8 -> Just $ ValueInt8 bytesToNum
+  TypeInt16 -> Just $ ValueInt16 bytesToNum
+  TypeInt24 -> Just $ ValueInt24 bytesToNum
+  TypeInt32 -> Just $ ValueInt32 bytesToNum
+  TypeInt40 -> Just $ ValueInt40 bytesToNum
+  TypeInt48 -> Just $ ValueInt48 bytesToNum
+  TypeInt56 -> Just $ ValueInt56 bytesToNum
+  TypeInt64 -> Just $ ValueInt64 bytesToNum
+  TypeInt72 -> Just $ ValueInt72 bytesToNum
+  TypeInt80 -> Just $ ValueInt80 bytesToNum
+  TypeInt88 -> Just $ ValueInt88 bytesToNum
+  TypeInt96 -> Just $ ValueInt96 bytesToNum
+  TypeInt104 -> Just $ ValueInt104 bytesToNum
+  TypeInt112 -> Just $ ValueInt112 bytesToNum
+  TypeInt120 -> Just $ ValueInt120 bytesToNum
+  TypeInt128 -> Just $ ValueInt128 bytesToNum
+  TypeInt136 -> Just $ ValueInt136 bytesToNum
+  TypeInt144 -> Just $ ValueInt144 bytesToNum
+  TypeInt152 -> Just $ ValueInt152 bytesToNum
+  TypeInt160 -> Just $ ValueInt160 bytesToNum
+  TypeInt168 -> Just $ ValueInt168 bytesToNum
+  TypeInt176 -> Just $ ValueInt176 bytesToNum
+  TypeInt184 -> Just $ ValueInt184 bytesToNum
+  TypeInt192 -> Just $ ValueInt192 bytesToNum
+  TypeInt200 -> Just $ ValueInt200 bytesToNum
+  TypeInt208 -> Just $ ValueInt208 bytesToNum
+  TypeInt216 -> Just $ ValueInt216 bytesToNum
+  TypeInt224 -> Just $ ValueInt224 bytesToNum
+  TypeInt232 -> Just $ ValueInt232 bytesToNum
+  TypeInt240 -> Just $ ValueInt240 bytesToNum
+  TypeInt248 -> Just $ ValueInt248 bytesToNum
+  TypeInt256 -> Just $ ValueInt256 bytesToNum
+  TypeInt -> Just $ ValueInt bytesToNum
+  TypeAddress -> ValueAddress <$>  stringAddress (Text.unpack . Text.decodeUtf8 $ b)
+  TypeBytes1 -> Just $ ValueBytes1 $ ByteString.head b
+  TypeBytes2 -> Just $ ValueBytes2 b
+  TypeBytes3 -> Just $ ValueBytes3 b
+  TypeBytes4 -> Just $ ValueBytes4 b
+  TypeBytes5 -> Just $ ValueBytes5 b
+  TypeBytes6 -> Just $ ValueBytes6 b
+  TypeBytes7 -> Just $ ValueBytes7 b
+  TypeBytes8 -> Just $ ValueBytes8 b
+  TypeBytes9 -> Just $ ValueBytes9 b
+  TypeBytes10 -> Just $ ValueBytes10 b
+  TypeBytes11 -> Just $ ValueBytes11 b
+  TypeBytes12 -> Just $ ValueBytes12 b
+  TypeBytes13 -> Just $ ValueBytes13 b
+  TypeBytes14 -> Just $ ValueBytes14 b
+  TypeBytes15 -> Just $ ValueBytes15 b
+  TypeBytes16 -> Just $ ValueBytes16 b
+  TypeBytes17 -> Just $ ValueBytes17 b
+  TypeBytes18 -> Just $ ValueBytes18 b
+  TypeBytes19 -> Just $ ValueBytes19 b
+  TypeBytes20 -> Just $ ValueBytes20 b
+  TypeBytes21 -> Just $ ValueBytes21 b
+  TypeBytes22 -> Just $ ValueBytes22 b
+  TypeBytes23 -> Just $ ValueBytes23 b
+  TypeBytes24 -> Just $ ValueBytes24 b
+  TypeBytes25 -> Just $ ValueBytes25 b
+  TypeBytes26 -> Just $ ValueBytes26 b
+  TypeBytes27 -> Just $ ValueBytes27 b
+  TypeBytes28 -> Just $ ValueBytes28 b
+  TypeBytes29 -> Just $ ValueBytes29 b
+  TypeBytes30 -> Just $ ValueBytes30 b
+  TypeBytes31 -> Just $ ValueBytes31 b
+  TypeBytes32 -> Just $ ValueBytes32 b
+  TypeBytes -> Just $ ValueBytes b
+  TypeString -> Just $ ValueString (Text.decodeUtf8 b)
+  where
+    bytesToNum :: Binary x => x
+    bytesToNum = Binary.decode (ByteString.Lazy.fromStrict b)
 
-valueToText :: Value -> Text
-valueToText = undefined
+bytesToValue :: ByteString -> Type -> Maybe Value
+bytesToValue b = \case
+  SimpleType ty -> SimpleValue <$> bytesToSimpleValue b ty
+  TypeArrayDynamic ty ->
+    let
+      rb = ByteString.drop 32 b
+      valArray = splitBytes rb ty
+    in ValueArrayDynamic <$> sequence valArray
+  TypeArrayFixed len ty ->
+    let valArray = splitBytes b ty
+    in ValueArrayFixed len <$> sequence valArray
+  TypeMapping _ _ -> Nothing -- TODO: Fixme
+  TypeFunction _ _ _ -> Nothing -- TODO: Fixme
+  TypeContract _ -> undefined
+  TypeEnum _ -> Nothing -- TODO: Fixme
+  TypeStruct _ -> Nothing  -- TODO: Fixme
+  where
+    splitBytes b' ty
+      | ByteString.null b' = []
+      | otherwise = case (getTypeByteLength ty) of
+        Nothing -> [Nothing]
+        Just size ->
+          let (valBytes, rb) = ByteString.splitAt size b'
+          in bytesToValue valBytes ty : splitBytes rb ty
+
+bytestringToValues :: ByteString -> [Type] -> Maybe [Value]
+bytestringToValues bs ts =
+  case bytesToBytesTypePair bs ts of
+    Nothing -> Nothing
+    Just (byteTypePairs) ->
+      sequence $ map (\ (b,t) ->  bytesToValue b t) byteTypePairs
+
+
+bytesToBytesTypePair :: ByteString -> [Type] -> Maybe [(ByteString,Type)]
+bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
+  where
+    toBytesTypePair _ [] = Just []
+    toBytesTypePair b (_:_) | ByteString.null b = Nothing
+    toBytesTypePair b types =
+      let
+        headType = head types
+        tailTypes = tail types
+      in case headType of
+        TypeMapping _ _ -> Nothing
+        TypeFunction _ _ _ -> Nothing
+        TypeStruct _ -> Nothing
+        TypeEnum _ -> undefined -- TODO: Need to implement
+        TypeContract _ -> undefined -- TODO: Need to implement
+        TypeArrayDynamic ty -> case getTypeByteLength ty of
+          Nothing -> Nothing
+          Just size -> do
+            let
+              (startingByte, restOfBytes) = ByteString.splitAt 32 b
+              start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
+              (lengthBytes, rb) =
+                ByteString.splitAt
+                  32
+                  (ByteString.drop (fromIntegral (start::Int256)) totalBytes)
+              len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
+              lenAsInt = (fromIntegral (len::Int256))
+              valueBytes = ByteString.take (size * lenAsInt) rb
+              arrayBytes = ByteString.append lengthBytes valueBytes
+            rest <- toBytesTypePair restOfBytes tailTypes
+            return $ (arrayBytes, headType) : rest
+        SimpleType TypeBytes -> do
+          let
+            (startingByte, restOfBytes) = ByteString.splitAt 32 b
+            start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
+            (lengthBytes, rb) =
+              ByteString.splitAt
+                32
+                (ByteString.drop (fromIntegral (start::Int256)) totalBytes)
+            len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
+            arrayBytes = ByteString.take (fromIntegral (len::Int256)) rb
+          rest <- toBytesTypePair restOfBytes tailTypes
+          return $ (arrayBytes, headType) : rest
+        SimpleType TypeString -> do
+          let
+            (startingByte, restOfBytes) = ByteString.splitAt 32 b
+            start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
+            (lengthBytes, rb) =
+              ByteString.splitAt
+                32
+                (ByteString.drop (fromIntegral (start::Int256)) totalBytes)
+            len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
+            arrayBytes = ByteString.take (fromIntegral (len::Int256)) rb
+          rest <- toBytesTypePair restOfBytes tailTypes
+          return $ (arrayBytes, headType) : rest
+        _ -> case getTypeByteLength headType of
+            Nothing -> Nothing
+            Just size -> do
+              let
+                (typeBytes, restOfBytes) = ByteString.splitAt size b
+              rest <- toBytesTypePair restOfBytes tailTypes
+              return $
+                (typeBytes,headType) : rest
+    -- do
+    --   let
+    --     (_ignoreBytes, rB) = ByteString.splitAt 32 b -- unnecessary bytes specifying total bytes of dynamic type
+    --     (arraySizeAsBytes, rBytes) = ByteString.splitAt 32 rB
+    --     arraySize = Binary.decode (ByteString.Lazy.fromStrict arraySizeAsBytes)
+    --     mEntrySize = case ty of
+    --       TypeArrayDynamic aType -> getTypeByteLength aType
+    --       _ -> Nothing
+    --   case mEntrySize of
+    --     Nothing -> Nothing
+    --     Just entrySize -> do
+    --       let
+    --         (typeBytes, restOfBytes) = ByteString.splitAt (entrySize * arraySize) rBytes
+    --       rest <- convertBytesToTextVals restOfBytes tailTypes
+    --       return $
+    --         (valueToText $ bytesToValue typeBytes headType) : rest
+
+valueToText :: Value -> Maybe Text
+valueToText = \case
+  SimpleValue sv -> simpleValueToText sv
+  ValueArrayDynamic vals ->
+    Text.concat <$> intersperse ("," ::Text) <$> sequence (valArrayToTextArray vals)
+  ValueArrayFixed _ vals ->
+    Text.concat <$> intersperse ("," ::Text) <$> sequence (valArrayToTextArray vals)
+  ValueContract addr -> Just $ Text.pack $ addressString addr
+  ValueEnum _ _ -> undefined -- TODO
+  ValueFunction _ _ _ -> undefined -- TODO
+  ValueStruct _ -> undefined
+  where
+    valArrayToTextArray [] = []
+    valArrayToTextArray (val:vals) = valueToText val : valArrayToTextArray vals
+
+simpleValueToText :: SimpleValue -> Maybe Text
+simpleValueToText sv = Just $ case sv of
+  ValueBool tf -> if tf then "true" else "false"
+  ValueUInt8 n -> Text.pack $ show n
+  ValueUInt16 n -> Text.pack $ show n
+  ValueUInt24 n -> Text.pack $ show n
+  ValueUInt32 n -> Text.pack $ show n
+  ValueUInt40 n -> Text.pack $ show n
+  ValueUInt48 n -> Text.pack $ show n
+  ValueUInt56 n -> Text.pack $ show n
+  ValueUInt64 n -> Text.pack $ show n
+  ValueUInt72 n -> Text.pack $ show n
+  ValueUInt80 n -> Text.pack $ show n
+  ValueUInt88 n -> Text.pack $ show n
+  ValueUInt96 n -> Text.pack $ show n
+  ValueUInt104 n -> Text.pack $ show n
+  ValueUInt112 n -> Text.pack $ show n
+  ValueUInt120 n -> Text.pack $ show n
+  ValueUInt128 n -> Text.pack $ show n
+  ValueUInt136 n -> Text.pack $ show n
+  ValueUInt144 n -> Text.pack $ show n
+  ValueUInt152 n -> Text.pack $ show n
+  ValueUInt160 n -> Text.pack $ show n
+  ValueUInt168 n -> Text.pack $ show n
+  ValueUInt176 n -> Text.pack $ show n
+  ValueUInt184 n -> Text.pack $ show n
+  ValueUInt192 n -> Text.pack $ show n
+  ValueUInt200 n -> Text.pack $ show n
+  ValueUInt208 n -> Text.pack $ show n
+  ValueUInt216 n -> Text.pack $ show n
+  ValueUInt224 n -> Text.pack $ show n
+  ValueUInt232 n -> Text.pack $ show n
+  ValueUInt240 n -> Text.pack $ show n
+  ValueUInt248 n -> Text.pack $ show n
+  ValueUInt256 n -> Text.pack $ show n
+  ValueUInt n -> Text.pack $ show n
+  ValueInt8 n -> Text.pack $ show n
+  ValueInt16 n -> Text.pack $ show n
+  ValueInt24 n -> Text.pack $ show n
+  ValueInt32 n -> Text.pack $ show n
+  ValueInt40 n -> Text.pack $ show n
+  ValueInt48 n -> Text.pack $ show n
+  ValueInt56 n -> Text.pack $ show n
+  ValueInt64 n -> Text.pack $ show n
+  ValueInt72 n -> Text.pack $ show n
+  ValueInt80 n -> Text.pack $ show n
+  ValueInt88 n -> Text.pack $ show n
+  ValueInt96 n -> Text.pack $ show n
+  ValueInt104 n -> Text.pack $ show n
+  ValueInt112 n -> Text.pack $ show n
+  ValueInt120 n -> Text.pack $ show n
+  ValueInt128 n -> Text.pack $ show n
+  ValueInt136 n -> Text.pack $ show n
+  ValueInt144 n -> Text.pack $ show n
+  ValueInt152 n -> Text.pack $ show n
+  ValueInt160 n -> Text.pack $ show n
+  ValueInt168 n -> Text.pack $ show n
+  ValueInt176 n -> Text.pack $ show n
+  ValueInt184 n -> Text.pack $ show n
+  ValueInt192 n -> Text.pack $ show n
+  ValueInt200 n -> Text.pack $ show n
+  ValueInt208 n -> Text.pack $ show n
+  ValueInt216 n -> Text.pack $ show n
+  ValueInt224 n -> Text.pack $ show n
+  ValueInt232 n -> Text.pack $ show n
+  ValueInt240 n -> Text.pack $ show n
+  ValueInt248 n -> Text.pack $ show n
+  ValueInt256 n -> Text.pack $ show n
+  ValueInt n -> Text.pack $ show n
+  ValueAddress addr -> Text.pack $ addressString addr
+  ValueBytes1 b -> Text.pack $ show . Base16.encode $ ByteString.singleton b
+  ValueBytes2 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes3 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes4 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes5 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes6 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes7 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes8 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes9 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes10 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes11 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes12 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes13 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes14 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes15 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes16 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes17 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes18 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes19 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes20 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes21 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes22 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes23 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes24 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes25 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes26 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes27 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes28 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes29 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes30 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes31 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes32 b -> Text.pack $ show . Base16.encode $ b
+  ValueBytes b -> Text.pack $ show . Base16.encode $ b
+  ValueString tx -> tx
 
 textToValue :: Text -> Type -> Maybe Value
 textToValue str = \case
