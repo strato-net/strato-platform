@@ -19,9 +19,9 @@ ansiColor('xterm') {
                     git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                     cd silo
                     cp /home/blockapps/basil .
-                    ./basil clone
-                    ./basil build
-                    ./basil multinode -c 2 > docker-compose.yml
+                    ./basil --basilfile Basilfile.test clone
+                    ./basil --basilfile Basilfile.test build > ./basil-build.log 2>&1 < /dev/null
+                    ./basil --basilfile Basilfile.test multinode -c 2 > docker-compose.yml
                     genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA apiUrlOverride=http://strato:3000 blockTime=2 minBlockDifficulty=8192 docker-compose up -d
                     docker ps    
                     '''
