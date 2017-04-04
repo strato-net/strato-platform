@@ -299,13 +299,13 @@ encodeValues values =
       ]
     tailLengths = scanl (\len bytes -> len + ByteString.length bytes) 0 tail'
     headLength = sum $ map (maybe 32 ByteString.length) head'
-    resolveHead tailLength
+    resolveHead
       = fromMaybe
       . encodeValue
       . ValueStatic
       . ValueUInt256
       . fromIntegral
-      $ headLength + tailLength
+      . (headLength +)
     head'' = zipWith resolveHead tailLengths head'
   in
     ByteString.concat head'' <> ByteString.concat tail'
