@@ -279,7 +279,6 @@ encodeValue = \case
         Left _ -> padding <> bs
         Right _ -> bs <> padding
 
-    sign :: Integral a => a -> Word8
     sign value = if signum value == -1 then -1 else 0
 
     pad32Left0 = pad 32 (Left ()) 0
