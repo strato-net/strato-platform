@@ -252,7 +252,7 @@ type GetUsersUser = "users"
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
-  :> ReqBody '[FormUrlEncoded] PostUsersUserRequest
+  :> ReqBody '[FormUrlEncoded, JSON] PostUsersUserRequest
   :> Post '[HTMLifiedAddress] Address
 data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
