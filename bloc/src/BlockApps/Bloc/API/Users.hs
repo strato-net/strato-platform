@@ -15,6 +15,7 @@
 module BlockApps.Bloc.API.Users where
 
 import Control.Arrow
+import Control.Monad (sequence)
 import Control.Monad.Except
 import Control.Monad.Log
 import Crypto.Secp256k1
@@ -197,46 +198,26 @@ instance MonadUsers Bloc where
           orderedResultIndexedXT
       txResult <- pollTxResult hash
       let
-        formattedResponse = Text.concat $
+        mFormattedResponse = Text.concat <$>
           convertResultResToTexts
             (transactionresultResponse txResult)
             orderedResultTypes
 
+      formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
+      
       return $ PostUsersContractMethodResponse formattedResponse
 
   postUsersSendList _ _ _ = throwError $ Unimplemented "postUsersSendList"
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
--- convertResultResToTexts = undefined
-convertResultResToTexts txResp responseTypes = do
-  byteResp <- Text.encodeUtf8 txResp
-  return $ convertBytesToTextVals byteResp responseTypes
-
-  where
-    convertBytesToTextVals b [] | ByteString.null b = Just []
-    convertBytesToTextVals b (x:xs) | ByteString.null b = Nothing
-    convertBytesToTextVals b types = do
-      let
-        headType = head types
-        tailTypes = tail types
-      case getTypeByteLength (headType) of
-        Just size -> do
-          (typeBytes, restOfBytes) <- ByteString.splitAt size
-          return $
-            [valueToText $ bytesToValue typeBytes headType]
-            ++
-            (convertBytesToTextVals restOfBytes )
-        Nothing -> undefined
-
-      -- let
-      --   typeSize = head types
-      --
-      --   tailTypes = tail types
-      --   (typeBytes, restOfBytes) = ByteString.splitAt headType
-
-
-
+convertResultResToTexts txResp responseTypes =
+  let
+    byteResp = Text.encodeUtf8 txResp
+  in case bytestringToValues byteResp responseTypes of
+    Nothing -> Nothing
+    Just vals ->
+      sequence $ map valueToText vals
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
 buildArgumentByteString args mFunctionId = case mFunctionId of
