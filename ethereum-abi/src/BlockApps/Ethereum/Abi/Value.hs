@@ -11,7 +11,6 @@ module BlockApps.Ethereum.Abi.Value
   , encodeValues
   ) where
 
-import Data.Binary (Binary)
 import Data.Bool (bool)
 import Data.ByteString (ByteString)
 import Data.Maybe
@@ -267,8 +266,7 @@ encodeValue = \case
       ValueBytes32 value -> pad32Right0 value
       ValueArrayStatic values -> encodeValues (map ValueStatic values)
 
-    encodeStrict :: Binary x => x -> ByteString
-    encodeStrict = ByteString.Lazy.toStrict . Binary.encode
+    encodeStrict x = ByteString.Lazy.toStrict $ Binary.encode x
 
     pad size dir ch bs =
       let
