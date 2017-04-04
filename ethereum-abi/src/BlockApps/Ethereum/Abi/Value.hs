@@ -7,18 +7,21 @@ module BlockApps.Ethereum.Abi.Value
   , ValueStatic(..)
   , ValueDynamic(..)
   , valueIsDynamic
-  , abiEncodeSingle
+  , encodeValue
+  , encodeValues
   ) where
 
 import Data.Binary (Binary)
 import Data.Bool (bool)
 import Data.ByteString (ByteString)
+import Data.Maybe
 import Data.Monoid
 import Data.Text (Text)
 
 import qualified Data.Binary as Binary
 import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as ByteString.Lazy
+import qualified Data.Text.Encoding as Text.Encoding
 
 import BlockApps.Ethereum
 import BlockApps.Ethereum.Abi.Int
@@ -145,13 +148,23 @@ data ValueDynamic
   | ValueArrayDynamic [ValueStatic]
   deriving (Eq,Show)
 
-abiEncodeSingle :: Value -> ByteString
-abiEncodeSingle = \case
-  ValueStatic value -> abiEncodeStatic value
-  ValueDynamic _ -> undefined
+encodeValue :: Value -> ByteString
+encodeValue = \case
+  ValueStatic value -> encodeStatic value
+  ValueDynamic value -> encodeDynamic value
   where
 
-    abiEncodeStatic = \case
+    encodeDynamic = \case
+      ValueBytes value ->
+        encodeStatic (ValueUInt256 (fromIntegral (ByteString.length value)))
+        <> pad32Right0 value
+      ValueString value ->
+        encodeDynamic . ValueBytes $ Text.Encoding.encodeUtf8 value
+      ValueArrayDynamic values ->
+        encodeStatic (ValueUInt256 (fromIntegral (length values)))
+        <> encodeValues (map ValueStatic values)
+
+    encodeStatic = \case
       ValueBool value -> pad32Left0 $ ByteString.singleton $ bool 0 1 value
       ValueUInt8 value -> pad32Left0 $ encodeStrict value
       ValueUInt16 value -> pad32Left0 $ encodeStrict value
@@ -185,7 +198,7 @@ abiEncodeSingle = \case
       ValueUInt240 value -> pad32Left0 $ encodeStrict value
       ValueUInt248 value -> pad32Left0 $ encodeStrict value
       ValueUInt256 value -> pad32Left0 $ encodeStrict value
-      ValueUInt value -> abiEncodeStatic $ ValueUInt256 value
+      ValueUInt value -> encodeStatic $ ValueUInt256 value
       ValueInt8 value -> pad32LeftSign value $ encodeStrict value
       ValueInt16 value -> pad32LeftSign value $ encodeStrict value
       ValueInt24 value -> pad32LeftSign value $ encodeStrict value
@@ -218,8 +231,8 @@ abiEncodeSingle = \case
       ValueInt240 value -> pad32LeftSign value $ encodeStrict value
       ValueInt248 value -> pad32LeftSign value $ encodeStrict value
       ValueInt256 value -> pad32LeftSign value $ encodeStrict value
-      ValueInt value -> abiEncodeStatic $ ValueInt256 value
-      ValueAddress value -> abiEncodeStatic . ValueUInt160 $ unAddress value
+      ValueInt value -> encodeStatic $ ValueInt256 value
+      ValueAddress value -> encodeStatic . ValueUInt160 $ unAddress value
       ValueBytes1 value -> pad32Right0 $ ByteString.singleton value
       ValueBytes2 value -> pad32Right0 value
       ValueBytes3 value -> pad32Right0 value
@@ -252,7 +265,7 @@ abiEncodeSingle = \case
       ValueBytes30 value -> pad32Right0 value
       ValueBytes31 value -> pad32Right0 value
       ValueBytes32 value -> pad32Right0 value
-      ValueArrayStatic _ -> undefined
+      ValueArrayStatic values -> encodeValues (map ValueStatic values)
 
     encodeStrict :: Binary x => x -> ByteString
     encodeStrict = ByteString.Lazy.toStrict . Binary.encode
@@ -271,4 +284,28 @@ abiEncodeSingle = \case
 
     pad32Left0 = pad 32 (Left ()) 0
     pad32Right0 = pad 32 (Right ()) 0
-    pad32LeftSign = pad 32 (Left ()) . sign
+    pad32LeftSign value = pad 32 (Left ()) (sign value)
+
+encodeValues :: [Value] -> ByteString
+encodeValues values =
+  let
+    head' =
+      [ if valueIsDynamic value then Nothing else Just (encodeValue value)
+      | value <- values
+      ]
+    tail' =
+      [ if valueIsDynamic value then encodeValue value else ByteString.empty
+      | value <- values
+      ]
+    tailLengths = scanl (\len bytes -> len + ByteString.length bytes) 0 tail'
+    headLength = sum $ map (maybe 32 ByteString.length) head'
+    resolveHead tailLength
+      = fromMaybe
+      . encodeValue
+      . ValueStatic
+      . ValueUInt256
+      . fromIntegral
+      $ headLength + tailLength
+    head'' = zipWith resolveHead tailLengths head'
+  in
+    ByteString.concat head'' <> ByteString.concat tail'
