@@ -280,7 +280,7 @@ encodeValue = \case
         Right _ -> bs <> padding
 
     sign :: Integral a => a -> Word8
-    sign = fromIntegral . signum
+    sign value = if signum value == -1 then -1 else 0
 
     pad32Left0 = pad 32 (Left ()) 0
     pad32Right0 = pad 32 (Right ()) 0
