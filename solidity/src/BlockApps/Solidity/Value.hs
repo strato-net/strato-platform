@@ -25,7 +25,7 @@ data Value
   | ValueEnum Text Text
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- | ValueMapping (Map SimpleValue Value)
-  -- | ValueStruct
+  | ValueStruct [(Text, Value)]
   deriving (Show)
 
 data SimpleValue
@@ -149,6 +149,7 @@ textToValue str = \case
   TypeFunction _ _ _ -> Nothing -- TODO: Fixme
   TypeContract _ -> ValueContract <$> stringAddress (Text.unpack str)
   TypeEnum _ -> Nothing -- TODO: Fixme
+  TypeStruct _ -> Nothing  -- TODO: Fixme
 
 textToSimpleValue :: Text -> SimpleType -> Maybe SimpleValue
 textToSimpleValue str = \case
@@ -255,7 +256,7 @@ textToSimpleValue str = \case
   TypeBytes30 -> ValueBytes30 <$> readBytes 30
   TypeBytes31 -> ValueBytes31 <$> readBytes 31
   TypeBytes32 -> ValueBytes32 <$> readBytes 32
-  TypeBytes -> ValueBytes <$> readBytes 32
+  TypeBytes -> ValueBytes <$> readBytesDyn
   TypeString -> Just $ ValueString str
   where
     readNum :: Num x => Maybe x
@@ -266,5 +267,13 @@ textToSimpleValue str = \case
         (bytes, leftover) = Base16.decode (Text.encodeUtf8 str)
       in
         if leftover /= ByteString.empty || ByteString.length bytes /= n
+          then Nothing
+          else Just bytes
+    readBytesDyn :: Maybe ByteString
+    readBytesDyn =
+      let
+        (bytes, leftover) = Base16.decode (Text.encodeUtf8 str)
+      in
+        if leftover /= ByteString.empty
           then Nothing
           else Just bytes

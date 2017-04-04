@@ -43,7 +43,6 @@ main = do
   void $ execute_ conn createTables
   mgr <- newManager defaultManagerSettings
   baseUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
-  
   let blocEnv = BlocEnv baseUrl mgr conn
   run flags_port (appBloc blocEnv)
 

@@ -1,0 +1,96 @@
+{
+    "funcs": {
+      "set": {
+        "args": {
+          "x": {
+            "type": "Int",
+            "index": 0,
+            "bytes": 32,
+            "name": "x"
+          }
+        },
+        "selector": "60fe47b1",
+        "vals": {}
+      },
+      "get": {
+        "args": {},
+        "selector": "6d4ce63c",
+        "vals": {
+          "retVal": {
+            "type": "Int",
+            "index": 0,
+            "bytes": 32
+          }
+        }
+      }
+    },
+    "types": {
+      "AnalysisEventEnum": {
+        "names": [
+          "NULL",
+          "PLAN",
+          "UPLOAD",
+          "FINALIZE"
+        ],
+        "type": "Enum",
+        "bytes": 1
+      }
+    },
+    "vars": {
+      "bo": {
+        "atBytes": 372,
+        "type": "Bool"
+      },
+      "contractEvent": {
+        "atBytes": 480,
+        "typedef": "AnalysisEventEnum",
+        "type": "Enum",
+        "bytes": 1,
+        "names": [
+          "NULL",
+          "PLAN",
+          "UPLOAD",
+          "FINALIZE"
+        ]
+      },
+      "a": {
+        "atBytes": 352,
+        "type": "Address"
+      },
+      "staticArray": {
+        "atBytes": 0,
+        "length": 10,
+        "entry": {
+          "signed": true,
+          "type": "Int",
+          "bytes": 32
+        },
+        "type": "Array"
+      },
+      "fb": {
+        "atBytes": 416,
+        "type": "Bytes",
+        "bytes": 32
+      },
+      "dynamicArray": {
+        "atBytes": 320,
+        "dynamic": true,
+        "entry": {
+          "signed": true,
+          "type": "Int",
+          "bytes": 32
+        },
+        "type": "Array"
+      },
+      "b": {
+        "atBytes": 384,
+        "dynamic": true,
+        "type": "Bytes"
+      },
+      "storedData": {
+        "atBytes": 512,
+        "type": "Int",
+        "bytes": 32
+      }
+    }
+  }

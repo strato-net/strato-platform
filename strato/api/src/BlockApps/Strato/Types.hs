@@ -68,7 +68,7 @@ import BlockApps.Ethereum
   , keccak256lazy
   , Nonce
   )
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 instance (Integral n, Show n) => Show (Hex n) where

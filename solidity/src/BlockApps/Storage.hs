@@ -1,4 +1,7 @@
-
+{-#
+  LANGUAGE
+    RecordWildCards
+#-}
 module BlockApps.Storage where
 
 import Data.LargeWord
@@ -18,7 +21,16 @@ positionAt p =
     byte=0
     }
 
-addBytes::Position->Int->Position
-addBytes position 32 = position{offset=offset position + 1}
-addBytes position v | v+byte position < 32 = position{byte=byte position+v}
-addBytes x y = error $ "addBytes called for value not defined yet: " ++ show x ++ ", " ++ show y
+addBytes::Position->Word256->Position
+addBytes position@Position{..} v =
+  let
+    (extraOffset, byte') = (fromIntegral byte+v) `quotRem` 32
+  in
+   position{offset=offset + extraOffset, byte=fromIntegral byte'}
+
+addOffset::Position->Word256->Position
+addOffset position@Position{..} v = position{offset=offset + v}
+
+alignedByte::Position->Word256
+alignedByte Position{byte=0, offset=o} = o
+alignedByte Position{offset=o} = o+1

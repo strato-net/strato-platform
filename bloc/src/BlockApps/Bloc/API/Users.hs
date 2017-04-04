@@ -22,6 +22,7 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Foldable
 import Data.Int (Int32)
@@ -51,10 +52,11 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
-import BlockApps.Solidity
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
+import BlockApps.Solidity.SolidityValue
+import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 
@@ -84,17 +86,22 @@ instance MonadUsers ClientM where
   postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 instance MonadUsers Bloc where
 
-  getUsers = map UserName <$> blocQuery getUsersQuery
+  getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
-  getUsersUser (UserName name) = blocQuery $ getUsersUserQuery name
+  getUsersUser (UserName name) = blocTransaction $
+    blocQuery $ getUsersUserQuery name
 
-  postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = do
+  postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransaction $ do
     keyStore <- newKeyStore pass
     createdUser <- blocModify $ postUsersUserQuery name keyStore
     unless createdUser (throwError (DBError "failed to create user"))
     let
       addr = keystoreAcctAddress keyStore
-    when (faucet /= 0) . void $ blocStrato (postFaucet addr)
+    when (faucet /= 0) $ do
+      logWith logNotice "Waiting for faucet transaction to be mined"
+      blocStrato $ do
+        void $ postFaucet addr
+        void $ waitNewAccount addr
     return addr
 
   postUsersSend userName addr
@@ -107,50 +114,19 @@ instance MonadUsers Bloc where
       return tx
 
   postUsersContract userName addr
-    (PostUsersContractRequest src password contract args txParams value) = do
+    (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
       --TODO: check what happens with mismatching args
       void $ compileContract contract src
-      logWith logNotice $
-        "constructor arguments: " <> Text.pack (show args)
-      cmIds_bins <- blocQuery $ proc () -> do
-        (cmId,name,bin) <- joinF
-          (\ (cmId,_,bin,_,_) (_,name) -> (cmId,name,bin))
-          (\ (_,contractId,_,_,_) (cid,_) -> cid .== contractId)
-          (queryTable contractsMetaDataTable)
-          (queryTable contractsTable) -< ()
-        restrict -< name .== constant contract
-        returnA -< (cmId,bin)
-      (cmId,bin) <-
-        blocMaybe "contractMetaDataId and bin" $ listToMaybe cmIds_bins
-      functionIds <- blocQuery $ proc () -> do
-        (xfId,contractMetaDataId,isConstr,_,_)
-          <- queryTable xabiFunctionsTable -< ()
-        restrict -< contractMetaDataId .== constant cmId .&& isConstr
-        returnA -< xfId
-      functionId <- blocMaybe "functionId" $ listToMaybe functionIds
-      argsBin <- case args of
-        Nothing -> return ByteString.empty
-        Just argsMap -> do
-          argNamesTypes <- fmap Map.fromList . blocQuery $ proc () -> do
-            (name,_,ty,_,dy,_,ety,_) <- getXabiFunctionsArgsQuery functionId -< ()
-            returnA -< (name,(ty,dy,ety))
-          let
-            determineValue valStr (tyM,dyM,etyM) =
-              let
-                typeM = textToArgType
-                  (fromMaybe "bytes" tyM)
-                  (fromMaybe False dyM)
-                  (fromMaybe "bytes" etyM)
-              in
-                textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
-          argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
-            then throwError $ AnError "argument names don't match"
-            else return $ Map.intersectionWith determineValue argsMap argNamesTypes
-          vals <- for (toList argsVals) $
-            maybe (throwError $ AnError "couldn't decode argument value") return
-          return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
+      logWith logNotice ("constructor arguments: " <> Text.pack (show args))
+      (cmId, bin16) <- getContractMetadataAndBin contract
+      let
+        (bin,leftOver) = Base16.decode $ bin16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+      mFunctionId <- getConstructorId cmId
+      argsBin <- buildArgumentByteString args mFunctionId
       tx <- prepareTx
         userName password addr Nothing txParams (Wei (fromIntegral value)) (bin <> argsBin)
+      logWith logNotice ("tx is: " <> Text.pack (show tx))
       hash <- blocStrato $ postTx tx
       txResult <- pollTxResult hash
       let
@@ -159,20 +135,114 @@ instance MonadUsers Bloc where
             Text.splitOn "," (transactionresultContractsCreated txResult)
           stringAddress $ Text.unpack str
       case addressMaybe of
-        Nothing -> throwError $ UserError "could not find txResult address"
+        Nothing -> case (transactionresultMessage txResult) of
+          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+          stratoMsg -> throwError $ UserError stratoMsg
         Just addr' -> do
           void . blocModify $ \conn -> runInsert conn contractsInstanceTable
             ( Nothing
-            , constant (cmId::Int32)
+            , constant cmId
             , constant addr'
             , Nothing
             )
           return addr'
 
-  postUsersUploadList _ _ _ = throwError Unimplemented
-  postUsersContractMethod _ _ _ _ _ = throwError Unimplemented
-  postUsersSendList _ _ _ = throwError Unimplemented
-  postUsersContractMethodList _ _ _ = throwError Unimplemented
+  postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
+  postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
+
+  postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
+    for txs $ \ (SendTransaction toAddr value txParams) -> do
+      tx <- prepareTx
+        userName pw addr (Just toAddr) txParams
+        (Wei (fromIntegral value)) ByteString.empty
+      hash <- blocStrato $ postTx tx
+      PostSendListResponse <$> if resolve
+        then transactionresultResponse <$> pollTxResult hash
+        else return hash
+
+  postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
+
+getContractMetadataAndBin :: Text ->  Bloc (Int32, ByteString)
+getContractMetadataAndBin contract = blocTransaction $ do
+  cmIds_bins <- blocQuery $ proc () -> do
+    (cmId,name,bin) <- joinF
+      (\ (cmId,_,bin,_,_,_) (_,name) -> (cmId,name,bin))
+      (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+      (queryTable contractsMetaDataTable)
+      (queryTable contractsTable) -< ()
+    restrict -< name .== constant contract
+    returnA -< (cmId,bin)
+  (cmId,bin) <- blocMaybe
+                  "No contract metadata id found. Likely, contract did not compile successfully"
+                  (listToMaybe cmIds_bins)
+  return (cmId,bin)
+
+getConstructorId :: Int32 -> Bloc (Maybe Int32)
+getConstructorId cmId = blocTransaction $ do
+  functionIds <- blocQuery $ proc () -> do
+    (xfId,contractMetaDataId,isConstr,_,_)
+      <- queryTable xabiFunctionsTable -< ()
+    restrict -< contractMetaDataId .== constant cmId .&& isConstr
+    returnA -< xfId
+  return $ listToMaybe functionIds
+
+buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
+buildArgumentByteString args mFunctionId = case mFunctionId of
+  Nothing -> return ByteString.empty
+  Just functionId -> do
+    argNamesTypes <- getXabiFunctionsArgsQuery functionId
+    let
+      determineValue valStr (Xabi.IndexedType _ xabiType) =
+        let
+          typeM = case xabiType of
+            Xabi.Int _ _ ->
+              textToArgType "Int" False ""
+            Xabi.String dy ->
+              textToArgType "String" (fromMaybe False dy) ""
+            Xabi.Bytes dy _ ->
+              textToArgType "Bytes" (fromMaybe False dy) ""
+            Xabi.Bool ->
+              textToArgType "Bool" False ""
+            Xabi.Address ->
+              textToArgType "Address" False ""
+            Xabi.Struct _ _ ->
+              textToArgType "Struct" False ""
+            Xabi.Enum _ _ ->
+              textToArgType "Enum" False ""
+            Xabi.Array dy _ ety ->
+              let
+                ettyty = case ety of
+                  Xabi.Int _ _ -> "Int"
+                  Xabi.String _ -> "String"
+                  Xabi.Bytes _ _ -> "Bytes"
+                  Xabi.Bool -> "Bool"
+                  Xabi.Address -> "Address"
+                  Xabi.Struct _ _ -> "Struct"
+                  Xabi.Enum _ _ -> "Enum"
+                  Xabi.Array _ _ _ ->
+                    error "Array of array not supported"
+                  Xabi.Contract _ -> "Contract"
+                  Xabi.Mapping _ _ _ -> "Mapping"
+              in
+                textToArgType "Array" (fromMaybe False dy) ettyty
+            Xabi.Contract _ ->
+              textToArgType "Contract" False ""
+            Xabi.Mapping dy _ _ ->
+              textToArgType "Mapping" (fromMaybe False dy) ""
+        in
+          textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
+    case args of
+      Nothing -> do
+        if Map.null argNamesTypes
+          then return ByteString.empty
+          else (throwError $ AnError "no arguments provided to function.")
+      Just argsMap -> do
+        argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
+          then throwError $ AnError "argument names don't match"
+          else return $ Map.intersectionWith determineValue argsMap argNamesTypes
+        vals <- for (toList argsVals) $
+          maybe (throwError $ AnError "couldn't decode argument value") return
+        return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
 type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
 
@@ -460,7 +530,7 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
         accountsFilterParams{qaAddress = Just addr}
       nonce <- case listToMaybe accts of
         Nothing -> throwError . UserError $ "strato error: failed to find account"
-        Just acct -> return . incrNonce $ accountNonce acct
+        Just acct -> return $ accountNonce acct
       return $ prepareSignedTx sk addr UnsignedTransaction
         { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
         , unsignedTransactionGasPrice =
@@ -500,5 +570,5 @@ prepareSignedTx sk addr unsignedTx = PostTransaction
     Wei gasPrice = transactionGasPrice tx
     Nonce nonce' = transactionNonce tx
     Wei value = transactionValue tx
-    code = Text.decodeUtf8 $ transactionInitOrData tx
+    code = Text.decodeUtf8 $ Base16.encode $ transactionInitOrData tx
     toAddr = transactionTo tx

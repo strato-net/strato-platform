@@ -63,19 +63,22 @@ contractsMetaDataTable :: Table
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBytea
   , Column PGBytea
   , Column PGBytea
+  , Column PGBytea
   )
-contractsMetaDataTable = Table "contracts_metadata" $ p5
+contractsMetaDataTable = Table "contracts_metadata" $ p6
   ( optional "id"
   , required "contract_id"
   , required "bin"
   , required "bin_runtime"
   , required "code_hash"
+  , required "xcode_hash"
   )
 
 contractsInstanceTable :: Table
@@ -112,14 +115,14 @@ xabiFunctionsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGInt4
   , Column PGBool
-  , Column (Nullable PGText)
-  , Column (Nullable PGBytea)
+  , Column PGText
+  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBool
-  , Column (Nullable PGText)
-  , Column (Nullable PGBytea)
+  , Column PGText
+  , Column PGBytea
   )
 xabiFunctionsTable = Table "xabi_functions" $ p5
   ( optional "id"
@@ -139,6 +142,7 @@ xabiTypesTable :: Table
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
+  , Column (Nullable PGInt4)
   )
   ( Column PGInt4
   , Column PGText
@@ -149,14 +153,16 @@ xabiTypesTable :: Table
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
   , Column (Nullable PGInt4)
+  , Column (Nullable PGInt4)
   )
-xabiTypesTable = Table "xabi_types" $ p9
+xabiTypesTable = Table "xabi_types" $ p10
   ( optional "id"
   , required "type"
   , required "typedef"
   , required "is_dynamic"
   , required "is_signed"
   , required "bytes"
+  , required "length"
   , required "entry_type_id"
   , required "value_type_id"
   , required "key_type_id"
@@ -223,4 +229,58 @@ xabiVariablesTable = Table "xabi_variables" $ p6
   , required "name"
   , required "at_bytes"
   , required "is_public"
+  )
+
+xabiTypeDefsTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+xabiTypeDefsTable = Table "xabi_type_defs" $ p4
+  ( optional "id"
+  , required "name"
+  , required "contract_metadata_id"
+  , required "type_id"
+  )
+
+xabiEnumNamesTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+xabiEnumNamesTable = Table "xabi_enum_names" $ p4
+  ( optional "id"
+  , required "name"
+  , required "value"
+  , required "type_def_id"
+  )
+
+xabiStructFieldsTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+  ( Column PGInt4
+  , Column PGText
+  , Column PGInt4
+  , Column PGInt4
+  )
+xabiStructFieldsTable = Table "xabi_struct_fields" $ p4
+  ( optional "id"
+  , required "name"
+  , required "at_bytes"
+  , required "type_def_id"
   )

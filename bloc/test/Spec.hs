@@ -41,7 +41,7 @@ setup = do
   let
     testConfig = TestConfig
       { mgr = mgr'
-      , blocUrl = bayar4a
+      , blocUrl = localhost
       , stratoUrl = strato
       , userName = "testUser1"
       , userAddress = Address 0x0

@@ -24,6 +24,6 @@ class Monad m => MonadAddresses m where
 instance MonadAddresses ClientM where
   getAddresses = client (Proxy @ GetAddresses)
 instance MonadAddresses Bloc where
-  getAddresses = blocQuery getAddressesQuery
+  getAddresses = blocTransaction $ blocQuery getAddressesQuery
 
 type GetAddresses = "addresses" :> Get '[HTMLifiedJSON] [Address]

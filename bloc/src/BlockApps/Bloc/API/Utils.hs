@@ -34,7 +34,7 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.Monad
 import BlockApps.Ethereum
-import BlockApps.Solidity
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
@@ -134,6 +134,10 @@ waitNewBlock = do
       . blockBlockData
       . withoutNext
       . head <$> getBlocksLast 0
+
+waitNewAccount :: Address -> ClientM Account
+waitNewAccount addr = untilJust $ listToMaybe <$>
+  getAccountsFilter accountsFilterParams{qaAddress = Just addr}
 
 pollTxResult :: Text -> Bloc TransactionResult
 pollTxResult hash = untilJust $ do
