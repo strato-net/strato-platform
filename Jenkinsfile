@@ -1,6 +1,6 @@
 githubCredentials = [[$class: 'UsernamePasswordMultiBinding', usernameVariable: 'USR', passwordVariable: 'GITHUB_TOKEN', credentialsId: 'blockapps-cd-github']]
 ansiColor('xterm') {
-    node('cd-9') {
+    node('cd9') {
         withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
             stage('CleanupRunningInstance') {
                // sh '''#!/bin/bash -l    
