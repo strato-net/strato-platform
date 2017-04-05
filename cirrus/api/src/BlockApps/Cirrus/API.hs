@@ -6,7 +6,6 @@
 
 module BlockApps.Cirrus.API where
 
-import Data.Aeson (Value)
 import Data.Text (Text)
 import Servant.API
 
@@ -19,7 +18,7 @@ type API =
     :> Post '[JSON] NoContent
   :<|> "cirrus"
     :> "search"
-    :> Get '[JSON] Value
+    :> Get '[JSON] [ContractDetails]
   :<|> "cirrus"
     :> "search"
     :> Capture "ContractName" Text
