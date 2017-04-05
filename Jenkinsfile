@@ -29,9 +29,8 @@ ansiColor('xterm') {
             }
             stage('E2E-Test') {
                 sh '''#!/bin/bash -l
-                cd silo/e2e
-                npm i
-                ./node_modules/mocha/bin/mocha e2e
+                cd silo
+                ./test
                 '''
             }
         }
