@@ -1,34 +1,31 @@
 githubCredentials = [[$class: 'UsernamePasswordMultiBinding', usernameVariable: 'USR', passwordVariable: 'GITHUB_TOKEN', credentialsId: 'blockapps-cd-github']]
 ansiColor('xterm') {
-    node('linux') {
-        withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
-        withDockerContainer(args: '-u root -v /var/run/docker.sock:/var/run/docker.sock -v /datadrive/ci-build/strato-docker-build-mount:/root -v /home/blockapps/.docker:/root/.docker',
-                            image: 'registry-aws.blockapps.net:5000/blockapps/basil-build-agent:latest') {
-            stage('Checkout') {
-                checkout scm
-                  withCredentials(githubCredentials) {
-                      sh '''
-                      git config --global credential.helper store
-                      go get github.com/aktau/github-release
-                      export GITHUB_TOKEN=$GITHUB_TOKEN
-                      github-release download -u blockapps -r basil -l -n basil-linux_amd64
-                      mv basil-linux_amd64 basil
-                      chmod a+x basil
-                      '''
-                    }
+    node('strato-integration') {
+        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+             stage('CleanupRunningInstance') {
+               sh 'sudo rm -rf silo'
+               checkout scm  
+               sh '''#!/bin/bash -l    
+                cd silo
+                docker-compose kill && docker-compose -v down
+                docker ps
+                '''
             }
-            stage('Build') {
-                withCredentials(githubCredentials) {
-                    sh '''
-                    git config credential.helper 'store --file=/root/.git-credentials '
-                    git clone https://$USR:$GITHUB_TOKEN@github.com/blockapps/silo.git -b monostrato-cutover
-                    rm -rf silo
+            stage('Build-Deploy') {
+                  sh '''#!/bin/bash -l
+                    cd silo
+                    docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                    git config --global credential.helper store
+                    git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                    cp /home/blockapps/basil .
                     ./basil clone
                     ./basil build
-                    '''
-                }
+                    ./basil multinode -c 2 > docker-compose.yml
+                    genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA apiUrlOverride=http://strato:3000 blockTime=2 minBlockDifficulty=8192 docker-compose up -d
+                    docker ps    
+                  '''
             }
-            }
-        }  
-    }
+         }
+     }  
 }
+
