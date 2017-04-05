@@ -20,12 +20,12 @@ packages:
 - strato-quarry/
 - strato-adit/
 - strato-index/
-- ethereum-test/
 - strato-sequencer/
 - ethereum-jsonrpc/
 - strato-model/
 - strato-redis-blockdb/
 - strato-statediff/
+- test-suite/
 - location:
     git: https://github.com/blockapps/blockapps-haskoin
     commit: 061a2afebae6dc2024e3fd883b250453f4111c7d

@@ -42,7 +42,7 @@ openConn num = do
     connect connInfo
 
 closeConn :: Connection -> IO ()
-closeConn _ = ()
+closeConn _ = return ()
 
 withConn :: Integer -> (Connection -> IO ()) -> IO ()
 withConn num = bracket (openConn num) closeConn
