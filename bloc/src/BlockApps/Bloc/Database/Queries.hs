@@ -877,7 +877,7 @@ insertXabi metadataId contractName Xabi{..} = do
 
 
 
-compileContract :: Text -> Text -> Bloc Keccak256
+compileContract :: Text -> Text -> Bloc [(Text,Keccak256)]
 compileContract contractName source = do
   (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
@@ -896,14 +896,15 @@ compileContract contractName source = do
   for_ metadataIds $ \ leftmetadataId ->
     for_ metadataIds $ \ rightmetadataId -> blocModify $
       insertContractLookup leftmetadataId rightmetadataId
-  blocQuery1 $ proc () -> do
-    (codeHash,name) <- joinF
-      (\ (_,_,_,_,codeHash,_) (_,name) -> (codeHash,name))
+
+  blocQuery $ proc () -> do
+    (cmId,codeHash,name) <- joinF
+      (\ (cmId,_,_,_,codeHash,_) (_,name) -> (cmId,codeHash,name))
       (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
       (queryTable contractsMetaDataTable)
       (queryTable contractsTable) -< ()
-    restrict -< name .== constant contractName
-    returnA -< codeHash
+    restrict -< in_ [constant mId | (_,mId) <- Map.toList metadataIds] cmId
+    returnA -< (name,codeHash)
 
 -- insertXabiContractTypes ::  Map Text Xabi.Def-> Bloc Int32
 -- insertXabiContractTypes types =
