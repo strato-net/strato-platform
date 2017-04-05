@@ -867,15 +867,11 @@ insertXabiConstr metadataId contractName constrArgs = do
     (\ (xfId,_,_,_,_) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
-
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
 insertXabi metadataId contractName Xabi{..} = do
-  --insertXabiContractTypes xabiTypes
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
-
-
 
 compileContract :: Text -> Text -> Bloc Keccak256
 compileContract contractName source = do
@@ -904,9 +900,6 @@ compileContract contractName source = do
       (queryTable contractsTable) -< ()
     restrict -< name .== constant contractName
     returnA -< codeHash
-
--- insertXabiContractTypes ::  Map Text Xabi.Def-> Bloc Int32
--- insertXabiContractTypes types =
 
 insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case

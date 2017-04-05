@@ -1,22 +1,22 @@
 {-# LANGUAGE
     DataKinds
-  , DeriveGeneric
   , TypeOperators
 #-}
 
 module BlockApps.Cirrus.API where
 
+import Data.Aeson
 import Data.Text (Text)
 import Servant.API
 
 import BlockApps.Solidity.Xabi
 
 type API =
-  "contract"
+  "contract/" -- why do I need a slash?
     :> ReqBody '[JSON] ContractDetails
     :> Post '[JSON] NoContent
   :<|> "search"
-    :> Get '[JSON] [ContractDetails]
+    :> Get '[JSON] Value
   :<|> "search"
     :> Capture "ContractName" Text
-    :> Get '[JSON] ContractDetails
+    :> Get '[JSON] Value

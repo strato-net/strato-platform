@@ -183,6 +183,11 @@ instance MonadContracts Bloc where
         codeHash <- compileContract
           postcompilerequestContractName
           postcompilerequestSource
+        for_ postcompilerequestSearchable $ \ contractName ->
+          contractDetails <-
+            getContractsContract (ContractName contractName) (Named "Latest")
+          blocCirrus $ postContract contractDetails
+
         return $ PostCompileResponse postcompilerequestContractName codeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
