@@ -29,5 +29,5 @@ stratoP2PServer = do
   _ <- liftIO $ forkIO $ runStratoP2PServerComm connectedPeers
 
   _ <- runResourceT $ do
-          runEthServer connectedPeers connStr' myPriv flags_listen
+          runEthServer connectedPeers myPriv flags_listen
   return ()

@@ -5,14 +5,10 @@ import Control.Monad.Logger
 import Control.Monad.State
 import Control.Monad.Trans.Resource
 
-import qualified Database.Persist.Postgresql as SQL
-
-import Blockchain.EthConf (connStr', mkConfiguredKafkaState)
-import Blockchain.DB.SQLDB
+import Blockchain.EthConf (mkConfiguredKafkaState)
 import Network.Kafka
 
 data AditState = AditState {
-    aditSqlDatabase :: SQLDB,
     aditKafkaState  :: KafkaState
 }
 
@@ -24,11 +20,7 @@ instance HasKafkaState AditM where
         ctx <- get
         put $ ctx { aditKafkaState = ns }
 
-instance HasSQLDB AditM where
-     getSQLDB = aditSqlDatabase <$> get
-
-runAditT :: Int -> AditM a -> LoggingT IO a
-runAditT pgPoolSize m = do
+runAditT :: AditM a -> LoggingT IO a
+runAditT m = do
     let initKafkaState = mkConfiguredKafkaState "strato-adit"
-    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr' pgPoolSize
-    runResourceT $ evalStateT m (AditState sqldb initKafkaState)
+    runResourceT $ evalStateT m (AditState initKafkaState)

@@ -22,7 +22,6 @@ import Control.Concurrent.STM.MonadIO
 import           Control.Monad
 import           Control.Monad.Logger
 
-
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Set as S
@@ -35,37 +34,29 @@ import           Blockchain.Display
 import           Blockchain.Event
 import           Blockchain.Frame
 import           Blockchain.ExtMergeSources
-import           Blockchain.BlockNotify
-import           Blockchain.RawTXNotify
+import           Blockchain.SeqEventNotify
 import           Blockchain.RLPx
 import           Blockchain.Util
 
 import qualified Data.ByteString.Lazy as BL
-
 import           Data.Maybe
 import           Control.Monad.State
 import           Prelude 
-
 import           Crypto.PubKey.ECC.DH
-
 import qualified Database.Persist.Postgresql as SQL
 
-import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
-
+import           Blockchain.P2PUtil
                
 theCurve::Curve
 theCurve = getCurveByName SEC_p256k1
 
-runEthServer::(MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)=>
-              TVar (S.Set String)->SQL.ConnectionString->PrivateNumber->Int->m ()
-runEthServer connectedPeers connStr myPriv listenPort = do  
-    cxt <- initContextLite connStr
+runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
+             => TVar (S.Set String) -> PrivateNumber -> Int -> m ()
+runEthServer connectedPeers  myPriv listenPort = do  
+    cxt <- initContextLite 
 
     let myPubkey = calculatePublic theCurve myPriv
-
-    createTXTrigger "tx"
-    createBlockTrigger "p2p_block"
        
     runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
       logInfoN $ T.pack $ "|||| Incoming connection from " ++ show (appSockAddr app)
@@ -82,33 +73,25 @@ runEthServer connectedPeers connStr myPriv listenPort = do
             appSink app
 
       runEthCryptMLite cxt $ do
-        let rSource = appSource app
-            txSource = txNotificationSource "tx"
-                      =$= CL.map NewTX
-            blockSource = blockNotificationSource "p2p_block"
-                      =$= CL.map (uncurry NewBL)
 
         eventSource <- mergeSourcesCloseForAny [
-          rSource =$=
-          appSource app =$=
-          ethDecrypt inCxt =$=
-          transPipe liftIO bytesToMessages =$=
-          transPipe lift (tap (displayMessage False (show $ appSockAddr app))) =$=
-          CL.map MsgEvt,
-          blockSource,
-          txSource
+              appSource app
+                =$= ethDecrypt inCxt
+                =$= transPipe liftIO bytesToMessages
+                =$= transPipe lift (tap (displayMessage False (show $ appSockAddr app)))
+                =$= CL.map MsgEvt 
+            , seqEventNotifictationSource =$= CL.map NewSeqEvent 
           ] 2
-
 
         logInfoN "server session starting"
 
         (_::Either SomeException ()) <- try $ 
-                 eventSource =$=
-                   handleMsgConduit myPubkey unwrappedPeer =$=
-                   transPipe lift (tap (displayMessage True (show $ appSockAddr app))) =$=
-                   messagesToBytes =$=
-                   ethEncrypt outCxt $$
-                   transPipe liftIO (appSink app)
+              eventSource
+                =$= handleMsgConduit myPubkey unwrappedPeer
+                =$= transPipe lift (tap (displayMessage True (show $ appSockAddr app)))
+                =$= messagesToBytes
+                =$= ethEncrypt outCxt
+                 $$ transPipe liftIO (appSink app)
 
         logInfoN "server session ended"
 
@@ -117,7 +100,6 @@ runEthServer connectedPeers connStr myPriv listenPort = do
         return ()
 
 
---cbSafeTake::Monad m=>Int->Consumer B.ByteString m B.ByteString
 cbSafeTake::Monad m=>Int->ConduitM BC.ByteString o m BC.ByteString
 cbSafeTake i = do
   ret <- fmap BL.toStrict $ CB.take i

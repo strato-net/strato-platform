@@ -3,17 +3,13 @@
 
 module DumpKafkaRaw where
 
-import Control.Lens
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Maybe
-import Network.Kafka
-import Network.Kafka.Consumer
 import Network.Kafka.Protocol
 
 import Blockchain.Stream.Raw
-import Blockchain.EthConf
 import Blockchain.KafkaTopics
 
 dumpKafkaRaw::String->Offset->IO ()

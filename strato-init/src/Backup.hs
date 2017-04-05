@@ -50,8 +50,7 @@ main = do
   putStrLn $ "b" ++ BC.unpack (B16.encode $ rlpSerialize $ rlpEncode backupBlock)
 
   LDB.runResourceT $ do
-    pool <- runNoLoggingT $ SQL.createPostgresqlPool
-            connStr' 20
+    pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20
 
     stateDB' <- LDB.open ".ethereumH/state" LDB.defaultOptions
     codeDB' <- LDB.open ".ethereumH/code" LDB.defaultOptions

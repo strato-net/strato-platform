@@ -12,6 +12,7 @@ import TestEthereum
 main::IO ()
 main = do
   args <- $initHFlags "The Ethereum Test program"
+  putStrLn $ "ethereum-test with args: " ++ unlines args
   testsExist <- doesDirectoryExist "tests"
   when (not testsExist) $
     error "You need to clone the git repository at https://github.com/ethereum/tests.git"

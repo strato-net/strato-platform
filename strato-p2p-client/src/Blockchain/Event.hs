@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase, ScopedTypeVariables, TemplateHaskell #-}
 
 module Blockchain.Event (
   Event(..),
@@ -14,7 +14,8 @@ import Control.Monad.IO.Class
 import Control.Monad.Logger
 import Control.Monad.State
 import Data.Conduit
-import qualified Data.Set as S
+import Data.List
+--import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.ByteString             as BS
 import qualified Data.ByteString.Char8       as BS8
@@ -28,7 +29,6 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Wire
 import Blockchain.Data.BlockDB
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.BlockOffset
 import Blockchain.Data.NewBlk
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Data.Transaction
@@ -42,7 +42,10 @@ import Blockchain.Verification
 import Blockchain.DBM
 import Blockchain.Data.PubKey
 
-import Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(..), blockToIngestBlock)
+import Blockchain.Sequencer.Event ( IngestTx(..), IngestEvent(..), OutputEvent(..), OutputTx(..)
+                                  , blockToIngestBlock, obTotalDifficulty, outputBlockToBlock
+                                  , otBaseTx
+                                  )
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 
 import Blockchain.Util (getCurrentMicrotime)
@@ -53,8 +56,9 @@ import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thing that ill really want to know one day
 
-data Event = MsgEvt Message | NewTX RawTransaction | NewBL Block Integer | TimerEvt deriving (Show)
+data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt deriving (Show)
 
+-- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m) => [Block] -> m Int
 setTitleAndProduceBlocks blocks = do
     lastVMEvents <- liftIO $ fetchLastVMEvents 200
@@ -121,13 +125,21 @@ handleEvents mode peer = awaitForever $ \case
         (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
         void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff) -- todo handle the result
         case redisParentHeader of
-            Nothing -> logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch
+            Nothing -> do
+                bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+                let fetchNumber = numFromRedis bestBlock - 1
+                logInfoN . T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+                logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber 
             Just _  -> do
                 void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                 lift . void $ setTitleAndProduceBlocks [block']
                 void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
-    MsgEvt (NewBlockHashes _) -> syncFetch
+    MsgEvt (NewBlockHashes _) -> do
+        bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+        let fetchNumber = numFromRedis bestBlock -1
+        logInfoN . T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
+        syncFetch Forward fetchNumber
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> case dir of
         Reverse -> do
@@ -157,23 +169,42 @@ handleEvents mode peer = awaitForever $ \case
 
     MsgEvt (BlockHeaders headers) -> do
         clearActionTimestamp
-        alreadyRequestedHeaders <- lift getBlockHeaders
-        when (null alreadyRequestedHeaders) $ do
-            let headerHashes = S.fromList $ map headerHash headers
-                parentHashes = S.fromList $ map parentHash headers
-                allNeeded = headerHashes `S.union` parentHashes
-            blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
-            let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
-                neededHashes = map headerHash neededHeaders
-                neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
-                unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
-            unless (null unfoundParents) $ do
-                logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
-                logInfoN . T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
-                logInfoN "### calling syncFetch again" >> syncFetch
+        alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
+        when (null alreadyRequestedHeaders) $ do        -- proceed if we are not already requesting headers
+            -- let headerHashes = S.fromList $ map headerHash headers
+            --     parentHashes = S.fromList $ map parentHash headers
+            --     allNeeded = headerHashes `S.union` parentHashes
+
+            -- check if blockheaders we recieved have parents.  
+            parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers 
+            let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
+            let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
+            unless (null missingParents) $ do
+                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+                 let fetchNumber = numFromRedis bestBlock + 1
+                 logInfoN . T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
+                 let lastParent = case length existingParents of
+                                      0 -> fetchNumber
+                                      _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
+                 (logInfoN $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)) >> syncFetch Reverse lastParent
+           
+            -- todo: try with (&&&)
+            headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
+            let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
+            
+            -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
+            -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
+            --     neededHashes = map headerHash neededHeaders
+            --     neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
+            --     unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
+            -- unless (null unfoundParents) $ do
+            --     -- logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
+            --     logInfoN . T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
+            --     logInfoN "### calling syncFetch again" >> syncFetch
+            
             lift $ putBlockHeaders neededHeaders
             logInfoN $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
-            yield $ GetBlockBodies neededHashes
+            yield . GetBlockBodies $ headerHash <$> neededHeaders
             stampActionTimestamp
 
     -- todo: seems like geth and parity will send bodies on a best-effort, skipping shas they doesnt have
@@ -220,17 +251,18 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
 
     MsgEvt (Disconnect _) -> throwIO PeerDisconnected
-    NewTX tx -> when shouldSend . yield $ Transactions [rawTX2TX tx]
-        where shouldSend = case rawTransactionOrigin tx of
-                Origin.PeerString ps -> ps /= peerString peer
-                Origin.API           -> True
-                Origin.BlockHash _   -> False
-                Origin.Direct        -> True
-                Origin.Quarry        -> False -- this should never reach this far anyway
-                Origin.Morphism      -> -- probably means it was converted, see if this is a problem
-                    trace "NewTx of type Morphism came in. Should this even happen?" True
-
-    NewBL b d -> yield (NewBlock b d)
+    
+    NewSeqEvent oe -> case oe of 
+            -- todo: use shouldSend here, to make sure we don't send back block
+            -- to peer we got it from
+            OEBlock b  -> do
+                $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
+                yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
+            OETx ts tx -> do
+                $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ format tx ++ " at " ++ show ts
+                when (shouldSend peer tx) . yield $ Transactions [tx'] where
+                    tx' = otBaseTx $ tx
+            _          -> return () -- shouldn't happen but our types don't prohibit us 
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
@@ -246,13 +278,28 @@ handleEvents mode peer = awaitForever $ \case
 
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
-syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m) => Conduit Event m Message
-syncFetch = do
-    blockHeaders' <- lift getBlockHeaders
+numFromRedis :: Maybe RedisBestBlock -> Integer
+numFromRedis = \case
+    Nothing                     -> 0
+    Just (RedisBestBlock _ n _) -> n
+
+-- todo: we should take blockNumber as argument here instead of just looking for
+-- bestBlock to prevent us from getting stuck
+syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m) 
+          => Direction -> Integer -> Conduit Event m Message
+syncFetch d num = do
+    blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        let fetchNumber = case bestBlock of
-                              Nothing          -> 0
-                              Just (RedisBestBlock _ num _) -> num
-        yield $ GetBlockHeaders (BlockNumber fetchNumber) maxReturnedHeaders 0 Forward
+        yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d 
         stampActionTimestamp
+
+shouldSend :: PPeer -> OutputTx -> Bool 
+shouldSend peer tx = case otOrigin tx of
+    Origin.PeerString ps -> ps /= peerString peer
+    Origin.API           -> True
+    Origin.BlockHash _   -> False
+    Origin.Direct        -> True
+    Origin.Quarry        -> False -- this should never reach this far anyway
+    Origin.Morphism      -> -- probably means it was converted, see if this is a problem
+        trace "NewTx of type Morphism came in. Should this even happen?" True
+

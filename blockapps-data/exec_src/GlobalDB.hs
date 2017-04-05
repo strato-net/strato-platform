@@ -12,8 +12,8 @@ $(return [])
 
 main :: IO ()
 main = do
-    _ <- $initHFlags "Migrate global blockchain database"
-
+    s <- $initHFlags "Migrate global blockchain database"
+    putStrLn $ "global-db with args: " ++ unlines s
     let cfg = SqlConf {
       user = flags_pguser,
       password = flags_password,

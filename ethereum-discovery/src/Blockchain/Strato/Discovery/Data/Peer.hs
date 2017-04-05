@@ -95,13 +95,13 @@ parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
 getAvailablePeers::IO [PPeer]
 getAvailablePeers = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO ()
 setPeerBondingState ip port' state = do
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
   return ()
@@ -109,21 +109,21 @@ setPeerBondingState ip port' state = do
 getBondedPeers::IO [PPeer]
 getBondedPeers = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
 getBondedPeersForUDP::IO [PPeer]
 getBondedPeersForUDP = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
 getUnbondedPeers::IO [PPeer]
 getUnbondedPeers = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
 
@@ -147,7 +147,7 @@ defaultPeer = PPeer{
 disablePeerForSeconds::PPeer->Int->IO ()
 disablePeerForSeconds peer seconds = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
@@ -155,7 +155,7 @@ disablePeerForSeconds peer seconds = do
 disableUDPPeerForSeconds::PPeer->Int->IO ()
 disableUDPPeerForSeconds peer seconds = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()

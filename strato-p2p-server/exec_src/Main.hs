@@ -11,8 +11,8 @@ import Executable.StratoP2PServer
 
 main :: IO ()
 main = do
-  _ <- $initHFlags "Strato Peer Server"
-
+  s <- $initHFlags "Strato Peer Server"
+  putStrLn $ "strato-p2p-server with flags: " ++ unlines s
   if flags_runUDPServer 
     then do
       putStrLn "Starting UDP server"

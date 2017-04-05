@@ -40,7 +40,9 @@ function newnode {
   runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
   echo "Starting ethereum-vm"
-  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm --diffPublish=true --createTransactionResults=true --miningVerification=$verifyBlocks >> logs/ethereum-vm 2>&1
+  runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
+                         --diffPublish=true --createTransactionResults=true \
+                         --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb >> logs/ethereum-vm 2>&1
 
   if $initialize
   then doRegister
@@ -67,7 +69,8 @@ function doInit {
                        --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                        --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                        --addBootnodes=$addBootnodes $stratoBootnode \
-                       --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty --backupblocks=true"
+                       --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
+                       --backupblocks=true"
      echo $cmd
      echo "# of lines in block-backup-file: `cat /var/lib/strato/backup_strato_block | wc -l`"
      $cmd < /var/lib/strato/backup_strato_block
@@ -87,9 +90,10 @@ function doInit {
 }
 
 function doRegister {
-  echo "Registering with the blockchain explorer"
-  fqdn=${stratoHost:-$(curl -s ident.me)}
-  until [[ $(curl -s -d "url=http://$fqdn/" http://$explorerHost:9000/api/nodes) == "SUCCESS" ]] ; do : ; done
+   echo "Not registering with the blockchain explorer"
+#  echo "Registering with the blockchain explorer"
+#  fqdn=${stratoHost:-$(curl -s ident.me)}
+#  until [[ $(curl -s -d "url=http://$fqdn/" http://$explorerHost:9000/api/nodes) == "SUCCESS" ]] ; do : ; done
 }
 
 function runForever {
@@ -142,6 +146,7 @@ setEnv receiveBlocks true
 setEnv addBootnodes false
 setEnv noMinPeers false
 setEnv useSyncMode false
+setEnv difficultyBomb false
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true

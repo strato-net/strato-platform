@@ -45,8 +45,8 @@ runEthCryptMLite :: (MonadBaseControl IO m )
                  -> m ()
 runEthCryptMLite cxt f = void . runResourceT $ runStateT f cxt
 
-initContextLite :: (MonadResource m, MonadIO m, MonadBaseControl IO m) => SQL.ConnectionString -> m Context
-initContextLite _ = do
+initContextLite :: (MonadResource m, MonadIO m, MonadBaseControl IO m) => m Context
+initContextLite = do
   dbs <- openDBs
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   return Context { actionTimestamp = Nothing

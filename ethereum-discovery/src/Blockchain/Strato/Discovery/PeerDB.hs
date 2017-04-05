@@ -22,7 +22,7 @@ import Blockchain.Strato.Discovery.UDP
 getClosePeers::NodeID->IO [PPeer]
 getClosePeers target = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   allPeers <- 
     fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $ 
     SQL.selectList [PPeerEnableTime SQL.<. currentTime, PPeerPubkey SQL.!=. Nothing] []
@@ -35,7 +35,7 @@ distance (NodeID x) (NodeID y) = bytesToWord512 $ zipWith (xor) (B.unpack x) (B.
 getNumAvailablePeers::IO Int
 getNumAvailablePeers = do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr' 20
+  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap length $ flip SQL.runSqlPool sqldb $ 
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
-
+          

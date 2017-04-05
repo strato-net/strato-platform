@@ -84,7 +84,7 @@ reIBBI = IndexerBestBlockInfo . BlockKey . fromIntegral
 runIContextM :: KafkaClientId -> IContextM a -> LoggingT IO a
 runIContextM cid f = do
     $logInfoS "runIContextM" . T.pack $ "Creating PG connection pool of size " ++ show pgPoolSize
-    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr' pgPoolSize
+    sqldb <- runNoLoggingT  $ SQL.createPostgresqlPool connStr pgPoolSize
     redis <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
     (ret, _) <- runResourceT $ runStateT f (IContext sqldb (mkConfiguredKafkaState cid) redis (reIBBI 0))
     $logInfoS "runIContextM" "runIContextM complete, returning"

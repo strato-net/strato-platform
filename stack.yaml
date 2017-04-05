@@ -20,12 +20,12 @@ packages:
 - strato-quarry/
 - strato-adit/
 - strato-index/
-- ethereum-test/
 - strato-sequencer/
 - ethereum-jsonrpc/
 - strato-model/
 - strato-redis-blockdb/
 - strato-statediff/
+- test-suite/
 - location:
     git: https://github.com/blockapps/blockapps-haskoin
     commit: 061a2afebae6dc2024e3fd883b250453f4111c7d
@@ -78,4 +78,10 @@ ghc-options:
   ethereum-test:           -Wall -Werror -fno-warn-warnings-deprecations
   strato-index:            -Wall -Werror
   strato-api:              -fno-warn-orphans
-  blockapps-tools:         -Wnoerror
+  blockapps-tools:         -Wall -Werror
+  strato-index:            -Wall -Werror -fno-warn-warnings-deprecations
+  strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
+  strato-quarry:           -Wall -Werror -fno-warn-warnings-deprecations
+  strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
+  strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing
+#  ethereum-jsonrpc:        -Wall -Werror -fno-warn-warnings-deprecations

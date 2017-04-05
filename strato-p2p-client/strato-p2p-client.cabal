@@ -26,7 +26,7 @@ executable strato-p2p-client
                  , monad-logger
                  , strato-p2p-client
     main-is: Main.hs
-    ghc-options: -Wall -O2 -threaded
+    ghc-options: -Wall -threaded
     buildable: True
     hs-source-dirs: exec_src
 
@@ -79,7 +79,6 @@ library
                  , hedis
 
     exposed-modules:
-                   Blockchain.BlockNotify
                    Blockchain.Context
                    Blockchain.Data.Wire
                    Blockchain.Display
@@ -88,7 +87,7 @@ library
                    Blockchain.NewEvent
                    Blockchain.ExtMergeSources
                    Blockchain.Options
-                   Blockchain.RawTXNotify
+                   Blockchain.SeqEventNotify
                    Blockchain.TCPClientWithTimeout
                    Executable.StratoP2PClient
     other-modules:

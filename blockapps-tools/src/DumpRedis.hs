@@ -5,18 +5,15 @@ import Database.Redis
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.Model.SHA
-
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 
 dumpRedis :: Integer -> IO ()
-dumpRedis num = do
+dumpRedis _ = do
     conn <- checkedConnect lookupRedisBlockDBConfig
     bb <- runRedis conn getBestBlockInfo 
     case bb of
         Nothing -> putStrLn "No best block in Redis"
         Just b  -> putStrLn . formatBB $ b
-        where
-          connInfo = defaultConnectInfo{connectHost="localhost", connectDatabase = num}
 
 formatBB :: RedisBestBlock -> String
 formatBB b = unlines [ ("Best block number:\t" ++) . show . bestBlockNumber $ b

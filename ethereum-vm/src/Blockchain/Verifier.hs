@@ -8,28 +8,25 @@ module Blockchain.Verifier (
 import Control.Monad
 import Control.Monad.Trans.Resource
 
-import Blockchain.Constants
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockSummary
-import Blockchain.Data.BlockDB
-import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
+import           Blockchain.Constants
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StateDB
-import Blockchain.Mining
-import Blockchain.Mining.Normal
-import Blockchain.Mining.Instant
-import Blockchain.Mining.SHA
-import Blockchain.Sequencer.Event
-import Blockchain.SHA
-import Blockchain.Util
-import Blockchain.VMContext
-import Blockchain.VMOptions
-import Blockchain.Verification
-
-
---import Debug.Trace
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.StateDB
+import           Blockchain.Mining
+import           Blockchain.Mining.Normal
+import           Blockchain.Mining.Instant
+import           Blockchain.Mining.SHA
+import           Blockchain.Sequencer.Event
+import           Blockchain.SHA
+import           Blockchain.Util
+import           Blockchain.VMContext
+import           Blockchain.VMOptions
+import           Blockchain.Verification
 
 {-
 nextGasLimit::Integer->Integer->Integer
@@ -50,23 +47,23 @@ instance Format BlockValidityError where
     format (BlockDifficultyWrong d expected) = "Block difficulty is wrong, is '" ++ show d ++ "', expected '" ++ show expected ++ "'"
 -}
 
-checkParentChildValidity::(Monad m)=>Bool->OutputBlock->BlockSummary->m ()
+checkParentChildValidity :: (Monad m) 
+                         => Bool -> OutputBlock -> BlockSummary -> m ()
 checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
     let nextDifficulty' = if isHomestead then homesteadNextDifficulty flags_difficultyBomb else nextDifficulty flags_difficultyBomb
-    unless (blockDataDifficulty c >= nextDifficulty' flags_testnet (bSumNumber parentBSum) (bSumDifficulty parentBSum) (bSumTimestamp parentBSum) (blockDataTimestamp c))
-             $ fail $ "Block difficulty is wrong: got '" ++ show (blockDataDifficulty c) ++
-                   "', expected '" ++
-                   show (nextDifficulty' flags_testnet (bSumNumber parentBSum) (bSumDifficulty parentBSum) (bSumTimestamp parentBSum) (blockDataTimestamp c)) ++ "'"
+    let calcNextDiff = nextDifficulty' flags_testnet (bSumNumber parentBSum) (bSumDifficulty parentBSum) (bSumTimestamp parentBSum) (blockDataTimestamp c)
+    unless (blockDataDifficulty c >= calcNextDiff)
+             $ fail $ "Block difficulty is wrong: got " ++ show (blockDataDifficulty c) ++ ", expected " ++ show calcNextDiff
     unless (blockDataNumber c == bSumNumber parentBSum + 1)
-             $ fail $ "Block number is wrong: got '" ++ show (blockDataNumber c) ++ ", expected '" ++ show (bSumNumber parentBSum + 1) ++ "'"
+             $ fail $ "Block number is wrong: got " ++ show (blockDataNumber c) ++ ", expected " ++ show (bSumNumber parentBSum + 1)
     unless (blockDataGasLimit c <= bSumGasLimit parentBSum +  nextGasLimitDelta (bSumGasLimit parentBSum))
-             $ fail $ "Block gasLimit is too high: got '" ++ show (blockDataGasLimit c) ++
-                   "', should be less than '" ++ show (bSumGasLimit parentBSum +  nextGasLimitDelta (bSumGasLimit parentBSum)) ++ "'"
+             $ fail $ "Block gasLimit is too high: got " ++ show (blockDataGasLimit c) ++
+                   ", should be less than " ++ show (bSumGasLimit parentBSum +  nextGasLimitDelta (bSumGasLimit parentBSum))
     unless (blockDataGasLimit c >= bSumGasLimit parentBSum - nextGasLimitDelta (bSumGasLimit parentBSum))
-             $ fail $ "Block gasLimit is too low: got '" ++ show (blockDataGasLimit c) ++
-                   "', should be less than '" ++ show (bSumGasLimit parentBSum -  nextGasLimitDelta (bSumGasLimit parentBSum)) ++ "'"
+             $ fail $ "Block gasLimit is too low: got " ++ show (blockDataGasLimit c) ++
+                   ", should be less than '" ++ show (bSumGasLimit parentBSum -  nextGasLimitDelta (bSumGasLimit parentBSum))
     unless (blockDataGasLimit c >= minGasLimit flags_testnet)
-             $ fail $ "Block gasLimit is lower than minGasLimit: got '" ++ show (blockDataGasLimit c) ++ "', should be larger than " ++ show (minGasLimit flags_testnet::Integer)
+             $ fail $ "Block gasLimit is lower than minGasLimit: got " ++ show (blockDataGasLimit c) ++ ", should be larger than " ++ show (minGasLimit flags_testnet::Integer)
     return ()
 
 verifier::Miner

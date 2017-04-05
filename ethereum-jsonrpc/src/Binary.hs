@@ -21,6 +21,7 @@ strToAddress ('0':'x':val) =
      case decodeOrFail $ BL.fromStrict b of
       Left (_, _, e) -> Left e
       Right ("", _, address) -> Right address
+      Right _ -> error "partial function"
    _ -> Left "invalid hex" 
 strToAddress _ = Left "missing 0x prefix for hex data"
 

@@ -515,7 +515,7 @@ oneTimeSetup genesisBlockName = do
       let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
       encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
 
-    {- kafkaTopics implicitly defined by ethconf.yaml above & unsafePerformIO -}
+      {- kafkaTopics implicitly defined by ethconf.yaml above & unsafePerformIO -}
 
       forM_ kafkaTopics $ createKafkaTopic . fromString
   
@@ -524,11 +524,16 @@ oneTimeSetup genesisBlockName = do
      {- CONFIG: define tables and indices -}
      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}  
      
-      runNoLoggingT $ withPostgresqlConn connStr $ runReaderT $ do
+      flip runLoggingT (printLogMsg' True True)$ withPostgresqlConn connStr $ runReaderT $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 
-         _ <- runMigrationSilent migrateAll
+         runMigration migrateAll
+         let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
+                        (False, _) -> Nothing
+                        (True, "") -> Just []
+                        (True, ipAddr) -> Just [ipAddr]
+         EthDiscovery.setup bootnodes
 
          liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
          rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (block_id);" []
@@ -550,41 +555,29 @@ oneTimeSetup genesisBlockName = do
          rawExecute "CREATE INDEX CONCURRENTLY ON transaction_result (transaction_hash);" []
 
      {- create directory and dbs -} 
-      _ <-
-          runResourceT $ do
-              liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
+     
+      void . runResourceT $ do
+         liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
 
-          {- CONFIG: localized -}
+     {- CONFIG: localized -}
 
-              sdb <- DB.open (dbDir "h" ++ stateDBPath)
-                     DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-              hdb <- DB.open (dbDir "h" ++ hashDBPath)
-                     DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-              cdb <- DB.open (dbDir "h" ++ codeDBPath)
-                     DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
-              let smpdb = MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
+         sdb <- DB.open (dbDir "h" ++ stateDBPath)
+                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+         hdb <- DB.open (dbDir "h" ++ hashDBPath)
+                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+         cdb <- DB.open (dbDir "h" ++ codeDBPath)
+                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+         let smpdb = MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
 
-              pool <- runNoLoggingT $ createPostgresqlPool connStr 20
+         pool <- runNoLoggingT $ createPostgresqlPool connStr 20
 
-              redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig) 
-              
-              _ <- flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool) $ do
-                addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
-                liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
-                case (flags_backupmp, flags_backupblocks) of
-                  (False, False) -> initializeGenesisBlock NoBackup genesisBlockName
-                  (True, True) -> error "You can't choose --backupmp and --backupblocks at the same time"
-                  (False, True) -> initializeGenesisBlock BlockBackup genesisBlockName
-                  (True, False) -> initializeGenesisBlock MPBackup genesisBlockName
-
-              return ()
-
-     {- create Kafka topics -} 
-
-      let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
-                        (False, _) -> Nothing
-                        (True, "") -> Just []
-                        (True, ipAddr) -> Just [ipAddr]
-      flip runLoggingT printLogMsg $ EthDiscovery.setup bootnodes
-
-      return ()
+         redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig) 
+         
+         void $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool) $ do
+           addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
+           liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
+           case (flags_backupmp, flags_backupblocks) of
+             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName
+             (True, True) -> error "You can't choose --backupmp and --backupblocks at the same time"
+             (False, True) -> initializeGenesisBlock BlockBackup genesisBlockName
+             (True, False) -> initializeGenesisBlock MPBackup genesisBlockName

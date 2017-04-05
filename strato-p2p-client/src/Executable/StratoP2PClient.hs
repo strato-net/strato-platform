@@ -32,7 +32,6 @@ import           System.Random
 import           Blockchain.Frame
 import           Blockchain.RLPx
 
-import           Blockchain.BlockNotify
 import qualified Blockchain.Colors                     as C
 import           Blockchain.Constants
 import           Blockchain.Context
@@ -44,8 +43,7 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Display
-import           Blockchain.EthConf                    hiding (genesisHash,
-                                                        port)
+import           Blockchain.EthConf                    hiding (port, genesisHash)
 import           Blockchain.EthEncryptionException
 import           Blockchain.Event
 import           Blockchain.EventException
@@ -53,7 +51,7 @@ import           Blockchain.ExtMergeSources
 import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.PeerUrls
-import           Blockchain.RawTXNotify
+import           Blockchain.SeqEventNotify
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
@@ -81,39 +79,39 @@ handleMsg :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB 
           -> PPeer
           -> Conduit Event m Message
 handleMsg myId peer = do
-    yield Hello { version = 4
-                , clientId = stratoVersionString
-                , capability = [ETH ethVersion]
-                , port = 0
-                , nodeId = myId
-                }
-    awaitMsg >>= \case
-        Just Hello{} ->
-            RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
-                Nothing -> error "we don't have a local BestBlock!"
-                Just (RedisBestBlock hash _ tdiff) -> do
-                    genHash <- lift getGenesisBlockHash
-                    yield Status {
-                        protocolVersion = fromIntegral ethVersion,
-                        networkID       = ourNetworkID,
-                        totalDifficulty = fromIntegral tdiff,
-                        latestHash      = hash,
-                        genesisHash     = genHash
-                    }
-        other -> assertHandshake other
-
-    awaitMsg >>= \case
-        Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
-            genesisBlockHash <- lift getGenesisHash
-            when (peerGH /= genesisBlockHash) $ throwIO WrongGenesisBlock
-            void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-            lastBlockNumber <- liftIO getBestKafkaBlockNumber
-            Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-            yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
-            stampActionTimestamp
-        other -> assertHandshake other
-
-    handleEvents (if flags_debugFail then Fail else Log) peer
+          yield Hello { version = 4
+                      , clientId = stratoVersionString
+                      , capability = [ETH ethVersion]
+                      , port = 0
+                      , nodeId = myId
+                      }
+          awaitMsg >>= \case
+              Just Hello{} ->
+                  RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
+                      Nothing -> error "we don't have a local BestBlock"
+                      Just (RedisBestBlock hash _ tdiff) -> do
+                          genHash <- lift getGenesisBlockHash
+                          yield Status {
+                              protocolVersion = fromIntegral ethVersion,
+                              networkID       = ourNetworkID,
+                              totalDifficulty = fromIntegral tdiff,
+                              latestHash      = hash,
+                              genesisHash     = genHash
+                          }
+              other -> assertHandshake other
+    
+          awaitMsg >>= \case
+              Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do 
+                      genHash <- lift getGenesisHash
+                      when (peerGH /= genHash) $ throwIO WrongGenesisBlock
+                      void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
+                      lastBlockNumber <- liftIO getBestKafkaBlockNumber
+                      Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
+                      yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
+                      stampActionTimestamp
+              other -> assertHandshake other
+    
+          handleEvents (if flags_debugFail then Fail else Log) peer
 
     where assertHandshake = throwIO . maybe PeerDisconnected EventBeforeHandshake
           ourNetworkID    = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
@@ -164,6 +162,7 @@ runPeer connectedPeers peer myPriv = do
     let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
     logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
     logInfoN . T.pack $ C.blue "============================"
+    logInfoN . T.pack $ C.blue "now on steroids too "
     logInfoN . T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
 
     let myPublic = calculatePublic theCurve myPriv
@@ -175,8 +174,7 @@ runPeer connectedPeers peer myPriv = do
         runResourceT $ do
             let peerString = T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer)
             void $ modifyTVar connectedPeers $ S.insert peerString
-            pool <- runNoLoggingT $ SQL.createPostgresqlPool
-                    connStr' 20
+            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20
 
             let kafkaState = mkConfiguredKafkaState "strato-p2p-client"
 
@@ -185,22 +183,21 @@ runPeer connectedPeers peer myPriv = do
                     appSource server $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink server
 
                 eventSource <- mergeSourcesCloseForAny [
-                  appSource server =$=
-                  ethDecrypt inCxt =$=
-                  bytesToMessages =$=
-                  tap (displayMessage False "") =$=
-                  CL.map MsgEvt,
-                  txNotificationSource "client_tx" =$= CL.map NewTX,
-                  blockNotificationSource "client_block" =$= CL.map (flip NewBL 0 . fst),
-                  timerSource
+                    appSource server
+                      =$= ethDecrypt inCxt
+                      =$= bytesToMessages
+                      =$= tap (displayMessage False "")
+                      =$= CL.map MsgEvt
+                  , seqEventNotifictationSource =$= CL.map NewSeqEvent
+                  , timerSource
                   ] 2
 
-                _ <- eventSource =$=
-                      handleMsg myPublic peer =$=
-                      transPipe lift (tap (displayMessage True "")) =$=
-                      messagesToBytes =$=
-                      ethEncrypt outCxt $$
-                      transPipe liftIO (appSink server)
+                _ <- eventSource
+                      =$= handleMsg myPublic peer
+                      =$= transPipe lift (tap (displayMessage True ""))
+                      =$= messagesToBytes
+                      =$= ethEncrypt outCxt
+                       $$ transPipe liftIO (appSink server)
 
                 void $ modifyTVar connectedPeers $ S.delete peerString
 
