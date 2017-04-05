@@ -47,6 +47,7 @@ library
     , http-api-data
     , http-client
     , http-media
+    , http-types
     , logging-effect
     , memory
     , monad-control

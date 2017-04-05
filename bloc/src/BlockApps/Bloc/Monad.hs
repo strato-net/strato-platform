@@ -16,14 +16,16 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Control
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Foldable
+import Data.String
 import Data.Text (Text)
-import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as Text
 import Data.Time.Format
 import Database.PostgreSQL.Simple (Connection,withTransaction)
 import Data.Profunctor.Product.Default
 import GHC.Stack
 import Network.HTTP.Client
+import Network.HTTP.Media
+import Network.HTTP.Types.Status
 import Opaleye
 import Servant
 import Servant.Client
@@ -74,6 +76,15 @@ data BlocError
   | Unimplemented Text
   deriving Show
 
+boxIt::String->String
+boxIt string =
+  replicate (len+4) '=' ++ "\n"
+  ++ unlines (map (\x -> "| " ++ x ++ " |") theLines)
+  ++ replicate (len+4) '='
+  where
+    len = Prelude.maximum $ map length theLines
+    theLines = lines string
+
 enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
   = Handler
@@ -83,12 +94,65 @@ enterBloc env x
   where
     reThrowError
       = \case
-          StratoError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          DBError err -> err500{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
-          UserError err -> err422{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
-          CouldNotFind err -> err404{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
-          AnError err -> err500{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
-          Unimplemented err -> err501{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
+          StratoError (FailureResponse (Status{statusCode=404}) responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Please contact your network administrator to have this problem fixed.",
+                     boxIt $ Lazy.Char8.unpack responseBody'
+                   ]}
+          StratoError (FailureResponse (Status{statusCode=404}) _ _) ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          StratoError (ConnectionError _) ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc can not connect to Strato.",
+                     "This probably is a configuration error, but can also mean the Strato peer is down.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          StratoError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc recieved a malformed response from Strato.",
+                     "This is probably a backend configuration problem.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          DBError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "Something is broken in the Bloc Server database.", 
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          UserError err -> err422{errBody = fromString $ show err}
+          CouldNotFind err -> err404{errBody = fromString $ show err}
+          AnError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "Something is broken in the Bloc Server.", 
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          Unimplemented err ->
+            err501{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "You are using a feature of the Bloc Server that has not yet been implemented.", 
+                     Text.unpack err
+                   ]}
     render
       = renderWithSeverity
       . renderWithCallStack
