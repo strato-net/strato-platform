@@ -12,14 +12,11 @@ import Servant.API
 import BlockApps.Solidity.Xabi
 
 type API =
-  "cirrus"
-    :> "contract"
+  "contract"
     :> ReqBody '[JSON] ContractDetails
     :> Post '[JSON] NoContent
-  :<|> "cirrus"
-    :> "search"
+  :<|> "search"
     :> Get '[JSON] [ContractDetails]
-  :<|> "cirrus"
-    :> "search"
+  :<|> "search"
     :> Capture "ContractName" Text
     :> Get '[JSON] ContractDetails

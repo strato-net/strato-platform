@@ -25,4 +25,4 @@ getSearchContract :: Text -> ClientM ContractDetails
 postContract :<|> getSearch :<|> getSearchContract = client (Proxy @ API)
 
 cirrusUrl :: BaseUrl
-cirrusUrl = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/cirrus"
+cirrusUrl = BaseUrl Http "tester11.eastus.cloudapp.azure.com" 80 "/cirrus/"
