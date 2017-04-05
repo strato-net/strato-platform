@@ -174,15 +174,14 @@ instance MonadContracts Bloc where
 
   getContractsStates _ = throwError $ Unimplemented "getContractsStates"
 
-  -- postContractsCompile = undefined
-
-  postContractsCompile = blocTransaction . traverse compileOneContract
+  postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
     where
       compileOneContract PostCompileRequest{..} = do
-        codeHash <- compileContract
+        codeHashes <- compileContract
           postcompilerequestContractName
           postcompilerequestSource
-        return $ PostCompileResponse postcompilerequestContractName codeHash
+        return $ map (uncurry PostCompileResponse) (codeHashes)
+
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
