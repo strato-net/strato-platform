@@ -6,6 +6,7 @@ ansiColor('xterm') {
                sh '''#!/bin/bash -l    
                 docker-compose kill && docker-compose -v down
                 docker ps
+                rm -rf repos silo
                 '''
             }
             stage('Build') {
@@ -16,7 +17,7 @@ ansiColor('xterm') {
                     git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                     cp /home/blockapps/basil .
                     ./basil clone
-                    ./basil build    
+                    ./basil build > ./basil-build.log 2>&1 < /dev/null   
                   '''
             }
             stage('Deploy') {
