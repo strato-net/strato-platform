@@ -9,6 +9,8 @@ module BlockApps.Ethereum.Abi.Value
   , valueIsDynamic
   , encodeValue
   , encodeValues
+  , decodeValue
+  , decodeValues
   ) where
 
 import Data.Bool (bool)
@@ -24,6 +26,7 @@ import qualified Data.Text.Encoding as Text.Encoding
 
 import BlockApps.Ethereum
 import BlockApps.Ethereum.Abi.Int
+import BlockApps.Ethereum.Abi.Type
 
 data Value
   = ValueStatic ValueStatic
@@ -164,7 +167,7 @@ encodeValue = \case
         <> encodeValues (map ValueStatic values)
 
     encodeStatic = \case
-      ValueBool value -> pad32Left0 $ ByteString.singleton $ bool 0 1 value
+      ValueBool value -> encodeStatic . ValueUInt256 $ bool 0 1 value
       ValueUInt8 value -> pad32Left0 $ encodeStrict value
       ValueUInt16 value -> pad32Left0 $ encodeStrict value
       ValueUInt24 value -> pad32Left0 $ encodeStrict value
@@ -306,3 +309,135 @@ encodeValues values =
     head'' = zipWith resolveHead tailLengths head'
   in
     ByteString.concat $ head'' <> tail'
+
+decodeValue :: ByteString -> Type -> Maybe Value
+decodeValue bytes' = \case
+  TypeStatic ty -> ValueStatic <$> decodeValueStatic bytes' ty
+  TypeDynamic ty -> ValueDynamic <$> decodeValueDynamic bytes' ty
+  where
+
+    decodeValueStatic bytes = \case
+      TypeBool -> ValueBool . (==1) <$> (decodeStrict bytes::Maybe Word256)
+      TypeUInt8 -> ValueUInt8 <$> decodeStrict bytes
+      TypeUInt16 -> ValueUInt16 <$> decodeStrict bytes
+      TypeUInt24 -> ValueUInt24 <$> decodeStrict bytes
+      TypeUInt32 -> ValueUInt32 <$> decodeStrict bytes
+      TypeUInt40 -> ValueUInt40 <$> decodeStrict bytes
+      TypeUInt48 -> ValueUInt48 <$> decodeStrict bytes
+      TypeUInt56 -> ValueUInt56 <$> decodeStrict bytes
+      TypeUInt64 -> ValueUInt64 <$> decodeStrict bytes
+      TypeUInt72 -> ValueUInt72 <$> decodeStrict bytes
+      TypeUInt80 -> ValueUInt80 <$> decodeStrict bytes
+      TypeUInt88 -> ValueUInt88 <$> decodeStrict bytes
+      TypeUInt96 -> ValueUInt96 <$> decodeStrict bytes
+      TypeUInt104 -> ValueUInt104 <$> decodeStrict bytes
+      TypeUInt112 -> ValueUInt112 <$> decodeStrict bytes
+      TypeUInt120 -> ValueUInt120 <$> decodeStrict bytes
+      TypeUInt128 -> ValueUInt128 <$> decodeStrict bytes
+      TypeUInt136 -> ValueUInt136 <$> decodeStrict bytes
+      TypeUInt144 -> ValueUInt144 <$> decodeStrict bytes
+      TypeUInt152 -> ValueUInt152 <$> decodeStrict bytes
+      TypeUInt160 -> ValueUInt160 <$> decodeStrict bytes
+      TypeUInt168 -> ValueUInt168 <$> decodeStrict bytes
+      TypeUInt176 -> ValueUInt176 <$> decodeStrict bytes
+      TypeUInt184 -> ValueUInt184 <$> decodeStrict bytes
+      TypeUInt192 -> ValueUInt192 <$> decodeStrict bytes
+      TypeUInt200 -> ValueUInt200 <$> decodeStrict bytes
+      TypeUInt208 -> ValueUInt208 <$> decodeStrict bytes
+      TypeUInt216 -> ValueUInt216 <$> decodeStrict bytes
+      TypeUInt224 -> ValueUInt224 <$> decodeStrict bytes
+      TypeUInt232 -> ValueUInt232 <$> decodeStrict bytes
+      TypeUInt240 -> ValueUInt240 <$> decodeStrict bytes
+      TypeUInt248 -> ValueUInt248 <$> decodeStrict bytes
+      TypeUInt256 -> ValueUInt256 <$> decodeStrict bytes
+      TypeUInt -> ValueUInt <$> decodeStrict bytes
+      TypeInt8 -> ValueInt8 <$> decodeStrict bytes
+      TypeInt16 -> ValueInt16 <$> decodeStrict bytes
+      TypeInt24 -> ValueInt24 <$> decodeStrict bytes
+      TypeInt32 -> ValueInt32 <$> decodeStrict bytes
+      TypeInt40 -> ValueInt40 <$> decodeStrict bytes
+      TypeInt48 -> ValueInt48 <$> decodeStrict bytes
+      TypeInt56 -> ValueInt56 <$> decodeStrict bytes
+      TypeInt64 -> ValueInt64 <$> decodeStrict bytes
+      TypeInt72 -> ValueInt72 <$> decodeStrict bytes
+      TypeInt80 -> ValueInt80 <$> decodeStrict bytes
+      TypeInt88 -> ValueInt88 <$> decodeStrict bytes
+      TypeInt96 -> ValueInt96 <$> decodeStrict bytes
+      TypeInt104 -> ValueInt104 <$> decodeStrict bytes
+      TypeInt112 -> ValueInt112 <$> decodeStrict bytes
+      TypeInt120 -> ValueInt120 <$> decodeStrict bytes
+      TypeInt128 -> ValueInt128 <$> decodeStrict bytes
+      TypeInt136 -> ValueInt136 <$> decodeStrict bytes
+      TypeInt144 -> ValueInt144 <$> decodeStrict bytes
+      TypeInt152 -> ValueInt152 <$> decodeStrict bytes
+      TypeInt160 -> ValueInt160 <$> decodeStrict bytes
+      TypeInt168 -> ValueInt168 <$> decodeStrict bytes
+      TypeInt176 -> ValueInt176 <$> decodeStrict bytes
+      TypeInt184 -> ValueInt184 <$> decodeStrict bytes
+      TypeInt192 -> ValueInt192 <$> decodeStrict bytes
+      TypeInt200 -> ValueInt200 <$> decodeStrict bytes
+      TypeInt208 -> ValueInt208 <$> decodeStrict bytes
+      TypeInt216 -> ValueInt216 <$> decodeStrict bytes
+      TypeInt224 -> ValueInt224 <$> decodeStrict bytes
+      TypeInt232 -> ValueInt232 <$> decodeStrict bytes
+      TypeInt240 -> ValueInt240 <$> decodeStrict bytes
+      TypeInt248 -> ValueInt248 <$> decodeStrict bytes
+      TypeInt256 -> ValueInt256 <$> decodeStrict bytes
+      TypeInt -> ValueInt <$> decodeStrict bytes
+      TypeAddress -> ValueAddress . Address <$> decodeStrict bytes
+      TypeBytes1 -> Just . ValueBytes1 $ ByteString.head bytes
+      TypeBytes2 -> Just . ValueBytes2 $ ByteString.take 2 bytes
+      TypeBytes3 -> Just . ValueBytes3 $ ByteString.take 3 bytes
+      TypeBytes4 -> Just . ValueBytes4 $ ByteString.take 4 bytes
+      TypeBytes5 -> Just . ValueBytes5 $ ByteString.take 5 bytes
+      TypeBytes6 -> Just . ValueBytes6 $ ByteString.take 6 bytes
+      TypeBytes7 -> Just . ValueBytes7 $ ByteString.take 7 bytes
+      TypeBytes8 -> Just . ValueBytes8 $ ByteString.take 8 bytes
+      TypeBytes9 -> Just . ValueBytes9 $ ByteString.take 9 bytes
+      TypeBytes10 -> Just . ValueBytes10 $ ByteString.take 10 bytes
+      TypeBytes11 -> Just . ValueBytes11 $ ByteString.take 11 bytes
+      TypeBytes12 -> Just . ValueBytes12 $ ByteString.take 12 bytes
+      TypeBytes13 -> Just . ValueBytes13 $ ByteString.take 13 bytes
+      TypeBytes14 -> Just . ValueBytes14 $ ByteString.take 14 bytes
+      TypeBytes15 -> Just . ValueBytes15 $ ByteString.take 15 bytes
+      TypeBytes16 -> Just . ValueBytes16 $ ByteString.take 16 bytes
+      TypeBytes17 -> Just . ValueBytes17 $ ByteString.take 17 bytes
+      TypeBytes18 -> Just . ValueBytes18 $ ByteString.take 18 bytes
+      TypeBytes19 -> Just . ValueBytes19 $ ByteString.take 19 bytes
+      TypeBytes20 -> Just . ValueBytes20 $ ByteString.take 20 bytes
+      TypeBytes21 -> Just . ValueBytes21 $ ByteString.take 21 bytes
+      TypeBytes22 -> Just . ValueBytes22 $ ByteString.take 22 bytes
+      TypeBytes23 -> Just . ValueBytes23 $ ByteString.take 23 bytes
+      TypeBytes24 -> Just . ValueBytes24 $ ByteString.take 24 bytes
+      TypeBytes25 -> Just . ValueBytes25 $ ByteString.take 25 bytes
+      TypeBytes26 -> Just . ValueBytes26 $ ByteString.take 26 bytes
+      TypeBytes27 -> Just . ValueBytes27 $ ByteString.take 27 bytes
+      TypeBytes28 -> Just . ValueBytes28 $ ByteString.take 28 bytes
+      TypeBytes29 -> Just . ValueBytes29 $ ByteString.take 29 bytes
+      TypeBytes30 -> Just . ValueBytes30 $ ByteString.take 30 bytes
+      TypeBytes31 -> Just . ValueBytes31 $ ByteString.take 31 bytes
+      TypeBytes32 -> Just . ValueBytes32 $ ByteString.take 32 bytes
+      TypeArrayStatic _len _ty -> undefined
+
+    decodeValueDynamic bytes = \case
+      TypeBytes -> do
+        let
+          (bytesLen,bytes'') = ByteString.splitAt 32 bytes
+        len <- decodeStrict bytesLen
+        return . ValueBytes $ ByteString.take len bytes''
+      TypeString -> do
+        ValueBytes str <- decodeValueDynamic bytes TypeBytes
+        return . ValueString $ Text.Encoding.decodeUtf8 str
+      TypeArrayDynamic _ty -> do
+        -- let
+        --   (bytesLen,bytes'') = ByteString.splitAt 32 bytes
+        -- len <- decodeStrict bytesLen
+        undefined
+
+    decodeStrict x =
+      case Binary.decodeOrFail (ByteString.Lazy.fromStrict x) of
+        Left _ -> Nothing
+        Right (_,_,y) -> Just y
+
+decodeValues :: ByteString -> [Type] -> Maybe [Value]
+decodeValues = undefined
