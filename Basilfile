@@ -1,0 +1,88 @@
+# vim: syntax=yaml tabstop=2 shiftwidth=2 expandtab smarttab :
+metadata:
+  name: silo
+  min_basil: "0.9.2"
+  version: 1.0
+  description: Test
+  git_repo: https://github.com/blockapps/silo
+  docker_repo: https://registry-aws.blockapps.net:5000/
+  hooks:
+    init: "#include basil_extensions.js"
+
+deployments:
+  - name: redis
+    compose:
+      image: redis:3.2
+      restart: always
+      command: redis-server --appendonly yes
+      ports:
+       - "6379:6379"
+
+  - name: strato
+    repo: https://github.com/blockapps/monstrato.git
+    ref: monostrato-cutover
+    compose:
+      restart: always
+      ports:
+        - "30303:30303"
+        - "30303:30303/udp"
+        - "33000:3000"
+      volumes:
+        - ./storage/strato:/var/lib/strato
+      environment:
+        networkID : "${networkID}"
+        genesis: "${genesis}"
+        genesisBlock: "${genesisBlock}"
+        bootnode: "${bootnode}"
+        addBootnodes: "${addBootnodes}"
+        lazyBlocks: "${lazyBlocks}"
+        miningAlgorithm: "${miningAlgorithm}"
+        miningThreads: "${miningThreads}"
+        blockTime: "${blockTime}"
+        minBlockDifficulty: "${minBlockDifficulty}"
+        debugFail: "${debugFail}"
+        backupblocks: "${backupblocks}"
+        redisBDBNumber: "${redisBDBNumber}"
+        useSyncMode: "${useSyncMode}"
+      links:
+        - zookeeper
+        - kafka
+        - postgres
+        - redis
+      depends_on:
+        - zookeeper
+        - kafka
+        - postgres
+        - redis
+
+  - name: postgres
+    repo: https://github.com/blockapps/postgres-packager.git
+    ref: monostrato-cutover
+    compose:
+      restart: always
+
+  - name: zookeeper
+    compose:
+      image: zookeeper:3.4.9
+      restart: always
+      environment:
+        ZOO_MY_ID: "1"
+      ports:
+        - "2181:2181"
+
+  - name: kafka
+    repo: https://github.com/blockapps/kafka-packager.git
+    ref: monostrato-cutover
+    compose:
+      restart: always
+      links:
+        - zookeeper
+      environment:
+        KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+        KAFKA_ADVERTISED_HOST_NAME: "kafka"
+        KAFKA_ADVERTISED_PORT: "9092"
+        KAFKA_DELETE_TOPIC_ENABLE: "true"
+        KAFKA_LOG_CLEANER_ENABLE: "false"
+        KAFKA_LOG_RETENTION_HOURS: "2147483647"
+      ports:
+        - "9092:9092"
