@@ -3,14 +3,13 @@ ansiColor('xterm') {
     node('cd9') {
         withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
             stage('CleanupRunningInstance') {
-               // sh '''#!/bin/bash -l    
-                //cd strato
-                //docker-compose kill && docker-compose -v down
-                //docker ps
-                //cd ../
-                //sudo rm -rf strato
-                //'''
-                echo 'todo cleanup'
+               sh '''#!/bin/bash -l    
+                cd strato
+                docker-compose kill && docker-compose -v down
+                docker ps
+                cd ../
+                sudo rm -rf strato
+                '''
             }
             stage('DeployMultinode') {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
