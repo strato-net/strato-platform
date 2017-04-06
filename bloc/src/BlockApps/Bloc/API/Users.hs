@@ -177,10 +177,10 @@ instance MonadUsers Bloc where
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
       let
         orderedResultIndexedXT = sortBy
-            (\x y -> compare (indexedXabiTypeIndex x) (indexedXabiTypeIndex y))
+            (\x y -> compare (Xabi.indexedTypeIndex x) (Xabi.indexedTypeIndex y))
             resultXabiTypes
         orderedResultTypes = map
-          (\IndexedXabiType{..} -> xabiTypeToType indexedXabiTypeType)
+          (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
           orderedResultIndexedXT
       txResult <- pollTxResult hash
       let
