@@ -20,6 +20,7 @@ library
   build-depends: base
     , blockapps-cirrus-api
     , blockapps-solidity
+    , aeson
     , containers
     , http-client
     , servant

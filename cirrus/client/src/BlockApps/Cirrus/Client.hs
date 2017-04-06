@@ -1,7 +1,5 @@
 {-# LANGUAGE
-    DeriveGeneric
-  , RecordWildCards
-  , TypeApplications
+    TypeApplications
 #-}
 
 module BlockApps.Cirrus.Client
@@ -11,6 +9,7 @@ module BlockApps.Cirrus.Client
   , cirrusUrl
   ) where
 
+import Data.Aeson
 import Data.Proxy
 import Data.Text (Text)
 import Servant.API
@@ -20,9 +19,9 @@ import BlockApps.Cirrus.API
 import BlockApps.Solidity.Xabi
 
 postContract :: ContractDetails -> ClientM NoContent
-getSearch :: ClientM [ContractDetails]
-getSearchContract :: Text -> ClientM ContractDetails
+getSearch :: ClientM Value
+getSearchContract :: Text -> ClientM Value
 postContract :<|> getSearch :<|> getSearchContract = client (Proxy @ API)
 
 cirrusUrl :: BaseUrl
-cirrusUrl = BaseUrl Http "tester11.eastus.cloudapp.azure.com" 80 "/cirrus/"
+cirrusUrl = BaseUrl Http "tester11.eastus.cloudapp.azure.com" 80 "/cirrus"
