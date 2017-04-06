@@ -61,12 +61,14 @@ instance MonadBaseControl IO Bloc where
 
 data BlocEnv = BlocEnv
   { urlStrato :: BaseUrl
+  , urlCirrus :: BaseUrl
   , httpManager :: Manager
   , dbConnection :: Connection
   }
 
 data BlocError
   = StratoError ServantError
+  | CirrusError ServantError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
@@ -84,6 +86,7 @@ enterBloc env x
     reThrowError
       = \case
           StratoError err -> err500{errBody = Lazy.Char8.pack (show err)}
+          CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
           DBError err -> err500{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
           UserError err -> err422{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
           CouldNotFind err -> err404{errBody = Lazy.Char8.fromStrict (encodeUtf8 err)}
@@ -155,6 +158,14 @@ blocStrato client' = do
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
   either (throwError . StratoError) return resultEither
+
+blocCirrus :: HasCallStack => ClientM x -> Bloc x
+blocCirrus client' = do
+  logWithCallStack callStack logNotice "Querying Strato"
+  url <- asks urlCirrus
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  either (throwError . CirrusError) return resultEither
 
 blocMaybe :: Text -> Maybe x -> Bloc x
 blocMaybe msg = maybe (throwError (CouldNotFind msg)) return

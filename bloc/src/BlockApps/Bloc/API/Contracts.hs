@@ -48,6 +48,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Bloc.Monad
+import BlockApps.Cirrus.Client
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.SolidityValue
@@ -183,7 +184,7 @@ instance MonadContracts Bloc where
         codeHash <- compileContract
           postcompilerequestContractName
           postcompilerequestSource
-        for_ postcompilerequestSearchable $ \ contractName ->
+        for_ postcompilerequestSearchable $ \ contractName -> do
           contractDetails <-
             getContractsContract (ContractName contractName) (Named "Latest")
           blocCirrus $ postContract contractDetails
