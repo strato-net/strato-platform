@@ -81,7 +81,6 @@ spec = do
       balance2AS `shouldBe` (initialWei + (etherToWei etherToSend))
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
-      -- pendingWith "Pending until contract method calls is implemented"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw

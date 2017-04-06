@@ -15,7 +15,6 @@
 module BlockApps.Bloc.API.Users where
 
 import Control.Arrow
-import Control.Monad (sequence)
 import Control.Monad.Except
 import Control.Monad.Log
 import Crypto.Secp256k1
@@ -27,7 +26,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Foldable
 import Data.Int (Int32)
-import Data.List (sortBy)
+import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -176,9 +175,10 @@ instance MonadUsers Bloc where
       hash <- blocStrato $ postTx tx
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
       let
-        orderedResultIndexedXT = sortBy
-            (\x y -> compare (Xabi.indexedTypeIndex x) (Xabi.indexedTypeIndex y))
-            resultXabiTypes
+        -- orderedResultIndexedXT = sortBy
+        --     (\x y -> compare (Xabi.indexedTypeIndex x) (Xabi.indexedTypeIndex y))
+        --     resultXabiTypes
+        orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
         orderedResultTypes = map
           (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
           orderedResultIndexedXT
@@ -212,8 +212,7 @@ convertResultResToTexts txResp responseTypes =
     byteResp = Text.encodeUtf8 txResp
   in case bytestringToValues byteResp responseTypes of
     Nothing -> Nothing
-    Just vals ->
-      sequence $ map valueToText vals
+    Just vals -> traverse valueToText vals
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
 buildArgumentByteString args mFunctionId = case mFunctionId of
