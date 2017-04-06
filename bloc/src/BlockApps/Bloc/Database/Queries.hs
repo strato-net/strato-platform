@@ -307,6 +307,15 @@ getContractsMetaDataId contractName = \case
     then getContractsMetaDataIdBySameNameQuery contractName
     else getContractsMetaDataIdByNameQuery contractName name
 
+getContractsMetaDataIdExhaustive :: Text -> Address -> Bloc Int32
+getContractsMetaDataIdExhaustive contractName contractAddr = do
+  cmIds <- catchError (blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr) $ \ _ ->
+    catchError (blocQuery $ getContractsMetaDataIdByLatestQuery contractName) $ \ _ ->
+      (blocQuery $ getContractsMetaDataIdBySameNameQuery contractName)
+  case cmIds of
+    [] -> throwError $ AnError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+    cmId:_ -> return cmId
+
 insertXabiFunctionArg
   :: Int32
   -> Map Text Xabi.IndexedType
@@ -873,21 +882,40 @@ insertXabi metadataId contractName Xabi{..} = do
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
 
+insertContract
+  :: Text
+  -> Text
+  -> Text
+  -> Text
+  -> Xabi
+  -> Bloc Int32
+insertContract parentContr contr bin binRuntime xabi = do
+  let
+    codeHash = keccak256 (Text.encodeUtf8 binRuntime)
+    xcodeHash = keccak256 (Text.encodeUtf8 bin)
+  cmIds <- blocQuery $ proc () -> do
+    (cmId,_,_,_,ch,xch) <- queryTable contractsMetaDataTable -< ()
+    restrict -< ch .== constant codeHash .&& xch .== constant xcodeHash
+    returnA -< cmId
+  case cmIds of
+    [] -> do
+      contrId <- createContractQuery contr
+      metadataId <- insertContractMetaDataQuery
+        contrId bin binRuntime codeHash xcodeHash
+      insertXabi metadataId parentContr xabi
+      return metadataId
+    cmId:_ -> return cmId
+
 compileContract :: Text -> Text -> Bloc [(Text,Keccak256)]
 compileContract contractName source = do
   (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   let
     contracts = Map.intersectionWith (,) xabis abiBins
-  metadataIds <- forMap contracts $ \ contrName (xabi,AbiBin{..}) -> do
-    let
-      codeHash = keccak256 (Text.encodeUtf8 binRuntime)
-      xcodeHash = keccak256 (Text.encodeUtf8 bin)
-    contrId <- createContractQuery contrName
-    metadataId <- insertContractMetaDataQuery
-      contrId bin binRuntime codeHash xcodeHash
-    insertXabi metadataId contractName xabi
-    return metadataId
+  metadataIds <-
+    flip Map.traverseWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
+      insertContract contractName contrName bin binRuntime xabi
+
 
   for_ metadataIds $ \ leftmetadataId ->
     for_ metadataIds $ \ rightmetadataId -> blocModify $
@@ -1152,6 +1180,35 @@ getContractXabi (ContractName contractName) contractId = do
   vars <- getXabiVariablesQuery metadataId
   return $ Xabi funcs constr vars $ error "Eitan, you gotta fix this!"
 
--- helper functions
-forMap :: Applicative m => Map k v -> (k -> v -> m x) -> m (Map k x)
-forMap m act = Map.traverseWithKey act m
+
+getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
+getContractMetadataAndBin contract = blocTransaction $ do
+  cmIds_bins <- blocQuery $ proc () -> do
+    (cmId,name,bin) <- joinF
+      (\ (cmId,_,bin,_,_,_) (_,name) -> (cmId,name,bin))
+      (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+      (queryTable contractsMetaDataTable)
+      (queryTable contractsTable) -< ()
+    restrict -< name .== constant contract
+    returnA -< (cmId,bin)
+  blocMaybe
+    "No contract metadata id found. Likely, contract did not compile successfully"
+    (listToMaybe cmIds_bins)
+
+getConstructorId :: Int32 -> Bloc (Maybe Int32)
+getConstructorId cmId = do
+  functionIds <- blocQuery $ proc () -> do
+    (xfId,contractMetaDataId,isConstr,_,_)
+      <- queryTable xabiFunctionsTable -< ()
+    restrict -< contractMetaDataId .== constant cmId .&& isConstr
+    returnA -< xfId
+  return $ listToMaybe functionIds
+
+getFunctionIdSel :: Int32 -> Text -> Bloc (Int32,ByteString)
+getFunctionIdSel cmId funcName = blocQuery1 $ proc () -> do
+  (xfId,contractMetaDataId,isConstr,name,sel)
+    <- queryTable xabiFunctionsTable -< ()
+  restrict -< contractMetaDataId .== constant cmId
+    .&& name .== constant funcName
+    .&& Opaleye.not isConstr
+  returnA -< (xfId,sel)
