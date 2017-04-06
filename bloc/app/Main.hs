@@ -42,8 +42,9 @@ main = do
   -- TODO: database connection resource management
   void $ execute_ conn createTables
   mgr <- newManager defaultManagerSettings
-  baseUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
-  let blocEnv = BlocEnv baseUrl mgr conn
+  stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
+  cirrusUrl <- parseBaseUrl flags_cirrusurl
+  let blocEnv = BlocEnv stratoUrl cirrusUrl mgr conn
   run flags_port (appBloc blocEnv)
 
 dbExistsQuery :: Query

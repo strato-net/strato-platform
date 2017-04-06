@@ -48,10 +48,12 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Bloc.Monad
+import BlockApps.Cirrus.Client
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.SolidityValue
 import BlockApps.SolidityVarReader
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.XAbiConverter
@@ -180,8 +182,11 @@ instance MonadContracts Bloc where
         codeHashes <- compileContract
           postcompilerequestContractName
           postcompilerequestSource
+        for_ postcompilerequestSearchable $ \ contractName -> do
+          contractDetails <-
+            getContractsContract (ContractName contractName) (Named "Latest")
+          blocCirrus $ postContract contractDetails
         return $ map (uncurry PostCompileResponse) (codeHashes)
-
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt

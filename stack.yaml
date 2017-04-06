@@ -1,6 +1,8 @@
 resolver: nightly-2017-03-07
 packages:
 - bloc
+- cirrus/api
+- cirrus/client
 - ethereum
 - solidity
 - strato/api
