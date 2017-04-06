@@ -917,14 +917,7 @@ compileContract contractName source = do
   metadataIds <-
     flip Map.traverseWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
       insertContract contractName contrName bin binRuntime xabi
-    -- let
-    --   codeHash = keccak256 (Text.encodeUtf8 binRuntime)
-    --   xcodeHash = keccak256 (Text.encodeUtf8 bin)
-    -- contrId <- createContractQuery contrName
-    -- metadataId <- insertContractMetaDataQuery
-    --   contrId bin binRuntime codeHash xcodeHash
-    -- insertXabi metadataId contractName xabi
-    -- return metadataId
+
 
   for_ metadataIds $ \ leftmetadataId ->
     for_ metadataIds $ \ rightmetadataId -> blocModify $
@@ -1203,10 +1196,9 @@ getContractMetadataAndBin contract = blocTransaction $ do
       (queryTable contractsTable) -< ()
     restrict -< name .== constant contract
     returnA -< (cmId,bin)
-  (cmId,bin) <- blocMaybe
-                  "No contract metadata id found. Likely, contract did not compile successfully"
-                  (listToMaybe cmIds_bins)
-  return (cmId,bin)
+  blocMaybe
+    "No contract metadata id found. Likely, contract did not compile successfully"
+    (listToMaybe cmIds_bins)
 
 getConstructorId :: Int32 -> Bloc (Maybe Int32)
 getConstructorId cmId = do

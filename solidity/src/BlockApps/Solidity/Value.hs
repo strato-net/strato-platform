@@ -349,22 +349,7 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
               rest <- toBytesTypePair restOfBytes tailTypes
               return $
                 (typeBytes,headType) : rest
-    -- do
-    --   let
-    --     (_ignoreBytes, rB) = ByteString.splitAt 32 b -- unnecessary bytes specifying total bytes of dynamic type
-    --     (arraySizeAsBytes, rBytes) = ByteString.splitAt 32 rB
-    --     arraySize = Binary.decode (ByteString.Lazy.fromStrict arraySizeAsBytes)
-    --     mEntrySize = case ty of
-    --       TypeArrayDynamic aType -> getTypeByteLength aType
-    --       _ -> Nothing
-    --   case mEntrySize of
-    --     Nothing -> Nothing
-    --     Just entrySize -> do
-    --       let
-    --         (typeBytes, restOfBytes) = ByteString.splitAt (entrySize * arraySize) rBytes
-    --       rest <- convertBytesToTextVals restOfBytes tailTypes
-    --       return $
-    --         (valueToText $ bytesToValue typeBytes headType) : rest
+
 
 valueToText :: Value -> Maybe Text
 valueToText = \case
