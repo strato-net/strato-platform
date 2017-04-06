@@ -32,12 +32,14 @@ library
   build-depends: base
     , bimap
     , binary
+    , blockapps-cirrus-client
     , blockapps-ethereum
     , blockapps-solidity
     , blockapps-strato-api
     , blockapps-strato-client
     , aeson
     , aeson-casing
+    , bimap
     , containers
     , contravariant
     , cryptonite

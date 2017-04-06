@@ -58,6 +58,7 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.SolidityValue
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
 import BlockApps.XAbiConverter (xabiTypeToType)

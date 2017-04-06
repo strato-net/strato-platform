@@ -48,6 +48,8 @@ library
     , memory
     , QuickCheck
     , quickcheck-instances
+    , servant
+    , servant-docs
     , text
     , unordered-containers
     , vector
