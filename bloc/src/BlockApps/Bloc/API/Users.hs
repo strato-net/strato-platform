@@ -26,6 +26,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Foldable
 import Data.Int (Int32)
+import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -57,8 +58,10 @@ import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.SolidityValue
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
+import BlockApps.XAbiConverter (xabiTypeToType)
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
@@ -148,7 +151,6 @@ instance MonadUsers Bloc where
           return addr'
 
   postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
-  postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
 
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
     for txs $ \ (SendTransaction toAddr value txParams) -> do
@@ -162,29 +164,52 @@ instance MonadUsers Bloc where
 
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
-getContractMetadataAndBin :: Text ->  Bloc (Int32, ByteString)
-getContractMetadataAndBin contract = blocTransaction $ do
-  cmIds_bins <- blocQuery $ proc () -> do
-    (cmId,name,bin) <- joinF
-      (\ (cmId,_,bin,_,_,_) (_,name) -> (cmId,name,bin))
-      (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
-      (queryTable contractsMetaDataTable)
-      (queryTable contractsTable) -< ()
-    restrict -< name .== constant contract
-    returnA -< (cmId,bin)
-  (cmId,bin) <- blocMaybe
-                  "No contract metadata id found. Likely, contract did not compile successfully"
-                  (listToMaybe cmIds_bins)
-  return (cmId,bin)
+  postUsersContractMethod
+    userName
+    userAddr
+    (ContractName contractName)
+    contractAddr
+    (PostUsersContractMethodRequest password funcName args value txParams) = do
+      cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
+      (functionId,sel16) <- getFunctionIdSel cmId funcName
+      let
+        (sel,leftOver) = Base16.decode $ sel16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+      argsBin <- buildArgumentByteString (Just args) (Just functionId)
+      tx <- prepareTx
+        userName
+        password
+        userAddr
+        (Just contractAddr)
+        txParams
+        (Wei (fromIntegral value))
+        (sel <> argsBin)
+      logWith logNotice ("tx is: " <> Text.pack (show tx))
+      hash <- blocStrato $ postTx tx
+      resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+      let
+        orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+        orderedResultTypes = map
+          (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+          orderedResultIndexedXT
+      txResult <- pollTxResult hash
+      let
+        mFormattedResponse = Text.concat <$>
+          convertResultResToTexts
+            (transactionresultResponse txResult)
+            orderedResultTypes
 
-getConstructorId :: Int32 -> Bloc (Maybe Int32)
-getConstructorId cmId = blocTransaction $ do
-  functionIds <- blocQuery $ proc () -> do
-    (xfId,contractMetaDataId,isConstr,_,_)
-      <- queryTable xabiFunctionsTable -< ()
-    restrict -< contractMetaDataId .== constant cmId .&& isConstr
-    returnA -< xfId
-  return $ listToMaybe functionIds
+      formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
+
+      return $ PostUsersContractMethodResponse formattedResponse
+
+convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
+convertResultResToTexts txResp responseTypes =
+  let
+    byteResp = Text.encodeUtf8 txResp
+  in case bytestringToValues byteResp responseTypes of
+    Nothing -> Nothing
+    Just vals -> traverse valueToText vals
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
 buildArgumentByteString args mFunctionId = case mFunctionId of
@@ -388,8 +413,9 @@ type PostUsersContractMethod = "users"
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
-  , postuserscontractmethodArgs :: Map Text SolidityValue
+  , postuserscontractmethodArgs :: Map Text Text
   , postuserscontractmethodValue :: Natural
+  , postuserscontractmethodTxParams :: TxParams
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform

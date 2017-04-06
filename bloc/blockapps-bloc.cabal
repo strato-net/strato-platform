@@ -30,13 +30,15 @@ library
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
+               , aeson
+               , aeson-casing
                , bimap
+               , binary
+               , blockapps-cirrus-client
                , blockapps-ethereum
                , blockapps-solidity
                , blockapps-strato-api
                , blockapps-strato-client
-               , aeson
-               , aeson-casing
                , containers
                , contravariant
                , cryptonite
@@ -75,7 +77,6 @@ library
                , unordered-containers
                , warp
                , wl-pprint-text
-
 executable blockapps-bloc
   hs-source-dirs: app
   main-is: Main.hs

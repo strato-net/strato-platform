@@ -1,5 +1,6 @@
 {-# LANGUAGE
-    OverloadedStrings
+    OverloadedStrings,
+    LambdaCase
 #-}
 
 module BlockApps.Solidity.Type where
@@ -128,6 +129,23 @@ data SimpleType
   | TypeBytes
   | TypeString
   deriving (Show,Read)
+
+getTypeByteLength :: Type -> Maybe Int
+getTypeByteLength = \case
+  SimpleType ty -> getSimpleTypeByteLength ty
+  TypeArrayDynamic _ -> Nothing
+  TypeArrayFixed len ty -> (fromIntegral len *) <$> (getTypeByteLength ty)
+  TypeMapping _ _ -> Nothing
+  TypeFunction _ _ _ -> Nothing
+  TypeStruct _ -> Nothing
+  TypeEnum _ -> Nothing
+  TypeContract _ -> getSimpleTypeByteLength TypeAddress
+
+getSimpleTypeByteLength :: SimpleType -> Maybe Int
+getSimpleTypeByteLength = \case
+  TypeBytes -> Nothing
+  TypeString -> Nothing
+  _ -> Just 32
 
 formatSimpleType::SimpleType->String
 formatSimpleType x = drop 4 $ show x
