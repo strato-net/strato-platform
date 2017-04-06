@@ -151,8 +151,6 @@ instance MonadUsers Bloc where
 
   postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
 
-  postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
-
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
     for txs $ \ (SendTransaction toAddr value txParams) -> do
       tx <- prepareTx
@@ -204,11 +202,8 @@ instance MonadUsers Bloc where
             orderedResultTypes
 
       formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
-      
-      return $ PostUsersContractMethodResponse formattedResponse
 
-  postUsersSendList _ _ _ = throwError $ Unimplemented "postUsersSendList"
-  postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
+      return $ PostUsersContractMethodResponse formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
