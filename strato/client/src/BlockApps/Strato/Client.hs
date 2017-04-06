@@ -14,6 +14,7 @@ module BlockApps.Strato.Client
   , getTxsFilter
   , getTxsLast
   , postTx
+  , postTxList
   , getTxResult
   , getBlocksFilter
   , getBlocksLast
@@ -100,6 +101,7 @@ accountsFilterParams = AccountsFilterParams
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Text
+postTxList :: [PostTransaction] -> ClientM [Keccak256]
 getTxResult :: Text -> ClientM [TransactionResult]
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
 getBlocksLast :: Natural -> ClientM [WithNext Block]
@@ -114,6 +116,7 @@ postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
   :<|> getTxsLast
   :<|> postTx
+  :<|> postTxList
   :<|> getTxResult
   :<|> getBlocksFilter
   :<|> getBlocksLast
@@ -128,6 +131,7 @@ getTxsFilter
     uncurryTxsFilterParams getTxsFilter'
     :<|> getTxsLast'
     :<|> postTx'
+    :<|> postTxList'
     :<|> getTxResult'
     :<|> uncurryBlocksFilterParams getBlocksFilter'
     :<|> getBlocksLast'
@@ -143,6 +147,7 @@ getTxsFilter
     getTxsFilter'
       :<|> getTxsLast'
       :<|> postTx'
+      :<|> postTxList'
       :<|> getTxResult'
       :<|> getBlocksFilter'
       :<|> getBlocksLast'
@@ -168,4 +173,4 @@ getTxsFilter
       qaNonce qaMinNonce qaMaxNonce
 
 stratoDev :: BaseUrl
-stratoDev = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+stratoDev = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
