@@ -17,7 +17,7 @@ ansiColor('xterm') {
                     git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                     cp /home/blockapps/basil .
                     ./basil clone
-                    ./basil build > ./basil-build.log 2>&1 < /dev/null   
+                    ./basil build 
                   '''
             }
             stage('Deploy') {
