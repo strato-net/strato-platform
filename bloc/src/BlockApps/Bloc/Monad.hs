@@ -9,6 +9,8 @@
 
 module BlockApps.Bloc.Monad where
 
+
+import Control.Exception.Lifted hiding (Handler, handle)
 import Control.Monad.Base
 import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
@@ -74,6 +76,7 @@ data BlocError
   | CouldNotFind Text
   | AnError Text
   | Unimplemented Text
+  | RuntimeError SomeException
   deriving Show
 
 boxIt::String->String
@@ -90,8 +93,16 @@ enterBloc env x
   = Handler
   $ withExceptT reThrowError
   $ flip runLoggingT (liftIO . print . render Leijen.textStrict)
-  $ flip runReaderT env $ runBloc x
+  $ flip runReaderT env $ runBloc
+  $ convertRuntimeErrors x
   where
+    convertRuntimeErrors::Bloc x->Bloc x
+    convertRuntimeErrors f = do
+      val <- try f
+      case val of
+       Left e -> throwError $ RuntimeError e
+       Right v -> return v
+    reThrowError :: BlocError -> ServantErr
     reThrowError
       = \case
           StratoError (FailureResponse (Status{statusCode=404}) responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
@@ -100,6 +111,7 @@ enterBloc env x
                      "Error!",
                      "Bloc seems to be improperly configured (Strato pages are missing.)",
                      "Please contact your network administrator to have this problem fixed.",
+                     "Response from server:",
                      boxIt $ Lazy.Char8.unpack responseBody'
                    ]}
           StratoError (FailureResponse (Status{statusCode=404}) _ _) ->
@@ -152,6 +164,13 @@ enterBloc env x
                      "Internal Error!",
                      "You are using a feature of the Bloc Server that has not yet been implemented.", 
                      Text.unpack err
+                   ]}
+          RuntimeError _ -> err500{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "Something wrong has happened inside of bloc.", 
+                     "Please contact your network administrator to have this problem fixed.", 
+                     "(More information can be found in the Bloc logs.)"
                    ]}
     render
       = renderWithSeverity
