@@ -440,4 +440,13 @@ decodeValue bytes' = \case
         Right (_,_,y) -> Just y
 
 decodeValues :: ByteString -> [Type] -> Maybe [Value]
-decodeValues = undefined
+decodeValues bytes = \case
+  [] -> if ByteString.null bytes then Just [] else Nothing
+  ty:tys -> case ty of
+    TypeStatic tyS ->
+      let
+        size = fromIntegral (typeStaticByteSize tyS)
+        (bytes',rest) = ByteString.splitAt size bytes
+      in
+        (:) <$> decodeValue bytes' ty <*> decodeValues rest tys
+    TypeDynamic _tyD -> undefined
