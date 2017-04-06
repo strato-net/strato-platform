@@ -37,7 +37,7 @@ type API =
     :> Post '[PlainText] Text
   :<|> "transactionList"
       :> ReqBody '[JSON] [PostTransaction]
-      :> Post '[JSON] [Keccak256]
+      :> Post '[JSON] [Text]
   :<|> "transactionResult"
     :> Capture "hash" Text
     :> Get '[JSON] [TransactionResult]

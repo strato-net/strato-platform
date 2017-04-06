@@ -31,6 +31,7 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy
 import Data.String
 import Data.Text (Text)
+import Data.Traversable
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
@@ -106,12 +107,12 @@ instance MonadContracts Bloc where
   getContractsContract contract@(ContractName contractName) contractId = blocTransaction $ do
     xabi <- getContractXabi contract contractId
     let
-      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name) =
+      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name,_ :: Int32) =
         ContractDetails
           { contractdetailsBin = Text.decodeUtf8 bin
           , contractdetailsAddress = detailsAddr
           , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-          , contractdetailsCodeHash = Text.decodeUtf8 codeHash
+          , contractdetailsCodeHash = codeHash
           , contractdetailsName = name
           , contractdetailsXabi = xabi
           }
@@ -177,11 +178,9 @@ instance MonadContracts Bloc where
   postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
     where
       compileOneContract PostCompileRequest{..} = do
-        codeHashes <- compileContract
-          postcompilerequestContractName
-          postcompilerequestSource
-        return $ map (uncurry PostCompileResponse) (codeHashes)
-
+        idsAndDetails <- compileContract postcompilerequestSource
+        for (toList idsAndDetails) $ \ (_,ContractDetails{..}) ->
+          return $ PostCompileResponse contractdetailsName contractdetailsCodeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt

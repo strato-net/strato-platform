@@ -116,11 +116,14 @@ instance MonadUsers Bloc where
   postUsersContract userName addr
     (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
       --TODO: check what happens with mismatching args
-      void $ compileContract contract src
+      idsAndDetails <- compileContract src
       logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-      (cmId, bin16) <- getContractMetadataAndBin contract
+      --(cmId, bin16) <- getContractMetadataAndBin contract
+
+      (cmId,ContractDetails{..}) <- blocMaybe "Could not find global contract metadataId" $
+        Map.lookup contract idsAndDetails
       let
-        (bin,leftOver) = Base16.decode $ bin16
+        (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
       unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
       mFunctionId <- getConstructorId cmId
       argsBin <- buildArgumentByteString args mFunctionId
@@ -148,17 +151,34 @@ instance MonadUsers Bloc where
           return addr'
 
   postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
+  -- postUsersUploadList userName addr (UploadListRequest pw contracts resolve) = do
+  --   txs <- for contracts $ \ (UploadListContract name arg txParams) -> do
+  --     (bin,binRuntime,codeHash,xcodeHash,cmId) <- getContractsContractLatestQuery name
+  --     let
+  --       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 bin
+  --     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+  --     mFunctionId <- getConstructorId cmId
+  --     argsBin <- buildArgumentByteString args mFunctionId
+  --     prepareTx
+  --       userName pw addr Nothing txParams (Wei (fromIntegral 0)) (bin <> argsBin)
+    hashes <- blocStrato $ postTxList txs'
+    -- resolve makes no sense because we have to save the addresses in the db
+    -- so we must poll for results
+
+    -- TODO: poll for results. insert contract instancesbn
+
+
   postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
 
-  postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
-    for txs $ \ (SendTransaction toAddr value txParams) -> do
-      tx <- prepareTx
+  postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
+    txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> do
+      prepareTx
         userName pw addr (Just toAddr) txParams
         (Wei (fromIntegral value)) ByteString.empty
-      hash <- blocStrato $ postTx tx
-      PostSendListResponse <$> if resolve
-        then transactionresultResponse <$> pollTxResult hash
-        else return hash
+    hashes <- blocStrato $ postTxList txs'
+    map PostSendListResponse <$> if resolve
+      then traverse (fmap transactionresultResponse . pollTxResult) hashes
+      else return hashes
 
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 

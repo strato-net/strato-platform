@@ -389,12 +389,13 @@ getContractsContractByAddressQuery
       , Column PGBytea
       , Column PGBytea
       , Column PGText
+      , Column PGInt4
     ) )
 getContractsContractByAddressQuery contractName contractAddress =
   limit 1 $ proc () -> do
-    (_,name,addr,_,bin,binRuntime,codeHash,xcodeHash) <-
+    (cmId,name,addr,_,bin,binRuntime,codeHash,xcodeHash) <-
       contractByAddress contractName contractAddress -< ()
-    returnA -< (addr,(bin,binRuntime,codeHash,xcodeHash,name))
+    returnA -< (addr,(bin,binRuntime,codeHash,xcodeHash,name,cmId))
 
 {- |
 SELECT CM2.id
@@ -449,13 +450,14 @@ getContractsContractByNameQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
+    , Column PGInt4
     )
 getContractsContractByNameQuery contractName1 contractName2 =
   limit 1 $ proc () -> do
-    (b,br,ch,xch,name1,name2,_) <- linkedContractsJoinTable -< ()
+    (b,br,ch,xch,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
     restrict -< name1 .== constant contractName1
     restrict -< name2 .== constant contractName2
-    returnA -< (b,br,ch,xch,name2)
+    returnA -< (b,br,ch,xch,name2,cm2Id)
 
 {- |
 SELECT CM.id
@@ -499,12 +501,13 @@ getContractsContractBySameNameQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
+    , Column PGInt4
     )
 getContractsContractBySameNameQuery contractName =
   limit 1 $ proc () -> do
-    (b,br,ch,xch,name,_) <- joinTable -< ()
+    (b,br,ch,xch,name,cmId) <- joinTable -< ()
     restrict -< name .== constant contractName
-    returnA -< (b,br,ch,xch,name)
+    returnA -< (b,br,ch,xch,name,cmId)
   where
     joinTable = joinF
       (\ (cmId,_,b,br,ch,xch) (_,name) -> (b,br,ch,xch,name,cmId))
@@ -526,7 +529,7 @@ LIMIT 1;
 getContractsMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
 getContractsMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
   (cmId,name,_,_,_,_,_,_) <-
-    orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
+    orderBy (desc (\ (cmId,_,_,_,_,_,_,_) -> cmId))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
   returnA -< cmId
@@ -555,13 +558,14 @@ getContractsContractLatestQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
+    , Column PGInt4
     )
 getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
-  (_,name,_,_,b,br,ch,xch) <-
-    orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
+  (cmId,name,_,_,b,br,ch,xch) <-
+    orderBy (desc (\ (cmId,_,_,_,_,_,_,_) -> cmId))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
-  returnA -< (b,br,ch,xch,name)
+  returnA -< (b,br,ch,xch,name, cmId)
 
 {- |
 SELECT
@@ -877,34 +881,52 @@ insertXabi metadataId contractName Xabi{..} = do
 
 
 
-compileContract :: Text -> Text -> Bloc [(Text,Keccak256)]
-compileContract contractName source = do
+compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
+compileContract source = do
   (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   let
     contracts = Map.intersectionWith (,) xabis abiBins
-  metadataIds <- forMap contracts $ \ contrName (xabi,AbiBin{..}) -> do
-    let
-      codeHash = keccak256 (Text.encodeUtf8 binRuntime)
-      xcodeHash = keccak256 (Text.encodeUtf8 bin)
-    contrId <- createContractQuery contrName
-    metadataId <- insertContractMetaDataQuery
-      contrId bin binRuntime codeHash xcodeHash
-    insertXabi metadataId contractName xabi
-    return metadataId
+    details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
+      ContractDetails
+      { contractdetailsBin = bin
+      , contractdetailsAddress = Just (Named "Latest")
+      , contractdetailsBinRuntime = binRuntime
+      , contractdetailsCodeHash = keccak256 (Text.encodeUtf8 binRuntime)
+      , contractdetailsName = contrName
+      , contractdetailsXabi = xabi
+      }
 
-  for_ metadataIds $ \ leftmetadataId ->
-    for_ metadataIds $ \ rightmetadataId -> blocModify $
+  metadataIds <- flip Map.traverseWithKey details $
+    \ contrName (detail@ContractDetails{..}) -> do
+      let
+        xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)
+      contrId <- createContractQuery contrName
+      metadataId <- insertContractMetaDataQuery
+        contrId
+        contractdetailsBin
+        contractdetailsBinRuntime
+        contractdetailsCodeHash
+        xcodeHash
+      insertXabi metadataId contrName contractdetailsXabi
+      return (metadataId,detail)
+
+  for_ metadataIds $ \ (leftmetadataId,_) ->
+    for_ metadataIds $ \ (rightmetadataId,_) -> blocModify $
       insertContractLookup leftmetadataId rightmetadataId
 
-  blocQuery $ proc () -> do
-    (cmId,codeHash,name) <- joinF
-      (\ (cmId,_,_,_,codeHash,_) (_,name) -> (cmId,codeHash,name))
-      (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
-      (queryTable contractsMetaDataTable)
-      (queryTable contractsTable) -< ()
-    restrict -< in_ [constant mId | (_,mId) <- Map.toList metadataIds] cmId
-    returnA -< (name,codeHash)
+  return metadataIds
+
+  -- hashes <- blocQuery $ proc () -> do
+  --   (cmId,codeHash,name) <- joinF
+  --     (\ (cmId,_,_,_,codeHash,_) (_,name) -> (cmId,codeHash,name))
+  --     (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
+  --     (queryTable contractsMetaDataTable)
+  --     (queryTable contractsTable) -< ()
+  --   restrict -< in_ [constant mId | (_,mId) <- Map.toList metadataIds] cmId
+  --   returnA -< (name,codeHash)
+
+
 
 -- insertXabiContractTypes ::  Map Text Xabi.Def-> Bloc Int32
 -- insertXabiContractTypes types =
