@@ -151,6 +151,49 @@ instance MonadUsers Bloc where
 
   postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
 
+  postUsersContractMethod
+    userName
+    userAddr
+    (ContractName contractName)
+    contractAddr
+    (PostUsersContractMethodRequest password funcName args value txParams) = do
+      cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
+      (functionId,sel16) <- getFunctionIdSel cmId funcName
+      let
+        (sel,leftOver) = Base16.decode $ sel16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+      argsBin <- buildArgumentByteString (Just args) (Just functionId)
+      tx <- prepareTx
+        userName
+        password
+        userAddr
+        (Just contractAddr)
+        txParams
+        (Wei (fromIntegral value))
+        (sel <> argsBin)
+      logWith logNotice ("tx is: " <> Text.pack (show tx))
+      hash <- blocStrato $ postTx tx
+      resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+      let
+        -- orderedResultIndexedXT = sortBy
+        --     (\x y -> compare (Xabi.indexedTypeIndex x) (Xabi.indexedTypeIndex y))
+        --     resultXabiTypes
+        orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+        orderedResultTypes = map
+          (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+          orderedResultIndexedXT
+      txResult <- pollTxResult hash
+      let
+        mFormattedResponse = Text.concat <$>
+          convertResultResToTexts
+            (transactionresultResponse txResult)
+            orderedResultTypes
+
+      formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
+
+      return $ PostUsersContractMethodResponse formattedResponse
+
+
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
     for txs $ \ (SendTransaction toAddr value txParams) -> do
       tx <- prepareTx

@@ -908,6 +908,7 @@ insertContract parentContr contr bin binRuntime xabi = do
       return metadataId
     cmId:_ -> return cmId
 
+
 compileContract :: Text -> Text -> Bloc [(Text,Keccak256)]
 compileContract contractName source = do
   (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
