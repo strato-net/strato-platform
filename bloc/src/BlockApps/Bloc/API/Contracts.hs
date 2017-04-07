@@ -22,7 +22,6 @@ import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
-import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.Int
 import Data.Maybe
@@ -33,7 +32,6 @@ import Data.String
 import Data.Text (Text)
 import Data.Traversable
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
 import Generic.Random.Generic
 import GHC.Generics
@@ -107,7 +105,7 @@ instance MonadContracts Bloc where
     return $ map Unnamed addresses ++ map Named names
 
   getContractsContract = getContractDetails
-    
+
   getContractsState contract@(ContractName contractName) contractId = do
     contract' <- xAbiToContract <$> getContractXabi contract contractId
 
