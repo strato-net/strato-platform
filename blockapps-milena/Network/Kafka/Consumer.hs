@@ -63,7 +63,7 @@ fetchSingleOffset groupName topic partition = do
         (NotCoordinatorForConsumerCode, _)       -> retry
         (ConsumerCoordinatorNotAvailableCode, _) -> retry
         (OffsetsLoadInProgressCode, _)           -> retry
-        (err, _) -> return $ Left err
+        (err', _) -> return $ Left err'
 
 commitSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> m (Either KafkaError ())
 commitSingleOffset groupName topic partition offset ofsMetadata = do

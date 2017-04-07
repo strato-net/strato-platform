@@ -34,6 +34,10 @@ packages:
     git: https://github.com/blockapps/ethereum-rlp
     commit: 6627727a26ee74381d057eccbe458b419ea24c92 # tag '1'
   extra-dep: true
+- location:
+    git: https://github.com/iostat/statsdi
+    commit: 65621e3ab4a08220a43cc8cdaabe4c4b3af51b6f
+  extra-dep: true
 extra-deps:
 - Crypto-4.2.5.1
 - SHA2-0.2.5
