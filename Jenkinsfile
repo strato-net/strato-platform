@@ -32,6 +32,7 @@ ansiColor('xterm') {
                 pwd
                 cd strato/repos/monstrato
                 make multinode
+                make unittest
                 '''
             }
         }

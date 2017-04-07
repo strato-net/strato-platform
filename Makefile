@@ -22,3 +22,6 @@ multinode:
 	fi
 	cd multinode-test/ && npm install && ./node_modules/mocha/bin/mocha test/ --reporter mochawesome
 
+unittest:
+	echo "unit tests"
+	stack test ethereum-discovery
