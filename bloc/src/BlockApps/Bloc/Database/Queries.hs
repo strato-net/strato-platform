@@ -918,7 +918,7 @@ insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
-  -- void $ insertXabiTypeDefs metadataId xabiTypes
+  void $ insertXabiTypeDefs metadataId xabiTypes
 
 insertContract
   :: Text
@@ -1219,6 +1219,22 @@ getXabiStructFields typeDefId = do
     ty <- getXabiType ftid
     return $ Xabi.FieldType atbytes ty
 
+insertXabiStructFields :: Int32 ->  Map Text Xabi.FieldType -> Bloc Int64
+insertXabiStructFields typeDefId fields = do
+  fieldsWithIds <- for fields $ \ (Xabi.FieldType atBytes xt) -> do
+    xtid <- insertXabiType xt
+    return (atBytes,xtid)
+  blocModify $ \ conn ->
+    runInsertMany conn xabiStructFieldsTable
+      [ ( Nothing
+        , constant name
+        , constant atBytes
+        , constant typeDefId
+        , constant xtid
+        )
+      | (name,(atBytes,xtid)) <- Map.toList fieldsWithIds
+      ]
+
 getXabiEnumNames :: Int32 -> Bloc [Text]
 getXabiEnumNames typeDefId = blocQuery $ proc () -> do
   (_,name,_,tdid) <-
@@ -1227,8 +1243,19 @@ getXabiEnumNames typeDefId = blocQuery $ proc () -> do
   restrict -< tdid .== constant typeDefId
   returnA -< name
 
-getXabiTypeDef :: Int32 -> Bloc (Map Text Xabi.Def.Def)
-getXabiTypeDef metadataId = do
+insertXabiEnumNames :: Int32 -> [Text] -> Bloc Int64
+insertXabiEnumNames typeDefId names = blocModify $ \ conn ->
+  runInsertMany conn xabiEnumNamesTable
+    [ ( Nothing
+      , constant name
+      , constant value
+      , constant typeDefId
+      )
+    | (name,value) <- zip names [0::Int32 ..]
+    ]
+
+getXabiTypeDefs :: Int32 -> Bloc (Map Text Xabi.Def.Def)
+getXabiTypeDefs metadataId = do
   typedefsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
     (tdid,name,cmid,ty,by) <- queryTable xabiTypeDefsTable -< ()
     restrict -< cmid .== constant metadataId
@@ -1244,6 +1271,30 @@ getXabiTypeDef metadataId = do
       _ -> throwError $ DBError $
         "Invalid type def. Expected Struct or Enum, saw " <> ty
 
+insertXabiTypeDefs :: Int32 -> Map Text Xabi.Def.Def -> Bloc ()
+insertXabiTypeDefs metadataId typeDefs = do
+  typeDefIds <- fmap Map.fromList . blocModify $ \ conn -> do
+    let
+      tyOf :: Xabi.Def.Def -> Text
+      tyOf = \case
+        Xabi.Def.Enum _ _ -> "Enum"
+        Xabi.Def.Struct _ _ -> "Struct"
+      byOf :: Xabi.Def.Def -> Int32
+      byOf = fromIntegral . Xabi.Def.bytes
+    runInsertManyReturning conn xabiTypeDefsTable
+      [ ( Nothing
+        , constant name
+        , constant metadataId
+        , constant (tyOf enumOrStruct)
+        , constant (byOf enumOrStruct)
+        )
+      | (name,enumOrStruct) <- Map.toList typeDefs
+      ]
+      (\ (tdId,name,_,_,_) -> (name,tdId))
+  for_ (Map.intersectionWith (,) typeDefs typeDefIds) $ \case
+    (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
+    (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
+
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
@@ -1251,7 +1302,7 @@ getContractXabi (ContractName contractName) contractId = do
   constrId <- blocQuery1 $ getXabiConstrQuery metadataId
   constr <- getXabiFunctionsArgsQuery constrId
   vars <- getXabiVariablesQuery metadataId
-  typeDefs <- getXabiTypeDef metadataId
+  typeDefs <- getXabiTypeDefs metadataId
   return $ Xabi funcs constr vars typeDefs
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
