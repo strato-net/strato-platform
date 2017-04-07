@@ -45,6 +45,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
+import qualified BlockApps.Solidity.Xabi.Def as Xabi.Def
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
@@ -1186,22 +1187,11 @@ getXabiType typeId = do
     "Address" ->
       return Xabi.Address
     "Struct" -> do
-      -- fieldWithTypes <- blocQuery $ proc()  -> do
-      --   (_,name,atby,pty,fty) <- queryTable xabiStructFieldsTable -< ()
-      --   restrict -< pty .== constant typeId
-      --   returnA -< (name,(atby,fty))
-      -- fields <- for (Map.fromList fieldWithTypes) $ \ (atby,fty) -> do
-      --   Xabi.FieldType atby <$> getXabiType fty
       xttd' <- blocMaybe "Missing typedef in type Struct" xttd
       return $ Xabi.Struct xtby xttd'
     "Enum" -> do
-      -- nameVals <- blocQuery . orderBy (asc (\(_,value) -> value)) $ proc()  -> do
-      --   (_,name,value,etid) <- queryTable xabiEnumNamesTable -< ()
-      --   restrict -< etid .== constant typeId
-      --   returnA -< (name,value)
       xttd' <- blocMaybe "Missing typedef in type Enum" xttd
       return $ Xabi.Enum xtby xttd'
-      -- return $ Xabi.Enum (map fst (nameVals :: [(Text,Int32)])) xtby xttd'
     "Array" -> do
       xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
       xtet <- getXabiType xtetid'
@@ -1217,6 +1207,42 @@ getXabiType typeId = do
       return $ Xabi.Mapping (Just xtdy) xtkt xtvt
     _ -> throwError $ DBError "Could not match type"
 
+getXabiStructFields :: Int32 -> Bloc (Map Text Xabi.FieldType)
+getXabiStructFields typeDefId = do
+  fieldsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (_,name,atbytes,tdid,ftid)
+      <- queryTable xabiStructFieldsTable -< ()
+    restrict -< tdid .== constant typeDefId
+    returnA -< (name,(atbytes,ftid))
+  for fieldsWithIds $ \ (atbytes,ftid) -> do
+    ty <- getXabiType ftid
+    return $ Xabi.FieldType atbytes ty
+
+getXabiEnumNames :: Int32 -> Bloc [Text]
+getXabiEnumNames typeDefId = blocQuery $ proc () -> do
+  (_,name,_,tdid) <-
+    orderBy (asc (\ (_,_,value,_) -> value))
+      (queryTable xabiEnumNamesTable) -< ()
+  restrict -< tdid .== constant typeDefId
+  returnA -< name
+
+-- TODO: ficx type def table query.
+getXabiTypeDef :: Int32 -> Bloc (Map Text Xabi.Def.Def)
+getXabiTypeDef metadataId = do
+  typedefsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (tdid,name,cmid,tid) <- queryTable xabiTypeDefsTable -< ()
+    restrict -< cmid .== constant metadataId
+    returnA -< (name,(tdid,tid))
+  for typedefsWithIds $ \ (tdid,tid) -> do
+    ty <- getXabiType tid
+    case ty of
+      Xabi.Struct by _ -> do
+        fields <- getXabiStructFields tdid
+        by' <- blocMaybe "Couldnt find bytes for struct" by
+        return $ Xabi.Def.Struct fields (fromIntegral by')
+      Xabi.Enum by _ -> do
+        names <-
+      _ -> throwError $ DBError "Invalid type def. Expected struct or enum."
 
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
@@ -1225,7 +1251,8 @@ getContractXabi (ContractName contractName) contractId = do
   constrId <- blocQuery1 $ getXabiConstrQuery metadataId
   constr <- getXabiFunctionsArgsQuery constrId
   vars <- getXabiVariablesQuery metadataId
-  return $ Xabi funcs constr vars $ error "Eitan, you gotta fix this!"
+  typeDefs <- getXabiTypeDef metadataId
+  return $ Xabi funcs constr vars typeDefs
 
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
