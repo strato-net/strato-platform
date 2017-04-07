@@ -32,7 +32,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.RLP
-import Data.Text (Text,pack)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Traversable
@@ -172,19 +172,24 @@ instance MonadUsers Bloc where
   postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
 
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
-    senderAccount <- blocStrato $ getAccountsFilter accountsFilterParams{qaAddress = Just addr}
-    txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> do
-      prepareTx
-        userName pw addr (Just toAddr) txParams
-        (Wei (fromIntegral value)) ByteString.empty
+    txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
+      userName pw addr (Just toAddr) txParams
+      (Wei (fromIntegral value)) ByteString.empty
     hashes <- blocStrato $ postTxList txs'
     map PostSendListResponse <$> if resolve
-      then traverse (fmap (getBalance (accountBalance $ head senderAccount) . transactionresultResponse) . pollTxResult) hashes
+      then for hashes $ \ hash -> do
+        txResult <- pollTxResult hash
+        let txResponse = transactionresultResponse txResult
+        case txResponse of
+          "Success!" -> do
+            senderAccounts <- blocStrato $ getAccountsFilter
+              accountsFilterParams{qaAddress = Just addr}
+            case senderAccounts of
+              [] -> throwError $ AnError "No sender account found"
+              senderAccount:_ -> return . Text.pack . show . unStrung $
+                accountBalance senderAccount
+          _ -> return txResponse
       else return hashes
-    where
-      getBalance balance response = case response of
-        "Success!" -> return Data.Text.pack . show $ balance
-        _ -> return response
 
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
