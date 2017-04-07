@@ -57,7 +57,6 @@ import BlockApps.Ethereum
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
-import BlockApps.Solidity.SolidityValue
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
@@ -190,20 +189,13 @@ instance MonadUsers Bloc where
           getContractDetails (ContractName name) (Unnamed addr')
     return $ map PostUsersUploadListResponse resps
 
-    -- TODO: poll for results. insert contract instancesbn
-    -- contractsCreated <-
-    --   map Text.splitOn "," $ traverse (fmap transactionresultContractsCreated . pollTxResult) hashes
-    --
-    -- resolve makes no sense because we have to save the addresses in the db
-    -- so we must poll for results
-
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
     txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
       userName pw addr (Just toAddr) txParams
       (Wei (fromIntegral value)) ByteString.empty
     hashes <- blocStrato $ postTxList txs'
     map PostSendListResponse <$> if resolve
-      then for hashes $ \ hash -> do
+      then forConcurrently hashes $ \ hash -> do
         txResult <- pollTxResult hash
         let txResponse = transactionresultResponse txResult
         case txResponse of
@@ -217,7 +209,43 @@ instance MonadUsers Bloc where
           _ -> return txResponse
       else return hashes
 
-  postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
+  postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
+    txsFuncIds <- for postmethodlistrequestTxs $ \ MethodCall{..} -> do
+      cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
+      (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
+      let
+        (sel,leftOver) = Base16.decode $ sel16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+      argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
+      tx <- prepareTx
+        userName
+        postmethodlistrequestPassword
+        userAddr
+        (Just methodcallContractAddress)
+        methodcallTxParams
+        (Wei (fromIntegral methodcallValue))
+        (sel <> argsBin)
+      -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+      return (tx,functionId)
+    let (txs,funcIds) = unzip txsFuncIds
+    logWith logNotice ("txs are: " <> Text.pack (show txs))
+    hashes <- blocStrato $ postTxList txs
+    map PostMethodListResponse <$> if postmethodlistrequestResolve
+      then forConcurrently (zip hashes funcIds) $ \ (hash,funcId) -> do
+        resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
+        let
+          orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+          orderedResultTypes = map
+            (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+            orderedResultIndexedXT
+        txResult <- pollTxResult hash
+        let
+          mFormattedResponse = Text.concat <$>
+            convertResultResToTexts
+              (transactionresultResponse txResult)
+              orderedResultTypes
+        blocMaybe "Failed to parse response" mFormattedResponse
+      else return hashes
 
   postUsersContractMethod
     userName
@@ -567,7 +595,7 @@ data MethodCall = MethodCall
   { methodcallContractName :: Text
   , methodcallContractAddress :: Address
   , methodcallMethodName :: Text
-  , methodcallArgs :: Map Text SolidityValue
+  , methodcallArgs :: Map Text Text
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams
   } deriving (Eq,Show,Generic)
