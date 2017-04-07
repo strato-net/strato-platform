@@ -58,7 +58,7 @@ data ContractDetails = ContractDetails
   { contractdetailsBin :: Text
   , contractdetailsAddress :: Maybe (MaybeNamed Address)
   , contractdetailsBinRuntime :: Text
-  , contractdetailsCodeHash :: Text
+  , contractdetailsCodeHash :: Keccak256
   , contractdetailsName :: Text
   , contractdetailsXabi :: Xabi
   } deriving (Show,Eq,Generic)

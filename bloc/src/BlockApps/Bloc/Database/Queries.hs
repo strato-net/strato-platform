@@ -45,6 +45,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
 import BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
+import qualified BlockApps.Solidity.Xabi.Def as Xabi.Def
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
@@ -398,12 +399,13 @@ getContractsContractByAddressQuery
       , Column PGBytea
       , Column PGBytea
       , Column PGText
+      , Column PGInt4
     ) )
 getContractsContractByAddressQuery contractName contractAddress =
   limit 1 $ proc () -> do
-    (_,name,addr,_,bin,binRuntime,codeHash,xcodeHash) <-
+    (cmId,name,addr,_,bin,binRuntime,codeHash,xcodeHash) <-
       contractByAddress contractName contractAddress -< ()
-    returnA -< (addr,(bin,binRuntime,codeHash,xcodeHash,name))
+    returnA -< (addr,(bin,binRuntime,codeHash,xcodeHash,name,cmId))
 
 {- |
 SELECT CM2.id
@@ -458,13 +460,14 @@ getContractsContractByNameQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
+    , Column PGInt4
     )
 getContractsContractByNameQuery contractName1 contractName2 =
   limit 1 $ proc () -> do
-    (b,br,ch,xch,name1,name2,_) <- linkedContractsJoinTable -< ()
+    (b,br,ch,xch,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
     restrict -< name1 .== constant contractName1
     restrict -< name2 .== constant contractName2
-    returnA -< (b,br,ch,xch,name2)
+    returnA -< (b,br,ch,xch,name2,cm2Id)
 
 {- |
 SELECT CM.id
@@ -508,12 +511,13 @@ getContractsContractBySameNameQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
+    , Column PGInt4
     )
 getContractsContractBySameNameQuery contractName =
   limit 1 $ proc () -> do
-    (b,br,ch,xch,name,_) <- joinTable -< ()
+    (b,br,ch,xch,name,cmId) <- joinTable -< ()
     restrict -< name .== constant contractName
-    returnA -< (b,br,ch,xch,name)
+    returnA -< (b,br,ch,xch,name,cmId)
   where
     joinTable = joinF
       (\ (cmId,_,b,br,ch,xch) (_,name) -> (b,br,ch,xch,name,cmId))
@@ -535,7 +539,7 @@ LIMIT 1;
 getContractsMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
 getContractsMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
   (cmId,name,_,_,_,_,_,_) <-
-    orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
+    orderBy (desc (\ (cmId,_,_,_,_,_,_,_) -> cmId))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
   returnA -< cmId
@@ -564,13 +568,14 @@ getContractsContractLatestQuery
     , Column PGBytea
     , Column PGBytea
     , Column PGText
+    , Column PGInt4
     )
 getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
-  (_,name,_,_,b,br,ch,xch) <-
-    orderBy (desc (\ (_,_,_,timestamp,_,_,_,_) -> timestamp))
+  (cmId,name,_,_,b,br,ch,xch) <-
+    orderBy (desc (\ (cmId,_,_,_,_,_,_,_) -> cmId))
       contractsJoinTable -< ()
   restrict -< name .== constant contractName
-  returnA -< (b,br,ch,xch,name)
+  returnA -< (b,br,ch,xch,name, cmId)
 
 {- |
 SELECT
@@ -705,6 +710,38 @@ getXabiVariableNamesQuery metadataId = proc () -> do
     queryTable xabiVariablesTable -< ()
   restrict -< cmid .== constant metadataId
   returnA -< varName
+
+getContractDetails :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
+getContractDetails contract@(ContractName contractName) contractId = do
+    xabi <- getContractXabi contract contractId
+    let
+      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name,_ :: Int32) =
+        ContractDetails
+          { contractdetailsBin = Text.decodeUtf8 bin
+          , contractdetailsAddress = detailsAddr
+          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
+          , contractdetailsCodeHash = codeHash
+          , contractdetailsName = name
+          , contractdetailsXabi = xabi
+          }
+    case contractId of
+      Named "Latest" -> do
+        tuple <- blocQuery1 $
+          getContractsContractLatestQuery contractName
+        return $ detailsWith Nothing tuple
+      Unnamed addr -> do
+        (addr',tuple) <- blocQuery1 $
+          getContractsContractByAddressQuery contractName addr
+        return $ detailsWith (Just (Unnamed addr')) tuple
+      Named name -> if contractName == name
+        then do
+          tuple <- blocQuery1 $
+            getContractsContractBySameNameQuery name
+          return $ detailsWith (Just (Named name)) tuple
+        else do
+          tuple <- blocQuery1 $
+            getContractsContractByNameQuery contractName name
+          return $ detailsWith (Just (Named name)) tuple
 
 {- |
 WITH contract_id AS (
@@ -881,6 +918,7 @@ insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
+  void $ insertXabiTypeDefs metadataId xabiTypes
 
 insertContract
   :: Text
@@ -906,29 +944,40 @@ insertContract parentContr contr bin binRuntime xabi = do
       return metadataId
     cmId:_ -> return cmId
 
-compileContract :: Text -> Text -> Bloc [(Text,Keccak256)]
-compileContract contractName source = do
+compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
+compileContract source = do
   (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   let
     contracts = Map.intersectionWith (,) xabis abiBins
-  metadataIds <-
-    flip Map.traverseWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
-      insertContract contractName contrName bin binRuntime xabi
+    details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
+      ContractDetails
+      { contractdetailsBin = bin
+      , contractdetailsAddress = Just (Named "Latest")
+      , contractdetailsBinRuntime = binRuntime
+      , contractdetailsCodeHash = keccak256 (Text.encodeUtf8 binRuntime)
+      , contractdetailsName = contrName
+      , contractdetailsXabi = xabi
+      }
 
+  metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
+    let
+      xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)
+    contrId <- createContractQuery contrName
+    metadataId <- insertContractMetaDataQuery
+      contrId
+      contractdetailsBin
+      contractdetailsBinRuntime
+      contractdetailsCodeHash
+      xcodeHash
+    insertXabi metadataId contrName contractdetailsXabi
+    return (metadataId,detail)
 
-  for_ metadataIds $ \ leftmetadataId ->
-    for_ metadataIds $ \ rightmetadataId -> blocModify $
+  for_ metadataIds $ \ (leftmetadataId,_) ->
+    for_ metadataIds $ \ (rightmetadataId,_) -> blocModify $
       insertContractLookup leftmetadataId rightmetadataId
 
-  blocQuery $ proc () -> do
-    (cmId,codeHash,name) <- joinF
-      (\ (cmId,_,_,_,codeHash,_) (_,name) -> (cmId,codeHash,name))
-      (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
-      (queryTable contractsMetaDataTable)
-      (queryTable contractsTable) -< ()
-    restrict -< in_ [constant mId | (_,mId) <- Map.toList metadataIds] cmId
-    returnA -< (name,codeHash)
+  return metadataIds
 
 insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case
@@ -1139,22 +1188,11 @@ getXabiType typeId = do
     "Address" ->
       return Xabi.Address
     "Struct" -> do
-      -- fieldWithTypes <- blocQuery $ proc()  -> do
-      --   (_,name,atby,pty,fty) <- queryTable xabiStructFieldsTable -< ()
-      --   restrict -< pty .== constant typeId
-      --   returnA -< (name,(atby,fty))
-      -- fields <- for (Map.fromList fieldWithTypes) $ \ (atby,fty) -> do
-      --   Xabi.FieldType atby <$> getXabiType fty
       xttd' <- blocMaybe "Missing typedef in type Struct" xttd
       return $ Xabi.Struct xtby xttd'
     "Enum" -> do
-      -- nameVals <- blocQuery . orderBy (asc (\(_,value) -> value)) $ proc()  -> do
-      --   (_,name,value,etid) <- queryTable xabiEnumNamesTable -< ()
-      --   restrict -< etid .== constant typeId
-      --   returnA -< (name,value)
       xttd' <- blocMaybe "Missing typedef in type Enum" xttd
       return $ Xabi.Enum xtby xttd'
-      -- return $ Xabi.Enum (map fst (nameVals :: [(Text,Int32)])) xtby xttd'
     "Array" -> do
       xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
       xtet <- getXabiType xtetid'
@@ -1170,6 +1208,92 @@ getXabiType typeId = do
       return $ Xabi.Mapping (Just xtdy) xtkt xtvt
     _ -> throwError $ DBError "Could not match type"
 
+getXabiStructFields :: Int32 -> Bloc (Map Text Xabi.FieldType)
+getXabiStructFields typeDefId = do
+  fieldsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (_,name,atbytes,tdid,ftid)
+      <- queryTable xabiStructFieldsTable -< ()
+    restrict -< tdid .== constant typeDefId
+    returnA -< (name,(atbytes,ftid))
+  for fieldsWithIds $ \ (atbytes,ftid) -> do
+    ty <- getXabiType ftid
+    return $ Xabi.FieldType atbytes ty
+
+insertXabiStructFields :: Int32 ->  Map Text Xabi.FieldType -> Bloc Int64
+insertXabiStructFields typeDefId fields = do
+  fieldsWithIds <- for fields $ \ (Xabi.FieldType atBytes xt) -> do
+    xtid <- insertXabiType xt
+    return (atBytes,xtid)
+  blocModify $ \ conn ->
+    runInsertMany conn xabiStructFieldsTable
+      [ ( Nothing
+        , constant name
+        , constant atBytes
+        , constant typeDefId
+        , constant xtid
+        )
+      | (name,(atBytes,xtid)) <- Map.toList fieldsWithIds
+      ]
+
+getXabiEnumNames :: Int32 -> Bloc [Text]
+getXabiEnumNames typeDefId = blocQuery $ proc () -> do
+  (_,name,_,tdid) <-
+    orderBy (asc (\ (_,_,value,_) -> value))
+      (queryTable xabiEnumNamesTable) -< ()
+  restrict -< tdid .== constant typeDefId
+  returnA -< name
+
+insertXabiEnumNames :: Int32 -> [Text] -> Bloc Int64
+insertXabiEnumNames typeDefId names = blocModify $ \ conn ->
+  runInsertMany conn xabiEnumNamesTable
+    [ ( Nothing
+      , constant name
+      , constant value
+      , constant typeDefId
+      )
+    | (name,value) <- zip names [0::Int32 ..]
+    ]
+
+getXabiTypeDefs :: Int32 -> Bloc (Map Text Xabi.Def.Def)
+getXabiTypeDefs metadataId = do
+  typedefsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (tdid,name,cmid,ty,by) <- queryTable xabiTypeDefsTable -< ()
+    restrict -< cmid .== constant metadataId
+    returnA -< (name,(tdid,ty,by))
+  for typedefsWithIds $ \ (tdid,ty,by::Int32) -> do
+    case ty of
+      "Struct" -> do
+        fields <- getXabiStructFields tdid
+        return $ Xabi.Def.Struct fields (fromIntegral by)
+      "Enum" -> do
+        names <- getXabiEnumNames tdid
+        return $ Xabi.Def.Enum names (fromIntegral by)
+      _ -> throwError $ DBError $
+        "Invalid type def. Expected Struct or Enum, saw " <> ty
+
+insertXabiTypeDefs :: Int32 -> Map Text Xabi.Def.Def -> Bloc ()
+insertXabiTypeDefs metadataId typeDefs = do
+  typeDefIds <- fmap Map.fromList . blocModify $ \ conn -> do
+    let
+      tyOf :: Xabi.Def.Def -> Text
+      tyOf = \case
+        Xabi.Def.Enum _ _ -> "Enum"
+        Xabi.Def.Struct _ _ -> "Struct"
+      byOf :: Xabi.Def.Def -> Int32
+      byOf = fromIntegral . Xabi.Def.bytes
+    runInsertManyReturning conn xabiTypeDefsTable
+      [ ( Nothing
+        , constant name
+        , constant metadataId
+        , constant (tyOf enumOrStruct)
+        , constant (byOf enumOrStruct)
+        )
+      | (name,enumOrStruct) <- Map.toList typeDefs
+      ]
+      (\ (tdId,name,_,_,_) -> (name,tdId))
+  for_ (Map.intersectionWith (,) typeDefs typeDefIds) $ \case
+    (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
+    (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
 
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
@@ -1178,8 +1302,8 @@ getContractXabi (ContractName contractName) contractId = do
   constrId <- blocQuery1 $ getXabiConstrQuery metadataId
   constr <- getXabiFunctionsArgsQuery constrId
   vars <- getXabiVariablesQuery metadataId
-  return $ Xabi funcs constr vars $ error "Eitan, you gotta fix this!"
-
+  typeDefs <- getXabiTypeDefs metadataId
+  return $ Xabi funcs constr vars typeDefs
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = blocTransaction $ do

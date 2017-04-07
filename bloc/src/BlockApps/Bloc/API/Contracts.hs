@@ -22,7 +22,6 @@ import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
-import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.Int
 import Data.Maybe
@@ -31,8 +30,8 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy
 import Data.String
 import Data.Text (Text)
+import Data.Traversable
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
 import Generic.Random.Generic
 import GHC.Generics
@@ -105,36 +104,7 @@ instance MonadContracts Bloc where
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract contract@(ContractName contractName) contractId = blocTransaction $ do
-    xabi <- getContractXabi contract contractId
-    let
-      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name) =
-        ContractDetails
-          { contractdetailsBin = Text.decodeUtf8 bin
-          , contractdetailsAddress = detailsAddr
-          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-          , contractdetailsCodeHash = Text.decodeUtf8 codeHash
-          , contractdetailsName = name
-          , contractdetailsXabi = xabi
-          }
-    case contractId of
-      Named "Latest" -> do
-        tuple <- blocQuery1 $
-          getContractsContractLatestQuery contractName
-        return $ detailsWith Nothing tuple
-      Unnamed addr -> do
-        (addr',tuple) <- blocQuery1 $
-          getContractsContractByAddressQuery contractName addr
-        return $ detailsWith (Just (Unnamed addr')) tuple
-      Named name -> if contractName == name
-        then do
-          tuple <- blocQuery1 $
-            getContractsContractBySameNameQuery name
-          return $ detailsWith (Just (Named name)) tuple
-        else do
-          tuple <- blocQuery1 $
-            getContractsContractByNameQuery contractName name
-          return $ detailsWith (Just (Named name)) tuple
+  getContractsContract = getContractDetails
 
   getContractsState contract@(ContractName contractName) contractId = do
     contract' <- xAbiToContract <$> getContractXabi contract contractId
@@ -179,14 +149,13 @@ instance MonadContracts Bloc where
   postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
     where
       compileOneContract PostCompileRequest{..} = do
-        codeHashes <- compileContract
-          postcompilerequestContractName
-          postcompilerequestSource
+        idsAndDetails <- compileContract postcompilerequestSource
         for_ postcompilerequestSearchable $ \ contractName -> do
           contractDetails <-
             getContractsContract (ContractName contractName) (Named "Latest")
           blocCirrus $ postContract contractDetails
-        return $ map (uncurry PostCompileResponse) (codeHashes)
+        for (toList idsAndDetails) $ \ (_,ContractDetails{..}) ->
+          return $ PostCompileResponse contractdetailsName contractdetailsCodeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt

@@ -15,6 +15,7 @@
 module BlockApps.Bloc.API.Users where
 
 import Control.Arrow
+import Control.Concurrent.Async.Lifted
 import Control.Monad.Except
 import Control.Monad.Log
 import Crypto.Secp256k1
@@ -56,7 +57,6 @@ import BlockApps.Ethereum
 import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
-import BlockApps.Solidity.SolidityValue
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
@@ -119,11 +119,12 @@ instance MonadUsers Bloc where
   postUsersContract userName addr
     (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
       --TODO: check what happens with mismatching args
-      void $ compileContract contract src
+      idsAndDetails <- compileContract src
       logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-      (cmId, bin16) <- getContractMetadataAndBin contract
+      (cmId,ContractDetails{..}) <- blocMaybe "Could not find global contract metadataId" $
+        Map.lookup contract idsAndDetails
       let
-        (bin,leftOver) = Base16.decode $ bin16
+        (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
       unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
       mFunctionId <- getConstructorId cmId
       argsBin <- buildArgumentByteString args mFunctionId
@@ -150,19 +151,101 @@ instance MonadUsers Bloc where
             )
           return addr'
 
-  postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
-
-  postUsersSendList userName addr (PostSendListRequest pw resolve txs) =
-    for txs $ \ (SendTransaction toAddr value txParams) -> do
+  postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
+    namesCmIdsTxs <- for contracts $ \ (UploadListContract name args txParams value) -> do
+      (bin16,cmId) <- blocQuery1 $ proc () -> do
+        (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
+        returnA -< (bin16,cmId)
+      let
+        (bin,leftOver) = Base16.decode $ bin16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+      mFunctionId <- getConstructorId cmId
+      argsBin <- buildArgumentByteString (Just args) mFunctionId
       tx <- prepareTx
-        userName pw addr (Just toAddr) txParams
-        (Wei (fromIntegral value)) ByteString.empty
-      hash <- blocStrato $ postTx tx
-      PostSendListResponse <$> if resolve
-        then transactionresultResponse <$> pollTxResult hash
-        else return hash
+        userName pw addr Nothing txParams (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
+      return ((name,cmId),tx)
+    let
+      namesCmIds = map fst namesCmIdsTxs
+      txs = map snd namesCmIdsTxs
+    hashes <- blocStrato $ postTxList txs
+    resps <- forConcurrently (zip namesCmIds hashes) $ \ ((name,cmId),hash) -> do
+      txResult <- pollTxResult hash
+      let
+        addressMaybe = do
+          str <- listToMaybe $
+            Text.splitOn "," (transactionresultContractsCreated txResult)
+          stringAddress $ Text.unpack str
+      case addressMaybe of
+        Nothing -> case transactionresultMessage txResult of
+          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+          stratoMsg -> throwError $ UserError stratoMsg
+        Just addr' -> do
+          void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+            ( Nothing
+            , constant cmId
+            , constant addr'
+            , Nothing
+            )
+          getContractDetails (ContractName name) (Unnamed addr')
+    return $ map PostUsersUploadListResponse resps
 
-  postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
+  postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
+    txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
+      userName pw addr (Just toAddr) txParams
+      (Wei (fromIntegral value)) ByteString.empty
+    hashes <- blocStrato $ postTxList txs'
+    map PostSendListResponse <$> if resolve
+      then forConcurrently hashes $ \ hash -> do
+        txResult <- pollTxResult hash
+        let txResponse = transactionresultResponse txResult
+        case txResponse of
+          "Success!" -> do
+            senderAccounts <- blocStrato $ getAccountsFilter
+              accountsFilterParams{qaAddress = Just addr}
+            case senderAccounts of
+              [] -> throwError $ AnError "No sender account found"
+              senderAccount:_ -> return . Text.pack . show . unStrung $
+                accountBalance senderAccount
+          _ -> return txResponse
+      else return hashes
+
+  postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
+    txsFuncIds <- for postmethodlistrequestTxs $ \ MethodCall{..} -> do
+      cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
+      (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
+      let
+        (sel,leftOver) = Base16.decode $ sel16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+      argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
+      tx <- prepareTx
+        userName
+        postmethodlistrequestPassword
+        userAddr
+        (Just methodcallContractAddress)
+        methodcallTxParams
+        (Wei (fromIntegral methodcallValue))
+        (sel <> argsBin)
+      -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+      return (tx,functionId)
+    let (txs,funcIds) = unzip txsFuncIds
+    logWith logNotice ("txs are: " <> Text.pack (show txs))
+    hashes <- blocStrato $ postTxList txs
+    map PostMethodListResponse <$> if postmethodlistrequestResolve
+      then forConcurrently (zip hashes funcIds) $ \ (hash,funcId) -> do
+        resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
+        let
+          orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+          orderedResultTypes = map
+            (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+            orderedResultIndexedXT
+        txResult <- pollTxResult hash
+        let
+          mFormattedResponse = Text.concat <$>
+            convertResultResToTexts
+              (transactionresultResponse txResult)
+              orderedResultTypes
+        blocMaybe "Failed to parse response" mFormattedResponse
+      else return hashes
 
   postUsersContractMethod
     userName
@@ -378,6 +461,7 @@ data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs :: Map Text Text
   , uploadlistcontractTxParams :: TxParams
+  , uploadlistcontractValue :: Maybe Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
 instance ToJSON UploadListContract where
@@ -511,7 +595,7 @@ data MethodCall = MethodCall
   { methodcallContractName :: Text
   , methodcallContractAddress :: Address
   , methodcallMethodName :: Text
-  , methodcallArgs :: Map Text SolidityValue
+  , methodcallArgs :: Map Text Text
   , methodcallValue :: Natural
   , methodcallTxParams :: TxParams
   } deriving (Eq,Show,Generic)

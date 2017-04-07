@@ -35,6 +35,9 @@ type API =
   :<|> "transaction"
     :> ReqBody '[JSON] PostTransaction
     :> Post '[PlainText] Text
+  :<|> "transactionList"
+      :> ReqBody '[JSON] [PostTransaction]
+      :> Post '[JSON] [Text]
   :<|> "transactionResult"
     :> Capture "hash" Text
     :> Get '[JSON] [TransactionResult]

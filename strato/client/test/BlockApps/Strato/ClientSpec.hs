@@ -85,6 +85,11 @@ spec
       forAll arbitrary $ \ tx -> do
         resp <- runClientM (postTx tx) (ClientEnv mgr stratoDev)
         resp `shouldSatisfy` isRight
+  describe "postTxList" $
+    it "works" $ \ mgr ->
+      forAll arbitrary $ \ tx -> do
+        resp <- runClientM (postTxList [tx,tx,tx]) (ClientEnv mgr stratoDev)
+        resp `shouldSatisfy` isRight
   describe "postFaucet" $
     it "works" $ \ mgr ->
       forAll arbitrary $ \ addr -> do
