@@ -11,6 +11,7 @@ ansiColor('xterm') {
             }
             stage('Build') {
                 checkout scm
+                try {
                   sh '''#!/bin/bash -l
                     docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                     git config --global credential.helper store
@@ -19,16 +20,21 @@ ansiColor('xterm') {
                     ./basil clone
                     ./basil build 
                   '''
+                 } 
+                 catch (err) {
+                   echo "Caught: ${err}"
+                   currentBuild.result = 'FAILURE'
+                 }
             }
             stage('Deploy') {
                  sh '''#!/bin/bash -l
-                  ./basil multinode -c 2 > docker-compose.yml
+                  ./basil compose > docker-compose.yml
                   genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA apiUrlOverride=http://strato:3000 blockTime=2 minBlockDifficulty=8192 docker-compose up -d
                   docker ps
                  '''
             }
              stage('E2E-Test') {
-                 sh '''#!/bin/bash -l
+                 sh '''
                  npm i
                  ./test
                  '''
