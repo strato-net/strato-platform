@@ -15,6 +15,7 @@
 module BlockApps.Bloc.API.Users where
 
 import Control.Arrow
+import Control.Concurrent.Async.Lifted
 import Control.Monad.Except
 import Control.Monad.Log
 import Crypto.Secp256k1
@@ -121,8 +122,6 @@ instance MonadUsers Bloc where
       --TODO: check what happens with mismatching args
       idsAndDetails <- compileContract src
       logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-      --(cmId, bin16) <- getContractMetadataAndBin contract
-
       (cmId,ContractDetails{..}) <- blocMaybe "Could not find global contract metadataId" $
         Map.lookup contract idsAndDetails
       let
@@ -153,19 +152,44 @@ instance MonadUsers Bloc where
             )
           return addr'
 
-  postUsersUploadList _ _ _ = throwError $ Unimplemented "postUsersUploadList"
+  postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
+    namesCmIdsTxs <- for contracts $ \ (UploadListContract name args txParams value) -> do
+      (bin16,cmId) <- blocQuery1 $ proc () -> do
+        (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
+        returnA -< (bin16,cmId)
+      let
+        (bin,leftOver) = Base16.decode $ bin16
+      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+      mFunctionId <- getConstructorId cmId
+      argsBin <- buildArgumentByteString (Just args) mFunctionId
+      tx <- prepareTx
+        userName pw addr Nothing txParams (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
+      return ((name,cmId),tx)
+    let
+      namesCmIds = map fst namesCmIdsTxs
+      txs = map snd namesCmIdsTxs
+    hashes <- blocStrato $ postTxList txs
+    resps <- forConcurrently (zip namesCmIds hashes) $ \ ((name,cmId),hash) -> do
+      txResult <- pollTxResult hash
+      let
+        addressMaybe = do
+          str <- listToMaybe $
+            Text.splitOn "," (transactionresultContractsCreated txResult)
+          stringAddress $ Text.unpack str
+      case addressMaybe of
+        Nothing -> case transactionresultMessage txResult of
+          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+          stratoMsg -> throwError $ UserError stratoMsg
+        Just addr' -> do
+          void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+            ( Nothing
+            , constant cmId
+            , constant addr'
+            , Nothing
+            )
+          getContractDetails (ContractName name) (Unnamed addr')
+    return $ map PostUsersUploadListResponse resps
 
-  -- postUsersUploadList userName addr (UploadListRequest pw contracts resolve) = do
-  --   txs <- for contracts $ \ (UploadListContract name arg txParams) -> do
-  --     (bin,binRuntime,codeHash,xcodeHash,cmId) <- getContractsContractLatestQuery name
-  --     let
-  --       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 bin
-  --       unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-  --       mFunctionId <- getConstructorId cmId
-  --       argsBin <- buildArgumentByteString args mFunctionId
-  --     prepareTx
-  --       userName pw addr Nothing txParams (Wei (fromIntegral 0)) (bin <> argsBin)
-  --   hashes <- blocStrato $ postTxList txs'
     -- TODO: poll for results. insert contract instancesbn
     -- contractsCreated <-
     --   map Text.splitOn "," $ traverse (fmap transactionresultContractsCreated . pollTxResult) hashes
@@ -409,6 +433,7 @@ data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs :: Map Text Text
   , uploadlistcontractTxParams :: TxParams
+  , uploadlistcontractValue :: Maybe Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
 instance ToJSON UploadListContract where

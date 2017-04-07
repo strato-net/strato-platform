@@ -50,6 +50,7 @@ library
                , http-client
                , http-media
                , http-types
+               , lifted-async
                , lifted-base
                , logging-effect
                , memory

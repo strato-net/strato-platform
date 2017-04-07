@@ -106,37 +106,8 @@ instance MonadContracts Bloc where
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract contract@(ContractName contractName) contractId = blocTransaction $ do
-    xabi <- getContractXabi contract contractId
-    let
-      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name,_ :: Int32) =
-        ContractDetails
-          { contractdetailsBin = Text.decodeUtf8 bin
-          , contractdetailsAddress = detailsAddr
-          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-          , contractdetailsCodeHash = codeHash
-          , contractdetailsName = name
-          , contractdetailsXabi = xabi
-          }
-    case contractId of
-      Named "Latest" -> do
-        tuple <- blocQuery1 $
-          getContractsContractLatestQuery contractName
-        return $ detailsWith Nothing tuple
-      Unnamed addr -> do
-        (addr',tuple) <- blocQuery1 $
-          getContractsContractByAddressQuery contractName addr
-        return $ detailsWith (Just (Unnamed addr')) tuple
-      Named name -> if contractName == name
-        then do
-          tuple <- blocQuery1 $
-            getContractsContractBySameNameQuery name
-          return $ detailsWith (Just (Named name)) tuple
-        else do
-          tuple <- blocQuery1 $
-            getContractsContractByNameQuery contractName name
-          return $ detailsWith (Just (Named name)) tuple
-
+  getContractsContract = getContractDetails
+    
   getContractsState contract@(ContractName contractName) contractId = do
     contract' <- xAbiToContract <$> getContractXabi contract contractId
 

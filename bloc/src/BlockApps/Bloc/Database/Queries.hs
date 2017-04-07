@@ -710,6 +710,38 @@ getXabiVariableNamesQuery metadataId = proc () -> do
   restrict -< cmid .== constant metadataId
   returnA -< varName
 
+getContractDetails :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
+getContractDetails contract@(ContractName contractName) contractId = do
+    xabi <- getContractXabi contract contractId
+    let
+      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name,_ :: Int32) =
+        ContractDetails
+          { contractdetailsBin = Text.decodeUtf8 bin
+          , contractdetailsAddress = detailsAddr
+          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
+          , contractdetailsCodeHash = codeHash
+          , contractdetailsName = name
+          , contractdetailsXabi = xabi
+          }
+    case contractId of
+      Named "Latest" -> do
+        tuple <- blocQuery1 $
+          getContractsContractLatestQuery contractName
+        return $ detailsWith Nothing tuple
+      Unnamed addr -> do
+        (addr',tuple) <- blocQuery1 $
+          getContractsContractByAddressQuery contractName addr
+        return $ detailsWith (Just (Unnamed addr')) tuple
+      Named name -> if contractName == name
+        then do
+          tuple <- blocQuery1 $
+            getContractsContractBySameNameQuery name
+          return $ detailsWith (Just (Named name)) tuple
+        else do
+          tuple <- blocQuery1 $
+            getContractsContractByNameQuery contractName name
+          return $ detailsWith (Just (Named name)) tuple
+
 {- |
 WITH contract_id AS (
  SELECT id FROM contracts WHERE name = $1)
