@@ -906,7 +906,7 @@ insertXabiConstr metadataId contractName constrArgs = do
   funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
     ( Nothing
     , constant metadataId
-    , constant False
+    , constant True
     , constant contractName
     , constant (Text.encodeUtf8 "")
     )
