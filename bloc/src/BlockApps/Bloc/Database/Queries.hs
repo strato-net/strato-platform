@@ -917,20 +917,6 @@ compileContract source = do
 
   return metadataIds
 
-  -- hashes <- blocQuery $ proc () -> do
-  --   (cmId,codeHash,name) <- joinF
-  --     (\ (cmId,_,_,_,codeHash,_) (_,name) -> (cmId,codeHash,name))
-  --     (\ (_,contractId,_,_,_,_) (cId,_) -> cId .== contractId)
-  --     (queryTable contractsMetaDataTable)
-  --     (queryTable contractsTable) -< ()
-  --   restrict -< in_ [constant mId | (_,mId) <- Map.toList metadataIds] cmId
-  --   returnA -< (name,codeHash)
-
-
-
--- insertXabiContractTypes ::  Map Text Xabi.Def-> Bloc Int32
--- insertXabiContractTypes types =
-
 insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case
   Xabi.Int signed bytes ->

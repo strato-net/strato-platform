@@ -32,7 +32,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.RLP
-import Data.Text (Text)
+import Data.Text (Text,pack)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Traversable
@@ -156,29 +156,35 @@ instance MonadUsers Bloc where
   --     (bin,binRuntime,codeHash,xcodeHash,cmId) <- getContractsContractLatestQuery name
   --     let
   --       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 bin
-  --     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-  --     mFunctionId <- getConstructorId cmId
-  --     argsBin <- buildArgumentByteString args mFunctionId
+  --       unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+  --       mFunctionId <- getConstructorId cmId
+  --       argsBin <- buildArgumentByteString args mFunctionId
   --     prepareTx
   --       userName pw addr Nothing txParams (Wei (fromIntegral 0)) (bin <> argsBin)
-    hashes <- blocStrato $ postTxList txs'
+  --   hashes <- blocStrato $ postTxList txs'
+    -- TODO: poll for results. insert contract instancesbn
+    -- contractsCreated <-
+    --   map Text.splitOn "," $ traverse (fmap transactionresultContractsCreated . pollTxResult) hashes
+    --
     -- resolve makes no sense because we have to save the addresses in the db
     -- so we must poll for results
-
-    -- TODO: poll for results. insert contract instancesbn
-
 
   postUsersContractMethod _ _ _ _ _ = throwError $ Unimplemented "postUsersContractMethod"
 
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
+    senderAccount <- blocStrato $ getAccountsFilter accountsFilterParams{qaAddress = Just addr}
     txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> do
       prepareTx
         userName pw addr (Just toAddr) txParams
         (Wei (fromIntegral value)) ByteString.empty
     hashes <- blocStrato $ postTxList txs'
     map PostSendListResponse <$> if resolve
-      then traverse (fmap transactionresultResponse . pollTxResult) hashes
+      then traverse (fmap (getBalance (accountBalance $ head senderAccount) . transactionresultResponse) . pollTxResult) hashes
       else return hashes
+    where
+      getBalance balance response = case response of
+        "Success!" -> return Data.Text.pack . show $ balance
+        _ -> return response
 
   postUsersContractMethodList _ _ _ = throwError $ Unimplemented "postUsersContractMethodList"
 
