@@ -29,7 +29,7 @@ ansiColor('xterm') {
             }
             stage('E2E-Test') {
                 sh '''#!/bin/bash -l
-                echo 'test2'
+                make
                 '''
             }
         }

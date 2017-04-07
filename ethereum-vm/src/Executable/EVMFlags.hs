@@ -3,6 +3,9 @@ module Executable.EVMFlags where
 
 import HFlags
 
+-- unclear if we need this now http://ghc.haskell.org/trac/ghc/ticket/7867
+{-# RULES "make_this_orphan" id = id :: MakeThisOrphan -> MakeThisOrphan #-}
+
 defineFlag "mempoolLivenessCutoff" (30 :: Integer) "max age of a transaction in seconds that is valid for the mempool"
 defineFlag "useTestnet" False "Change difficulty computation for ethdev testnet"
 defineFlag "newRBIBBehavior" True "Use new replaceBestIfBetter behavior"
