@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveGeneric, FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module Blockchain.EthConf ( 
+module Blockchain.EthConf (
       EthConf(..),
       DiscoveryConf(..),
       SqlConf(..), postgreSQLConnectionString,
@@ -12,31 +13,35 @@ module Blockchain.EthConf (
       EthUniqueId(..),
       GeneralConf(..),
       PrivKey(..),
+      StatsConf(..), runStatsTConfigured,
       ethConf,
       connStr,
     ) where
 
-import Control.Monad.Except (ExceptT(..))
-import Control.Monad.Trans.State
-
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
-import Data.Yaml
-import Database.PostgreSQL.Simple (ConnectInfo(..))
+import           Control.Monad.Except       (ExceptT (..))
+import           Control.Monad.IO.Class
+import qualified Control.Monad.Stats        as StatsT
+import           Control.Monad.Trans.State
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Char8      as B8
+import           Data.Ratio                 ((%))
+import           Data.String
+import           Data.Yaml
+import           Database.PostgreSQL.Simple (ConnectInfo (..))
 import qualified Database.PostgreSQL.Simple as PS (postgreSQLConnectionString)
-import GHC.Generics
-import System.IO.Unsafe
+import qualified Database.Redis             as Redis
+import           Network.HostName
+import           Network.Kafka
+import qualified Network.Kafka.Protocol     as KP
+import           System.Environment         (getProgName)
+import           System.IO.Unsafe
 
-import Data.String
-import Network.Kafka
-import qualified Network.Kafka.Protocol as KP
+import           GHC.Generics
 
-import Data.Ratio ((%))
+import           Blockchain.PrivateKeyConf
+import           Blockchain.StatsConf
 
-import Blockchain.PrivateKeyConf
-import qualified Database.Redis as Redis
-
-data EthConf = 
+data EthConf =
     EthConf {
         ethUniqueId        :: EthUniqueId,
         privKey            :: PrivKey,
@@ -47,7 +52,8 @@ data EthConf =
         quarryConfig       :: QuarryConf,
         blockConfig        :: BlockConf,
         discoveryConfig    :: DiscoveryConf,
-        generalConfig      :: GeneralConf
+        generalConfig      :: GeneralConf,
+        statsConfig        :: Maybe StatsConf
     } deriving (Generic)
 
 instance FromJSON EthConf
@@ -73,10 +79,10 @@ instance ToJSON GeneralConf
 
 data SqlConf =
     SqlConf {
-        user :: String,
+        user     :: String,
         password :: String,
-        host :: String,
-        port :: Int,
+        host     :: String,
+        port     :: Int,
         database :: String,
         poolsize :: Int
     } deriving (Generic)
@@ -153,7 +159,7 @@ data BlockConf =
 instance FromJSON BlockConf
 instance ToJSON BlockConf
 
-{- CONFIG: first change, make this local -} 
+{- CONFIG: first change, make this local -}
 
 -- noinline cause its not like we had any guarantee of whether or not the file
 -- got re-read anyway
@@ -193,3 +199,28 @@ lookupRedisBlockDBConfig = let r = redisBlockDBConfig ethConf in
         Redis.connectMaxConnections = redisMaxConnections r,
         Redis.connectMaxIdleTime    = fromRational (redisMaxIdleTime r % 1)
     }
+
+ourProgName :: String
+ourProgName = unsafePerformIO getProgName
+{-# NOINLINE ourProgName #-}
+
+ourHostName :: String
+ourHostName = unsafePerformIO getHostName
+{-# NOINLINE ourHostName #-}
+
+assertingStratoTags :: StatsConf -> StatsT.StatsTConfig
+assertingStratoTags conf = toStatsTConfig modified
+    where modified     = conf { statsDefaultTags = hostnameTag:prognameTag:existingTags }
+          existingTags = statsDefaultTags conf
+          tagNames     = fst <$> existingTags
+          prognameTag  = if "exe" `elem` tagNames
+                         then error "statsConfig: strato reserves the `exe` tag, but it was specified"
+                         else ("exe", ourProgName)
+          hostnameTag  = if "hostname" `elem` tagNames
+                         then error "statsConfig: strato reserves the `hostname` tag, but it was specified"
+                         else ("hostname", ourHostName)
+
+runStatsTConfigured :: (MonadIO m) => StatsT.StatsT m a -> m a
+runStatsTConfigured m = case statsConfig ethConf of
+    Nothing -> StatsT.runNoStatsT m
+    Just x  -> StatsT.runStatsT m (assertingStratoTags x)

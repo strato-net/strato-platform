@@ -44,6 +44,7 @@ import           Blockchain.DB.SQLDB
 import           Blockchain.Constants
 import           Blockchain.EthConf
 import           Blockchain.PrivateKeyConf
+import           Blockchain.StatsConf (defaultStatsConf)
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 
@@ -191,7 +192,8 @@ defaultConfig =
       blockConfig        = defaultBlockConfig,
       quarryConfig       = defaultQuarryConfig,
       discoveryConfig    = defaultDiscoveryConfig,
-      generalConfig      = defaultGeneralConfig
+      generalConfig      = defaultGeneralConfig,
+      statsConfig        = Just defaultStatsConf
     }
                    
 defaultPeers::[(String,Int)]
