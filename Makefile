@@ -1,4 +1,4 @@
-.PHONY: test
+.PHONY: multinode 
 
 test:
 	echo "checking for ethereum test suite"
@@ -7,7 +7,7 @@ test:
 	else \
 	    git clone https://github.com/ethereum/tests.git test-suite/tests; \
 	fi
-	stack test test-suite/
+	stack test test-suite
 
 
 multinode:
@@ -17,7 +17,5 @@ multinode:
 	else \
 	  git clone https://github.com/blockapps/multinode-test -b kristoffer multinode-test; \
 	fi
-	cd multinode-test/
-	npm install
-	./node_modules/mocha/bin/mocha test/
+	cd multinode-test/ && npm install && ./node_modules/mocha/bin/mocha test/
 
