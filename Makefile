@@ -1,5 +1,6 @@
 .PHONY: multinode 
 
+
 test:
 	echo "checking for ethereum test suite"
 	if [ -d "test-suite/tests" ]; then \
