@@ -81,7 +81,6 @@ spec = do
       balance2AS `shouldBe` (initialWei + (etherToWei etherToSend))
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
-      pendingWith "Pending until contract method calls is implemented"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -136,8 +135,9 @@ spec = do
         postUsersContractMethodRequestSet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
-          , postuserscontractmethodArgs = Map.singleton "x" (SolidityValueAsString "3")
+          , postuserscontractmethodArgs = Map.singleton "x" "3"
           , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherSet <- runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
@@ -152,6 +152,7 @@ spec = do
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherGet <- runClientM
         (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
@@ -358,7 +359,7 @@ spec = do
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestLessComplexCons contract and check state after constructor" $ \ TestConfig {..} -> do
-
+      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
