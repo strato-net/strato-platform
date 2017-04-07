@@ -918,6 +918,7 @@ insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
+  -- void $ insertXabiTypeDefs metadataId xabiTypes
 
 insertContract
   :: Text
@@ -1226,23 +1227,22 @@ getXabiEnumNames typeDefId = blocQuery $ proc () -> do
   restrict -< tdid .== constant typeDefId
   returnA -< name
 
--- TODO: ficx type def table query.
 getXabiTypeDef :: Int32 -> Bloc (Map Text Xabi.Def.Def)
 getXabiTypeDef metadataId = do
   typedefsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (tdid,name,cmid,tid) <- queryTable xabiTypeDefsTable -< ()
+    (tdid,name,cmid,ty,by) <- queryTable xabiTypeDefsTable -< ()
     restrict -< cmid .== constant metadataId
-    returnA -< (name,(tdid,tid))
-  for typedefsWithIds $ \ (tdid,tid) -> do
-    ty <- getXabiType tid
+    returnA -< (name,(tdid,ty,by))
+  for typedefsWithIds $ \ (tdid,ty,by::Int32) -> do
     case ty of
-      Xabi.Struct by _ -> do
+      "Struct" -> do
         fields <- getXabiStructFields tdid
-        by' <- blocMaybe "Couldnt find bytes for struct" by
-        return $ Xabi.Def.Struct fields (fromIntegral by')
-      Xabi.Enum by _ -> do
-        names <-
-      _ -> throwError $ DBError "Invalid type def. Expected struct or enum."
+        return $ Xabi.Def.Struct fields (fromIntegral by)
+      "Enum" -> do
+        names <- getXabiEnumNames tdid
+        return $ Xabi.Def.Enum names (fromIntegral by)
+      _ -> throwError $ DBError $
+        "Invalid type def. Expected Struct or Enum, saw " <> ty
 
 getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
@@ -1253,7 +1253,6 @@ getContractXabi (ContractName contractName) contractId = do
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDef metadataId
   return $ Xabi funcs constr vars typeDefs
-
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = blocTransaction $ do
