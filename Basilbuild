@@ -37,7 +37,8 @@ STACKFLAGS=
 else
 STACKFLAGS=--allow-different-user
 endif
-BUILD_HASKELL=stack setup $(STACKFLAGS) && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
+BUILD_HASKELL=stack setup $(STACKFLAGS) && stack install $(STACKFLAGS)
+--local-bin-path=$(FAKEROOT)/usr/bin && stack test --no-run-tests test-suite/
 
 all: build_docker
 
@@ -100,7 +101,8 @@ pull_blockapps_js: prebuild
 	)
 
 build_docker: build_deploybase build_haskell build_solidity pull_blockapps_js
-	cp -f Dockerfile $(FAKEROOT)
+	cp -f $(STACKWORK)/dist/x86_64-linux/Cabal-1.24.2.0/build/test-ethereum-test/test-ethereum-test $(FAKEROOT)/usr/bin
+        cp -f Dockerfile $(FAKEROOT)
 	cp -f $(EXTRADEPS) $(LIBHOME)
 	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
