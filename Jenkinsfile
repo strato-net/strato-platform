@@ -29,6 +29,8 @@ ansiColor('xterm') {
             }
             stage('E2E-Test') {
                 sh '''#!/bin/bash -l
+                pwd
+                cd repos/monstrato
                 make
                 '''
             }
