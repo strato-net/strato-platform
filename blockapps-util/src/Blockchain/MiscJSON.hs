@@ -8,7 +8,6 @@ import qualified Data.ByteString.Base16 as B16
 import Data.Text.Encoding
 import Data.Aeson.Types
 
-
 instance FromJSON B.ByteString where
     parseJSON (String t) = pure . fst . B16.decode $ encodeUtf8 t
     parseJSON v          = typeMismatch "ByteString" v
