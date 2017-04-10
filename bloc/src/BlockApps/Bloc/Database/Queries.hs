@@ -538,10 +538,8 @@ LIMIT 1;
 -}
 getContractsMetaDataIdByLatestQuery :: Text -> Query (Column PGInt4)
 getContractsMetaDataIdByLatestQuery contractName = limit 1 $ proc () -> do
-  (cmId,name,_,_,_,_,_,_) <-
-    orderBy (desc (\ (cmId,_,_,_,_,_,_,_) -> cmId))
-      contractsJoinTable -< ()
-  restrict -< name .== constant contractName
+  (_,_,_,_,_,cmId) <-
+    getContractsContractLatestQuery contractName -< ()
   returnA -< cmId
 
 {- |
@@ -571,12 +569,17 @@ getContractsContractLatestQuery
     , Column PGInt4
     )
 getContractsContractLatestQuery contractName = limit 1 $ proc () -> do
-  (cmId,name,_,_,b,br,ch,xch) <-
-    orderBy (desc (\ (cmId,_,_,_,_,_,_,_) -> cmId))
-      contractsJoinTable -< ()
+  (cmId,name,b,br,ch,xch) <-
+    orderBy (desc (\ (cmId,_,_,_,_,_) -> cmId))
+      joinTable -< ()
   restrict -< name .== constant contractName
-  returnA -< (b,br,ch,xch,name, cmId)
-
+  returnA -< (b,br,ch,xch,name,cmId)
+  where
+    joinTable = joinF
+      (\ (cmId,_,b,br,ch,xch) (_,n) -> (cmId,n,b,br,ch,xch))
+      (\ (_,contractId,_,_,_,_) (cid,_) -> cid .== contractId)
+      (queryTable contractsMetaDataTable)
+      (queryTable contractsTable)
 {- |
 SELECT
   XF.id
@@ -675,7 +678,7 @@ getXabiFunctionsReturnValuesQuery
   -> Bloc [Xabi.IndexedType]
 getXabiFunctionsReturnValuesQuery funcId = do
   valsWithIds <- blocQuery $ proc () -> do
-    (_,functionId,tyid,index) <-
+    (_,functionId,index,tyid) <-
       queryTable xabiFunctionReturnsTable -< ()
     restrict -< functionId .== constant funcId
     returnA -< (index,tyid)
@@ -886,23 +889,29 @@ insertXabiFunction
   -> (Text, Func)
   -> Bloc ()
 insertXabiFunction metadataId (name,Func{..}) = do
-  funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
-    ( Nothing
-    , constant metadataId
-    , constant False
-    , constant name
-    , constant (Text.encodeUtf8 funcSelector)
-    )
-    (\ (xfId,_,_,_,_) -> xfId)
-  void $ insertXabiFunctionArg funcId funcArgs
-  void $ insertXabiFunctionRet funcId (toList funcVals)
+  funcIds :: [Int32] <- blocQuery $ proc () -> do
+    (fId,cmId,_,fname,_) <- queryTable xabiFunctionsTable -< ()
+    restrict -< cmId .== constant metadataId
+      .&& fname .== constant name
+    returnA -< (fId)
+  when (null funcIds) $ do
+    funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
+      ( Nothing
+      , constant metadataId
+      , constant False
+      , constant name
+      , constant (Text.encodeUtf8 funcSelector)
+      )
+      (\ (xfId,_,_,_,_) -> xfId)
+    void $ insertXabiFunctionArg funcId funcArgs
+    void $ insertXabiFunctionRet funcId (toList funcVals)
 
 insertXabiConstr
   :: Int32
   -> Text
   -> Map Text Xabi.IndexedType
   -> Bloc ()
-insertXabiConstr metadataId contractName constrArgs = do
+insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArgs) $ do
   funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
     ( Nothing
     , constant metadataId

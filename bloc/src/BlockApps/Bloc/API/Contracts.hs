@@ -152,7 +152,9 @@ instance MonadContracts Bloc where
         idsAndDetails <- compileContract postcompilerequestSource
         for_ postcompilerequestSearchable $ \ contractName -> do
           contractDetails <-
-            getContractsContract (ContractName contractName) (Named "Latest")
+            catchError
+              (getContractsContract (ContractName contractName) (Named "Latest"))
+              (\ _ -> throwError $ UserError "Unable to find contract details. Please check contract name.")
           blocCirrus $ postContract contractDetails
         for (toList idsAndDetails) $ \ (_,ContractDetails{..}) ->
           return $ PostCompileResponse contractdetailsName contractdetailsCodeHash

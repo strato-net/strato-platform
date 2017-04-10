@@ -422,6 +422,15 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestValue :: Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
+-- TODO: This end point needs to support form url encoding
+-- instance ToForm PostUsersContractRequest where
+--     toForm PostUsersContractRequest{..} = Map.fromList
+--       [ ("src", toQueryParam postuserscontractrequestSrc)
+--       , ("password", toQueryParam postuserscontractrequestPassword)
+--
+--       ]
+-- instance FromForm PostUsersContractRequest where
+--
 instance ToJSON PostUsersContractRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostUsersContractRequest where
@@ -644,9 +653,9 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
       return $ prepareSignedTx sk addr UnsignedTransaction
         { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
         , unsignedTransactionGasPrice =
-            fromMaybe (Wei 1000000000000000000) txparamsGasPrice
+            fromMaybe (Wei 1) txparamsGasPrice
         , unsignedTransactionGasLimit =
-            fromMaybe (Gas 3141592) txparamsGasLimit
+            fromMaybe (Gas 100000000) txparamsGasLimit
         , unsignedTransactionTo = toAddr
         , unsignedTransactionValue = value
         , unsignedTransactionInitOrData = code
