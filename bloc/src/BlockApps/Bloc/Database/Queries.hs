@@ -35,6 +35,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Traversable
 import Database.PostgreSQL.Simple (Connection)
+import GHC.Stack
 import Opaleye hiding (not,null)
 import qualified Opaleye as Opaleye (not,null)
 
@@ -585,9 +586,8 @@ SELECT
 FROM xabi_functions XF
 WHERE XF.is_constructor = false AND XF.contract_metadata_id = $1;
 -}
-getXabiFunctionsQuery
-  :: Int32
-  -> Bloc (Map Text Func)
+getXabiFunctionsQuery :: HasCallStack =>
+                         Int32 -> Bloc (Map Text Func)
 getXabiFunctionsQuery cmId = do
   funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
     (xfId,contractmetadataId,isConstr,name,selector) <-
@@ -670,9 +670,8 @@ LEFT OUTER JOIN xabi_types XTE
   ON XTE.id = XT.entry_type_id
 WHERE XFR.function_id = $1;"
 -}
-getXabiFunctionsReturnValuesQuery
-  :: Int32
-  -> Bloc [Xabi.IndexedType]
+getXabiFunctionsReturnValuesQuery :: HasCallStack =>
+                                     Int32 -> Bloc [Xabi.IndexedType]
 getXabiFunctionsReturnValuesQuery funcId = do
   valsWithIds <- blocQuery $ proc () -> do
     (_,functionId,tyid,index) <-
@@ -1168,7 +1167,8 @@ insertXabiType = \case
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
 
-getXabiType :: Int32 -> Bloc Xabi.Type
+getXabiType :: HasCallStack =>
+               Int32 -> Bloc Xabi.Type
 getXabiType typeId = do
   (xtty,xttd,xtdy,xtsi,xtby,xtlen,xtetid,xtvtid,xtktid)
     <- blocQuery1 $ proc () -> do
@@ -1295,7 +1295,8 @@ insertXabiTypeDefs metadataId typeDefs = do
     (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
     (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
 
-getContractXabi :: ContractName -> MaybeNamed Address -> Bloc Xabi
+getContractXabi :: HasCallStack =>
+                   ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
   funcs <- getXabiFunctionsQuery metadataId
