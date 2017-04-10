@@ -2,6 +2,7 @@
 .stack-work
 .basil-work
 .ethereumH/
+multinode-test/
 work
 sftp-config.json
 test-suite/tests
