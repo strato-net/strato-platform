@@ -7,7 +7,7 @@ function customHttp { # set behavior of http I like....  crash on error, print b
   output=`http -b --check-status --timeout=60 "$@"`
   returnVal=$?
   set -e
-  
+
 
   if [ "$returnVal" == "0" ]
   then
@@ -26,7 +26,7 @@ address=`customHttp --form http://localhost:8000/users/fred password=qqqq faucet
 
 echo "Here are the details of the new address '$address':"
 
-customHttp http://bayar4a.eastus.cloudapp.azure.com/strato-api/eth/v1.2/account?address=$address | jq 
+customHttp http://tester13.eastus.cloudapp.azure.com/strato-api/eth/v1.2/account?address=$address | jq
 
 echo ""
 
@@ -55,8 +55,3 @@ echo "# querying state in new contract #"
 echo "##################################"
 
 customHttp http://localhost:8000/contracts/SimpleStorage/Latest/state
-
-
-
-
-
