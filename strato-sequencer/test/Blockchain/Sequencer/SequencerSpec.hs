@@ -35,9 +35,9 @@ withTemporaryDepBlockDB :: IngestBlock -> SequencerM a -> IO a
 withTemporaryDepBlockDB genesisBlock m = do
     cwd          <- getCurrentDirectory
     randomSuffix <- generate $ (arbitrary :: Gen Integer) `suchThat` (>1000)
-    timestamp    <- (show . round) <$> getPOSIXTime
-    let fullPath ="./.ethereumH/dep_block_" ++ timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
-        tempKCID ="sequencer_" ++ timestamp ++ "_" ++ showHex randomSuffix ""
+    timestamp    <- round <$> getPOSIXTime  :: IO Integer
+    let fullPath ="./.ethereumH/dep_block_" ++ show timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
+        tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
     setCurrentDirectory "../" -- for ethconf to be happy
     createDirectoryIfMissing True fullPath
     let kcid = KP.KString (C8.pack tempKCID)

@@ -54,25 +54,25 @@ instance (Show t, Format t, OrderValidateable t) => Format (OrderValidatorState 
 runValidatorM :: (OrderValidateable gb, OrderValidateable ts) => OrderValidatorM ts a -> gb -> [ts] -> IO (OrderValidatorState ts)
 runValidatorM monad root validateables = do
     seedSeen <- return $ Map.singleton (getBlockHash root) (getBlockNumber root)
-    state    <- return $ OrderValidatorState { seenBlocks = seedSeen, unseenBlocks = validateables, runState = Valid }
-    snd <$> runStateT monad state
+    state'   <- return $ OrderValidatorState { seenBlocks = seedSeen, unseenBlocks = validateables, runState = Valid }
+    snd <$> runStateT monad state'
 
 validator :: OrderValidateable t => OrderValidatorM t ()
 validator = do
-    state            <- get
-    (thisBlock:rest) <- return $ (unseenBlocks state)
+    state'           <- get
+    (thisBlock:rest) <- return $ (unseenBlocks state')
     thisBlockNumber  <- return $ getBlockNumber thisBlock
     thisBlockHash    <- return $ getBlockHash   thisBlock
     thisBlockParent  <- return $ getParentHash  thisBlock
-    state            <- return $ state { unseenBlocks = rest }
+    state''          <- return $ state' { unseenBlocks = rest }
     currSeenBlocks   <- seenBlocks <$> get
     case Map.lookup thisBlockParent currSeenBlocks of
-        Nothing -> put $ state { runState = InvalidOrder thisBlockParent 0 thisBlock ("Saw block #" ++ (show thisBlockNumber) ++ " before its parent") }
+        Nothing -> put $ state'' { runState = InvalidOrder thisBlockParent 0 thisBlock ("Saw block #" ++ (show thisBlockNumber) ++ " before its parent") }
         Just parentNumber ->
             if (parentNumber < thisBlockNumber) then
-                put $ state { seenBlocks = (Map.insert thisBlockHash thisBlockNumber currSeenBlocks) }
+                put $ state'' { seenBlocks = (Map.insert thisBlockHash thisBlockNumber currSeenBlocks) }
             else
-                put $ state { runState = InvalidOrder thisBlockParent parentNumber thisBlock ("Saw block w/ block number >= its parent, culprit block #" ++ (show thisBlockNumber)) }
+                put $ state'' { runState = InvalidOrder thisBlockParent parentNumber thisBlock ("Saw block w/ block number >= its parent, culprit block #" ++ (show thisBlockNumber)) }
     newState <- get
     if ((isValid newState) && (not . null . unseenBlocks $ newState)) then validator else return ()
 

@@ -5,7 +5,7 @@ module Blockchain.Sequencer.ArbitraryInstances where
 import Data.DeriveTH
 import Test.QuickCheck
 
-import Blockchain.Data.ArbitraryInstances
+import Blockchain.Data.ArbitraryInstances()
 import Blockchain.Sequencer.Event
 
 derive makeArbitrary ''IngestEvent

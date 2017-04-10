@@ -15,7 +15,7 @@ import Test.QuickCheck
 -- todo should genesis block make somebody exceptionally wealthy?
 makeGenesisBlock :: IO IngestBlock
 makeGenesisBlock = do
-    startBlock <-  ( (setIngestBlockParentHash (SHA . fromIntegral $ 0))
+    startBlock <-  ( (setIngestBlockParentHash (SHA . fromIntegral $ (0 :: Int)))
                    . (setIngestBlockUnclesHash (ommersVerificationValue []))
                    . (setIngestBlockNumber 0)
                    . (setIngestBlockGasUsed 0)
@@ -44,10 +44,10 @@ mapIngestHeader :: (BlockData -> BlockData) -> IngestBlock -> IngestBlock
 mapIngestHeader f baseBlock = baseBlock { ibBlockData = (f . ibBlockData $ baseBlock) }
 
 setIngestBlockParentHash :: SHA -> IngestBlock -> IngestBlock
-setIngestBlockParentHash hash = mapIngestHeader $ \h -> h { blockDataParentHash = hash }
+setIngestBlockParentHash hash' = mapIngestHeader $ \h -> h { blockDataParentHash = hash'}
 
 setIngestBlockUnclesHash :: SHA -> IngestBlock -> IngestBlock
-setIngestBlockUnclesHash hash = mapIngestHeader $ \h -> h { blockDataUnclesHash = hash }
+setIngestBlockUnclesHash hash' = mapIngestHeader $ \h -> h { blockDataUnclesHash = hash'}
 
 setIngestBlockDifficulty :: Integer -> IngestBlock -> IngestBlock
 setIngestBlockDifficulty diff = mapIngestHeader $ \h -> h { blockDataDifficulty = diff }
@@ -68,8 +68,10 @@ extractBlocksFromOutputEvents :: [OutputEvent] -> [OutputBlock]
 extractBlocksFromOutputEvents = join . (map convert)
     where convert (OETx _ _)  = []
           convert (OEBlock b) = [b]
+          convert _           = error "partial function inf extractBlocksFromOutputEvents"
 
 extractTxsFromOutputEvents :: [OutputEvent] -> [OutputTx]
 extractTxsFromOutputEvents = join . (map convert)
     where convert (OETx _ t)  = [t]
           convert (OEBlock _) = []
+          convert _           = error "partial function in extractTxsFromOutputEvents"

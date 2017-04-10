@@ -250,7 +250,9 @@ handleEvents mode peer = awaitForever $ \case
                 yield $ GetBlockBodies (map headerHash remainingHeaders)
                 stampActionTimestamp
 
-    MsgEvt (Disconnect _) -> throwIO PeerDisconnected
+    MsgEvt (Disconnect _) -> do
+            logInfoN $ T.pack $ "Disconnect event received in Event handler"
+            throwIO PeerDisconnected
     
     NewSeqEvent oe -> case oe of 
             -- todo: use shouldSend here, to make sure we don't send back block

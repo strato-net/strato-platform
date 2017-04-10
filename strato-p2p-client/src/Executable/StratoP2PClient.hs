@@ -113,7 +113,9 @@ handleMsg myId peer = do
     
           handleEvents (if flags_debugFail then Fail else Log) peer
 
-    where assertHandshake = throwIO . maybe PeerDisconnected EventBeforeHandshake
+    where assertHandshake m = do
+              logInfoN $ T.pack $ "asserHandshake: " ++ show m
+              throwIO . maybe PeerDisconnected EventBeforeHandshake $ m
           ourNetworkID    = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
 cbSafeTake::Monad m=>Int->ConduitM BC.ByteString o m BC.ByteString
