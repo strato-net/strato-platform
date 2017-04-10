@@ -1,8 +1,10 @@
 {-# LANGUAGE
     FlexibleContexts
   , GeneralizedNewtypeDeriving
+  , ImplicitParams
   , MultiParamTypeClasses
   , OverloadedStrings
+  , RecordWildCards
   , TypeFamilies
   , LambdaCase
 #-}
@@ -58,6 +60,21 @@ instance MonadError BlocError Bloc where
     logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
 
+--prettyCallStack' is the same idea as prettyCallStack, but with formatting more suitable for out project.  In particular, package names a very mangled by stack, making prettyCallStack unreadable.
+prettyCallStack'::CallStack->String
+prettyCallStack' cs =
+  "CallStack:\n" ++ unlines (map formatCSLine $ getCallStack cs)
+  where
+    formatCSLine (funcName, SrcLoc{..}) =
+      "  " ++ funcName ++ ", called at " ++ srcLocModule ++ ":" ++ show srcLocStartLine ++ ":" ++ show srcLocStartCol
+
+blocError::HasCallStack=>BlocError->Bloc y
+blocError err = do
+    logWithCallStack ?callStack logError (Text.pack (show err ++ "\n" ++ prettyCallStack' ?callStack))
+    Bloc $ throwError err
+
+
+
 instance MonadBaseControl IO Bloc where
   type StM Bloc x = Either BlocError x
   liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
@@ -94,7 +111,7 @@ enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
   = Handler
   $ withExceptT reThrowError
-  $ flip runLoggingT (liftIO . print . render Leijen.textStrict)
+  $ flip runLoggingT (liftIO . print . render Leijen.stringStrict)
   $ flip runReaderT env $ runBloc
   $ convertRuntimeErrors x
   where
@@ -175,11 +192,23 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.", 
                      "(More information can be found in the Bloc logs.)"
                    ]}
+    render::(a0 -> Leijen.Doc)
+            -> WithSeverity (WithCallStack (WithTimestamp a0))
+            -> Leijen.Doc
     render
       = renderWithSeverity
-      . renderWithCallStack
+      . renderLocation
       . renderWithTimestamp
-          (formatTime defaultTimeLocale rfc822DateFormat)
+          (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+
+renderLocation::(a -> Leijen.Doc)->WithCallStack a->Leijen.Doc
+renderLocation k (WithCallStack stack msg) =
+  (Leijen.fill 40 $ Leijen.string (fromString $ formatTopLocation $ getCallStack stack)) Leijen.<> k msg
+
+formatTopLocation::[(String, SrcLoc)]->String
+formatTopLocation [] = "[-]"
+formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
+
 
 logWithCallStack
   :: CallStack
@@ -209,7 +238,7 @@ blocQuery1 q = do
   conn <- asks dbConnection
   results <- liftIO $ runQuery conn q
   case results of
-    [] -> throwError $ DBError "No result, expected one row"
+    [] -> blocError $ DBError "No result, expected one row"
     [y] -> return y
     _:_:_ -> throwError $ DBError "Multiple results, expected one row"
 
