@@ -142,3 +142,5 @@ instance ToJSON TxParams where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+emptyTxParams :: TxParams
+emptyTxParams = TxParams Nothing Nothing Nothing
