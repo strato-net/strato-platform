@@ -1309,8 +1309,10 @@ getContractXabi :: HasCallStack =>
 getContractXabi (ContractName contractName) contractId = do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
   funcs <- getXabiFunctionsQuery metadataId
-  constrId <- blocQuery1 $ getXabiConstrQuery metadataId
-  constr <- getXabiFunctionsArgsQuery constrId
+  constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
+  constr <- case constrIdMaybe of
+    Nothing -> return Map.empty
+    Just constrId -> getXabiFunctionsArgsQuery constrId
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId
   return $ Xabi funcs constr vars typeDefs
