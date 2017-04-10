@@ -112,7 +112,7 @@ instance MonadContracts Bloc where
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 
     address <- blocQuery1 $ proc () -> do
-      (_,cmId,addr,_) <- queryTable contractsInstanceTable -< ()
+      (_,cmId,addr,_) <- limit 1 (orderBy (desc (\ (_,_,_,ts) -> ts)) (queryTable contractsInstanceTable)) -< ()
       restrict -< cmId .== constant (metadataId::Int32)
       returnA -< addr
 
@@ -152,7 +152,9 @@ instance MonadContracts Bloc where
         idsAndDetails <- compileContract postcompilerequestSource
         for_ postcompilerequestSearchable $ \ contractName -> do
           contractDetails <-
-            getContractsContract (ContractName contractName) (Named "Latest")
+            catchError
+              (getContractsContract (ContractName contractName) (Named "Latest"))
+              (\ _ -> throwError $ UserError "Unable to find contract details. Please check contract name.")
           blocCirrus $ postContract contractDetails
         for (toList idsAndDetails) $ \ (_,ContractDetails{..}) ->
           return $ PostCompileResponse contractdetailsName contractdetailsCodeHash

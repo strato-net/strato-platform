@@ -163,7 +163,7 @@ enterBloc env x
             err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something is broken in the Bloc Server database.", 
+                     "Something is broken in the Bloc Server database.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
@@ -174,7 +174,7 @@ enterBloc env x
             err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something is broken in the Bloc Server.", 
+                     "Something is broken in the Bloc Server.",
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
@@ -182,14 +182,14 @@ enterBloc env x
             err501{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "You are using a feature of the Bloc Server that has not yet been implemented.", 
+                     "You are using a feature of the Bloc Server that has not yet been implemented.",
                      Text.unpack err
                    ]}
           RuntimeError _ -> err500{errBody = fromString $ unlines
                    [
                      "Internal Error!",
-                     "Something wrong has happened inside of bloc.", 
-                     "Please contact your network administrator to have this problem fixed.", 
+                     "Something wrong has happened inside of bloc.",
+                     "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
     render::(a0 -> Leijen.Doc)
@@ -229,6 +229,19 @@ blocQuery q = do
   conn <- asks dbConnection
   liftIO $ runQuery conn q
 
+blocQueryMaybe
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  => Query x
+  -> Bloc (Maybe y)
+blocQueryMaybe q = do
+  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
+  conn <- asks dbConnection
+  results <- liftIO $ runQuery conn q
+  case results of
+    [] -> return Nothing
+    [y] -> return (Just y)
+    _:_:_ -> throwError $ DBError "blocQueryMaybe: Multiple results, expected one row"
+
 blocQuery1
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
@@ -240,7 +253,7 @@ blocQuery1 q = do
   case results of
     [] -> blocError $ DBError "No result, expected one row"
     [y] -> return y
-    _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+    _:_:_ -> throwError $ DBError "blocQuery1: Multiple results, expected one row"
 
 blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
 blocModify modify = do

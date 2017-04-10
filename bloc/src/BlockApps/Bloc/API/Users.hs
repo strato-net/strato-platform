@@ -110,7 +110,7 @@ instance MonadUsers Bloc where
   postUsersSend userName addr
     (PostSendParameters toAddr value password txParams) = do
       tx <- prepareTx
-        userName password addr (Just toAddr) txParams
+        userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
         (Wei (fromIntegral value)) ByteString.empty
       hash <- blocStrato $ postTx tx
       void $ pollTxResult hash
@@ -129,7 +129,7 @@ instance MonadUsers Bloc where
       mFunctionId <- getConstructorId cmId
       argsBin <- buildArgumentByteString args mFunctionId
       tx <- prepareTx
-        userName password addr Nothing txParams (Wei (fromIntegral value)) (bin <> argsBin)
+        userName password addr Nothing (fromMaybe emptyTxParams txParams) (Wei (fromIntegral value)) (bin <> argsBin)
       logWith logNotice ("tx is: " <> Text.pack (show tx))
       hash <- blocStrato $ postTx tx
       txResult <- pollTxResult hash
@@ -162,7 +162,7 @@ instance MonadUsers Bloc where
       mFunctionId <- getConstructorId cmId
       argsBin <- buildArgumentByteString (Just args) mFunctionId
       tx <- prepareTx
-        userName pw addr Nothing txParams (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
+        userName pw addr Nothing (fromMaybe emptyTxParams txParams) (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
       return ((name,cmId),tx)
     let
       namesCmIds = map fst namesCmIdsTxs
@@ -191,7 +191,7 @@ instance MonadUsers Bloc where
 
   postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
     txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
-      userName pw addr (Just toAddr) txParams
+      userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral value)) ByteString.empty
     hashes <- blocStrato $ postTxList txs'
     map PostSendListResponse <$> if resolve
@@ -222,7 +222,7 @@ instance MonadUsers Bloc where
         postmethodlistrequestPassword
         userAddr
         (Just methodcallContractAddress)
-        methodcallTxParams
+        (fromMaybe emptyTxParams methodcallTxParams)
         (Wei (fromIntegral methodcallValue))
         (sel <> argsBin)
       -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
@@ -264,7 +264,7 @@ instance MonadUsers Bloc where
         password
         userAddr
         (Just contractAddr)
-        txParams
+        (fromMaybe emptyTxParams txParams)
         (Wei (fromIntegral value))
         (sel <> argsBin)
       logWith logNotice ("tx is: " <> Text.pack (show tx))
@@ -391,7 +391,7 @@ data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
   , sendPassword :: Password
-  , sendTxParams :: TxParams
+  , sendTxParams :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendParameters where
@@ -404,7 +404,7 @@ instance ToSample PostSendParameters where
     { sendToAddress = Address 0xdeadbeef
     , sendValue = 10
     , sendPassword = "securePassword"
-    , sendTxParams = TxParams Nothing Nothing Nothing
+    , sendTxParams = Nothing
     }
 
 type PostUsersContract = "users"
@@ -418,10 +418,19 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Text
   , postuserscontractrequestArgs :: Maybe (Map Text Text)
-  , postuserscontractrequestTxParams :: TxParams
+  , postuserscontractrequestTxParams :: Maybe TxParams
   , postuserscontractrequestValue :: Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
+-- TODO: This end point needs to support form url encoding
+-- instance ToForm PostUsersContractRequest where
+--     toForm PostUsersContractRequest{..} = Map.fromList
+--       [ ("src", toQueryParam postuserscontractrequestSrc)
+--       , ("password", toQueryParam postuserscontractrequestPassword)
+--
+--       ]
+-- instance FromForm PostUsersContractRequest where
+--
 instance ToJSON PostUsersContractRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON PostUsersContractRequest where
@@ -435,7 +444,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestPassword = "securePassword"
     , postuserscontractrequestContract = "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
-    , postuserscontractrequestTxParams = TxParams Nothing Nothing Nothing
+    , postuserscontractrequestTxParams = Nothing
     , postuserscontractrequestValue = 1000000
     }
 
@@ -460,7 +469,7 @@ instance ToSample UploadListRequest where
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs :: Map Text Text
-  , uploadlistcontractTxParams :: TxParams
+  , uploadlistcontractTxParams :: Maybe TxParams
   , uploadlistcontractValue :: Maybe Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
@@ -499,7 +508,7 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   , postuserscontractmethodMethod :: Text
   , postuserscontractmethodArgs :: Map Text Text
   , postuserscontractmethodValue :: Natural
-  , postuserscontractmethodTxParams :: TxParams
+  , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
@@ -543,7 +552,7 @@ instance ToSample PostSendListRequest where
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue :: Natural
-  , sendtransactionTxParams :: TxParams
+  , sendtransactionTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
 instance ToJSON SendTransaction where
@@ -597,7 +606,7 @@ data MethodCall = MethodCall
   , methodcallMethodName :: Text
   , methodcallArgs :: Map Text Text
   , methodcallValue :: Natural
-  , methodcallTxParams :: TxParams
+  , methodcallTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
 instance ToJSON MethodCall where
@@ -644,9 +653,9 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
       return $ prepareSignedTx sk addr UnsignedTransaction
         { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
         , unsignedTransactionGasPrice =
-            fromMaybe (Wei 1000000000000000000) txparamsGasPrice
+            fromMaybe (Wei 1) txparamsGasPrice
         , unsignedTransactionGasLimit =
-            fromMaybe (Gas 3141592) txparamsGasLimit
+            fromMaybe (Gas 100000000) txparamsGasLimit
         , unsignedTransactionTo = toAddr
         , unsignedTransactionValue = value
         , unsignedTransactionInitOrData = code
