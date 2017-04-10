@@ -19,6 +19,7 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Ethereum
 import BlockApps.Solidity.SolidityValue
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
@@ -369,7 +370,7 @@ spec = do
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
-        txParamsComplex = TxParams (Just (Gas 100000000000000)) (Just (Wei 1)) Nothing
+        txParamsComplex = Just $ TxParams (Just (Gas 100000000000000)) (Just (Wei 1)) Nothing
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         postUsersContractRequest = PostUsersContractRequest
