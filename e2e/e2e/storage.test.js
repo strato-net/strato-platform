@@ -59,6 +59,6 @@ describe('Storage operations ', function() {
   });
 
   for (i=0; i < 10; i++) {
-  itShould.getStorage(storage);
-}
+    itShould.getStorage(storage);
+  }
 });
