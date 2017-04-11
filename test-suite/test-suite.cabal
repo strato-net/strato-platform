@@ -44,20 +44,56 @@ executable test-suite-exe
                      , TestDescriptions
                      , TestEthereum
 
-test-suite ethereum-discover-test
+Test-suite test-suite 
     default-language: Haskell2010
     type: exitcode-stdio-1.0
     hs-source-dirs: test
-    ghc-options: -Wall -Werror
+    ghc-options: -Wall -Werror -threaded
     main-is: Spec.hs
     other-modules:
+        Blockchain.Event.EventSpec
         Blockchain.Strato.Discovery.Data.PeerSpec
         Blockchain.Strato.Discovery.UDPSpec
+        Blockchain.Strato.Model.BlockchainClassSpec
+        Blockchain.Strato.Model.TransactionModel
+        Blockchain.Strato.Model.BlockHeaderModel
+        Blockchain.Strato.Model.BlockchainModel
+        Blockchain.Strato.Model.BlockModel
+        Blockchain.Strato.Model.Constants
+        Blockchain.Sequencer.ArbitraryInstances
+        Blockchain.Sequencer.ChainHelpers
+        Blockchain.Sequencer.SequencerSpec
+        Blockchain.Sequencer.OrderValidator
     build-depends: base
-      , blockapps-util
-      , hspec
-      , ethereum-discovery
-      , network
+                 , base16-bytestring
+                 , binary
+                 , blockapps-data
+                 , blockapps-haskoin
+                 , blockapps-milena
+                 , blockapps-util
+                 , bytestring
+                 , conduit
+                 , containers
+                 , crypto-pubkey-types
+                 , deepseq
+                 , derive
+                 , directory
+                 , ethereum-discovery
+                 , ethereum-encryption
+                 , ethereum-rlp
+                 , fast-ecrecover
+                 , hspec
+                 , hspec-contrib
+                 , HUnit
+                 , monad-logger
+                 , mtl
+                 , network
+                 , strato-conf
+                 , strato-model
+                 , strato-p2p-client
+                 , strato-sequencer
+                 , time
+                 , QuickCheck
 
 -- Test-Suite test-suite
 --   default-language: Haskell98
