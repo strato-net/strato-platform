@@ -25,3 +25,7 @@ multinode:
 unittest:
 	echo "unit tests"
 	stack test test-suite 
+
+solidity:
+	echo "solidity-abi"
+	stack test solidity-abi

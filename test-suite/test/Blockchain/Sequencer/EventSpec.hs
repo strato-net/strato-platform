@@ -8,9 +8,6 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.ArbitraryInstances()
 import Blockchain.Data.ArbitraryInstances()
 
-main :: IO ()
-main = hspec spec
-
 spec :: Spec
 spec = parallel $ do
     describe "IngestTx" $ do

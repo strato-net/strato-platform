@@ -61,8 +61,11 @@ Test-suite test-suite
         Blockchain.Strato.Model.BlockchainModel
         Blockchain.Strato.Model.BlockModel
         Blockchain.Strato.Model.Constants
+        Blockchain.Strato.RedisBlockDB.RedisBlockDBSpec
+        Blockchain.Strato.RedisBlockDB.Chain
         Blockchain.Sequencer.ArbitraryInstances
         Blockchain.Sequencer.ChainHelpers
+        Blockchain.Sequencer.EventSpec
         Blockchain.Sequencer.SequencerSpec
         Blockchain.Sequencer.OrderValidator
     build-depends: base
@@ -83,9 +86,12 @@ Test-suite test-suite
                  , ethereum-encryption
                  , ethereum-rlp
                  , fast-ecrecover
+                 , hedis
                  , hspec
                  , hspec-contrib
                  , HUnit
+                 , lens-family
+                 , lens-family-th
                  , leveldb-haskell
                  , merkle-patricia-db
                  , monad-logger
@@ -96,6 +102,7 @@ Test-suite test-suite
                  , strato-conf
                  , strato-model
                  , strato-p2p-client
+                 , strato-redis-blockdb
                  , strato-sequencer
                  , time
                  , QuickCheck
