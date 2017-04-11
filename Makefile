@@ -24,4 +24,4 @@ multinode:
 
 unittest:
 	echo "unit tests"
-	stack test ethereum-discovery
+	stack test test-suite 
