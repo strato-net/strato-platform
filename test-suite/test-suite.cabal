@@ -69,6 +69,8 @@ Test-suite test-suite
         Blockchain.Sequencer.SequencerSpec
         Blockchain.Sequencer.OrderValidator
     build-depends: base
+                 , aeson
+                 , ansi-wl-pprint
                  , base16-bytestring
                  , binary
                  , blockapps-data
@@ -79,14 +81,18 @@ Test-suite test-suite
                  , conduit
                  , containers
                  , crypto-pubkey-types
+                 , cryptohash
                  , deepseq
                  , derive
                  , directory
+                 , either
                  , ethereum-discovery
                  , ethereum-encryption
                  , ethereum-rlp
+                 , ethereum-vm
                  , fast-ecrecover
                  , hedis
+                 , hflags
                  , hspec
                  , hspec-contrib
                  , HUnit
@@ -104,7 +110,10 @@ Test-suite test-suite
                  , strato-p2p-client
                  , strato-redis-blockdb
                  , strato-sequencer
+                 , text
                  , time
+                 , transformers
+                 , unordered-containers
                  , QuickCheck
 
 -- Test-Suite test-suite

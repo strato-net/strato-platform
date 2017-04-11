@@ -15,14 +15,15 @@ import           Test.HUnit
 import           Data.Aeson
 import           Data.Either
 import           HFlags
-import qualified TestDescriptions as TD
+import           Test.Hspec
 import qualified Data.Map as M
 import qualified Data.ByteString.Lazy as BL
-
+import           Test.Hspec.Contrib.HUnit (fromHUnitTest)
 import           Blockchain.VMOptions()
 import           Blockchain.VMContext
-import           TestEthereum
-import           TestFiles
+import           Blockchain.VM.TestEthereum
+import           Blockchain.VM.TestFiles
+import qualified Blockchain.VM.TestDescriptions as TD
 
 doTests :: [(String, TD.Test)] -> IO ()
 doTests tests = do
@@ -59,9 +60,10 @@ doTests'' tests = do
   f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
 
 spec :: Spec
-spec = unsafePerformIO spec'
+spec = describe "EF tests" $ do 
+    fromHUnitTest . unsafePerformIO $ spec'
 
-spec' :: IO Spec
+spec' :: IO Test 
 spec' = do
   _ <- $initHFlags "The ethereum-test test-suite"
   testsExist <- doesDirectoryExist "tests"
