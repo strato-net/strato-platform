@@ -31,29 +31,37 @@ import qualified Blockchain.Bagger.BaggerState as B
 import qualified Data.Map as M
 import Blockchain.Format
 
+data RunAttemptState = RunAttemptState { rasRanTxs    :: [OutputTx]
+                                       , rasUnranTxs  :: [OutputTx]
+                                       , rasStateRoot :: StateRoot
+                                       , rasRemGas    :: Integer
+                                       } deriving (Eq, Read, Show)
+
 data RunAttemptError = CantFindStateRoot
-                     | GasLimitReached [OutputTx] [OutputTx] StateRoot Integer -- ran, unran, new stateroot, remgas
-                     deriving Show
+                     | GasLimitReached [OutputTx] [OutputTx] StateRoot Integer    -- ran, unran, new stateroot, remgas
+                     | RecoverableFailure TxRejection [OutputTx] [OutputTx] StateRoot Integer -- this means the culprit can be dropped from the pool and the block can continue
+                     deriving (Eq, Read, Show)                                                -- same order of args
 
-data BaggerTxQueue = Incoming | Pending | Queued deriving (Eq, Show)
+data BaggerTxQueue = Incoming | Pending | Queued deriving (Eq, Read, Show)
 
-data BaggerTxRejection = NonceTooLow    BaggerStage BaggerTxQueue Integer  OutputTx -- integer is actual nonce
-                       | BalanceTooLow  BaggerStage BaggerTxQueue Integer  OutputTx -- integer is actual balance
-                       | GasLimitTooLow BaggerStage BaggerTxQueue Integer  OutputTx -- queue should probably only be Validation, integer is intrinsic gas
-                       | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
-                       deriving Show
+data TxRejection = NonceTooLow    BaggerStage BaggerTxQueue Integer OutputTx -- integers: needed nonce
+                 | BalanceTooLow  BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
+                 | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
+                 | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
+                 deriving (Eq, Read, Show)
 
-data BaggerStage = Insertion | Validation | Promotion | Demotion deriving (Read, Eq, Show)
+data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
-instance Format BaggerTxRejection where
+instance Format TxRejection where
     format (NonceTooLow    stage queue actual o@OutputTx{otHash=hash}) =
         "NonceTooLow at stage "    ++ show stage ++ " in queue " ++ show queue ++
         "\n\tactual nonce "     ++ show actual ++
         "\n\ttx hash " ++ format hash ++
         "\n" ++ format o
-    format (BalanceTooLow  stage queue actual o@OutputTx{otHash=hash}) =
+    format (BalanceTooLow  stage queue needed actual o@OutputTx{otHash=hash}) =
         "BalanceTooLow at stage "  ++ show stage ++ " in queue " ++ show queue ++
-        "\n\tactual tx limit "  ++ show actual ++
+        "\n\tneeded balance "  ++ show needed ++
+        "\n\tavailable balance" ++ show actual ++
         "\n\ttx hash " ++ format hash ++
         "\n" ++ format o
     format (GasLimitTooLow stage queue actual o@OutputTx{otHash=hash}) =
@@ -71,7 +79,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
-    txsDroppedCallback :: [BaggerTxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
+    txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
     getCheckpointableState :: m (SHA, DD.BlockData, [SHA])
@@ -245,10 +253,10 @@ promoteExecutables = do
         let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce state''
         putBaggerState state'''
         forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
-
+        state''' <- getBaggerState
         -- todo callback per promotion call instead of per-address?
         let nonceDrops = NonceTooLow Promotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = BalanceTooLow Promotion Queued addressBalance <$> discardedByCost
+        let costDrops  = (\t -> BalanceTooLow Promotion Queued (B.calculateIntrinsicTxFee state''' t) addressBalance t) <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops) txShas
         forM_ readyToMine promoteTx
 
@@ -282,10 +290,10 @@ demoteUnexecutables = do
         putBaggerState state''
         forM_ discardedByCost removeFromSeen
         forM_ discardedByCost $ logDiscard "demoteUnexecutables  Pending Balance" address addressBalance
-
+        state''' <- getBaggerState
         -- todo callback per demotion call instead of per-address?
         let nonceDrops = NonceTooLow Demotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = BalanceTooLow Demotion Queued addressBalance <$> discardedByCost
+        let costDrops  = (\t -> BalanceTooLow Demotion Queued (B.calculateIntrinsicTxFee state''' t) addressBalance t) <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops) txShas
 
         -- drop all existing pending transactions, and try to see if they're
@@ -302,7 +310,7 @@ wasSeen OutputTx{otHash=sha} = do
     -- $logDebugS "Bagger.wasSeen" . T.pack $ "wasSeen " ++ (show sha) ++ " = " ++ (show ret)
     return ret
 
-isValidForPool :: MonadBagger m => OutputTx -> m (Either BaggerTxRejection ())
+isValidForPool :: MonadBagger m => OutputTx -> m (Either TxRejection ())
 isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
     -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
     state <- getBaggerState
@@ -318,7 +326,7 @@ isValidForPool t@OutputTx{otSigner=address, otBaseTx=bt} = do
             if addressNonce > txNonce then
                 return . Left $ NonceTooLow Validation Incoming addressNonce t
             else if addressBalance < txFee then
-                return . Left $ BalanceTooLow Validation Incoming addressBalance t
+                return . Left $ BalanceTooLow Validation Incoming txFee addressBalance t
             else
                 return $ Right ()
 

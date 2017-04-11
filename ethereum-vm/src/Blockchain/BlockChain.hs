@@ -18,16 +18,15 @@ module Blockchain.BlockChain
   ) where
 
 import           Control.Monad
-import           Control.Monad.Extra                  (unlessM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import qualified Control.Monad.State                  as State
 import           Control.Monad.Stats
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Either
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as BC
-import qualified Data.ByteString.Lazy                 as BL
 import           Data.IORef                           (newIORef, readIORef,
                                                        writeIORef)
 import           Data.List
@@ -38,10 +37,9 @@ import qualified Data.Set                             as S
 import qualified Data.Text                            as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
-import           Text.PrettyPrint.ANSI.Leijen         hiding (lines, (<$>))
+import           Network.Kafka                        (withKafkaViolently)
+import           Text.PrettyPrint.ANSI.Leijen         (pretty)
 import           Text.Printf
-
-import qualified Data.Aeson                           as Aeson
 
 import qualified Blockchain.Colors                    as CL
 import           Blockchain.Constants
@@ -52,7 +50,6 @@ import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.ExecResults
-import           Blockchain.Data.Extra
 import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.Transaction
@@ -67,7 +64,6 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
-import           Blockchain.Stream.Raw
 import           Blockchain.Stream.UnminedBlock
 import           Blockchain.TheDAOFork
 import           Blockchain.Verifier
@@ -89,25 +85,27 @@ import           Blockchain.Strato.StateDiff          hiding
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka
-import qualified Control.Monad.State                  as State
 
 import           Blockchain.Strato.Indexer.Kafka      (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model      (IndexEvent (..))
-
-import           Network.Kafka                        (withKafkaViolently)
-
 import           Executable.EVMFlags
 
-data TransactionFailureCause = TFInsufficientFunds Integer Integer -- txCost, accountBalance
-                             | TFIntrinsicGasExceedsTxLimit Integer Integer -- intrinsicGas, txGasLimit
-                             | TFBlockGasLimitExceeded Integer Integer -- neededGas, actualGas
-                             | TFNonceMismatch Integer Integer  -- expectedNonce, actualNonce
+data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- txCost, accountBalance
+                             | TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
+                             | TFBlockGasLimitExceeded Integer Integer OutputTx-- neededGas, actualGas
+                             | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
+
+tfToBaggerTxRejection :: TransactionFailureCause -> Bagger.TxRejection
+tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = Bagger.BalanceTooLow Bagger.Execution Bagger.Queued cost balance tx
+tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = Bagger.GasLimitTooLow Bagger.Execution Bagger.Queued ig tx
+tfToBaggerTxRejection TFBlockGasLimitExceeded{} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
+tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = Bagger.NonceTooLow Bagger.Execution Bagger.Queued expected tx
 
 instance Show TransactionFailureCause where
-    show (TFInsufficientFunds cost bal) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
-    show (TFIntrinsicGasExceedsTxLimit intG txGL) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
-    show (TFBlockGasLimitExceeded txG blkG) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
-    show (TFNonceMismatch expected actual) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
+    show (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
+    show (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
+    show (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
+    show (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -116,18 +114,21 @@ instance Bagger.MonadBagger ContextM where
         ctx <- State.get
         State.put $ ctx { contextBaggerState = s }
 
-    runFromStateRoot sr remainingGas blockHeader txs = do
+    runFromStateRoot sr remainingGas theBlockHeader txs = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        (res, ranTxs, unranTxs, newGas) <- mineTransactions' blockHeader remainingGas [] txs
+        (res, ranTxs, unranTxs, newGas) <- mineTransactions' theBlockHeader remainingGas [] txs
         flushMemStorageDB
         flushMemAddressStateDB
         newStateRoot <- getStateRoot
         setStateDBStateRoot startingStateRoot
-        case res of -- currently only get GasLimit errors out of mineTransactions'
-            Left (TFBlockGasLimitExceeded _ _) -> return $ Left (Bagger.GasLimitReached ranTxs unranTxs newStateRoot newGas)
-            Left err -> error $ "mineTransactions' failed unexpectedly: " ++ show err
-            Right _ -> return $ Right (newStateRoot, newGas)
+        let recoverable f = Left (Bagger.RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
+        return $ case res of -- currently only get GasLimit errors out of mineTransactions'
+            Left TFBlockGasLimitExceeded{}  -> Left (Bagger.GasLimitReached ranTxs unranTxs newStateRoot newGas)
+            Left f@TFInsufficientFunds{} -> recoverable f
+            Left f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
+            Left f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ show f
+            Right _ -> Right (newStateRoot, newGas)
 
     rewardCoinbases sr us uncles ourNumber = do
         startingStateRoot <- getStateRoot
@@ -145,16 +146,16 @@ instance Bagger.MonadBagger ContextM where
 
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
-        let (message, stage, queue, txHash) = baggerRejectionToTransactionResultBits rejection
+        let (message, _, _, theHash) = baggerRejectionToTransactionResultBits rejection
         -- if a tx is dropped from Queued during demotion, it means it was likely culled during the demotion as the
         -- new best block we just mined came in
-        let isRecentlyRan = txHash `elem` bestBlockShas
+        let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format rejection
             _ <- putTransactionResult
                      TransactionResult {
                        transactionResultBlockHash=SHA 0,
-                       transactionResultTransactionHash=txHash,
+                       transactionResultTransactionHash=theHash,
                        transactionResultMessage=message,
                        transactionResultResponse="",
                        transactionResultTrace="rejected",
@@ -169,18 +170,19 @@ instance Bagger.MonadBagger ContextM where
                        }
             return ()
 
-baggerRejectionToTransactionResultBits :: Bagger.BaggerTxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
+baggerRejectionToTransactionResultBits :: Bagger.TxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
-    Bagger.NonceTooLow    stage queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to low tx nonce", stage, queue, hash)
-    Bagger.BalanceTooLow  stage queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to low account balance", stage, queue, hash)
-    Bagger.GasLimitTooLow stage queue _ OutputTx{otHash=hash} -> ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to low tx gas limit", stage, queue, hash)
-    Bagger.LessLucrative  stage queue OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
-        ("Rejected from mempool at "++ show stage ++ "/" ++ show queue ++ " due to " ++ formatSHAWithoutColor hashBetter ++
-         " being a more lucrative transaction", stage, queue, hashWorse)
+    Bagger.NonceTooLow    s q actual OutputTx{otHash=hash, otBaseTx=bt} ->
+        (p' s q ++ "tx nonce (expected: " ++ show (transactionNonce bt) ++ ", actual: " ++ show actual ++ ")", s, q, hash)
+    Bagger.BalanceTooLow  s q needed actual OutputTx{otHash=hash} ->
+        (p' s q ++ "account balance (expected: " ++ show needed ++ ", actual: " ++ show actual ++ ")", s, q, hash)
+    Bagger.GasLimitTooLow s q _ OutputTx{otHash=hash} ->
+        (p' s q ++ "tx gas limit", s, q, hash)
+    Bagger.LessLucrative  s q OutputTx{otHash=hashBetter} OutputTx{otHash=hashWorse} ->
+        (p s q ++ formatSHAWithoutColor hashBetter ++ " being a more lucrative transaction", s, q, hashWorse)
 
-isNonceRejection :: Bagger.BaggerTxRejection -> Bool
-isNonceRejection Bagger.NonceTooLow{} = True
-isNonceRejection _                    = False
+    where p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
+          p' s q        = p s q ++ "low "
 
 -- todo: lovely!
 
@@ -223,7 +225,6 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               let oldStateRoot = blockDataStateRoot oldHeader
               didReplaceBest <- liftIO (newIORef False)
               replacedBest   <- liftIO (newIORef undefined)
-              replacedBBI    <- liftIO (newIORef undefined)
               forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
                   addBlock isUnmined block
                   unless isUnmined $ do
@@ -288,7 +289,7 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
     valid <- checkValidity isUnmined (blockIsHomestead $ blockDataNumber bd) bSum b'
     case valid of
         Right _  -> tick ctr_vm_blocks_valid
-        Left err -> tick ctr_vm_blocks_invalid -- error err -- todo: i dont think we ACTUALLY need to error here
+        Left  _  -> tick ctr_vm_blocks_invalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     tick $ if isUnmined
            then ctr_vm_blocks_unmined
@@ -324,7 +325,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     time time' time_vm_tx_mining
     printTransactionMessage tx result time'
     case result of
-        Left f@(TFBlockGasLimitExceeded need have) -> return (Left f, reverse ran, unran, have)
+        Left f@(TFBlockGasLimitExceeded _ have _) -> return (Left f, reverse ran, unran, have)
         Left other       -> error $ "mineTransactions' unexpected failure: " ++ show other
         Right execResult -> mineTransactions' header (erRemainingBlockGas execResult) (tx:ran) txs
 
@@ -347,10 +348,10 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
 
     let txCost      = transactionGasLimit bt * transactionGasPrice bt + transactionValue bt
         acctBalance = addressStateBalance addressState
-    when (txCost > acctBalance) $ left $ TFInsufficientFunds txCost acctBalance
-    when (intrinsicGas' > transactionGasLimit bt) $ left $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt)
-    when (transactionGasLimit bt > remainingBlockGas) $ left $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas
-    unless nonceValid $ left $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState)
+    when (txCost > acctBalance) $ left $ TFInsufficientFunds txCost acctBalance t
+    when (intrinsicGas' > transactionGasLimit bt) $ left $ TFIntrinsicGasExceedsTxLimit intrinsicGas' (transactionGasLimit bt) t
+    when (transactionGasLimit bt > remainingBlockGas) $ left $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
+    unless nonceValid $ left $ TFNonceMismatch (transactionNonce bt) (addressStateNonce addressState) t
 
     let availableGas = transactionGasLimit bt - intrinsicGas'
 
@@ -449,7 +450,7 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 --outputTransactionMessage::IO ()
 outputTransactionResult::BlockData->OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->
                          M.Map Address AddressStateModification->M.Map Address AddressStateModification->ContextM ()
-outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} result deltaT beforeMap afterMap = do
+outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} result deltaT beforeMap afterMap = do
   let
     (message, gasRemaining) =
       case result of
@@ -484,12 +485,12 @@ outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} re
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       forM_ theLogs $ \log' ->
-        putLogDB $ LogDB txHash tAddr (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
+        putLogDB $ LogDB theHash tAddr (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
 
       _ <- putTransactionResult
              TransactionResult {
                transactionResultBlockHash=blockHeaderHash b,
-               transactionResultTransactionHash=txHash,
+               transactionResultTransactionHash=theHash,
                transactionResultMessage=message,
                transactionResultResponse=response,
                transactionResultTrace=theTrace',
@@ -504,40 +505,33 @@ outputTransactionResult b OutputTx{otHash=txHash, otBaseTx=t, otSigner=tAddr} re
                }
       return ()
 
-data BoxMode = Pre | Ok | Err deriving (Eq)
-
-modeToColor :: BoxMode -> (String -> String)
-modeToColor Pre = CL.blue
-modeToColor Ok  = CL.magenta
-modeToColor Err = CL.red
-
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
-logWithBox source headerSize lines = do
+logWithBox source headerSize theLines = do
     let headerAndFooter = indent ++ CL.magenta (replicate headerSize '=')
         addBorder line  = indent ++ CL.magenta "|" ++ " " ++ line ++ " " ++ CL.magenta "|"
         indent          = "    "
     $logInfoS source $ T.pack headerAndFooter
-    forM_ (addBorder <$> lines) ($logInfoS source . T.pack)
+    forM_ (addBorder <$> theLines) ($logInfoS source . T.pack)
     $logInfoS source $ T.pack headerAndFooter
 
 printTransactionMessage::MonadLogger m=>
                          OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->m ()
-printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=txHash} (Left errMsg) deltaT = do
+printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash} (Left errMsg) deltaT = do
     let tNonce = transactionNonce baseTx
     logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                                , "Tx hash:  " ++ format txHash
+                                , "Tx hash:  " ++ format theHash
                                 , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
                                 , CL.red "Transaction failure: " ++ CL.red (show errMsg)
                                 , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
                                 ]
 
-printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=txHash} (Right results) deltaT = do
+printTransactionMessage OutputTx{otBaseTx=t, otSigner=tAddr, otHash=theHash} (Right results) deltaT = do
     let tNonce = transactionNonce t
         txPretty = if isMessageTX t
           then "MessageTX to " ++ show (pretty $ transactionTo t) ++ "                     "
           else "Create Contract "  ++ show (pretty $ fromJust $ erNewContractAddress results) ++ "                  "
     logWithBox "printTx/ok" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
-                               , "Tx hash:  " ++ format txHash
+                               , "Tx hash:  " ++ format theHash
                                , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
                                , txPretty
                                , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
@@ -556,7 +550,7 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 replaceBestIfBetter :: OutputBlock -> Bool -> ContextM (Bool, (SHA, Integer, Integer))
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} emitStateDiff = do
-    ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, oldUncleCount) <- getContextBestBlockInfo
+    ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
     let newNumber     = blockDataNumber bd
         newStateRoot  = blockDataStateRoot bd
