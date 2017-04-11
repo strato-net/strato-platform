@@ -49,7 +49,6 @@ test-suite strato-model-test
        Blockchain.Strato.Model.BlockModel,
        Blockchain.Strato.Model.Constants
 
-
     build-depends:
        base,
        hspec,

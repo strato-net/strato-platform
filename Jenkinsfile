@@ -27,12 +27,40 @@ ansiColor('xterm') {
                     '''
                 }
             }
+            // this stage is currently running 'stack test ...' meaning it
+            // it depends only on the build environment
+            stage('unit-test') {
+                sh '''#!/bin/bash -l
+                pwd
+                cd strato/repos/monstrato
+                make unit
+                '''
+            }
+            // this stage needs running dependent docker images such as redis
+            // they run with strato running but preferrably they are turned off
+            // and are run with 'deep-test'
+            stage('integration-test') {
+                sh '''#!/bin/bash -l
+                pwd
+                cd strato/repos/monstrato
+                make test-suite
+                '''
+            }
+            // this stage also depends on the docker images but we need all
+            // strato components turned off (such as `ethereum-vm`)
+            stage('deep-test') {
+                sh '''#!/bin/bash -l
+                pwd
+                cd strato/repos/monstrato
+                make vm-test
+                '''
+            }
+            // this stage needs a fully running strato (multi) node environment
             stage('E2E-Test') {
                 sh '''#!/bin/bash -l
                 pwd
                 cd strato/repos/monstrato
-                make build
-                make test
+                make multinode
                 '''
             }
         }

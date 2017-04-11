@@ -58,7 +58,7 @@ Test-Suite test-merkle-patricia-db
     default-language: Haskell2010
     hs-source-dirs: test, src
     type:           exitcode-stdio-1.0
-    main-is:        Main.hs
+    main-is:        MerklePatriciaSpec.hs
     build-depends:  base >=4 && < 5
                   , data-default
                   , leveldb-haskell
@@ -78,6 +78,8 @@ Test-Suite test-merkle-patricia-db
                   , blockapps-util
                   , aeson
                   , mtl
+                  , hspec
+                  , hspec-contrib
     other-modules:  Blockchain.Database.MerklePatricia
                   , Blockchain.Database.MerklePatricia.Internal
                   , Blockchain.Database.MerklePatricia.InternalMem
