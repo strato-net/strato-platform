@@ -94,6 +94,7 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFIntrinsicGasExceedsTxLimit Integer Integer OutputTx -- intrinsicGas, txGasLimit
                              | TFBlockGasLimitExceeded Integer Integer OutputTx-- neededGas, actualGas
                              | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
+                             deriving (Eq, Read, Show)
 
 tfToBaggerTxRejection :: TransactionFailureCause -> Bagger.TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = Bagger.BalanceTooLow Bagger.Execution Bagger.Queued cost balance tx
@@ -101,11 +102,11 @@ tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig _ tx) = Bagger.GasLimitTo
 tfToBaggerTxRejection TFBlockGasLimitExceeded{} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = Bagger.NonceTooLow Bagger.Execution Bagger.Queued expected tx
 
-instance Show TransactionFailureCause where
-    show (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
-    show (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
-    show (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
-    show (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
+instance Format TransactionFailureCause where
+    format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
+    format (TFIntrinsicGasExceedsTxLimit intG txGL _) = "Intrinsic gas exceeds TX gas limit: intrinsic gas " ++ show intG ++ " > tx gas limit " ++ show txGL
+    format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
+    format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -117,18 +118,18 @@ instance Bagger.MonadBagger ContextM where
     runFromStateRoot sr remainingGas theBlockHeader txs = do
         startingStateRoot <- getStateRoot
         setStateDBStateRoot sr
-        (res, ranTxs, unranTxs, newGas) <- mineTransactions' theBlockHeader remainingGas [] txs
+        (TxMiningResult res ranTxs unranTxs newGas) <- mineTransactions' theBlockHeader remainingGas [] txs
         flushMemStorageDB
         flushMemAddressStateDB
         newStateRoot <- getStateRoot
         setStateDBStateRoot startingStateRoot
         let recoverable f = Left (Bagger.RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
         return $ case res of -- currently only get GasLimit errors out of mineTransactions'
-            Left TFBlockGasLimitExceeded{}  -> Left (Bagger.GasLimitReached ranTxs unranTxs newStateRoot newGas)
-            Left f@TFInsufficientFunds{} -> recoverable f
-            Left f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
-            Left f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ show f
-            Right _ -> Right (newStateRoot, newGas)
+            Nothing -> Right (newStateRoot, newGas)
+            Just TFBlockGasLimitExceeded{}  -> Left (Bagger.GasLimitReached ranTxs unranTxs newStateRoot newGas)
+            Just f@TFInsufficientFunds{} -> recoverable f
+            Just f@TFIntrinsicGasExceedsTxLimit{} -> recoverable f
+            Just f@TFNonceMismatch{} -> error $ "mineTransactions' we messed up: " ++ format f
 
     rewardCoinbases sr us uncles ourNumber = do
         startingStateRoot <- getStateRoot
@@ -318,16 +319,21 @@ addTransactions isUnmined b blockGas (t:rest) = do
 
   addTransactions isUnmined b remainingBlockGas rest
 
-mineTransactions' :: BlockData -> Integer -> [OutputTx] -> [OutputTx] -> ContextM (Either TransactionFailureCause (), [OutputTx], [OutputTx], Integer)
-mineTransactions' _ remGas ran [] = return (Right (), reverse ran, [], remGas)
+data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
+                                     , tmrRanTxs   :: [OutputTx]
+                                     , tmrUnranTxs :: [OutputTx]
+                                     , tmrRemGas   :: Integer
+                                     } deriving (Eq, Read, Show)
+
+mineTransactions' :: BlockData -> Integer -> [OutputTx] -> [OutputTx] -> ContextM TxMiningResult
+mineTransactions' _ remGas ran [] = return $ TxMiningResult Nothing (reverse ran) [] remGas
 mineTransactions' header remGas ran unran@(tx:txs) = do
     (time', !result) <- timeIt . runEitherT $ addTransaction False header remGas tx
     time time' time_vm_tx_mining
     printTransactionMessage tx result time'
     case result of
-        Left f@(TFBlockGasLimitExceeded _ have _) -> return (Left f, reverse ran, unran, have)
-        Left other       -> error $ "mineTransactions' unexpected failure: " ++ show other
         Right execResult -> mineTransactions' header (erRemainingBlockGas execResult) (tx:ran) txs
+        Left  failure    -> return $ TxMiningResult (Just failure) ran unran remGas
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
@@ -340,9 +346,9 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
         intrinsicGas' = intrinsicGas isHomestead t
 
     when flags_debug . lift $ do
-        $logDebugS "addTx" $ T.pack $ "bytes cost: " ++ show (gTXDATAZERO * fromIntegral (zeroBytesLength t) + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - fromIntegral (zeroBytesLength t)))
-        $logDebugS "addTx" $ T.pack $ "transaction cost: " ++ show gTX
-        $logDebugS "addTx" $ T.pack $ "intrinsicGas: " ++ show intrinsicGas'
+        $logDebugS "addTx" . T.pack $ "bytes cost: " ++ show (gTXDATAZERO * fromIntegral (zeroBytesLength t) + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - fromIntegral (zeroBytesLength t)))
+        $logDebugS "addTx" . T.pack $ "transaction cost: " ++ show gTX
+        $logDebugS "addTx" . T.pack $ "intrinsicGas: " ++ show intrinsicGas'
 
     addressState <- lift $ getAddressState tAddr
 
@@ -454,7 +460,7 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} r
   let
     (message, gasRemaining) =
       case result of
-        Left err -> (show err, 0) -- TODO Also include the trace
+        Left err -> (format err, 0) -- TODO Also include the trace
         Right r  -> ("Success!", erRemainingBlockGas r)
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasLimit t)
@@ -521,7 +527,7 @@ printTransactionMessage OutputTx{otSigner=tAddr, otBaseTx=baseTx, otHash=theHash
     logWithBox "printTx/err" 78 [ "Adding transaction signed by: " ++ show (pretty tAddr) ++ "    "
                                 , "Tx hash:  " ++ format theHash
                                 , rightPad 74 ' ' $ "Tx nonce: " ++ show tNonce
-                                , CL.red "Transaction failure: " ++ CL.red (show errMsg)
+                                , CL.red "Transaction failure: " ++ CL.red (format errMsg)
                                 , "t = " ++ printf "%.5f" (realToFrac deltaT::Double) ++ "s                                                              "
                                 ]
 

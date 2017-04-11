@@ -153,7 +153,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
                     let (newSR, newGas, newExec, newUnexec) = case run of
                             Left (GasLimitReached rtx urtx nsr nbg) -> (nsr, nbg, lastExec ++ rtx, urtx)
-                            Left CantFindStateRoot                  -> error $ "Cant find StateRoot " ++ show lastSR
+                            Left e                                  -> error (show e)
                             Right (newSR', newGas')                 -> (newSR', newGas', lastExec ++ promoted, [])
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
@@ -253,10 +253,10 @@ promoteExecutables = do
         let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce state''
         putBaggerState state'''
         forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
-        state''' <- getBaggerState
+        state'''' <- getBaggerState
         -- todo callback per promotion call instead of per-address?
         let nonceDrops = NonceTooLow Promotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = (\t -> BalanceTooLow Promotion Queued (B.calculateIntrinsicTxFee state''' t) addressBalance t) <$> discardedByCost
+        let costDrops  = (\t -> BalanceTooLow Promotion Queued (B.calculateIntrinsicTxFee state'''' t) addressBalance t) <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops) txShas
         forM_ readyToMine promoteTx
 
@@ -290,10 +290,10 @@ demoteUnexecutables = do
         putBaggerState state''
         forM_ discardedByCost removeFromSeen
         forM_ discardedByCost $ logDiscard "demoteUnexecutables  Pending Balance" address addressBalance
-        state''' <- getBaggerState
+        state'''' <- getBaggerState
         -- todo callback per demotion call instead of per-address?
         let nonceDrops = NonceTooLow Demotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = (\t -> BalanceTooLow Demotion Queued (B.calculateIntrinsicTxFee state''' t) addressBalance t) <$> discardedByCost
+        let costDrops  = (\t -> BalanceTooLow Demotion Queued (B.calculateIntrinsicTxFee state'''' t) addressBalance t) <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops) txShas
 
         -- drop all existing pending transactions, and try to see if they're
