@@ -13,14 +13,14 @@ import           Test.HUnit
 import           Data.Aeson
 import           Data.Either
 import           HFlags
-import qualified TestDescriptions as TD
+import qualified Blockchain.VM.TestDescriptions as TD
 import qualified Data.Map as M
 import qualified Data.ByteString.Lazy as BL
 
 import           Blockchain.VMOptions()
 import           Blockchain.VMContext
-import           TestEthereum
-import           TestFiles
+import           Blockchain.VM.TestEthereum
+import           Blockchain.VM.TestFiles
 
 doTests :: [(String, TD.Test)] -> IO ()
 doTests tests = do

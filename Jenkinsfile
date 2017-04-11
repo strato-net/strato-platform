@@ -31,8 +31,8 @@ ansiColor('xterm') {
                 sh '''#!/bin/bash -l
                 pwd
                 cd strato/repos/monstrato
-                make multinode
-                make unittest
+                make build
+                make test
                 '''
             }
         }
