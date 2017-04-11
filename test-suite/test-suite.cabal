@@ -51,6 +51,7 @@ Test-suite test-suite
     ghc-options: -Wall -Werror -threaded
     main-is: Spec.hs
     other-modules:
+        Blockchain.Database.MerklePatricia.MerklePatriciaSpec
         Blockchain.Event.EventSpec
         Blockchain.Strato.Discovery.Data.PeerSpec
         Blockchain.Strato.Discovery.UDPSpec
@@ -85,9 +86,13 @@ Test-suite test-suite
                  , hspec
                  , hspec-contrib
                  , HUnit
+                 , leveldb-haskell
+                 , merkle-patricia-db
                  , monad-logger
                  , mtl
                  , network
+                 , nibblestring
+                 , resourcet
                  , strato-conf
                  , strato-model
                  , strato-p2p-client

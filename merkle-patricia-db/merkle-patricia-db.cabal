@@ -47,8 +47,8 @@ library
                    , Blockchain.Database.MerklePatricia.Diff
                    , Blockchain.Database.MerklePatricia.Map
                    , Blockchain.Database.MerklePatricia.NodeData
-    other-modules: Blockchain.Database.MerklePatricia.MPDB
-                 , Blockchain.Database.MerklePatricia.StateRoot
+                   , Blockchain.Database.MerklePatricia.MPDB
+                   , Blockchain.Database.MerklePatricia.StateRoot
     ghc-options: -Wall
     buildable: True
     hs-source-dirs: src
