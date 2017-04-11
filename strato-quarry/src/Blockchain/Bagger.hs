@@ -52,6 +52,13 @@ data TxRejection = NonceTooLow    BaggerStage BaggerTxQueue Integer OutputTx -- 
                  | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
                  deriving (Eq, Read, Show)
 
+rejectedTx :: TxRejection -> OutputTx
+rejectedTx (NonceTooLow _ _ _ t)     = t
+rejectedTx (BalanceTooLow _ _ _ _ t) = t
+rejectedTx (GasLimitTooLow _ _ _ t)  = t
+rejectedTx (LessLucrative _ _ _ t)   = t
+
+
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
 instance Format TxRejection where
@@ -157,9 +164,11 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                             Right (newSR', newGas') -> return (newSR', newGas', lastExec ++ promoted, [])
                             Left e -> do
                                 logRAE e
-                                return $ case e of
-                                    (GasLimitReached rtx urtx nsr nbg)      -> (nsr, nbg, lastExec ++ rtx, urtx)
-                                    (RecoverableFailure _ rtx urtx nsr nbg) -> (nsr, nbg, lastExec ++ rtx, urtx)
+                                case e of
+                                    (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx)
+                                    (RecoverableFailure f rtx urtx nsr nbg) -> do
+                                        txsDroppedCallback [f] []
+                                        return (nsr, nbg, lastExec ++ rtx, urtx)
                                     x                                       -> error (show x)
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
