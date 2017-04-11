@@ -9,6 +9,8 @@ enableSsl=false
 testDir="e2e"
 rootDir=$PWD
 
+suite=${1:-$testDir}
+
 # Parse command line arguments
 for arg in "$@"
 do
@@ -56,9 +58,9 @@ echo "Running vm tests..."
 echo "Running e2e tests..."
 if [[ "$enableSsl" == true ]]
 then
-  node_modules/mocha/bin/mocha --config $rootDir/test-https.config.yaml e2e
+  node_modules/mocha/bin/mocha --config $rootDir/test-https.config.yaml $suite
 else
-  node_modules/mocha/bin/mocha --config $rootDir/test.config.yaml e2e
+  node_modules/mocha/bin/mocha --config $rootDir/test.config.yaml $suite
 fi
 
 cd $rootDir
