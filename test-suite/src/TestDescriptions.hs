@@ -33,8 +33,6 @@ import Blockchain.SHA
 import Blockchain.Util
 import Blockchain.VM.VMState
 
---import Debug.Trace
-
 data Env =
   Env {
     currentCoinbase::Address,
