@@ -35,6 +35,7 @@ import qualified Data.Text as Text
 import Data.Time.Clock.POSIX
 import Generic.Random.Generic
 import GHC.Generics
+import GHC.Stack
 import Numeric
 import Opaleye
 import Servant.API
@@ -61,7 +62,7 @@ class Monad m => MonadContracts m where
   getContracts :: m GetContractsResponse
   getContractsData :: ContractName -> m [MaybeNamed Address]
   getContractsContract :: ContractName -> MaybeNamed Address -> m ContractDetails
-  getContractsState :: ContractName -> MaybeNamed Address -> m GetContractsStateResponses -- state-translation
+  getContractsState :: HasCallStack => ContractName -> MaybeNamed Address -> m GetContractsStateResponses -- state-translation
   getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
   getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
   getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> m GetContractsStateMappingResponse -- state-translation
