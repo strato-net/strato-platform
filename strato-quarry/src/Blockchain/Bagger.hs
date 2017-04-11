@@ -1,35 +1,37 @@
-{-# LANGUAGE OverloadedStrings, BangPatterns, TemplateHaskell #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS -fprof-auto -fprof-cafs #-}
 module Blockchain.Bagger where
 
-import Control.Monad.Extra
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Arrow ((&&&)) -- yes. very yes.
+import           Control.Arrow                      ((&&&))
+import           Control.Monad.Extra
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import qualified Data.Map                           as M
+import qualified Data.Text                          as T
+import           Data.Time.Clock
+import           Numeric                            (readHex)
 
-import Data.Time.Clock
-import qualified Data.Text as T
-import Numeric (readHex)
+import           Blockchain.CoreFlags               (flags_difficultyBomb,
+                                                     flags_testnet)
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.StateDB
 
-import Blockchain.CoreFlags (flags_difficultyBomb, flags_testnet)
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StateDB
-import Blockchain.DB.HashDB
-
-import Blockchain.Data.Address
-import Blockchain.Database.MerklePatricia (StateRoot(..))
-import Blockchain.SHA hiding (hash)
-import Blockchain.Sequencer.Event (OutputTx(..), OutputBlock(..))
-import qualified Blockchain.Data.BlockDB as BDB
-import qualified Blockchain.Data.DataDefs as DD
-import qualified Blockchain.Data.TransactionDef as TD
-import qualified Blockchain.Data.TXOrigin as TO
-import qualified Blockchain.Verification as V
-import qualified Blockchain.EthConf as Conf
-import qualified Blockchain.Bagger.BaggerState as B
-
-import qualified Data.Map as M
-import Blockchain.Format
+import qualified Blockchain.Bagger.BaggerState      as B
+import           Blockchain.Data.Address
+import qualified Blockchain.Data.BlockDB            as BDB
+import qualified Blockchain.Data.DataDefs           as DD
+import qualified Blockchain.Data.TransactionDef     as TD
+import qualified Blockchain.Data.TXOrigin           as TO
+import           Blockchain.Database.MerklePatricia (StateRoot (..))
+import qualified Blockchain.EthConf                 as Conf
+import           Blockchain.Format
+import           Blockchain.Sequencer.Event         (OutputBlock (..),
+                                                     OutputTx (..))
+import           Blockchain.SHA                     hiding (hash)
+import qualified Blockchain.Verification            as V
 
 data RunAttemptState = RunAttemptState { rasRanTxs    :: [OutputTx]
                                        , rasUnranTxs  :: [OutputTx]
@@ -61,7 +63,7 @@ instance Format TxRejection where
     format (BalanceTooLow  stage queue needed actual o@OutputTx{otHash=hash}) =
         "BalanceTooLow at stage "  ++ show stage ++ " in queue " ++ show queue ++
         "\n\tneeded balance "  ++ show needed ++
-        "\n\tavailable balance" ++ show actual ++
+        "\n\tavailable balance " ++ show actual ++
         "\n\ttx hash " ++ format hash ++
         "\n" ++ format o
     format (GasLimitTooLow stage queue actual o@OutputTx{otHash=hash}) =
@@ -151,10 +153,14 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let remGas          = B.remainingGas cache
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
-                    let (newSR, newGas, newExec, newUnexec) = case run of
-                            Left (GasLimitReached rtx urtx nsr nbg) -> (nsr, nbg, lastExec ++ rtx, urtx)
-                            Left e                                  -> error (show e)
-                            Right (newSR', newGas')                 -> (newSR', newGas', lastExec ++ promoted, [])
+                    (newSR, newGas, newExec, newUnexec) <- case run of
+                            Right (newSR', newGas') -> return (newSR', newGas', lastExec ++ promoted, [])
+                            Left e -> do
+                                logRAE e
+                                return $ case e of
+                                    (GasLimitReached rtx urtx nsr nbg)      -> (nsr, nbg, lastExec ++ rtx, urtx)
+                                    (RecoverableFailure _ rtx urtx nsr nbg) -> (nsr, nbg, lastExec ++ rtx, urtx)
+                                    x                                       -> error (show x)
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
                                                 , B.remainingGas          = newGas
@@ -179,7 +185,19 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
 
-logReady :: (MonadLogger m) => String -> Address -> OutputTx -> m()
+logRAE :: (MonadLogger m) => RunAttemptError -> m ()
+logRAE rae = do
+    $logWarnS "Bagger.logRunAttemptError" "!!!!!!!!!!!!!!!!!!!"
+    mapM_ ($logWarnS "Bagger.logRunAttemptError" . T.pack) $ case rae of
+        CantFindStateRoot          -> ["Cant find state root!"]
+        GasLimitReached r u _ g    -> ["Hit gas limit!",  show (length r) ++ "/" ++ show (length u) ++ " ran/unran. remgas: " ++ show g]
+        RecoverableFailure f r u _ g -> concat [ ["(Ideally) recoverable failure!"]
+                                               , [show (length r) ++ "/" ++ show (length u) ++ " ran/unran. remgas: " ++ show g]
+                                               , lines (format f)
+                                               ]
+    $logWarnS "Bagger.logRunAttemptError" "!!!!!!!!!!!!!!!!!!!"
+
+logReady :: (MonadLogger m) => String -> Address -> OutputTx -> m ()
 logReady prefix address OutputTx{otHash=h, otBaseTx=t} = do
     $logDebugS "Bagger.logReady++++++++" "+++++++++++++++++++"
     $logDebugS "Bagger.logReady+status " . T.pack $ prefix
@@ -253,10 +271,11 @@ promoteExecutables = do
         let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce state''
         putBaggerState state'''
         forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
-        state'''' <- getBaggerState
+
+        calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
         -- todo callback per promotion call instead of per-address?
         let nonceDrops = NonceTooLow Promotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = (\t -> BalanceTooLow Promotion Queued (B.calculateIntrinsicTxFee state'''' t) addressBalance t) <$> discardedByCost
+        let costDrops  = (\t -> BalanceTooLow Promotion Queued (calcFee t) addressBalance t) <$> discardedByCost
         txsDroppedCallback (nonceDrops ++ costDrops) txShas
         forM_ readyToMine promoteTx
 
@@ -281,20 +300,35 @@ demoteUnexecutables = do
         state <- getBaggerState
         (addressNonce, addressBalance) <- getAddressNonceAndBalance address
 
-        let !(discardedByNonce, state') = B.trimBelowNonceFromPending address addressNonce state
+        let !(pDiscardedByNonce, state') = B.trimBelowNonceFromPending address addressNonce state
         putBaggerState state'
-        forM_ discardedByNonce removeFromSeen
-        forM_ discardedByNonce $ logDiscard "demoteUnexecutables Pending Nonce" address addressNonce
+        forM_ pDiscardedByNonce removeFromSeen
+        forM_ pDiscardedByNonce $ logDiscard "demoteUnexecutables Pending Nonce" address addressNonce
 
-        let !(discardedByCost, state'') = B.trimAboveCostFromPending address addressBalance state'
+        let !(pDiscardedByCost, state'') = B.trimAboveCostFromPending address addressBalance state'
         putBaggerState state''
-        forM_ discardedByCost removeFromSeen
-        forM_ discardedByCost $ logDiscard "demoteUnexecutables  Pending Balance" address addressBalance
+        forM_ pDiscardedByCost removeFromSeen
+        forM_ pDiscardedByCost $ logDiscard "demoteUnexecutables Pending Balance" address addressBalance
+
         state'''' <- getBaggerState
+        let !(qDiscardedByNonce, state''''') = B.trimBelowNonceFromPending address addressNonce state''''
+        putBaggerState state'''''
+        forM_ qDiscardedByNonce removeFromSeen
+        forM_ qDiscardedByNonce $ logDiscard "demoteUnexecutables Queued Nonce" address addressNonce
+
+        let !(qDiscardedByCost, state'''''') = B.trimAboveCostFromPending address addressBalance state'''''
+        putBaggerState state''''''
+        forM_ qDiscardedByCost removeFromSeen
+        forM_ qDiscardedByCost $ logDiscard "demoteUnexecutables Queued Balance" address addressBalance
+
+        calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
+
         -- todo callback per demotion call instead of per-address?
-        let nonceDrops = NonceTooLow Demotion Queued addressNonce     <$> discardedByNonce
-        let costDrops  = (\t -> BalanceTooLow Demotion Queued (B.calculateIntrinsicTxFee state'''' t) addressBalance t) <$> discardedByCost
-        txsDroppedCallback (nonceDrops ++ costDrops) txShas
+        let pNonceDrops = NonceTooLow Demotion Pending addressNonce <$> pDiscardedByNonce
+        let pCostDrops  = (\t -> BalanceTooLow Demotion Pending (calcFee t) addressBalance t) <$> pDiscardedByCost
+        let qNonceDrops = NonceTooLow Demotion Queued addressNonce <$> qDiscardedByNonce
+        let qCostDrops  = (\t -> BalanceTooLow Demotion Queued (calcFee t) addressBalance t) <$> qDiscardedByCost
+        txsDroppedCallback (pNonceDrops ++ pCostDrops ++ qNonceDrops ++ qCostDrops) txShas
 
         -- drop all existing pending transactions, and try to see if they're
         -- still valid to add to the (likely new) queued pool
