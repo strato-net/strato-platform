@@ -111,26 +111,29 @@ instance MonadContracts Bloc where
 
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 
-    address <- blocQuery1 $ proc () -> do
+    addressMaybe <- blocQueryMaybe $ proc () -> do
       (_,cmId,addr,_) <- limit 1 (orderBy (desc (\ (_,_,_,ts) -> ts)) (queryTable contractsInstanceTable)) -< ()
       restrict -< cmId .== constant (metadataId::Int32)
       returnA -< addr
 
-    storage' <- blocStrato $ getStorage $ Just address
+    case addressMaybe of
+      Nothing -> return Map.empty
+      Just _ -> do
+        storage' <- blocStrato $ getStorage addressMaybe
 
-    let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-        storage k = fromMaybe 0 $ Map.lookup k storageMap
+        let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+            storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
-        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
+            ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
 
-    logWith logNotice $ Text.unlines
-      [ "Storage:"
-      , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-      , "End of storage"
-      ]
+        logWith logNotice $ Text.unlines
+          [ "Storage:"
+          , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+          , "End of storage"
+          ]
 
-    return $ Map.fromList ret
+        return $ Map.fromList ret
 
   getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
