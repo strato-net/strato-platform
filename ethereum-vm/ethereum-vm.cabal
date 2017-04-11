@@ -65,6 +65,7 @@ library
                  , strato-statediff
                  , strato-redis-blockdb
                  , hedis
+                 , statsdi
     exposed-modules: 
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults
@@ -78,6 +79,7 @@ library
                      Blockchain.VM.Environment
                      Blockchain.VM.Opcodes
                      Blockchain.VM.VMState
+                     Blockchain.VMMetrics
                      Executable.EthereumVM
                      Executable.EVMFlags
                      Executable.EVMCheckpoint

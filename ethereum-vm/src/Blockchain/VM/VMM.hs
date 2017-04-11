@@ -1,35 +1,38 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.VMM where
 
-import Control.Monad
-import Control.Monad.Logger
-import Control.Monad.Trans
-import Control.Monad.Trans.Either
-import Control.Monad.Trans.Resource
-import Control.Monad.Trans.State
-import qualified Data.ByteString as B
-import qualified Data.Set as S
+import           Control.Monad
+import           Control.Monad.Logger
+import           Control.Monad.Stats
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.State
+import qualified Data.ByteString                    as B
+import qualified Data.Set                           as S
 
-import Blockchain.Data.Address
-import Blockchain.Data.Log
+import           Blockchain.Data.Address
+import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StorageDB
-import Blockchain.DB.ModifyStateDB
-import Blockchain.DB.StateDB
-import Blockchain.DB.SQLDB
-import Blockchain.ExtWord
-import Blockchain.SHA
-import Blockchain.VM.Environment
-import Blockchain.VM.VMState
-import Blockchain.VMContext
+import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.ModifyStateDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
+import           Blockchain.ExtWord
+import           Blockchain.SHA
+import           Blockchain.VM.Environment
+import           Blockchain.VM.VMState
+import           Blockchain.VMContext
 
-type VMM = EitherT VMException (StateT VMState (ResourceT (LoggingT IO)))
+type VMM = EitherT VMException (StateT VMState (StatsT (ResourceT (LoggingT IO))))
 --type VMM2 = EitherT VMException (StateT VMState (ResourceT IO))
 
 --TODO- Do I really need this?  Is it bad that it is undefined?
@@ -66,7 +69,7 @@ instance HasStorageDB VMM where
       cxt <- lift get
       lift $ put cxt{dbs=(dbs cxt){contextStorageMap=theMap}}
 
-        
+
 instance HasCodeDB VMM where
     getCodeDB = lift $ fmap (contextCodeDB . dbs) get
 
@@ -107,7 +110,7 @@ pop = do
     VMState{stack=val:rest} -> do
                 lift $ put state'{stack=rest}
                 return $ fromWord256 val
-    _ -> left StackTooSmallException 
+    _ -> left StackTooSmallException
 
 
 getStackItem::Word256Storable a=>Int->VMM a

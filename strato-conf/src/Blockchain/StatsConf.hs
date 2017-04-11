@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.StatsConf
     ( StatsConf(..)
     , defaultStatsConf
@@ -26,7 +27,7 @@ instance FromJSON StatsConf
 instance ToJSON StatsConf
 
 defaultStatsConf :: StatsConf
-defaultStatsConf = fromStatsTConfig defaultStatsTConfig
+defaultStatsConf = fromStatsTConfig (defaultStatsTConfig { host = "telegraf" })
 
 fromStatsTConfig :: StatsTConfig -> StatsConf
 fromStatsTConfig f =

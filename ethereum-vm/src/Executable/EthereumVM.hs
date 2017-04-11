@@ -1,59 +1,57 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell, BangPatterns, LambdaCase #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Executable.EthereumVM (
   ethereumVM
 ) where
 
-import Control.Monad
-import Control.Monad.Logger
-import Control.Monad.IO.Class
-import Control.Monad.STM
-import Data.IORef
-import qualified Data.Text as T
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Protocol as KP
-import qualified Network.Kafka.Consumer as KC
-import Control.Concurrent
-import Control.Concurrent.STM.TVar
-import System.Directory
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import qualified Data.Text                             as T
+import qualified Network.Kafka                         as K
+import qualified Network.Kafka.Consumer                as KC
+import qualified Network.Kafka.Protocol                as KP
 
-import Blockchain.BlockChain
-import Blockchain.Data.BlockSummary
-import Blockchain.DB.BlockSummaryDB
-import Blockchain.EthConf
-import Blockchain.JsonRpcCommand
-import Blockchain.KafkaTopics
-import Blockchain.VMOptions
-import Blockchain.VMContext
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
-import Blockchain.Stream.UnminedBlock (produceUnminedBlocksM)
-import Blockchain.Format (format)
+import           Blockchain.BlockChain
+import           Blockchain.Data.BlockSummary
+import           Blockchain.DB.BlockSummaryDB
+import           Blockchain.EthConf
+import           Blockchain.Format                     (format)
+import           Blockchain.JsonRpcCommand
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Kafka
+import           Blockchain.Stream.UnminedBlock        (produceUnminedBlocksM)
+import           Blockchain.VMContext
+import           Blockchain.VMOptions
 
-import Executable.EVMFlags
-import Executable.EVMCheckpoint
+import           Executable.EVMCheckpoint
+import           Executable.EVMFlags
 
-import qualified Blockchain.Bagger as Bagger
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import qualified Blockchain.Bagger                     as Bagger
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
-import Blockchain.Util (Microtime, getCurrentMicrotime, secondsToMicrotime)
+import           Blockchain.Util                       (getCurrentMicrotime,
+                                                        secondsToMicrotime)
 
 uncurry3 :: (a -> b -> c -> d) -> ((a, b, c) -> d)
 uncurry3 f (a, b, c) = f a b c
 
 ethereumVM :: LoggingT IO ()
 ethereumVM = void . execContextM $ do
- 
+
     $logInfoS "difficultyBomb" $ T.pack $ "Difficulty bomb is " ++ show flags_difficultyBomb -- remove me once we figure out how to print args at startup
 
     let makeLazyBlocks = lazyBlocks $ quarryConfig ethConf
     Bagger.setCalculateIntrinsicGas calculateIntrinsicGas'
-    (cpOffset, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
+    (cpOffsetStart, EVMCheckpoint cpHash cpHead cpShas cpBBI) <- getCheckpoint
     putContextBestBlockInfo cpBBI
     Bagger.processNewBestBlock cpHash cpHead cpShas -- bootstrap Bagger with genesis block
 
-    $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffset
+    $logInfoS "evm/preLoop" $ T.pack $ "cpOffset = " ++ show cpOffsetStart
     let microtimeCutoff = secondsToMicrotime flags_mempoolLivenessCutoff
     forever $ do
         (cpOffset, _) <- getCheckpoint
@@ -67,7 +65,7 @@ ethereumVM = void . execContextM $ do
         forM_ newCommands runJsonRpcCommand
 
         let allNewTxs = [(ts, t) | OETx ts t <- seqEvents]
-        forM_ allNewTxs $ \(ts, t) ->
+        forM_ allNewTxs $ \(ts, _) ->
             $logInfoS "evm/loop/allNewTxs" $ T.pack $ "math :: " ++ show currentMicrotime ++ " - " ++ show ts ++ " = " ++ show (currentMicrotime - ts) ++ "; <= " ++ show microtimeCutoff ++ "? " ++ show ((currentMicrotime - ts) <= microtimeCutoff)
         let poolableNewTxs = [t | (ts, t) <- allNewTxs, abs (currentMicrotime - ts) <= microtimeCutoff]
         $logInfoS "evm/loop" (T.pack ("adding " ++ show (length poolableNewTxs) ++ "/" ++ show (length allNewTxs) ++ " txs to mempool"))
@@ -94,9 +92,6 @@ ethereumVM = void . execContextM $ do
         checkpointData <- baggerData <$> getContextBestBlockInfo
         setCheckpoint newOffset checkpointData
 
-clientId :: K.KafkaClientId
-clientId = "ethereum-vm"
-
 consumerGroup :: KP.ConsumerGroup
 consumerGroup = lookupConsumerGroup "ethereum-vm"
 
@@ -112,25 +107,25 @@ initializeCheckpointAndBlockSummary :: ContextM ()
 initializeCheckpointAndBlockSummary = do
     block <- getFirstBlockFromSequencer
     initBlockSummary block
-    let sha  = outputBlockHash block
-        head = obBlockData block
-        txs  = obReceiptTransactions block
-        td   = obTotalDifficulty block
-        txHs = otHash <$> txs
-        txL  = length txs
-        uncL = length (obBlockUncles block)
-        cbbi = ContextBestBlockInfo (sha, head, td, txL, uncL)
-    setCheckpoint 1 (EVMCheckpoint sha head txHs cbbi)
+    let sha    = outputBlockHash block
+        header = obBlockData block
+        txs    = obReceiptTransactions block
+        td     = obTotalDifficulty block
+        txHs   = otHash <$> txs
+        txL    = length txs
+        uncL   = length (obBlockUncles block)
+        cbbi   = ContextBestBlockInfo (sha, header, td, txL, uncL)
+    setCheckpoint 1 (EVMCheckpoint sha header txHs cbbi)
 
 
 initBlockSummary :: OutputBlock -> ContextM ()
 initBlockSummary block =
-    let sha   = outputBlockHash block
-        head  = obBlockData block
-        td    = obTotalDifficulty block
-        txCnt = fromIntegral $ length (obReceiptTransactions block)
+    let sha    = outputBlockHash block
+        header = obBlockData block
+        td     = obTotalDifficulty block
+        txCnt  = fromIntegral $ length (obReceiptTransactions block)
     in
-        putBSum sha (blockHeaderToBSum head td txCnt)
+        putBSum sha (blockHeaderToBSum header td txCnt)
 
 getCheckpoint :: ContextM (KP.Offset, EVMCheckpoint)
 getCheckpoint = do

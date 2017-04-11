@@ -1,62 +1,67 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings, FlexibleInstances, TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# OPTIONS -fno-warn-deprecations #-}
 
-module TestEthereum (
-                      runAllTests
-                    , runTest
-                    , noLog
-                    ) where
+module TestEthereum
+    ( runAllTests
+    , runTest
+    , noLog
+    ) where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.Trans
-import Control.Monad.Trans.Either
-import Control.Monad.Trans.State
-import qualified Crypto.Hash.SHA3 as SHA3
-import Data.Aeson
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Either
-import Data.List
-import qualified Data.Map as M
-import Data.Maybe
-import qualified Data.Set as S
-import HFlags
-import qualified Network.Haskoin.Internals as Haskoin
-import Network.Haskoin.Crypto (withSource)
-import Numeric
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.State
+import qualified Crypto.Hash.SHA3                            as SHA3
+import           Data.Aeson
+import qualified Data.ByteString                             as B
+import qualified Data.ByteString.Lazy                        as BL
+import           Data.Either
+import           Data.List
+import qualified Data.Map                                    as M
+import           Data.Maybe
+import qualified Data.Set                                    as S
+import           HFlags
+import           Network.Haskoin.Crypto                      (withSource)
+import qualified Network.Haskoin.Internals                   as Haskoin
+import           Numeric
+import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>),
+                                                              (</>))
 
-import Blockchain.BlockChain
-import qualified Blockchain.Colors as C
-import Blockchain.Data.Address
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.BlockDB
-import Blockchain.Data.Code
-import Blockchain.VMContext
-import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Database.MerklePatricia.Internal
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StateDB
-import Blockchain.DB.StorageDB
-import Blockchain.DB.CodeDB
-import Blockchain.ExtWord
-import Blockchain.Format
-import Blockchain.SHA
-import Blockchain.Util
-import Blockchain.VM
-import Blockchain.VM.Code
-import Blockchain.VM.Environment
-import Blockchain.VM.VMState
-import Blockchain.Sequencer.Event
-import Blockchain.Data.ExecResults
-import qualified Blockchain.Data.TXOrigin as TO
-import qualified Data.NibbleString as N
+import           Blockchain.BlockChain
+import qualified Blockchain.Colors                           as C
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Code
+import           Blockchain.Data.ExecResults
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction
+import qualified Blockchain.Data.TXOrigin                    as TO
+import qualified Blockchain.Database.MerklePatricia          as MP
+import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
+import           Blockchain.ExtWord
+import           Blockchain.Format
+import           Blockchain.Sequencer.Event
+import           Blockchain.SHA
+import           Blockchain.Util
+import           Blockchain.VM
+import           Blockchain.VM.Code
+import           Blockchain.VM.Environment
+import           Blockchain.VM.VMState
+import           Blockchain.VMContext
+import qualified Data.NibbleString                           as N
 
-import TestDescriptions
-import TestFiles
+import           TestDescriptions
+import           TestFiles
 
 defineFlag "debugEnabled" False "enable debugging"
 defineFlag "debugEnabled2" False "enable debugging"
@@ -98,8 +103,8 @@ getDataAndRevertAddressState _ addressState = do
     let mpdb = (contextStateDB dbs'){stateRoot=addressStateContractRoot addressState}
     kvs <- lift $ unsafeGetKeyVals mpdb ""
     let toInt = fromInteger . rlpDecode . rlpDeserialize . rlpDecode
-    return $ map (fmap $ toInt) kvs :: ContextM [(Key, Integer)] 
-  
+    return $ map (fmap $ toInt) kvs :: ContextM [(Key, Integer)]
+
   return $
     AddressState'
     (addressStateNonce addressState)
@@ -109,7 +114,7 @@ getDataAndRevertAddressState _ addressState = do
 
 getNumber::String->Integer
 getNumber "" = 0
-getNumber x = read x
+getNumber x  = read x
 
 --Just a cheap trick to enable the display of nearly all storage keys in the tests
 someHashes::M.Map SHA Int
@@ -119,16 +124,16 @@ showHash::Integer->String
 showHash val =
   case M.lookup (SHA (fromIntegral val)) someHashes of
    Nothing -> showHexInt val ++ "[#ed]"
-   Just x -> show x
+   Just x  -> show x
 
 showInfo::(Address,AddressState')->String
-showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code c}) = 
-    show (pretty key) ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++ 
+showInfo (key,AddressState'{nonce'=n, balance'=b, storage'=s, contractCode'=Code c}) =
+    show (pretty key) ++ "[#ed]" ++ "(" ++ show n ++ "): " ++ show b ++
          (if M.null s
           then ""
           else ", " ++ (show $ M.toList $
                M.map showHexInt $ M.mapKeys showHash s)
-         ) ++ 
+         ) ++
          (if B.null c then "" else ", CODE:[" ++ C.blue (format c) ++ "]")
 showInfo _ = undefined
 
@@ -145,7 +150,7 @@ txToOutputTx = fromJust . wrapTransaction . IngestTx TO.Direct
 
 runTest::Test->ContextM (Either String String)
 runTest test = do
-  
+
   MP.initializeBlank =<< getStateDB
   setStateDBStateRoot emptyTriePtr
 
@@ -251,7 +256,7 @@ runTest test = do
         case result of
             Right (ExecResults remGas retVal _ rLogs _) -> do
               return ( Right (), retVal, remGas, rLogs, Just [], Nothing)
-            Left _ -> do 
+            Left _ -> do
               return (Right (), Nothing, 0, [], Just [], Nothing)
 
   afterAddressStates <- addressStates
@@ -259,7 +264,7 @@ runTest test = do
   let hashInteger = byteString2Integer . nibbleString2ByteString . N.EvenNibbleString . (SHA3.hash 256) . nibbleString2ByteString . N.pack . (N.byte2Nibbles =<<) . word256ToBytes . fromIntegral
   let postTest = M.toList $
                  flip M.map (post test) $
-                 \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')} 
+                 \s' -> s'{storage' = M.mapKeys hashInteger (storage' s')}
 
   when flags_debugEnabled $ do
     liftIO $ putStrLn "Before   -------------"
@@ -274,7 +279,7 @@ runTest test = do
         (M.fromList afterAddressStates == M.fromList postTest) || (null postTest && isLeft result),
         case remainingGas test of
           Nothing -> True
-          Just x -> gasRemaining == x,
+          Just x  -> gasRemaining == x,
         tlogs == reverse (logs' test),
         (callcreates test == fmap reverse returnedCallCreates) || (isNothing (callcreates test) && (returnedCallCreates == Just []))
         ) of
@@ -292,17 +297,17 @@ runTest test = do
       liftIO $ do
         putStrLn $ "callcreates test = " ++ show (callcreates test)
         putStrLn $ "returnedCallCreates = " ++ show returnedCallCreates
-      
+
       return $ Left $ "callcreates don't match"
     _ -> return $ Right "Success"
 
 formatResult::(String, Either String String)->String
-formatResult (name, Left err) = "> " ++ name ++ ": " ++ C.red err
+formatResult (name, Left err)      = "> " ++ name ++ ": " ++ C.red err
 formatResult (name, Right message) = "> " ++ name ++ ": " ++ C.green message
 
 runTests::[(String, Test)]->ContextM ()
 runTests tests = do
-  results <- 
+  results <-
     forM tests $ \(name, test) -> do
       --liftIO $ putStrLn $ "Running test: " ++ show name
       result <- runTest test
@@ -313,9 +318,9 @@ runAllTests::Maybe String->Maybe String->ContextM ()
 runAllTests maybeFileName maybeTestName= do
   let theFiles =
         case maybeFileName of
-          Nothing -> testFiles
+          Nothing       -> testFiles
           Just fileName -> [fileName]
-    
+
   forM_ theFiles $ \theFileName -> do
       theFile <- liftIO $ BL.readFile theFileName
       liftIO $ putStrLn $ C.yellow $ "#### Running tests in file: " ++ theFileName
@@ -332,9 +337,9 @@ runTestsInFile maybeTestName theFile = do
         Success tests -> runTests (filter ((matchName maybeTestName) . fst) (M.toList tests))
   where
     matchName::Maybe String->String->Bool
-    matchName Nothing _ = True
+    matchName Nothing _    = True
     matchName (Just x1) x2 | x1 == x2 = True
-    matchName _ _ = False
+    matchName _ _          = False
 
 
 noLog :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
