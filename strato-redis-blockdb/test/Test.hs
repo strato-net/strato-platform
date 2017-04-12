@@ -188,7 +188,7 @@ specTest = around (withConn 1) $ do
                     let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
                     let allblocks = toList $ tree
                     let chains = flip stem' allblocks <$> bestBlocks
-                    liftIO . putStrLn . showTree $ pb <$> tree
+                    -- liftIO . putStrLn . showTree $ pb <$> tree
 
                     r <- runRedis conn $ do
                         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
@@ -211,7 +211,7 @@ specTest = around (withConn 1) $ do
                     let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
                     let allblocks = toList $ tree
                     let chains = flip stem' allblocks <$> bestBlocks
-                    liftIO . putStrLn . showTree $ pb <$> tree
+                    -- liftIO . putStrLn . showTree $ pb <$> tree
 
                     r <- runRedis conn $ do
                         void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
@@ -234,7 +234,7 @@ specTest = around (withConn 1) $ do
             let bestBlocks = sortBy (comparing blockDataNumber) (leaves tree)
             let chains = flip stem' (toList tree) <$> bestBlocks
 
-            liftIO . putStrLn $ showTree $ pb <$> tree
+            -- liftIO . putStrLn $ showTree $ pb <$> tree
             r <- runRedis conn $ do
                 forM_ allblocks RDB.putHeader
                 void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
@@ -245,7 +245,7 @@ specTest = around (withConn 1) $ do
             
             HUnit.assertEqual
                 "Couldn't get the longest best chain"
-                (reverse (pb <$> last chains)) (pb <$> map snd r) 
+                ((reverse . drop 1) (pb <$> last chains)) (pb <$> map snd r) 
 
 
 workChain :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()

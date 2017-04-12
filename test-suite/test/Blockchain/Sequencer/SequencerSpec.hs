@@ -38,7 +38,7 @@ withTemporaryDepBlockDB genesisBlock m = do
     timestamp    <- round <$> getPOSIXTime  :: IO Integer
     let fullPath ="./.ethereumH/dep_block_" ++ show timestamp ++ "_" ++ showHex randomSuffix "" ++ "/"
         tempKCID ="sequencer_" ++ show timestamp ++ "_" ++ showHex randomSuffix ""
-    setCurrentDirectory "../" -- for ethconf to be happy
+    -- setCurrentDirectory "../" -- for ethconf to be happy, let's try this
     createDirectoryIfMissing True fullPath
     let kcid = KP.KString (C8.pack tempKCID)
         cfg  = SequencerConfig { depBlockDBCacheSize   = 0

@@ -71,8 +71,8 @@ main = do
         Right val ->
           case val of
             Success tests -> TestLabel theFileName <$> (doTests'' (M.toList tests))
-            _ -> undefined
-        Left _ -> undefined 
+            _ -> error $ "hit Failure for " ++ show theFileName 
+        Left _ -> error "hit Left"
 
   let g f mas = (fmap f) <$> sequence mas -- :: (Monad m, Traversable t) => (a -> b) -> t (m a) -> m (t b)
   let b = g id tests
