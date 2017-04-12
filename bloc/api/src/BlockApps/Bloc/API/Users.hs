@@ -35,23 +35,6 @@ import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Types
 
 --------------------------------------------------------------------------------
--- | MonadUsers
---------------------------------------------------------------------------------
-
-
-class Monad m => MonadUsers m where
-  getUsers :: m [UserName]
-  getUsersUser :: UserName -> m [Address]
-  postUsersUser :: UserName -> PostUsersUserRequest -> m Address
-  postUsersSend :: UserName -> Address -> PostSendParameters -> m PostTransaction
-  postUsersContract :: UserName -> Address -> PostUsersContractRequest -> m Address
-  postUsersUploadList :: UserName -> Address -> UploadListRequest -> m [PostUsersUploadListResponse]
-  postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> m PostUsersContractMethodResponse
-  postUsersSendList :: UserName -> Address -> PostSendListRequest -> m [PostSendListResponse]
-  postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> m [PostMethodListResponse]
-
-
---------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 

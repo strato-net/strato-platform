@@ -41,6 +41,7 @@ library
                , saltine
                , secp256k1
                , servant
+               , servant-client
                , servant-docs
                , text
 

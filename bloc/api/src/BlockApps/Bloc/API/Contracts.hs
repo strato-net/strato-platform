@@ -32,21 +32,6 @@ import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
 
 --------------------------------------------------------------------------------
--- | MonadContracts
---------------------------------------------------------------------------------
-
-class Monad m => MonadContracts m where
-  getContracts :: m GetContractsResponse
-  getContractsData :: ContractName -> m [MaybeNamed Address]
-  getContractsContract :: ContractName -> MaybeNamed Address -> m ContractDetails
-  getContractsState :: ContractName -> MaybeNamed Address -> m GetContractsStateResponses -- state-translation
-  getContractsFunctions :: ContractName -> MaybeNamed Address -> m [FunctionName]
-  getContractsSymbols :: ContractName -> MaybeNamed Address -> m [SymbolName]
-  getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> m GetContractsStateMappingResponse -- state-translation
-  getContractsStates :: ContractName -> m [GetContractsStatesResponse] -- state-translation
-  postContractsCompile :: [PostCompileRequest] -> m [PostCompileResponse]
-
---------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse

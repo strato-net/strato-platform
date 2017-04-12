@@ -25,13 +25,6 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Ethereum
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
---------------------------------------------------------------------------------
--- | MonadSearchContract
---------------------------------------------------------------------------------
-class Monad m => MonadSearchContract m where
-  getSearchContract :: ContractName -> m [MaybeNamed Address]
-  getSearchContractState :: ContractName -> m [SearchContractState]
-  getSearchContractStateReduced :: ContractName -> [Text] -> m [SearchContractState]
 
 --------------------------------------------------------------------------------
 -- | Routes and Types

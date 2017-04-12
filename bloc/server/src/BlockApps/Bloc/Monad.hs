@@ -98,6 +98,19 @@ data BlocError
   | RuntimeError SomeException
   deriving Show
 
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------
 boxIt::String->String
 boxIt string =
   replicate (len+4) '=' ++ "\n"

@@ -1,4 +1,4 @@
-name: blockapps-bloc
+name: blockapps-bloc-server
 version: 0.1.0.0
 synopsis: Bloc microservice
 description: Bloc microservice
@@ -15,18 +15,17 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Bloc.API
-    BlockApps.Bloc.API.Addresses
-    BlockApps.Bloc.API.Contracts
-    BlockApps.Bloc.API.Search
-    BlockApps.Bloc.API.Users
-    BlockApps.Bloc.API.Utils
-    BlockApps.Bloc.Crypto
+    BlockApps.Bloc.Server.Addresses
+    BlockApps.Bloc.Server.Contracts
+    BlockApps.Bloc.Server.Search
+    BlockApps.Bloc.Server.Users
+    BlockApps.Bloc.Server.Utils
     BlockApps.Bloc.Database.Create
     BlockApps.Bloc.Database.Queries
     BlockApps.Bloc.Database.Tables
     BlockApps.Bloc.Monad
     BlockApps.Bloc.Options
+    BlockApps.Bloc.Site
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
@@ -37,6 +36,7 @@ library
                , blockapps-cirrus-client
                , blockapps-ethereum
                , blockapps-solidity
+               , blockapps-bloc-api
                , blockapps-strato-api
                , blockapps-strato-client
                , containers
@@ -83,7 +83,7 @@ executable blockapps-bloc
   main-is: Main.hs
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
   build-depends: base
-    , blockapps-bloc
+    , blockapps-bloc-server
     , blockapps-strato-api
     , blockapps-strato-client
     , hflags
@@ -93,37 +93,6 @@ executable blockapps-bloc
     , warp
   default-language: Haskell2010
 
-test-suite blockapps-bloc-test
-  default-language: Haskell2010
-  type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  ghc-options: -Wall -Werror
-  main-is: Spec.hs
-  other-modules:
-    BlockApps.Bloc.APISpec
-    BlockApps.Bloc.API.AddressesSpec
-    BlockApps.Bloc.API.ContractsSpec
-    BlockApps.Bloc.API.E2ESpec
-    BlockApps.Bloc.API.SearchSpec
-    BlockApps.Bloc.API.UsersSpec
-    BlockApps.Bloc.API.SpecUtils
-  other-modules:
-  build-depends: base >=4 && < 5
-    , blockapps-bloc
-    , blockapps-strato-api
-    , blockapps-strato-client
-    , blockapps-solidity
-    , blockapps-ethereum
-    , directory
-    , generic-random
-    , hspec
-    , http-client
-    , QuickCheck
-    , quickcheck-instances
-    , text
-    -- , servant-aeson-specs
-    , servant-client
-    , containers
 
 source-repository head
   type: git
