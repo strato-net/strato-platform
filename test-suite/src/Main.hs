@@ -7,7 +7,7 @@ import System.Directory
 
 import Blockchain.VMOptions()
 import Blockchain.VMContext
-import TestEthereum
+import Blockchain.VM.TestEthereum
 
 main::IO ()
 main = do
