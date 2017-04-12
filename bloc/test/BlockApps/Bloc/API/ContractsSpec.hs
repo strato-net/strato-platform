@@ -12,6 +12,7 @@ import Test.Hspec
 import BlockApps.Bloc.API.Contracts
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
+import BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
 spec = do

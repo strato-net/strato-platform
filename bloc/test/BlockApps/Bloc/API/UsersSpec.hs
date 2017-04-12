@@ -67,11 +67,13 @@ spec = do
             { uploadlistcontractContractName = simpleStorageContractName
             , uploadlistcontractArgs = Map.empty
             , uploadlistcontractTxParams = txParams
+            , uploadlistcontractValue = Nothing
             }
           , UploadListContract
             { uploadlistcontractContractName = testContractName
             , uploadlistcontractArgs = Map.empty
             , uploadlistcontractTxParams = txParams
+            , uploadlistcontractValue = Nothing
             }
           ]
         uploadListRequest = UploadListRequest
@@ -92,6 +94,7 @@ spec = do
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEither <- runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)

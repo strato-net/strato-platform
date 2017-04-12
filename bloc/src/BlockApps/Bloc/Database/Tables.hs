@@ -235,18 +235,21 @@ xabiTypeDefsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText
   , Column PGInt4
+  , Column PGText
   , Column PGInt4
   )
   ( Column PGInt4
   , Column PGText
   , Column PGInt4
+  , Column PGText
   , Column PGInt4
   )
-xabiTypeDefsTable = Table "xabi_type_defs" $ p4
+xabiTypeDefsTable = Table "xabi_type_defs" $ p5
   ( optional "id"
   , required "name"
   , required "contract_metadata_id"
-  , required "type_id"
+  , required "type"
+  , required "bytes"
   )
 
 xabiEnumNamesTable :: Table
@@ -272,15 +275,18 @@ xabiStructFieldsTable :: Table
   , Column PGText
   , Column PGInt4
   , Column PGInt4
+  , Column PGInt4
   )
   ( Column PGInt4
   , Column PGText
   , Column PGInt4
   , Column PGInt4
+  , Column PGInt4
   )
-xabiStructFieldsTable = Table "xabi_struct_fields" $ p4
+xabiStructFieldsTable = Table "xabi_struct_fields" $ p5
   ( optional "id"
   , required "name"
   , required "at_bytes"
   , required "type_def_id"
+  , required "field_type_id"
   )

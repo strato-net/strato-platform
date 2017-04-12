@@ -22,7 +22,6 @@ import Control.Monad.Log
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Encoding
-import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.Int
 import Data.Maybe
@@ -31,8 +30,8 @@ import qualified Data.Map.Strict as Map
 import Data.Proxy
 import Data.String
 import Data.Text (Text)
+import Data.Traversable
 import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
 import Generic.Random.Generic
 import GHC.Generics
@@ -48,10 +47,12 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Bloc.Monad
+import BlockApps.Cirrus.Client
 import BlockApps.Ethereum
 import BlockApps.Solidity.Contract
 import BlockApps.Solidity.SolidityValue
 import BlockApps.SolidityVarReader
+import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 import BlockApps.XAbiConverter
@@ -103,62 +104,36 @@ instance MonadContracts Bloc where
     names <- blocQuery $ getContractsDataNamesQuery contractName
     return $ map Unnamed addresses ++ map Named names
 
-  getContractsContract contract@(ContractName contractName) contractId = blocTransaction $ do
-    xabi <- getContractXabi contract contractId
-    let
-      detailsWith detailsAddr (bin,binRuntime,codeHash,_ :: ByteString,name) =
-        ContractDetails
-          { contractdetailsBin = Text.decodeUtf8 bin
-          , contractdetailsAddress = detailsAddr
-          , contractdetailsBinRuntime = Text.decodeUtf8 binRuntime
-          , contractdetailsCodeHash = Text.decodeUtf8 codeHash
-          , contractdetailsName = name
-          , contractdetailsXabi = xabi
-          }
-    case contractId of
-      Named "Latest" -> do
-        tuple <- blocQuery1 $
-          getContractsContractLatestQuery contractName
-        return $ detailsWith Nothing tuple
-      Unnamed addr -> do
-        (addr',tuple) <- blocQuery1 $
-          getContractsContractByAddressQuery contractName addr
-        return $ detailsWith (Just (Unnamed addr')) tuple
-      Named name -> if contractName == name
-        then do
-          tuple <- blocQuery1 $
-            getContractsContractBySameNameQuery name
-          return $ detailsWith (Just (Named name)) tuple
-        else do
-          tuple <- blocQuery1 $
-            getContractsContractByNameQuery contractName name
-          return $ detailsWith (Just (Named name)) tuple
+  getContractsContract = getContractDetails
 
   getContractsState contract@(ContractName contractName) contractId = do
     contract' <- xAbiToContract <$> getContractXabi contract contractId
 
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 
-    address <- blocQuery1 $ proc () -> do
-      (_,cmId,addr,_) <- queryTable contractsInstanceTable -< ()
+    addressMaybe <- blocQueryMaybe $ proc () -> do
+      (_,cmId,addr,_) <- limit 1 (orderBy (desc (\ (_,_,_,ts) -> ts)) (queryTable contractsInstanceTable)) -< ()
       restrict -< cmId .== constant (metadataId::Int32)
       returnA -< addr
 
-    storage' <- blocStrato $ getStorage $ Just address
+    case addressMaybe of
+      Nothing -> return Map.empty
+      Just _ -> do
+        storage' <- blocStrato $ getStorage addressMaybe
 
-    let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-        storage k = fromMaybe 0 $ Map.lookup k storageMap
+        let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+            storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
-        ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
+            ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
 
-    logWith logNotice $ Text.unlines
-      [ "Storage:"
-      , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
-      , "End of storage"
-      ]
+        logWith logNotice $ Text.unlines
+          [ "Storage:"
+          , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+          , "End of storage"
+          ]
 
-    return $ Map.fromList ret
+        return $ Map.fromList ret
 
   getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
     metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
@@ -177,11 +152,15 @@ instance MonadContracts Bloc where
   postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
     where
       compileOneContract PostCompileRequest{..} = do
-        codeHashes <- compileContract
-          postcompilerequestContractName
-          postcompilerequestSource
-        return $ map (uncurry PostCompileResponse) (codeHashes)
-
+        idsAndDetails <- compileContract postcompilerequestSource
+        for_ postcompilerequestSearchable $ \ contractName -> do
+          contractDetails <-
+            catchError
+              (getContractsContract (ContractName contractName) (Named "Latest"))
+              (\ _ -> throwError $ UserError "Unable to find contract details. Please check contract name.")
+          blocCirrus $ postContract contractDetails
+        for (toList idsAndDetails) $ \ (_,ContractDetails{..}) ->
+          return $ PostCompileResponse contractdetailsName contractdetailsCodeHash
 
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt

@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS xabi_functions(
   is_constructor boolean NOT NULL,
   name varchar(512) NOT NULL,
   selector bytea NOT NULL,
+  UNIQUE (contract_metadata_id, name),
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]
@@ -156,9 +157,9 @@ CREATE TABLE IF NOT EXISTS xabi_type_defs(
   id serial PRIMARY KEY,
   name varchar(12) NOT NULL,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
-  type_id int NOT NULL REFERENCES xabi_types(id),
-  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
-  FOREIGN KEY (type_id) REFERENCES xabi_types(id)
+  type varchar(50) NOT NULL,
+  bytes INT NOT NULL,
+  FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id)
 );
 |]
 
@@ -180,7 +181,9 @@ CREATE TABLE IF NOT EXISTS xabi_struct_fields(
   name varchar(512) NOT NULL,
   at_bytes int NOT NULL,
   type_def_id int NOT NULL REFERENCES xabi_type_defs(id),
-  FOREIGN KEY (type_def_id) REFERENCES xabi_type_defs(id)
+  field_type_id int NOT NULL REFERENCES xabi_types(id),
+  FOREIGN KEY (type_def_id) REFERENCES xabi_type_defs(id),
+  FOREIGN KEY (field_type_id) REFERENCES xabi_types(id)
 );
 |]
 

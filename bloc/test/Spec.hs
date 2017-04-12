@@ -18,6 +18,7 @@ import qualified BlockApps.Bloc.API.UsersSpec as Users
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.API.E2ESpec as E2E
+import BlockApps.Solidity.Xabi
 -- import qualified BlockApps.Bloc.APISpec as API
 
 import BlockApps.Ethereum
@@ -54,7 +55,7 @@ setup = do
       , testContractAddress  = Address 0x0
       , simpleMappingContractName = "SimpleMapping"
       , simpleMappingContractAddress = Address 0x0
-      , txParams = TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
+      , txParams = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
       , simpleStorageSrc = simpleStorageSource
       , testSrc = testSource
       , simpleMappingSrc = simpleMappingSource
@@ -71,16 +72,19 @@ setup = do
       { uploadlistcontractContractName = simpleStorageContractName testConfig
       , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractValue = Nothing
       }
     uploadListContract2 = UploadListContract
       { uploadlistcontractContractName = testContractName testConfig
       , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractValue = Nothing
       }
     uploadListContract3 = UploadListContract
       { uploadlistcontractContractName = simpleMappingContractName testConfig
       , uploadlistcontractArgs = Map.empty
       , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractValue = Nothing
       }
     uploadListRequest = UploadListRequest
       { uploadlistPassword = pw testConfig

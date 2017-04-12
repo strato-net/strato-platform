@@ -57,4 +57,5 @@ endif
 build_docker: build_deploybase build_haskell
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f $(EXTRADEPS) $(BLOCHOME)
+	cp -f $(FAKEROOT)/usr/bin/blockapps-bloc $(BLOCHOME)
 	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
