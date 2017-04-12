@@ -1,5 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-unused-binds #-}
 {-# LANGUAGE
     TypeOperators
+  , TypeApplications
 #-}
 
 module BlockApps.Bloc.API
@@ -13,7 +15,10 @@ module BlockApps.Bloc.API
   , module BlockApps.Bloc.Crypto
   ) where
 
-import Servant.API
+import Data.Text
+import Servant
+import Servant.Docs
+import Servant.Mock
 
 import BlockApps.Bloc.API.Users
 import BlockApps.Bloc.API.Addresses
@@ -49,3 +54,12 @@ type BlocAPI =
   :<|> GetSearchContract
   :<|> GetSearchContractState
   :<|> GetSearchContractStateReduced
+
+markdownBloc :: String
+markdownBloc = markdown $ docs (Proxy @ BlocAPI)
+
+mockBloc :: Server BlocAPI
+mockBloc = mock (Proxy @ BlocAPI) Proxy
+
+layoutBloc :: Text
+layoutBloc = layout (Proxy @ BlocAPI)

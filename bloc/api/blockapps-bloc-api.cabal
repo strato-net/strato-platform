@@ -41,8 +41,9 @@ library
                , saltine
                , secp256k1
                , servant
-               , servant-client
+               , servant-server
                , servant-docs
+               , servant-mock
                , text
 
 source-repository head
