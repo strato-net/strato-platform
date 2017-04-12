@@ -28,10 +28,14 @@ import           Control.Monad.Trans.Resource
 import qualified Data.Map                           as M
 import qualified Database.LevelDB                   as DB
 import qualified Database.Persist.Postgresql        as SQL
+import qualified Database.Redis                     as Redis
+import qualified Network.Kafka                      as K
 import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 
 
+import           Blockchain.Bagger.BaggerState      (BaggerState,
+                                                     defaultBaggerState)
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -46,17 +50,9 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
-import           Blockchain.VMOptions
-
-import           Blockchain.Bagger
-import           Blockchain.Bagger.BaggerState      (BaggerState,
-                                                     defaultBaggerState)
-
 import           Blockchain.Strato.Model.SHA
-
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
-import qualified Database.Redis                     as Redis
-import qualified Network.Kafka                      as K
+import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 

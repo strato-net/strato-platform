@@ -153,23 +153,22 @@ instance Bagger.MonadBagger ContextM where
         let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format rejection
-            _ <- putTransactionResult
-                     TransactionResult {
-                       transactionResultBlockHash=SHA 0,
-                       transactionResultTransactionHash=theHash,
-                       transactionResultMessage=message,
-                       transactionResultResponse="",
-                       transactionResultTrace="rejected",
-                       transactionResultGasUsed=0,
-                       transactionResultEtherUsed=0,
-                       transactionResultContractsCreated="",
-                       transactionResultContractsDeleted="",
-                       transactionResultStateDiff="",
-                       transactionResultTime=0,
-                       transactionResultNewStorage="",
-                       transactionResultDeletedStorage=""
-                       }
-            return ()
+            void $ putTransactionResult
+                     TransactionResult { transactionResultBlockHash        = SHA 0
+                                       , transactionResultTransactionHash  = theHash
+                                       , transactionResultMessage          = message
+                                       , transactionResultResponse         = ""
+                                       , transactionResultTrace            = "rejected"
+                                       , transactionResultGasUsed          = 0
+                                       , transactionResultEtherUsed        = 0
+                                       , transactionResultContractsCreated = ""
+                                       , transactionResultContractsDeleted = ""
+                                       , transactionResultStateDiff        = ""
+                                       , transactionResultTime             = 0
+                                       , transactionResultNewStorage       = ""
+                                       , transactionResultDeletedStorage   = ""
+                                       , transactionResultStatus           = Nothing
+                                       }
 
 baggerRejectionToTransactionResultBits :: Bagger.TxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
@@ -333,7 +332,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     printTransactionMessage tx result time'
     case result of
         Right execResult -> mineTransactions' header (erRemainingBlockGas execResult) (tx:ran) txs
-        Left  failure    -> return $ TxMiningResult (Just failure) ran unran remGas
+        Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
@@ -493,23 +492,22 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} r
       forM_ theLogs $ \log' ->
         putLogDB $ LogDB theHash tAddr (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
 
-      _ <- putTransactionResult
-             TransactionResult {
-               transactionResultBlockHash=blockHeaderHash b,
-               transactionResultTransactionHash=theHash,
-               transactionResultMessage=message,
-               transactionResultResponse=response,
-               transactionResultTrace=theTrace',
-               transactionResultGasUsed=gasUsed,
-               transactionResultEtherUsed=etherUsed,
-               transactionResultContractsCreated=intercalate "," $ map formatAddress newAddresses,
-               transactionResultContractsDeleted=intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
-               transactionResultStateDiff="", --BC.unpack $ BL.toStrict $ Aeson.encode addrDiff,
-               transactionResultTime=realToFrac deltaT,
-               transactionResultNewStorage="",
-               transactionResultDeletedStorage=""
-               }
-      return ()
+      void $ putTransactionResult
+             TransactionResult { transactionResultBlockHash        = blockHeaderHash b
+                               , transactionResultTransactionHash  = theHash
+                               , transactionResultMessage          = message
+                               , transactionResultResponse         = response
+                               , transactionResultTrace            = theTrace'
+                               , transactionResultGasUsed          = gasUsed
+                               , transactionResultEtherUsed        = etherUsed
+                               , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
+                               , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
+                               , transactionResultStateDiff        = "" --BC.unpack $ BL.toStrict $ Aeson.encode addrDiff
+                               , transactionResultTime             = realToFrac deltaT
+                               , transactionResultNewStorage       = ""
+                               , transactionResultDeletedStorage   = ""
+                               , transactionResultStatus           = Nothing
+                               }
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do

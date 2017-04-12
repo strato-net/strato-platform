@@ -168,7 +168,9 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                     (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx)
                                     (RecoverableFailure f rtx urtx nsr nbg) -> do
                                         txsDroppedCallback [f] []
-                                        return (nsr, nbg, lastExec ++ rtx, urtx)
+                                        let theRejectedTx = rejectedTx f
+                                        purgeFromPending theRejectedTx
+                                        return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
                                     x                                       -> error (show x)
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
@@ -383,7 +385,13 @@ getAddressNonceAndBalance :: MonadBagger m => Address -> m (Integer, Integer)
 getAddressNonceAndBalance addr = (DD.addressStateNonce &&& DD.addressStateBalance) <$> getAddressState addr
 
 addToPromotionCache :: MonadBagger m => OutputTx -> m ()
-addToPromotionCache tx = updateBaggerState $ B.addToPromotionCache tx
+addToPromotionCache tx = updateBaggerState (B.addToPromotionCache tx)
+
+purgeFromPending :: MonadBagger m => OutputTx -> m ()
+purgeFromPending tx = updateBaggerState (B.purgeFromPending tx)
+
+purgeFromQueued :: MonadBagger m => OutputTx -> m ()
+purgeFromQueued tx = updateBaggerState (B.purgeFromQueued tx)
 
 -- | Parent gas limit -> child gas limit
 nextGasLimit :: Integer -> Integer

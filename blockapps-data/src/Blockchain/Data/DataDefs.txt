@@ -14,7 +14,7 @@ BlockData
     extraData Integer 
     nonce Word64
     mixHash SHA
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 BlockDataRef
     parentHash SHA
@@ -37,13 +37,13 @@ BlockDataRef
     powVerified Bool
     isConfirmed Bool
     totalDifficulty Integer sqltype=numeric(1000,0)
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 Block 
     blockData BlockData
     receiptTransactions [Transaction]
     blockUncles [BlockData]
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 NewBlk
     hash SHA
@@ -52,18 +52,19 @@ NewBlk
     blockUncles [BlockData]
     Primary hash
     TheHash hash
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 BlockTransaction
     blockId BlockId
     transaction RawTransactionId
+    deriving Eq Read Show
 
 AddressState 
     nonce Integer sqltype=numeric(1000,0)
     balance Integer sqltype=numeric(1000,0)
     contractRoot StateRoot 
     codeHash SHA 
-    deriving Show Read Eq Generic
+    deriving Eq Generic Read Show
 
 AddressStateRef
     address Address
@@ -73,7 +74,7 @@ AddressStateRef
     code BS.ByteString
     codeHash SHA
     latestBlockDataRefNumber Integer
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 RawTransaction
     timestamp UTCTime
@@ -91,13 +92,13 @@ RawTransaction
     txHash SHA
     origin TXOrigin
     UniqueTXHash txHash
-    deriving Show Read Eq Generic
+    deriving Eq Generic Read Show
 
 Storage json
     addressStateRefId AddressStateRefId
     key Word256
     value Word256
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 TransactionResult json
     blockHash SHA
@@ -113,7 +114,8 @@ TransactionResult json
     time Double
     newStorage String
     deletedStorage String
-    deriving Show
+    status TransactionResultStatus Maybe
+    deriving Eq Read Show
 
 UserN json
     email String
@@ -122,13 +124,13 @@ UserN json
     numLogins Int
     verified Bool
     verkey BS.ByteString
-    deriving Show Read Eq   
+    deriving Eq Read Show
 
 UserData json
     encryptedWallet String
     address Address
     userId UserNId
-    deriving Show Read Eq
+    deriving Eq Read Show
     
 BlockApp json
     name String
@@ -139,20 +141,21 @@ BlockApp json
     loginPassHash BS.ByteString
     verified Bool
     verkey BS.ByteString
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 BlockAppLogin json
     userId UserNId
     blockAppId BlockAppId
     timestamp UTCTime
     ip String
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 Extra
     theKey String
     value String
     Primary theKey
     TheKey theKey
+    deriving Eq Read Show
 
 LogDB
     transactionHash SHA
@@ -163,7 +166,7 @@ LogDB
     topic4 Word256 Maybe
     theData BS.ByteString
     bloom Word512
-    deriving Show Read Eq
+    deriving Eq Read Show
 
 BlockOffset
     offset Integer
@@ -171,3 +174,4 @@ BlockOffset
     hash SHA
     Primary hash
     UniqueH hash
+    deriving Eq Read Show
