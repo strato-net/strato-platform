@@ -37,8 +37,10 @@ spec :: Spec
 spec = specTest
 
 openConn :: Integer -> IO Connection
-openConn num = do
-    let connInfo = defaultConnectInfo{connectHost="localhost", connectDatabase = num}
+openConn _ = do
+    -- connectHost="localhost"
+    -- connectDatabase=num
+    let connInfo = defaultConnectInfo
     -- liftIO $ putStrLn $ "Opening connection to Redis database: " ++ show connInfo 
     connect connInfo
 

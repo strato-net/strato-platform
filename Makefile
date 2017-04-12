@@ -14,6 +14,8 @@ vm-tests:
 integration:
 	echo "running integration tests"
 	docker cp test-suite/.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/test-suite/test-suite strato_strato_1:/usr/bin
+	-docker exec strato_strato_1 bash -c "kill $(pidof ethereum-vm)" 
+	-stack test strato-redis-blockdb
 	docker exec strato_strato_1 bash -c "cd /var/lib/strato; test-suite"
 
 multinode:
@@ -27,7 +29,7 @@ multinode:
 
 unit:
 	echo "testing unit tests"
-	stack test ethereum-discovery merkle-patricia-db solidity-abi strato-p2p-client
+	stack test ethereum-discovery solidity-abi strato-p2p-client
 	stack test strato-model
 
 test: unit test-suite vm-tests multinode
