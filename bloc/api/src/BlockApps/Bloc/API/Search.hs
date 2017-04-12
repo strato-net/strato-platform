@@ -33,7 +33,7 @@ import BlockApps.Solidity.Xabi
 -- GET /search/:contractName
 type GetSearchContract = "search"
   :> Capture "contractName" ContractName
-  :> Get '[OctetStream] [MaybeNamed Address]
+  :> Get '[OctetStream, JSON] [MaybeNamed Address]
 
 -- GET /search/:contractName/state
 type GetSearchContractState = "search"

@@ -13,4 +13,4 @@ import BlockApps.Bloc.API.Utils
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type GetAddresses = "addresses" :> Get '[HTMLifiedJSON] [Address]
+type GetAddresses = "addresses" :> Get '[HTMLifiedJSON, JSON] [Address]

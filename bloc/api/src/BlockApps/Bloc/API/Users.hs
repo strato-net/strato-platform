@@ -38,16 +38,16 @@ import BlockApps.Strato.Types
 -- | Routes and types
 --------------------------------------------------------------------------------
 
-type GetUsers = "users" :> Get '[HTMLifiedJSON] [UserName]
+type GetUsers = "users" :> Get '[HTMLifiedJSON, JSON] [UserName]
 
 type GetUsersUser = "users"
   :> Capture "user" UserName
-  :> Get '[HTMLifiedJSON] [Address]
+  :> Get '[HTMLifiedJSON, JSON] [Address]
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
   :> ReqBody '[FormUrlEncoded, JSON] PostUsersUserRequest
-  :> Post '[HTMLifiedAddress] Address
+  :> Post '[HTMLifiedAddress, JSON] Address
 data PostUsersUserRequest = PostUsersUserRequest
   { userFaucet :: Int
   , userPassword :: Password
@@ -72,7 +72,7 @@ type PostUsersSend = "users"
   :> Capture "address" Address
   :> "send"
   :> ReqBody '[JSON] PostSendParameters
-  :> Post '[HTMLifiedJSON] PostTransaction
+  :> Post '[HTMLifiedJSON, JSON] PostTransaction
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
   , sendValue :: Natural
@@ -98,7 +98,7 @@ type PostUsersContract = "users"
   :> Capture "address" Address
   :> "contract"
   :> ReqBody '[JSON] PostUsersContractRequest
-  :> Post '[HTMLifiedAddress] Address
+  :> Post '[HTMLifiedAddress, JSON] Address
 data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc :: Text
   , postuserscontractrequestPassword :: Password
@@ -188,7 +188,7 @@ type PostUsersContractMethod = "users"
   :> Capture "contractAddress" Address
   :> "call"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
-  :> Post '[HTMLifiedPlainText] PostUsersContractMethodResponse
+  :> Post '[HTMLifiedPlainText, JSON] PostUsersContractMethodResponse
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
