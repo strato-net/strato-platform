@@ -1,13 +1,21 @@
 #!/bin/bash
 
-stratoHost=${stratoHost:-$(curl -s ident.me)}
-canonicalHost=$(getent hosts $stratoHost | tr -s ' ' | cut -d ' ' -f 2)
-if [[ $stratoHost == "0.0.0.0" || $canonicalHost == "localhost" ]]
-then stratoHost="strato:3000"
-fi
+#cd /usr/bin/bloc/
+function setEnv {
+  [[ -n ${!1} ]] || eval $1=$2
+  echo "$1 = ${!1}"
+}
+echo "Environment variables:"
 
-cd /usr/bin/bloc/
-blocserver="/usr/bin/bloc/blockapps-bloc"
-apiUrl=${apiUrlOverride:-"http$(${ssl:-false} && echo "s")://$stratoHost/strato-api"}
-sed -i "s|^apiURL: .*\$|apiURL: '$apiUrl'|" config.yaml
-HOST=0.0.0.0 exec $blocserver start
+setEnv pguser postgres
+setEnv pgpasswd api
+setEnv pghost postgres
+setEnv stratourl http://localhost 
+setEnv cirrusurl http://localhost/cirrus 
+
+blocserver="/usr/bin/blockapps-bloc"
+locale-gen "en_US.UTF-8"
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+echo "Executing this: $blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="$stratourl/strato-api/eth/v1.2" --cirrusurl="$cirrusurl""
+exec $blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="$stratourl/strato-api/eth/v1.2" --cirrusurl="$cirrusurl" 
