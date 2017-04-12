@@ -1,0 +1,97 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE
+    DataKinds
+  , DeriveGeneric
+  , FlexibleInstances
+  , MultiParamTypeClasses
+  , OverloadedStrings
+
+#-}
+
+module BlockApps.Bloc.API.Utils where
+
+import Data.Aeson
+import Data.Aeson.Casing
+import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+import Data.String
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Generic.Random.Generic
+import GHC.Generics
+import Servant.API
+import Servant.Docs
+import qualified Network.HTTP.Media as M
+import Test.QuickCheck
+import Test.QuickCheck.Instances ()
+
+import BlockApps.Ethereum
+--------------------------------------------------------------------------------
+
+data HTMLifiedJSON
+instance Accept HTMLifiedJSON where
+  contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
+instance FromJSON x => MimeUnrender HTMLifiedJSON x where
+  mimeUnrender _ = eitherDecode
+instance ToJSON x => MimeRender HTMLifiedJSON x where
+  mimeRender _ = encode
+
+data HTMLifiedAddress
+instance Accept HTMLifiedAddress where
+  contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
+instance MimeUnrender HTMLifiedAddress Address where
+  mimeUnrender _
+    = maybe (Left "could not unrender Address") Right
+    . stringAddress . Lazy.Char8.unpack
+instance MimeRender HTMLifiedAddress Address where
+  mimeRender _ = Lazy.Char8.pack . addressString
+
+newtype ContractName = ContractName Text
+instance IsString ContractName where
+  fromString = ContractName . Text.pack
+instance ToHttpApiData ContractName where
+  toUrlPiece (ContractName name) = name
+instance FromHttpApiData ContractName where
+  parseUrlPiece = Right . ContractName
+instance ToJSON ContractName where
+  toJSON (ContractName name) = toJSON name
+instance FromJSON ContractName where
+  parseJSON = fmap ContractName . parseJSON
+instance ToCapture (Capture "contractName" ContractName) where
+  toCapture _ = DocCapture "contractName" "a contract name"
+
+-- hack because endpoints are returning stringified json
+-- as application/octet-stream
+instance FromJSON x => MimeUnrender OctetStream x where
+  mimeUnrender _ = eitherDecode
+instance ToJSON x => MimeRender OctetStream x where
+  mimeRender _ = encode
+
+
+newtype UserName = UserName {getUserName :: Text} deriving (Eq,Show,Generic)
+instance IsString UserName where
+  fromString = UserName . Text.pack
+instance ToHttpApiData UserName where
+  toUrlPiece = getUserName
+instance FromHttpApiData UserName where
+  parseUrlPiece = Right . UserName
+instance ToJSON UserName where
+  toJSON = toJSON . getUserName
+instance FromJSON UserName where
+  parseJSON = fmap UserName . parseJSON
+instance ToSample UserName where
+  toSamples _ = samples
+    [ UserName name | name <- ["samrit", "eitan", "ilya", "ilir"]]
+instance ToCapture (Capture "user" UserName) where
+  toCapture _ = DocCapture "user" "a user name"
+instance Arbitrary UserName where arbitrary = genericArbitrary uniform
+
+data TxParams = TxParams
+  { txparamsGasLimit :: Maybe Gas
+  , txparamsGasPrice :: Maybe Wei
+  , txparamsNonce :: Maybe Nonce
+  } deriving (Eq,Show,Generic)
+instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
+instance ToJSON TxParams where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON TxParams where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
