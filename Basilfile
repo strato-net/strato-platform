@@ -17,10 +17,8 @@ deployments:
       restart: always
       environment:
         ssl: "${ssl}"
-        stratoHost: "${stratoHost}"
-        apiUrlOverride: "${apiUrlOverride}"
-        pghost: ${pghost}
-        pguser: ${pguser}
-        pgpasswd: ${pgpasswd}
-        cirrusurl: ${cirrusurl}
-        stratourl: ${stratourl}
+        pghost: "${pghost}"
+        pguser: "${pguser}"
+        pgpasswd: "${pgpasswd}"
+        cirrusurl: "${cirrusurl}"
+        stratourl: "${stratourl}"
