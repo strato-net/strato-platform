@@ -18,8 +18,10 @@ import Control.Monad.Except
 import Control.Monad.Log hiding (Handler)
 import Control.Monad.Reader
 import Control.Monad.Trans.Control
+import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import Data.Foldable
+import qualified Data.HashMap.Lazy as HashMap
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -54,11 +56,17 @@ newtype Bloc x = Bloc
 
 instance MonadError BlocError Bloc where
   throwError err = do
-    logWith logError (Text.pack (show err))
+    logWith logError (Text.pack (formatError err))
     Bloc $ throwError err
   catchError m handle = do
     logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
+
+-- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
+formatError::BlocError->String
+formatError (StratoError (FailureResponse{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
+formatError e = show e
+
 
 --prettyCallStack' is the same idea as prettyCallStack, but with formatting more suitable for out project.  In particular, package names a very mangled by stack, making prettyCallStack unreadable.
 prettyCallStack'::CallStack->String
@@ -154,6 +162,8 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
+          StratoError (FailureResponse {..}) | statusIsClientError responseStatus ->
+            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           StratoError (ConnectionError _) ->
             err500{errBody = fromString $ unlines
                    [
@@ -213,6 +223,20 @@ enterBloc env x
       . renderLocation
       . renderWithTimestamp
           (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+
+
+--This is an annoyingly named and poorly written function, deliberately designed that way to remind us that we need to clean up the response from strato-api/solc.
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage::Lazy.Char8.ByteString->String
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage x | "Invalid Arguments" `Lazy.Char8.isPrefixOf` x =
+   case JSON.decode $ Lazy.Char8.drop 18 x of
+     Nothing -> error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+     Just o ->
+       case HashMap.lookup ("error"::Text) o of
+         Nothing -> error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+         Just val -> val
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage x = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+
+
 
 renderLocation::(a -> Leijen.Doc)->WithCallStack a->Leijen.Doc
 renderLocation k (WithCallStack stack msg) =

@@ -30,7 +30,6 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Ethereum
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
-
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
