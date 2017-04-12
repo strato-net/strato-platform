@@ -27,7 +27,7 @@ library
     BlockApps.Bloc.Options
     BlockApps.Bloc.Site
   default-language: Haskell2010
-  ghc-options: -Wall -Werror
+  ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   build-depends: base
                , aeson
                , aeson-casing
