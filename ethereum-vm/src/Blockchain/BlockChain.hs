@@ -20,28 +20,28 @@ module Blockchain.BlockChain
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import qualified Control.Monad.State                  as State
-import           Control.Monad.Stats
+import qualified Control.Monad.State                     as State
+import           Control.Monad.Stats                     hiding (Success)
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Either
-import qualified Data.ByteString                      as B
-import qualified Data.ByteString.Base16               as B16
-import qualified Data.ByteString.Char8                as BC
-import           Data.IORef                           (newIORef, readIORef,
-                                                       writeIORef)
+import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Base16                  as B16
+import qualified Data.ByteString.Char8                   as BC
+import           Data.IORef                              (newIORef, readIORef,
+                                                          writeIORef)
 import           Data.List
-import qualified Data.Map                             as M
+import qualified Data.Map                                as M
 import           Data.Maybe
-import           Data.Ord                             (comparing)
-import qualified Data.Set                             as S
-import qualified Data.Text                            as T
+import           Data.Ord                                (comparing)
+import qualified Data.Set                                as S
+import qualified Data.Text                               as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
-import           Network.Kafka                        (withKafkaViolently)
-import           Text.PrettyPrint.ANSI.Leijen         (pretty)
+import           Network.Kafka                           (withKafkaViolently)
+import           Text.PrettyPrint.ANSI.Leijen            (pretty)
 import           Text.Printf
 
-import qualified Blockchain.Colors                    as CL
+import qualified Blockchain.Colors                       as CL
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
@@ -54,9 +54,10 @@ import           Blockchain.Data.Log
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TransactionResult
-import qualified Blockchain.Database.MerklePatricia   as MP
-import qualified Blockchain.DB.AddressStateDB         as NoCache
-import qualified Blockchain.DB.BlockSummaryDB         as BSDB
+import           Blockchain.Data.TransactionResultStatus
+import qualified Blockchain.Database.MerklePatricia      as MP
+import qualified Blockchain.DB.AddressStateDB            as NoCache
+import qualified Blockchain.DB.BlockSummaryDB            as BSDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.ModifyStateDB
 import           Blockchain.DB.StateDB
@@ -75,19 +76,19 @@ import           Blockchain.VMContext
 import           Blockchain.VMMetrics
 import           Blockchain.VMOptions
 
-import qualified Blockchain.Bagger                    as Bagger
-import           Blockchain.Output                    (rightPad)
-import           Blockchain.SHA                       (formatSHAWithoutColor)
+import qualified Blockchain.Bagger                       as Bagger
+import           Blockchain.Output                       (rightPad)
+import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
-import           Blockchain.Strato.StateDiff          hiding
-                                                       (StateDiff (blockHash))
+import           Blockchain.Strato.StateDiff             hiding
+                                                          (StateDiff (blockHash))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka
 
-import           Blockchain.Strato.Indexer.Kafka      (writeIndexEvents)
-import           Blockchain.Strato.Indexer.Model      (IndexEvent (..))
+import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
+import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
 import           Executable.EVMFlags
 
 data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- txCost, accountBalance
@@ -95,6 +96,16 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
                              | TFBlockGasLimitExceeded Integer Integer OutputTx-- neededGas, actualGas
                              | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
                              deriving (Eq, Read, Show)
+
+txRejectionToAPIFailureCause :: Bagger.TxRejection -> TransactionResultStatus
+txRejectionToAPIFailureCause (Bagger.NonceTooLow    stage queue needed tx) =
+    Failure (show stage) (Just $ show queue) IncorrectNonce (Just needed) (Just . transactionNonce $ otBaseTx tx) Nothing
+txRejectionToAPIFailureCause (Bagger.BalanceTooLow  stage queue needed actual tx) =
+    Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InsufficientFunds (Just needed) (Just actual) Nothing
+txRejectionToAPIFailureCause (Bagger.GasLimitTooLow stage queue needed tx) =
+    Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . transactionGasLimit $ otBaseTx tx) Nothing
+txRejectionToAPIFailureCause (Bagger.LessLucrative  stage queue newTx oldTx) =
+    Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatSHAWithoutColor (otHash newTx))
 
 tfToBaggerTxRejection :: TransactionFailureCause -> Bagger.TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = Bagger.BalanceTooLow Bagger.Execution Bagger.Queued cost balance tx
@@ -153,23 +164,22 @@ instance Bagger.MonadBagger ContextM where
         let isRecentlyRan = theHash `elem` bestBlockShas
         when (flags_createTransactionResults && not isRecentlyRan) $ do
             $logInfoS "txsDroppedCallback" . T.pack $ "Transaction rejection :: " ++ format rejection
-            _ <- putTransactionResult
-                     TransactionResult {
-                       transactionResultBlockHash=SHA 0,
-                       transactionResultTransactionHash=theHash,
-                       transactionResultMessage=message,
-                       transactionResultResponse="",
-                       transactionResultTrace="rejected",
-                       transactionResultGasUsed=0,
-                       transactionResultEtherUsed=0,
-                       transactionResultContractsCreated="",
-                       transactionResultContractsDeleted="",
-                       transactionResultStateDiff="",
-                       transactionResultTime=0,
-                       transactionResultNewStorage="",
-                       transactionResultDeletedStorage=""
-                       }
-            return ()
+            void $ putTransactionResult
+                     TransactionResult { transactionResultBlockHash        = SHA 0
+                                       , transactionResultTransactionHash  = theHash
+                                       , transactionResultMessage          = message
+                                       , transactionResultResponse         = ""
+                                       , transactionResultTrace            = "rejected"
+                                       , transactionResultGasUsed          = 0
+                                       , transactionResultEtherUsed        = 0
+                                       , transactionResultContractsCreated = ""
+                                       , transactionResultContractsDeleted = ""
+                                       , transactionResultStateDiff        = ""
+                                       , transactionResultTime             = 0
+                                       , transactionResultNewStorage       = ""
+                                       , transactionResultDeletedStorage   = ""
+                                       , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
+                                       }
 
 baggerRejectionToTransactionResultBits :: Bagger.TxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
 baggerRejectionToTransactionResultBits rejection = case rejection of
@@ -289,8 +299,8 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
 
     valid <- checkValidity isUnmined (blockIsHomestead $ blockDataNumber bd) bSum b'
     case valid of
-        Right _  -> tick ctr_vm_blocks_valid
-        Left  _  -> tick ctr_vm_blocks_invalid -- error err -- todo: i dont think we ACTUALLY need to error here
+        Right _ -> tick ctr_vm_blocks_valid
+        Left  _ -> tick ctr_vm_blocks_invalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
     tick $ if isUnmined
            then ctr_vm_blocks_unmined
@@ -333,7 +343,7 @@ mineTransactions' header remGas ran unran@(tx:txs) = do
     printTransactionMessage tx result time'
     case result of
         Right execResult -> mineTransactions' header (erRemainingBlockGas execResult) (tx:ran) txs
-        Left  failure    -> return $ TxMiningResult (Just failure) ran unran remGas
+        Left  failure    -> return $ TxMiningResult (Just failure) (reverse ran) unran remGas
 
 blockIsHomestead :: Integer -> Bool
 blockIsHomestead blockNum = blockNum >= gHomesteadFirstBlock
@@ -458,10 +468,10 @@ outputTransactionResult::BlockData->OutputTx->Either TransactionFailureCause Exe
                          M.Map Address AddressStateModification->M.Map Address AddressStateModification->ContextM ()
 outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} result deltaT beforeMap afterMap = do
   let
-    (message, gasRemaining) =
+    (txrStatus, message, gasRemaining) =
       case result of
-        Left err -> (format err, 0) -- TODO Also include the trace
-        Right r  -> ("Success!", erRemainingBlockGas r)
+        Left err -> let fmt = format err in (Failure "Execution" Nothing ExecutionFailure Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
+        Right r  -> (Success, "Success!", erRemainingBlockGas r)
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
     etherUsed = gasUsed * fromInteger (transactionGasLimit t)
 
@@ -493,23 +503,22 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} r
       forM_ theLogs $ \log' ->
         putLogDB $ LogDB theHash tAddr (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
 
-      _ <- putTransactionResult
-             TransactionResult {
-               transactionResultBlockHash=blockHeaderHash b,
-               transactionResultTransactionHash=theHash,
-               transactionResultMessage=message,
-               transactionResultResponse=response,
-               transactionResultTrace=theTrace',
-               transactionResultGasUsed=gasUsed,
-               transactionResultEtherUsed=etherUsed,
-               transactionResultContractsCreated=intercalate "," $ map formatAddress newAddresses,
-               transactionResultContractsDeleted=intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
-               transactionResultStateDiff="", --BC.unpack $ BL.toStrict $ Aeson.encode addrDiff,
-               transactionResultTime=realToFrac deltaT,
-               transactionResultNewStorage="",
-               transactionResultDeletedStorage=""
-               }
-      return ()
+      void $ putTransactionResult
+             TransactionResult { transactionResultBlockHash        = blockHeaderHash b
+                               , transactionResultTransactionHash  = theHash
+                               , transactionResultMessage          = message
+                               , transactionResultResponse         = response
+                               , transactionResultTrace            = theTrace'
+                               , transactionResultGasUsed          = gasUsed
+                               , transactionResultEtherUsed        = etherUsed
+                               , transactionResultContractsCreated = intercalate "," $ map formatAddress newAddresses
+                               , transactionResultContractsDeleted = intercalate "," $ map formatAddress $ S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes)
+                               , transactionResultStateDiff        = "" --BC.unpack $ BL.toStrict $ Aeson.encode addrDiff
+                               , transactionResultTime             = realToFrac deltaT
+                               , transactionResultNewStorage       = ""
+                               , transactionResultDeletedStorage   = ""
+                               , transactionResultStatus           = Just txrStatus
+                               }
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
 logWithBox source headerSize theLines = do
