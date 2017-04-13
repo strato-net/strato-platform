@@ -64,6 +64,8 @@ data Event = Event
   { eventLogs::Map Text Xabi.IndexedType
   } deriving (Eq,Show,Generic)
 
+data Using = Using {} deriving (Eq,Show,Generic)
+
 
 data ContractDetails = ContractDetails
   { contractdetailsBin :: Text

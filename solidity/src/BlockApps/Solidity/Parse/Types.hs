@@ -77,3 +77,4 @@ mappingType = do
     c <- simpleTypeExpression
     return (d, c)
   return $ Xabitype.Mapping (Just True) mapDomT mapCodT
+

@@ -75,7 +75,7 @@ data Declaration =
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration Xabi.Def
   | EnumDeclaration Xabi.Def
-  | UsingDeclaration SolidityTypeDef
+  | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
   | VariableDeclaration Xabitype.Type
 
@@ -135,15 +135,18 @@ usingDeclaration = do
   reserved "for"
   string usingContract'
   dot
-  usingName <- identifier
+--  usingName <- identifier
+  _ <- identifier
   semi
   return
     (
       undefined,
-      UsingDeclaration TypeDef{
-        typeName = usingContract' ++ "." ++ usingName,
-        typeDecl = Using { usingContract = usingContract', usingType = usingName }
-        }
+      UsingDeclaration Xabi.Using{}
+
+--      TypeDef{
+--        typeName = usingContract' ++ "." ++ usingName,
+--        typeDecl = Using { usingContract = usingContract', usingType = usingName }
+--        }
     )
 
 {- Variables -}
