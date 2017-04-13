@@ -331,12 +331,14 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
                     error "Array of array not supported"
                   Xabi.Contract _ -> "Contract"
                   Xabi.Mapping _ _ _ -> "Mapping"
+                  Xabi.Label _ -> undefined -- TODO - fill this in
               in
                 textToArgType "Array" (fromMaybe False dy) ettyty
             Xabi.Contract _ ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
               textToArgType "Mapping" (fromMaybe False dy) ""
+            Xabi.Label _ -> undefined -- TODO - fill this in
         in
           textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
     case args of

@@ -54,6 +54,17 @@ instance FromJSON Func where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance Arbitrary Func where arbitrary = genericArbitrary uniform
 
+data Modifier = Modifier
+  { modifierArgs :: Map Text Xabi.IndexedType
+  , modifierSelector :: Text
+  , modifierVals :: Map Text Xabi.IndexedType
+  } deriving (Eq,Show,Generic)
+
+data Event = Event
+  { eventLogs::Map Text Xabi.IndexedType
+  } deriving (Eq,Show,Generic)
+
+
 data ContractDetails = ContractDetails
   { contractdetailsBin :: Text
   , contractdetailsAddress :: Maybe (MaybeNamed Address)

@@ -44,6 +44,7 @@ import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
+import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import qualified BlockApps.Solidity.Xabi.Def as Xabi.Def
@@ -954,8 +955,16 @@ insertContract parentContr contr bin binRuntime xabi = do
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source = do
-  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-    (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+--  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+--     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+  
+  SolcResponse abiBins <- blocStrato $ postSolc (Src source)
+  --TODO - clean this up, what should filename be instead of "-"
+  --       get rid of error
+  --       name nicer, mabye merge with next let
+  let maybeXabis = parseXabi "-" $ Text.unpack source
+      xabis = either (error . show) Map.fromList maybeXabis
+      
   let
     contracts = Map.intersectionWith (,) xabis abiBins
     details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
@@ -1175,6 +1184,7 @@ insertXabiType = \case
         , constant $ Just keyId
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Label _ -> undefined --TODO - fill this in
 
 getXabiType :: HasCallStack =>
                Int32 -> Bloc Xabi.Type
