@@ -1,6 +1,7 @@
 resolver: nightly-2017-03-07
 packages:
-- bloc
+- bloc/api
+- bloc/server
 - cirrus/api
 - cirrus/client
 - ethereum
@@ -30,4 +31,4 @@ flags: {}
 extra-package-dbs: []
 
 ghc-options:
-  blockapps-bloc: -fsimpl-tick-factor=1000
+  blockapps-bloc: -fsimpl-tick-factor=20000
