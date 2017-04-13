@@ -43,7 +43,7 @@ ansiColor('xterm') {
                 sh '''#!/bin/bash -l
                 pwd
                 cd strato/repos/monstrato
-                make test-suite
+                make integration 
                 '''
             }
             // this stage also depends on the docker images but we need all
@@ -52,7 +52,7 @@ ansiColor('xterm') {
                 sh '''#!/bin/bash -l
                 pwd
                 cd strato/repos/monstrato
-                make vm-test
+                make vm-tests
                 '''
             }
             // this stage needs a fully running strato (multi) node environment
