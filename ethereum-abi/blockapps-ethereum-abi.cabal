@@ -40,6 +40,7 @@ test-suite blockapps-ethereum-abi-test
     , blockapps-ethereum
     , blockapps-ethereum-abi
     , base16-bytestring
+    , bytestring
     , hspec
 
 source-repository head
