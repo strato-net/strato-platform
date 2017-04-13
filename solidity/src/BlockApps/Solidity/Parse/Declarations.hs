@@ -42,24 +42,30 @@ solidityContract = do
       return (name, consArgs)
   declarations <-
     braces (many solidityDeclaration)
-  return (Text.pack contractName',
-          Xabi{
-            xabiFuncs =
-               Map.fromList 
-               [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
-          , xabiConstr = Map.fromList [] --undefined -- :: Map Text Xabi.IndexedType
-          , xabiVars =
-                 Map.fromList $
-                 zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v) 
-                 [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
-                 [0..] 
-          , xabiTypes = Map.fromList [] -- $ undefined declarations -- :: Map Text Xabi.Def
-    
+  return
+    (
+      Text.pack contractName',
+      Xabi{
+        xabiFuncs =
+           Map.fromList 
+           [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
+      , xabiConstr = Map.fromList [] --undefined -- :: Map Text Xabi.IndexedType
+      , xabiVars =
+             Map.fromList $
+             zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v) 
+             [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
+             [0..] 
+      , xabiTypes =
+          Map.fromList $
+          [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
+          ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
+               
 --    contractName = contractName',
 --    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
 --    contractTypes = contractTypes',
 --    contractBaseNames = baseConstrs
-            })
+      }
+    )
 
 
 
@@ -68,7 +74,7 @@ data Declaration =
   FuncDeclaration Xabi.Func 
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration Xabi.Def
-  | EnumDeclaration SolidityTypeDef
+  | EnumDeclaration Xabi.Def
   | UsingDeclaration SolidityTypeDef
   | EventDeclaration Xabi.Event
   | VariableDeclaration Xabitype.Type
@@ -117,9 +123,9 @@ enumDeclaration = do
   return $
     (
       enumName,
-      EnumDeclaration TypeDef {
-        typeName = enumName,
-        typeDecl = Enum { names = enumFields}
+      EnumDeclaration Xabi.Enum {
+        Xabi.names = map Text.pack enumFields,
+        Xabi.bytes = 0
         }
     )
 
