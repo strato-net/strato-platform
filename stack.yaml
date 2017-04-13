@@ -1,6 +1,7 @@
 resolver: nightly-2017-03-07
 packages:
 - bloc/api
+- bloc/client
 - bloc/server
 - cirrus/api
 - cirrus/client

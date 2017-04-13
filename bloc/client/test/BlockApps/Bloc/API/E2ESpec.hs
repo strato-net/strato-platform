@@ -9,46 +9,22 @@ module BlockApps.Bloc.API.E2ESpec where
 
 import Control.Concurrent
 import Data.Either
-import Data.Proxy
 import qualified Data.Map as Map
 import Data.Maybe
 import Numeric.Natural
 import Servant.Client
 import Test.Hspec
 
-import BlockApps.Bloc.Server.Users (MonadUsers(..))
 import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.Server.Contracts (MonadContracts(..))
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.API.SpecUtils
+import BlockApps.Bloc.Client
 import BlockApps.Ethereum
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
-instance MonadUsers ClientM where
-  getUsers = client (Proxy @ GetUsers)
-  getUsersUser = client (Proxy @ GetUsersUser)
-  postUsersUser = client (Proxy @ PostUsersUser)
-  postUsersSend = client (Proxy @ PostUsersSend)
-  postUsersContract = client (Proxy @ PostUsersContract)
-  postUsersUploadList = client (Proxy @ PostUsersUploadList)
-  postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
-  postUsersSendList = client (Proxy @ PostUsersSendList)
-  postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
-
-instance MonadContracts ClientM where
-  getContracts = client (Proxy @ GetContracts)
-  getContractsData = client (Proxy @ GetContractsData)
-  getContractsContract = client (Proxy @ GetContractsContract)
-  getContractsState = client (Proxy @ GetContractsState)
-  getContractsFunctions = client (Proxy @ GetContractsFunctions)
-  getContractsSymbols = client (Proxy @ GetContractsSymbols)
-  getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
-  getContractsStates = client (Proxy @ GetContractsStates)
-  postContractsCompile = client (Proxy @ PostContractsCompile)
 -- TODO: user/contract methods Addresses may need to be MayBe Named Address
 
 etherToWei :: Natural -> Natural

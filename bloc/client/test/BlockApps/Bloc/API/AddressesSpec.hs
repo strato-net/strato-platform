@@ -7,16 +7,11 @@
 module BlockApps.Bloc.API.AddressesSpec where
 
 import Data.Either
-import Data.Proxy
 import Servant.Client
 import Test.Hspec
 
-import BlockApps.Bloc.API.Addresses
-import BlockApps.Bloc.Server.Addresses
 import BlockApps.Bloc.API.SpecUtils
-
-instance MonadAddresses ClientM where
-  getAddresses = client (Proxy @ GetAddresses)
+import BlockApps.Bloc.Client
 
 spec :: SpecWith TestConfig
 spec =
