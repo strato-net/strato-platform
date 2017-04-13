@@ -118,7 +118,7 @@ instance MonadContracts Bloc where
       returnA -< addr
 
     case addressMaybe of
-      Nothing -> return Map.empty
+      Nothing -> error "addressMaybe is Nothing" --I am keeping this as `error` for now, since I think it is an internal error that we need to look at, nothing a client can fix.
       Just _ -> do
         storage' <- blocStrato $ getStorage addressMaybe
 
