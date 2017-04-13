@@ -16,15 +16,9 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabitype
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)
-simpleTypeExpression :: SolidityParser Xabitype.IndexedType
+simpleTypeExpression :: SolidityParser Xabitype.Type
 simpleTypeExpression = do
-  theType <- try arrayType <|> simpleType <|> mappingType
-  return Xabitype.IndexedType{
-    Xabitype.indexedTypeIndex = 0,
-    Xabitype.indexedTypeType = theType
-    }
-
-    --undefined -- try arrayType <|> simpleType <|> mappingType
+  try arrayType <|> simpleType <|> mappingType
 
 -- | Parses builtins and user-defined names
 simpleType :: SolidityParser Xabitype.Type
@@ -82,4 +76,4 @@ mappingType = do
     reservedOp "=>"
     c <- simpleTypeExpression
     return (d, c)
-  return $ Xabitype.Mapping (Just True) (Xabitype.indexedTypeType mapDomT) (Xabitype.indexedTypeType mapCodT) -- $ Mapping mapDomT mapCodT
+  return $ Xabitype.Mapping (Just True) mapDomT mapCodT

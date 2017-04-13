@@ -46,11 +46,13 @@ solidityContract = do
           Xabi{
             xabiFuncs =
                Map.fromList 
-               [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations] -- :: Map Text Func
+               [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
           , xabiConstr = Map.fromList [] --undefined -- :: Map Text Xabi.IndexedType
           , xabiVars =
-            Map.fromList
-            [ (Text.pack n, Xabitype.VarType{Xabitype.varTypeType=v, Xabitype.varTypeAtBytes=0, Xabitype.varTypePublic=Nothing}) | (n, VariableDeclaration (Xabitype.IndexedType _ v)) <- declarations] -- :: Map Text Xabi.VarType
+                 Map.fromList $
+                 zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v) 
+                 [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
+                 [0..] 
           , xabiTypes = Map.fromList [] -- $ undefined declarations -- :: Map Text Xabi.Def
     
 --    contractName = contractName',
@@ -69,7 +71,7 @@ data Declaration =
   | EnumDeclaration SolidityTypeDef
   | UsingDeclaration SolidityTypeDef
   | EventDeclaration Xabi.Event
-  | VariableDeclaration Xabitype.IndexedType
+  | VariableDeclaration Xabitype.Type
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
@@ -211,10 +213,14 @@ functionDeclaration = do
     (
       functionName,
       FuncDeclaration Xabi.Func{
-        Xabi.funcArgs = Map.fromList functionArgs  -- :: Map Text Xabi.IndexedType
-        , Xabi.funcSelector = Text.pack "qqqq" -- undefined --  :: Text
-      , Xabi.funcVals = Map.fromList functionRet -- undefined objValueType' -- :: Map Text Xabi.IndexedType
-
+        Xabi.funcArgs =
+           Map.fromList $
+           zipWith (\x i -> fmap (Xabitype.IndexedType i) x) functionArgs [0..]
+      , Xabi.funcSelector = Text.pack "qqqq" -- undefined --  :: Text
+      , Xabi.funcVals =
+           Map.fromList $
+           zipWith (\v i -> fmap (Xabitype.IndexedType i) v) functionRet [0..]
+        
 
 --    objName = functionName,
 --    objValueType = objValueType',
@@ -276,7 +282,7 @@ modifierDeclaration = do
 
 -- | Parses a '(x, y, z)'-style tuple, such as appears in function
 -- arguments and return values.
-tupleDeclaration :: SolidityParser [(Text, Xabitype.IndexedType)]
+tupleDeclaration :: SolidityParser [(Text, Xabitype.Type)]
 tupleDeclaration = parens $ commaSep $ do
   partType <- simpleTypeExpression
   optional $ reserved "indexed" <|>
@@ -299,7 +305,7 @@ tupleDeclaration = parens $ commaSep $ do
 -- constant specifiers, and possibly base construtor arguments, in the case
 -- of a constructor.  These can appear in any order, so we have to use
 -- a special permutation parser for this.
-functionModifiers :: SolidityParser ([(Text, Xabitype.IndexedType)], Bool, Bool, String)
+functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Bool, Bool, String)
 functionModifiers =
   permute $
   (\a b c d1 d2 d3 d4 -> (a, b, c, unwords [d1, d2, d3, d4])) <$?>
