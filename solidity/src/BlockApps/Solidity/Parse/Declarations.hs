@@ -99,18 +99,16 @@ structDeclaration = do
   reserved "struct"
   structName <- identifier
   structFields <- braces $ many1 $ do
-    decl <- simpleVariableDeclaration
+    (fieldName, VariableDeclaration decl) <- simpleVariableDeclaration
     semi
-    return decl
+    return (fieldName, decl)
   return
     (
       structName,
       StructDeclaration Xabi.Struct{
-        Xabi.fields = undefined structFields, -- ::Map Text Xabi.FieldType,
-        Xabi.bytes = undefined -- ::Word
-
---    typeName = structName,
---    typeDecl = Struct { fields = structFields }
+        Xabi.fields =
+           Map.fromList $ map (\(n, v) -> (Text.pack n, Xabitype.FieldType 0 v)) structFields,
+        Xabi.bytes = 0
         }
     )
 
