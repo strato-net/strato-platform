@@ -30,16 +30,22 @@ ansiColor('xterm') {
             
             // this stage is currently running 'stack test ...' meaning it
             // it depends only on the build environment
+            // DOES NOT NEED DOCKER CONTAINER SETUP
             stage('unit-test') {
                 sh '''#!/bin/bash -l
                 pwd
                 cd strato/repos/monstrato
                 make unit || true
                 '''
+                slackSend (
+                  color: 'good',
+                  message: "Unit-tests succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+                )
             }
             // this stage needs running dependent docker images such as redis
             // they run with strato running but preferrably they are turned off
             // and are run with 'deep-test'
+            // NEED DOCKER CONTAINER SETUP
             stage('integration-test') {
                 sh '''#!/bin/bash -l
                 pwd
@@ -49,6 +55,7 @@ ansiColor('xterm') {
             }
             // this stage also depends on the docker images but we need all
             // strato components turned off (such as `ethereum-vm`)
+            // NEED CONTAINER BUT SEPARATE FROM INTEGRATION!
             stage('deep-test') {
                 sh '''#!/bin/bash -l
                 pwd
@@ -57,6 +64,7 @@ ansiColor('xterm') {
                 '''
             }
             // this stage needs a fully running strato (multi) node environment
+            // NEEDS A MULTINODE DOCKER SETUP
             stage('e2e-test') {
                 sh '''#!/bin/bash -l
                 pwd
