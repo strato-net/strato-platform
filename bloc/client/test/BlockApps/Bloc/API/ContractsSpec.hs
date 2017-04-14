@@ -9,26 +9,14 @@
 module BlockApps.Bloc.API.ContractsSpec where
 
 import Data.Either
-import Data.Proxy
 import Servant.Client
 import Test.Hspec
 
 import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.Server.Contracts (MonadContracts(..))
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.Client
 import BlockApps.Solidity.Xabi
-
-instance MonadContracts ClientM where
-  getContracts = client (Proxy @ GetContracts)
-  getContractsData = client (Proxy @ GetContractsData)
-  getContractsContract = client (Proxy @ GetContractsContract)
-  getContractsState = client (Proxy @ GetContractsState)
-  getContractsFunctions = client (Proxy @ GetContractsFunctions)
-  getContractsSymbols = client (Proxy @ GetContractsSymbols)
-  getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
-  getContractsStates = client (Proxy @ GetContractsStates)
-  postContractsCompile = client (Proxy @ PostContractsCompile)
 
 spec :: SpecWith TestConfig
 spec = do

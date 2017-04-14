@@ -6,19 +6,12 @@
 #-}
 module BlockApps.Bloc.API.SearchSpec where
 
-import Data.Proxy
 import Data.Either
 import Servant.Client
 import Test.Hspec
 
-import BlockApps.Bloc.API.Search
 import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.Server.Search (MonadSearchContract(..))
-
-instance MonadSearchContract ClientM where
-  getSearchContract = client (Proxy @ GetSearchContract)
-  getSearchContractState = client (Proxy @ GetSearchContractState)
-  getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
+import BlockApps.Bloc.Client
 
 spec :: SpecWith TestConfig
 spec = do

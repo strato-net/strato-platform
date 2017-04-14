@@ -4,45 +4,39 @@
   , TypeApplications
 #-}
 
-module TestSetup where
+module Main where
 
 import qualified Data.Map.Strict as Map
 import Network.HTTP.Client hiding (Proxy)
-import Data.Proxy
 import Servant.Client
+import Test.Hspec
+
+import qualified BlockApps.Bloc.API.AddressesSpec as Addresses
+import qualified BlockApps.Bloc.API.ContractsSpec as Contracts
+import qualified BlockApps.Bloc.API.SearchSpec as Search
+import qualified BlockApps.Bloc.API.UsersSpec as Users
+import BlockApps.Bloc.API.E2ESpec as E2E
+-- import qualified BlockApps.Bloc.APISpec as API
 
 import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.Server.Contracts (MonadContracts(..))
 import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.Server.Users (MonadUsers(..))
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Server.Utils
+import BlockApps.Bloc.Client
+-- import BlockApps.Bloc.Server.Utils
 import BlockApps.Solidity.Xabi
 
 import BlockApps.Ethereum
 
-instance MonadUsers ClientM where
-  getUsers = client (Proxy @ GetUsers)
-  getUsersUser = client (Proxy @ GetUsersUser)
-  postUsersUser = client (Proxy @ PostUsersUser)
-  postUsersSend = client (Proxy @ PostUsersSend)
-  postUsersContract = client (Proxy @ PostUsersContract)
-  postUsersUploadList = client (Proxy @ PostUsersUploadList)
-  postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
-  postUsersSendList = client (Proxy @ PostUsersSendList)
-  postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
-
-instance MonadContracts ClientM where
-  getContracts = client (Proxy @ GetContracts)
-  getContractsData = client (Proxy @ GetContractsData)
-  getContractsContract = client (Proxy @ GetContractsContract)
-  getContractsState = client (Proxy @ GetContractsState)
-  getContractsFunctions = client (Proxy @ GetContractsFunctions)
-  getContractsSymbols = client (Proxy @ GetContractsSymbols)
-  getContractsStateMapping = client (Proxy @ GetContractsStateMapping)
-  getContractsStates = client (Proxy @ GetContractsStates)
-  postContractsCompile = client (Proxy @ PostContractsCompile)
+main :: IO ()
+main = hspec $ do
+  -- API.spec
+  beforeAll setup $ do
+    Addresses.spec
+    Contracts.spec
+    Search.spec
+    Users.spec
+    E2E.spec
 
 setup :: IO TestConfig
 setup = do
@@ -129,3 +123,6 @@ setup = do
 
 localhost :: BaseUrl
 localhost = BaseUrl Http "localhost" 8000 ""
+
+strato :: BaseUrl
+strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"

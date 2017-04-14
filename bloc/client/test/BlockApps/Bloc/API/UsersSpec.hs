@@ -9,35 +9,17 @@
 module BlockApps.Bloc.API.UsersSpec where
 
 import Control.Concurrent
-import Data.Proxy
 import qualified Data.Map.Strict as Map
 import Data.Either
 import Servant.Client
 import Test.Hspec
 
 import BlockApps.Bloc.API
-import BlockApps.Bloc.Server.Users (MonadUsers(..))
-import BlockApps.Bloc.Server.Search (MonadSearchContract(..))
 import BlockApps.Bloc.API.SpecUtils
+import BlockApps.Bloc.Client
 import BlockApps.Ethereum
 
 -- TODO: user/contract methods Addresses may need to be MayBe Named Address
-
-instance MonadUsers ClientM where
-  getUsers = client (Proxy @ GetUsers)
-  getUsersUser = client (Proxy @ GetUsersUser)
-  postUsersUser = client (Proxy @ PostUsersUser)
-  postUsersSend = client (Proxy @ PostUsersSend)
-  postUsersContract = client (Proxy @ PostUsersContract)
-  postUsersUploadList = client (Proxy @ PostUsersUploadList)
-  postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
-  postUsersSendList = client (Proxy @ PostUsersSendList)
-  postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
-
-instance MonadSearchContract ClientM where
-  getSearchContract = client (Proxy @ GetSearchContract)
-  getSearchContractState = client (Proxy @ GetSearchContractState)
-  getSearchContractStateReduced = client (Proxy @ GetSearchContractStateReduced)
 
 spec :: SpecWith TestConfig
 spec = do
