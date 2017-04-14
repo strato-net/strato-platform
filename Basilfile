@@ -20,19 +20,6 @@ deployments:
         stratoHost: "${stratoHost}"
         apiUrlOverride: "${apiUrlOverride}"
 
-  - name: bloch
-    repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: master
-    compose:
-      restart: always
-      environment:
-        ssl: "${ssl}"
-        stratourl: "${stratourl}"
-        cirrusurl: "${cirrusurl}"
-        pguser: "${pguser}"
-        pgpasswd: "${pgpasswd}"
-        pghost: "${pghost}"
-
   - name: redis
     compose:
       image: redis:3.2
@@ -76,6 +63,12 @@ deployments:
         backupblocks: "${backupblocks}"
         redisBDBNumber: "${redisBDBNumber}"
         useSyncMode: "${useSyncMode}"
+        statsEnable: "${statsEnable}"
+        statsHost: "${statsHost}"
+        statsPort: "${statsPort}"
+        statsFlush: "${statsFlush}"
+        statsPrefix: "${statsPrefix}"
+        statsSuffix: "${statsSuffix}"
       links:
         - zookeeper
         - kafka
