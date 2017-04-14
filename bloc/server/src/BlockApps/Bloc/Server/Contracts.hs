@@ -68,7 +68,10 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
-  contract' <- xAbiToContract <$> getContractXabi contract contractId
+  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+
+  contract' <-
+    either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 

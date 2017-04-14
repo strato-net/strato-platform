@@ -206,9 +206,13 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
       let
         orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-        orderedResultTypes = map
-          (\Xabi.IndexedType{..} -> xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType)
-          orderedResultIndexedXT
+      orderedResultTypes <-
+        for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+          either (throwError . UserError . Text.pack) return $
+            xabiTypeToType
+              (error "missing typedefs in postUsersContractMethod")
+              indexedTypeType
+
       txResult <- pollTxResult hash
       let
         mFormattedResponse = Text.concat <$>
@@ -244,9 +248,14 @@ postUsersContractMethod
     resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
     let
       orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-      orderedResultTypes = map
-        (\Xabi.IndexedType{..} -> xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType)
-        orderedResultIndexedXT
+    orderedResultTypes <-
+      for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+        either (throwError . UserError . Text.pack) return $
+          xabiTypeToType
+              (error "missing typedefs in postUsersContractMethod")
+              indexedTypeType
+
+
     txResult <- pollTxResult hash
     let
       mFormattedResponse = Text.concat <$>
