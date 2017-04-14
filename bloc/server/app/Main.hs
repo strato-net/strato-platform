@@ -13,7 +13,7 @@ import Network.HTTP.Client
 import Network.Wai.Handler.Warp
 import Servant.Common.BaseUrl
 
-import BlockApps.Bloc.Site
+import BlockApps.Bloc.Server
 import BlockApps.Bloc.Database.Create
 import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Options
