@@ -4,7 +4,7 @@
   , TypeOperators
 #-}
 
-module BlockApps.Bloc.Site where
+module BlockApps.Bloc.Server where
 
 import Data.Proxy
 import Servant
