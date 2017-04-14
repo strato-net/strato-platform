@@ -55,8 +55,8 @@ describe('Bloc - TX load', function() {
       .then(function(scope) {
         const aliceAddress = scope.users[aliceName].address;
         const bobAddress = scope.users[bobName].address;
-        // console.log('Alice', scope.balances[aliceAddress]);
-        // console.log('Bob', scope.balances[bobAddress]);
+        // console.log('Alice', aliceAddress, scope.balances[aliceAddress]);
+        // console.log('Bob', bobAddress, scope.balances[bobAddress]);
         done();
       })
       .catch(done);
@@ -94,6 +94,8 @@ describe('Bloc - TX load', function() {
         // console.log( 'count', txCount,'elapsed', elapsedTime, 'delay', batchDelay, 'tps', tps);
         return processBatch(aliceName, bobName, batch, batchSize, batchValue, uid)(scope)
           .then(rest.waitNextBlock()) // wait for cirrus to catch up
+          .delay(2 * batchSize * batchCount) // actually nextBlock isn't necessarily correct.
+                                             // it might take multiple blocks depending on latency and gas limits
           .then(rest.getBalance(aliceAddress))
           .then(rest.getBalance(bobAddress))
       })
