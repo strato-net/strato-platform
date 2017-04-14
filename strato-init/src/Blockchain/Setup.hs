@@ -68,6 +68,13 @@ defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
+defineFlag "statsEnable" True "Enable DogStatsD reporting"
+defineFlag "statsHost" ("telegraf" :: String) "Hostname/address of DogStatsD server"
+defineFlag "statsPort" (8125 :: Int) "Port of DogStatsD server"
+defineFlag "statsFlush" (1000 :: Int) "DogStatsD flush interval in ms"
+defineFlag "statsPrefix" ("" :: String) "Prefix all metrics with a string"
+defineFlag "statsSuffix" ("" :: String) "Suffix all metrics with a string"
+
 data SetupDBs =
   SetupDBs {
     stateDB::StateDB,
@@ -193,8 +200,17 @@ defaultConfig =
       quarryConfig       = defaultQuarryConfig,
       discoveryConfig    = defaultDiscoveryConfig,
       generalConfig      = defaultGeneralConfig,
-      statsConfig        = Just defaultStatsConf
+      statsConfig        = statsConfig'
     }
+
+    where statsConfig' = if flags_statsEnable
+                         then Just (defaultStatsConf { statsHost          = flags_statsHost
+                                                     , statsPort          = flags_statsPort
+                                                     , statsFlushInterval = flags_statsFlush
+                                                     , statsPrefix        = flags_statsPrefix
+                                                     , statsSuffix        = flags_statsSuffix
+                                                     })
+                         else Nothing
                    
 defaultPeers::[(String,Int)]
 defaultPeers = 
