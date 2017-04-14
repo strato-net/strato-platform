@@ -7,7 +7,7 @@
 
 module BlockApps.XAbiConverter where
 
---import qualified Data.Bimap as Bimap
+import qualified Data.Bimap as Bimap
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.List
@@ -24,7 +24,7 @@ import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage as Storage
---import qualified BlockApps.Solidity.Xabi.Def as XabiDef
+import qualified BlockApps.Solidity.Xabi.Def as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
@@ -125,15 +125,17 @@ funcToType typeDefs Func{..} = do
 
 
 xabiToTypeDefs::TypeDefs->Xabi->Either String TypeDefs
-xabiToTypeDefs = undefined
-{-  TypeDefs{
+xabiToTypeDefs _ Xabi{..} = do
+
+  return $
+    TypeDefs{
       enumDefs=
           -- fmap (Bimap.fromList . map swap . Map.toList . XabiDef.names) xabiTypes,
           fmap (Bimap.fromList . zip [0..] . XabiDef.names) xabiTypes,
       structDefs=Map.empty
 --      flip Struct (Storage.positionAt 0) $ Map.fromList
 --         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]
-      } -}
+      } 
 
 
 xAbiToContract::Xabi->Either String Contract
