@@ -61,23 +61,18 @@ function doInit {
                     --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
                     --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
                     --addBootnodes=$addBootnodes $stratoBootnode \
-                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty"
+                    --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
+                    --statsEnable=$statsEnable --statsHost=$statsHost --statsPort=$statsPort \
+                    --statsFlush=$statsFlush --statsPrefix='$statsPrefix' --statsSuffix='$statsSuffix'"
 # For backup_restore; the environment var is set during strato-admin.sh invocation.
 # Required: Backup file to be accessible to strato container at /tmp/backup
-  if [[ ${backupblocks} ]] ; then
-     cmd="strato-setup --pguser=$pgUser --password=$pgPass --genesisBlockName=$genesis --kafka=./kafka-topics.sh \
-                       --pghost=$pgHost --kafkahost=$kafkaHost --zkhost=$zkHost --lazyblocks=$lazyBlocks \
-                       --redisHost=$redisBDBHost --redisPort=$redisBDBPort --redisDBNumber=$redisBDBNumber \
-                       --addBootnodes=$addBootnodes $stratoBootnode \
-                       --blockTime=$blockTime --minBlockDifficulty=$minBlockDifficulty \
-                       --backupblocks=true"
-     echo $cmd
-     echo "# of lines in block-backup-file: `cat /var/lib/strato/backup_strato_block | wc -l`"
-     $cmd < /var/lib/strato/backup_strato_block
-  else
-     echo $cmd
-     $cmd
+  if [[ $backupblocks ]] ; then
+     cmd="${cmd} --backupblocks=true < /var/lib/strato/backup_strato_block"
+     echo "# of lines in block-backup-file: " `cat $backupLocation | wc -l`
   fi
+
+  echo $cmd
+  $cmd
 
   if $noMinPeers
   then sed -i 's/minAvailablePeers:.*/minAvailablePeers: 0/' .ethereumH/ethconf.yaml
@@ -148,6 +143,15 @@ setEnv noMinPeers false
 setEnv useSyncMode false
 setEnv difficultyBomb false
 
+setEnv backupLocation /var/lib/strato/backup_strato_block
+
+setEnv statsEnable false
+setEnv statsHost telegraf
+setEnv statsPort 8125
+setEnv statsFlush 1000
+setEnv statsPrefix ""
+setEnv statsSuffix ""
+
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
 
@@ -157,15 +161,16 @@ if [[ -n $genesisBlock ]]
 then echo "$genesisBlock" > ${genesis}Genesis.json
 fi
 
-until nc -z zookeeper 2181 >&/dev/null
+until nc -z $zkHost 2181 >&/dev/null
 do  echo "Waiting for Zookeeper to become available"
     sleep 1
 done
 
-until nc -z kafka 9092 >&/dev/null
+until nc -z $kafkaHost 9092 >&/dev/null
 do  echo "Waiting for Kafka to become available"
     sleep 1
 done
+
 
 
 global-db --pghost postgres || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
