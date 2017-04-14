@@ -125,15 +125,36 @@ funcToType typeDefs Func{..} = do
                 convertedFuncVals
 
 
+{-
+data Xabi = Xabi
+  { xabiFuncs :: Map Text Func
+  , xabiConstr :: Map Text Xabi.IndexedType
+  , xabiVars :: Map Text Xabi.VarType
+  , xabiTypes :: Map Text Xabi.Def
+  } deriving (Eq,Show,Generic)
+
+data Def =
+  Enum {
+    names::[Text],
+    bytes::Word
+    }
+  | Struct {
+    fields::Map Text Xabi.FieldType,
+    bytes::Word
+    } deriving (Eq, Show, Generic)
+-}
+
 xabiToTypeDefs::TypeDefs->Xabi->Either String TypeDefs
-xabiToTypeDefs _ Xabi{..} = do
+xabiToTypeDefs typeDefs Xabi{..} = do
 
   return $
     TypeDefs{
       enumDefs=
           -- fmap (Bimap.fromList . map swap . Map.toList . XabiDef.names) xabiTypes,
-          fmap (Bimap.fromList . zip [0..] . XabiDef.names) xabiTypes,
-      structDefs=Map.empty
+          Map.fromList $
+            map (fmap (Bimap.fromList . zip [0..]))
+              [(enumName, names) | (enumName, XabiDef.Enum{..}) <- Map.toList xabiTypes],
+      structDefs=Map.fromList $ undefined typeDefs xabiTypes
 --      flip Struct (Storage.positionAt 0) $ Map.fromList
 --         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]
       } 
