@@ -7,14 +7,14 @@
 
 module BlockApps.XAbiConverter where
 
-import qualified Data.Bimap as Bimap
+--import qualified Data.Bimap as Bimap
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import Data.Function
 import Data.List
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Traversable
 import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 
@@ -24,7 +24,7 @@ import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage as Storage
-import qualified BlockApps.Solidity.Xabi.Def as XabiDef
+--import qualified BlockApps.Solidity.Xabi.Def as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
@@ -85,51 +85,70 @@ xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
-
-xabiTypeToType::Xabi.Type->Type
-xabiTypeToType Xabi.Array { Xabi.length=Just len, Xabi.entry=var } =
-  TypeArrayFixed len $ xabiTypeToType var
-xabiTypeToType Xabi.Array { Xabi.entry=var } =
-  TypeArrayDynamic $ xabiTypeToType var
-xabiTypeToType Xabi.Contract { Xabi.typedef=name } = TypeContract name
-xabiTypeToType Xabi.Mapping { Xabi.key=k, Xabi.value=v } = TypeMapping (xabiTypeToSimpleType k) (xabiTypeToType v)
-xabiTypeToType Xabi.Enum { Xabi.typedef=enumName } = TypeEnum enumName
-xabiTypeToType Xabi.Struct { Xabi.typedef=name } = TypeStruct name
-xabiTypeToType v = SimpleType $ xabiTypeToSimpleType v
-
-
-
-funcToType::Func->Type
-funcToType Func{..} =
-  let
-    selector =
-      case B16.decode $ BC.pack $ Text.unpack funcSelector of
-       (val, "") -> val
-       _ -> error "selector in function is bad"
-  in
-   TypeFunction
-       selector
-       (Map.toList $ fmap (xabiTypeToType . Xabi.indexedTypeType) funcArgs)
-       (map (\(name, val) -> (Just name, xabiTypeToType $ Xabi.indexedTypeType val)) $ Map.toList funcVals)
+xabiTypeToType::TypeDefs->Xabi.Type->Either String Type
+xabiTypeToType typeDefs Xabi.Array { Xabi.length=Just len, Xabi.entry=var } =
+  TypeArrayFixed len <$> xabiTypeToType typeDefs var
+xabiTypeToType typeDefs Xabi.Array { Xabi.entry=var } =
+  TypeArrayDynamic <$> xabiTypeToType typeDefs var
+xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
+xabiTypeToType typeDefs (Xabi.Label name) =
+  case (Map.lookup (Text.pack name) (enumDefs typeDefs), Map.lookup (Text.pack name) (structDefs typeDefs)) of
+   (Nothing, Nothing) -> Left $ "Contract is using a label that has not been defined as an enum or struct: " ++ name
+   (Just _, Just _) -> Left $ "Contract label was defined as both an enum an struct, so it is not clear which one to use: " ++ name
+   (Just _, _) -> Right $ TypeEnum $ Text.pack name
+   (_, Just theType) -> undefined theType -- xabiTypeToType typeDefs theType
+xabiTypeToType typeDefs Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
+  value <- xabiTypeToType typeDefs v
+  return $ TypeMapping (xabiTypeToSimpleType k) value
+xabiTypeToType _ Xabi.Enum { Xabi.typedef=enumName } = return $ TypeEnum enumName
+xabiTypeToType _ Xabi.Struct { Xabi.typedef=name } = return $ TypeStruct name
+xabiTypeToType _ v = return $ SimpleType $ xabiTypeToSimpleType v
 
 
-xAbiToContract::Xabi->Contract
-xAbiToContract Xabi{..} =
-  let
-    typeDefs' = TypeDefs{
+funcToType::TypeDefs->Func->Either String Type
+funcToType typeDefs Func{..} = do
+  let selector =
+        case B16.decode $ BC.pack $ Text.unpack funcSelector of
+         (val, "") -> val
+         _ -> error "selector in function is bad"
+
+  convertedFuncArgs <- for funcArgs $ xabiTypeToType typeDefs . Xabi.indexedTypeType
+
+  convertedFuncVals <- for (Map.toList funcVals) $ \(name, val) -> do
+    val' <- xabiTypeToType typeDefs $ Xabi.indexedTypeType val
+    return (Just name, val')
+  
+  return $ TypeFunction
+                selector
+                (Map.toList convertedFuncArgs)
+                convertedFuncVals
+
+
+xabiToTypeDefs::TypeDefs->Xabi->Either String TypeDefs
+xabiToTypeDefs = undefined
+{-  TypeDefs{
       enumDefs=
           -- fmap (Bimap.fromList . map swap . Map.toList . XabiDef.names) xabiTypes,
           fmap (Bimap.fromList . zip [0..] . XabiDef.names) xabiTypes,
       structDefs=Map.empty
 --      flip Struct (Storage.positionAt 0) $ Map.fromList
 --         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]
-      }
-  in
-   Contract{
-     mainStruct=
-        fieldsToStruct typeDefs' $
-            (map (fmap (xabiTypeToType . Xabi.varTypeType)) $ sortBy (compare `on` (Xabi.varTypeAtBytes . snd)) $ Map.toList xabiVars)
-            ++ map (fmap funcToType) (Map.toList xabiFuncs)
-     ,
-     typeDefs=typeDefs'
-     }
+      } -}
+
+
+xAbiToContract::Xabi->Either String Contract
+xAbiToContract contractXabi@Xabi{..} = do
+  let (Right typeDefs') = xabiToTypeDefs typeDefs' contractXabi
+  
+  let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
+  vars <- for vars' $ \(name, var) -> do
+    var' <- (xabiTypeToType typeDefs' . Xabi.varTypeType) var
+    return (name, var')
+  
+  funcs <- traverse (funcToType typeDefs') xabiFuncs
+            
+
+  return Contract{
+    mainStruct=fieldsToStruct typeDefs' $ vars ++ Map.toList funcs,
+    typeDefs=typeDefs'
+    }

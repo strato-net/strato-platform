@@ -208,7 +208,7 @@ instance MonadUsers Bloc where
         let
           orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
           orderedResultTypes = map
-            (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+            (\Xabi.IndexedType{..} -> xabiTypeToType (error "missing typedefs in postUsersContractMethodList") indexedTypeType)
             orderedResultIndexedXT
         txResult <- pollTxResult hash
         let
@@ -245,7 +245,7 @@ instance MonadUsers Bloc where
       let
         orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
         orderedResultTypes = map
-          (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+          (\Xabi.IndexedType{..} -> xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType)
           orderedResultIndexedXT
       txResult <- pollTxResult hash
       let
