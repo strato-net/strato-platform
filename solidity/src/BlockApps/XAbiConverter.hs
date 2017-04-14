@@ -2,6 +2,7 @@
   LANGUAGE
     OverloadedStrings
   , RecordWildCards
+  , RecursiveDo
 #-}
 
 
@@ -139,8 +140,8 @@ xabiToTypeDefs _ Xabi{..} = do
 
 
 xAbiToContract::Xabi->Either String Contract
-xAbiToContract contractXabi@Xabi{..} = do
-  let (Right typeDefs') = xabiToTypeDefs typeDefs' contractXabi
+xAbiToContract contractXabi@Xabi{..} = mdo
+  typeDefs' <- xabiToTypeDefs typeDefs' contractXabi
   
   let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
