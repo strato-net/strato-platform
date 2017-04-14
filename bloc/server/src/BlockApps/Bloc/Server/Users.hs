@@ -48,200 +48,162 @@ import BlockApps.XAbiConverter (xabiTypeToType)
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 
-class Monad m => MonadUsers m where
-  getUsers :: m [UserName]
-  getUsersUser :: UserName -> m [Address]
-  postUsersUser :: UserName -> PostUsersUserRequest -> m Address
-  postUsersSend :: UserName -> Address -> PostSendParameters -> m PostTransaction
-  postUsersContract :: UserName -> Address -> PostUsersContractRequest -> m Address
-  postUsersUploadList :: UserName -> Address -> UploadListRequest -> m [PostUsersUploadListResponse]
-  postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> m PostUsersContractMethodResponse
-  postUsersSendList :: UserName -> Address -> PostSendListRequest -> m [PostSendListResponse]
-  postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> m [PostMethodListResponse]
+getUsers :: Bloc [UserName]
+getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
-instance MonadUsers Bloc where
 
-  getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
+getUsersUser :: UserName -> Bloc [Address]
+getUsersUser (UserName name) = blocTransaction $
+  blocQuery $ getUsersUserQuery name
 
-  getUsersUser (UserName name) = blocTransaction $
-    blocQuery $ getUsersUserQuery name
+postUsersUser :: UserName -> PostUsersUserRequest -> Bloc Address
+postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransaction $ do
+  keyStore <- newKeyStore pass
+  createdUser <- blocModify $ postUsersUserQuery name keyStore
+  unless createdUser (throwError (DBError "failed to create user"))
+  let
+    addr = keystoreAcctAddress keyStore
+  when (faucet /= 0) $ do
+    logWith logNotice "Waiting for faucet transaction to be mined"
+    blocStrato $ do
+      void $ postFaucet addr
+      void $ waitNewAccount addr
+  return addr
 
-  postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransaction $ do
-    keyStore <- newKeyStore pass
-    createdUser <- blocModify $ postUsersUserQuery name keyStore
-    unless createdUser (throwError (DBError "failed to create user"))
-    let
-      addr = keystoreAcctAddress keyStore
-    when (faucet /= 0) $ do
-      logWith logNotice "Waiting for faucet transaction to be mined"
-      blocStrato $ do
-        void $ postFaucet addr
-        void $ waitNewAccount addr
-    return addr
 
-  postUsersSend userName addr
-    (PostSendParameters toAddr value password txParams) = do
-      tx <- prepareTx
-        userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-        (Wei (fromIntegral value)) ByteString.empty
-      hash <- blocStrato $ postTx tx
-      void $ pollTxResult hash
-      return tx
-
-  postUsersContract userName addr
-    (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
-      --TODO: check what happens with mismatching args
-      idsAndDetails <- compileContract src
-      logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-      (cmId,ContractDetails{..}) <- blocMaybe "Could not find global contract metadataId" $
-        Map.lookup contract idsAndDetails
-      let
-        (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
-      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-      mFunctionId <- getConstructorId cmId
-      argsBin <- buildArgumentByteString args mFunctionId
-      tx <- prepareTx
-        userName password addr Nothing (fromMaybe emptyTxParams txParams) (Wei (fromIntegral value)) (bin <> argsBin)
-      logWith logNotice ("tx is: " <> Text.pack (show tx))
-      hash <- blocStrato $ postTx tx
-      txResult <- pollTxResult hash
-      let
-        addressMaybe = do
-          str <- listToMaybe $
-            Text.splitOn "," (transactionresultContractsCreated txResult)
-          stringAddress $ Text.unpack str
-      case addressMaybe of
-        Nothing -> case (transactionresultMessage txResult) of
-          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-          stratoMsg -> throwError $ UserError stratoMsg
-        Just addr' -> do
-          void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-            ( Nothing
-            , constant cmId
-            , constant addr'
-            , Nothing
-            )
-          return addr'
-
-  postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
-    namesCmIdsTxs <- for contracts $ \ (UploadListContract name args txParams value) -> do
-      (bin16,cmId) <- blocQuery1 $ proc () -> do
-        (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
-        returnA -< (bin16,cmId)
-      let
-        (bin,leftOver) = Base16.decode $ bin16
-      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-      mFunctionId <- getConstructorId cmId
-      argsBin <- buildArgumentByteString (Just args) mFunctionId
-      tx <- prepareTx
-        userName pw addr Nothing (fromMaybe emptyTxParams txParams) (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
-      return ((name,cmId),tx)
-    let
-      namesCmIds = map fst namesCmIdsTxs
-      txs = map snd namesCmIdsTxs
-    hashes <- blocStrato $ postTxList txs
-    resps <- forConcurrently (zip namesCmIds hashes) $ \ ((name,cmId),hash) -> do
-      txResult <- pollTxResult hash
-      let
-        addressMaybe = do
-          str <- listToMaybe $
-            Text.splitOn "," (transactionresultContractsCreated txResult)
-          stringAddress $ Text.unpack str
-      case addressMaybe of
-        Nothing -> case transactionresultMessage txResult of
-          "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-          stratoMsg -> throwError $ UserError stratoMsg
-        Just addr' -> do
-          void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-            ( Nothing
-            , constant cmId
-            , constant addr'
-            , Nothing
-            )
-          getContractDetails (ContractName name) (Unnamed addr')
-    return $ map PostUsersUploadListResponse resps
-
-  postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
-    txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
-      userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
+postUsersSend :: UserName -> Address -> PostSendParameters -> Bloc PostTransaction
+postUsersSend userName addr
+  (PostSendParameters toAddr value password txParams) = do
+    tx <- prepareTx
+      userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral value)) ByteString.empty
-    hashes <- blocStrato $ postTxList txs'
-    map PostSendListResponse <$> if resolve
-      then forConcurrently hashes $ \ hash -> do
-        txResult <- pollTxResult hash
-        let txResponse = transactionresultResponse txResult
-        case txResponse of
-          "Success!" -> do
-            senderAccounts <- blocStrato $ getAccountsFilter
-              accountsFilterParams{qaAddress = Just addr}
-            case senderAccounts of
-              [] -> throwError $ AnError "No sender account found"
-              senderAccount:_ -> return . Text.pack . show . unStrung $
-                accountBalance senderAccount
-          _ -> return txResponse
-      else return hashes
+    hash <- blocStrato $ postTx tx
+    void $ pollTxResult hash
+    return tx
 
-  postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-    txsFuncIds <- for postmethodlistrequestTxs $ \ MethodCall{..} -> do
-      cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
-      (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
-      let
-        (sel,leftOver) = Base16.decode $ sel16
-      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
-      argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
-      tx <- prepareTx
-        userName
-        postmethodlistrequestPassword
-        userAddr
-        (Just methodcallContractAddress)
-        (fromMaybe emptyTxParams methodcallTxParams)
-        (Wei (fromIntegral methodcallValue))
-        (sel <> argsBin)
-      -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-      return (tx,functionId)
-    let (txs,funcIds) = unzip txsFuncIds
-    logWith logNotice ("txs are: " <> Text.pack (show txs))
-    hashes <- blocStrato $ postTxList txs
-    map PostMethodListResponse <$> if postmethodlistrequestResolve
-      then forConcurrently (zip hashes funcIds) $ \ (hash,funcId) -> do
-        resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
-        let
-          orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-          orderedResultTypes = map
-            (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
-            orderedResultIndexedXT
-        txResult <- pollTxResult hash
-        let
-          mFormattedResponse = Text.concat <$>
-            convertResultResToTexts
-              (transactionresultResponse txResult)
-              orderedResultTypes
-        blocMaybe "Failed to parse response" mFormattedResponse
-      else return hashes
 
-  postUsersContractMethod
-    userName
-    userAddr
-    (ContractName contractName)
-    contractAddr
-    (PostUsersContractMethodRequest password funcName args value txParams) = do
-      cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
-      (functionId,sel16) <- getFunctionIdSel cmId funcName
-      let
-        (sel,leftOver) = Base16.decode $ sel16
-      unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
-      argsBin <- buildArgumentByteString (Just args) (Just functionId)
-      tx <- prepareTx
-        userName
-        password
-        userAddr
-        (Just contractAddr)
-        (fromMaybe emptyTxParams txParams)
-        (Wei (fromIntegral value))
-        (sel <> argsBin)
-      logWith logNotice ("tx is: " <> Text.pack (show tx))
-      hash <- blocStrato $ postTx tx
-      resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
+postUsersContract userName addr
+  (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
+    --TODO: check what happens with mismatching args
+    idsAndDetails <- compileContract src
+    logWith logNotice ("constructor arguments: " <> Text.pack (show args))
+    (cmId,ContractDetails{..}) <- blocMaybe "Could not find global contract metadataId" $
+      Map.lookup contract idsAndDetails
+    let
+      (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
+    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+    mFunctionId <- getConstructorId cmId
+    argsBin <- buildArgumentByteString args mFunctionId
+    tx <- prepareTx
+      userName password addr Nothing (fromMaybe emptyTxParams txParams) (Wei (fromIntegral value)) (bin <> argsBin)
+    logWith logNotice ("tx is: " <> Text.pack (show tx))
+    hash <- blocStrato $ postTx tx
+    txResult <- pollTxResult hash
+    let
+      addressMaybe = do
+        str <- listToMaybe $
+          Text.splitOn "," (transactionresultContractsCreated txResult)
+        stringAddress $ Text.unpack str
+    case addressMaybe of
+      Nothing -> case (transactionresultMessage txResult) of
+        "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+        stratoMsg -> throwError $ UserError stratoMsg
+      Just addr' -> do
+        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+          ( Nothing
+          , constant cmId
+          , constant addr'
+          , Nothing
+          )
+        return addr'
+
+
+postUsersUploadList :: UserName -> Address -> UploadListRequest -> Bloc [PostUsersUploadListResponse]
+postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
+  namesCmIdsTxs <- for contracts $ \ (UploadListContract name args txParams value) -> do
+    (bin16,cmId) <- blocQuery1 $ proc () -> do
+      (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
+      returnA -< (bin16,cmId)
+    let
+      (bin,leftOver) = Base16.decode $ bin16
+    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+    mFunctionId <- getConstructorId cmId
+    argsBin <- buildArgumentByteString (Just args) mFunctionId
+    tx <- prepareTx
+      userName pw addr Nothing (fromMaybe emptyTxParams txParams) (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
+    return ((name,cmId),tx)
+  let
+    namesCmIds = map fst namesCmIdsTxs
+    txs = map snd namesCmIdsTxs
+  hashes <- blocStrato $ postTxList txs
+  resps <- forConcurrently (zip namesCmIds hashes) $ \ ((name,cmId),hash) -> do
+    txResult <- pollTxResult hash
+    let
+      addressMaybe = do
+        str <- listToMaybe $
+          Text.splitOn "," (transactionresultContractsCreated txResult)
+        stringAddress $ Text.unpack str
+    case addressMaybe of
+      Nothing -> case transactionresultMessage txResult of
+        "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+        stratoMsg -> throwError $ UserError stratoMsg
+      Just addr' -> do
+        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+          ( Nothing
+          , constant cmId
+          , constant addr'
+          , Nothing
+          )
+        getContractDetails (ContractName name) (Unnamed addr')
+  return $ map PostUsersUploadListResponse resps
+
+postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSendListResponse]
+postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
+  txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
+    userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
+    (Wei (fromIntegral value)) ByteString.empty
+  hashes <- blocStrato $ postTxList txs'
+  map PostSendListResponse <$> if resolve
+    then forConcurrently hashes $ \ hash -> do
+      txResult <- pollTxResult hash
+      let txResponse = transactionresultResponse txResult
+      case txResponse of
+        "Success!" -> do
+          senderAccounts <- blocStrato $ getAccountsFilter
+            accountsFilterParams{qaAddress = Just addr}
+          case senderAccounts of
+            [] -> throwError $ AnError "No sender account found"
+            senderAccount:_ -> return . Text.pack . show . unStrung $
+              accountBalance senderAccount
+        _ -> return txResponse
+    else return hashes
+
+postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> Bloc [PostMethodListResponse]
+postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
+  txsFuncIds <- for postmethodlistrequestTxs $ \ MethodCall{..} -> do
+    cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
+    (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
+    let
+      (sel,leftOver) = Base16.decode $ sel16
+    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+    argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
+    tx <- prepareTx
+      userName
+      postmethodlistrequestPassword
+      userAddr
+      (Just methodcallContractAddress)
+      (fromMaybe emptyTxParams methodcallTxParams)
+      (Wei (fromIntegral methodcallValue))
+      (sel <> argsBin)
+    -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+    return (tx,functionId)
+  let (txs,funcIds) = unzip txsFuncIds
+  logWith logNotice ("txs are: " <> Text.pack (show txs))
+  hashes <- blocStrato $ postTxList txs
+  map PostMethodListResponse <$> if postmethodlistrequestResolve
+    then forConcurrently (zip hashes funcIds) $ \ (hash,funcId) -> do
+      resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
       let
         orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
         orderedResultTypes = map
@@ -253,10 +215,48 @@ instance MonadUsers Bloc where
           convertResultResToTexts
             (transactionresultResponse txResult)
             orderedResultTypes
+      blocMaybe "Failed to parse response" mFormattedResponse
+    else return hashes
 
-      formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
+postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> Bloc PostUsersContractMethodResponse
+postUsersContractMethod
+  userName
+  userAddr
+  (ContractName contractName)
+  contractAddr
+  (PostUsersContractMethodRequest password funcName args value txParams) = do
+    cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
+    (functionId,sel16) <- getFunctionIdSel cmId funcName
+    let
+      (sel,leftOver) = Base16.decode $ sel16
+    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+    argsBin <- buildArgumentByteString (Just args) (Just functionId)
+    tx <- prepareTx
+      userName
+      password
+      userAddr
+      (Just contractAddr)
+      (fromMaybe emptyTxParams txParams)
+      (Wei (fromIntegral value))
+      (sel <> argsBin)
+    logWith logNotice ("tx is: " <> Text.pack (show tx))
+    hash <- blocStrato $ postTx tx
+    resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+    let
+      orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+      orderedResultTypes = map
+        (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+        orderedResultIndexedXT
+    txResult <- pollTxResult hash
+    let
+      mFormattedResponse = Text.concat <$>
+        convertResultResToTexts
+          (transactionresultResponse txResult)
+          orderedResultTypes
 
-      return $ PostUsersContractMethodResponse formattedResponse
+    formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
+
+    return $ PostUsersContractMethodResponse formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
