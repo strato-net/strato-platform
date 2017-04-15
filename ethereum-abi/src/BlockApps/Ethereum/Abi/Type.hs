@@ -12,19 +12,17 @@ module BlockApps.Ethereum.Abi.Type
 
 import Data.Maybe
 
-import BlockApps.Ethereum.Abi.Int
-
 data Type
   = TypeBool
-  | TypeUInt (Maybe Word256)
-  | TypeInt (Maybe Word256)
+  | TypeUInt (Maybe Int)
+  | TypeInt (Maybe Int)
   | TypeAddress
   -- | TypeFixed
   -- | TypeUFixed
-  | TypeBytesStatic Word256
+  | TypeBytesStatic Int
   | TypeBytesDynamic
   | TypeString
-  | TypeArrayStatic Word256 Type
+  | TypeArrayStatic Int Type
   | TypeArrayDynamic Type
   deriving (Eq,Show)
 
@@ -54,10 +52,10 @@ typeIsDynamic = \case
   TypeArrayStatic n ty -> n /= 0 && typeIsDynamic ty
   TypeArrayDynamic _ -> True
 
-typeByteSize :: Type -> Maybe Word256
+typeByteSize :: Type -> Maybe Int
 typeByteSize = fmap (`div` 8) . typeBitSize
 
-typeBitSize :: Type -> Maybe Word256
+typeBitSize :: Type -> Maybe Int
 typeBitSize = \case
   TypeBool -> return 8
   TypeUInt n -> return $ fromMaybe 256 n

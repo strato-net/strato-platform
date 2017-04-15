@@ -12,10 +12,10 @@ module BlockApps.Ethereum.Abi.Value
   , decodeValues
   ) where
 
-import Debug.Trace
-
 import Data.Bool (bool)
 import Data.ByteString (ByteString)
+import Data.LargeInt
+import Data.LargeWord
 import Data.Maybe
 import Data.Monoid
 import Data.Text (Text)
@@ -27,7 +27,6 @@ import qualified Data.ByteString.Lazy as ByteString.Lazy
 import qualified Data.Text.Encoding as Text.Encoding
 
 import BlockApps.Ethereum
-import BlockApps.Ethereum.Abi.Int
 import BlockApps.Ethereum.Abi.Type
 
 data Value
@@ -66,11 +65,11 @@ validValue ty' val' = validType ty' && case (ty',val') of
     (negate x <= 2^(n-1) && x <= 2^(n-1) - 1)
   (TypeAddress,ValueAddress _) -> True
   (TypeBytesStatic len, ValueBytesStatic bytes) ->
-    fromIntegral (ByteString.length bytes) == len
+    ByteString.length bytes == len
   (TypeBytesDynamic, ValueBytesDynamic _) -> True
   (TypeString, ValueString _) -> True
   (TypeArrayStatic len ty, ValueArrayStatic vals) ->
-    fromIntegral (length vals) == len && all (validValue ty) vals
+    length vals == len && all (validValue ty) vals
   (TypeArrayDynamic ty, ValueArrayDynamic vals) -> all (validValue ty) vals
   _ -> False
 
@@ -83,14 +82,12 @@ encodeValue = \case
     encodeValue . ValueUInt . fromIntegral $ unAddress value
   ValueBytesStatic value -> padRight value
   ValueBytesDynamic value -> padRight $
-    encodeValue (ValueUInt (fromIntegral (ByteString.length value)))
-    <> value
+    encodeLength (ByteString.length value) <> value
   ValueString value ->
     encodeValue . ValueBytesDynamic $ Text.Encoding.encodeUtf8 value
   ValueArrayStatic values -> encodeValues values
   ValueArrayDynamic values ->
-    encodeValue (ValueUInt (fromIntegral (length values)))
-    <> encodeValues values
+    encodeLength (length values) <> encodeValues values
   where
     encodeStrict x = ByteString.Lazy.toStrict $ Binary.encode x
     padRight bs =
@@ -113,14 +110,8 @@ encodeValues values =
       | value <- values
       ]
     tailLens = scanl (\len bytes -> len + ByteString.length bytes) 0 tail'
-    headLen = trace "headLen" . traceShowId $ sum $ map (maybe 32 ByteString.length) head'
-    resolveHead
-      = fromMaybe
-      . encodeValue
-      . ValueUInt
-      . fromIntegral
-      . (headLen +)
-    head'' = zipWith resolveHead tailLens head'
+    headLen = sum $ map (maybe 32 ByteString.length) head'
+    head'' = zipWith (fromMaybe . encodeLength . (headLen +)) tailLens head'
   in
     ByteString.concat $ head'' <> tail'
 
@@ -135,22 +126,20 @@ decodeValue bytes = \case
     ValueUInt addr <- decodeValue bytes (TypeUInt Nothing)
     return . ValueAddress . Address $ fromIntegral addr
   TypeBytesStatic len ->
-    return . ValueBytesStatic $ ByteString.take (fromIntegral len) bytes
+    return . ValueBytesStatic $ ByteString.take len bytes
   TypeBytesDynamic -> do
-    let
-      (bytesLen,bytesRest) = ByteString.splitAt 32 bytes
-    ValueUInt len <- decodeValue bytesLen (TypeUInt Nothing)
+    let (bytesLen,bytesRest) = ByteString.splitAt 32 bytes
+    len <- decodeLength bytesLen
     ValueBytesStatic rest <- decodeValue bytesRest (TypeBytesStatic len)
     return $ ValueBytesDynamic rest
   TypeString -> do
     ValueBytesDynamic str <- decodeValue bytes TypeBytesDynamic
     return . ValueString $ Text.Encoding.decodeUtf8 str
-  TypeArrayStatic n ty ->
-    ValueArrayStatic <$> decodeValues bytes (replicate (fromIntegral n) ty)
+  TypeArrayStatic len ty ->
+    ValueArrayStatic <$> decodeValues bytes (replicate len ty)
   TypeArrayDynamic ty -> do
-    let
-      (bytesLen,bytesRest) = ByteString.splitAt 32 bytes
-    ValueUInt len <- decodeValue bytesLen (TypeUInt Nothing)
+    let (bytesLen,bytesRest) = ByteString.splitAt 32 bytes
+    len <- decodeLength bytesLen
     ValueArrayStatic rest <- decodeValue bytesRest (TypeArrayStatic len ty)
     return $ ValueArrayDynamic rest
   where
@@ -171,7 +160,7 @@ decodeValues bytes tys' = do
     bytesLen = ByteString.length bytes
     tailLens head' = tail $
       scanr (either (const . fst) (const id)) bytesLen head'
-    paddedLen len = fromIntegral $ 32 + 32 * ((len - 1) `div` 32)
+    paddedLen len = 32 + 32 * ((len - 1) `div` 32)
     headLen = sum (map (paddedLen . fromMaybe 32 . typeByteSize) tys')
     headBytes' = ByteString.take headLen bytes
     decodeHead headBytes = \case
@@ -179,9 +168,9 @@ decodeValues bytes tys' = do
       ty:tys -> case typeByteSize ty of
         Nothing -> do
           let (tailLenBytes,restBytes) = ByteString.splitAt 32 headBytes
-          ValueUInt tailLen <- decodeValue tailLenBytes (TypeUInt Nothing)
+          tailLen <- decodeLength tailLenBytes
           rest <- decodeHead restBytes tys
-          return $ Left (fromIntegral tailLen,ty) : rest
+          return $ Left (tailLen,ty) : rest
         Just len -> do
           let
             (valBytes,restBytes) =
@@ -189,3 +178,11 @@ decodeValues bytes tys' = do
           val <- decodeValue valBytes ty
           rest <- decodeHead restBytes tys
           return $ Right val : rest
+
+encodeLength :: Int -> ByteString
+encodeLength = encodeValue . ValueUInt . fromIntegral
+
+decodeLength :: ByteString -> Maybe Int
+decodeLength bytes = do
+  ValueUInt len <- decodeValue bytes (TypeUInt Nothing)
+  return $ fromIntegral len
