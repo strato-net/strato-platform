@@ -96,8 +96,8 @@ xabiTypeToType typeDefs (Xabi.Label name) =
   case (Map.lookup (Text.pack name) (enumDefs typeDefs), Map.lookup (Text.pack name) (structDefs typeDefs)) of
    (Nothing, Nothing) -> Left $ "Contract is using a label that has not been defined as an enum or struct: " ++ name
    (Just _, Just _) -> Left $ "Contract label was defined as both an enum an struct, so it is not clear which one to use: " ++ name
-   (Just _, _) -> Right $ TypeEnum $ Text.pack name
-   (_, Just theType) -> undefined theType -- xabiTypeToType typeDefs theType
+   (Just _, _) -> return $ TypeEnum $ Text.pack name
+   (_, Just _) -> return $ TypeStruct $ Text.pack name
 xabiTypeToType typeDefs Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
   value <- xabiTypeToType typeDefs v
   return $ TypeMapping (xabiTypeToSimpleType k) value
@@ -142,19 +142,60 @@ data Def =
     fields::Map Text Xabi.FieldType,
     bytes::Word
     } deriving (Eq, Show, Generic)
+
+data Struct =
+  Struct {
+    fields::Map Text (Storage.Position, Type),
+    size::Word256
+    } deriving (Show)
+
+data FieldType = FieldType
+  { fieldTypeAtBytes :: Int32
+  , fieldTypeType :: Type
+  } deriving (Eq, Show, Generic)
+
+
 -}
+
+xabiFieldsToFields::TypeDefs->[(Text, Xabi.FieldType)]->Either String [(Text, Type)]
+xabiFieldsToFields typeDefs xabifields = do
+  for xabifields $ \(name, field) -> do
+    theType <- xabiTypeToType typeDefs $ Xabi.fieldTypeType field
+    return (name, theType)
+
+convertFieldsToStruct::TypeDefs->[(Text, Xabi.FieldType)]->Either String Struct
+convertFieldsToStruct typeDefs fields = 
+    fmap (fieldsToStruct typeDefs) $ xabiFieldsToFields typeDefs fields
+
+  
 
 xabiToTypeDefs::TypeDefs->Xabi->Either String TypeDefs
 xabiToTypeDefs typeDefs Xabi{..} = do
+  let
+    xabiEnums = [(enumName, names) |
+                 (enumName, XabiDef.Enum{..}) <- Map.toList xabiTypes]
+    xabiStructs = [(structName, Map.toList fields) |
+                   (structName, XabiDef.Struct{..}) <- Map.toList xabiTypes]::[(Text, [(Text, Xabi.FieldType)])]
 
+  
+  structDefs' <-
+    for xabiStructs $ \(name, fields) -> do
+      theStruct <- convertFieldsToStruct typeDefs $ sortOn (Xabi.fieldTypeAtBytes . snd) fields
+      return (name, theStruct)
+  
   return $
     TypeDefs{
       enumDefs=
-          -- fmap (Bimap.fromList . map swap . Map.toList . XabiDef.names) xabiTypes,
-          Map.fromList $
-            map (fmap (Bimap.fromList . zip [0..]))
-              [(enumName, names) | (enumName, XabiDef.Enum{..}) <- Map.toList xabiTypes],
-      structDefs=Map.fromList $ undefined typeDefs xabiTypes
+        Map.fromList $
+          map (fmap (Bimap.fromList . zip [0..])) xabiEnums,
+      
+      structDefs=Map.fromList structDefs'::Map.Map Text Struct
+
+
+
+
+
+                 
 --      flip Struct (Storage.positionAt 0) $ Map.fromList
 --         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]
       } 

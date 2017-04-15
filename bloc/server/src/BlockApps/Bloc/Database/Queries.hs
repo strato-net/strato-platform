@@ -1184,7 +1184,21 @@ insertXabiType = \case
         , constant $ Just keyId
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Label _ -> undefined --TODO - fill this in
+  Xabi.Label name -> 
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Label"::Text)
+        , constant $ Just name
+        , constant False
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
 
 getXabiType :: HasCallStack =>
                Int32 -> Bloc Xabi.Type
@@ -1225,6 +1239,9 @@ getXabiType typeId = do
       xtkt <- getXabiType xtktid'
       xtvt <- getXabiType xtvtid'
       return $ Xabi.Mapping (Just xtdy) xtkt xtvt
+    "Label" -> do
+      xttd' <- blocMaybe "Missing typedef in type Enum" xttd
+      return $ Xabi.Label $ Text.unpack xttd'
     _ -> throwError $ DBError "Could not match type"
 
 getXabiStructFields :: Int32 -> Bloc (Map Text Xabi.FieldType)

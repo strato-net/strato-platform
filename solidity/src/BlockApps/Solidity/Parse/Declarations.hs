@@ -107,7 +107,7 @@ structDeclaration = do
       structName,
       StructDeclaration Xabi.Struct{
         Xabi.fields =
-           Map.fromList $ map (\(n, v) -> (Text.pack n, Xabitype.FieldType 0 v)) structFields,
+           Map.fromList $ zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
         Xabi.bytes = 0
         }
     )
@@ -223,7 +223,7 @@ functionDeclaration = do
         Xabi.funcArgs =
            Map.fromList $
            zipWith (\x i -> fmap (Xabitype.IndexedType i) x) functionArgs [0..]
-      , Xabi.funcSelector = Text.pack "qqqq" -- undefined --  :: Text
+      , Xabi.funcSelector = Text.pack "abcd" --TODO - put in the correct value
       , Xabi.funcVals =
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) v) functionRet [0..]
