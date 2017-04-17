@@ -489,3 +489,69 @@ Offset is Offset 257574
 [s0] 0:host  1:backbone  2:indexers  3:network  4:strato-api  5:misc-api  6:explorer  7:graphs  8:stream_blocks  9:stream_seq- 10:checkpoints* 11:cirrus  12:monitor  13:d> "watch  /home/blockapp" 17:23 17-Apr-17
 [18] 0:build- 1:tmux*                                                                                                                                                       "bash  /home/blockapps" 17:23 17-Apr-17
 ```
+
+## monitor
+
+```
+                                                                                                       │                     19.1Mb               38.1Mb               57.2Mb               76.3Mb          95.4Mb
+  1  [|||||||||||||||||||||||||||||||||||||99.3%]   Tasks: 386, 877 thr; 16 running                     │+--------------------+--------------------+--------------------+--------------------+---------------------
+  2  [|||||||||||||||||||||||||||||||||||||97.4%]   Load average: 21.48 18.70 14.90                     │10.10.0.5                               => 107.14.57.128                           80.6Kb  68.4Kb  72.6Kb
+  3  [|||||||||||||||||||||||||||||||||||||92.7%]   Uptime: 41 days, 23:13:09                           │                                        <=                                         3.66Kb  4.29Kb  4.32Kb
+  4  [|||||||||||||||||||||||||||||||||||||96.7%]                                                       │10.10.0.5                               => 121.18.238.104                          1.14Kb  3.24Kb  2.82Kb
+  Mem[|||||||||||||||||||||||||||||||12.4G/13.7G]                                                       │                                        <=                                          544b   1.63Kb  1.79Kb
+  Swp[                                     0K/0K]                                                       │10.10.0.5                               => 221.194.47.208                           480b    605b   2.37Kb
+                                                                                                        │                                        <=                                            0b    326b   1.44Kb
+  PID USER      PRI  NI  VIRT   RES   SHR S CPU% MEM%   TIME+  Command                                  │10.10.0.5                               => 116.31.116.14                              0b    454b    637b
+    1 root       20   0 38064  5368  3228 S  0.0  0.0  1:17.18 /lib/systemd/systemd --system --deseriali│                                        <=                                            0b    397b    457b
+41288 blockapps  20   0 19556   320     0 S  0.0  0.0  0:42.87 ├─ tmux -CC a                            │10.10.0.5                               => 168.63.129.16                              0b    246b    383b
+40981 blockapps  20   0  797M  780M  1528 R 36.5  5.6 50:46.93 ├─ tmux -CC                              │                                        <=                                            0b    493b   1.02Kb
+65055 blockapps  20   0  247M  2512  1584 S  0.0  0.0  0:00.06 │  ├─ -fish                              │10.10.0.5                               => helium.constant.com                        0b     61b     15b
+  976 root       20   0 57620  2048  1588 S  0.0  0.0  0:00.00 │  │  └─ sudo iftop                      │                                        <=                                            0b     61b     15b
+ 1015 root       20   0  243M  3660  1076 S  0.0  0.0  0:56.67 │  │     └─ iftop                        │10.10.0.5                               => table.bl5prdstr06a.store.core.windows.     0b      0b   1.88Kb
+ 1149 root       20   0  243M  3660  1076 S  0.0  0.0  0:08.58 │  │        ├─ iftop                     │                                        <=                                            0b      0b   3.41Kb
+ 1021 root       20   0  243M  3660  1076 S  0.0  0.0  0:00.01 │  │        ├─ iftop                     │10.10.0.5                               => 168.62.32.14                               0b      0b    356b
+ 1020 root       20   0  243M  3660  1076 S  0.0  0.0  0:00.02 │  │        └─ iftop                     │                                        <=                                            0b      0b   3.51Kb
+64611 blockapps  20   0  247M  2608  1608 S  0.0  0.0  0:00.07 │  ├─ -fish                              │10.10.0.5                               => blob.bl5prdstr06a.store.core.windows.n     0b      0b    866b
+  718 blockapps  20   0 13524  3072  1872 S  0.0  0.0  1:07.40 │  │  └─ watch -c -n 5 ./watcher.sh cirru│                                        <=                                            0b      0b   1.78Kb
+63486 blockapps  20   0  119M  2500  1588 S  0.0  0.0  0:00.07 │  ├─ -fish                              │10.10.0.5                               => thedipsy.thedipsy.com                      0b      0b   1.11Kb
+  322 blockapps  20   0 12944  2396  1816 S  0.0  0.0  1:07.36 │  │  └─ watch -c -n 5 ./watcher.sh cirru│                                        <=                                            0b      0b    776b
+62778 blockapps  20   0  311M  2632  1644 S  0.0  0.0  0:00.10 │  ├─ -fish                              │10.10.0.5                               => 58.218.199.218                             0b      0b    692b
+64309 blockapps  20   0 12948  2664  2048 S  0.0  0.0  1:05.04 │  │  └─ watch -n 1 docker exec -it strat│                                        <=                                            0b      0b    522b
+ 8927 blockapps  20   0 12948   616     0 S  0.0  0.0  0:00.00 │  │     └─ watch -n 1 docker exec -it st│
+ 8936 blockapps  20   0  4508   800   720 S  0.0  0.0  0:00.00 │  │        └─ sh -c docker exec -it stra│----------------------------------------------------------------------------------------------------------
+ 8961 blockapps  20   0  265M 13084  9432 S  0.0  0.1  0:00.00 │  │           └─ docker exec -it strato_│TX:             cum:   1.38GB   peak:    139Kb                            rates:   82.2Kb  73.0Kb  83.6Kb
+ 9017 blockapps  20   0  265M 13084  9432 S  0.0  0.1  0:00.00 │  │              ├─ docker exec -it stra│RX:                    1.15GB            135Kb                                     4.19Kb  7.17Kb  19.0Kb
+F1Help  F2Setup F3SearchF4FilterF5SortedF6CollapF7Nice -F8Nice +F9Kill  F10Quit                         │TOTAL:                 2.53GB            244Kb                                     86.4Kb  80.1Kb   103Kb
+────────────────────────────────────────────────────────────────────────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────
+          61.27    0.00   36.96    0.00    0.00    1.77                                                 │  ctop - 17:26:52 UTC      31 containers
+                                                                                                        │
+Device:            tps    kB_read/s    kB_wrtn/s    kB_read    kB_wrtn                                  │   NAME                CID                 CPU                 MEM                 NET RX/TX
+loop0            62.00         0.00       348.00          0        348                                  │
+loop1             0.00         0.00         0.00          0          0                                  │ ◉  ctop-strato_strato… 32a14c31f931                 1%             14M / 13.69G    648B / 0B
+scd0              0.00         0.00         0.00          0          0                                  │ ◉  ctop-strato_strato… 9d6bdaa289b5                 2%             12M / 13.69G    648B / 0B
+fd0               0.00         0.00         0.00          0          0                                  │ ◉  strato_kafka_1      111e666d648b                 1%            1.03G / 13.69G   28.7G / 34.32G
+sda               2.00         0.00        40.00          0         40                                  │ ◉  strato_postgres_1   5afb351b65a7                 3%             1.1G / 13.69G   3.53G / 18.51G
+sdb               0.00         0.00         0.00          0          0                                  │ ◉  strato_redis_1      07eea2230195                 0%             416M / 13.69G   26.15G / 44.00G
+sdc              39.00         0.00       444.00          0        444                                  │ ◉  strato_strato-1_1   8a3038053305                235%           6.98G / 13.69G   57.82G / 27.39G
+docker-8:33-44567741-pool    37.00         0.00       168.00          0        168                      │ ◉  strato_strato_1     d1afbf79ed79                192%            569M / 13.69G   64.66G / 56.78G
+docker-8:33-44567741-1bb26cd066f92a88e560cbd3c74cff683a9b96167883675fcfb0ed5dc064d486     6.00         0│ ◉  strato_zookeeper_1  c389adc49624                 0%             116M / 13.69G   16M / 10M
+.00        48.00          0         48                                                                  │ ◉  815379e56162_cirru… 815379e56162                  -                   -         -
+docker-8:33-44567741-2b4aae0ce8819c499d8f759fdc41877cd1df04b95e3add6d04042d4a52674adb     0.00         0│ ◉  cirrus_cirrus_birr… df8752ab3a8a                  -                   -         -
+.00         0.00          0          0                                                                  │ ◉  cirrus_cirrus_bloc… 0b9c650e325e                  -                   -         -
+docker-8:33-44567741-851040208cc11e70586d52bbc15e014d7de4f5058e5a4f93c91067d273de50c4     0.00         0│ ◉  cirrus_cirrus_cirr… 9ba0aa34a197                  -                   -         -
+.00         0.00          0          0                                                                  │ ◉  cirrus_cirrus_vm_1  d6a5741da9cb                  -                   -         -
+docker-8:33-44567741-2ee95bb4588543d7af3989f2da0f5383ea8c7b4e6dea0a939abe4a5ca68d76cb    30.00         0│ ◉  ctop                dee50dcdc625                  -                   -         -
+.00       120.00          0        120                                                                  │ ◉  loving_darwin       b7afa388e101                  -                   -         -
+docker-8:33-44567741-9b92a651736b4e40988f540b3ee61ed9e431191aa2cb833312120c96684f577b     0.00         0│ ◉  serene_stonebraker  ea5009109bf1                  -                   -         -
+.00         0.00          0          0                                                                  │ ◉  silo_dashboard_1    a6bf7ea469bd                  -                   -         -
+docker-8:33-44567741-770c098104522ba6b949322f72ec8d8348b99fc1360a71b2c04dbda4b4f0946a     0.00         0│ ◉  silo_strato-2_1     706fdfbb5999                  -                   -         -
+.00         0.00          0          0                                                                  │ ◉  silo_strato-duplic… 8e7944127824                  -                   -         -
+docker-8:33-44567741-482b61ce66c35a99c8e13529e09f282a12ac5b3b07117d3efba23f4b098265b2     0.00         0│ ◉  silo_strato2_1      27ac468920d4                  -                   -         -
+.00         0.00          0          0                                                                  │ ◉  some-docker         17d256b18750                  -                   -         -
+docker-8:33-44567741-75f0bf64fcbe251d3291b21324ea5a9f50b41953f79ff1211e61879cb95575ae     0.00         0│ ◉  cirrus_cirrus_1     7e54217ca83c                  -                   -         -
+.00         0.00          0          0                                                                  │ ◉  ctop-strato_strato… 3364c9759eea                  -                   -         -
+                                                                                                        │ ◉  drunk_hamilton      fb124c4d9ae3                  -                   -         -
+                                                                                                        │ ◉  fervent_goldwasser  0477427b2425                  -                   -         -
+[s0] 0:host  1:backbone  2:indexers  3:network  4:strato-api  5:misc-api  6:explorer  7:graphs  8:stream_blocks  9:stream_seq  10:checkpoints  11:cirrus  12:monitor* 13:d> "docker  /home/blockap" 17:26 17-Apr-17
+[18] 0:build- 1:tmux*                                                                                                                                                       "bash  /home/blockapps" 17:26 17-Apr-17
+```
