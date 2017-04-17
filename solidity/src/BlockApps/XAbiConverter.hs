@@ -86,37 +86,36 @@ xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
 
-xabiTypeToType::TypeDefs->Xabi.Type->Either String Type
-xabiTypeToType typeDefs Xabi.Array { Xabi.length=Just len, Xabi.entry=var } =
-  TypeArrayFixed len <$> xabiTypeToType typeDefs var
-xabiTypeToType typeDefs Xabi.Array { Xabi.entry=var } =
-  TypeArrayDynamic <$> xabiTypeToType typeDefs var
+xabiTypeToType::Xabi->Xabi.Type->Either String Type
+xabiTypeToType xabi Xabi.Array { Xabi.length=Just len, Xabi.entry=var } =
+  TypeArrayFixed len <$> xabiTypeToType xabi var
+xabiTypeToType xabi Xabi.Array { Xabi.entry=var } =
+  TypeArrayDynamic <$> xabiTypeToType xabi var
 xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
-xabiTypeToType typeDefs (Xabi.Label name) =
-  case (Map.lookup (Text.pack name) (enumDefs typeDefs), Map.lookup (Text.pack name) (structDefs typeDefs)) of
-   (Nothing, Nothing) -> Left $ "Contract is using a label that has not been defined as an enum or struct: " ++ name
-   (Just _, Just _) -> Left $ "Contract label was defined as both an enum an struct, so it is not clear which one to use: " ++ name
-   (Just _, _) -> return $ TypeEnum $ Text.pack name
-   (_, Just _) -> return $ TypeStruct $ Text.pack name
-xabiTypeToType typeDefs Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
-  value <- xabiTypeToType typeDefs v
+xabiTypeToType xabi (Xabi.Label name) =
+  case Map.lookup (Text.pack name) (xabiTypes xabi) of
+   Nothing -> Left $ "Contract is using a label that has not been defined as an enum or struct: " ++ name
+   Just (XabiDef.Enum _ _) -> return $ TypeEnum $ Text.pack name
+   Just (XabiDef.Struct _ _) -> return $ TypeStruct $ Text.pack name
+xabiTypeToType xabi Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
+  value <- xabiTypeToType xabi v
   return $ TypeMapping (xabiTypeToSimpleType k) value
 xabiTypeToType _ Xabi.Enum { Xabi.typedef=enumName } = return $ TypeEnum enumName
 xabiTypeToType _ Xabi.Struct { Xabi.typedef=name } = return $ TypeStruct name
 xabiTypeToType _ v = return $ SimpleType $ xabiTypeToSimpleType v
 
 
-funcToType::TypeDefs->Func->Either String Type
-funcToType typeDefs Func{..} = do
+funcToType::Xabi->Func->Either String Type
+funcToType xabi Func{..} = do
   let selector =
         case B16.decode $ BC.pack $ Text.unpack funcSelector of
          (val, "") -> val
          _ -> error "selector in function is bad"
 
-  convertedFuncArgs <- for funcArgs $ xabiTypeToType typeDefs . Xabi.indexedTypeType
+  convertedFuncArgs <- for funcArgs $ xabiTypeToType xabi . Xabi.indexedTypeType
 
   convertedFuncVals <- for (Map.toList funcVals) $ \(name, val) -> do
-    val' <- xabiTypeToType typeDefs $ Xabi.indexedTypeType val
+    val' <- xabiTypeToType xabi $ Xabi.indexedTypeType val
     return (Just name, val')
   
   return $ TypeFunction
@@ -157,20 +156,16 @@ data FieldType = FieldType
 
 -}
 
-xabiFieldsToFields::TypeDefs->[(Text, Xabi.FieldType)]->Either String [(Text, Type)]
-xabiFieldsToFields typeDefs xabifields = do
+xabiFieldsToFields::Xabi->[(Text, Xabi.FieldType)]->Either String [(Text, Type)]
+xabiFieldsToFields xabi xabifields = do
   for xabifields $ \(name, field) -> do
-    theType <- xabiTypeToType typeDefs $ Xabi.fieldTypeType field
+    theType <- xabiTypeToType xabi $ Xabi.fieldTypeType field
     return (name, theType)
-
-convertFieldsToStruct::TypeDefs->[(Text, Xabi.FieldType)]->Either String Struct
-convertFieldsToStruct typeDefs fields = 
-    fmap (fieldsToStruct typeDefs) $ xabiFieldsToFields typeDefs fields
 
   
 
 xabiToTypeDefs::TypeDefs->Xabi->Either String TypeDefs
-xabiToTypeDefs typeDefs Xabi{..} = do
+xabiToTypeDefs typeDefs' xabi@Xabi{..} = do
   let
     xabiEnums = [(enumName, names) |
                  (enumName, XabiDef.Enum{..}) <- Map.toList xabiTypes]
@@ -180,7 +175,9 @@ xabiToTypeDefs typeDefs Xabi{..} = do
   
   structDefs' <-
     for xabiStructs $ \(name, fields) -> do
-      theStruct <- convertFieldsToStruct typeDefs $ sortOn (Xabi.fieldTypeAtBytes . snd) fields
+      theStruct <- 
+        fmap (fieldsToStruct typeDefs') $ xabiFieldsToFields xabi 
+        $ sortOn (Xabi.fieldTypeAtBytes . snd) fields
       return (name, theStruct)
   
   return $
@@ -207,10 +204,10 @@ xAbiToContract contractXabi@Xabi{..} = mdo
   
   let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
-    var' <- (xabiTypeToType typeDefs' . Xabi.varTypeType) var
+    var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
     return (name, var')
   
-  funcs <- traverse (funcToType typeDefs') xabiFuncs
+  funcs <- traverse (funcToType contractXabi) xabiFuncs
             
 
   return Contract{
