@@ -75,6 +75,19 @@ uintTypes= Vector.fromList
     TypeUInt232, TypeUInt240, TypeUInt248, TypeUInt256
   ]
 
+bytesTypes::Vector SimpleType
+bytesTypes = Vector.fromList
+  [
+    TypeBytes1, TypeBytes2, TypeBytes3, TypeBytes4,
+    TypeBytes5, TypeBytes6, TypeBytes7, TypeBytes8,
+    TypeBytes9, TypeBytes10, TypeBytes11, TypeBytes12,
+    TypeBytes13, TypeBytes14, TypeBytes15, TypeBytes16,
+    TypeBytes17, TypeBytes18, TypeBytes19, TypeBytes20,
+    TypeBytes21, TypeBytes22, TypeBytes23, TypeBytes24,
+    TypeBytes25, TypeBytes26, TypeBytes27, TypeBytes28,
+    TypeBytes29, TypeBytes30, TypeBytes31, TypeBytes32
+  ]
+
 xabiTypeToSimpleType::Xabi.Type->SimpleType
 xabiTypeToSimpleType Xabi.String{} = TypeString
 xabiTypeToSimpleType Xabi.Address = TypeAddress
@@ -82,6 +95,9 @@ xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
   case signed of
    Just True -> intTypes Vector.! fromIntegral (b-1)
    _ -> uintTypes Vector.! fromIntegral (b-1)
+xabiTypeToSimpleType (Xabi.Bytes _ (Just size)) =
+   bytesTypes Vector.! fromIntegral (size-1)
+xabiTypeToSimpleType (Xabi.Bytes _ Nothing) = TypeBytes
 
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
