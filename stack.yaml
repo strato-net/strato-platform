@@ -6,6 +6,7 @@ packages:
 - cirrus/api
 - cirrus/client
 - ethereum
+- ethereum-abi
 - solidity
 - strato/api
 - strato/client
