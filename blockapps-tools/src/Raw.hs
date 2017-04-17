@@ -1,20 +1,12 @@
+module Raw where
 
-module Raw (
-  doit
-  ) where
+import           Blockchain.Format
+import           DumpLevelDB                  ()
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import           Util
 
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
-
-import Blockchain.Format
-
-import DumpLevelDB ()
-import Util
-
---import Debug.Trace
-
-doit::String->IO ()
-doit filename = do
-  ldbForEach filename $ \key val ->
+doit :: String -> IO ()
+doit filename = ldbForEach filename $ \key val ->
     putStrLn $ "----------\n"
       ++ show (pretty key)
       ++ ": "

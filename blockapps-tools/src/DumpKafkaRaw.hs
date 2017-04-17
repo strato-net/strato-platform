@@ -1,24 +1,27 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-
-
 module DumpKafkaRaw where
 
-import Control.Monad.IO.Class
+import           Control.Monad          (void)
+import           Control.Monad.IO.Class
 import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.Maybe
-import Network.Kafka.Protocol
+import qualified Data.ByteString.Char8  as BC
 
-import Blockchain.Stream.Raw
-import Blockchain.KafkaTopics
+import           Network.Kafka
+import           Network.Kafka.Protocol hiding (Message)
 
-dumpKafkaRaw::String->Offset->IO ()
-dumpKafkaRaw streamName startingBlock = do
-  doConsume' startingBlock
+import           Blockchain.EthConf
+import           Blockchain.KafkaTopics
+import           Blockchain.Stream.Raw
+
+dumpKafkaRaw :: String -> Offset -> IO ()
+dumpKafkaRaw streamName = void . runKafkaConfigured "queryStrato" . doConsume'
   where
+    topic = lookupTopic streamName
     doConsume' offset = do
-      result <- fmap (fromMaybe (error "offset out of range")) $ fetchBytesIO (lookupTopic streamName) offset
-
-      liftIO $ putStrLn $ unlines $ map (BC.unpack . B16.encode) result
-
-      doConsume' (offset + fromIntegral (length result))
+        lastOffset <- getLastOffset LatestTime 0 topic
+        if lastOffset < offset then error "offset out of range" else doConsume'' offset
+    doConsume'' offset = do
+      result <- fetchBytes topic offset
+      liftIO . putStrLn . unlines $ (BC.unpack . B16.encode) <$> result
+      doConsume'' (offset + fromIntegral (length result))

@@ -1,30 +1,24 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
-
-
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
 module DumpKafkaUnminedBlocks where
 
-import Control.Lens
-import Control.Monad.IO.Class
-import Network.Kafka
-import Network.Kafka.Protocol
+import           Control.Monad.IO.Class
+import           Network.Kafka.Protocol
 
-import Blockchain.Format
-import Blockchain.Stream.UnminedBlock
-import Blockchain.EthConf
+import           Blockchain.EthConf
+import           Blockchain.Format
+import           Blockchain.Stream.Raw          (setDefaultKafkaState)
+import           Blockchain.Stream.UnminedBlock
 
 dumpKafkaUnminedBlocks::Offset->IO ()
 dumpKafkaUnminedBlocks startingBlock = do
   ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
   case ret of
-    Left e -> error $ show e
+    Left e  -> error $ show e
     Right _ -> return ()
   where
     doConsume' offset = do
-      stateRequiredAcks .= -1
-      stateWaitSize .= 1
-      stateWaitTime .= 100000
+      setDefaultKafkaState
       blocks <- fetchUnminedBlocks offset
-                                     
-      liftIO $ putStrLn $ unlines $ map format blocks
-
+      liftIO . putStrLn . unlines $ format <$> blocks
       doConsume' (offset + fromIntegral (length blocks))

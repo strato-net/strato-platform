@@ -1,37 +1,33 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module State (
-  doit
-  ) where
+module State (doit) where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
-import Data.Default
-import qualified Database.LevelDB as DB
-import System.FilePath
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                             as B
+import           Data.Default
+import qualified Database.LevelDB                            as DB
+import           System.FilePath
 
-import qualified Data.NibbleString as N
-import Blockchain.Data.RLP
+import           Blockchain.Data.RLP
+import qualified Data.NibbleString                           as N
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Constants
-import Blockchain.Data.AddressStateDB
-import Blockchain.Format
+import qualified Blockchain.Colors                           as CL
+import           Blockchain.Constants
+import           Blockchain.Data.AddressStateDB
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import           Blockchain.Format
 
-import Util
+import           Util
 
-nibbleStringToByteString::N.NibbleString->B.ByteString
+nibbleStringToByteString :: N.NibbleString -> B.ByteString
 nibbleStringToByteString (N.EvenNibbleString x) = x
 nibbleStringToByteString _ = error "nibbleStringToByteString called for Odd length nibblestring"
 
-showVals::DB.DB->MP.StateRoot->ResourceT IO ()
+showVals :: DB.DB -> MP.StateRoot -> ResourceT IO ()
 showVals sdb sr = do
   db <- DB.open (".ethereumH" </> "hash") def
-    
-
   kvs <- MP.unsafeGetKeyVals MP.MPDB{MP.ldb=sdb, MP.stateRoot=sr} ""
   liftIO $ putStrLn $ "Number of items: " ++ show (length kvs) ++ "\n------------------------"
   forM_ (filter (isNecessary . fst ) kvs) $ \(key, val) -> do
@@ -39,20 +35,18 @@ showVals sdb sr = do
     let keyShowVal =
           case unhashed of
             Nothing -> error "missing value in unhash table"
-            Just x -> CL.yellow $ format x
+            Just x  -> CL.yellow $ format x
     liftIO $ putStrLn $
       keyShowVal
       ++ ":"
       ++ tab ("\n" ++ format (rlpDecode $ rlpDeserialize $ rlpDecode val::AddressState))
       ++ "\n----------------------------"
 
-doit::String->MP.StateRoot->IO()
-doit theType sr = do
-  DB.runResourceT $ do
-    --sdb <- DB.open (homeDir </> ".ethereum" </> "chaindata")
+doit :: String -> MP.StateRoot -> IO()
+doit theType sr = DB.runResourceT $ do
     sdb <- DB.open (dbDir theType ++ stateDBPath)
            DB.defaultOptions{DB.cacheSize=1024}
-           
+
     showVals sdb sr
 
 isNecessary::N.NibbleString->Bool
@@ -70,11 +64,11 @@ isNecessary "f6b1e9dc460d4d62cc22ec5f987d726929c0f9f0" = False
 isNecessary "cc45122d8b7fa0b1eaa6b29e0fb561422a9239d0" = False
 isNecessary "b7576e9d314df41ec5506494293afb1bd5d3f65d" = False
 
-isNecessary _ = True
+isNecessary _                                          = True
 
 
 
 
 
 
-                      
+

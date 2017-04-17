@@ -1,24 +1,26 @@
-{-# LANGUAGE DeriveDataTypeable, LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE OverloadedStrings  #-}
 module Checkpoints where
 
-import Control.Monad (forM_, when, unless, void)
+import           Control.Monad                   (forM_, unless, void, when)
 
-import Data.Data
-import Data.Maybe
-import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Char8           as S8
+import           Data.Data
+import           Data.Maybe
 
-import GHC.Read
-import qualified Text.Read.Lex as L
+import           GHC.Read
 import qualified Text.ParserCombinators.ReadPrec as P
+import qualified Text.Read.Lex                   as L
 
-import Blockchain.EthConf
+import           Blockchain.EthConf
 
-import qualified Network.Kafka as K
-import qualified Network.Kafka.Consumer as KC
-import qualified Network.Kafka.Protocol as KP
+import qualified Network.Kafka                   as K
+import qualified Network.Kafka.Consumer          as KC
+import qualified Network.Kafka.Protocol          as KP
 
-import qualified Blockchain.Sequencer.Kafka as SeqKafka
-import qualified Blockchain.Sequencer.Constants as SeqConst
+import qualified Blockchain.Sequencer.Constants  as SeqConst
+import qualified Blockchain.Sequencer.Kafka      as SeqKafka
 
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 
@@ -35,8 +37,8 @@ instance Read CheckpointOperation where
             _     -> P.pfail
 
 instance Show CheckpointOperation where
-    show Get = "get"
-    show Put = "put"
+    show Get           = "get"
+    show Put           = "put"
     show NullOperation = "NullOperation"
 
 instance Read CheckpointService where

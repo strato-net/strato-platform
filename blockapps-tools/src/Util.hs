@@ -1,21 +1,14 @@
+module Util where
 
-module Util (
-  ldbForEach,
-  tab
-  ) where
+import           Control.Monad.IO.Class
+import           Control.Monad.Loops
+import           Control.Monad.Trans.Resource
+import qualified Data.ByteString              as B
+import           Data.Default
+import qualified Database.LevelDB             as DB
 
-import Control.Monad.Loops
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
-import Data.Default
-import qualified Database.LevelDB as DB
-
---import Debug.Trace
-
-ldbForEach::FilePath->(B.ByteString->B.ByteString->IO ())->IO ()
-ldbForEach dbDir f = do
-  runResourceT $ do
+ldbForEach :: FilePath -> (B.ByteString -> B.ByteString -> IO ()) -> IO ()
+ldbForEach dbDir f = runResourceT $ do
     db <- DB.open dbDir def
     i <- DB.iterOpen db def
     DB.iterFirst i
@@ -26,7 +19,7 @@ ldbForEach dbDir f = do
       DB.iterNext i
       return ()
 
-tab::String->String
-tab [] = []
+tab :: String->String
+tab []          = []
 tab ('\n':rest) = "\n  " ++ tab rest
-tab (c:rest) = c:tab rest
+tab (c:rest)    = c:tab rest

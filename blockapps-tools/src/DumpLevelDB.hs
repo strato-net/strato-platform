@@ -1,20 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
-module DumpLevelDB 
-    (
-     showKeyVal,
-     typeToDB
+module DumpLevelDB
+    ( showKeyVal
+    , typeToDB
     ) where
 
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.Default
-import qualified Database.LevelDB as DB
-import System.FilePath
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
+import           Control.Monad                (when)
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Resource
+import qualified Data.ByteString              as B
+import qualified Data.ByteString.Base16       as B16
+import qualified Data.ByteString.Char8        as BC
+import           Data.Default
+import qualified Database.LevelDB             as DB
+import           System.FilePath
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>), (</>))
 
 --import Debug.Trace
 
@@ -39,9 +38,7 @@ showAllKeyVal db f = do
         else liftIO $ putStrLn $ "----------\n" ++ show (pretty key) ++ ": " ++ f val
       DB.iterNext i
       v <- DB.iterValid i
-      if v
-        then showAllKeyVal' db' i
-        else return ()
+      when v $ showAllKeyVal' db' i
 
 showKeyVal::(B.ByteString->String)->String->String->Maybe String->IO ()
 showKeyVal f dbType dbName maybeKey = do
@@ -58,10 +55,7 @@ showKeyVal f dbType dbName maybeKey = do
                      Nothing -> error $ "Missing value in database: " ++ show key
                      Just val -> liftIO $ putStrLn $ f val
 
-
-typeToDB::String->IO String
-typeToDB "h" = do
-  return $ ".ethereumH"
-typeToDB "c" = do
-  return $ ".ethereum"
-typeToDB x = error $ "Unsupported case in typeToDB: " ++ show x
+typeToDB :: String -> IO String
+typeToDB "h" = return ".ethereumH"
+typeToDB "c" = return ".ethereum"
+typeToDB x   = error $ "Unsupported case in typeToDB: " ++ show x

@@ -1,13 +1,9 @@
-module Block 
-    (
-     doit
-    ) where
+module Block where
 
-import DumpLevelDB
+import           Blockchain.Format
+import           DumpLevelDB
 
-import Blockchain.Format
-
-doit::String->String->IO ()
+doit :: String -> String -> IO ()
 doit dbtype h = showKeyVal format dbtype "blockchain" (if h == "-" then Nothing else Just h)
 
 

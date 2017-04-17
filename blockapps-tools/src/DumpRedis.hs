@@ -1,16 +1,16 @@
 module DumpRedis where
 
-import Database.Redis
+import           Database.Redis
 
-import Blockchain.Strato.RedisBlockDB
-import Blockchain.Strato.RedisBlockDB.Models
-import Blockchain.Strato.Model.SHA
-import Blockchain.EthConf (lookupRedisBlockDBConfig)
+import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.RedisBlockDB
+import           Blockchain.Strato.RedisBlockDB.Models
 
 dumpRedis :: Integer -> IO ()
 dumpRedis _ = do
     conn <- checkedConnect lookupRedisBlockDBConfig
-    bb <- runRedis conn getBestBlockInfo 
+    bb <- runRedis conn getBestBlockInfo
     case bb of
         Nothing -> putStrLn "No best block in Redis"
         Just b  -> putStrLn . formatBB $ b
