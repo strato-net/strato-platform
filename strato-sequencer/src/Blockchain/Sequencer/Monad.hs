@@ -1,4 +1,7 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 module Blockchain.Sequencer.Monad (
     SequencerContext(..)
   , SequencerConfig(..)
@@ -8,23 +11,27 @@ module Blockchain.Sequencer.Monad (
   , getKafkaConsumerGroup
 ) where
 
-import Control.Monad.Logger
-import Control.Monad.State
-import Control.Monad.Reader
-import Control.Monad.Trans.Resource
+import           Control.Monad.Logger
+import           Control.Monad.Reader
+import           Control.Monad.State
+import           Control.Monad.Stats
+import           Control.Monad.Trans.Resource
 
-import Blockchain.Constants
-import Blockchain.EthConf (mkConfiguredKafkaState)
-import Blockchain.Sequencer.DB.SeenTransactionDB
-import Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Constants
+import           Blockchain.EthConf                        (mkConfiguredKafkaState)
+import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.SeenTransactionDB
 
-import System.Directory (createDirectoryIfMissing)
+import           System.Directory                          (createDirectoryIfMissing)
 
-import qualified Database.LevelDB       as LDB
-import qualified Network.Kafka          as K
-import qualified Network.Kafka.Protocol as KP
+import qualified Database.LevelDB                          as LDB
+import qualified Network.Kafka                             as K
+import qualified Network.Kafka.Protocol                    as KP
 
-type SequencerM  = StateT SequencerContext (ResourceT (ReaderT SequencerConfig (LoggingT IO)))
+type SequencerM  = StateT SequencerContext (ResourceT (ReaderT SequencerConfig (StatsT (LoggingT IO))))
+
+instance (MonadLogger m) => MonadLogger (StatsT m) where
+    monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
 
 data SequencerContext = SequencerContext
                       { dependentBlockDB    :: DependentBlockDB
@@ -60,7 +67,7 @@ instance K.HasKafkaState SequencerM where
         ctx <- get
         put $ ctx { sequencerKafkaState = newS }
 
-runSequencerM :: SequencerConfig -> SequencerM a -> LoggingT IO a
+runSequencerM :: SequencerConfig -> SequencerM a -> StatsT (LoggingT IO) a
 runSequencerM c m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
     a <- flip runReaderT c $ runResourceT $ do

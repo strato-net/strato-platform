@@ -6,7 +6,7 @@ import Data.Time.Clock.POSIX
 import Control.Monad.Logger
 import Control.Exception (finally)
 
-import Blockchain.EthConf (lookupConsumerGroup)
+import Blockchain.EthConf (lookupConsumerGroup, runStatsTConfigured)
 import Blockchain.Sequencer
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Monad
@@ -50,7 +50,7 @@ withTemporaryDepBlockDB genesisBlock m = do
                                , bootstrapDoEmit       = True
                                }
 
-    runLoggingT (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m)) printLogMsg
+    runLoggingT (runStatsTConfigured (runSequencerM cfg (bootstrap (ingestBlockToBlock genesisBlock) >> m))) printLogMsg
         `finally`
         (removeDirectoryRecursive fullPath >> setCurrentDirectory cwd)-- always clean up
 
