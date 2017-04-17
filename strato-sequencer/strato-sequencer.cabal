@@ -43,6 +43,7 @@ library
                      , bytestring
                      , ethereum-rlp
                      , time
+                     , statsdi
 
   default-language:    Haskell2010
 
