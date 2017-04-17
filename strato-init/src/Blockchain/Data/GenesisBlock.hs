@@ -18,7 +18,6 @@ import qualified Data.ByteString.Lazy.Char8           as BLC
 import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.BackupBlocks
---import           Blockchain.BackupMP
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
@@ -49,7 +48,8 @@ import qualified Network.Kafka.Protocol               as KP
 import qualified Data.Map                             as Map
 
 import           Blockchain.EthConf                   (lookupConsumerGroup,
-                                                       runKafkaConfigured)
+                                                       runKafkaConfigured,
+                                                       runStatsTConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
@@ -195,4 +195,4 @@ bootstrapSequencer gb = do
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
                                             }
-    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) (printLogMsg' True True)
+    runLoggingT (runStatsTConfigured (runSequencerM dummySequencerCfg (bootstrap gb))) (printLogMsg' True True)
