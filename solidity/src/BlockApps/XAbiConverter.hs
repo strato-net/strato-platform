@@ -98,6 +98,7 @@ xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
 xabiTypeToSimpleType (Xabi.Bytes _ (Just size)) =
    bytesTypes Vector.! fromIntegral (size-1)
 xabiTypeToSimpleType (Xabi.Bytes _ Nothing) = TypeBytes
+xabiTypeToSimpleType Xabi.Bool = TypeBool
 
 xabiTypeToSimpleType v = error $ "undefined var in xabiTypeToSimpleType: " ++ show v -- show (Xabi.xabiTypeType v) ++ ":" ++ show (xabiTypeBytes v)
 
