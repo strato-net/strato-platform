@@ -23,7 +23,7 @@ multinode:
 	if [ -d "multinode-test" ]; then \
 	  echo "... multinode already checked out"; \
 	else \
-	  git clone https://github.com/blockapps/multinode-test -b kristoffer multinode-test; \
+	  git clone https://github.com/blockapps/multinode-test multinode-test; \
 	fi
 	cd multinode-test/ && npm install && ./node_modules/mocha/bin/mocha test/ --reporter mochawesome
 
