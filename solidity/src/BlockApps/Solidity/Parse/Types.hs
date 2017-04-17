@@ -45,7 +45,7 @@ simpleType =
         string "bytes"
         let sizesS = reverse $ map show [1::Int .. 32]
         size <- read <$> choice (map (try . string) sizesS)
-        return $ Xabitype.Bytes Nothing size
+        return $ Xabitype.Bytes Nothing $ Just size
       ) 
     intSuffixed base baseType = lexeme $ try $ do
       string base
