@@ -61,7 +61,7 @@ defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "backupmp" False "backup the MP database from STDIN"
 defineFlag "backupblocks" False "backup the block DB from STDIN"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
-defineFlag "stratoBootnode" ("" :: String) "Replaces the default set of public boot nodes with the provided ip address, considered as the address of a strato node"
+defineEQFlag "stratoBootnode" [| [] :: [String] |] "STRING_LIST" "Replaces the default set of public boot nodes with the provided ip address(es), considered as the address of a strato node(s)"
 defineFlag "blockTime" (13 :: Integer) "Blocktime"
 defineFlag "minBlockDifficulty" (131072 :: Integer) "Minimum block difficulty"
 defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
@@ -549,8 +549,9 @@ oneTimeSetup genesisBlockName = do
          runMigration migrateAll
          let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
                         (False, _) -> Nothing
-                        (True, "") -> Just []
-                        (True, ipAddr) -> Just [ipAddr]
+                        (True, []) -> Just []
+                        (True, [""]) -> Just []
+                        (True, ipAddrs) -> Just ipAddrs
          EthDiscovery.setup bootnodes
 
          liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
