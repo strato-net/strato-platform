@@ -111,9 +111,10 @@ xabiTypeToType xabi Xabi.Array { Xabi.entry=var } =
 xabiTypeToType _ Xabi.Contract { Xabi.typedef=name } = return $ TypeContract name
 xabiTypeToType xabi (Xabi.Label name) =
   case Map.lookup (Text.pack name) (xabiTypes xabi) of
-   Nothing -> Left $ "Contract is using a label that has not been defined as an enum or struct: " ++ name
+   Nothing -> Left $ "Contract is using a label that has not been defined as an enum, struct, or contract: " ++ name ++ "\navailable names: " ++ show (map fst $ Map.toList $ xabiTypes xabi)
    Just (XabiDef.Enum _ _) -> return $ TypeEnum $ Text.pack name
    Just (XabiDef.Struct _ _) -> return $ TypeStruct $ Text.pack name
+   Just (XabiDef.Contract _) -> return $ TypeContract $ Text.pack name
 xabiTypeToType xabi Xabi.Mapping { Xabi.key=k, Xabi.value=v } = do
   value <- xabiTypeToType xabi v
   return $ TypeMapping (xabiTypeToSimpleType k) value

@@ -1304,6 +1304,8 @@ getXabiTypeDefs metadataId = do
       "Enum" -> do
         names <- getXabiEnumNames tdid
         return $ Xabi.Def.Enum names (fromIntegral by)
+      "Contract" -> do
+        return $ Xabi.Def.Contract $ fromIntegral by
       _ -> throwError $ DBError $
         "Invalid type def. Expected Struct or Enum, saw " <> ty
 
@@ -1315,6 +1317,7 @@ insertXabiTypeDefs metadataId typeDefs = do
       tyOf = \case
         Xabi.Def.Enum _ _ -> "Enum"
         Xabi.Def.Struct _ _ -> "Struct"
+        Xabi.Def.Contract _ -> "Contract"
       byOf :: Xabi.Def.Def -> Int32
       byOf = fromIntegral . Xabi.Def.bytes
     runInsertManyReturning conn xabiTypeDefsTable
@@ -1330,6 +1333,7 @@ insertXabiTypeDefs metadataId typeDefs = do
   for_ (Map.intersectionWith (,) typeDefs typeDefIds) $ \case
     (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
     (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
+    (Xabi.Def.Contract _, _) -> return 0
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
