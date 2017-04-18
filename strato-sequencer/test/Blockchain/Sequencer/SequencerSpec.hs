@@ -3,6 +3,7 @@ module Blockchain.Sequencer.SequencerSpec where
 import Numeric (showHex)
 import Data.Time.Clock.POSIX
 
+import Control.Monad.Stats
 import Control.Monad.Logger
 import Control.Exception (finally)
 

@@ -1,32 +1,39 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings, DataKinds, LambdaCase #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Sequencer where
 
-import Control.Monad.Reader
-import Control.Monad.Logger
+import           Control.Monad.Logger
+import           Control.Monad.Reader
+import           Control.Monad.Stats                       hiding (prefix)
 
-import Data.Maybe (catMaybes, fromMaybe)
-import Data.Function ((&))
-import qualified Data.Text as T
+import           Data.Function                             ((&))
+import           Data.Maybe                                (catMaybes,
+                                                            fromMaybe)
+import qualified Data.Text                                 as T
 
-import Blockchain.Format
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.DB.DependentBlockDB
-import Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Format
+import           Blockchain.Sequencer.DB.DependentBlockDB
+import           Blockchain.Sequencer.DB.SeenTransactionDB
+import           Blockchain.Sequencer.Event
 
-import Blockchain.Sequencer.Kafka
-import Blockchain.Sequencer.Monad
+import           Blockchain.Sequencer.Kafka
+import           Blockchain.Sequencer.Metrics
+import           Blockchain.Sequencer.Monad
 
-import qualified Blockchain.Data.Address        as A
-import qualified Blockchain.Data.BlockDB        as BDB
-import qualified Blockchain.Data.Transaction    as TX
-import qualified Blockchain.Data.TransactionDef as TD
-import qualified Blockchain.Data.TXOrigin       as TO
+import qualified Blockchain.Data.Address                   as A
+import qualified Blockchain.Data.BlockDB                   as BDB
+import qualified Blockchain.Data.Transaction               as TX
+import qualified Blockchain.Data.TransactionDef            as TD
+import qualified Blockchain.Data.TXOrigin                  as TO
 
-import qualified Database.LevelDB as LDB
+import qualified Database.LevelDB                          as LDB
 
-import qualified Network.Kafka          as K
-import qualified Network.Kafka.Protocol as KP
-import qualified Network.Kafka.Consumer as KC
+import qualified Network.Kafka                             as K
+import qualified Network.Kafka.Consumer                    as KC
+import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
@@ -38,6 +45,8 @@ sequencer = forever $ do
             lenOutEv         = length outEv
         $logInfoS "sequencer" . T.pack $ "Have " ++ show (length pendingLDBWrites) ++ " pending LDB writes and " ++ show lenOutEv ++ " output events"
         applyLDBBatchWrites pendingLDBWrites
+        tick ctr_sequencer_ldb_batch_writes
+        setGauge (length pendingLDBWrites) ctr_sequencer_ldb_batch_size
         $logInfoS "sequencer" "Applied pending LDB writes"
         unless (lenOutEv == 0) $ do
             writeSeqEvents' outEv
@@ -79,32 +88,39 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
             case wrappedTx of
                 Nothing -> do
                     $logWarnS "transformEvents/emitTxs" . T.pack $ "Cannot ECRecover " ++ prettyTx inTx ++"; not emitting"
+                    tick ctr_sequencer_txs_ecrfail
                     return [] -- ignore transactions we cant ECrecover
                 Just tx -> do
                     let witnessHash = witnessableHash tx
-                    -- txWasWitnessed <- wasTransactionHashWitnessed witnessHash
-                    let txWasWitnessed = False -- we have a mempool now, now need for tx dedup. todo: remove SeenTxDB completely
+                    txWasWitnessed <- wasTransactionHashWitnessed witnessHash
                     if txWasWitnessed
                       then do
-                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx inTx ++ "; not emitting"
-                        return [] -- dont queue for emission
+                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx inTx
+                        tick ctr_sequencer_txs_witnessed
                       else do
-                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx inTx ++ "; emitting"
+                        $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx inTx
                         witnessTransactionHash witnessHash
-                        return [(Nothing, OETx inTs tx)]
+                        tick ctr_sequencer_txs_unwitnessed
+
+                    -- we have a mempool now, now need for tx dedup. todo: remove SeenTxDB completely
+                    return [(Nothing, OETx inTs tx)]
 
           emitBlocks bk b' = case b' of
             Nothing -> do
                 $logWarnS "transformEvents/emitBlocks" . T.pack $ "Could not ECRecover the pubkey of certain Txs in Block " ++ prettyBlock bk ++ "; not emitting"
+                tick ctr_sequencer_blocks_ecrfail
                 return [] -- couldnt ecrecover some transactions in this block. block is likely garbage
             Just b  -> do
                 readyToEmit <- enqueueIfParentNotEmitted b
                 case readyToEmit of
                     (ReadyToEmit totalPastDifficulty) -> do
                         $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit! Emitting it and chain of dependents."
-                        buildEmissionChain b totalPastDifficulty
+                        chain <- buildEmissionChain b totalPastDifficulty
+                        tickBy (length chain) ctr_sequencer_blocks_released
+                        return chain
                     NotReadyToEmit                    -> do
                         $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is not yet ready to emit."
+                        tick ctr_sequencer_blocks_enqueued
                         return []
 
           prettyBlock IngestBlock{ibOrigin=o,ibBlockData=bd,ibReceiptTransactions=txs} = "Block #" ++ blockNonce ++ "/" ++ blockHash ++ " (via " ++ format o ++ ", " ++ show (length txs) ++ " txs)"
@@ -122,24 +138,31 @@ readUnseqEvents' :: SequencerM [(KP.Offset, IngestEvent)]
 readUnseqEvents' = do
     offset <- getNextIngestedOffset
     $logInfoS "readUnseqEvents'" . T.pack $ "Fetching unseqevents from " ++ show offset
-    zip [(offset+1)..] <$> K.withKafkaViolently (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
+    ret <- zip [(offset+1)..] <$> K.withKafkaViolently (readUnseqEvents offset) -- its really [(nextOffset, eventAtThisOffset)]
+    tickBy (length ret) ctr_sequencer_kafka_unseq_reads
+    return ret
 
 writeSeqEvents' :: [OutputEvent] -> SequencerM ()
-writeSeqEvents' events = void $ K.withKafkaViolently (writeSeqEvents events)
+writeSeqEvents' events = void $ do
+    void $ K.withKafkaViolently (writeSeqEvents events)
+    tickBy (length events) ctr_sequencer_kafka_seq_writes
 
 getNextIngestedOffset :: SequencerM KP.Offset
 getNextIngestedOffset = do
   group  <- getKafkaConsumerGroup
-  K.withKafkaViolently (KC.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
+  ret <- K.withKafkaViolently (KC.fetchSingleOffset group unseqEventsTopicName 0) >>= \case
     Left KP.UnknownTopicOrPartition -> -- we've never committed an Offset
         setNextIngestedOffset 0 >> getNextIngestedOffset
     Left err -> error $ "Unexpected response when fetching offset for " ++ show unseqEventsTopicName ++ ": " ++ show err
     Right (ofs, _) -> return ofs
+  tick ctr_sequencer_kafka_checkpoint_reads
+  return ret
 
 setNextIngestedOffset :: KP.Offset -> SequencerM ()
 setNextIngestedOffset newOffset = do
     group  <- getKafkaConsumerGroup
     $logInfoS "setNextIngestedOffset" . T.pack $ "Setting checkpoint to " ++ show newOffset
+    tick ctr_sequencer_kafka_checkpoint_writes
     op <- K.withKafkaViolently $ KC.commitSingleOffset group unseqEventsTopicName 0 newOffset ""
     op & \case
         Left err ->
