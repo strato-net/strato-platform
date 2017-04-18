@@ -76,19 +76,19 @@ setup = do
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractTxParams = (\ p -> p{txparamsNonce=Just (Nonce 0)}) <$> txParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListContract2 = UploadListContract
       { uploadlistcontractContractName = testContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractTxParams = (\ p -> p{txparamsNonce=Just (Nonce 1)}) <$> txParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListContract3 = UploadListContract
       { uploadlistcontractContractName = simpleMappingContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = txParams testConfig
+      , uploadlistcontractTxParams = (\ p -> p{txparamsNonce=Just (Nonce 2)}) <$> txParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListRequest = UploadListRequest
@@ -125,4 +125,4 @@ localhost :: BaseUrl
 localhost = BaseUrl Http "localhost" 8000 ""
 
 strato :: BaseUrl
-strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+strato = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
