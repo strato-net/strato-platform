@@ -46,7 +46,7 @@ util.RegisterCommand({
       basilfile.ExecuteShellInTTYOrDie("sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442")
       basilfile.ExecuteShellInTTYOrDie("echo \"deb http://download.fpcomplete.com/ubuntu $(lsb_release -s -c) main\" | sudo tee /etc/apt/sources.list.d/fpco.list")
       basilfile.ExecuteShellInTTYOrDie("sudo apt-get update") 
-      basilfile.ExecuteShellInTTYOrDie("sudo apt-get install -y --allow-unauthenticated libleveldb-dev libpq-dev libpcre3-dev libboost-all-dev libjsoncpp-dev netbase netcat-openbsd libstdc++6 nodejs cmake stack");
+      basilfile.ExecuteShellInTTYOrDie("sudo apt-get install -y --allow-unauthenticated libleveldb-dev libpq-dev libpcre3-dev libboost-all-dev libjsoncpp-dev netbase netcat-openbsd libstdc++6 nodejs cmake stack libsodium-dev libblas-dev liblapack-dev");
       basilfile.GetDeployment("strato").ExecuteShellInTTYOrDie("stack setup && stack install alex happy")
     } else {
       console.error("Don't know how to setup for " + JSON.stringify(util.OS));
