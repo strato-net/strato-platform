@@ -18,7 +18,7 @@ import           Control.Monad.Stats
 import           Control.Monad.Trans.Resource
 
 import           Blockchain.Constants
-import           Blockchain.EthConf                        (mkConfiguredKafkaState)
+import           Blockchain.EthConf                        (mkConfiguredKafkaState, runStatsTConfigured)
 import           Blockchain.Sequencer.DB.DependentBlockDB
 import           Blockchain.Sequencer.DB.SeenTransactionDB
 
@@ -28,10 +28,13 @@ import qualified Database.LevelDB                          as LDB
 import qualified Network.Kafka                             as K
 import qualified Network.Kafka.Protocol                    as KP
 
-type SequencerM  = StateT SequencerContext (ResourceT (ReaderT SequencerConfig (StatsT (LoggingT IO))))
+type SequencerM  = StateT SequencerContext (ReaderT SequencerConfig (StatsT (ResourceT (LoggingT IO))))
 
 instance (MonadLogger m) => MonadLogger (StatsT m) where
     monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
+
+instance (MonadResource m) => MonadResource (StatsT m) where
+    liftResourceT = lift . liftResourceT
 
 data SequencerContext = SequencerContext
                       { dependentBlockDB    :: DependentBlockDB
@@ -67,10 +70,10 @@ instance K.HasKafkaState SequencerM where
         ctx <- get
         put $ ctx { sequencerKafkaState = newS }
 
-runSequencerM :: SequencerConfig -> SequencerM a -> StatsT (LoggingT IO) a
+runSequencerM :: SequencerConfig -> SequencerM a -> (LoggingT IO) a
 runSequencerM c m = do
     liftIO $ createDirectoryIfMissing False $ dbDir "h"
-    a <- flip runReaderT c $ runResourceT $ do
+    a <- runResourceT . runStatsTConfigured . flip runReaderT c $ do
         dbCS     <- depBlockDBCacheSize <$> ask
         dbPath   <- depBlockDBPath      <$> ask
         stxSize  <- seenTransactionDBSize <$> ask

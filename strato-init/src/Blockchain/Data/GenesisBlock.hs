@@ -48,8 +48,7 @@ import qualified Network.Kafka.Protocol               as KP
 import qualified Data.Map                             as Map
 
 import           Blockchain.EthConf                   (lookupConsumerGroup,
-                                                       runKafkaConfigured,
-                                                       runStatsTConfigured)
+                                                       runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
@@ -195,4 +194,4 @@ bootstrapSequencer gb = do
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
                                             }
-    runLoggingT (runStatsTConfigured (runSequencerM dummySequencerCfg (bootstrap gb))) (printLogMsg' True True)
+    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) (printLogMsg' True True)

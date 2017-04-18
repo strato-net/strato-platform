@@ -29,4 +29,4 @@ main = do
     , syncWrites            = flags_syncwrites
     , bootstrapDoEmit       = True
   }
-  runLoggingT (runStatsTConfigured (runSequencerM cfg sequencer)) (printLogMsg' True True)
+  runLoggingT (runSequencerM cfg sequencer) (printLogMsg' True True)

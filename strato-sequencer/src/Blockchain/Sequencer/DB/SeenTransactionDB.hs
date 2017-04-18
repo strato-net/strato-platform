@@ -30,25 +30,24 @@ class (MonadResource m) => HasSeenTransactionDB m where
     {-# MINIMAL getSeenTransactionDB, putSeenTransactionDB #-}
 
     wasTransactionHashWitnessed :: HasSeenTransactionDB m => SHA -> m Bool
-    wasTransactionHashWitnessed sha = do
-        stxdb <- getSeenTransactionDB
-        return $ sha `S.member` (seen stxdb)
+    wasTransactionHashWitnessed sha = (S.member sha . seen) <$> getSeenTransactionDB
 
     witnessTransactionHash :: HasSeenTransactionDB m => SHA -> m ()
     witnessTransactionHash sha = do
         stxdb     <- getSeenTransactionDB
-        withClear <- return $ stxdb { operations = (operations stxdb) + 1
-                                    , clearQueue = (clearQueue stxdb) Q.|> sha
-                                    , seen       = sha `S.insert` (seen stxdb)
-                                    }
-        withIntBoundFix <- return $ if (operations withClear) >= 0
-            then withClear
-            else withClear { operations = ((size withClear) + 1) } -- prevent Int rollover since were comparing to size which is int
-        withPop <- return $ if (operations withIntBoundFix) < (size withIntBoundFix) then withIntBoundFix
-                   else
-                       case Q.viewl (clearQueue withIntBoundFix) of
-                        Q.EmptyL    -> withIntBoundFix
-                        (q Q.:< qs) -> withIntBoundFix { clearQueue = qs, seen = q `S.delete` (seen withIntBoundFix) }
+        let withClear = stxdb { operations = operations stxdb + 1
+                              , clearQueue = clearQueue stxdb Q.|> sha
+                              , seen       = sha `S.insert` seen stxdb
+                              }
+            withIntBoundFix = if operations withClear >= 0
+                    then withClear
+                    else withClear { operations = size withClear + 1 } -- prevent Int rollover since were comparing to size which is int
+            withPop = if operations withIntBoundFix < size withIntBoundFix
+                        then withIntBoundFix
+                        else
+                            case Q.viewl (clearQueue withIntBoundFix) of
+                                Q.EmptyL    -> withIntBoundFix
+                                (q Q.:< qs) -> withIntBoundFix { clearQueue = qs, seen = q `S.delete` seen withIntBoundFix }
         putSeenTransactionDB withPop
 
     wasTransactionWitnessed :: (HasSeenTransactionDB m, Witnessable t) => t -> m Bool

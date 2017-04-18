@@ -24,6 +24,7 @@ library
                      , Blockchain.Sequencer.Kafka
                      , Blockchain.Sequencer.Constants
                      , Blockchain.Sequencer.BinaryInstances
+  other-modules:       Blockchain.Sequencer.Metrics
   build-depends:       base >=4.8 && <4.10
                      , strato-model
                      , blockapps-data
@@ -32,6 +33,7 @@ library
                      , containers
                      , directory
                      , mtl
+                     , transformers-lift
                      , resourcet
                      , monad-logger
                      , text
