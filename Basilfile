@@ -64,8 +64,8 @@ deployments:
         - "30303:30303"
         - "30303:30303/udp"
         - "33000:3000"
-      volumes:
-        - ./storage/strato:/var/lib/strato
+#      volumes:
+#        - ./storage/strato:/var/lib/strato
       environment:
         networkID : "${networkID}"
         genesis: "${genesis}"
@@ -81,6 +81,12 @@ deployments:
         backupblocks: "${backupblocks}"
         redisBDBNumber: "${redisBDBNumber}"
         useSyncMode: "${useSyncMode}"
+        statsEnable: "${statsEnable}"
+        statsHost: "${statsHost}"
+        statsPort: "${statsPort}"
+        statsFlush: "${statsFlush}"
+        statsPrefix: "${statsPrefix}"
+        statsSuffix: "${statsSuffix}"
       links:
         - zookeeper
         - kafka
