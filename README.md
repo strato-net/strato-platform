@@ -8,5 +8,10 @@ Install `make`, `autoconf`, `libtool`, `blas`, `lapack` and `stack` first.
 
 ## Run bloch server with docker-compose up
 ```sh
-pghost=postgres pguser=postgres pgpasswd=api stratourl=http://localhost cirrusurl=http://localhost/cirrus docker-compose up -d
+pghost=postgres \
+pguser=postgres \
+pgpasswd=api \
+stratourl=http://localhost \
+cirrusurl=http://localhost/cirrus \
+docker-compose up -d
 ```
