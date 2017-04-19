@@ -76,19 +76,19 @@ setup = do
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = (\ p -> p{txparamsNonce=Just (Nonce 0)}) <$> txParams testConfig
+      , uploadlistcontractTxParams = txParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListContract2 = UploadListContract
       { uploadlistcontractContractName = testContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = (\ p -> p{txparamsNonce=Just (Nonce 1)}) <$> txParams testConfig
+      , uploadlistcontractTxParams = txParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListContract3 = UploadListContract
       { uploadlistcontractContractName = simpleMappingContractName testConfig
       , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = (\ p -> p{txparamsNonce=Just (Nonce 2)}) <$> txParams testConfig
+      , uploadlistcontractTxParams = txParams testConfig
       , uploadlistcontractValue = Nothing
       }
     uploadListRequest = UploadListRequest

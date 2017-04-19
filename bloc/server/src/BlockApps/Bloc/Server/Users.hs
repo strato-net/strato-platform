@@ -70,17 +70,15 @@ postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransacti
       void $ waitNewAccount addr
   return addr
 
-
 postUsersSend :: UserName -> Address -> PostSendParameters -> Bloc PostTransaction
 postUsersSend userName addr
   (PostSendParameters toAddr value password txParams) = do
     tx <- prepareTx
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-      (Wei (fromIntegral value)) ByteString.empty
+      (Wei (fromIntegral value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
     void $ pollTxResult hash
     return tx
-
 
 postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
 postUsersContract userName addr
@@ -96,7 +94,8 @@ postUsersContract userName addr
     mFunctionId <- getConstructorId cmId
     argsBin <- buildArgumentByteString args mFunctionId
     tx <- prepareTx
-      userName password addr Nothing (fromMaybe emptyTxParams txParams) (Wei (fromIntegral value)) (bin <> argsBin)
+      userName password addr Nothing (fromMaybe emptyTxParams txParams)
+      (Wei (fromIntegral value)) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     txResult <- pollTxResult hash
@@ -121,7 +120,7 @@ postUsersContract userName addr
 
 postUsersUploadList :: UserName -> Address -> UploadListRequest -> Bloc [PostUsersUploadListResponse]
 postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
-  namesCmIdsTxs <- for contracts $ \ (UploadListContract name args txParams value) -> do
+  namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args txParams value,nonceIncr) -> do
     (bin16,cmId) <- blocQuery1 $ proc () -> do
       (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
       returnA -< (bin16,cmId)
@@ -131,7 +130,8 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     mFunctionId <- getConstructorId cmId
     argsBin <- buildArgumentByteString (Just args) mFunctionId
     tx <- prepareTx
-      userName pw addr Nothing (fromMaybe emptyTxParams txParams) (Wei (maybe 0 fromIntegral value)) (bin <> argsBin)
+      userName pw addr Nothing (fromMaybe emptyTxParams txParams)
+      (Wei (maybe 0 fromIntegral value)) (bin <> argsBin) nonceIncr
     return ((name,cmId),tx)
   let
     namesCmIds = map fst namesCmIdsTxs
@@ -160,9 +160,9 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
 
 postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSendListResponse]
 postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
-  txs' <- for txs $ \ (SendTransaction toAddr value txParams) -> prepareTx
+  txs' <- for (zip txs [0..]) $ \ (SendTransaction toAddr value txParams,nonceIncr) -> prepareTx
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-    (Wei (fromIntegral value)) ByteString.empty
+    (Wei (fromIntegral value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
   map PostSendListResponse <$> if resolve
     then forConcurrently hashes $ \ hash -> do
@@ -181,7 +181,7 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
 
 postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-  txsFuncIds <- for postmethodlistrequestTxs $ \ MethodCall{..} -> do
+  txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
     (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
     let
@@ -196,6 +196,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       (fromMaybe emptyTxParams methodcallTxParams)
       (Wei (fromIntegral methodcallValue))
       (sel <> argsBin)
+      nonceIncr
     -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
     return (tx,functionId)
   let (txs,funcIds) = unzip txsFuncIds
@@ -243,6 +244,7 @@ postUsersContractMethod
       (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral value))
       (sel <> argsBin)
+      0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
@@ -335,7 +337,6 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
           maybe (throwError $ AnError "couldn't decode argument value") return
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
-
 prepareTx
   :: UserName
   -> Password
@@ -344,8 +345,9 @@ prepareTx
   -> TxParams
   -> Wei
   -> ByteString
+  -> Int
   -> Bloc PostTransaction
-prepareTx userName password addr toAddr TxParams{..} value code = do
+prepareTx userName password addr toAddr TxParams{..} value code nonceIncr = do
   uIds <- blocQuery $ proc () -> do
     (uId,name) <- queryTable usersTable -< ()
     restrict -< name .== constant userName
@@ -369,11 +371,12 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
     Just sk -> do
       accts <- blocStrato $ getAccountsFilter
         accountsFilterParams{qaAddress = Just addr}
-      nonce <- case listToMaybe accts of
+      Nonce nonce <- case listToMaybe accts of
         Nothing -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
+      let newNonce = Nonce (nonce + fromIntegral nonceIncr)
       return $ prepareSignedTx sk addr UnsignedTransaction
-        { unsignedTransactionNonce = fromMaybe nonce txparamsNonce
+        { unsignedTransactionNonce = fromMaybe newNonce txparamsNonce
         , unsignedTransactionGasPrice =
             fromMaybe (Wei 1) txparamsGasPrice
         , unsignedTransactionGasLimit =
