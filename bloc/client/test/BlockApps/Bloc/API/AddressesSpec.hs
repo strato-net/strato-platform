@@ -6,7 +6,6 @@
 
 module BlockApps.Bloc.API.AddressesSpec where
 
-import Data.Either
 import Servant.Client
 import Test.Hspec
 
@@ -17,5 +16,5 @@ spec :: SpecWith TestConfig
 spec =
   describe "getAddresses" $
     it "gets a list of addresses" $ \ TestConfig {..} -> do
-      addrsEither <- runClientM getAddresses (ClientEnv mgr blocUrl)
-      addrsEither `shouldSatisfy` isRight
+      Right addrsEither <- runClientM getAddresses (ClientEnv mgr blocUrl)
+      addrsEither `shouldContain` [userAddress,toUserAddress]
