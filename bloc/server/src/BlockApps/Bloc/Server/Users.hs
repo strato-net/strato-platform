@@ -164,21 +164,22 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
     (Wei (fromIntegral value)) ByteString.empty
   hashes <- blocStrato $ postTxList txs'
-  -- resolved <- pollTxResultBatch hashes
-  map PostSendListResponse <$> if resolve
-    then forConcurrently hashes $ \ hash -> do
-      txResult <- pollTxResult hash
-      let txResponse = transactionresultResponse txResult
-      case txResponse of
-        "Success!" -> do
-          senderAccounts <- blocStrato $ getAccountsFilter
-            accountsFilterParams{qaAddress = Just addr}
-          case senderAccounts of
-            [] -> throwError $ AnError "No sender account found"
-            senderAccount:_ -> return . Text.pack . show . unStrung $
-              accountBalance senderAccount
-        _ -> return txResponse
+  ret <- if resolve
+    then do
+        resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
+        for (Map.elems (unBatchTransactionResult resolved)) $ \(res:_) -> do
+          let txResponse = transactionresultResponse res
+          case txResponse of
+            "Success!" -> do
+              senderAccounts <- blocStrato $ getAccountsFilter
+                accountsFilterParams{qaAddress = Just addr}
+              case senderAccounts of
+                [] -> throwError $ AnError "No sender account found"
+                senderAccount:_ -> return . Text.pack . show . unStrung $ accountBalance senderAccount
+            _ -> return txResponse
     else return (Text.pack . keccak256String <$> hashes)
+
+  return $ PostSendListResponse <$> ret
 
 postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
