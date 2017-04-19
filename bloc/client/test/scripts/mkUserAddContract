@@ -1,10 +1,17 @@
+#!/bin/bash
 
 set -e
+
+if [ "$1" == "" ]
+then
+    echo "Error, you need to supply the contract" 1>&2
+    exit 1
+fi
 
 port=8000
 #port=10001
 
-contractName=${1%.*}
+contractName=`basename ${1%.*}`
 
 function customHttp { # set behavior of http I like....  crash on error, print body to stderr, timeout longer
 
@@ -40,6 +47,8 @@ src=`cat $1`
 echo $src
 
 request=`echo '{"password":"qqqq", "args": {}, "value": 0, "txParams":{}}' | jq --arg src "$src" '.src= $src ' | jq --arg contractName "$contractName" '.contract= $contractName '`
+
+echo $request
 
 echo "########################"
 echo "# Uploading a contract #"
