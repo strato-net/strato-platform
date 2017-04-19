@@ -20,6 +20,7 @@ module BlockApps.Strato.Types
   , TransactionType (..)
   , Transaction (..)
   , TransactionResult (..)
+  , BatchTransactionResult (..)
   , PostTransaction (..)
   , toPostTx
   , BlockData (..)
@@ -336,3 +337,11 @@ instance ToJSON TransactionResult where
   toJSON = genericToJSON (aesonPrefix camelCase)
 instance FromJSON TransactionResult where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+newtype BatchTransactionResult = BatchTransactionResult
+    { unBatchTransactionResult :: Map Keccak256 [TransactionResult]
+    } deriving (Eq, Show, Generic)
+instance ToJSON BatchTransactionResult where
+    toJSON = toJSON . unBatchTransactionResult
+instance FromJSON BatchTransactionResult where
+    parseJSON = fmap BatchTransactionResult . parseJSON

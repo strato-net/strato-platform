@@ -41,6 +41,10 @@ type API =
   :<|> "transactionResult"
     :> Capture "hash" Text
     :> Get '[JSON] [TransactionResult]
+  :<|> "transactionResult"
+    :> "batch"
+    :> ReqBody '[JSON] [Keccak256]
+    :> Post '[JSON] BatchTransactionResult
   :<|> "block"
     :> QueryParam "number" Natural
     :> QueryParam "minnumber" Natural
