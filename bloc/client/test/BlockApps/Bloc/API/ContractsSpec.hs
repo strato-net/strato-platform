@@ -9,6 +9,7 @@
 module BlockApps.Bloc.API.ContractsSpec where
 
 import Data.Either
+import qualified Data.Map.Strict as Map
 import Servant.Client
 import Test.Hspec
 
@@ -17,6 +18,8 @@ import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Client
 import BlockApps.Solidity.Xabi
+
+import Debug.Trace
 
 spec :: SpecWith TestConfig
 spec = do
@@ -27,16 +30,25 @@ spec = do
           []
           simpleStorageContractName
           simpleStorageSrc
-      contractsEither <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
+      Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
+      contracts `shouldSatisfy` any
+        (\ (PostCompileResponse name _) -> name == simpleStorageContractName)
   describe "getContracts" $
     it "gets a list of contracts" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM getContracts (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
+      Right (GetContractsResponse contracts) <- runClientM getContracts (ClientEnv mgr blocUrl)
+      let Just addressesCreatedAt1 = Map.lookup simpleStorageContractName contracts
+      let Just addressesCreatedAt2 = Map.lookup testContractName contracts
+      let Just addressesCreatedAt3 = Map.lookup simpleMappingContractName contracts
+      addressesCreatedAt1 `shouldSatisfy` any
+        (\ (AddressCreatedAt _ addr) -> addr == Unnamed simpleStorageContractAddress)
+      addressesCreatedAt2 `shouldSatisfy` any
+        (\ (AddressCreatedAt _ addr) -> addr == Unnamed testContractAddress)
+      addressesCreatedAt3 `shouldSatisfy` any
+        (\ (AddressCreatedAt _ addr) -> addr == Unnamed simpleMappingContractAddress)
   describe "getContractsData" $
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
+      Right addrs <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl)
+      addrs `shouldContain` [Unnamed simpleStorageContractAddress]
   describe "getContractsContract" $ do
     it "get xabi data for an uploaded contracted at a specific address" $ \ TestConfig {..} -> do
       contractsEither <- runClientM
@@ -56,13 +68,13 @@ spec = do
       contractsEither `shouldSatisfy` isRight
   describe "getContractsFunctions" $
     it "get a list of contract functions for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM
+      Right functionNames <- runClientM
         (getContractsFunctions
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
+      functionNames `shouldBe` [FunctionName "get", FunctionName "set"]
   describe "getContractsSymbols" $
     it "get a list of contract symbols for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       contractsEither <- runClientM
@@ -71,6 +83,7 @@ spec = do
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
+      traceShowM contractsEither
       contractsEither `shouldSatisfy` isRight
   describe "getContractsState" $
     it "get contract state for an uploaded contract at a specific address" $ \ TestConfig {..} -> do

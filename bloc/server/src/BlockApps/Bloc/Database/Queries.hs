@@ -864,9 +864,18 @@ insertXabiVariables
   -> Map Text Xabi.VarType
   -> Bloc Int64
 insertXabiVariables metadataId vars = do
-  varsWithIds <- for vars $ \ (Xabi.VarType atBytes ispublic xt) -> do
-    xtid <- insertXabiType xt
-    return (atBytes,ispublic,xtid)
+  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic xt) -> do
+    varIds :: [Int32] <- blocQuery $ proc () -> do
+      (vId,cmId,_,vname,_,_) <- queryTable xabiVariablesTable -< ()
+      restrict -< cmId .== constant metadataId
+        .&& vname .== constant name
+      returnA -< (vId)
+    if null varIds
+    then do
+      xtid <- insertXabiType xt
+      return $ Just (name,atBytes,ispublic,xtid)
+    else
+      return Nothing
   blocModify $ \ conn -> do
     runInsertMany conn xabiVariablesTable
       [ ( Nothing
@@ -876,7 +885,7 @@ insertXabiVariables metadataId vars = do
         , constant atBytes
         , constant (fromMaybe False ispublic)
         )
-      | (name,(atBytes,ispublic,xtid)) <- Map.toList varsWithIds
+      | Just (name,atBytes,ispublic,xtid) <- varsWithIds
       ]
 
 {- |
@@ -957,14 +966,14 @@ compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source = do
 --  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
 --     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-  
+
   SolcResponse abiBins <- blocStrato $ postSolc (Src source)
   --TODO - clean this up, what should filename be instead of "-"
   --       get rid of error
   --       name nicer, mabye merge with next let
   let maybeXabis = parseXabi "-" $ Text.unpack source
       xabis = either (error . show) Map.fromList maybeXabis
-      
+
   let
     contracts = Map.intersectionWith (,) xabis abiBins
     details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
@@ -1184,7 +1193,7 @@ insertXabiType = \case
         , constant $ Just keyId
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Label name -> 
+  Xabi.Label name ->
     blocModify1 $ \ conn -> do
       runInsertReturning conn xabiTypesTable
         ( Nothing

@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS xabi_variables(
   name varchar(512) NOT NULL,
   at_bytes int NOT NULL,
   is_public boolean NOT NULL,
+  UNIQUE (contract_metadata_id, name),
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
   FOREIGN KEY (type_id) REFERENCES xabi_types(id)
 );
