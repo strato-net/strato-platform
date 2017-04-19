@@ -46,6 +46,7 @@ import Handler.Solc
 import Handler.AfterSubmission
 import Handler.TransactionDemo
 import Handler.StorageInfo
+import Handler.BatchTransactionResult
 import Handler.TransactionResult
 import Handler.Faucet
 import Handler.ExtABI
