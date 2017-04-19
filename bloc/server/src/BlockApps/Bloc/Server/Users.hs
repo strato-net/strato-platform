@@ -106,7 +106,7 @@ postUsersContract userName addr
           Text.splitOn "," (transactionresultContractsCreated txResult)
         stringAddress $ Text.unpack str
     case addressMaybe of
-      Nothing -> case (transactionresultMessage txResult) of
+      Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
         stratoMsg -> throwError $ UserError stratoMsg
       Just addr' -> do
@@ -126,7 +126,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
       (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
       returnA -< (bin16,cmId)
     let
-      (bin,leftOver) = Base16.decode $ bin16
+      (bin,leftOver) = Base16.decode bin16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
     mFunctionId <- getConstructorId cmId
     argsBin <- buildArgumentByteString (Just args) mFunctionId
@@ -164,6 +164,7 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
     (Wei (fromIntegral value)) ByteString.empty
   hashes <- blocStrato $ postTxList txs'
+  -- resolved <- pollTxResultBatch hashes
   map PostSendListResponse <$> if resolve
     then forConcurrently hashes $ \ hash -> do
       txResult <- pollTxResult hash
@@ -177,7 +178,7 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
             senderAccount:_ -> return . Text.pack . show . unStrung $
               accountBalance senderAccount
         _ -> return txResponse
-    else return hashes
+    else return (Text.pack . keccak256String <$> hashes)
 
 postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
@@ -185,7 +186,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
     (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
     let
-      (sel,leftOver) = Base16.decode $ sel16
+      (sel,leftOver) = Base16.decode sel16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
     argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
     tx <- prepareTx
@@ -216,7 +217,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
             (transactionresultResponse txResult)
             orderedResultTypes
       blocMaybe "Failed to parse response" mFormattedResponse
-    else return hashes
+    else return (Text.pack . keccak256String <$> hashes)
 
 postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> Bloc PostUsersContractMethodResponse
 postUsersContractMethod
@@ -228,7 +229,7 @@ postUsersContractMethod
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     (functionId,sel16) <- getFunctionIdSel cmId funcName
     let
-      (sel,leftOver) = Base16.decode $ sel16
+      (sel,leftOver) = Base16.decode sel16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
     argsBin <- buildArgumentByteString (Just args) (Just functionId)
     tx <- prepareTx
@@ -292,27 +293,26 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
             Xabi.Array dy _ ety ->
               let
                 ettyty = case ety of
-                  Xabi.Int _ _ -> "Int"
-                  Xabi.String _ -> "String"
-                  Xabi.Bytes _ _ -> "Bytes"
+                  Xabi.Int{} -> "Int"
+                  Xabi.String{} -> "String"
+                  Xabi.Bytes{} -> "Bytes"
                   Xabi.Bool -> "Bool"
                   Xabi.Address -> "Address"
-                  Xabi.Struct _ _ -> "Struct"
-                  Xabi.Enum _ _ -> "Enum"
-                  Xabi.Array _ _ _ ->
-                    error "Array of array not supported"
-                  Xabi.Contract _ -> "Contract"
-                  Xabi.Mapping _ _ _ -> "Mapping"
+                  Xabi.Struct{} -> "Struct"
+                  Xabi.Enum{} -> "Enum"
+                  Xabi.Array{} -> error "Array of array not supported"
+                  Xabi.Contract{} -> "Contract"
+                  Xabi.Mapping{} -> "Mapping"
               in
                 textToArgType "Array" (fromMaybe False dy) ettyty
-            Xabi.Contract _ ->
+            Xabi.Contract{} ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
               textToArgType "Mapping" (fromMaybe False dy) ""
         in
           textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
     case args of
-      Nothing -> do
+      Nothing ->
         if Map.null argNamesTypes
           then return ByteString.empty
           else (throwError $ AnError "no arguments provided to function.")

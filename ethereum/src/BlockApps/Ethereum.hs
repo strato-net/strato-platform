@@ -7,6 +7,7 @@
   , OverloadedStrings
   , RecordWildCards
   , TypeApplications
+  , MultiParamTypeClasses
 #-}
 
 module BlockApps.Ethereum
@@ -160,6 +161,10 @@ instance FromHttpApiData Keccak256 where
 instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
 instance FromForm Keccak256 where fromForm = parseUnique "hash"
+instance MimeUnrender PlainText Keccak256 where
+  mimeUnrender _ = maybe (Left "Couldn't read Keccak") Right . stringKeccak256 . Char8.unpack . Lazy.toStrict
+instance MimeRender PlainText Keccak256 where
+  mimeRender _ = Lazy.fromStrict . Char8.pack . keccak256String
 instance Arbitrary Keccak256 where
   arbitrary = keccak256lazy . Binary.encode @ Integer <$> arbitrary
 keccak256 :: ByteString -> Keccak256

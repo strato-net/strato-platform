@@ -101,9 +101,9 @@ accountsFilterParams = AccountsFilterParams
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> ClientM [WithNext Transaction]
-postTx :: PostTransaction -> ClientM Text
-postTxList :: [PostTransaction] -> ClientM [Text]
-getTxResult :: Text -> ClientM [TransactionResult]
+postTx :: PostTransaction -> ClientM Keccak256
+postTxList :: [PostTransaction] -> ClientM [Keccak256]
+getTxResult :: Keccak256 -> ClientM [TransactionResult]
 postTxResultBatch :: [Keccak256] -> ClientM BatchTransactionResult
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
 getBlocksLast :: Natural -> ClientM [WithNext Block]
