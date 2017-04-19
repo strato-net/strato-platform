@@ -19,8 +19,6 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Client
 import BlockApps.Solidity.Xabi
 
-import Debug.Trace
-
 spec :: SpecWith TestConfig
 spec = do
   describe "postContractsCompile" $
@@ -77,14 +75,13 @@ spec = do
       functionNames `shouldBe` [FunctionName "get", FunctionName "set"]
   describe "getContractsSymbols" $
     it "get a list of contract symbols for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM
+      Right symbols <- runClientM
         (getContractsSymbols
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
-      traceShowM contractsEither
-      contractsEither `shouldSatisfy` isRight
+      symbols `shouldBe` [SymbolName "storedData"]
   describe "getContractsState" $
     it "get contract state for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       contractsEither <- runClientM
