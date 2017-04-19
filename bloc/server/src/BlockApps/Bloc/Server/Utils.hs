@@ -52,11 +52,18 @@ waitNewAccount addr = untilJust $ listToMaybe <$>
   getAccountsFilter accountsFilterParams{qaAddress = Just addr}
 
 pollTxResult :: Text -> Bloc TransactionResult
-pollTxResult hash = untilJust $ do
-  liftIO $ threadDelay 1000000
-  logWith logNotice $ "Looking up " <> hash
-  result <- blocStrato $ getTxResult hash
-  return $ listToMaybe result
+pollTxResult hash = go (0::Int)
+  where
+    go n = do
+      liftIO $ threadDelay 1000000
+      logWith logNotice $ "Polling result for transaction hash: " <> hash
+      result <- blocStrato $ getTxResult hash
+      case listToMaybe result of
+        Nothing -> if n >= 30
+          then blocError $ AnError $
+            "Strato polling timeout on transaction hash: " <> hash
+          else go (n+1)
+        Just res -> return res
 
 emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
