@@ -48,25 +48,26 @@ waitNewAccount addr = untilJust $ listToMaybe <$>
   getAccountsFilter accountsFilterParams{qaAddress = Just addr}
 
 pollTxResult :: Keccak256 -> Bloc TransactionResult
-pollTxResult hash = go (0::Int)
+pollTxResult hash = go 1
   where
-    go n = do
+    attempts = 30 :: Int
+    hashString = keccak256String hash
+    go n | n > attempts = blocError . AnError . Text.pack $ "Strato result polling timeout after " ++ show attempts ++ " attempts on transaction hash: " ++ hashString
+         | otherwise = do
       liftIO $ threadDelay 1000000
-      logWith logNotice . Text.pack $ "Polling result for transaction hash: " ++ keccak256String hash
-      result <- blocStrato $ getTxResult hash
+      logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling result for transaction hash: " ++ hashString
+      result <- blocStrato (getTxResult hash)
       case listToMaybe result of
-        Nothing -> if n >= 30
-          then blocError . AnError . Text.pack $
-            "Strato polling timeout on transaction hash: " ++ keccak256String hash
-          else go (n+1)
+        Nothing  -> go (n+1)
         Just res -> return res
 
 pollTxResultBatch :: [Keccak256] -> Bloc BatchTransactionResult
 pollTxResultBatch keccaks = go 1 where
-    attempts = 15 :: Int
-    go n | n > attempts = blocError . AnError . Text.pack $ "Got bored of polling a TX result batch after " ++ show attempts ++ " attempts"
+    attempts   = 15 :: Int
+    hashString = show (keccak256String <$> keccaks)
+    go n | n > attempts = blocError . AnError . Text.pack $ "Strato result batch polling timeout after " ++ show attempts ++ " attempts for hashes: " ++ hashString
          | otherwise    = do
-             logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Looking up " ++ show (keccak256String <$> keccaks)
+             logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Looking up " ++ hashString
              resolutions <- blocStrato (postTxResultBatch keccaks)
              if any null (unBatchTransactionResult resolutions)
                  then liftIO (threadDelay 1000000) >> go (n + 1)
