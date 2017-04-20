@@ -1,5 +1,9 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings
+           , TypeSynonymInstances
+           , FlexibleInstances
+           , FlexibleContexts 
+           , TemplateHaskell 
+           #-}
 
 module Blockchain.Setup (
   oneTimeSetup
@@ -29,6 +33,7 @@ import qualified Data.Text as T
 import           Network.Kafka
 import           Network.Kafka.Protocol
 import           System.Entropy
+import           Data.List.Split (splitWhen)
 
 import           Blockchain.APIFiles
 import qualified Blockchain.Colors as CL
@@ -61,7 +66,11 @@ defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "backupmp" False "backup the MP database from STDIN"
 defineFlag "backupblocks" False "backup the block DB from STDIN"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
-defineEQFlag "stratoBootnode" [| [] :: [String] |] "STRING_LIST" "Replaces the default set of public boot nodes with the provided ip address(es), considered as the address of a strato node(s)"
+defineCustomFlag "stratoBootnode" [| [] :: [String] |] "STRING_LIST"
+     [| \s -> if any (==',') s then splitWhen (==',') s else [s] |]
+  [| show |]
+  "Replaces the default set of public boot nodes with the provided ip address(es), considered as the address of a strato node(s)"
+
 defineFlag "blockTime" (13 :: Integer) "Blocktime"
 defineFlag "minBlockDifficulty" (131072 :: Integer) "Minimum block difficulty"
 defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
@@ -428,6 +437,12 @@ oneTimeSetup genesisBlockName = do
         putStrLn ".ethereumH exists, unsafe to run setup"
         return ()
     else do  
+      let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
+                     (False, _) -> Nothing
+                     (True, []) -> Just []
+                     (True, [""]) -> Just []
+                     (True, ipAddrs) -> Just ipAddrs
+      liftIO $ putStrLn $ CL.red ">>>> Bootnodes: " ++ show bootnodes
 
      {- CONFIG create default config files -} 
 
@@ -547,11 +562,7 @@ oneTimeSetup genesisBlockName = do
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 
          runMigration migrateAll
-         let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
-                        (False, _) -> Nothing
-                        (True, []) -> Just []
-                        (True, [""]) -> Just []
-                        (True, ipAddrs) -> Just ipAddrs
+        
          EthDiscovery.setup bootnodes
 
          liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
