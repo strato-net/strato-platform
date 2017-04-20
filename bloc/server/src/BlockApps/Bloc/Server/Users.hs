@@ -1,56 +1,52 @@
-{-# LANGUAGE
-    Arrows
-  , OverloadedStrings
-  , RecordWildCards
-  , ScopedTypeVariables
-#-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BlockApps.Bloc.Server.Users where
 
-import Control.Arrow
-import Control.Concurrent.Async.Lifted
-import Control.Monad.Except
-import Control.Monad.Log
-import Crypto.Secp256k1
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Base16 as Base16
-import Data.Foldable
-import Data.Int (Int32)
-import Data.List (sortOn)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Monoid
-import Data.RLP
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Data.Traversable
-import Opaleye
+import           Control.Arrow
+import           Control.Monad.Except
+import           Control.Monad.Log
+import           Crypto.Secp256k1
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as ByteString
+import qualified Data.ByteString.Base16          as Base16
+import           Data.Foldable
+import           Data.Int                        (Int32)
+import           Data.List                       (sortOn)
+import           Data.Map.Strict                 (Map)
+import qualified Data.Map.Strict                 as Map
+import           Data.Maybe
+import           Data.Monoid
+import           Data.RLP
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
+import qualified Data.Text.Encoding              as Text
+import           Data.Traversable
+import           Opaleye
 
-import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Server.Utils
-import BlockApps.Bloc.Crypto
-import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Database.Queries
-import BlockApps.Bloc.Database.Tables
-import BlockApps.Ethereum
-import BlockApps.Solidity.Storage
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.Value
-import qualified BlockApps.Solidity.Xabi.Type as Xabi
-import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Types hiding (Transaction(..))
-import BlockApps.Strato.Client
-import BlockApps.XAbiConverter (xabiTypeToType)
+import           BlockApps.Bloc.API.Users
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Crypto
+import           BlockApps.Bloc.Database.Queries
+import           BlockApps.Bloc.Database.Tables
+import           BlockApps.Bloc.Monad
+import           BlockApps.Bloc.Server.Utils
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Storage
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types          hiding (Transaction (..))
+import           BlockApps.XAbiConverter         (xabiTypeToType)
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
-
 
 getUsersUser :: UserName -> Bloc [Address]
 getUsersUser (UserName name) = blocTransaction $
@@ -105,7 +101,7 @@ postUsersContract userName addr
           Text.splitOn "," (transactionresultContractsCreated txResult)
         stringAddress $ Text.unpack str
     case addressMaybe of
-      Nothing -> case (transactionresultMessage txResult) of
+      Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
         stratoMsg -> throwError $ UserError stratoMsg
       Just addr' -> do
@@ -117,7 +113,6 @@ postUsersContract userName addr
           )
         return addr'
 
-
 postUsersUploadList :: UserName -> Address -> UploadListRequest -> Bloc [PostUsersUploadListResponse]
 postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
   namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args txParams value,nonceIncr) -> do
@@ -125,7 +120,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
       (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
       returnA -< (bin16,cmId)
     let
-      (bin,leftOver) = Base16.decode $ bin16
+      (bin,leftOver) = Base16.decode bin16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
     mFunctionId <- getConstructorId cmId
     argsBin <- buildArgumentByteString (Just args) mFunctionId
@@ -136,14 +131,14 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
   let
     namesCmIds = map fst namesCmIdsTxs
     txs = map snd namesCmIdsTxs
-  hashes <- blocStrato $ postTxList txs
-  resps <- forConcurrently (zip namesCmIds hashes) $ \ ((name,cmId),hash) -> do
-    txResult <- pollTxResult hash
-    let
-      addressMaybe = do
-        str <- listToMaybe $
-          Text.splitOn "," (transactionresultContractsCreated txResult)
-        stringAddress $ Text.unpack str
+  hashes <- blocStrato (postTxList txs)
+  results <- unBatchTransactionResult <$> pollTxResultBatch hashes -- pollTxResultBatch will always have at least one result for a hash
+  let zipped = resultJoiner <$> zip namesCmIds hashes
+      resultJoiner (nc, hash) = (nc, head . fromJust $ Map.lookup hash results)
+  resps <- for zipped $ \((name,cmId),txResult) -> do
+    let addressMaybe = do
+          str <- listToMaybe $ Text.splitOn "," (transactionresultContractsCreated txResult)
+          stringAddress (Text.unpack str)
     case addressMaybe of
       Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
@@ -156,7 +151,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
           , Nothing
           )
         getContractDetails (ContractName name) (Unnamed addr')
-  return $ map PostUsersUploadListResponse resps
+  return $ PostUsersUploadListResponse <$> resps
 
 postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSendListResponse]
 postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
@@ -164,20 +159,22 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
     (Wei (fromIntegral value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
-  map PostSendListResponse <$> if resolve
-    then forConcurrently hashes $ \ hash -> do
-      txResult <- pollTxResult hash
-      let txResponse = transactionresultResponse txResult
-      case txResponse of
-        "Success!" -> do
-          senderAccounts <- blocStrato $ getAccountsFilter
-            accountsFilterParams{qaAddress = Just addr}
-          case senderAccounts of
-            [] -> throwError $ AnError "No sender account found"
-            senderAccount:_ -> return . Text.pack . show . unStrung $
-              accountBalance senderAccount
-        _ -> return txResponse
-    else return hashes
+  ret <- if resolve
+    then do
+        resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
+        for (Map.elems (unBatchTransactionResult resolved)) $ \(res:_) -> do
+          let txResponse = transactionresultResponse res
+          case txResponse of
+            "Success!" -> do
+              senderAccounts <- blocStrato $ getAccountsFilter
+                accountsFilterParams{qaAddress = Just addr}
+              case senderAccounts of
+                [] -> throwError $ AnError "No sender account found"
+                senderAccount:_ -> return . Text.pack . show . unStrung $ accountBalance senderAccount
+            _ -> return txResponse
+    else return (Text.pack . keccak256String <$> hashes)
+
+  return $ PostSendListResponse <$> ret
 
 postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
@@ -185,7 +182,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
     (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
     let
-      (sel,leftOver) = Base16.decode $ sel16
+      (sel,leftOver) = Base16.decode sel16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
     argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
     tx <- prepareTx
@@ -202,26 +199,22 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  map PostMethodListResponse <$> if postmethodlistrequestResolve
-    then forConcurrently (zip hashes funcIds) $ \ (hash,funcId) -> do
-      resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
-      let
-        orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-      orderedResultTypes <-
-        for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-          either (throwError . UserError . Text.pack) return $
-            xabiTypeToType
-              (error "missing typedefs in postUsersContractMethod")
-              indexedTypeType
+  resps <- if postmethodlistrequestResolve
+           then do
+             txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes
+             let zipped = resultJoiner <$> zip funcIds hashes
+                 resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
 
-      txResult <- pollTxResult hash
-      let
-        mFormattedResponse = Text.concat <$>
-          convertResultResToTexts
-            (transactionresultResponse txResult)
-            orderedResultTypes
-      blocMaybe "Failed to parse response" mFormattedResponse
-    else return hashes
+             for zipped $ \(funcId,txResult) -> do
+               resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
+               let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+               orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+                                       either (throwError . UserError . Text.pack) return $
+                                         xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
+               let mFormattedResponse = Text.concat <$> convertResultResToTexts (transactionresultResponse txResult) orderedResultTypes
+               blocMaybe "Failed to parse response" mFormattedResponse
+           else return (Text.pack . keccak256String <$> hashes)
+  return $ PostMethodListResponse <$> resps
 
 postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> Bloc PostUsersContractMethodResponse
 postUsersContractMethod
@@ -233,7 +226,7 @@ postUsersContractMethod
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     (functionId,sel16) <- getFunctionIdSel cmId funcName
     let
-      (sel,leftOver) = Base16.decode $ sel16
+      (sel,leftOver) = Base16.decode sel16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
     argsBin <- buildArgumentByteString (Just args) (Just functionId)
     tx <- prepareTx
@@ -274,7 +267,7 @@ convertResultResToTexts txResp responseTypes =
   let
     byteResp = Text.encodeUtf8 txResp
   in case bytestringToValues byteResp responseTypes of
-    Nothing -> Nothing
+    Nothing   -> Nothing
     Just vals -> traverse valueToText vals
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
@@ -317,7 +310,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
                   Xabi.Label _ -> undefined -- TODO - fill this in
               in
                 textToArgType "Array" (fromMaybe False dy) ettyty
-            Xabi.Contract _ ->
+            Xabi.Contract{} ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
               textToArgType "Mapping" (fromMaybe False dy) ""
@@ -325,13 +318,13 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
         in
           textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
     case args of
-      Nothing -> do
+      Nothing ->
         if Map.null argNamesTypes
           then return ByteString.empty
-          else (throwError $ AnError "no arguments provided to function.")
+          else throwError (AnError "no arguments provided to function.")
       Just argsMap -> do
         argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
-          then throwError $ AnError "argument names don't match"
+          then throwError (AnError "argument names don't match")
           else return $ Map.intersectionWith determineValue argsMap argNamesTypes
         vals <- for (toList argsVals) $
           maybe (throwError $ AnError "couldn't decode argument value") return
@@ -385,7 +378,6 @@ prepareTx userName password addr toAddr TxParams{..} value code nonceIncr = do
         , unsignedTransactionValue = value
         , unsignedTransactionInitOrData = code
         }
-
 
 prepareSignedTx
   :: SecKey

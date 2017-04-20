@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 if [ "$1" == "" ]
@@ -8,8 +7,14 @@ then
     exit 1
 fi
 
-port=8000
-#port=10001
+function setEnv {
+  [[ -n ${!1} ]] || eval $1=$2
+  echo "$1 = ${!1}"
+}
+
+setEnv blocHost localhost
+setEnv blocPort 8000
+setEnv stratoUrl "http://tester13.eastus.cloudapp.azure.com/strato-api/eth/v1.2"
 
 contractName=`basename ${1%.*}`
 
@@ -34,12 +39,11 @@ echo "#################################################"
 echo "# Creating a new address and running the faucet #"
 echo "#################################################"
 
-address=`customHttp --form http://localhost:$port/users/fred password=qqqq faucet=1`
+address=`customHttp --form http://$blocHost:$blocPort/users/fred password=qqqq faucet=1`
 
 echo "Here are the details of the new address '$address':"
 
-customHttp http://bayar4a.eastus.cloudapp.azure.com/strato-api/eth/v1.2/account?address=$address | jq 
-
+customHttp $stratoUrl/account?address=$address | jq
 echo ""
 
 src=`cat $1`
@@ -54,7 +58,7 @@ echo "########################"
 echo "# Uploading a contract #"
 echo "########################"
 
-echo "$request" | customHttp POST http://localhost:$port/users/fred/$address/contract "Accept: */*"
+echo "$request" | customHttp POST http://$blocHost:$blocPort/users/fred/$address/contract "Accept: */*"
 
 echo ""
 
@@ -62,9 +66,4 @@ echo "##################################"
 echo "# querying state in new contract #"
 echo "##################################"
 
-customHttp http://localhost:$port/contracts/$contractName/Latest/state | jq
-
-
-
-
-
+customHttp http://$blocHost:$blocPort/contracts/SimpleStorage/Latest/state | jq
