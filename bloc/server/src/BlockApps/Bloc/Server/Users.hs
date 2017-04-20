@@ -1,56 +1,52 @@
-{-# LANGUAGE
-    Arrows
-  , OverloadedStrings
-  , RecordWildCards
-  , ScopedTypeVariables
-#-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BlockApps.Bloc.Server.Users where
 
-import Control.Arrow
-import Control.Concurrent.Async.Lifted
-import Control.Monad.Except
-import Control.Monad.Log
-import Crypto.Secp256k1
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Base16 as Base16
-import Data.Foldable
-import Data.Int (Int32)
-import Data.List (sortOn)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Monoid
-import Data.RLP
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Data.Traversable
-import Opaleye
+import           Control.Arrow
+import           Control.Monad.Except
+import           Control.Monad.Log
+import           Crypto.Secp256k1
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as ByteString
+import qualified Data.ByteString.Base16          as Base16
+import           Data.Foldable
+import           Data.Int                        (Int32)
+import           Data.List                       (sortOn)
+import           Data.Map.Strict                 (Map)
+import qualified Data.Map.Strict                 as Map
+import           Data.Maybe
+import           Data.Monoid
+import           Data.RLP
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
+import qualified Data.Text.Encoding              as Text
+import           Data.Traversable
+import           Opaleye
 
-import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Server.Utils
-import BlockApps.Bloc.Crypto
-import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Database.Queries
-import BlockApps.Bloc.Database.Tables
-import BlockApps.Ethereum
-import BlockApps.Solidity.Storage
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.Value
-import qualified BlockApps.Solidity.Xabi.Type as Xabi
-import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Types hiding (Transaction(..))
-import BlockApps.Strato.Client
-import BlockApps.XAbiConverter (xabiTypeToType)
+import           BlockApps.Bloc.API.Users
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Crypto
+import           BlockApps.Bloc.Database.Queries
+import           BlockApps.Bloc.Database.Tables
+import           BlockApps.Bloc.Monad
+import           BlockApps.Bloc.Server.Utils
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Storage
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.Value
+import           BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types          hiding (Transaction (..))
+import           BlockApps.XAbiConverter         (xabiTypeToType)
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
-
 
 getUsersUser :: UserName -> Bloc [Address]
 getUsersUser (UserName name) = blocTransaction $
@@ -70,7 +66,6 @@ postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransacti
       void $ waitNewAccount addr
   return addr
 
-
 postUsersSend :: UserName -> Address -> PostSendParameters -> Bloc PostTransaction
 postUsersSend userName addr
   (PostSendParameters toAddr value password txParams) = do
@@ -80,7 +75,6 @@ postUsersSend userName addr
     hash <- blocStrato $ postTx tx
     void $ pollTxResult hash
     return tx
-
 
 postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
 postUsersContract userName addr
@@ -118,7 +112,6 @@ postUsersContract userName addr
           )
         return addr'
 
-
 postUsersUploadList :: UserName -> Address -> UploadListRequest -> Bloc [PostUsersUploadListResponse]
 postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
   namesCmIdsTxs <- for contracts $ \ (UploadListContract name args txParams value) -> do
@@ -136,14 +129,14 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
   let
     namesCmIds = map fst namesCmIdsTxs
     txs = map snd namesCmIdsTxs
-  hashes <- blocStrato $ postTxList txs
-  resps <- forConcurrently (zip namesCmIds hashes) $ \ ((name,cmId),hash) -> do
-    txResult <- pollTxResult hash
-    let
-      addressMaybe = do
-        str <- listToMaybe $
-          Text.splitOn "," (transactionresultContractsCreated txResult)
-        stringAddress $ Text.unpack str
+  hashes <- blocStrato (postTxList txs)
+  results <- unBatchTransactionResult <$> pollTxResultBatch hashes -- pollTxResultBatch will always have at least one result for a hash
+  let zipped = resultJoiner <$> zip namesCmIds hashes
+      resultJoiner (nc, hash) = (nc, head . fromJust $ Map.lookup hash results)
+  resps <- for zipped $ \((name,cmId),txResult) -> do
+    let addressMaybe = do
+          str <- listToMaybe $ Text.splitOn "," (transactionresultContractsCreated txResult)
+          stringAddress (Text.unpack str)
     case addressMaybe of
       Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
@@ -156,7 +149,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
           , Nothing
           )
         getContractDetails (ContractName name) (Unnamed addr')
-  return $ map PostUsersUploadListResponse resps
+  return $ PostUsersUploadListResponse <$> resps
 
 postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSendListResponse]
 postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
@@ -203,22 +196,25 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  map PostMethodListResponse <$> if postmethodlistrequestResolve
-    then forConcurrently (zip hashes funcIds) $ \ (hash,funcId) -> do
-      resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
-      let
-        orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-        orderedResultTypes = map
-          (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
-          orderedResultIndexedXT
-      txResult <- pollTxResult hash
-      let
-        mFormattedResponse = Text.concat <$>
-          convertResultResToTexts
-            (transactionresultResponse txResult)
-            orderedResultTypes
-      blocMaybe "Failed to parse response" mFormattedResponse
-    else return (Text.pack . keccak256String <$> hashes)
+  resps <- if postmethodlistrequestResolve
+           then do
+             txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes
+             let zipped = resultJoiner <$> zip funcIds hashes
+                 resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
+
+             for zipped $ \(funcId,txResult) -> do
+               resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
+               let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+                   orderedResultTypes = map
+                         (\Xabi.IndexedType{..} -> xabiTypeToType indexedTypeType)
+                         orderedResultIndexedXT
+                   mFormattedResponse = Text.concat <$>
+                             convertResultResToTexts
+                               (transactionresultResponse txResult)
+                               orderedResultTypes
+               blocMaybe "Failed to parse response" mFormattedResponse
+           else return (Text.pack . keccak256String <$> hashes)
+  return $ PostMethodListResponse <$> resps
 
 postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> Bloc PostUsersContractMethodResponse
 postUsersContractMethod
@@ -265,7 +261,7 @@ convertResultResToTexts txResp responseTypes =
   let
     byteResp = Text.encodeUtf8 txResp
   in case bytestringToValues byteResp responseTypes of
-    Nothing -> Nothing
+    Nothing   -> Nothing
     Just vals -> traverse valueToText vals
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
@@ -294,16 +290,16 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
             Xabi.Array dy _ ety ->
               let
                 ettyty = case ety of
-                  Xabi.Int{} -> "Int"
-                  Xabi.String{} -> "String"
-                  Xabi.Bytes{} -> "Bytes"
-                  Xabi.Bool -> "Bool"
-                  Xabi.Address -> "Address"
-                  Xabi.Struct{} -> "Struct"
-                  Xabi.Enum{} -> "Enum"
-                  Xabi.Array{} -> error "Array of array not supported"
+                  Xabi.Int{}      -> "Int"
+                  Xabi.String{}   -> "String"
+                  Xabi.Bytes{}    -> "Bytes"
+                  Xabi.Bool       -> "Bool"
+                  Xabi.Address    -> "Address"
+                  Xabi.Struct{}   -> "Struct"
+                  Xabi.Enum{}     -> "Enum"
+                  Xabi.Array{}    -> error "Array of array not supported"
                   Xabi.Contract{} -> "Contract"
-                  Xabi.Mapping{} -> "Mapping"
+                  Xabi.Mapping{}  -> "Mapping"
               in
                 textToArgType "Array" (fromMaybe False dy) ettyty
             Xabi.Contract{} ->
@@ -316,15 +312,14 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
       Nothing ->
         if Map.null argNamesTypes
           then return ByteString.empty
-          else (throwError $ AnError "no arguments provided to function.")
+          else throwError (AnError "no arguments provided to function.")
       Just argsMap -> do
         argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
-          then throwError $ AnError "argument names don't match"
+          then throwError (AnError "argument names don't match")
           else return $ Map.intersectionWith determineValue argsMap argNamesTypes
         vals <- for (toList argsVals) $
           maybe (throwError $ AnError "couldn't decode argument value") return
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
-
 
 prepareTx
   :: UserName
@@ -372,7 +367,6 @@ prepareTx userName password addr toAddr TxParams{..} value code = do
         , unsignedTransactionValue = value
         , unsignedTransactionInitOrData = code
         }
-
 
 prepareSignedTx
   :: SecKey
