@@ -46,8 +46,7 @@ echo "Here are the details of the new address '$address':"
 customHttp $stratoUrl/account?address=$address | jq
 echo ""
 
-src=`cat $1`
-
+src=$(cat ../Contracts/$contractName.sol)
 echo $src
 
 request=`echo '{"password":"qqqq", "args": {}, "value": 0, "txParams":{}}' | jq --arg src "$src" '.src= $src ' | jq --arg contractName "$contractName" '.contract= $contractName '`
@@ -66,4 +65,4 @@ echo "##################################"
 echo "# querying state in new contract #"
 echo "##################################"
 
-customHttp http://$blocHost:$blocPort/contracts/SimpleStorage/Latest/state | jq
+customHttp http://$blocHost:$blocPort/contracts/$contractName/Latest/state | jq
