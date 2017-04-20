@@ -5,7 +5,8 @@
 #-}
 
 module BlockApps.Bloc.Client
-  ( getAddresses
+  ( getHomepage
+  , getAddresses
   , getContracts
   , getContractsData
   , getContractsContract
@@ -39,6 +40,9 @@ import BlockApps.Ethereum
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Strato.Types
+
+getHomepage :: ClientM Homepage
+getHomepage = client (Proxy @ GetHomepage)
 
 getAddresses :: ClientM [Address]
 getAddresses = client (Proxy @ GetAddresses)

@@ -2,6 +2,7 @@
 {-# LANGUAGE
     DataKinds
   , DeriveGeneric
+  , GeneralizedNewtypeDeriving
   , FlexibleInstances
   , MultiParamTypeClasses
   , OverloadedStrings
@@ -26,6 +27,16 @@ import Test.QuickCheck.Instances ()
 
 import BlockApps.Ethereum
 --------------------------------------------------------------------------------
+
+type GetHomepage = Get '[PlainText] Homepage
+whoWould'veThoughtThisIsActuallyTheHomepage :: Homepage
+whoWould'veThoughtThisIsActuallyTheHomepage = Homepage "home page!"
+newtype Homepage = Homepage { unHomepage :: Text }
+    deriving (Eq, Ord, Read, Show, Generic, MimeRender PlainText, MimeUnrender PlainText)
+instance ToSample Homepage where
+    toSamples _ = noSamples
+instance Arbitrary Homepage where -- seriously, lmfao
+    arbitrary = return whoWould'veThoughtThisIsActuallyTheHomepage
 
 data HTMLifiedJSON
 instance Accept HTMLifiedJSON where
