@@ -3,19 +3,20 @@
   , DeriveGeneric
   , GeneralizedNewtypeDeriving
   , OverloadedStrings
+  , LambdaCase
   , MultiParamTypeClasses
   , TypeOperators
 #-}
 
 module BlockApps.Bloc.API.Users where
 
-import Data.Aeson
+import Data.Aeson hiding (Value)
 import Data.Aeson.Casing
-import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
+-- import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Map (Map)
 import Data.Text (Text)
-import qualified Data.Text as Text
+-- import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
@@ -180,16 +181,16 @@ instance ToSample PostUsersUploadListResponse where
   toSamples _ = noSamples
 
 -- This should return the return value from the method call
-type PostUsersContractMethod = "users"
+type PostUsersMethod = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "contract"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "call"
-  :> ReqBody '[JSON] PostUsersContractMethodRequest
-  :> Post '[HTMLifiedPlainText, JSON] PostUsersContractMethodResponse
-data PostUsersContractMethodRequest = PostUsersContractMethodRequest
+  :> ReqBody '[JSON] PostUsersMethodRequest
+  :> Post '[JSON,HTMLifiedPlainText] PostUsersMethodResponse
+data PostUsersMethodRequest = PostUsersMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod :: Text
   , postuserscontractmethodArgs :: Map Text Text
@@ -197,24 +198,32 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
-instance ToJSON PostUsersContractMethodRequest where
+instance Arbitrary PostUsersMethodRequest where arbitrary = genericArbitrary uniform
+instance ToJSON PostUsersMethodRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON PostUsersContractMethodRequest where
+instance FromJSON PostUsersMethodRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToSample PostUsersContractMethodRequest where
+instance ToSample PostUsersMethodRequest where
   toSamples _ = noSamples
-newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse Text deriving (Eq,Show,FromJSON,ToJSON,Arbitrary)
-instance ToSample PostUsersContractMethodResponse where
+data PostUsersMethodResponse
+  = PostUsersMethodResponse
+  { postusersmethodresponseValues :: Text
+  , postusersmethodresponseTransactionResult :: TransactionResult
+  }
+  deriving (Eq,Show,Generic)
+instance FromJSON PostUsersMethodResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+instance ToJSON PostUsersMethodResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance ToSample PostUsersMethodResponse where
   toSamples _ = noSamples
 --hack because endpoints are returning random text
 data HTMLifiedPlainText
 instance Accept HTMLifiedPlainText where
   contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
-instance MimeUnrender HTMLifiedPlainText PostUsersContractMethodResponse where
-  mimeUnrender _ = return . PostUsersContractMethodResponse . Text.pack . Lazy.Char8.unpack
-instance MimeRender HTMLifiedPlainText PostUsersContractMethodResponse where
-  mimeRender _ (PostUsersContractMethodResponse resp) =  Lazy.Char8.pack $ Text.unpack resp
+instance MimeRender HTMLifiedPlainText PostUsersMethodResponse where
+  mimeRender _ (PostUsersMethodResponse values _) =
+    ByteString.Lazy.fromStrict $ Text.encodeUtf8 values
 
 -- POST /users/:user/:userAddress/sendList
 type PostUsersSendList = "users"
@@ -258,12 +267,12 @@ instance Arbitrary PostSendListResponse where
   arbitrary = genericArbitrary uniform
 
 --POST /users/:user/:address/callList
-type PostUsersContractMethodList = "users"
+type PostUsersMethodList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "callList"
   :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [PostMethodListResponse]
+  :> Post '[JSON] [Either Keccak256 PostUsersMethodResponse]
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password
   , postmethodlistrequestResolve :: Bool
@@ -276,16 +285,6 @@ instance FromJSON PostMethodListRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostMethodListRequest where
   toSamples _ = noSamples
-newtype PostMethodListResponse = PostMethodListResponse
-  { postmethodlistresponseReturnValue :: Text
-  } deriving (Eq,Show,Generic)
-instance ToJSON PostMethodListResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON PostMethodListResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToSample PostMethodListResponse where
-  toSamples _ = noSamples
-instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary uniform
 data MethodCall = MethodCall
   { methodcallContractName :: Text
   , methodcallContractAddress :: Address

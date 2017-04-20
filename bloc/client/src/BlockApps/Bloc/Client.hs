@@ -118,9 +118,9 @@ postUsersContractMethod
   -> Address
   -> ContractName
   -> Address
-  -> PostUsersContractMethodRequest
-  -> ClientM PostUsersContractMethodResponse
-postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
+  -> PostUsersMethodRequest
+  -> ClientM PostUsersMethodResponse
+postUsersContractMethod = client (Proxy @ PostUsersMethod)
 
 postUsersSendList
   :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
@@ -130,5 +130,5 @@ postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> ClientM [PostMethodListResponse]
-postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
+  -> ClientM [Either Keccak256 PostUsersMethodResponse]
+postUsersContractMethodList = client (Proxy @ PostUsersMethodList)

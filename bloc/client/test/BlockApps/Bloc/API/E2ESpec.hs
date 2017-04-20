@@ -135,7 +135,7 @@ spec = do
 
       let
         contractName = ContractName simpleStorageContractName
-        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+        postUsersContractMethodRequestSet = PostUsersMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" "3"
@@ -150,7 +150,7 @@ spec = do
       -- call get value and verify
 
       let
-        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+        postUsersContractMethodRequestGet = PostUsersMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
@@ -163,7 +163,7 @@ spec = do
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right getResponse = postUsersContractMethodEitherGet
-      getResponse `shouldBe` PostUsersContractMethodResponse "transaction returned: 3"
+      getResponse `shouldBe` PostUsersMethodResponse "transaction returned: 3"
 
       -- get state and verify
 
