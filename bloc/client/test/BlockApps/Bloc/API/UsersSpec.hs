@@ -92,7 +92,7 @@ spec = do
       let
         contractName = ContractName simpleStorageContractName
         contractAddress = simpleStorageContractAddress
-        postUsersContractMethodRequest = PostUsersContractMethodRequest
+        postUsersContractMethodRequest = PostUsersMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty

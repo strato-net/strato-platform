@@ -176,7 +176,11 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
 
   return $ PostSendListResponse <$> ret
 
-postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> Bloc [PostMethodListResponse]
+postUsersContractMethodList
+  :: UserName
+  -> Address
+  -> PostMethodListRequest
+  -> Bloc [Either Keccak256 PostUsersMethodResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
@@ -199,30 +203,29 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  resps <- if postmethodlistrequestResolve
-           then do
-             txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes
-             let zipped = resultJoiner <$> zip funcIds hashes
-                 resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
+  if postmethodlistrequestResolve
+  then do
+    txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
+    let zipped = resultJoiner <$> zip funcIds hashes
+        resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
 
-             for zipped $ \(funcId,txResult) -> do
-               resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
-               let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-               orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-                                       either (throwError . UserError . Text.pack) return $
-                                         xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
-               let mFormattedResponse = Text.concat <$> convertResultResToTexts (transactionresultResponse txResult) orderedResultTypes
-               blocMaybe "Failed to parse response" mFormattedResponse
-           else return (Text.pack . keccak256String <$> hashes)
-  return $ PostMethodListResponse <$> resps
+    for zipped $ \(funcId,txResult) -> do
+      resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
+      let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+      orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+                              either (throwError . UserError . Text.pack) return $
+                                xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
+      let mFormattedResponse = Text.concat <$> convertResultResToTexts (transactionresultResponse txResult) orderedResultTypes
+      Right . flip PostUsersMethodResponse txResult <$> blocMaybe "Failed to parse response" mFormattedResponse
+  else for hashes $ pure . Left
 
-postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersContractMethodRequest -> Bloc PostUsersContractMethodResponse
+postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersMethodRequest -> Bloc PostUsersMethodResponse
 postUsersContractMethod
   userName
   userAddr
   (ContractName contractName)
   contractAddr
-  (PostUsersContractMethodRequest password funcName args value txParams) = do
+  (PostUsersMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     (functionId,sel16) <- getFunctionIdSel cmId funcName
     let
@@ -260,7 +263,7 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
-    return $ PostUsersContractMethodResponse formattedResponse
+    return $ PostUsersMethodResponse formattedResponse txResult
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
