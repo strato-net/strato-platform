@@ -52,21 +52,21 @@ pollTxResult hash = go (0::Int)
   where
     go n = do
       liftIO $ threadDelay 1000000
-      logWith logNotice . Text.pack $ "Polling result for transaction hash: " ++ keccak256String hash ++ ", you fucker!"
+      logWith logNotice . Text.pack $ "Polling result for transaction hash: " ++ keccak256String hash
       result <- blocStrato $ getTxResult hash
       case listToMaybe result of
         Nothing -> if n >= 30
           then blocError . AnError . Text.pack $
-            "Strato polling timeout on transaction hash: " ++ keccak256String hash  ++ ", you fucker!"
+            "Strato polling timeout on transaction hash: " ++ keccak256String hash
           else go (n+1)
         Just res -> return res
 
 pollTxResultBatch :: [Keccak256] -> Bloc BatchTransactionResult
 pollTxResultBatch keccaks = go 1 where
     attempts = 15 :: Int
-    go n | n > attempts = blocError . AnError . Text.pack $ "Got bored of polling a TX result batch after " ++ show attempts ++ " attempts, you fucker!"
+    go n | n > attempts = blocError . AnError . Text.pack $ "Got bored of polling a TX result batch after " ++ show attempts ++ " attempts"
          | otherwise    = do
-             logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Looking up " ++ show (keccak256String <$> keccaks) ++ ", you fucker!"
+             logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Looking up " ++ show (keccak256String <$> keccaks)
              resolutions <- blocStrato (postTxResultBatch keccaks)
              if any null (unBatchTransactionResult resolutions)
                  then liftIO (threadDelay 1000000) >> go (n + 1)
