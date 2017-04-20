@@ -25,8 +25,6 @@ import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Client
 import BlockApps.Strato.Types
 
--- TODO: user/contract methods Addresses may need to be MayBe Named Address
-
 etherToWei :: Natural -> Natural
 etherToWei x = 1000000000000000000 * x
 
@@ -108,7 +106,6 @@ spec = do
       let
         Right accts1 = eAccts1
       length accts1 `shouldBe` 1
-      print (show accts1)
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
       let
@@ -162,8 +159,8 @@ spec = do
         (ClientEnv mgr blocUrl)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
-        Right getResponse = postUsersContractMethodEitherGet
-      getResponse `shouldBe` PostUsersMethodResponse "transaction returned: 3"
+        Right (PostUsersMethodResponse values _) = postUsersContractMethodEitherGet
+      values `shouldBe` "transaction returned: 3"
 
       -- get state and verify
 
