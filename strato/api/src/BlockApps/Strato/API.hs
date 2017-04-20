@@ -1,16 +1,13 @@
-{-# LANGUAGE
-    DataKinds
-  , DeriveGeneric
-  , TypeOperators
-#-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE TypeOperators #-}
 
 module BlockApps.Strato.API where
 
-import Data.Text (Text)
-import Numeric.Natural
-import Servant.API
+import           Data.Text              (Text)
+import           Numeric.Natural
+import           Servant.API
 
-import BlockApps.Strato.Types
+import           BlockApps.Strato.Types
 
 type API =
   "transaction"
@@ -34,13 +31,17 @@ type API =
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> ReqBody '[JSON] PostTransaction
-    :> Post '[PlainText] Text
+    :> Post '[PlainText] Keccak256
   :<|> "transactionList"
       :> ReqBody '[JSON] [PostTransaction]
-      :> Post '[JSON] [Text]
+      :> Post '[JSON] [Keccak256]
   :<|> "transactionResult"
-    :> Capture "hash" Text
+    :> Capture "hash" Keccak256
     :> Get '[JSON] [TransactionResult]
+  :<|> "transactionResult"
+    :> "batch"
+    :> ReqBody '[JSON] [Keccak256]
+    :> Post '[JSON] BatchTransactionResult
   :<|> "block"
     :> QueryParam "number" Natural
     :> QueryParam "minnumber" Natural

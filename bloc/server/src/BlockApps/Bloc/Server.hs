@@ -17,8 +17,8 @@ import BlockApps.Bloc.Server.Search
 import BlockApps.Bloc.API
 
 bloc :: ServerT BlocAPI Bloc
-bloc =
-       getUsers
+bloc = getHomepage
+  :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
   :<|> postUsersSend
@@ -41,7 +41,8 @@ bloc =
   :<|> getSearchContractState
   :<|> getSearchContractStateReduced
 
-
+getHomepage :: Bloc Homepage
+getHomepage = return whoWould'veThoughtThisIsActuallyTheHomepage
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc

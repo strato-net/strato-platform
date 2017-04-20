@@ -16,6 +16,7 @@ module BlockApps.Strato.Client
   , postTx
   , postTxList
   , getTxResult
+  , postTxResultBatch
   , getBlocksFilter
   , getBlocksLast
   , getAccountsFilter
@@ -100,9 +101,10 @@ accountsFilterParams = AccountsFilterParams
 
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> ClientM [WithNext Transaction]
-postTx :: PostTransaction -> ClientM Text
-postTxList :: [PostTransaction] -> ClientM [Text]
-getTxResult :: Text -> ClientM [TransactionResult]
+postTx :: PostTransaction -> ClientM Keccak256
+postTxList :: [PostTransaction] -> ClientM [Keccak256]
+getTxResult :: Keccak256 -> ClientM [TransactionResult]
+postTxResultBatch :: [Keccak256] -> ClientM BatchTransactionResult
 getBlocksFilter :: BlocksFilterParams -> ClientM [WithNext Block]
 getBlocksLast :: Natural -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
@@ -118,6 +120,7 @@ getTxsFilter
   :<|> postTx
   :<|> postTxList
   :<|> getTxResult
+  :<|> postTxResultBatch
   :<|> getBlocksFilter
   :<|> getBlocksLast
   :<|> getAccountsFilter
@@ -133,6 +136,7 @@ getTxsFilter
     :<|> postTx'
     :<|> postTxList'
     :<|> getTxResult'
+    :<|> postTxResultBatch'
     :<|> uncurryBlocksFilterParams getBlocksFilter'
     :<|> getBlocksLast'
     :<|> uncurryAccountsFilterParams getAccountsFilter'
@@ -149,6 +153,7 @@ getTxsFilter
       :<|> postTx'
       :<|> postTxList'
       :<|> getTxResult'
+      :<|> postTxResultBatch'
       :<|> getBlocksFilter'
       :<|> getBlocksLast'
       :<|> getAccountsFilter'

@@ -5,7 +5,8 @@
 #-}
 
 module BlockApps.Bloc.Client
-  ( getAddresses
+  ( getHomepage
+  , getAddresses
   , getContracts
   , getContractsData
   , getContractsContract
@@ -39,6 +40,9 @@ import BlockApps.Ethereum
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Strato.Types
+
+getHomepage :: ClientM Homepage
+getHomepage = client (Proxy @ GetHomepage)
 
 getAddresses :: ClientM [Address]
 getAddresses = client (Proxy @ GetAddresses)
@@ -118,9 +122,9 @@ postUsersContractMethod
   -> Address
   -> ContractName
   -> Address
-  -> PostUsersContractMethodRequest
-  -> ClientM PostUsersContractMethodResponse
-postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
+  -> PostUsersMethodRequest
+  -> ClientM PostUsersMethodResponse
+postUsersContractMethod = client (Proxy @ PostUsersMethod)
 
 postUsersSendList
   :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
@@ -130,5 +134,5 @@ postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> ClientM [PostMethodListResponse]
-postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
+  -> ClientM [Either Keccak256 PostUsersMethodResponse]
+postUsersContractMethodList = client (Proxy @ PostUsersMethodList)
