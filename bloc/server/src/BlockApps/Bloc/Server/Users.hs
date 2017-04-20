@@ -37,14 +37,16 @@ import BlockApps.Bloc.Monad
 import BlockApps.Bloc.Database.Queries
 import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
+import BlockApps.Solidity.Contract
 import BlockApps.Solidity.Storage
+import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.Xabi
 import BlockApps.Strato.Types hiding (Transaction(..))
 import BlockApps.Strato.Client
-import BlockApps.XAbiConverter (xabiTypeToType)
+import BlockApps.XAbiConverter
 
 -- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 
@@ -183,10 +185,22 @@ postUsersContractMethodList :: UserName -> Address -> PostMethodListRequest -> B
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
-    (functionId,sel16) <- getFunctionIdSel cmId methodcallMethodName
-    let
-      (sel,leftOver) = Base16.decode $ sel16
-    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+    functionId <- getFunctionId cmId methodcallMethodName
+
+    eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+
+    contract' <-
+      either (throwError . UserError . Text.pack) return eitherErrorOrContract
+
+    let maybeFunc = Map.lookup methodcallMethodName (fields $ mainStruct contract')
+
+    sel <-
+      case maybeFunc of
+       Just (_, TypeFunction selector _ _) -> return selector
+       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+
+
+    
     argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
     tx <- prepareTx
       userName
@@ -231,10 +245,20 @@ postUsersContractMethod
   contractAddr
   (PostUsersContractMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
-    (functionId,sel16) <- getFunctionIdSel cmId funcName
-    let
-      (sel,leftOver) = Base16.decode $ sel16
-    unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode selector"
+    functionId <- getFunctionId cmId funcName
+                           
+    eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName contractName) (Unnamed contractAddr)
+
+    contract' <-
+      either (throwError . UserError . Text.pack) return eitherErrorOrContract
+    
+    let maybeFunc = Map.lookup funcName (fields $ mainStruct contract')
+
+    sel <-
+      case maybeFunc of
+       Just (_, TypeFunction selector _ _) -> return selector
+       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
+                
     argsBin <- buildArgumentByteString (Just args) (Just functionId)
     tx <- prepareTx
       userName
@@ -243,7 +267,7 @@ postUsersContractMethod
       (Just contractAddr)
       (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral value))
-      (sel <> argsBin)
+      ((sel::ByteString) <> (argsBin::ByteString))
       0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx

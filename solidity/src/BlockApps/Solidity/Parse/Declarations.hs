@@ -26,7 +26,6 @@ import qualified BlockApps.Solidity.Xabi.Def as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabitype
 
 
-
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser (Text, Xabi)
 solidityContract = do
@@ -216,6 +215,7 @@ functionDeclaration = do
 --        _ | null functionName || not functionVisible -> NoValue
 --        _ | functionName == contractName' -> SingleValue $ Typedef contractName'
 --        _ -> functionRet
+
   return
     (
       functionName,
@@ -223,7 +223,6 @@ functionDeclaration = do
         Xabi.funcArgs =
            Map.fromList $
            zipWith (\x i -> fmap (Xabitype.IndexedType i) x) functionArgs [0..]
-      , Xabi.funcSelector = Text.pack "abcd" --TODO - put in the correct value
       , Xabi.funcVals =
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) v) functionRet [0..]

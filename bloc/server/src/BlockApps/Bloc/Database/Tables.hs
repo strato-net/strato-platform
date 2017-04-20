@@ -116,20 +116,17 @@ xabiFunctionsTable :: Table
   , Column PGInt4
   , Column PGBool
   , Column PGText
-  , Column PGBytea
   )
   ( Column PGInt4
   , Column PGInt4
   , Column PGBool
   , Column PGText
-  , Column PGBytea
   )
-xabiFunctionsTable = Table "xabi_functions" $ p5
+xabiFunctionsTable = Table "xabi_functions" $ p4
   ( optional "id"
   , required "contract_metadata_id"
   , required "is_constructor"
   , required "name"
-  , required "selector"
   )
 
 xabiTypesTable :: Table

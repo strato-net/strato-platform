@@ -9,8 +9,6 @@
 module BlockApps.XAbiConverter where
 
 import qualified Data.Bimap as Bimap
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
 import Data.List
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -21,12 +19,14 @@ import qualified Data.Vector as Vector
 
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Contract
+import BlockApps.Solidity.Parse.Selector
 import BlockApps.Solidity.Struct
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
 import qualified BlockApps.Storage as Storage
 import qualified BlockApps.Solidity.Xabi.Def as XabiDef
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
+
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
 fieldsToStruct typeDefs' vars =
@@ -123,18 +123,20 @@ xabiTypeToType _ Xabi.Struct { Xabi.typedef=name } = return $ TypeStruct name
 xabiTypeToType _ v = return $ SimpleType $ xabiTypeToSimpleType v
 
 
-funcToType::Xabi->Func->Either String Type
-funcToType xabi Func{..} = do
-  let selector =
-        case B16.decode $ BC.pack $ Text.unpack funcSelector of
-         (val, "") -> val
-         _ -> error "selector in function is bad"
+funcToType::Xabi->Text->Func->Either String Type
+funcToType xabi name Func{..} = do
 
   convertedFuncArgs <- for funcArgs $ xabiTypeToType xabi . Xabi.indexedTypeType
 
-  convertedFuncVals <- for (Map.toList funcVals) $ \(name, val) -> do
+  convertedFuncVals <- for (Map.toList funcVals) $ \(name', val) -> do
     val' <- xabiTypeToType xabi $ Xabi.indexedTypeType val
-    return (Just name, val')
+    return (Just name', val')
+
+  let enumSizes =
+        [(name', length items) |
+         (name', XabiDef.Enum items _) <- Map.toList $ xabiTypes xabi]
+
+  let selector = deriveSelector enumSizes name $ map snd $ Map.toList convertedFuncArgs
   
   return $ TypeFunction
                 selector
@@ -225,7 +227,11 @@ xAbiToContract contractXabi@Xabi{..} = mdo
     var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
     return (name, var')
   
-  funcs <- traverse (funcToType contractXabi) xabiFuncs
+  funcs <-
+    fmap Map.fromList $
+    for (Map.toList xabiFuncs) $ \(name, func) -> do
+      theFunction <- funcToType contractXabi name func
+      return (name, theFunction)
             
 
   return Contract{

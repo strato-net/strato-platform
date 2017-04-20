@@ -35,6 +35,7 @@ library
                  BlockApps.Solidity.Parse.File
                  BlockApps.Solidity.Parse.Lexer
                  BlockApps.Solidity.Parse.ParserTypes
+                 BlockApps.Solidity.Parse.Selector
                  BlockApps.Solidity.Parse.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror
@@ -47,6 +48,7 @@ library
                , binary
                , bytestring
                , containers
+               , cryptonite
                , generic-random
                , http-api-data
                , largeint

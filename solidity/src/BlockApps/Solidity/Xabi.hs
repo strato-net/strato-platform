@@ -45,7 +45,6 @@ instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
-  , funcSelector :: Text
   , funcVals :: Map Text Xabi.IndexedType
   } deriving (Eq,Show,Generic)
 instance ToJSON Func where
