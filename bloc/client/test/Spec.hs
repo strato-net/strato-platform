@@ -125,4 +125,4 @@ localhost :: BaseUrl
 localhost = BaseUrl Http "localhost" 8000 ""
 
 strato :: BaseUrl
-strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+strato = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"

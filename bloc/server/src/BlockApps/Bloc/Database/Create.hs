@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS xabi_variables(
   name varchar(512) NOT NULL,
   at_bytes int NOT NULL,
   is_public boolean NOT NULL,
+  UNIQUE (contract_metadata_id, name),
   FOREIGN KEY (contract_metadata_id) REFERENCES contracts_metadata(id),
   FOREIGN KEY (type_id) REFERENCES xabi_types(id)
 );
@@ -155,7 +156,7 @@ xabiTypeDefsTables :: Query
 xabiTypeDefsTables = [sql|
 CREATE TABLE IF NOT EXISTS xabi_type_defs(
   id serial PRIMARY KEY,
-  name varchar(12) NOT NULL,
+  name varchar(512) NOT NULL,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
   type varchar(50) NOT NULL,
   bytes INT NOT NULL,

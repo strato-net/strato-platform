@@ -71,6 +71,5 @@ pollTxResultBatch keccaks = go 1 where
              if any null (unBatchTransactionResult resolutions)
                  then liftIO (threadDelay 1000000) >> go (n + 1)
                  else return resolutions
-
 emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
