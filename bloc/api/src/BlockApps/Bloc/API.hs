@@ -2,7 +2,6 @@
 {-# LANGUAGE
     TypeOperators
   , TypeApplications
-  , DataKinds
 #-}
 
 module BlockApps.Bloc.API
