@@ -349,11 +349,17 @@ protocols: [ HTTP ]
 #          description: Get the status of a transaction by the SHA
 
 /transactionResult:
-    /{SHA}:
-      description: |
-        handler: TransactionResultR
-      get:
-        description: Get the status of a transaction by the SHA
+  /batch:
+    description: |
+      handler: BatchTransactionResultR
+    post:
+      description: Get the status of a batch of transactions by SHA (input is JSON array)
+
+  /{SHA}:
+    description: |
+      handler: TransactionResultR
+    get:
+      description: Get the status of a transaction by the SHA
 
 /storage:
   description: |

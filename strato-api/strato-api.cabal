@@ -37,6 +37,7 @@ library
                      Handler.AfterSubmission
                      Handler.TransactionDemo
                      Handler.StorageInfo
+                     Handler.BatchTransactionResult
                      Handler.TransactionResult
                      Handler.Faucet
                      Handler.ExtABI
