@@ -2,6 +2,7 @@
 {-# LANGUAGE
     TypeOperators
   , TypeApplications
+  , DataKinds
 #-}
 
 module BlockApps.Bloc.API
@@ -28,8 +29,10 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 
 type BlocAPI =
+  -- / endpoint, for smoke test
+  GetHomepage
   -- /users endpoints
-       GetUsers
+  :<|> GetUsers
   :<|> PostUsersUser
   :<|> GetUsersUser
   :<|> PostUsersSend
