@@ -18,6 +18,7 @@ library
                   BlockApps.Solidity.Contract
                   BlockApps.Solidity.Int
                   BlockApps.Solidity.Parse.Parser
+                  BlockApps.Solidity.Parse.Selector
                   BlockApps.Solidity.SolidityValue
                   BlockApps.Solidity.Storage
                   BlockApps.Solidity.Struct
@@ -35,7 +36,6 @@ library
                  BlockApps.Solidity.Parse.File
                  BlockApps.Solidity.Parse.Lexer
                  BlockApps.Solidity.Parse.ParserTypes
-                 BlockApps.Solidity.Parse.Selector
                  BlockApps.Solidity.Parse.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror
@@ -73,13 +73,15 @@ test-suite blockapps-solidity-test
   other-modules:
     BlockApps.SoliditySpec
     BlockApps.Solidity.StorageSpec
+    BlockApps.Solidity.Parse.SelectorSpec
   build-depends: base >=4 && < 5
-    , base16-bytestring
-    , blockapps-ethereum
-    , blockapps-solidity
-    , hspec
-    , aeson
-    , bytestring
+               , aeson
+               , base16-bytestring
+               , blockapps-ethereum
+               , blockapps-solidity
+               , bytestring
+               , hspec
+               , text
 
 source-repository head
   type: git
