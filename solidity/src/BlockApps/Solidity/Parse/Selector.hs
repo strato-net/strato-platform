@@ -5,11 +5,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module BlockApps.Solidity.Parse.Selector (deriveSelector) where
-
 import Crypto.Hash
 import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
+import Data.Char
 import Data.List
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -39,9 +39,19 @@ prettyArgTypes enumSizes args =
   map (formatArg enumSizes) args
 
 formatArg :: [(Text, Int)] -> Type -> String
-formatArg _ (SimpleType TypeBool) = "bool"
-formatArg _ (SimpleType TypeAddress) = "address"
+formatArg _ (SimpleType TypeInt) = "int256"
+formatArg _ (SimpleType x) = drop 4 $ map toLower $ show x --yeah, it is a hack, but it is way cleaner than writting out like 200 lines of the same thing
 formatArg _ x = error $ "undefined value in formatArg: " ++ show x
+
+
+
+
+
+
+
+
+
+
 {-formatArg _ (SignedInt s) = text "int" <> natural (s * 8)
 formatArg _ (UnsignedInt s) = text "uint" <> natural (s * 8)
 formatArg _ (FixedBytes s) = text "bytes" <> natural s
