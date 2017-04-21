@@ -87,7 +87,7 @@ function blocinit(cmdArgv) {
       appName: cmdArgv.appName,
       developer: cmdArgv.developer,
       apiURL: cmdArgv.apiURL,
-      profile: cmdArgv.profile || "strato-dev"
+      profile: cmdArgv.profile || "ethereum-frontier"
     }
 
     if ("email" in cmdArgv) {
@@ -117,7 +117,7 @@ function checkForProject() {
 }
 
 function setApiProfile() {
-  api.setProfile("strato-dev", config.apiURL, stratoVersion);
+  api.setProfile("ethereum-frontier", config.apiURL, stratoVersion);
 }
 
 function main (){
@@ -165,13 +165,10 @@ function main (){
         solSrcFiles = [fname];
       }
       else {
-        console.log("Compiling all contracts no longer supported!");
-        break;
-
-          // solSrcFiles = fs.readdirSync(solSrcDir).
-          //   filter(function(filename) {
-          //     return path.extname(filename) === '.sol';
-          //   })
+        solSrcFiles = fs.readdirSync(solSrcDir).
+          filter(function(filename) {
+            return path.extname(filename) === '.sol';
+          })
       }
 
       Promise.all(solSrcFiles).

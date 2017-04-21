@@ -8,6 +8,7 @@ var home = require('./app/routes/home.js');
 var users = require('./app/routes/users.js');
 var addresses = require('./app/routes/addresses.js');
 var contracts = require('./app/routes/contract.js');
+var search = require('./app/routes/search.js');
 
 var helper = require('./app/lib/contract-helpers');
 var api = require('blockapps-js');
@@ -25,8 +26,10 @@ var _ = require('underscore');
 
 app.use(logger('dev'));
 
-app.use(bodyParser.json()); 
-app.use(bodyParser.urlencoded({ extended: true })); 
+console.log("Body limit: 500mb")
+app.use(bodyParser.json({limit: '500mb'}));
+app.use(bodyParser.urlencoded({limit: '500mb', extended: true }));
+
 app.use(cookieParser());
 
 app.use(session({resave: true, 
@@ -38,9 +41,11 @@ app.use('/', home);
 app.use('/users', users); 
 app.use('/addresses', addresses);
 app.use('/contracts', contracts);
+app.use('/search', search);
 
 app.use('/static', express.static('app/static'));
 app.use('/images', express.static('images'));
+
 
 var port = process.env.PORT || 8000;
 var host = process.env.HOST || '0.0.0.0';

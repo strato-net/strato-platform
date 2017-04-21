@@ -1,5 +1,4 @@
 'use strict';
-
 var path = require('path');                                                                
 var yaml = require('js-yaml');
 var readdirp = require('readdirp');
@@ -10,10 +9,16 @@ var stream = require('stream');
 var es = require('event-stream');
 var merge = require('deepmerge');
 var fs = require('fs');
+var api = require('blockapps-js');
 
+var Promise = require("bluebird");
 /* utility */
 var getContents = function(file, cb) {
+  // try{
   cb(null,file.contents);
+  // } catch (error) {
+  //   console.log("tried reading contents, failed: " + error)
+  // }
 };
 
 var getPath = function(file, cb) {
@@ -54,13 +59,47 @@ function contractAddressesStream(name) {
       .pipe( map(getPath) );  
 }
 
-function contractsMetaAddressStream(name,address) { 
-  return vinylFs.src( [ path.join('app', 'meta', name, address + '.json') ] )
-      .pipe( map(getContents) )
-      .pipe( es.map(function (data, cb) {
-        cb(null, JSON.parse(data))
-      }));
+function contractsMetaAddressStream(name, address) { 
+  var fileName = path.join('app', 'meta', name, address + '.json');
+  var inject = false;
+  try {
+    console.log("Looking for contract at: " + fileName)
+    fs.statSync(fileName);
+  } catch(e) {
+    console.log("Contract wasn't already uploaded with that address, trying by injecting address");
+    inject = true;
+    fileName = path.join('app', 'meta', name, "Latest" + '.json');
+  }
+  try {
+    fs.statSync(fileName);
+  } catch(e) {
+    fileName = path.join('app', 'meta', name, name + '.json');
+  }
+  try {
+    fs.statSync(fileName);
+  } catch(e) {
+    console.log("Really couldn't find file, aborting: " + fileName);
+    return null;
+  }
+
+  var vfs = vinylFs.src( [ fileName ] );
+  var toRet = vfs
+    .pipe( map(getContents) )
+    .pipe( es.map(function (data, cb) {
+      var parsedData = {};
+      try {
+        var parsedData = JSON.parse(data)
+      } catch (error) {
+        console.log("failed parsing data")
+      }
+      if(inject){
+        parsedData["address"] = address;
+      }
+      cb(null, parsedData);
+    }));
+  return toRet;
 }
+
 /* emits all contract metadata as json */
 function contractsMetaStream() { 
   return vinylFs.src( [ path.join('meta', '*.json') ] )
@@ -114,7 +153,7 @@ function allKeysStream() {
 // collects a bunch of data, makes an array out of it, and emits it 
 
 function collect() {
-
+  console.log("collect")
   var a = new stream.Stream ()
     , array = [], isDone = false;
  
@@ -201,6 +240,15 @@ function pendingForAddress(address){
   }));
 }
 
+function resolveTXHandlersList(r, resolve, resolver) {
+  if(resolve){
+    return Promise.map(r, function(handlers) { return handlers[resolver]; });
+  } 
+  else {
+    return Promise.map(r, function(handlers) { return handlers.txHash; });
+  }
+}
+
 function txToJSON(t) {
   var result = {
     "nonce"      : t.nonce,
@@ -221,6 +269,26 @@ function txToJSON(t) {
   return result;
 }
 
+String.prototype.hexEncode8 = function(){
+  var hex, i;
+  var result = "";
+  for (i=0; i<this.length; i++) {
+    hex = this.charCodeAt(i).toString(16);
+    result += ("0"+hex).slice(-2);
+  }
+  return result
+}
+
+String.prototype.hexDecode8 = function(){
+  var j;
+  var hexes = this.match(/.{1,2}/g) || [];
+  var back = "";
+  for(j = 0; j<hexes.length; j++) {
+    back += String.fromCharCode(parseInt(hexes[j], 16));
+  }
+  return back;
+}
+
 module.exports = {
   contractNameStream : contractNameStream,
   contractsStream : contractsStream,
@@ -237,5 +305,18 @@ module.exports = {
   allKeysStream : allKeysStream,
   pendingForUser: pendingForUser,
   pendingForAddress: pendingForAddress,
-  txToJSON: txToJSON
+  txToJSON: txToJSON,
+  resolveTXHandlersList: resolveTXHandlersList,
+  fromSolidity: function(x){
+    if(x)
+      return x.split('0').join('').hexDecode8();
+    else
+      return undefined;
+  },
+  toSolidity: function(x){
+    if(x)
+      return ("0".repeat(64)+x.hexEncode8()).slice(-64);
+    else
+      return undefined;
+  }
 };
