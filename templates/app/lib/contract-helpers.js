@@ -22,7 +22,13 @@ var getContents = function(file, cb) {
 };
 
 var getPath = function(file, cb) {
-  cb(null,file.relative);
+  if(file.relative.includes('\\')) {
+    var index = file.relative.lastIndexOf('\\');
+    var val = file.relative.slice(index+1);
+    cb(null,val);
+  } else {
+    cb(null,file.relative);
+  }
 };
 
 // var getDir = function(file, cb) {

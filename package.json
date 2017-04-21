@@ -1,6 +1,6 @@
 {
   "name": "blockapps-bloc",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "A minimal build and deploy tool for the BlockApps API",
   "main": "bin/main.js",
   "bin": {
@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "bignumber.js": "^2.0.7",
-    "blockapps-js": "blockapps/blockapps-js#monostrato-cutover",
+    "blockapps-js": "blockapps/blockapps-js",
     "bluebird": "^2.9.34",
     "body-parser": "^1.14.1",
     "chalk": "^1.1.3",

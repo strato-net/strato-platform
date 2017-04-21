@@ -5,7 +5,7 @@
 [![Join the chat at https://gitter.im/blockapps/bloc](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/blockapps/bloc?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![Build Status](https://travis-ci.org/blockapps/bloc.svg)](https://travis-ci.org/blockapps/bloc) [![npm version](https://badge.fury.io/js/blockapps-bloc.svg)](https://badge.fury.io/js/blockapps-bloc)
 
 `bloc` makes building applications for the Ethereum blockchain as easy. Bloc uses the [blockapps api](https://blockapps.net) and provides: 
-* Application scaffoldig and generated UI based on smart contracts methods to test interactions
+* Application scaffolding and generated UI based on smart contracts methods to test interactions
 * Generated Smart Contract APIs to make working with Ethereum smart contracts easy in any language
 * Ethereum Account key management
 
@@ -77,12 +77,12 @@ bloc genkey
 
 This generates a new user with name `admin` as well as a private key and fills it with test-ether (note- free sample Ether is only available on the test network, of course). You can view the address information in the newly created `app/users/admin/<address>.json` file. Also, beware that this file contains your private key, so if you intend to use this address on the live network, make sure you keep this file secure and hidden.
 
-The new account has also been created on the blockchain, and you can view account information by using our REST API directly in a browser by visiting http://strato-dev3.blockapps.net/eth/v1.2/account?address= &lt; fill in your address here &gt;
+The new account has also been created on the blockchain, and you can view account information by using our REST API directly in a browser by visiting http://strato-dev4.blockapps.net/eth/v1.2/account?address= &lt; fill in your address here &gt;
 
 An example output is: 
 
 ```sh
-curl "http://strato-dev3.blockapps.net/eth/v1.2/account?address=6ad318ce7b79c37b262fbda8a603365bbdbd41be"
+curl "http://strato-dev4.blockapps.net/eth/v1.2/account?address=6ad318ce7b79c37b262fbda8a603365bbdbd41be"
 ```
 ```json
 [
@@ -122,7 +122,7 @@ bloc upload <ContractName>
 You will now see that Ether has been deducted from your account
 
 ```sh
-curl "http://strato-dev3.blockapps.net/eth/v1.2/account?address=6ad318ce7b79c37b262fbda8a603365bbdbd41be"
+curl "http://strato-dev4.blockapps.net/eth/v1.2/account?address=6ad318ce7b79c37b262fbda8a603365bbdbd41be"
 ```
 ```json
 [
@@ -141,7 +141,7 @@ curl "http://strato-dev3.blockapps.net/eth/v1.2/account?address=6ad318ce7b79c37b
 Also, the newly created contract has been given its own address, which you can view in the data in the `app/users/<username>` folder.  Viewing contract information, including compiled bytecode for your Solidity contract can be done using the same URL that you use to view your own account information.
 
 ```sh
-curl "http://strato-dev3.blockapps.net/eth/v1.1/account?address=47424dbce71e182d2836045b76a7e1ce459d6e08"
+curl "http://strato-dev4.blockapps.net/eth/v1.2/account?address=47424dbce71e182d2836045b76a7e1ce459d6e08"
 ```
 
 ```json

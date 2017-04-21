@@ -14,14 +14,14 @@ var path = require('path');
  * @param {object} Constructor arguments
  * @return {array}
  */
-function upload(contractName, privkey, argObj, params) { 
+function upload(contractName, privkey, argObj, params) {
   var compiledFile = path.join('app', 'meta', contractName, contractName + ".json");
 
   var id = setInterval(function () { console.log("    ...waiting for transaction to be mined"); }, 2000);
 
   var toRet = fs.readFileAsync(compiledFile, {encoding:"utf8"}).
     then(Solidity.attach).
-    then(function(solObj) { 
+    then(function(solObj) {
       var toret;
       if (argObj.constructor === Object) {
         toret = solObj.construct(argObj);
@@ -33,7 +33,6 @@ function upload(contractName, privkey, argObj, params) {
       // We now have handlers.enable == true in routes/users.js
       return toret.txParams(params).callFrom(privkey);
     }).
-    get("contract").
     then(function(contrObj){
       var addr = contrObj.account.address.toString();
       var uploadedFile = path.join('app', 'meta', contractName, addr + ".json");
@@ -49,9 +48,9 @@ function upload(contractName, privkey, argObj, params) {
         fs.writeFileAsync(arr[1], arr[2])
         ).return(arr);
     })
-   .catch(function (err) { 
+   .catch(function (err) {
      console.log("there was an error: " + err);
-     clearInterval(id); 
+     clearInterval(id);
      Promise.reject(err.toString());
    });
 
