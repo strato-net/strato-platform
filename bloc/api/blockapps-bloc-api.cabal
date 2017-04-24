@@ -18,6 +18,7 @@ library
     BlockApps.Bloc.API
     BlockApps.Bloc.Crypto
     BlockApps.Bloc.API.Addresses
+    BlockApps.Bloc.API.SwaggerSchema
     BlockApps.Bloc.API.Contracts
     BlockApps.Bloc.API.Search
     BlockApps.Bloc.API.Users
@@ -36,6 +37,7 @@ library
                , generic-random
                , http-api-data
                , http-media
+               , lens
                , QuickCheck
                , quickcheck-instances
                , saltine
@@ -44,6 +46,7 @@ library
                , servant-server
                , servant-docs
                , servant-mock
+               , swagger2
                , text
 
 source-repository head

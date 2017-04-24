@@ -25,19 +25,32 @@ import Test.QuickCheck.Instances ()
 import Web.HttpApiData
 
 import BlockApps.Ethereum
+import BlockApps.Bloc.API.SwaggerSchema
 
 newtype Password = Password ByteString
   deriving (Eq,Show,Generic)
+
+instance ToParamSchema Password where
+  toParamSchema _ = passwordParamSchema
+
+instance ToSchema Password where
+  declareNamedSchema _ = plain $ passwordSchema
+
 instance ToJSON Password where
   toJSON (Password pw) = toJSON $ Text.decodeUtf8 pw
+
 instance FromJSON Password where
   parseJSON = fmap (Password . Text.encodeUtf8) . parseJSON
+
 instance Arbitrary Password where
   arbitrary = genericArbitrary uniform
+
 instance IsString Password where
   fromString = Password . Char8.pack
+
 instance ToHttpApiData Password where
   toUrlPiece (Password pw) = Text.decodeUtf8 pw
+
 instance FromHttpApiData Password where
   parseUrlPiece = return . Password . Text.encodeUtf8
 
