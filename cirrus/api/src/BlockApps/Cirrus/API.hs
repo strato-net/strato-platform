@@ -1,15 +1,13 @@
-{-# LANGUAGE
-    DataKinds
-  , TypeOperators
-#-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE TypeOperators #-}
 
 module BlockApps.Cirrus.API where
 
-import Data.Aeson
-import Data.Text (Text)
-import Servant.API
+import           Data.Aeson
+import           Data.Text               (Text)
+import           Servant.API
 
-import BlockApps.Solidity.Xabi
+import           BlockApps.Solidity.Xabi
 
 type API =
   "contract/" -- why do I need a slash?

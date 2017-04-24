@@ -1,30 +1,28 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    DataKinds
-  , DeriveGeneric
-  , FlexibleInstances
-  , MultiParamTypeClasses
-  , TypeOperators
-#-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module BlockApps.Bloc.API.Search where
 
-import Data.Aeson
-import Data.Aeson.Casing
-import Data.Map.Strict (Map)
-import Data.Text (Text)
-import GHC.Generics
-import Generic.Random.Generic
-import Servant.API
-import Servant.Docs
+import           Data.Aeson
+import           Data.Aeson.Casing
+import           Data.Map.Strict                  (Map)
+import           Data.Text                        (Text)
+import           Generic.Random.Generic
+import           GHC.Generics
+import           Servant.API
+import           Servant.Docs
 
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances        ()
 
-import BlockApps.Bloc.API.Utils
-import BlockApps.Ethereum
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
 
 --------------------------------------------------------------------------------
 -- | Routes and Types
@@ -53,7 +51,7 @@ instance ToParam (QueryParams "props" Text) where
 
 data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
-  , searchcontractstateState :: Map Text SolidityValue
+  , searchcontractstateState   :: Map Text SolidityValue
   } deriving (Eq, Show, Generic)
 instance ToJSON SearchContractState where
   toJSON = genericToJSON (aesonPrefix camelCase)

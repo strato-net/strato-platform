@@ -1,11 +1,11 @@
--- | 
+-- |
 -- Module: ParserTypes
 -- Description: Types used throughout solidity-abi, primarily the ones
---   containing the structure of a parsed contract.  
+--   containing the structure of a parsed contract.
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module BlockApps.Solidity.Parse.ParserTypes where
 
-import Text.Parsec
+import           Text.Parsec
 
 -- | Source file names; also source file /paths/.
 type FileName = SourceName
@@ -32,6 +32,5 @@ getContractName = getState
 
 -- | Not actually used.
 type SolidityValue = String
-
 
 

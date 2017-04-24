@@ -49,10 +49,10 @@ module BlockApps.Solidity.Int
   , Int248
   ) where
 
-import Data.Int
-import Data.LargeInt
-import Data.LargeWord
-import Data.Word
+import           Data.Int
+import           Data.LargeInt
+import           Data.LargeWord
+import           Data.Word
 
 type Word24 = LargeKey Word8 Word16
 type Word40 = LargeKey Word8 Word32

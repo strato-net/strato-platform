@@ -1,42 +1,39 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    DataKinds
-  , DeriveGeneric
-  , GeneralizedNewtypeDeriving
-  , FlexibleInstances
-  , MultiParamTypeClasses
-  , OverloadedStrings
-
-#-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
 
 module BlockApps.Bloc.API.Utils where
 
-import Data.Aeson
-import Data.Aeson.Casing
+import           Data.Aeson
+import           Data.Aeson.Casing
 import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Data.String
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Generic.Random.Generic
-import GHC.Generics
-import Servant.API
-import Servant.Docs
-import qualified Network.HTTP.Media as M
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
+import           Data.String
+import           Data.Text                  (Text)
+import qualified Data.Text                  as Text
+import           Generic.Random.Generic
+import           GHC.Generics
+import qualified Network.HTTP.Media         as M
+import           Servant.API
+import           Servant.Docs
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances  ()
 
-import BlockApps.Ethereum
+import           BlockApps.Ethereum
 --------------------------------------------------------------------------------
 
 type GetHomepage = Get '[PlainText] Homepage
-whoWould'veThoughtThisIsActuallyTheHomepage :: Homepage
-whoWould'veThoughtThisIsActuallyTheHomepage = Homepage "home page!"
+whoWouldveThoughtThisIsActuallyTheHomepage :: Homepage
+whoWouldveThoughtThisIsActuallyTheHomepage = Homepage "home page!"
 newtype Homepage = Homepage { unHomepage :: Text }
     deriving (Eq, Ord, Read, Show, Generic, MimeRender PlainText, MimeUnrender PlainText)
 instance ToSample Homepage where
     toSamples _ = noSamples
 instance Arbitrary Homepage where -- seriously, lmfao
-    arbitrary = return whoWould'veThoughtThisIsActuallyTheHomepage
+    arbitrary = return whoWouldveThoughtThisIsActuallyTheHomepage
 
 data HTMLifiedJSON
 instance Accept HTMLifiedJSON where
@@ -99,7 +96,7 @@ instance Arbitrary UserName where arbitrary = genericArbitrary uniform
 data TxParams = TxParams
   { txparamsGasLimit :: Maybe Gas
   , txparamsGasPrice :: Maybe Wei
-  , txparamsNonce :: Maybe Nonce
+  , txparamsNonce    :: Maybe Nonce
   } deriving (Eq,Show,Generic)
 instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
 instance ToJSON TxParams where

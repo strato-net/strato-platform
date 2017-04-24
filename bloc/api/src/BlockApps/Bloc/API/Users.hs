@@ -1,39 +1,36 @@
-{-# LANGUAGE
-    DataKinds
-  , DeriveGeneric
-  , GeneralizedNewtypeDeriving
-  , OverloadedStrings
-  , LambdaCase
-  , MultiParamTypeClasses
-  , TypeOperators
-#-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeOperators              #-}
 
 module BlockApps.Bloc.API.Users where
 
-import Data.Aeson hiding (Value)
-import Data.Aeson.Casing
+import           Data.Aeson                hiding (Value)
+import           Data.Aeson.Casing
 -- import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.Map (Map)
-import Data.Text (Text)
+import qualified Data.ByteString.Lazy      as ByteString.Lazy
+import           Data.Map                  (Map)
+import           Data.Text                 (Text)
 -- import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Generic.Random.Generic
-import GHC.Generics
-import Numeric.Natural
-import Servant.API
-import Servant.Docs
-import qualified Network.HTTP.Media as M
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
-import Web.FormUrlEncoded
+import qualified Data.Text.Encoding        as Text
+import           Generic.Random.Generic
+import           GHC.Generics
+import qualified Network.HTTP.Media        as M
+import           Numeric.Natural
+import           Servant.API
+import           Servant.Docs
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances ()
+import           Web.FormUrlEncoded
 
 
-import BlockApps.Bloc.Crypto
-import BlockApps.Bloc.API.Utils
-import BlockApps.Ethereum
-import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Types
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Crypto
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Xabi
+import           BlockApps.Strato.Types
 
 --------------------------------------------------------------------------------
 -- | Routes and types
@@ -50,7 +47,7 @@ type PostUsersUser = "users"
   :> ReqBody '[FormUrlEncoded, JSON] PostUsersUserRequest
   :> Post '[HTMLifiedAddress, JSON] Address
 data PostUsersUserRequest = PostUsersUserRequest
-  { userFaucet :: Int
+  { userFaucet   :: Int
   , userPassword :: Password
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary uniform
@@ -76,9 +73,9 @@ type PostUsersSend = "users"
   :> Post '[HTMLifiedJSON, JSON] PostTransaction
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
-  , sendValue :: Natural
-  , sendPassword :: Password
-  , sendTxParams :: Maybe TxParams
+  , sendValue     :: Natural
+  , sendPassword  :: Password
+  , sendTxParams  :: Maybe TxParams
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostSendParameters where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendParameters where
@@ -101,12 +98,12 @@ type PostUsersContract = "users"
   :> ReqBody '[JSON] PostUsersContractRequest
   :> Post '[HTMLifiedAddress, JSON] Address
 data PostUsersContractRequest = PostUsersContractRequest
-  { postuserscontractrequestSrc :: Text
+  { postuserscontractrequestSrc      :: Text
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Text
-  , postuserscontractrequestArgs :: Maybe (Map Text Text)
+  , postuserscontractrequestArgs     :: Maybe (Map Text Text)
   , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue :: Natural
+  , postuserscontractrequestValue    :: Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
 -- TODO: This end point needs to support form url encoding
@@ -142,9 +139,9 @@ type PostUsersUploadList = "users"
   :> ReqBody '[JSON] UploadListRequest
   :> Post '[JSON] [PostUsersUploadListResponse]
 data UploadListRequest = UploadListRequest
-  { uploadlistPassword :: Password
+  { uploadlistPassword  :: Password
   , uploadlistContracts :: [UploadListContract]
-  , uploadlistResolve :: Bool
+  , uploadlistResolve   :: Bool
   } deriving (Eq,Show,Generic)
 instance ToJSON UploadListRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -155,9 +152,9 @@ instance ToSample UploadListRequest where
   toSamples _ = noSamples
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
-  , uploadlistcontractArgs :: Map Text Text
-  , uploadlistcontractTxParams :: Maybe TxParams
-  , uploadlistcontractValue :: Maybe Natural
+  , uploadlistcontractArgs         :: Map Text Text
+  , uploadlistcontractTxParams     :: Maybe TxParams
+  , uploadlistcontractValue        :: Maybe Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
 instance ToJSON UploadListContract where
@@ -175,7 +172,7 @@ instance FromJSON PostUsersUploadListResponse where
   parseJSON = withObject "PostUsersUploadListResponse" $ \obj -> do
     str <- obj .: "contractJSON"
     case eitherDecode (ByteString.Lazy.fromStrict (Text.encodeUtf8 str)) of
-      Left err -> fail err
+      Left err      -> fail err
       Right details -> return $ PostUsersUploadListResponse details
 instance ToSample PostUsersUploadListResponse where
   toSamples _ = noSamples
@@ -192,9 +189,9 @@ type PostUsersMethod = "users"
   :> Post '[JSON,HTMLifiedPlainText] PostUsersMethodResponse
 data PostUsersMethodRequest = PostUsersMethodRequest
   { postuserscontractmethodPassword :: Password
-  , postuserscontractmethodMethod :: Text
-  , postuserscontractmethodArgs :: Map Text Text
-  , postuserscontractmethodValue :: Natural
+  , postuserscontractmethodMethod   :: Text
+  , postuserscontractmethodArgs     :: Map Text Text
+  , postuserscontractmethodValue    :: Natural
   , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
@@ -207,7 +204,7 @@ instance ToSample PostUsersMethodRequest where
   toSamples _ = noSamples
 data PostUsersMethodResponse
   = PostUsersMethodResponse
-  { postusersmethodresponseValues :: Text
+  { postusersmethodresponseValues            :: Text
   , postusersmethodresponseTransactionResult :: TransactionResult
   }
   deriving (Eq,Show,Generic)
@@ -234,8 +231,8 @@ type PostUsersSendList = "users"
   :> Post '[JSON] [PostSendListResponse]
 data PostSendListRequest = PostSendListRequest
   { postsendlistrequestPassword :: Password
-  , postsendlistrequestResolve :: Bool
-  , postsendlistrequestTxs :: [SendTransaction]
+  , postsendlistrequestResolve  :: Bool
+  , postsendlistrequestTxs      :: [SendTransaction]
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostSendListRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostSendListRequest where
@@ -246,8 +243,8 @@ instance ToSample PostSendListRequest where
   toSamples _ = noSamples
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
-  , sendtransactionValue :: Natural
-  , sendtransactionTxParams :: Maybe TxParams
+  , sendtransactionValue     :: Natural
+  , sendtransactionTxParams  :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
 instance ToJSON SendTransaction where
@@ -275,8 +272,8 @@ type PostUsersMethodList = "users"
   :> Post '[JSON] [Either Keccak256 PostUsersMethodResponse]
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password
-  , postmethodlistrequestResolve :: Bool
-  , postmethodlistrequestTxs :: [MethodCall]
+  , postmethodlistrequestResolve  :: Bool
+  , postmethodlistrequestTxs      :: [MethodCall]
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostMethodListRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostMethodListRequest where
@@ -286,12 +283,12 @@ instance FromJSON PostMethodListRequest where
 instance ToSample PostMethodListRequest where
   toSamples _ = noSamples
 data MethodCall = MethodCall
-  { methodcallContractName :: Text
+  { methodcallContractName    :: Text
   , methodcallContractAddress :: Address
-  , methodcallMethodName :: Text
-  , methodcallArgs :: Map Text Text
-  , methodcallValue :: Natural
-  , methodcallTxParams :: Maybe TxParams
+  , methodcallMethodName      :: Text
+  , methodcallArgs            :: Map Text Text
+  , methodcallValue           :: Natural
+  , methodcallTxParams        :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
 instance ToJSON MethodCall where
