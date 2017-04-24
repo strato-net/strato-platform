@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Bloc.API.SwaggerSchema
 
@@ -6,7 +7,7 @@ module BlockApps.Bloc.API.SwaggerSchema
     blocSchemaOptions,
 
     -- ** re-exports
-    plain,
+    named,
     module Data.Swagger
 
   )
@@ -16,7 +17,7 @@ import           Control.Lens                 ((&), (.~), (?~))
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
 import           Data.Monoid                  ()
 import           Data.Swagger
-import           Data.Swagger.Internal.Schema (plain)
+import           Data.Swagger.Internal.Schema (named)
 import           Data.Swagger.SchemaOptions   (SchemaOptions (..),
                                                defaultSchemaOptions)
 import           Numeric.Natural
@@ -41,4 +42,4 @@ instance ToParamSchema Natural where
     & minimum_ ?~ fromInteger 0
 
 instance ToSchema Natural where
-  declareNamedSchema = plain . paramSchemaToSchema
+  declareNamedSchema = pure . named "Natural" . paramSchemaToSchema

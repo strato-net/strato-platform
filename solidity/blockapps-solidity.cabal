@@ -42,6 +42,7 @@ library
     , containers
     , generic-random
     , http-api-data
+    , lens
     , largeint
     , largeword
     , logging-effect
@@ -50,6 +51,7 @@ library
     , quickcheck-instances
     , servant
     , servant-docs
+    , swagger2
     , text
     , unordered-containers
     , vector

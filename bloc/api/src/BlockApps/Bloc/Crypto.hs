@@ -1,5 +1,6 @@
 {-# LANGUAGE
     DeriveGeneric
+  , OverloadedStrings
 #-}
 
 module BlockApps.Bloc.Crypto where
@@ -31,10 +32,10 @@ newtype Password = Password ByteString
   deriving (Eq,Show,Generic)
 
 instance ToParamSchema Password where
-  toParamSchema _ = passwordParamSchema
+  toParamSchema = const passwordParamSchema
 
 instance ToSchema Password where
-  declareNamedSchema _ = plain $ passwordSchema
+  declareNamedSchema =  const . pure . named "Password" $ passwordSchema
 
 instance ToJSON Password where
   toJSON (Password pw) = toJSON $ Text.decodeUtf8 pw

@@ -7,12 +7,13 @@
 
 module BlockApps.Bloc.API.Users where
 
-import           Control.Lens                     ((&), (?~), mapped)
+import           Control.Lens                     (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import qualified Data.ByteString.Lazy             as ByteString.Lazy
 import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
 import           Data.Map                         (Map)
+import qualified Data.Map                         as Map
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -74,6 +75,11 @@ instance ToSample PostUsersUserRequest where
     , userPassword = "securePassword"
     }
 
+instance ToSchema PostUsersUserRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Form to create a user"
+    & mapped.schema.example ?~ toJSON (PostUsersUserRequest 1 "myPassword")
+
 --------------------------------------------------------------------------------
 
 type PostUsersSend = "users"
@@ -105,6 +111,19 @@ instance ToSample PostSendParameters where
     , sendPassword = "securePassword"
     , sendTxParams = Nothing
     }
+
+instance ToSchema PostSendParameters where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Send ether from one account to another"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostSendParameters
+      ex = PostSendParameters
+        { sendToAddress = Address 0xdeadbeef
+        , sendValue = 10
+        , sendPassword = "securePassword"
+        , sendTxParams = Nothing
+        }
 
 --------------------------------------------------------------------------------
 
@@ -196,6 +215,28 @@ instance Arbitrary UploadListRequest where arbitrary = genericArbitrary uniform
 instance ToSample UploadListRequest where
   toSamples _ = noSamples
 
+instance ToSchema UploadListRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Make a request to upload a list of contracts"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      exContract1 :: UploadListContract
+      exContract1 = UploadListContract
+        { uploadlistcontractContractName = "UserInfoContract"
+        , uploadlistcontractArgs = Map.fromList [("user", "Bob"), ("age","1")]
+        , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
+        , uploadlistcontractValue = Nothing
+        }
+      exContract2 :: UploadListContract
+      exContract2 = UploadListContract
+        { uploadlistcontractContractName = "AccountsContract"
+        , uploadlistcontractArgs = Map.fromList [("accountType", "Checking"), ("balance","10")]
+        , uploadlistcontractTxParams = Nothing
+        , uploadlistcontractValue = Nothing
+        }
+      ex :: UploadListRequest
+      ex = UploadListRequest "SecretPassword" [exContract1, exContract2] True
+
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs         :: Map Text Text
@@ -210,6 +251,19 @@ instance ToJSON UploadListContract where
 
 instance FromJSON UploadListContract where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSchema UploadListContract where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "A contract in a list of to-upload contracts"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: UploadListContract
+      ex = UploadListContract
+        { uploadlistcontractContractName = "SampleContract"
+        , uploadlistcontractArgs = Map.fromList [("user", "Bob"), ("age","1")]
+        , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
+        , uploadlistcontractValue = Nothing
+        }
 
 newtype PostUsersUploadListResponse = PostUsersUploadListResponse
   { contractJSON :: ContractDetails } deriving (Eq,Show,Generic)
@@ -262,6 +316,10 @@ instance FromJSON PostUsersContractMethodRequest where
 
 instance ToSample PostUsersContractMethodRequest where
   toSamples _ = noSamples
+
+--instance ToSchema PostUsersContractMethodRequest where
+--  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+--    & 
 
 newtype PostUsersContractMethodResponse =
   PostUsersContractMethodResponse Text deriving (Eq,Show,FromJSON,ToJSON,Arbitrary)
