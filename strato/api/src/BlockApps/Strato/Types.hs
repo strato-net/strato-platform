@@ -6,6 +6,7 @@
   , OverloadedStrings
   , RecordWildCards
   , TypeApplications
+  , FlexibleInstances
 #-}
 
 module BlockApps.Strato.Types
@@ -35,8 +36,10 @@ module BlockApps.Strato.Types
   ) where
 
 import Control.Applicative
+import Control.Lens  ((&),(?~),mapped)
 import Data.Aeson
 import Data.Aeson.Casing
+import Data.Aeson.Casing.Internal (dropFPrefix)
 import qualified Data.Binary as Binary
 import Data.Foldable
 import qualified Data.HashMap.Strict as HashMap
@@ -44,6 +47,8 @@ import Data.LargeWord
 import Data.List.NonEmpty (NonEmpty)
 import Data.Map.Strict (Map)
 import Data.Maybe
+import Data.Swagger
+import Data.Swagger.Internal.Schema (named)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time
@@ -65,29 +70,39 @@ import BlockApps.Ethereum
   , addressString
   , stringAddress
   , Keccak256 (..)
+  , keccak256
   , keccak256lazy
   , Nonce
   )
 import BlockApps.Solidity.Xabi
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
+
 instance (Integral n, Show n) => Show (Hex n) where
   show (Hex n) = showHex n ""
+
 instance (Eq n, Num n) => Read (Hex n) where
   readPrec = Hex <$> readP_to_Prec (const readHexP)
   --I'm not sure what `d` precision parameter is used for
+
 instance Num n => FromJSON (Hex n) where
   parseJSON value = do
     string <- parseJSON value
     case fmap fromInteger (readMaybe ("0x" ++ string)) of
       Nothing -> fail $ "not hex encoded: " ++ string
       Just n -> return $ Hex n
+
 instance (Integral n, Show n) => ToJSON (Hex n) where
   toJSON = toJSON . show
+
 instance (Integral n, Show n) => ToHttpApiData (Hex n) where
   toUrlPiece = Text.pack . show
+
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
+
+instance ToSchema (Hex Word256) where
+  declareNamedSchema = const . pure $ named "hex word256" binarySchema
 
 -- hack to deal with weird `ToJSON`s
 newtype Strung x = Strung { unStrung :: x } deriving (Eq, Show, Generic)
@@ -332,7 +347,20 @@ data TransactionResult = TransactionResult
   , transactionresultNewStorage :: Text
   , transactionresultDeletedStorage :: Text
   } deriving (Show, Generic, Eq)
+
 instance ToJSON TransactionResult where
   toJSON = genericToJSON (aesonPrefix camelCase)
+
 instance FromJSON TransactionResult where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSchema TransactionResult where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "Transaction Result"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: TransactionResult
+      ex = TransactionResult (keccak256 "blockHask") (keccak256 "txhash") "I'm a tx result message" "I'm a tx result response" "tx trace" (Hex 0xFFFFFFFFFFFFFFFF) (Hex 0x000000000000000A)  "[MyNewContractA, MyNewContractB]" "[MyOldContract]" "I am a state Diff" 0.2321 "New Storage" "Deleted Storage"
+
+stratoSchemaOptions :: SchemaOptions
+stratoSchemaOptions = defaultSchemaOptions {fieldLabelModifier = camelCase . dropFPrefix}

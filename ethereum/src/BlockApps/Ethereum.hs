@@ -64,7 +64,7 @@ import Data.Monoid
 import Data.Proxy
 import Data.RLP
 import Data.Swagger
-import Data.Swagger.Internal.Schema (plain)
+import Data.Swagger.Internal.Schema (plain, named)
 import qualified Data.Text as Text
 import Data.Time
 import Data.Word
@@ -75,7 +75,7 @@ import Servant.API
 import Servant.Docs
 import Test.QuickCheck
 import Text.Read hiding (String)
-import Web.FormUrlEncoded
+import Web.FormUrlEncoded hiding (fieldLabelModifier)
 
 --------------------------------------------------------------------------------
 
@@ -143,6 +143,7 @@ instance ToParamSchema Address where
 
 instance ToSchema Address where
   declareNamedSchema proxy = (plain . paramSchemaToSchema $ proxy)
+    & mapped.name ?~ "Address"
     & mapped.schema.example ?~ toJSON (Address 0xdeadbeef)
 
 deriveAddress :: PubKey -> Address
@@ -208,6 +209,9 @@ keccak256lazy = Keccak256 . hashlazy
 instance ToSample Keccak256 where
   toSamples _ =
     samples [keccak256lazy (Binary.encode @ Integer n) | n <- [1..10]]
+
+instance ToSchema Keccak256 where
+  declareNamedSchema = const . pure $ named "Keccak256" byteSchema
 
 keccak256Address :: ByteString -> Address
 keccak256Address
@@ -402,7 +406,7 @@ instance ToParamSchema Nonce where
   toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
 
 instance ToSchema Nonce where
-  declareNamedSchema = plain . paramSchemaToSchema
+  declareNamedSchema = pure . named "Nonce" . paramSchemaToSchema
 
 instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
 
@@ -421,7 +425,7 @@ instance ToParamSchema Wei where
   toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
 
 instance ToSchema Wei where
-  declareNamedSchema = plain . paramSchemaToSchema
+  declareNamedSchema = pure . named "Wei" . paramSchemaToSchema
 
 instance ToJSON Wei where
   toJSON (Wei g) = toJSON $ toInteger g
@@ -447,7 +451,7 @@ instance ToParamSchema Gas where
   toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
 
 instance ToSchema Gas where
-  declareNamedSchema = plain . paramSchemaToSchema
+  declareNamedSchema = pure . named "Gas" . paramSchemaToSchema
 
 instance RLPEncodable Gas where
   rlpEncode (Gas n) = rlpEncode $ toInteger n
