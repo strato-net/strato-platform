@@ -160,7 +160,7 @@ spec = do
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersMethodResponse values _) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 3"
+      values `shouldBe` "3"
 
       -- get state and verify
 

@@ -1,9 +1,12 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module BlockApps.Bloc.Server.Users where
+
+import Debug.Trace
 
 import           Control.Arrow
 import           Control.Monad.Except
@@ -170,6 +173,8 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
             "Success!" -> do
               senderAccounts <- blocStrato $ getAccountsFilter
                 accountsFilterParams{qaAddress = Just addr}
+              traceM "senderAccounts"
+              traceShowM senderAccounts
               case senderAccounts of
                 [] -> throwError $ AnError "No sender account found"
                 senderAccount:_ -> return . Text.pack . show . unStrung $ accountBalance senderAccount
@@ -201,7 +206,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
 
-    
+
     argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
     tx <- prepareTx
       userName
@@ -242,12 +247,12 @@ postUsersContractMethod
   (PostUsersMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
-                           
+
     eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName contractName) (Unnamed contractAddr)
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
-    
+
     let maybeFunc = Map.lookup funcName (fields $ mainStruct contract')
 
     sel <-
@@ -267,6 +272,8 @@ postUsersContractMethod
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+    traceM "resultXabiTypes"
+    traceShowM resultXabiTypes
     let
       orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
     orderedResultTypes <-
@@ -276,8 +283,14 @@ postUsersContractMethod
               (error "missing typedefs in postUsersContractMethod")
               indexedTypeType
 
-
     txResult <- pollTxResult hash
+
+    traceM "orderedResultTypes"
+    traceShowM orderedResultTypes
+
+    traceM "transactionresultResponse txResult"
+    traceShowM (transactionresultResponse txResult)
+
     let
       mFormattedResponse = Text.concat <$>
         convertResultResToTexts
@@ -286,12 +299,15 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
+    traceM "formattedResponse"
+    traceShowM formattedResponse
+
     return $ PostUsersMethodResponse formattedResponse txResult
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
   let
-    byteResp = Text.encodeUtf8 txResp
+    byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
   in case bytestringToValues byteResp responseTypes of
     Nothing   -> Nothing
     Just vals -> traverse valueToText vals
