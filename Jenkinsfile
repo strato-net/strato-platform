@@ -11,13 +11,15 @@ node ('cd9') {
    stage('Build') {
     echo 'doing build'
     sh 'echo $pwd'
-      sh 'ls -ltr'
-      dir('blockapps-haskell') {
-        sh 'echo before stack build'
-        sh 'stack build'
-      }
-   slackSend (color: 'good', message: "Build Completed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
+    sh 'ls -ltr'
+    sh 'echo installing hlint'
+    sh 'stack install hlint'
+    sh 'echo before hlint && pwd && ls -altr'
+    sh 'stack exec hlint -- .'
+    sh 'echo before stack build'
+    sh 'stack build'
    }
+   slackSend (color: 'good', message: "Build Completed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
    
    stage ('Test')
    {
