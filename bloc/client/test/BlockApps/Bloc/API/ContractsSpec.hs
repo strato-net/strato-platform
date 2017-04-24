@@ -17,6 +17,7 @@ import BlockApps.Bloc.API.Contracts
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Client
+import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
@@ -84,15 +85,22 @@ spec = do
       symbols `shouldBe` [SymbolName "storedData"]
   describe "getContractsState" $
     it "get contract state for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM
+      Right contracts <- runClientM
         (getContractsState
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
+      contracts `shouldBe`
+        ( Map.fromList
+          [ ("get",SolidityValueAsString "function () returns (UInt256)")
+          , ("set",SolidityValueAsString "function (UInt256) returns ()")
+          , ("storedData",SolidityValueAsString "0")
+          ]
+        )
   describe "getContractsStateMapping" $
     it "get contract state for a mapping within an uploaded contract at a specific address" $ \ TestConfig {..} -> do
+      pendingWith "state mapping endpoint not yet implemented"
       contractsEitherSimple <- runClientM
         (getContractsStateMapping
           (ContractName simpleMappingContractName)
@@ -122,6 +130,7 @@ spec = do
       contractsEitherBool `shouldSatisfy` isRight
   describe "getContractsStates" $
     it "get contract states all uploaded contracts at a specific name" $ \ TestConfig {..} -> do
+      pendingWith "contract multiple states endpoint not yet implemented"
       contractsEither <- runClientM
         (getContractsStates
           (ContractName simpleMappingContractName)

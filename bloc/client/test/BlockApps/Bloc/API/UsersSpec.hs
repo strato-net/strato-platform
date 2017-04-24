@@ -11,6 +11,7 @@ module BlockApps.Bloc.API.UsersSpec where
 import Control.Concurrent
 import qualified Data.Map.Strict as Map
 import Data.Either
+import qualified Data.Text as Text
 import Servant.Client
 import Test.Hspec
 
@@ -18,19 +19,18 @@ import BlockApps.Bloc.API
 import BlockApps.Bloc.API.SpecUtils
 import BlockApps.Bloc.Client
 import BlockApps.Ethereum
-
--- TODO: user/contract methods Addresses may need to be MayBe Named Address
+import BlockApps.Strato.Types
 
 spec :: SpecWith TestConfig
 spec = do
   describe "getUsers" $
     it "should get a list of users" $ \ TestConfig {..} -> do
-      usersEither <- runClientM getUsers (ClientEnv mgr blocUrl)
-      usersEither `shouldSatisfy` isRight
+      Right users <- runClientM getUsers (ClientEnv mgr blocUrl)
+      users `shouldContain` [UserName "testUser1", UserName "testUser2"]
   describe "getUsersUser" $
     it "should get a list of user's addresses" $ \ TestConfig {..} -> do
-      userAddressesEither <- runClientM (getUsersUser userName) (ClientEnv mgr blocUrl)
-      userAddressesEither `shouldSatisfy` isRight
+      Right userAddresses <- runClientM (getUsersUser userName) (ClientEnv mgr blocUrl)
+      userAddresses `shouldContain` [userAddress]
   describe "postUsersUser" $
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
@@ -43,8 +43,8 @@ spec = do
       let
         postSendParameters = PostSendParameters (toUserAddress) 100 pw txParams
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345" txParams
-      postSendEither <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
-      postSendEither `shouldSatisfy` isRight
+      Right postSend <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
+      postSend `shouldSatisfy` (== Strung 100) . posttransactionValue
       postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr blocUrl)
       postSendEitherBad `shouldSatisfy` isLeft
   describe "postUsersContract" $
@@ -99,10 +99,11 @@ spec = do
           , postuserscontractmethodValue = 0
           , postuserscontractmethodTxParams = txParams
           }
-      postUsersContractMethodEither <- runClientM
+      Right response <- runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
         (ClientEnv mgr blocUrl)
-      postUsersContractMethodEither `shouldSatisfy` isRight
+      response `shouldSatisfy`
+        (== "0") . postusersmethodresponseValues
   describe "postUsersSendList" $
     it "should post a list of send transactions" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -117,10 +118,17 @@ spec = do
               , sendtransactionTxParams = txParams
               }
           }
-      postSendListEither <- runClientM
+      Right balances <- runClientM
         (postUsersSendList userName userAddress postSendListRequest)
         (ClientEnv mgr blocUrl)
-      postSendListEither `shouldSatisfy` isRight
+      balances `shouldBe`
+        [ PostSendListResponse (Text.pack (show balance))
+        | balance <-
+          [ 1000000000000000000000 - 100 :: Integer
+          , 1000000000000000000000 - 200
+          , 1000000000000000000000 - 300
+          ]
+        ]
   describe "postUsersContractMethodList" $
     it "should call a list of methods" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -138,7 +146,8 @@ spec = do
               , methodcallTxParams = txParams
               }
           }
-      postCallMethodListEither <- runClientM
+      Right responses <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      postCallMethodListEither `shouldSatisfy` isRight
+      [response | Right response <- responses]
+        `shouldSatisfy` all ((== "0") . postusersmethodresponseValues)
