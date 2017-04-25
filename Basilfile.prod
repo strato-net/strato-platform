@@ -142,6 +142,7 @@ deployments:
       environment:
         POSTGRES_USER: postgres
         POSTGRES_PASSWORD: api 
+        PGDATA: /var/lib/postgresql/data/pgdata
       volumes_from:
         - pg_data
       restart: always
