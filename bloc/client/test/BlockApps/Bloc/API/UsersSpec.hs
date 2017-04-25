@@ -1,23 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
-{-# LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Bloc.API.UsersSpec where
 
-import Control.Concurrent
-import qualified Data.Map.Strict as Map
-import Data.Either
-import Servant.Client
-import Test.Hspec
+import           Control.Concurrent
+import           Data.Either
+import qualified Data.Map.Strict              as Map
+import           Servant.Client
+import           Test.Hspec
 
-import BlockApps.Bloc.API
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.Client
-import BlockApps.Ethereum
+import           BlockApps.Bloc.API
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.Client
+import           BlockApps.Ethereumw
 
 -- TODO: user/contract methods Addresses may need to be MayBe Named Address
 
@@ -41,7 +37,7 @@ spec = do
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters (toUserAddress) 100 pw txParams
+        postSendParameters = PostSendParameters toUserAddress 100 pw txParams
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345" txParams
       postSendEither <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight

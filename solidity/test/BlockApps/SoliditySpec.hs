@@ -7,18 +7,18 @@ import qualified Data.ByteString.Lazy as ByteString
 import BlockApps.Solidity.Xabi
 
 spec :: Spec
-spec = do
+spec =
   describe "Xabi" $ do
-    it "should decode simple xabi json correctly" $ do
+    it "should decode simple xabi json correctly" $
       decodeXabi "test/BlockApps/Fixtures/example1.json"
 
-    it "should decode xabi json with contract array correctly" $ do
+    it "should decode xabi json with contract array correctly" $
       decodeXabi "test/BlockApps/Fixtures/example4.json"
 
-    it "should decode xabi json with structs correctly" $ do
+    it "should decode xabi json with structs correctly" $
       decodeXabi "test/BlockApps/Fixtures/example5.json"
 
-    it "should decode xabi json with enums correctly" $ do
+    it "should decode xabi json with enums correctly" $
       decodeXabi "test/BlockApps/Fixtures/example6.json"
 
 decodeXabi :: FilePath -> Expectation

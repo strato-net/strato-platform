@@ -1,23 +1,20 @@
-{-# LANGUAGE
-    OverloadedStrings
-#-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Ethereum.Abi.ValueSpec where
 
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Base16 as Base16
-import Test.Hspec
+import           Data.ByteString              (ByteString)
+import qualified Data.ByteString.Base16       as Base16
+import           Test.Hspec
 
-import BlockApps.Ethereum
-import BlockApps.Ethereum.Abi.Value
-import BlockApps.Ethereum.Abi.Type
+import           BlockApps.Ethereum
+import           BlockApps.Ethereum.Abi.Type
+import           BlockApps.Ethereum.Abi.Value
 
 spec :: Spec
 spec =
-  describe "encodeValues" $ do
+  describe "encodeValues" $
     describe "convert an array of arguments into a bytestring" $ do
       context "official Ethereum ABI Tests: found at https://github.com/ethereum/tests/blob/develop/ABITests/basic_abi_tests.json" $ do
-
         it "should convert 4 args with types: uint256, uint32[], bytes10, and bytes" $ encodeDecodeValues
           [ ValueUInt 291
             , ValueArrayDynamic

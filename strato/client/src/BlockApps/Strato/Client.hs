@@ -1,8 +1,6 @@
-{-# LANGUAGE
-    DeriveGeneric
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE DeriveGeneric    #-}
+{-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE TypeApplications #-}
 
 module BlockApps.Strato.Client
   ( TxsFilterParams (..)
@@ -30,27 +28,27 @@ module BlockApps.Strato.Client
   , stratoDev
   ) where
 
-import Data.Proxy
-import Data.Text (Text)
-import GHC.Generics
-import Numeric.Natural
-import Servant.API
-import Servant.Client
+import           Data.Proxy
+import           Data.Text              (Text)
+import           GHC.Generics
+import           Numeric.Natural
+import           Servant.API
+import           Servant.Client
 
-import BlockApps.Strato.API
-import BlockApps.Strato.Types
+import           BlockApps.Strato.API
+import           BlockApps.Strato.Types
 
 data TxsFilterParams = TxsFilterParams
-  { qtFrom :: Maybe Address
-  , qtTo :: Maybe Address
-  , qtAddress :: Maybe Address
-  , qtValue :: Maybe Natural
-  , qtMaxValue :: Maybe Natural
-  , qtMinValue :: Maybe Natural
-  , qtGasPrice :: Maybe Natural
+  { qtFrom        :: Maybe Address
+  , qtTo          :: Maybe Address
+  , qtAddress     :: Maybe Address
+  , qtValue       :: Maybe Natural
+  , qtMaxValue    :: Maybe Natural
+  , qtMinValue    :: Maybe Natural
+  , qtGasPrice    :: Maybe Natural
   , qtMaxGasPrice :: Maybe Natural
   , qtMinGasPrice :: Maybe Natural
-  , qtGasLimit :: Maybe Natural
+  , qtGasLimit    :: Maybe Natural
   , qtMaxGasLimit :: Maybe Natural
   , qtMinGasLimit :: Maybe Natural
   , qtBlockNumber :: Maybe Natural
@@ -62,22 +60,22 @@ txsFilterParams = TxsFilterParams
   Nothing Nothing Nothing Nothing Nothing
 
 data BlocksFilterParams = BlocksFilterParams
-  { qbNumber :: Maybe Natural
-  , qbMinNumber :: Maybe Natural
-  , qbMaxNumber :: Maybe Natural
-  , qbGasLim :: Maybe Natural
-  , qbMinGasLim :: Maybe Natural
-  , qbMaxGasLim :: Maybe Natural
-  , qbGasUsed :: Maybe Natural
+  { qbNumber     :: Maybe Natural
+  , qbMinNumber  :: Maybe Natural
+  , qbMaxNumber  :: Maybe Natural
+  , qbGasLim     :: Maybe Natural
+  , qbMinGasLim  :: Maybe Natural
+  , qbMaxGasLim  :: Maybe Natural
+  , qbGasUsed    :: Maybe Natural
   , qbMinGasUsed :: Maybe Natural
   , qbMaxGasUsed :: Maybe Natural
-  , qbDiff :: Maybe Natural
-  , qbMinDiff :: Maybe Natural
-  , qbMaxDiff :: Maybe Natural
-  , qbTxAddress :: Maybe Address
-  , qbAddress :: Maybe Address
-  , qbCoinbase :: Maybe Address
-  , qbHash :: Maybe Keccak256
+  , qbDiff       :: Maybe Natural
+  , qbMinDiff    :: Maybe Natural
+  , qbMaxDiff    :: Maybe Natural
+  , qbTxAddress  :: Maybe Address
+  , qbAddress    :: Maybe Address
+  , qbCoinbase   :: Maybe Address
+  , qbHash       :: Maybe Keccak256
   } deriving (Eq, Show, Generic)
 
 blocksFilterParams :: BlocksFilterParams
@@ -86,13 +84,13 @@ blocksFilterParams = BlocksFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
 data AccountsFilterParams = AccountsFilterParams
-  { qaAddress :: Maybe Address
-  , qaBalance :: Maybe Natural
+  { qaAddress    :: Maybe Address
+  , qaBalance    :: Maybe Natural
   , qaMinBalance :: Maybe Natural
   , qaMaxBalance :: Maybe Natural
-  , qaNonce :: Maybe Natural
-  , qaMinNonce :: Maybe Natural
-  , qaMaxNonce :: Maybe Natural
+  , qaNonce      :: Maybe Natural
+  , qaMinNonce   :: Maybe Natural
+  , qaMaxNonce   :: Maybe Natural
   } deriving (Eq, Show, Generic)
 
 accountsFilterParams :: AccountsFilterParams

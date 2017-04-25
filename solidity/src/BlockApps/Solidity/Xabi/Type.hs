@@ -1,20 +1,20 @@
-{-# LANGUAGE
-    DeriveGeneric
-  , OverloadedStrings
-  , RecordWildCards
-#-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Solidity.Xabi.Type where
 
-import Data.Aeson
-import Data.Aeson.TH
-import qualified Data.HashMap.Lazy as HashMap
-import Data.Int (Int32)
-import Data.Text (Text)
-import Generic.Random.Generic
-import GHC.Generics
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
+import           Control.Lens              (mapped, (&), (?~))
+import           Data.Aeson
+import           Data.Aeson.TH
+import qualified Data.HashMap.Lazy         as HashMap
+import           Data.Int                  (Int32)
+import           Data.Swagger
+import           Data.Text                 (Text)
+import           Generic.Random.Generic
+import           GHC.Generics
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances ()
 
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
@@ -38,12 +38,14 @@ instance ToJSON Type where
 instance FromJSON Type where
   parseJSON = genericParseJSON typeAesonOptions
 instance Arbitrary Type where arbitrary = genericArbitrary uniform
+instance ToSchema Type where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & mapped.name ?~ "Solidity type"
+    & mapped.schema.description ?~ "Represents a soldity type"
+    & mapped.schema.example ?~ toJSON Address
 
-data IndexedType =
-  IndexedType {
-    indexedTypeIndex::Int32,
-    indexedTypeType::Type
-    } deriving (Eq, Show, Generic)
+data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
+                 deriving (Eq, Show, Generic)
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -51,6 +53,7 @@ instance FromJSON IndexedType where
       index <-  v .: "index"
       theType <- parseJSON $ Object $ HashMap.insertWith (const id) "type" "Contract" v
       return $ IndexedType index theType
+
 instance ToJSON IndexedType where
   toJSON (IndexedType indexedTypeIndex theType) =
     let
@@ -62,12 +65,18 @@ instance ToJSON IndexedType where
 
 instance Arbitrary IndexedType where arbitrary = genericArbitrary uniform
 
+instance ToSchema IndexedType where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & mapped.name ?~ "Solidity type"
+    & mapped.schema.description ?~ "Represents a soldity type"
+    & mapped.schema.example ?~ toJSON (IndexedType 10 (Mapping (Just False) Address (Bytes Nothing Nothing)))
+
 
 data VarType =
   VarType
   { varTypeAtBytes :: Int32
-  , varTypePublic :: Maybe Bool
-  , varTypeType :: Type
+  , varTypePublic  :: Maybe Bool
+  , varTypeType    :: Type
   } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
@@ -89,12 +98,17 @@ instance ToJSON VarType where
      HashMap.insert "public" (toJSON varTypePublic)
      theMap
 
+instance ToSchema VarType where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & mapped.name ?~ "VarType"
+    & mapped.schema.description ?~ "Represents a Solidity Variable"
+    & mapped.schema.example ?~ toJSON (VarType 16 (Just True) Address)
+
+
 instance Arbitrary VarType where arbitrary = genericArbitrary uniform
 
-data FieldType = FieldType
-  { fieldTypeAtBytes :: Int32
-  , fieldTypeType :: Type
-  } deriving (Eq, Show, Generic)
+data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
+               deriving (Eq, Show, Generic)
 
 instance FromJSON FieldType where
   parseJSON =
@@ -104,12 +118,16 @@ instance FromJSON FieldType where
       return $ FieldType atBytes theType
 
 instance ToJSON FieldType where
-  toJSON (FieldType fieldTypeAtBytes theType) =
+  toJSON FieldType{..} =
     let
-      Object theMap = toJSON theType
+      Object theMap = toJSON fieldTypeType
     in
-      Object $
-      HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) $
-      theMap
+      Object $ HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
 
 instance Arbitrary FieldType where arbitrary = genericArbitrary uniform
+
+instance ToSchema FieldType  where
+  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
+    & mapped.name ?~ "FieldType"
+    & mapped.schema.description ?~ "Represents a Solidity Field Type"
+    & mapped.schema.example ?~ toJSON (FieldType 32 Address)

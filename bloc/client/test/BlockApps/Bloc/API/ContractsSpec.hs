@@ -1,23 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
-{-# LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Bloc.API.ContractsSpec where
 
-import Data.Either
-import qualified Data.Map.Strict as Map
-import Servant.Client
-import Test.Hspec
+import           Data.Either
+import qualified Data.Map.Strict              as Map
+import           Servant.Client
+import           Test.Hspec
 
-import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Client
-import BlockApps.Solidity.Xabi
+import           BlockApps.Bloc.API.Contracts
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Client
+import           BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
 spec = do

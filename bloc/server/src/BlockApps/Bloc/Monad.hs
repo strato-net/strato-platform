@@ -1,42 +1,42 @@
-{-# LANGUAGE
-    FlexibleContexts
-  , GeneralizedNewtypeDeriving
-  , ImplicitParams
-  , MultiParamTypeClasses
-  , OverloadedStrings
-  , RecordWildCards
-  , TypeFamilies
-  , LambdaCase
-#-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ImplicitParams             #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module BlockApps.Bloc.Monad where
 
 
-import Control.Exception.Lifted hiding (Handler, handle)
-import Control.Monad.Base
-import Control.Monad.Except
-import Control.Monad.Log hiding (Handler)
-import Control.Monad.Reader
-import Control.Monad.Trans.Control
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
-import Data.Foldable
-import qualified Data.HashMap.Lazy as HashMap
-import Data.String
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Time.Format
-import Database.PostgreSQL.Simple (Connection,withTransaction)
-import Data.Profunctor.Product.Default
-import GHC.Stack
-import Network.HTTP.Client
-import Network.HTTP.Media
-import Network.HTTP.Types.Status
-import Opaleye
-import Servant
-import Servant.Client
-import Servant.Server.Internal.ServantErr
-import qualified Text.PrettyPrint.Leijen.Text as Leijen
+import           Control.Exception.Lifted           hiding (Handler, handle)
+import           Control.Monad.Base
+import           Control.Monad.Except
+import           Control.Monad.Log                  hiding (Handler)
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Control
+import qualified Data.Aeson                         as JSON
+import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
+import           Data.Foldable
+import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Maybe                         (fromMaybe)
+import           Data.Profunctor.Product.Default
+import           Data.String
+import           Data.Text                          (Text)
+import qualified Data.Text                          as Text
+import           Data.Time.Format
+import           Database.PostgreSQL.Simple         (Connection,
+                                                     withTransaction)
+import           GHC.Stack
+import           Network.HTTP.Client
+import           Network.HTTP.Media
+import           Network.HTTP.Types.Status
+import           Opaleye
+import           Servant
+import           Servant.Client
+import           Servant.Server.Internal.ServantErr
+import qualified Text.PrettyPrint.Leijen.Text       as Leijen
 
 newtype Bloc x = Bloc
   { runBloc ::
@@ -67,7 +67,7 @@ instance MonadError BlocError Bloc where
 
 -- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
 formatError::BlocError->String
-formatError (StratoError (FailureResponse{responseBody=e})) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
+formatError (StratoError FailureResponse{responseBody=e}) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
 formatError e = show e
 
 
@@ -92,9 +92,9 @@ instance MonadBaseControl IO Bloc where
   restoreM = Bloc . restoreM
 
 data BlocEnv = BlocEnv
-  { urlStrato :: BaseUrl
-  , urlCirrus :: BaseUrl
-  , httpManager :: Manager
+  { urlStrato    :: BaseUrl
+  , urlCirrus    :: BaseUrl
+  , httpManager  :: Manager
   , dbConnection :: Connection
   }
 
@@ -143,12 +143,12 @@ enterBloc env x
     convertRuntimeErrors f = do
       val <- try f
       case val of
-       Left e -> throwError $ RuntimeError e
+       Left e  -> throwError $ RuntimeError e
        Right v -> return v
     reThrowError :: BlocError -> ServantErr
     reThrowError
       = \case
-          StratoError (FailureResponse (Status{statusCode=404}) responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
+          StratoError (FailureResponse Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
@@ -157,7 +157,7 @@ enterBloc env x
                      "Response from server:",
                      boxIt $ Lazy.Char8.unpack responseBody'
                    ]}
-          StratoError (FailureResponse (Status{statusCode=404}) _ _) ->
+          StratoError (FailureResponse Status{statusCode=404} _ _) ->
             err500{errBody = fromString $ unlines
                    [
                      "Error!",
@@ -165,7 +165,7 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-          StratoError (FailureResponse {..}) | statusIsClientError responseStatus ->
+          StratoError FailureResponse{..} | statusIsClientError responseStatus ->
             err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
           StratoError (ConnectionError _) ->
             err500{errBody = fromString $ unlines
@@ -233,17 +233,15 @@ compensateForTheOddStratoApiFormattingAndPullOutTheMessage::Lazy.Char8.ByteStrin
 compensateForTheOddStratoApiFormattingAndPullOutTheMessage x | "Invalid Arguments" `Lazy.Char8.isPrefixOf` x =
    case JSON.decode $ Lazy.Char8.drop 18 x of
      Nothing -> error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
-     Just o ->
-       case HashMap.lookup ("error"::Text) o of
-         Nothing -> error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
-         Just val -> val
+     Just o -> fromMaybe errMsg (HashMap.lookup ("error" :: Text) o)
+                  where errMsg = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
 compensateForTheOddStratoApiFormattingAndPullOutTheMessage x = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
 
 
 
 renderLocation::(a -> Leijen.Doc)->WithCallStack a->Leijen.Doc
 renderLocation k (WithCallStack stack msg) =
-  (Leijen.fill 40 $ Leijen.string (fromString $ formatTopLocation $ getCallStack stack)) Leijen.<> k msg
+  Leijen.fill 40 (Leijen.string (fromString $ formatTopLocation $ getCallStack stack)) Leijen.<> k msg
 
 formatTopLocation::[(String, SrcLoc)]->String
 formatTopLocation [] = "[-]"
@@ -273,11 +271,7 @@ blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> Bloc (Maybe y)
-blocQueryMaybe q = do
-  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
-  conn <- asks dbConnection
-  results <- liftIO $ runQuery conn q
-  case results of
+blocQueryMaybe q = blocQuery q >>= \case
     [] -> return Nothing
     [y] -> return (Just y)
     _:_:_ -> throwError $ DBError "blocQueryMaybe: Multiple results, expected one row"
@@ -286,11 +280,7 @@ blocQuery1
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
   => Query x
   -> Bloc y
-blocQuery1 q = do
-  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
-  conn <- asks dbConnection
-  results <- liftIO $ runQuery conn q
-  case results of
+blocQuery1 q = blocQuery q >>= \case
     [] -> blocError $ DBError "No result, expected one row"
     [y] -> return y
     _:_:_ -> throwError $ DBError "blocQuery1: Multiple results, expected one row"
@@ -307,8 +297,8 @@ blocModify1 modify = do
   conn <- asks dbConnection
   results <- liftIO $ modify conn
   case results of
-    [] -> throwError $ DBError "No result, expected one row"
-    [y] -> return y
+    []    -> throwError $ DBError "No result, expected one row"
+    [y]   -> return y
     _:_:_ -> throwError $ DBError "Multiple results, expected one row"
 
 blocTransaction :: Bloc x -> Bloc x

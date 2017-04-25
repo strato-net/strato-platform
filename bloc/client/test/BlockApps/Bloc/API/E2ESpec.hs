@@ -1,43 +1,42 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Bloc.API.E2ESpec where
 
-import Control.Concurrent
-import Data.Either
-import qualified Data.Map as Map
-import Data.Maybe
-import Numeric.Natural
-import Servant.Client
-import Test.Hspec
+import           Control.Concurrent
+import           Data.Either
+import qualified Data.Map                         as Map
+import           Data.Maybe
+import           Numeric.Natural
+import           Servant.Client
+import           Test.Hspec
 
-import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.Client
-import BlockApps.Ethereum
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.API.Users
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Client
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types
+
+{-# ANN module "HLint: ignore Reduce duplication" #-}
 
 etherToWei :: Natural -> Natural
 etherToWei x = 1000000000000000000 * x
 
 spec :: SpecWith TestConfig
-spec = do
+spec =
   describe "Integration Tests" $ do
+    let userName1 = UserName "blockapps1"
+        userName2 = UserName "blockapps2"
+        postUsersUserRequest1 = PostUsersUserRequest 1 pw
+        postUsersUserRequest2 = PostUsersUserRequest 1 pw
+        simpleConstructorName = "SimpleConstructor"
     it "should send Ether between two users" $ \ TestConfig {..} -> do
       pendingWith "Skipping until contract E2E works"
-      let
-          userName1 = UserName "blockapps1"
-          userName2 = UserName "blockapps2"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
-          postUsersUserRequest2 = PostUsersUserRequest 1 pw
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       threadDelay 3000000
       postUsersEither2 <- runClientM (postUsersUser userName2 postUsersUserRequest2) (ClientEnv mgr blocUrl)
@@ -68,7 +67,7 @@ spec = do
       threadDelay 4000000
       let
         etherToSend = 100
-        postSendParameters = PostSendParameters (address2) (etherToWei etherToSend) pw txParams
+        postSendParameters = PostSendParameters address2 (etherToWei etherToSend) pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
@@ -79,12 +78,9 @@ spec = do
       let
         Right (account2AS : _) = accts2AfterSend
         balance2AS = unStrung (accountBalance account2AS)
-      balance2AS `shouldBe` (initialWei + (etherToWei etherToSend))
+      balance2AS `shouldBe` initialWei + etherToWei etherToSend
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
-      let
-          userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
@@ -99,9 +95,7 @@ spec = do
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = 0
           }
-      eAccts1 <- runClientM
-        (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
@@ -181,10 +175,6 @@ spec = do
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
       pendingWith "until state route is implemented"
-      let
-          userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
-          simpleConstructorName = "SimpleConstructor"
       simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
@@ -200,13 +190,11 @@ spec = do
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = 0
           }
-      eAccts1 <- runClientM
-        (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
-      length accts1 `shouldBe` 1
+      length accts1 `shouldBe` 1 -- todo: uh what?
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
       let

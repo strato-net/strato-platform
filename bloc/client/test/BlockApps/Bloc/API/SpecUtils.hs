@@ -1,46 +1,43 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    DataKinds
-  , DeriveGeneric
-  , FlexibleInstances
-  , MultiParamTypeClasses
-  , OverloadedStrings
-  , RecordWildCards
-#-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 module BlockApps.Bloc.API.SpecUtils where
 
-import Data.Text (Text, pack)
-import GHC.Generics
-import Servant.Client
-import Test.QuickCheck.Instances ()
+import           Data.Text                 (Text, pack)
+import           GHC.Generics
+import           Servant.Client
+import           Test.QuickCheck.Instances ()
 
-import BlockApps.Ethereum
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Crypto
-import Network.HTTP.Client
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Crypto
+import           BlockApps.Ethereum
+import           Network.HTTP.Client
 
 
 data TestConfig = TestConfig
-  { mgr :: Manager
-  , blocUrl :: BaseUrl
-  , stratoUrl :: BaseUrl
+  { mgr                          :: Manager
+  , blocUrl                      :: BaseUrl
+  , stratoUrl                    :: BaseUrl
   -- , url :: BaseUrl
-  , userName :: UserName
-  , userAddress :: Address
-  , toUserName :: UserName
-  , toUserAddress :: Address
-  , pw :: Password
-  , simpleStorageContractName :: Text
+  , userName                     :: UserName
+  , userAddress                  :: Address
+  , toUserName                   :: UserName
+  , toUserAddress                :: Address
+  , pw                           :: Password
+  , simpleStorageContractName    :: Text
   , simpleStorageContractAddress :: Address
-  , testContractName :: Text
-  , testContractAddress :: Address
-  , simpleMappingContractName :: Text
+  , testContractName             :: Text
+  , testContractAddress          :: Address
+  , simpleMappingContractName    :: Text
   , simpleMappingContractAddress :: Address
-  , txParams :: Maybe TxParams
-  , simpleStorageSrc :: Text
-  , testSrc :: Text
-  , simpleMappingSrc :: Text
-  , delay :: Int --microsecond
+  , txParams                     :: Maybe TxParams
+  , simpleStorageSrc             :: Text
+  , testSrc                      :: Text
+  , simpleMappingSrc             :: Text
+  , delay                        :: Int --microsecond
   } deriving (Generic)
 
 

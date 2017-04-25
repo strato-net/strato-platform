@@ -201,7 +201,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
 
-    
+
     argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
     tx <- prepareTx
       userName
@@ -242,12 +242,12 @@ postUsersContractMethod
   (PostUsersMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
-                           
+
     eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName contractName) (Unnamed contractAddr)
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
-    
+
     let maybeFunc = Map.lookup funcName (fields $ mainStruct contract')
 
     sel <-
@@ -322,18 +322,18 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
             Xabi.Array dy _ ety ->
               let
                 ettyty = case ety of
-                  Xabi.Int _ _ -> "Int"
-                  Xabi.String _ -> "String"
-                  Xabi.Bytes _ _ -> "Bytes"
+                  Xabi.Int{} -> "Int"
+                  Xabi.String{} -> "String"
+                  Xabi.Bytes{} -> "Bytes"
                   Xabi.Bool -> "Bool"
                   Xabi.Address -> "Address"
-                  Xabi.Struct _ _ -> "Struct"
-                  Xabi.Enum _ _ -> "Enum"
-                  Xabi.Array _ _ _ ->
+                  Xabi.Struct{} -> "Struct"
+                  Xabi.Enum{} -> "Enum"
+                  Xabi.Array{} ->
                     error "Array of array not supported"
-                  Xabi.Contract _ -> "Contract"
-                  Xabi.Mapping _ _ _ -> "Mapping"
-                  Xabi.Label _ -> undefined -- TODO - fill this in
+                  Xabi.Contract{} -> "Contract"
+                  Xabi.Mapping{} -> "Mapping"
+                  Xabi.Label{} -> undefined -- TODO - fill this in
               in
                 textToArgType "Array" (fromMaybe False dy) ettyty
             Xabi.Contract{} ->

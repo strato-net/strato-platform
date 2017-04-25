@@ -1,6 +1,4 @@
-{-# LANGUAGE
-    LambdaCase
-#-}
+{-# LANGUAGE LambdaCase #-}
 
 module BlockApps.Ethereum.Abi.Value
   ( Value(..)
@@ -12,22 +10,22 @@ module BlockApps.Ethereum.Abi.Value
   , decodeValues
   ) where
 
-import Data.Bool (bool)
-import Data.ByteString (ByteString)
-import Data.LargeInt
-import Data.LargeWord
-import Data.Maybe
-import Data.Monoid
-import Data.Text (Text)
-import Data.Traversable
+import           Data.Bool                   (bool)
+import           Data.ByteString             (ByteString)
+import           Data.LargeInt
+import           Data.LargeWord
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Text                   (Text)
+import           Data.Traversable
 
-import qualified Data.Binary as Binary
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Lazy as ByteString.Lazy
-import qualified Data.Text.Encoding as Text.Encoding
+import qualified Data.Binary                 as Binary
+import qualified Data.ByteString             as ByteString
+import qualified Data.ByteString.Lazy        as ByteString.Lazy
+import qualified Data.Text.Encoding          as Text.Encoding
 
-import BlockApps.Ethereum
-import BlockApps.Ethereum.Abi.Type
+import           BlockApps.Ethereum
+import           BlockApps.Ethereum.Abi.Type
 
 data Value
   = ValueBool Bool
@@ -145,7 +143,7 @@ decodeValue bytes = \case
   where
     decodeStrict bytes' =
       case Binary.decodeOrFail (ByteString.Lazy.fromStrict bytes') of
-        Left _ -> Nothing
+        Left _        -> Nothing
         Right (_,_,y) -> Just y
 
 decodeValues :: ByteString -> [Type] -> Maybe [Value]

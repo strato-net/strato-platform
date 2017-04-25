@@ -12,6 +12,9 @@ import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Value
 import BlockApps.Solidity.Type
 
+{-# ANN module ("HLint: ignore Redundant do" :: String) #-}
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
+
 spec :: Spec
 spec = do
   describe "toStorage" $ do
@@ -131,7 +134,7 @@ spec = do
       let
         types = [ SimpleType TypeUInt ]
         (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000003"
-        mBytes = toStorage <$> ValueArrayFixed 1 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
         Just bytes = mBytes
@@ -140,7 +143,7 @@ spec = do
       let
         types = [ SimpleType TypeInt ]
         (dataBytestring,_) = Base16.decode "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0ff"
-        mBytes = toStorage <$> ValueArrayFixed 1 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
         Just bytes = mBytes
@@ -149,7 +152,7 @@ spec = do
       let
         types = [ SimpleType TypeAddress ]
         (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000deadbeef"
-        mBytes = toStorage <$> ValueArrayFixed 1 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage . ValueArrayFixed 1 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
         Just bytes = mBytes
@@ -158,7 +161,7 @@ spec = do
       let
         types = [ SimpleType TypeUInt, SimpleType TypeInt, TypeArrayDynamic (SimpleType TypeUInt), SimpleType TypeBytes ]
         (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000005b303132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738393132333435363738390000000000"
-        mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage . ValueArrayFixed 4 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
         Just bytes = mBytes
@@ -173,7 +176,7 @@ spec = do
           ]
         (dataBytestring,_) = Base16.decode "00000000000000000000000000000000000000000000000000000000000001230000000000000000000000000000000000000000000000000000000000000080313233343536373839300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000004560000000000000000000000000000000000000000000000000000000000000789000000000000000000000000000000000000000000000000000000000000000d48656c6c6f2c20776f726c642100000000000000000000000000000000000000"
         -- mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
-        mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage . ValueArrayFixed 4 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
         Just bytes = mBytes
@@ -183,7 +186,7 @@ spec = do
         types =
           [ SimpleType TypeBool ]
         (dataBytestring,_) = Base16.decode "0000000000000000000000000000000000000000000000000000000000000001"
-        mBytes = toStorage <$> ValueArrayFixed 4 <$> (bytestringToValues dataBytestring types)
+        mBytes = toStorage . ValueArrayFixed 4 <$> bytestringToValues dataBytestring types
       mBytes `shouldSatisfy` isJust
       let
         Just bytes = mBytes

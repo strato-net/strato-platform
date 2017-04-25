@@ -1,36 +1,28 @@
-{-#
-  LANGUAGE
-    RecordWildCards
-#-}
+{-# LANGUAGE RecordWildCards #-}
 module BlockApps.Storage where
 
-import Data.LargeWord
+import           Data.LargeWord
 
-type Storage = Word256->Word256
+type Storage = Word256 -> Word256
 
 data Position =
-  Position {
-    offset::Word256,
-    byte::Int
-    } deriving (Show)
+  Position { offset :: Word256
+           , byte   :: Int
+           } deriving (Show)
 
-positionAt::Word256->Position
-positionAt p =
-  Position {
-    offset=p,
-    byte=0
-    }
+positionAt :: Word256 -> Position
+positionAt p = Position p 0
 
-addBytes::Position->Word256->Position
+addBytes :: Position -> Word256 -> Position
 addBytes position@Position{..} v =
   let
     (extraOffset, byte') = (fromIntegral byte+v) `quotRem` 32
   in
    position{offset=offset + extraOffset, byte=fromIntegral byte'}
 
-addOffset::Position->Word256->Position
+addOffset :: Position -> Word256 -> Position
 addOffset position@Position{..} v = position{offset=offset + v}
 
-alignedByte::Position->Word256
+alignedByte :: Position -> Word256
 alignedByte Position{byte=0, offset=o} = o
-alignedByte Position{offset=o} = o+1
+alignedByte Position{offset=o}         = o+1

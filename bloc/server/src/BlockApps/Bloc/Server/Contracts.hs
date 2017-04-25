@@ -1,41 +1,39 @@
-{-# LANGUAGE
-    Arrows
-  , OverloadedStrings
-  , RecordWildCards
-  , ScopedTypeVariables
-  , TupleSections
-#-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 module BlockApps.Bloc.Server.Contracts where
 
-import Control.Arrow
-import Control.Monad.Except
-import Control.Monad.Log
-import Data.Foldable
-import Data.Int
-import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Monoid
-import Data.Text (Text)
-import Data.Traversable
-import qualified Data.Text as Text
-import Data.Time.Clock.POSIX
-import Numeric
-import Opaleye
+import           Control.Arrow
+import           Control.Monad.Except
+import           Control.Monad.Log
+import           Data.Foldable
+import           Data.Int
+import qualified Data.Map.Strict                 as Map
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
+import           Data.Time.Clock.POSIX
+import           Data.Traversable
+import           Numeric
+import           Opaleye
 
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.Database.Queries
-import BlockApps.Bloc.Database.Tables
-import BlockApps.Bloc.Monad
-import BlockApps.Cirrus.Client
-import BlockApps.Ethereum
-import BlockApps.Solidity.Contract
-import BlockApps.SolidityVarReader
-import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
-import BlockApps.XAbiConverter
+import           BlockApps.Bloc.API.Contracts
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Database.Queries
+import           BlockApps.Bloc.Database.Tables
+import           BlockApps.Bloc.Monad
+import           BlockApps.Cirrus.Client
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Xabi
+import           BlockApps.SolidityVarReader
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types
+import           BlockApps.XAbiConverter
 
 getContracts :: Bloc GetContractsResponse
 getContracts = blocTransaction $ do

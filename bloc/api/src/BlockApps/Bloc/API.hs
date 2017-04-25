@@ -1,13 +1,12 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-{-# LANGUAGE
-    TypeOperators
-  , TypeApplications
-#-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module BlockApps.Bloc.API
   ( BlocAPI
   , markdownBloc
   , layoutBloc
+  , blocApi
   , module BlockApps.Bloc.API.Users
   , module BlockApps.Bloc.API.Addresses
   , module BlockApps.Bloc.API.Contracts
@@ -16,16 +15,17 @@ module BlockApps.Bloc.API
   , module BlockApps.Bloc.Crypto
   ) where
 
-import Data.Text
-import Servant
-import Servant.Docs
+import           Data.Proxy
+import           Data.Text
+import           Servant
+import           Servant.Docs
 
-import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.Addresses
-import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.API.Search
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Crypto
+import           BlockApps.Bloc.API.Addresses
+import           BlockApps.Bloc.API.Contracts
+import           BlockApps.Bloc.API.Search
+import           BlockApps.Bloc.API.Users
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Crypto
 
 type BlocAPI =
   -- / endpoint, for smoke test
@@ -58,7 +58,10 @@ type BlocAPI =
   :<|> GetSearchContractStateReduced
 
 markdownBloc :: String
-markdownBloc = markdown $ docs (Proxy @ BlocAPI)
+markdownBloc = markdown $ docs (Proxy @BlocAPI)
 
 layoutBloc :: Text
 layoutBloc = layout (Proxy @ BlocAPI)
+
+blocApi :: Proxy BlocAPI
+blocApi = Proxy
