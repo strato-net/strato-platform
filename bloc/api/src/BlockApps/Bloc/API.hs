@@ -6,6 +6,7 @@ module BlockApps.Bloc.API
   ( BlocAPI
   , markdownBloc
   , layoutBloc
+  , blocApi
   , module BlockApps.Bloc.API.Users
   , module BlockApps.Bloc.API.Addresses
   , module BlockApps.Bloc.API.Contracts
@@ -14,6 +15,7 @@ module BlockApps.Bloc.API
   , module BlockApps.Bloc.Crypto
   ) where
 
+import           Data.Proxy
 import           Data.Text
 import           Servant
 import           Servant.Docs
@@ -60,3 +62,6 @@ markdownBloc = markdown $ docs (Proxy @BlocAPI)
 
 layoutBloc :: Text
 layoutBloc = layout (Proxy @ BlocAPI)
+
+blocApi :: Proxy BlocAPI
+blocApi = Proxy
