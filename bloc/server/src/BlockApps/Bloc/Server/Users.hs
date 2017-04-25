@@ -94,7 +94,7 @@ postUsersContract userName addr
     argsBin <- buildArgumentByteString args mFunctionId
     tx <- prepareTx
       userName password addr Nothing (fromMaybe emptyTxParams txParams)
-      (Wei (fromIntegral value)) (bin <> argsBin) 0
+      (Wei (fromIntegral (fromMaybe 0 value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     txResult <- pollTxResult hash
@@ -305,7 +305,7 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
-    return $ PostUsersContractMethodResponse formattedResponse
+    return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =

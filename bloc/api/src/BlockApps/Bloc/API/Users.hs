@@ -107,7 +107,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestContract :: Text
   , postuserscontractrequestArgs :: Maybe (Map Text Text)
   , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue :: Natural
+  , postuserscontractrequestValue :: Maybe Natural
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
 -- TODO: This end point needs to support form url encoding
@@ -133,7 +133,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestContract = "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = Nothing
-    , postuserscontractrequestValue = 1000000
+    , postuserscontractrequestValue = Just 1000000
     }
 
 type PostUsersUploadList = "users"

@@ -322,7 +322,7 @@ blocStrato client' = do
   url <- asks urlStrato
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
-  either (throwError . StratoError) return resultEither
+  either (blocError . StratoError) return resultEither
 
 blocCirrus :: HasCallStack => ClientM x -> Bloc x
 blocCirrus client' = do
