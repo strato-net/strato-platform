@@ -39,8 +39,8 @@ spec = do
       generateSelector [] "doit" [TypeArrayFixed 10 (SimpleType TypeInt)] "76be8dcc"
     it "should generate a selector for a function with one dynamic array argument" $ do
       generateSelector [] "doit" [TypeArrayDynamic (SimpleType TypeString)] "2a146d1b"
-    it "should generate a selector for a function with one mapping argument" $ do
-      generateSelector [] "doit" [TypeMapping TypeInt (SimpleType TypeString)] "9864b05b"
+--    it "should generate a selector for a function with one mapping argument" $ do
+--      generateSelector [] "doit" [TypeMapping TypeInt (SimpleType TypeString)] "9864b05b"
     it "should generate a selector for a function with one enum argument" $ do
       generateSelector [("Pets", 4)] "doit" [TypeEnum "Pets"] "941d86aa"
 

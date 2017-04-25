@@ -44,7 +44,7 @@ formatArg _ (SimpleType TypeUInt) = "uint256"
 formatArg _ (SimpleType x) = drop 4 $ map toLower $ show x --yeah, it is a hack, but it is way cleaner than writting out like 200 lines of the same thing
 formatArg enumSizes (TypeArrayFixed size x) = formatArg enumSizes x ++"[" ++ show size ++ "]"
 formatArg enumSizes (TypeArrayDynamic x) = formatArg enumSizes x ++"[]"
-formatArg enumSizes (TypeMapping x y) = "mapping (" ++ formatArg enumSizes (SimpleType x) ++ " => " ++ formatArg enumSizes y ++ ")"
+formatArg enumSizes (TypeMapping x y) = "mapping(" ++ formatArg enumSizes (SimpleType x) ++ "=>" ++ formatArg enumSizes y ++ ")"
 formatArg enumSizes (TypeEnum label) =
   case lookup label enumSizes of
    Nothing -> error "you are using an enum not defined"
