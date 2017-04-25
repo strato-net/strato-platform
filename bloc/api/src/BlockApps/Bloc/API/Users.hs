@@ -368,6 +368,26 @@ instance FromJSON PostSendListRequest where
 instance ToSample PostSendListRequest where
   toSamples _ = noSamples
 
+instance ToSchema PostSendListRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Users Send List Request"
+    & mapped.schema.description ?~ "Send a list of users some ether"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostSendListRequest
+      ex = PostSendListRequest
+        { postsendlistrequestPassword = "MyPassword"
+        , postsendlistrequestResolve = False
+        , postsendlistrequestTxs = [sendEx]
+        }
+      sendEx :: SendTransaction
+      sendEx = SendTransaction
+        { sendtransactionToAddress = Address 0xdeadbeef
+        , sendtransactionValue = 12
+        , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
+            (Just $ Nonce 9876))
+        }
+
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
   , sendtransactionValue     :: Natural
@@ -398,6 +418,20 @@ instance ToSample PostSendListResponse where
 instance Arbitrary PostSendListResponse where
   arbitrary = genericArbitrary uniform
 
+instance ToSchema SendTransaction where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Send Transaction"
+    & mapped.schema.description ?~ "Single transaction for batch"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: SendTransaction
+      ex = SendTransaction
+        { sendtransactionToAddress = Address 0xdeadbeef
+        , sendtransactionValue = 12
+        , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
+            (Just $ Nonce 9876))
+        }
+
 --------------------------------------------------------------------------------
 
 --POST /users/:user/:address/callList
@@ -425,6 +459,28 @@ instance FromJSON PostMethodListRequest where
 instance ToSample PostMethodListRequest where
   toSamples _ = noSamples
 
+instance ToSchema PostMethodListRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Method List Request"
+    & mapped.schema.description ?~ "Everything you need to batch method calls"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex ::PostMethodListRequest
+      ex = PostMethodListRequest
+        { postmethodlistrequestPassword = "MyPassword"
+        , postmethodlistrequestResolve = True
+        , postmethodlistrequestTxs = [exMethodCall]
+        }
+      exMethodCall ::MethodCall
+      exMethodCall = MethodCall
+        { methodcallTxParams = Nothing
+        , methodcallValue = 10
+        , methodcallArgs = Map.fromList [("user", "Bob"), ("age", "52")]
+        , methodcallMethodName = "getHoroscope"
+        , methodcallContractAddress = Address 0xdeadbeef
+        , methodcallContractName = "HorroscopeApp"
+        }
+
 newtype PostMethodListResponse = PostMethodListResponse
   { postmethodlistresponseReturnValue :: Text
   } deriving (Eq,Show,Generic)
@@ -439,6 +495,8 @@ instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
 
 instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary uniform
+
+instance ToSchema PostMethodListResponse
 
 data MethodCall = MethodCall
   { methodcallContractName    :: Text
@@ -456,3 +514,19 @@ instance ToJSON MethodCall where
 
 instance FromJSON MethodCall where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSchema MethodCall where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Method Call"
+    & mapped.schema.description ?~ "Everything you'll need for a method call"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex ::MethodCall
+      ex = MethodCall
+        { methodcallTxParams = Nothing
+        , methodcallValue = 10
+        , methodcallArgs = Map.fromList [("user", "Bob"), ("age", "52")]
+        , methodcallMethodName = "getHoroscope"
+        , methodcallContractAddress = Address 0xdeadbeef
+        , methodcallContractName = "HorroscopeApp"
+        }

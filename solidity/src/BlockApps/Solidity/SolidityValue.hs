@@ -6,10 +6,12 @@
 
 module BlockApps.Solidity.SolidityValue where
 
+import Control.Lens ((&),(?~))
 import Data.Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import Data.Foldable
+import Data.Swagger
 import Data.Text (Text)
 import GHC.Generics
 import Test.QuickCheck
@@ -22,6 +24,7 @@ data SolidityValue
   | SolidityBytes  ByteString
   | SolidityObject [(Text, SolidityValue)]
   deriving (Eq,Show,Generic)
+
 instance ToJSON SolidityValue where
   toJSON (SolidityValueAsString str) = toJSON str
   toJSON (SolidityBool boolean) = toJSON boolean
@@ -31,7 +34,8 @@ instance ToJSON SolidityValue where
     , "data" .= ByteString.unpack bytes
     ]
   toJSON (SolidityObject namedItems) =
-    object $ map (\(name, value) -> name .= value) namedItems
+    object $ map (\(_name, value) -> _name .= value) namedItems
+
 instance FromJSON SolidityValue where
   parseJSON (String str) = return $ SolidityValueAsString str
   parseJSON (Bool boolean) = return $ SolidityBool boolean
@@ -46,12 +50,12 @@ instance FromJSON SolidityValue where
     else
       fail "Failed to parse SolidityBytes"
   parseJSON _ = fail "Failed to parse solidity value"
+
 instance Arbitrary SolidityValue where
   arbitrary = return (SolidityBool True)
 
-
-
-
-
-              
+instance ToSchema SolidityValue where
+  declareNamedSchema = pure . pure $ NamedSchema (Just "Solidity Value") $ mempty
+      & description ?~ "A Solidity return type value"
+      & example ?~ toJSON (SolidityBool True)
 
