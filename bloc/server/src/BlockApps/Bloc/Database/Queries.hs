@@ -312,12 +312,21 @@ getContractsMetaDataId contractName = \case
 
 getContractsMetaDataIdExhaustive :: Text -> Address -> Bloc Int32
 getContractsMetaDataIdExhaustive contractName contractAddr = do
-  cmIds <- catchError (blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr) $ \ _ ->
-    catchError (blocQuery $ getContractsMetaDataIdByLatestQuery contractName) $ \ _ ->
-      (blocQuery $ getContractsMetaDataIdBySameNameQuery contractName)
+  -- cmIds <- catchError byAddress $ \ _ ->
+  --   catchError byLatest $ \ _ ->
+  --     bySameName
+  cmIdsByAddress <- byAddress
+  cmIdsByLatest <- byLatest
+  cmIdsBySameName <- bySameName
+  let cmIds = cmIdsByAddress ++ cmIdsByLatest ++ cmIdsBySameName
+  -- cmIds <- catchError byAddress (\ _ -> (catchError byLatest (\ _ -> bySameName)))
   case cmIds of
-    [] -> throwError $ AnError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+    [] -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
     cmId:_ -> return cmId
+  where
+    byAddress = blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr
+    byLatest = blocQuery $ getContractsMetaDataIdByLatestQuery contractName
+    bySameName = blocQuery $ getContractsMetaDataIdBySameNameQuery contractName
 
 insertXabiFunctionArg
   :: Int32
@@ -1341,6 +1350,17 @@ insertXabiTypeDefs metadataId typeDefs = do
     (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
     (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
     (Xabi.Def.Contract _, _) -> return 0
+
+getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
+getContractXabiByMetadataId metadataId = do
+  funcs <- getXabiFunctionsQuery metadataId
+  constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
+  constr <- case constrIdMaybe of
+    Nothing -> return Map.empty
+    Just constrId -> getXabiFunctionsArgsQuery constrId
+  vars <- getXabiVariablesQuery metadataId
+  typeDefs <- getXabiTypeDefs metadataId
+  return $ Xabi funcs constr vars typeDefs
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi

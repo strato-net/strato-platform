@@ -256,7 +256,7 @@ postUsersContractMethod
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
 
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName contractName) (Unnamed contractAddr)
+    eitherErrorOrContract <- xAbiToContract <$> getContractXabiByMetadataId cmId
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
