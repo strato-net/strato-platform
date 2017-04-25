@@ -1,17 +1,15 @@
-{-# LANGUAGE
-    DataKinds
-  , OverloadedStrings
-#-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
-import Control.Lens ((&), (.~), (?~))
-import BlockApps.Bloc.API (blocApi)
-import Data.Swagger
-import Servant
-import Servant.Swagger
-import Servant.Swagger.UI
-import Network.Wai.Handler.Warp
+import           BlockApps.Bloc.API       (blocApi)
+import           Control.Lens             ((&), (.~), (?~))
+import           Data.Swagger
+import           Network.Wai.Handler.Warp
+import           Servant
+import           Servant.Swagger
+import           Servant.Swagger.UI
 
 type SwaggerizedAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
 
