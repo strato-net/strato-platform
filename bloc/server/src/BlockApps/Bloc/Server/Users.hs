@@ -62,7 +62,7 @@ postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransacti
   unless createdUser (throwError (DBError "failed to create user"))
   let
     addr = keystoreAcctAddress keyStore
-  when (faucet /= 0) $ do
+  when (faucet == "1") $ do
     logWith logNotice "Waiting for faucet transaction to be mined"
     blocStrato $ do
       void $ postFaucet addr

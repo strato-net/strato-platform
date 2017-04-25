@@ -12,11 +12,9 @@ module BlockApps.Bloc.API.Users where
 
 import Data.Aeson hiding (Value)
 import Data.Aeson.Casing
--- import qualified Data.ByteString.Lazy.Char8 as Lazy.Char8
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Map (Map)
 import Data.Text (Text)
--- import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Generic.Random.Generic
 import GHC.Generics
@@ -50,7 +48,7 @@ type PostUsersUser = "users"
   :> ReqBody '[FormUrlEncoded, JSON] PostUsersUserRequest
   :> Post '[HTMLifiedAddress, JSON] Address
 data PostUsersUserRequest = PostUsersUserRequest
-  { userFaucet :: Int
+  { userFaucet :: Text
   , userPassword :: Password
   } deriving (Eq, Show, Generic)
 instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary uniform
@@ -64,7 +62,7 @@ instance FromForm PostUsersUserRequest where
   fromForm = genericFromForm (FormOptions (camelCase . drop 4))
 instance ToSample PostUsersUserRequest where
   toSamples _ = singleSample PostUsersUserRequest
-    { userFaucet = 1
+    { userFaucet = "1"
     , userPassword = "securePassword"
     }
 
