@@ -40,14 +40,15 @@ prettyArgTypes enumSizes args =
 
 formatArg :: [(Text, Int)] -> Type -> String
 formatArg _ (SimpleType TypeInt) = "int256"
+formatArg _ (SimpleType TypeUInt) = "uint256"
 formatArg _ (SimpleType x) = drop 4 $ map toLower $ show x --yeah, it is a hack, but it is way cleaner than writting out like 200 lines of the same thing
 formatArg enumSizes (TypeArrayFixed size x) = formatArg enumSizes x ++"[" ++ show size ++ "]"
 formatArg enumSizes (TypeArrayDynamic x) = formatArg enumSizes x ++"[]"
-formatArg enumSizes (TypeMapping x y) = "(" ++ formatArg enumSizes (SimpleType x) ++ "=>" ++ formatArg enumSizes y ++ ")"
+formatArg enumSizes (TypeMapping x y) = "mapping (" ++ formatArg enumSizes (SimpleType x) ++ " => " ++ formatArg enumSizes y ++ ")"
 formatArg enumSizes (TypeEnum label) =
   case lookup label enumSizes of
    Nothing -> error "you are using an enum not defined"
-   Just x | x < 256 -> formatArg enumSizes (SimpleType TypeInt8)
+   Just x | x < 256 -> formatArg enumSizes (SimpleType TypeUInt8)
    Just x -> error $ "undefined case in formatArg for enum with more than 255 items: size=" ++ show x
 
 formatArg _ x = error $ "undefined value in formatArg: " ++ show x
