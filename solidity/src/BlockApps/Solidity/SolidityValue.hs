@@ -1,19 +1,16 @@
-{-# LANGUAGE
-    DeriveGeneric
-  , OverloadedStrings
-  , RecordWildCards
-#-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Solidity.SolidityValue where
 
-import Data.Aeson
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import Data.Foldable
-import Data.Text (Text)
-import GHC.Generics
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
+import           Data.Aeson
+import           Data.ByteString           (ByteString)
+import qualified Data.ByteString           as ByteString
+import           Data.Foldable
+import           Data.Text                 (Text)
+import           GHC.Generics
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances ()
 
 data SolidityValue
   = SolidityValueAsString Text
@@ -31,7 +28,7 @@ instance ToJSON SolidityValue where
     , "data" .= ByteString.unpack bytes
     ]
   toJSON (SolidityObject namedItems) =
-    object $ map (\(name, value) -> name .= value) namedItems
+    object $ uncurry (.=) <$> namedItems
 instance FromJSON SolidityValue where
   parseJSON (String str) = return $ SolidityValueAsString str
   parseJSON (Bool boolean) = return $ SolidityBool boolean
@@ -52,6 +49,4 @@ instance Arbitrary SolidityValue where
 
 
 
-
-              
 

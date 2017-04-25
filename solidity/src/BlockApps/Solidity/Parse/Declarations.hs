@@ -6,24 +6,24 @@
 module BlockApps.Solidity.Parse.Declarations (solidityContract) where
 
 --import Data.Either
-import Data.List
-import qualified Data.Map as Map
+import           Data.List
+import qualified Data.Map                             as Map
 --import Data.Map (Map)
-import Data.Maybe
-import Data.Text (Text)
-import qualified Data.Text as Text
+import           Data.Maybe
+import           Data.Text                            (Text)
+import qualified Data.Text                            as Text
 
-import Text.Parsec
-import Text.Parsec.Perm
+import           Text.Parsec
+import           Text.Parsec.Perm
 
-import BlockApps.Solidity.Parse.Lexer
-import BlockApps.Solidity.Parse.ParserTypes
-import BlockApps.Solidity.Parse.Types
+import           BlockApps.Solidity.Parse.Lexer
+import           BlockApps.Solidity.Parse.ParserTypes
+import           BlockApps.Solidity.Parse.Types
 
-import BlockApps.Solidity.Xabi (Xabi(..))
-import qualified BlockApps.Solidity.Xabi as Xabi
-import qualified BlockApps.Solidity.Xabi.Def as Xabi
-import qualified BlockApps.Solidity.Xabi.Type as Xabitype
+import           BlockApps.Solidity.Xabi              (Xabi (..))
+import qualified BlockApps.Solidity.Xabi              as Xabi
+import qualified BlockApps.Solidity.Xabi.Def          as Xabi
+import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
 -- | Parses an entire Solidity contract
@@ -46,19 +46,19 @@ solidityContract = do
       Text.pack contractName',
       Xabi{
         xabiFuncs =
-           Map.fromList 
+           Map.fromList
            [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
       , xabiConstr = Map.fromList [] --undefined -- :: Map Text Xabi.IndexedType
       , xabiVars =
              Map.fromList $
-             zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v) 
+             zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v)
              [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
-             [0..] 
+             [0..]
       , xabiTypes =
           Map.fromList $
           [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
           ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
-               
+
 --    contractName = contractName',
 --    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
 --    contractTypes = contractTypes',
@@ -70,7 +70,7 @@ solidityContract = do
 
 
 data Declaration =
-  FuncDeclaration Xabi.Func 
+  FuncDeclaration Xabi.Func
   | ModifierDeclaration Xabi.Modifier
   | StructDeclaration Xabi.Def
   | EnumDeclaration Xabi.Def
@@ -117,7 +117,7 @@ enumDeclaration = do
   reserved "enum"
   enumName <- identifier
   enumFields <- braces $ commaSep1 identifier
-  return $
+  return
     (
       enumName,
       EnumDeclaration Xabi.Enum {
@@ -159,7 +159,7 @@ variableDeclaration = do
     many $ noneOf ";"
   semi
   return vDecl
-      
+
 -- | Parses the declaration part of a variable definition, which is
 -- everything except possibly the initializer and semicolon.  Necessary
 -- because these kinds of expressions also appear in struct definitions and
@@ -183,7 +183,7 @@ simpleVariableDeclaration = do
 --        if variableVisible
 --        then SingleValue variableType
 --        else NoValue
-             
+
   return (variableName, VariableDeclaration variableType)
 
 --  ObjDef{
@@ -226,7 +226,7 @@ functionDeclaration = do
       , Xabi.funcVals =
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) v) functionRet [0..]
-        
+
 
 --    objName = functionName,
 --    objValueType = objValueType',

@@ -1,35 +1,32 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    OverloadedStrings
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
-import qualified Data.Map.Strict as Map
-import Network.HTTP.Client hiding (Proxy)
-import Servant.Client
-import Test.Hspec
+import qualified Data.Map.Strict                  as Map
+import           Network.HTTP.Client              hiding (Proxy)
+import           Servant.Client
+import           Test.Hspec
 
 import qualified BlockApps.Bloc.API.AddressesSpec as Addresses
 import qualified BlockApps.Bloc.API.ContractsSpec as Contracts
-import qualified BlockApps.Bloc.API.SearchSpec as Search
-import qualified BlockApps.Bloc.API.UsersSpec as Users
-import BlockApps.Bloc.API.E2ESpec as E2E
+import           BlockApps.Bloc.API.E2ESpec       as E2E
+import qualified BlockApps.Bloc.API.SearchSpec    as Search
+import qualified BlockApps.Bloc.API.UsersSpec     as Users
 -- import qualified BlockApps.Bloc.APISpec as API
 
-import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Client
+import           BlockApps.Bloc.API.Contracts
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.API.Users
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Client
 -- import BlockApps.Bloc.Server.Utils
-import BlockApps.Solidity.Xabi
+import           BlockApps.Solidity.Xabi
 
-import BlockApps.Ethereum
+import           BlockApps.Ethereum
 
 main :: IO ()
-main = hspec $ do
+main = hspec $
   -- API.spec
   beforeAll setup $ do
     Addresses.spec
@@ -118,7 +115,7 @@ setup = do
       return config
   cfgEither <- runClientM  clients (ClientEnv mgr' localhost)
   case cfgEither of
-    Left err -> fail $ "Failed to bootstrap tests: " ++ show err
+    Left err  -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg
 
 localhost :: BaseUrl

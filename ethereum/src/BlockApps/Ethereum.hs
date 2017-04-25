@@ -1,14 +1,11 @@
-{-# LANGUAGE
-    DataKinds
-  , DeriveGeneric
-  , FlexibleInstances
-  , LambdaCase
-  , OverloadedLists
-  , OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-  , MultiParamTypeClasses
-#-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedLists       #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TypeApplications      #-}
 
 module BlockApps.Ethereum
   ( -- * Addresses
@@ -47,34 +44,34 @@ module BlockApps.Ethereum
   , BloomFilter (..)
   ) where
 
-import Crypto.Hash
-import Crypto.Random.Entropy
-import Crypto.Secp256k1
-import Data.Aeson hiding (Array,String)
-import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Encoding as AesonEnc
-import qualified Data.Binary as Binary
-import qualified Data.ByteArray as ByteArray
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Char8 as Char8
+import           Crypto.Hash
+import           Crypto.Random.Entropy
+import           Crypto.Secp256k1
+import           Data.Aeson             hiding (Array, String)
+import qualified Data.Aeson             as Aeson
+import qualified Data.Aeson.Encoding    as AesonEnc
+import qualified Data.Binary            as Binary
+import qualified Data.ByteArray         as ByteArray
+import           Data.ByteString        (ByteString)
+import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Lazy as Lazy
-import Data.LargeWord
-import Data.Maybe
-import Data.Monoid
-import Data.RLP
-import qualified Data.Text as Text
-import Data.Time
-import Data.Word
-import GHC.Generics
-import Numeric
-import Numeric.Natural
-import Servant.API
-import Servant.Docs
-import Test.QuickCheck
-import Text.Read hiding (String)
-import Web.FormUrlEncoded
+import qualified Data.ByteString.Char8  as Char8
+import qualified Data.ByteString.Lazy   as Lazy
+import           Data.LargeWord
+import           Data.Maybe
+import           Data.Monoid
+import           Data.RLP
+import qualified Data.Text              as Text
+import           Data.Time
+import           Data.Word
+import           GHC.Generics
+import           Numeric
+import           Numeric.Natural
+import           Servant.API
+import           Servant.Docs
+import           Test.QuickCheck
+import           Text.Read              hiding (String)
+import           Web.FormUrlEncoded
 
 newtype Address = Address { unAddress :: Word160 }
   deriving (Eq, Ord, Show, Generic)
@@ -89,13 +86,13 @@ instance FromJSON Address where
   parseJSON value = do
     string <- parseJSON value
     case stringAddress string of
-      Nothing -> fail $ "Could not decode Address: " <> string
+      Nothing      -> fail $ "Could not decode Address: " <> string
       Just address -> return address
 instance ToHttpApiData Address where
   toUrlPiece = Text.pack . addressString
 instance FromHttpApiData Address where
   parseUrlPiece text = case stringAddress (Text.unpack text) of
-    Nothing -> Left $ "Could not decode Address: " <> text
+    Nothing      -> Left $ "Could not decode Address: " <> text
     Just address -> Right address
 instance ToForm Address where
   toForm address = [("address", toQueryParam address)]
@@ -144,7 +141,7 @@ instance FromJSON Keccak256 where
   parseJSON value = do
     string <- parseJSON value
     case stringKeccak256 string of
-      Nothing -> fail $ "Could not decode Keccak256: " <> string
+      Nothing      -> fail $ "Could not decode Keccak256: " <> string
       Just hash256 -> return hash256
 instance ToJSONKey Keccak256 where
     toJSONKey = ToJSONKeyText f f'
@@ -156,7 +153,7 @@ instance ToHttpApiData Keccak256 where
   toUrlPiece = Text.pack . keccak256String
 instance FromHttpApiData Keccak256 where
   parseUrlPiece text = case stringKeccak256 (Text.unpack text) of
-    Nothing -> Left $ "Could not decode Keccak256: " <> text
+    Nothing      -> Left $ "Could not decode Keccak256: " <> text
     Just hash256 -> Right hash256
 instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
@@ -185,22 +182,22 @@ keccak256Address
   . keccak256
 
 data AccountState = AccountState
-  { accountStateNonce :: Nonce
-  , accountStateBalance :: Wei
+  { accountStateNonce       :: Nonce
+  , accountStateBalance     :: Wei
   , accountStateStorageRoot :: Keccak256
-  , accountStateCodeHash :: Keccak256
+  , accountStateCodeHash    :: Keccak256
   } deriving (Eq,Show,Generic)
 
 data Transaction = Transaction
-  { transactionNonce :: Nonce
-  , transactionGasPrice :: Wei
-  , transactionGasLimit :: Gas
-  , transactionTo :: Maybe Address
-  , transactionValue :: Wei
+  { transactionNonce      :: Nonce
+  , transactionGasPrice   :: Wei
+  , transactionGasLimit   :: Gas
+  , transactionTo         :: Maybe Address
+  , transactionValue      :: Wei
   , transactionInitOrData :: ByteString
-  , transactionV :: Word8
-  , transactionR :: Word256
-  , transactionS :: Word256
+  , transactionV          :: Word8
+  , transactionR          :: Word256
+  , transactionS          :: Word256
   } deriving (Eq,Show,Generic)
 instance RLPEncodable Transaction where
   rlpEncode Transaction{..} = rlpEncode
@@ -230,11 +227,11 @@ instance RLPEncodable Transaction where
       }
 
 data UnsignedTransaction = UnsignedTransaction
-  { unsignedTransactionNonce :: Nonce
-  , unsignedTransactionGasPrice :: Wei
-  , unsignedTransactionGasLimit :: Gas
-  , unsignedTransactionTo :: Maybe Address
-  , unsignedTransactionValue :: Wei
+  { unsignedTransactionNonce      :: Nonce
+  , unsignedTransactionGasPrice   :: Wei
+  , unsignedTransactionGasLimit   :: Gas
+  , unsignedTransactionTo         :: Maybe Address
+  , unsignedTransactionValue      :: Wei
   , unsignedTransactionInitOrData :: ByteString
   } deriving (Eq,Show,Generic)
 instance RLPEncodable UnsignedTransaction where
@@ -308,7 +305,7 @@ verifyTransaction pk Transaction{..} =
       )
   in
     case importCompactSig (CompactSig transactionR transactionS) of
-      Nothing -> False
+      Nothing  -> False
       Just sig -> verifySig pk sig message
 
 recoverTransaction :: Transaction -> Maybe PubKey
@@ -336,21 +333,21 @@ newAccountAddress Transaction{..}
   = keccak256Address $ rlpSerialize (transactionTo, transactionNonce)
 
 data BlockHeader = BlockHeader
-  { blockHeaderParentHash :: Keccak256
-  , blockHeaderOmmersHash :: Keccak256
-  , blockHeaderBeneficiary :: Address
-  , blockHeaderStateRoot :: Keccak256
+  { blockHeaderParentHash       :: Keccak256
+  , blockHeaderOmmersHash       :: Keccak256
+  , blockHeaderBeneficiary      :: Address
+  , blockHeaderStateRoot        :: Keccak256
   , blockHeaderTransactionsRoot :: Keccak256
-  , blockHeaderReceiptsRoot :: Keccak256
-  , blockHeaderLogsBloom :: BloomFilter
-  , blockHeaderDifficulty :: Natural
-  , blockHeaderNumber :: Natural
-  , blockHeaderGasLimit :: Gas
-  , blockHeaderGasUsed :: Gas
-  , blockHeaderTimeStamp :: UTCTime
-  , blockHeaderExtraData :: Word256
-  , blockHeaderMixHash :: Keccak256
-  , blockHeaderNonce :: Nonce
+  , blockHeaderReceiptsRoot     :: Keccak256
+  , blockHeaderLogsBloom        :: BloomFilter
+  , blockHeaderDifficulty       :: Natural
+  , blockHeaderNumber           :: Natural
+  , blockHeaderGasLimit         :: Gas
+  , blockHeaderGasUsed          :: Gas
+  , blockHeaderTimeStamp        :: UTCTime
+  , blockHeaderExtraData        :: Word256
+  , blockHeaderMixHash          :: Keccak256
+  , blockHeaderNonce            :: Nonce
   } deriving (Eq,Show,Generic)
 
 newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)

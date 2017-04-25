@@ -11,15 +11,15 @@ module BlockApps.Solidity.Parse.File (solidityFile) where
 
 --import Data.Either
 
-import Data.Text (Text)
-import Text.Parsec
+import           Data.Text                             (Text)
+import           Text.Parsec
 
-import Prelude hiding (lookup)
+import           Prelude                               hiding (lookup)
 
-import BlockApps.Solidity.Parse.Declarations
-import BlockApps.Solidity.Parse.Lexer
-import BlockApps.Solidity.Parse.ParserTypes
-import BlockApps.Solidity.Xabi
+import           BlockApps.Solidity.Parse.Declarations
+import           BlockApps.Solidity.Parse.Lexer
+import           BlockApps.Solidity.Parse.ParserTypes
+import           BlockApps.Solidity.Xabi
 
 -- TODO- oops, it looks like xabis can contain multiple contracts and imports.  For now I'll just hardcode a single contract to match the XABI type.
 {-
@@ -55,7 +55,7 @@ data Xabi = Xabi
 
 --TODO readd imports
 
-{-  
+{-
 -- | Parses any of the various kinds of import statements
 solidityImport :: SolidityParser (FileName, ImportAs)
 solidityImport = do
@@ -63,7 +63,7 @@ solidityImport = do
   i <- simpleImport <|> es6Import
   semi
   return i
- 
+
 -- | Parses 'import "File"' and 'import "File" as name' statements
 simpleImport :: SolidityParser (FileName, ImportAs)
 simpleImport = do
@@ -83,7 +83,7 @@ es6Import = do
 
 -- | Parses the '{sym1 as alias, sym2}' or '*" part of an es6 style import
 es6ImportAs :: SolidityParser ImportAs
-es6ImportAs = 
+es6ImportAs =
   (do
     importAs <- es6As
     case importAs of
@@ -91,7 +91,7 @@ es6ImportAs =
       ("*", p) -> return $ StarPrefix p
       _ -> parserFail "ES6-style import without braces must import \"*\""
   ) <|>
-  braces 
+  braces
   (do
     importsAs <- commaSep1 es6As
     return $ Aliases importsAs

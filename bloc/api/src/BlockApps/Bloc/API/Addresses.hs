@@ -1,14 +1,12 @@
-{-# LANGUAGE
-    DataKinds
-  , TypeOperators
-#-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE TypeOperators #-}
 
 module BlockApps.Bloc.API.Addresses where
 
-import Servant.API
+import           Servant.API
 
-import BlockApps.Ethereum
-import BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Ethereum
 
 --------------------------------------------------------------------------------
 -- Routes and Types

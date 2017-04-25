@@ -1,20 +1,18 @@
-{-# LANGUAGE
-    DeriveGeneric
-  , OverloadedStrings
-  , RecordWildCards
-#-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Solidity.Xabi.Type where
 
-import Data.Aeson
-import Data.Aeson.TH
-import qualified Data.HashMap.Lazy as HashMap
-import Data.Int (Int32)
-import Data.Text (Text)
-import Generic.Random.Generic
-import GHC.Generics
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
+import           Data.Aeson
+import           Data.Aeson.TH
+import qualified Data.HashMap.Lazy         as HashMap
+import           Data.Int                  (Int32)
+import           Data.Text                 (Text)
+import           Generic.Random.Generic
+import           GHC.Generics
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances ()
 
 typeAesonOptions::Options
 typeAesonOptions=defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
@@ -39,11 +37,8 @@ instance FromJSON Type where
   parseJSON = genericParseJSON typeAesonOptions
 instance Arbitrary Type where arbitrary = genericArbitrary uniform
 
-data IndexedType =
-  IndexedType {
-    indexedTypeIndex::Int32,
-    indexedTypeType::Type
-    } deriving (Eq, Show, Generic)
+data IndexedType = IndexedType { indexedTypeIndex::Int32, indexedTypeType::Type }
+                 deriving (Eq, Show, Generic)
 
 instance FromJSON IndexedType where
   parseJSON =
@@ -66,8 +61,8 @@ instance Arbitrary IndexedType where arbitrary = genericArbitrary uniform
 data VarType =
   VarType
   { varTypeAtBytes :: Int32
-  , varTypePublic :: Maybe Bool
-  , varTypeType :: Type
+  , varTypePublic  :: Maybe Bool
+  , varTypeType    :: Type
   } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
@@ -91,10 +86,8 @@ instance ToJSON VarType where
 
 instance Arbitrary VarType where arbitrary = genericArbitrary uniform
 
-data FieldType = FieldType
-  { fieldTypeAtBytes :: Int32
-  , fieldTypeType :: Type
-  } deriving (Eq, Show, Generic)
+data FieldType = FieldType { fieldTypeAtBytes :: Int32, fieldTypeType :: Type }
+               deriving (Eq, Show, Generic)
 
 instance FromJSON FieldType where
   parseJSON =
@@ -104,12 +97,10 @@ instance FromJSON FieldType where
       return $ FieldType atBytes theType
 
 instance ToJSON FieldType where
-  toJSON (FieldType fieldTypeAtBytes theType) =
+  toJSON FieldType{..} =
     let
-      Object theMap = toJSON theType
+      Object theMap = toJSON fieldTypeType
     in
-      Object $
-      HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) $
-      theMap
+      Object $ HashMap.insert "atBytes" (toJSON fieldTypeAtBytes) theMap
 
 instance Arbitrary FieldType where arbitrary = genericArbitrary uniform

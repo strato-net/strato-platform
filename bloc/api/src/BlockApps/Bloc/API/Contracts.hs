@@ -1,42 +1,40 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    DataKinds
-  , FlexibleInstances
-  , DeriveGeneric
-  , OverloadedStrings
-  , TypeOperators
-  , TypeSynonymInstances
-#-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module BlockApps.Bloc.API.Contracts where
 
-import Data.Aeson
-import Data.Aeson.Casing
-import Data.Aeson.Encoding
-import Data.Int (Int64)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.String (IsString(..))
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Generic.Random.Generic
-import GHC.Generics
-import Servant.API
-import Servant.Docs
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
+import           Data.Aeson
+import           Data.Aeson.Casing
+import           Data.Aeson.Encoding
+import           Data.Int                         (Int64)
+import           Data.Map.Strict                  (Map)
+import qualified Data.Map.Strict                  as Map
+import           Data.String                      (IsString (..))
+import           Data.Text                        (Text)
+import qualified Data.Text                        as Text
+import           Generic.Random.Generic
+import           GHC.Generics
+import           Servant.API
+import           Servant.Docs
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances        ()
 
-import BlockApps.Bloc.API.Utils
-import BlockApps.Ethereum
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
 --------------------------------------------------------------------------------
 -- | Routes and types
 --------------------------------------------------------------------------------
 type GetContracts = "contracts" :> Get '[JSON] GetContractsResponse
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64
-  , address :: MaybeNamed Address
+  , address   :: MaybeNamed Address
   } deriving (Eq, Show, Generic)
 instance ToJSON AddressCreatedAt
 instance FromJSON AddressCreatedAt
@@ -144,9 +142,9 @@ type PostContractsCompile = "contracts"
   :> ReqBody '[JSON] [PostCompileRequest]
   :> Post '[JSON] [PostCompileResponse]
 data PostCompileRequest = PostCompileRequest
-  { postcompilerequestSearchable :: [Text]
+  { postcompilerequestSearchable   :: [Text]
   , postcompilerequestContractName :: Text
-  , postcompilerequestSource :: Text
+  , postcompilerequestSource       :: Text
   } deriving (Eq,Show,Generic)
 instance Arbitrary PostCompileRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostCompileRequest where
@@ -158,7 +156,7 @@ instance ToSample PostCompileRequest where
 
 data PostCompileResponse = PostCompileResponse
   { postcompileresponseContractName :: Text
-  , postcompileresponseCodeHash :: Keccak256
+  , postcompileresponseCodeHash     :: Keccak256
   } deriving (Eq,Show,Generic)
 instance ToJSON PostCompileResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -182,4 +180,3 @@ instance ToHttpApiData SymbolName where
   toUrlPiece (SymbolName name) = name
 instance FromHttpApiData SymbolName where
   parseUrlPiece = Right . SymbolName
-
