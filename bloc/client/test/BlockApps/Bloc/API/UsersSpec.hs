@@ -121,14 +121,8 @@ spec = do
       Right balances <- runClientM
         (postUsersSendList userName userAddress postSendListRequest)
         (ClientEnv mgr blocUrl)
-      balances `shouldBe`
-        [ PostSendListResponse (Text.pack (show balance))
-        | balance <-
-          [ 1000000000000000000000 - 100 :: Integer
-          , 1000000000000000000000 - 200
-          , 1000000000000000000000 - 300
-          ]
-        ]
+      balances `shouldSatisfy` all (\(PostSendListResponse balance) ->
+        read (Text.unpack balance) <= (1000000000000000000000 - 300 :: Integer))
   describe "postUsersContractMethodList" $
     it "should call a list of methods" $ \ TestConfig {..} -> do
       threadDelay delay

@@ -6,8 +6,6 @@
 
 module BlockApps.Bloc.Server.Users where
 
-import Debug.Trace
-
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -137,6 +135,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     namesCmIds = map fst namesCmIdsTxs
     txs = map snd namesCmIdsTxs
   hashes <- blocStrato (postTxList txs)
+  -- TODO: use `ensureMostRecentSuccessfulTx`
   results <- unBatchTransactionResult <$> pollTxResultBatch hashes -- pollTxResultBatch will always have at least one result for a hash
   let zipped = resultJoiner <$> zip namesCmIds hashes
       resultJoiner (nc, hash) = (nc, head . fromJust $ Map.lookup hash results)
@@ -166,22 +165,30 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
   hashes <- blocStrato $ postTxList txs'
   ret <- if resolve
     then do
-        resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
-        for (Map.elems (unBatchTransactionResult resolved)) $ \(res:_) -> do
-          let txResponse = transactionresultResponse res
-          case txResponse of
-            "Success!" -> do
-              senderAccounts <- blocStrato $ getAccountsFilter
-                accountsFilterParams{qaAddress = Just addr}
-              traceM "senderAccounts"
-              traceShowM senderAccounts
-              case senderAccounts of
-                [] -> throwError $ AnError "No sender account found"
-                senderAccount:_ -> return . Text.pack . show . unStrung $ accountBalance senderAccount
-            _ -> return txResponse
+      resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
+      results <- traverse ensureMostRecentSuccessfulTx $
+        Map.elems (unBatchTransactionResult resolved)
+      senderAccounts <- blocStrato $ getAccountsFilter
+        accountsFilterParams{qaAddress = Just addr}
+      case senderAccounts of
+        [] -> throwError $ AnError "No sender account found"
+        senderAccount:_ -> return $
+          let strungBalance = Text.pack . show . unStrung $ accountBalance senderAccount
+          in const strungBalance <$> results
     else return (Text.pack . keccak256String <$> hashes)
-
   return $ PostSendListResponse <$> ret
+
+ensureMostRecentSuccessfulTx
+  :: [TransactionResult]
+  -> Bloc TransactionResult
+ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
+  filter ((== "Success!") . transactionresultMessage)
+    (sortOn (negate . transactionresultTime) results)
+  where
+    hash = transactionresultTransactionHash (head results)
+    err = "Transaction with hash "
+      <> Text.pack (keccak256String hash)
+      <> " never ran successfully."
 
 postUsersContractMethodList
   :: UserName
@@ -224,6 +231,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   hashes <- blocStrato $ postTxList txs
   if postmethodlistrequestResolve
   then do
+    -- TODO: use `ensureMostRecentSuccessfulTx`
     txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
     let zipped = resultJoiner <$> zip funcIds hashes
         resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
@@ -272,8 +280,6 @@ postUsersContractMethod
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-    traceM "resultXabiTypes"
-    traceShowM resultXabiTypes
     let
       orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
     orderedResultTypes <-
@@ -285,12 +291,6 @@ postUsersContractMethod
 
     txResult <- pollTxResult hash
 
-    traceM "orderedResultTypes"
-    traceShowM orderedResultTypes
-
-    traceM "transactionresultResponse txResult"
-    traceShowM (transactionresultResponse txResult)
-
     let
       mFormattedResponse = Text.concat <$>
         convertResultResToTexts
@@ -298,9 +298,6 @@ postUsersContractMethod
           orderedResultTypes
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
-
-    traceM "formattedResponse"
-    traceShowM formattedResponse
 
     return $ PostUsersMethodResponse formattedResponse txResult
 

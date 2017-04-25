@@ -32,7 +32,6 @@ spec :: SpecWith TestConfig
 spec = do
   describe "Integration Tests" $ do
     it "should send Ether between two users" $ \ TestConfig {..} -> do
-      pendingWith "Skipping until contract E2E works"
       let
           userName1 = UserName "blockapps1"
           userName2 = UserName "blockapps2"
@@ -180,7 +179,6 @@ spec = do
       storedData' `shouldBe` SolidityValueAsString "3"
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "until state route is implemented"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -230,7 +228,6 @@ spec = do
       storedData `shouldBe` SolidityValueAsString "3"
 
     it "should create TestArrayStatCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -262,7 +259,6 @@ spec = do
 
 
     it "should create TestArrayDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -293,7 +289,6 @@ spec = do
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestBytesDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -324,7 +319,6 @@ spec = do
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestAddressBytesCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
@@ -359,7 +353,6 @@ spec = do
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestLessComplexCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
           postUsersUserRequest1 = PostUsersUserRequest 1 pw
