@@ -194,7 +194,7 @@ postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> Bloc [Either Keccak256 PostUsersMethodResponse]
+  -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
@@ -229,7 +229,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  if postmethodlistrequestResolve
+  map PostMethodListResponse <$> if postmethodlistrequestResolve
   then do
     -- TODO: use `ensureMostRecentSuccessfulTx`
     txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
@@ -243,16 +243,22 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
                               either (throwError . UserError . Text.pack) return $
                                 xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
       let mFormattedResponse = Text.concat <$> convertResultResToTexts (transactionresultResponse txResult) orderedResultTypes
-      Right . flip PostUsersMethodResponse txResult <$> blocMaybe "Failed to parse response" mFormattedResponse
-  else for hashes $ pure . Left
+      blocMaybe "Failed to parse response" mFormattedResponse
+  else return $ map (Text.pack . keccak256String) hashes
 
-postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersMethodRequest -> Bloc PostUsersMethodResponse
+postUsersContractMethod
+  :: UserName
+  -> Address
+  -> ContractName
+  -> Address
+  -> PostUsersContractMethodRequest
+  -> Bloc PostUsersContractMethodResponse
 postUsersContractMethod
   userName
   userAddr
   (ContractName contractName)
   contractAddr
-  (PostUsersMethodRequest password funcName args value txParams) = do
+  (PostUsersContractMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
 
@@ -299,7 +305,7 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
-    return $ PostUsersMethodResponse formattedResponse txResult
+    return $ PostUsersContractMethodResponse formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
