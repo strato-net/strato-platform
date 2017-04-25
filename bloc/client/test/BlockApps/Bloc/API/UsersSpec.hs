@@ -35,7 +35,7 @@ spec = do
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
         username = "blockapps"
-        postUsersUserRequest = PostUsersUserRequest 1 pw
+        postUsersUserRequest = PostUsersUserRequest "1" pw
       postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr blocUrl)
       postUsersEither `shouldSatisfy` isRight
   describe "postUsersSend" $
