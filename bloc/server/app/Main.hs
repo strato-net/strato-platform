@@ -1,26 +1,28 @@
-{-# LANGUAGE
-    OverloadedStrings
-  , TemplateHaskell
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Main where
 
-import Data.String
-import HFlags
-import Control.Monad
-import Database.PostgreSQL.Simple
-import Network.HTTP.Client
-import Network.Wai.Handler.Warp
-import Servant.Common.BaseUrl
+import           Control.Monad
+import           Data.String
+import           Database.PostgreSQL.Simple
+import           HFlags
+import           Network.HTTP.Client
+import           Network.Wai.Handler.Warp
+import           Servant.Common.BaseUrl
+import           System.IO                          (BufferMode (..),
+                                                     hSetBuffering, stderr,
+                                                     stdout)
 
-import BlockApps.Bloc.Server
-import BlockApps.Bloc.Database.Create
-import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Options
-import BlockApps.Strato.StratoURLResolver
+import           BlockApps.Bloc.Database.Create
+import           BlockApps.Bloc.Monad
+import           BlockApps.Bloc.Options
+import           BlockApps.Bloc.Server
+import           BlockApps.Strato.StratoURLResolver
 
 main :: IO ()
 main = do
+  forM_ [stdout, stderr] $ flip hSetBuffering LineBuffering
   putStrLn . unlines $
     [ "██████╗ ██╗      ██████╗  ██████╗"
     , "██╔══██╗██║     ██╔═══██╗██╔════╝"

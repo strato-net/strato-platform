@@ -5,8 +5,9 @@
 #-}
 
 module BlockApps.Bloc.API
-  (
-    BlocAPI
+  ( BlocAPI
+  , markdownBloc
+  , layoutBloc
   , module BlockApps.Bloc.API.Users
   , module BlockApps.Bloc.API.Addresses
   , module BlockApps.Bloc.API.Contracts
@@ -18,7 +19,6 @@ module BlockApps.Bloc.API
 import Data.Text
 import Servant
 import Servant.Docs
-import Servant.Mock
 
 import BlockApps.Bloc.API.Users
 import BlockApps.Bloc.API.Addresses
@@ -28,16 +28,18 @@ import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Crypto
 
 type BlocAPI =
+  -- / endpoint, for smoke test
+  GetHomepage
   -- /users endpoints
-       GetUsers
+  :<|> GetUsers
   :<|> PostUsersUser
   :<|> GetUsersUser
   :<|> PostUsersSend
   :<|> PostUsersContract
   :<|> PostUsersUploadList
-  :<|> PostUsersContractMethod
+  :<|> PostUsersMethod
   :<|> PostUsersSendList
-  :<|> PostUsersContractMethodList
+  :<|> PostUsersMethodList
   -- /address endpoints
   :<|> GetAddresses
   -- /contracts endpoints
@@ -57,9 +59,6 @@ type BlocAPI =
 
 markdownBloc :: String
 markdownBloc = markdown $ docs (Proxy @ BlocAPI)
-
-mockBloc :: Server BlocAPI
-mockBloc = mock (Proxy @ BlocAPI) Proxy
 
 layoutBloc :: Text
 layoutBloc = layout (Proxy @ BlocAPI)

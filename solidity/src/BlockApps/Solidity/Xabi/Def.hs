@@ -28,6 +28,9 @@ data Def =
   | Struct {
     fields::Map Text Xabi.FieldType,
     bytes::Word
+    }
+  | Contract {
+    bytes::Word
     } deriving (Eq, Show, Generic)
 
 instance Arbitrary Def where arbitrary = genericArbitrary uniform

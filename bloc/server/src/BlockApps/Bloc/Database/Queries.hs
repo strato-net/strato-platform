@@ -44,6 +44,7 @@ import BlockApps.Bloc.Database.Tables
 import BlockApps.Ethereum
 import BlockApps.Bloc.API.Utils
 import BlockApps.Bloc.Monad
+import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import qualified BlockApps.Solidity.Xabi.Def as Xabi.Def
@@ -593,11 +594,11 @@ getXabiFunctionsQuery :: HasCallStack =>
                          Int32 -> Bloc (Map Text Func)
 getXabiFunctionsQuery cmId = do
   funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (xfId,contractmetadataId,isConstr,name,selector) <-
+    (xfId,contractmetadataId,isConstr,name) <-
       queryTable xabiFunctionsTable -< ()
     restrict -< contractmetadataId .== constant cmId .&& Opaleye.not isConstr
-    returnA -< (name,(selector,xfId))
-  for funcsWithIds $ \ (selector,xfId) -> do
+    returnA -< (name,xfId)
+  for funcsWithIds $ \ xfId -> do --TODO remove the selector from the DB
     args <- getXabiFunctionsArgsQuery xfId
     let
       valMap valList = Map.fromList
@@ -605,11 +606,11 @@ getXabiFunctionsQuery cmId = do
         | val <- valList
         ]
     vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
-    return $ Func args (Text.decodeUtf8 selector) vals
+    return $ Func args vals
 
 getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
 getXabiFunctionNamesQuery metadataId = proc () -> do
-  (_,cmid,isc,name,_) <-
+  (_,cmid,isc,name) <-
     queryTable xabiFunctionsTable -< ()
   restrict -< cmid .== constant metadataId .&& Opaleye.not isc
   returnA -< name
@@ -621,7 +622,7 @@ WHERE XF.is_constructor = true AND XF.contract_metadata_id = $1;
 -}
 getXabiConstrQuery :: Int32 -> Query (Column PGInt4)
 getXabiConstrQuery cmId = proc () -> do
-  (xfId,contractmetadataId,isConstr,_,_) <-
+  (xfId,contractmetadataId,isConstr,_) <-
     queryTable xabiFunctionsTable -< ()
   restrict -< contractmetadataId .== constant cmId .&& isConstr
   returnA -< xfId
@@ -863,9 +864,18 @@ insertXabiVariables
   -> Map Text Xabi.VarType
   -> Bloc Int64
 insertXabiVariables metadataId vars = do
-  varsWithIds <- for vars $ \ (Xabi.VarType atBytes ispublic xt) -> do
-    xtid <- insertXabiType xt
-    return (atBytes,ispublic,xtid)
+  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic xt) -> do
+    varIds :: [Int32] <- blocQuery $ proc () -> do
+      (vId,cmId,_,vname,_,_) <- queryTable xabiVariablesTable -< ()
+      restrict -< cmId .== constant metadataId
+        .&& vname .== constant name
+      returnA -< (vId)
+    if null varIds
+    then do
+      xtid <- insertXabiType xt
+      return $ Just (name,atBytes,ispublic,xtid)
+    else
+      return Nothing
   blocModify $ \ conn -> do
     runInsertMany conn xabiVariablesTable
       [ ( Nothing
@@ -875,7 +885,7 @@ insertXabiVariables metadataId vars = do
         , constant atBytes
         , constant (fromMaybe False ispublic)
         )
-      | (name,(atBytes,ispublic,xtid)) <- Map.toList varsWithIds
+      | Just (name,atBytes,ispublic,xtid) <- varsWithIds
       ]
 
 {- |
@@ -889,7 +899,7 @@ insertXabiFunction
   -> Bloc ()
 insertXabiFunction metadataId (name,Func{..}) = do
   funcIds :: [Int32] <- blocQuery $ proc () -> do
-    (fId,cmId,_,fname,_) <- queryTable xabiFunctionsTable -< ()
+    (fId,cmId,_,fname) <- queryTable xabiFunctionsTable -< ()
     restrict -< cmId .== constant metadataId
       .&& fname .== constant name
     returnA -< (fId)
@@ -899,9 +909,8 @@ insertXabiFunction metadataId (name,Func{..}) = do
       , constant metadataId
       , constant False
       , constant name
-      , constant (Text.encodeUtf8 funcSelector)
       )
-      (\ (xfId,_,_,_,_) -> xfId)
+      (\ (xfId,_,_,_) -> xfId)
     void $ insertXabiFunctionArg funcId funcArgs
     void $ insertXabiFunctionRet funcId (toList funcVals)
 
@@ -916,9 +925,8 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
     , constant metadataId
     , constant True
     , constant contractName
-    , constant (Text.encodeUtf8 "")
     )
-    (\ (xfId,_,_,_,_) -> xfId)
+    (\ (xfId,_,_,_) -> xfId)
   void $ insertXabiFunctionArg funcId constrArgs
 
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
@@ -954,8 +962,16 @@ insertContract parentContr contr bin binRuntime xabi = do
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source = do
-  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
-    (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+--  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
+--     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
+
+  SolcResponse abiBins <- blocStrato $ postSolc (Src source)
+  --TODO - clean this up, what should filename be instead of "-"
+  --       get rid of error
+  --       name nicer, mabye merge with next let
+  let maybeXabis = parseXabi "-" $ Text.unpack source
+      xabis = either (error . show) Map.fromList maybeXabis
+
   let
     contracts = Map.intersectionWith (,) xabis abiBins
     details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
@@ -1175,6 +1191,21 @@ insertXabiType = \case
         , constant $ Just keyId
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
+  Xabi.Label name ->
+    blocModify1 $ \ conn -> do
+      runInsertReturning conn xabiTypesTable
+        ( Nothing
+        , constant ("Label"::Text)
+        , constant $ Just name
+        , constant False
+        , constant False
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        , Opaleye.null
+        )
+        (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
 
 getXabiType :: HasCallStack =>
                Int32 -> Bloc Xabi.Type
@@ -1215,6 +1246,9 @@ getXabiType typeId = do
       xtkt <- getXabiType xtktid'
       xtvt <- getXabiType xtvtid'
       return $ Xabi.Mapping (Just xtdy) xtkt xtvt
+    "Label" -> do
+      xttd' <- blocMaybe "Missing typedef in type Enum" xttd
+      return $ Xabi.Label $ Text.unpack xttd'
     _ -> throwError $ DBError "Could not match type"
 
 getXabiStructFields :: Int32 -> Bloc (Map Text Xabi.FieldType)
@@ -1277,6 +1311,8 @@ getXabiTypeDefs metadataId = do
       "Enum" -> do
         names <- getXabiEnumNames tdid
         return $ Xabi.Def.Enum names (fromIntegral by)
+      "Contract" -> do
+        return $ Xabi.Def.Contract $ fromIntegral by
       _ -> throwError $ DBError $
         "Invalid type def. Expected Struct or Enum, saw " <> ty
 
@@ -1288,6 +1324,7 @@ insertXabiTypeDefs metadataId typeDefs = do
       tyOf = \case
         Xabi.Def.Enum _ _ -> "Enum"
         Xabi.Def.Struct _ _ -> "Struct"
+        Xabi.Def.Contract _ -> "Contract"
       byOf :: Xabi.Def.Def -> Int32
       byOf = fromIntegral . Xabi.Def.bytes
     runInsertManyReturning conn xabiTypeDefsTable
@@ -1303,6 +1340,7 @@ insertXabiTypeDefs metadataId typeDefs = do
   for_ (Map.intersectionWith (,) typeDefs typeDefIds) $ \case
     (Xabi.Def.Struct fields _, tdId) -> insertXabiStructFields tdId fields
     (Xabi.Def.Enum names _, tdId) -> insertXabiEnumNames tdId names
+    (Xabi.Def.Contract _, _) -> return 0
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
@@ -1334,17 +1372,17 @@ getContractMetadataAndBin contract = blocTransaction $ do
 getConstructorId :: Int32 -> Bloc (Maybe Int32)
 getConstructorId cmId = do
   functionIds <- blocQuery $ proc () -> do
-    (xfId,contractMetaDataId,isConstr,_,_)
+    (xfId,contractMetaDataId,isConstr,_)
       <- queryTable xabiFunctionsTable -< ()
     restrict -< contractMetaDataId .== constant cmId .&& isConstr
     returnA -< xfId
   return $ listToMaybe functionIds
 
-getFunctionIdSel :: Int32 -> Text -> Bloc (Int32,ByteString)
-getFunctionIdSel cmId funcName = blocQuery1 $ proc () -> do
-  (xfId,contractMetaDataId,isConstr,name,sel)
+getFunctionId :: Int32 -> Text -> Bloc Int32
+getFunctionId cmId funcName = blocQuery1 $ proc () -> do
+  (xfId,contractMetaDataId,isConstr,name)
     <- queryTable xabiFunctionsTable -< ()
   restrict -< contractMetaDataId .== constant cmId
     .&& name .== constant funcName
     .&& Opaleye.not isConstr
-  returnA -< (xfId,sel)
+  returnA -< xfId

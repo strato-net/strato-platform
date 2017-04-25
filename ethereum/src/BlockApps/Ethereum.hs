@@ -7,6 +7,7 @@
   , OverloadedStrings
   , RecordWildCards
   , TypeApplications
+  , MultiParamTypeClasses
 #-}
 
 module BlockApps.Ethereum
@@ -50,6 +51,8 @@ import Crypto.Hash
 import Crypto.Random.Entropy
 import Crypto.Secp256k1
 import Data.Aeson hiding (Array,String)
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encoding as AesonEnc
 import qualified Data.Binary as Binary
 import qualified Data.ByteArray as ByteArray
 import Data.ByteString (ByteString)
@@ -124,7 +127,7 @@ newSecKey = fromMaybe err . secKey <$> getEntropy 32
     err = error "could not generate secret key"
 
 newtype Keccak256 = Keccak256 { digestKeccak256 :: Digest Keccak_256 }
-  deriving (Eq,Show,Generic)
+  deriving (Eq,Ord,Show,Generic)
 keccak256ByteString :: Keccak256 -> ByteString
 keccak256ByteString = ByteArray.convert . digestKeccak256
 byteStringKeccak256 :: ByteString -> Maybe Keccak256
@@ -143,6 +146,12 @@ instance FromJSON Keccak256 where
     case stringKeccak256 string of
       Nothing -> fail $ "Could not decode Keccak256: " <> string
       Just hash256 -> return hash256
+instance ToJSONKey Keccak256 where
+    toJSONKey = ToJSONKeyText f f'
+        where f k = let (Aeson.String s) = toJSON k in s
+              f'  = AesonEnc.text . f
+instance FromJSONKey Keccak256 where
+    fromJSONKey = FromJSONKeyTextParser (parseJSON . Aeson.String)
 instance ToHttpApiData Keccak256 where
   toUrlPiece = Text.pack . keccak256String
 instance FromHttpApiData Keccak256 where
@@ -152,6 +161,10 @@ instance FromHttpApiData Keccak256 where
 instance ToForm Keccak256 where
   toForm hash256 = [("hash", toQueryParam hash256)]
 instance FromForm Keccak256 where fromForm = parseUnique "hash"
+instance MimeUnrender PlainText Keccak256 where
+  mimeUnrender _ = maybe (Left "Couldn't read Keccak") Right . stringKeccak256 . Char8.unpack . Lazy.toStrict
+instance MimeRender PlainText Keccak256 where
+  mimeRender _ = Lazy.fromStrict . Char8.pack . keccak256String
 instance Arbitrary Keccak256 where
   arbitrary = keccak256lazy . Binary.encode @ Integer <$> arbitrary
 keccak256 :: ByteString -> Keccak256

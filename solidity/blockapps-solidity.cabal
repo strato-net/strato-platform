@@ -15,44 +15,54 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Solidity.Contract
-    BlockApps.Solidity.Int
-    BlockApps.Solidity.SolidityValue
-    BlockApps.Solidity.Storage
-    BlockApps.Solidity.Struct
-    BlockApps.Solidity.Type
-    BlockApps.Solidity.TypeDefs
-    BlockApps.Solidity.Value
-    BlockApps.Solidity.Xabi
-    BlockApps.Solidity.Xabi.Def
-    BlockApps.Solidity.Xabi.Type
-    BlockApps.SolidityVarReader
-    BlockApps.Storage
-    BlockApps.XAbiConverter
+                  BlockApps.Solidity.Contract
+                  BlockApps.Solidity.Int
+                  BlockApps.Solidity.Parse.Parser
+                  BlockApps.Solidity.Parse.Selector
+                  BlockApps.Solidity.SolidityValue
+                  BlockApps.Solidity.Storage
+                  BlockApps.Solidity.Struct
+                  BlockApps.Solidity.Type
+                  BlockApps.Solidity.TypeDefs
+                  BlockApps.Solidity.Value
+                  BlockApps.Solidity.Xabi
+                  BlockApps.Solidity.Xabi.Def
+                  BlockApps.Solidity.Xabi.Type
+                  BlockApps.SolidityVarReader
+                  BlockApps.Storage
+                  BlockApps.XAbiConverter
+  other-modules: BlockApps.Solidity.Parse.Declarations
+                 BlockApps.Solidity.Parse.Expression
+                 BlockApps.Solidity.Parse.File
+                 BlockApps.Solidity.Parse.Lexer
+                 BlockApps.Solidity.Parse.ParserTypes
+                 BlockApps.Solidity.Parse.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
-    , blockapps-ethereum
-    , aeson
-    , aeson-casing
-    , base16-bytestring
-    , bimap
-    , binary
-    , bytestring
-    , containers
-    , generic-random
-    , http-api-data
-    , largeint
-    , largeword
-    , logging-effect
-    , memory
-    , QuickCheck
-    , quickcheck-instances
-    , servant
-    , servant-docs
-    , text
-    , unordered-containers
-    , vector
+               , blockapps-ethereum
+               , aeson
+               , aeson-casing
+               , base16-bytestring
+               , bimap
+               , binary
+               , bytestring
+               , containers
+               , cryptonite
+               , generic-random
+               , http-api-data
+               , largeint
+               , largeword
+               , logging-effect
+               , memory
+               , parsec
+               , QuickCheck
+               , quickcheck-instances
+               , servant
+               , servant-docs
+               , text
+               , unordered-containers
+               , vector
 
 test-suite blockapps-solidity-test
   default-language: Haskell2010
@@ -63,13 +73,15 @@ test-suite blockapps-solidity-test
   other-modules:
     BlockApps.SoliditySpec
     BlockApps.Solidity.StorageSpec
+    BlockApps.Solidity.Parse.SelectorSpec
   build-depends: base >=4 && < 5
-    , base16-bytestring
-    , blockapps-ethereum
-    , blockapps-solidity
-    , hspec
-    , aeson
-    , bytestring
+               , aeson
+               , base16-bytestring
+               , blockapps-ethereum
+               , blockapps-solidity
+               , bytestring
+               , hspec
+               , text
 
 source-repository head
   type: git

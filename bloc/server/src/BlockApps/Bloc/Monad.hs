@@ -55,6 +55,9 @@ newtype Bloc x = Bloc
   )
 
 instance MonadError BlocError Bloc where
+  throwError err@(RuntimeError _) = do
+    logWith logError (Text.pack $ formatError err ++ "\n  callstack missing for runtime errors")
+    Bloc $ throwError err
   throwError err = do
     logWith logError (Text.pack (formatError err))
     Bloc $ throwError err

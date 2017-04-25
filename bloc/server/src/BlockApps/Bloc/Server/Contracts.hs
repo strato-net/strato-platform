@@ -13,8 +13,9 @@ import Control.Monad.Except
 import Control.Monad.Log
 import Data.Foldable
 import Data.Int
-import Data.Maybe
 import qualified Data.Map.Strict as Map
+import Data.Maybe
+import Data.Monoid
 import Data.Text (Text)
 import Data.Traversable
 import qualified Data.Text as Text
@@ -68,14 +69,23 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
-  contract' <- xAbiToContract <$> getContractXabi contract contractId
+  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+
+  contract' <-
+    either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 
-  address <- blocQuery1 $ proc () -> do
-    (_,cmId,addr,_) <- queryTable contractsInstanceTable -< ()
-    restrict -< cmId .== constant (metadataId::Int32)
-    returnA -< addr
+  address <- case contractId of
+    Unnamed addr -> return addr
+    Named "Latest" -> blocQuery1 $ proc () -> do
+      (_,cmId,addr,_) <-
+        (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+          (queryTable contractsInstanceTable) -< ()
+      restrict -< cmId .== constant (metadataId::Int32)
+      returnA -< addr
+    Named somethingElse -> blocError $ UserError $
+      "Expected address or \"Latest\": saw " <> somethingElse
 
   storage' <- blocStrato $ getStorage $ Just address
 

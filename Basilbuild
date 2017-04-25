@@ -21,7 +21,7 @@ else
 STACKFLAGS=--allow-different-user
 endif
 
-BUILD_HASKELL=stack setup $(STACKFLAGS) --verbose && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
+BUILD_HASKELL=stack setup $(STACKFLAGS) && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin
 
 all: build_docker
 
