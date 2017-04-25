@@ -119,13 +119,13 @@ type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity v
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
-instance ToSchema GetContractsStateResponses where
-  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
-    & description ?~ "Response to the Get Cotnracts State route"
-    & example ?~ toJSON ex
-    where
-      ex :: GetContractsStateResponses
-      ex = Map.fromList [("willRain", SolidityBool False)]
+--instance {-# OVERLAPPING #-} ToSchema GetContractsStateResponses where
+--  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
+--    & description ?~ "Response to the Get Cotnracts State route"
+--    & example ?~ toJSON ex
+--    where
+--      ex :: GetContractsStateResponses
+--      ex = Map.fromList [("willRain", SolidityBool False)]
 
 --------------------------------------------------------------------------------
 
@@ -186,7 +186,7 @@ type GetContractsStateMappingResponse =
 instance ToSample GetContractsStateMappingResponse where
   toSamples _ = noSamples
 
-instance ToSchema GetContractsStateMappingResponse where
+instance {-# OVERLAPPING #-} ToSchema GetContractsStateMappingResponse where
   declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Mapping Response") $ mempty
     & description ?~ "Response to the Get Cotnracts State Mapping route"
     & example ?~ toJSON ex
@@ -216,13 +216,13 @@ instance ToJSONKey Address where
 instance ToSample GetContractsStatesResponse where
   toSamples _ = noSamples
 
-instance ToSchema GetContractsStatesResponse where
-  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
-    & description ?~ "Response to the Get Cotnracts State route"
-    & example ?~ toJSON ex
-    where
-      ex :: [GetContractsStatesResponse]
-      ex = [Map.fromList [(Address 0xdeadbeef, Map.fromList [("it will rain",SolidityBool False)])]]
+--instance ToSchema GetContractsStatesResponse where
+--  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
+--    & description ?~ "Response to the Get Cotnracts State route"
+--    & example ?~ toJSON ex
+--    where
+--      ex :: [GetContractsStatesResponse]
+--      ex = [Map.fromList [(Address 0xdeadbeef, Map.fromList [("it will rain",SolidityBool False)])]]
 
 
 --------------------------------------------------------------------------------

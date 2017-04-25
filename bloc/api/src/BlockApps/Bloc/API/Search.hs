@@ -5,13 +5,17 @@
   , FlexibleInstances
   , MultiParamTypeClasses
   , TypeOperators
+  , OverloadedStrings
 #-}
 
 module BlockApps.Bloc.API.Search where
 
+import Control.Lens ((&), (?~), mapped)
 import Data.Aeson
 import Data.Aeson.Casing
 import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Swagger
 import Data.Text (Text)
 import GHC.Generics
 import Generic.Random.Generic
@@ -22,6 +26,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 
 import BlockApps.Bloc.API.Utils
+import BlockApps.Bloc.API.SwaggerSchema
 import BlockApps.Ethereum
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Xabi
@@ -48,6 +53,7 @@ type GetSearchContractStateReduced = "search"
   :> "reduced"
   :> QueryParams "props" Text
   :> Get '[JSON] [SearchContractState]
+
 instance ToParam (QueryParams "props" Text) where
   toParam _ = DocQueryParam "props" ["id","value"] "Names of contract variables" List
 
@@ -55,11 +61,26 @@ data SearchContractState = SearchContractState
   { searchcontractstateAddress :: Address
   , searchcontractstateState :: Map Text SolidityValue
   } deriving (Eq, Show, Generic)
+
+instance ToSchema SearchContractState where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Search Contract State"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: SearchContractState
+      ex = SearchContractState
+        { searchcontractstateState = Map.fromList [("val", SolidityBool False)]
+        , searchcontractstateAddress = Address 0xdeadbeef
+        }
+
 instance ToJSON SearchContractState where
   toJSON = genericToJSON (aesonPrefix camelCase)
+
 instance FromJSON SearchContractState where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
+
 instance ToSample SearchContractState where
   toSamples _ = noSamples
+
 instance Arbitrary SearchContractState where
   arbitrary = genericArbitrary uniform

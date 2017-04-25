@@ -44,6 +44,8 @@ library
                , secp256k1
                , servant
                , servant-server
+               , servant-swagger
+               , servant-swagger-ui
                , servant-docs
                , servant-mock
                , swagger2

@@ -268,6 +268,8 @@ instance ToSchema UploadListContract where
 newtype PostUsersUploadListResponse = PostUsersUploadListResponse
   { contractJSON :: ContractDetails } deriving (Eq,Show,Generic)
 
+instance ToSchema PostUsersUploadListResponse
+
 instance Arbitrary PostUsersUploadListResponse where
   arbitrary = genericArbitrary uniform
 
@@ -319,12 +321,27 @@ instance FromJSON PostUsersContractMethodRequest where
 instance ToSample PostUsersContractMethodRequest where
   toSamples _ = noSamples
 
---instance ToSchema PostUsersContractMethodRequest where
---  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
---    & 
+instance ToSchema PostUsersContractMethodRequest where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Users Contract Method Request"
+    & mapped.schema.description ?~ "Everything you need to make a method request"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostUsersContractMethodRequest
+      ex = PostUsersContractMethodRequest
+       { postuserscontractmethodPassword = "MySecretPassword"
+       , postuserscontractmethodMethod = "fireMissiles"
+       , postuserscontractmethodArgs = Map.fromList [("arg1", "accessCodes"), ("arg2", "target")]
+       , postuserscontractmethodValue = 0 :: Natural
+       , postuserscontractmethodTxParams = Nothing
+       }
 
 newtype PostUsersContractMethodResponse =
   PostUsersContractMethodResponse Text deriving (Eq,Show,FromJSON,ToJSON,Arbitrary)
+
+instance ToSchema PostUsersContractMethodResponse where
+  declareNamedSchema = const . pure . named "Post contract response" $
+    sketchSchema (PostUsersContractMethodResponse "I am a contract response")
 
 instance ToSample PostUsersContractMethodResponse where
   toSamples _ = noSamples
@@ -418,6 +435,11 @@ instance ToSample PostSendListResponse where
 instance Arbitrary PostSendListResponse where
   arbitrary = genericArbitrary uniform
 
+
+instance ToSchema PostSendListResponse where
+  declareNamedSchema = const . pure . named "Post Send List response" $
+    sketchSchema (PostSendListResponse "I am a send listresponse")
+
 instance ToSchema SendTransaction where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.name ?~ "Send Transaction"
@@ -497,6 +519,7 @@ instance ToSample PostMethodListResponse where
 instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary uniform
 
 instance ToSchema PostMethodListResponse
+
 
 data MethodCall = MethodCall
   { methodcallContractName    :: Text
