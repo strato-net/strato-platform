@@ -10,6 +10,8 @@ import           Test.Hspec
 import           BlockApps.Solidity.Parse.Selector
 import           BlockApps.Solidity.Type
 
+{-# ANN module ("HLint: ignore Redundant do" :: String) #-}
+
 spec :: Spec
 spec =
   describe "Selector" $ do
