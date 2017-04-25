@@ -15,7 +15,9 @@ import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Proxy
 import Data.Swagger
+import Data.Swagger.Internal.Schema (named)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Generic.Random.Generic
@@ -131,6 +133,32 @@ instance ToSample ContractDetails where toSamples _ = noSamples
 instance Arbitrary ContractDetails where
   arbitrary = genericArbitrary uniform
 
+instance ToSchema ContractDetails where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "ContractDetails"
+    & mapped.schema.description ?~ "Returned data from contract creation."
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: ContractDetails
+      ex = ContractDetails
+        { contractdetailsBin = "ContractBin"
+        , contractdetailsAddress = Just (Unnamed (Address 0xdeadbeef))
+        , contractdetailsBinRuntime = "ContractRuntime"
+        , contractdetailsCodeHash = keccak256 "digest"
+        , contractdetailsName = "DetailsName"
+        , contractdetailsXabi = sampleXabi
+        }
+      sampleXabi :: Xabi
+      sampleXabi = Xabi
+        { xabiFuncs = Map.fromList
+          [ ("get", Func {funcArgs = Map.fromList [], funcSelector="<funcSelector>", funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]})
+          , ("set", Func {funcSelector = "<funcSelector>", funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})], funcVals = Map.fromList []})
+          ]
+        , xabiConstr = Map.fromList []
+        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+        }
+
 --------------------------------------------------------------------------------
 
 data MaybeNamed a = Named Text | Unnamed a deriving (Eq,Show,Generic)
@@ -162,6 +190,12 @@ instance ToSample (MaybeNamed Address) where
 
 instance ToCapture (Capture "contractAddress" (MaybeNamed Address)) where
   toCapture _ = DocCapture "contractAddress" "an Ethereum address or Contract Name"
+
+instance ToParamSchema (MaybeNamed Address) where
+  toParamSchema _ = toParamSchema (Proxy :: Proxy Address)
+
+instance ToSchema (MaybeNamed Address) where
+  declareNamedSchema = pure . named "MaybeNamed Address" . paramSchemaToSchema
 
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions = SchemaOptions
