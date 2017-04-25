@@ -44,7 +44,9 @@ deployments:
       restart: always
       command: redis-server --appendonly yes
       ports:
-       - "6379:6379"
+        - "6379:6379"
+      volumes:
+        - ./storage/redis:/data
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
@@ -64,6 +66,8 @@ deployments:
         - "30303:30303"
         - "30303:30303/udp"
         - "33000:3000"
+      volumes:
+        - ./storage/strato:/var/lib/strato
       environment:
         networkID : "${networkID}"
         genesis: "${genesis}"
@@ -104,6 +108,8 @@ deployments:
         POSTGRES_USER: postgres
         PG_ENV_POSTGRES_DB: cirrus
         PG_ENV_POSTGRES_USER: postgres
+      volumes:
+        - ./storage/pg-cirrus:/var/lib/postgresql
       ports:
         - '5434:5432'
 
@@ -127,6 +133,8 @@ deployments:
     repo: https://github.com/blockapps/postgres-packager.git
     ref: monostrato-cutover
     compose:
+      volumes:
+        - ./storage/pg-strato:/var/lib/postgresql
       restart: always
 
   - name: explorer
@@ -170,6 +178,9 @@ deployments:
         ZOO_MY_ID: "1"
       ports:
         - "2181:2181"
+      volumes:
+        - ./storage/zk/data:/data
+        - ./storage/zk/datalog:/datalog
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
@@ -187,3 +198,6 @@ deployments:
         KAFKA_LOG_RETENTION_HOURS: "2147483647"
       ports:
         - "9092:9092"
+      volumes:
+        - ./storage/kafka:/var/lib/kafka
+        - ./storage/logs/kafka:/usr/lib/kafka/logs
