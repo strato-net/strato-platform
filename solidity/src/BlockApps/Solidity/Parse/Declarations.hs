@@ -27,13 +27,12 @@ import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
 -- | Parses an entire Solidity contract
-solidityContract :: SolidityParser (Text, Xabi)
+solidityContract :: SolidityParser (Text, Xabi, [Text])
 solidityContract = do
   reserved "contract" <|> reserved "library"
   contractName' <- identifier
   setContractName contractName'
---  baseConstrs <- option [] $ do
-  _ <- option [] $ do
+  baseConstrs <- option [] $ do
     reserved "is"
     commaSep1 $ do
       name <- intercalate "." <$> sepBy1 identifier dot
@@ -63,7 +62,8 @@ solidityContract = do
 --    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
 --    contractTypes = contractTypes',
 --    contractBaseNames = baseConstrs
-      }
+      },
+      map (Text.pack . fst) baseConstrs
     )
 
 
