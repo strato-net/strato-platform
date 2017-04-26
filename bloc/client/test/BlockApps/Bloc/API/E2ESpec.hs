@@ -22,7 +22,7 @@ import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
-{-# ANN module "HLint: ignore Reduce duplication" #-}
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 etherToWei :: Natural -> Natural
 etherToWei x = 1000000000000000000 * x
@@ -30,13 +30,12 @@ etherToWei x = 1000000000000000000 * x
 spec :: SpecWith TestConfig
 spec =
   describe "Integration Tests" $ do
-    let userName1 = UserName "blockapps1"
-        userName2 = UserName "blockapps2"
-        postUsersUserRequest1 = PostUsersUserRequest 1 pw
-        postUsersUserRequest2 = PostUsersUserRequest 1 pw
-        simpleConstructorName = "SimpleConstructor"
     it "should send Ether between two users" $ \ TestConfig {..} -> do
-      pendingWith "Skipping until contract E2E works"
+      let
+          userName1 = UserName "blockapps1"
+          userName2 = UserName "blockapps2"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+          postUsersUserRequest2 = PostUsersUserRequest "1" pw
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       threadDelay 3000000
       postUsersEither2 <- runClientM (postUsersUser userName2 postUsersUserRequest2) (ClientEnv mgr blocUrl)
@@ -81,6 +80,9 @@ spec =
       balance2AS `shouldBe` initialWei + etherToWei etherToSend
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
@@ -93,7 +95,7 @@ spec =
           , postuserscontractrequestContract = simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -126,7 +128,7 @@ spec =
 
       let
         contractName = ContractName simpleStorageContractName
-        postUsersContractMethodRequestSet = PostUsersMethodRequest
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" "3"
@@ -141,7 +143,7 @@ spec =
       -- call get value and verify
 
       let
-        postUsersContractMethodRequestGet = PostUsersMethodRequest
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
@@ -153,7 +155,7 @@ spec =
         (ClientEnv mgr blocUrl)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
-        Right (PostUsersMethodResponse values _) = postUsersContractMethodEitherGet
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
       values `shouldBe` "transaction returned: 3"
 
       -- get state and verify
@@ -174,7 +176,10 @@ spec =
       storedData' `shouldBe` SolidityValueAsString "3"
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "until state route is implemented"
+      let
+          userName1 = UserName "blockapps1"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+          simpleConstructorName = "SimpleConstructor"
       simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
@@ -188,7 +193,7 @@ spec =
           , postuserscontractrequestContract = simpleConstructorName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "3"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -218,10 +223,9 @@ spec =
       storedData `shouldBe` SolidityValueAsString "3"
 
     it "should create TestArrayStatCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
           testArrayStatName = "TestArrayStatCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
@@ -236,7 +240,7 @@ spec =
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "[3,2,3]"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -250,10 +254,9 @@ spec =
 
 
     it "should create TestArrayDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
           testArrayStatName = "TestArrayDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
@@ -268,7 +271,7 @@ spec =
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "[1,2,3,4,5,6,7,8]"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -281,10 +284,9 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestBytesDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
           testArrayStatName = "TestBytesDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
@@ -299,7 +301,7 @@ spec =
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -312,10 +314,9 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestAddressBytesCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
           testArrayStatName = "TestAddressBytesCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
@@ -334,7 +335,7 @@ spec =
             )
           ]
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -347,10 +348,9 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestLessComplexCons contract and check state after constructor" $ \ TestConfig {..} -> do
-      pendingWith "pending until we can check state"
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest 1 pw
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
           testArrayStatName = "TestLessComplexCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
       postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
@@ -374,7 +374,7 @@ spec =
           , ("_uintArrSt", "[1,2,3]")
           ]
           , postuserscontractrequestTxParams = txParamsComplex
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)

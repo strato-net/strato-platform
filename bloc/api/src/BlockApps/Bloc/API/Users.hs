@@ -11,9 +11,11 @@ import           Control.Lens                     (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import qualified Data.ByteString.Lazy             as ByteString.Lazy
+import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Text                        (Text)
+import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
 import           Generic.Random.Generic
 import           GHC.Generics
@@ -48,7 +50,7 @@ type PostUsersUser = "users"
   :> Post '[HTMLifiedAddress, JSON] Address
 
 data PostUsersUserRequest = PostUsersUserRequest
-  { userFaucet   :: Int
+  { userFaucet :: Text
   , userPassword :: Password
   } deriving (Eq, Show, Generic)
 
@@ -68,14 +70,14 @@ instance FromForm PostUsersUserRequest where
 
 instance ToSample PostUsersUserRequest where
   toSamples _ = singleSample PostUsersUserRequest
-    { userFaucet = 1
+    { userFaucet = "1"
     , userPassword = "securePassword"
     }
 
 instance ToSchema PostUsersUserRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.schema.description ?~ "Form to create a user"
-    & mapped.schema.example ?~ toJSON (PostUsersUserRequest 1 "myPassword")
+    & mapped.schema.example ?~ toJSON (PostUsersUserRequest "1" "myPassword")
 
 --------------------------------------------------------------------------------
 
@@ -137,7 +139,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestContract :: Text
   , postuserscontractrequestArgs     :: Maybe (Map Text Text)
   , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue    :: Natural
+  , postuserscontractrequestValue :: Maybe Natural
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
@@ -166,7 +168,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestContract = "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = Nothing
-    , postuserscontractrequestValue = 1000000
+    , postuserscontractrequestValue = Just 1000000
     }
 
 instance ToSchema PostUsersContractRequest where
@@ -183,7 +185,7 @@ instance ToSchema PostUsersContractRequest where
         , postuserscontractrequestContract = "SimpleStorage"
         , postuserscontractrequestArgs = Nothing
         , postuserscontractrequestTxParams = Nothing
-        , postuserscontractrequestValue = 1000000
+        , postuserscontractrequestValue = Just 1000000
         }
 
 --------------------------------------------------------------------------------
@@ -289,17 +291,17 @@ instance ToSample PostUsersUploadListResponse where
 --------------------------------------------------------------------------------
 
 -- This should return the return value from the method call
-type PostUsersMethod = "users"
+type PostUsersContractMethod = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "contract"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "call"
-  :> ReqBody '[JSON] PostUsersMethodRequest
-  :> Post '[HTMLifiedPlainText, JSON] PostUsersMethodResponse
+  :> ReqBody '[JSON] PostUsersContractMethodRequest
+  :> Post '[HTMLifiedPlainText, JSON] PostUsersContractMethodResponse
 
-data PostUsersMethodRequest = PostUsersMethodRequest
+data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod   :: Text
   , postuserscontractmethodArgs     :: Map Text Text
@@ -307,21 +309,26 @@ data PostUsersMethodRequest = PostUsersMethodRequest
   , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
-instance Arbitrary PostUsersMethodRequest where arbitrary = genericArbitrary uniform
-instance ToJSON PostUsersMethodRequest where
+instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
+instance ToJSON PostUsersContractMethodRequest where
   toJSON = genericToJSON (aesonPrefix camelCase)
-instance FromJSON PostUsersMethodRequest where
+instance FromJSON PostUsersContractMethodRequest where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToSample PostUsersMethodRequest where
+instance ToSample PostUsersContractMethodRequest where
   toSamples _ = noSamples
-instance ToSchema PostUsersMethodRequest where
+
+newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse Text deriving (Eq,Show,FromJSON,ToJSON,Arbitrary)
+instance ToSample PostUsersContractMethodResponse where
+  toSamples _ = noSamples --hack because endpoints are returning random text
+
+instance ToSchema PostUsersContractMethodRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.name ?~ "Post Users Contract Method Request"
     & mapped.schema.description ?~ "Everything you need to make a method request"
     & mapped.schema.example ?~ toJSON ex
     where
-      ex :: PostUsersMethodRequest
-      ex = PostUsersMethodRequest
+      ex :: PostUsersContractMethodRequest
+      ex = PostUsersContractMethodRequest
        { postuserscontractmethodPassword = "MySecretPassword"
        , postuserscontractmethodMethod = "fireMissiles"
        , postuserscontractmethodArgs = Map.fromList [("arg1", "accessCodes"), ("arg2", "target")]
@@ -338,7 +345,7 @@ instance FromJSON PostUsersMethodResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToJSON PostUsersMethodResponse where
   toJSON = genericToJSON (aesonPrefix camelCase)
-instance ToSchema PostUsersMethodResponse where
+instance ToSchema PostUsersContractMethodResponse where
     declareNamedSchema = const . pure . named "Post contract response" $
       sketchSchema (PostUsersMethodResponse "I am a contract response" exampleTxResult)
 instance ToSample PostUsersMethodResponse where
@@ -349,9 +356,10 @@ data HTMLifiedPlainText
 instance Accept HTMLifiedPlainText where
   contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
 
-instance MimeRender HTMLifiedPlainText PostUsersMethodResponse where
-  mimeRender _ (PostUsersMethodResponse values _) =
-    ByteString.Lazy.fromStrict $ Text.encodeUtf8 values
+instance MimeUnrender HTMLifiedPlainText PostUsersContractMethodResponse where
+  mimeUnrender _ = return . PostUsersContractMethodResponse . Text.pack . Lazy.Char8.unpack
+instance MimeRender HTMLifiedPlainText PostUsersContractMethodResponse where
+  mimeRender _ (PostUsersContractMethodResponse resp) =  Lazy.Char8.pack $ Text.unpack resp
 
 instance MimeUnrender HTMLifiedPlainText PostUsersMethodResponse where
   mimeUnrender _ = error "why would you pay money for this. really, why?"
@@ -455,12 +463,12 @@ instance ToSchema SendTransaction where
 --------------------------------------------------------------------------------
 
 --POST /users/:user/:address/callList
-type PostUsersMethodList = "users"
+type PostUsersContractMethodList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "callList"
   :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [Either Keccak256 PostUsersMethodResponse]
+  :> Post '[JSON] [PostMethodListResponse]
 
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password
@@ -485,13 +493,13 @@ instance ToSchema PostMethodListRequest where
     & mapped.schema.description ?~ "Everything you need to batch method calls"
     & mapped.schema.example ?~ toJSON ex
     where
-      ex ::PostMethodListRequest
+      ex :: PostMethodListRequest
       ex = PostMethodListRequest
         { postmethodlistrequestPassword = "MyPassword"
         , postmethodlistrequestResolve = True
         , postmethodlistrequestTxs = [exMethodCall]
         }
-      exMethodCall ::MethodCall
+      exMethodCall :: MethodCall
       exMethodCall = MethodCall
         { methodcallTxParams = Nothing
         , methodcallValue = 10
@@ -548,5 +556,5 @@ instance ToSchema MethodCall where
         , methodcallArgs = Map.fromList [("user", "Bob"), ("age", "52")]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
-        , methodcallContractName = "HorroscopeApp"
+        , methodcallContractName = "HoroscopeApp"
         }

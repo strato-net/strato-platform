@@ -37,9 +37,9 @@ type BlocAPI =
   :<|> PostUsersSend
   :<|> PostUsersContract
   :<|> PostUsersUploadList
-  :<|> PostUsersMethod
+  :<|> PostUsersContractMethod
   :<|> PostUsersSendList
-  :<|> PostUsersMethodList
+  :<|> PostUsersContractMethodList
   -- /address endpoints
   :<|> GetAddresses
   -- /contracts endpoints

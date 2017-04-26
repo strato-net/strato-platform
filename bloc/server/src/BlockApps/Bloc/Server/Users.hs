@@ -61,7 +61,7 @@ postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransacti
   unless createdUser (throwError (DBError "failed to create user"))
   let
     addr = keystoreAcctAddress keyStore
-  when (faucet /= 0) $ do
+  when (faucet == "1") $ do
     logWith logNotice "Waiting for faucet transaction to be mined"
     blocStrato $ do
       void $ postFaucet addr
@@ -93,7 +93,7 @@ postUsersContract userName addr
     argsBin <- buildArgumentByteString args mFunctionId
     tx <- prepareTx
       userName password addr Nothing (fromMaybe emptyTxParams txParams)
-      (Wei (fromIntegral value)) (bin <> argsBin) 0
+      (Wei (fromIntegral (fromMaybe 0 value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     txResult <- pollTxResult hash
@@ -134,6 +134,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     namesCmIds = map fst namesCmIdsTxs
     txs = map snd namesCmIdsTxs
   hashes <- blocStrato (postTxList txs)
+  -- TODO: use `ensureMostRecentSuccessfulTx`
   results <- unBatchTransactionResult <$> pollTxResultBatch hashes -- pollTxResultBatch will always have at least one result for a hash
   let zipped = resultJoiner <$> zip namesCmIds hashes
       resultJoiner (nc, hash) = (nc, head . fromJust $ Map.lookup hash results)
@@ -163,26 +164,36 @@ postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
   hashes <- blocStrato $ postTxList txs'
   ret <- if resolve
     then do
-        resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
-        for (Map.elems (unBatchTransactionResult resolved)) $ \(res:_) -> do
-          let txResponse = transactionresultResponse res
-          case txResponse of
-            "Success!" -> do
-              senderAccounts <- blocStrato $ getAccountsFilter
-                accountsFilterParams{qaAddress = Just addr}
-              case senderAccounts of
-                [] -> throwError $ AnError "No sender account found"
-                senderAccount:_ -> return . Text.pack . show . unStrung $ accountBalance senderAccount
-            _ -> return txResponse
+      resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
+      results <- traverse ensureMostRecentSuccessfulTx $
+        Map.elems (unBatchTransactionResult resolved)
+      senderAccounts <- blocStrato $ getAccountsFilter
+        accountsFilterParams{qaAddress = Just addr}
+      case senderAccounts of
+        [] -> throwError $ AnError "No sender account found"
+        senderAccount:_ -> return $
+          let strungBalance = Text.pack . show . unStrung $ accountBalance senderAccount
+          in const strungBalance <$> results
     else return (Text.pack . keccak256String <$> hashes)
-
   return $ PostSendListResponse <$> ret
+
+ensureMostRecentSuccessfulTx
+  :: [TransactionResult]
+  -> Bloc TransactionResult
+ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
+  filter ((== "Success!") . transactionresultMessage)
+    (sortOn (negate . transactionresultTime) results)
+  where
+    hash = transactionresultTransactionHash (head results)
+    err = "Transaction with hash "
+      <> Text.pack (keccak256String hash)
+      <> " never ran successfully."
 
 postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> Bloc [Either Keccak256 PostUsersMethodResponse]
+  -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
@@ -217,8 +228,9 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  if postmethodlistrequestResolve
+  map PostMethodListResponse <$> if postmethodlistrequestResolve
   then do
+    -- TODO: use `ensureMostRecentSuccessfulTx`
     txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
     let zipped = resultJoiner <$> zip funcIds hashes
         resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
@@ -230,20 +242,26 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
                               either (throwError . UserError . Text.pack) return $
                                 xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
       let mFormattedResponse = Text.concat <$> convertResultResToTexts (transactionresultResponse txResult) orderedResultTypes
-      Right . flip PostUsersMethodResponse txResult <$> blocMaybe "Failed to parse response" mFormattedResponse
-  else for hashes $ pure . Left
+      blocMaybe "Failed to parse response" mFormattedResponse
+  else return $ map (Text.pack . keccak256String) hashes
 
-postUsersContractMethod :: UserName -> Address -> ContractName -> Address -> PostUsersMethodRequest -> Bloc PostUsersMethodResponse
+postUsersContractMethod
+  :: UserName
+  -> Address
+  -> ContractName
+  -> Address
+  -> PostUsersContractMethodRequest
+  -> Bloc PostUsersContractMethodResponse
 postUsersContractMethod
   userName
   userAddr
   (ContractName contractName)
   contractAddr
-  (PostUsersMethodRequest password funcName args value txParams) = do
+  (PostUsersContractMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
 
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName contractName) (Unnamed contractAddr)
+    eitherErrorOrContract <- xAbiToContract <$> getContractXabiByMetadataId cmId
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
@@ -276,8 +294,8 @@ postUsersContractMethod
               (error "missing typedefs in postUsersContractMethod")
               indexedTypeType
 
-
     txResult <- pollTxResult hash
+
     let
       mFormattedResponse = Text.concat <$>
         convertResultResToTexts
@@ -286,12 +304,12 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
-    return $ PostUsersMethodResponse formattedResponse txResult
+    return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
   let
-    byteResp = Text.encodeUtf8 txResp
+    byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
   in case bytestringToValues byteResp responseTypes of
     Nothing   -> Nothing
     Just vals -> traverse valueToText vals

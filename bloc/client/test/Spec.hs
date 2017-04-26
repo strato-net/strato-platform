@@ -9,24 +9,24 @@ import           Servant.Client
 import           Test.Hspec
 
 import qualified BlockApps.Bloc.API.AddressesSpec as Addresses
+import           BlockApps.Bloc.API.Contracts
 import qualified BlockApps.Bloc.API.ContractsSpec as Contracts
 import           BlockApps.Bloc.API.E2ESpec       as E2E
 import qualified BlockApps.Bloc.API.SearchSpec    as Search
-import qualified BlockApps.Bloc.API.UsersSpec     as Users
--- import qualified BlockApps.Bloc.APISpec as API
-
-import           BlockApps.Bloc.API.Contracts
 import           BlockApps.Bloc.API.SpecUtils
 import           BlockApps.Bloc.API.Users
+import qualified BlockApps.Bloc.API.UsersSpec     as Users
 import           BlockApps.Bloc.API.Utils
 import           BlockApps.Bloc.Client
+import           BlockApps.Ethereum
 -- import BlockApps.Bloc.Server.Utils
 import           BlockApps.Solidity.Xabi
 
-import           BlockApps.Ethereum
+{-# ANN module ("HLint: ignore Redundant do" :: String) #-}
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 main :: IO ()
-main = hspec $
+main = hspec $ do
   -- API.spec
   beforeAll setup $ do
     Addresses.spec
@@ -94,8 +94,8 @@ setup = do
       , uploadlistResolve = True
       }
     clients = do
-      addr1 <- postUsersUser (userName testConfig) (PostUsersUserRequest 1 (pw testConfig))
-      addr2 <- postUsersUser (toUserName testConfig) (PostUsersUserRequest 1 (pw testConfig))
+      addr1 <- postUsersUser (userName testConfig) (PostUsersUserRequest "1" (pw testConfig))
+      addr2 <- postUsersUser (toUserName testConfig) (PostUsersUserRequest "1" (pw testConfig))
       _ <- postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
       PostUsersUploadListResponse simpleStorageDetails
         : PostUsersUploadListResponse testDetails

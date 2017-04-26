@@ -10,7 +10,7 @@ import           Servant.API
 import           BlockApps.Solidity.Xabi
 
 type API =
-  "contract/" -- why do I need a slash?
+  "contract"
     :> ReqBody '[JSON] ContractDetails
     :> Post '[JSON] NoContent
   :<|> "search"
