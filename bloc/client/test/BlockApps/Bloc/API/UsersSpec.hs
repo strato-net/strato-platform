@@ -1,26 +1,23 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
-{-# LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Bloc.API.UsersSpec where
 
-import Control.Concurrent
-import qualified Data.Map.Strict as Map
-import Data.Either
-import qualified Data.Text as Text
-import Servant.Client
-import Test.Hspec
+import           Control.Concurrent
+import           Data.Either
+import qualified Data.Map.Strict              as Map
+import qualified Data.Text                    as Text
+import           Servant.Client
+import           Test.Hspec
 
-import BlockApps.Bloc.API
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.Client
-import BlockApps.Ethereum
-import BlockApps.Strato.Types
+import           BlockApps.Bloc.API
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.Client
+import           BlockApps.Ethereum
+import           BlockApps.Strato.Types
 
+-- TODO: user/contract methods Addresses may need to be Maybe (Named Address)
 spec :: SpecWith TestConfig
 spec = do
   describe "getUsers" $
@@ -41,7 +38,7 @@ spec = do
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters (toUserAddress) 100 pw txParams
+        postSendParameters = PostSendParameters toUserAddress 100 pw txParams
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345" txParams
       Right postSend <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
       postSend `shouldSatisfy` (== Strung 100) . posttransactionValue
@@ -57,7 +54,7 @@ spec = do
           , postuserscontractrequestContract = simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
@@ -92,18 +89,17 @@ spec = do
       let
         contractName = ContractName simpleStorageContractName
         contractAddress = simpleStorageContractAddress
-        postUsersContractMethodRequest = PostUsersMethodRequest
+        postUsersContractMethodRequest = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
           , postuserscontractmethodValue = 0
           , postuserscontractmethodTxParams = txParams
           }
-      Right response <- runClientM
+      Right (PostUsersContractMethodResponse response) <- runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
         (ClientEnv mgr blocUrl)
-      response `shouldSatisfy`
-        (== "0") . postusersmethodresponseValues
+      response `shouldBe` "transaction returned: 0"
   describe "postUsersSendList" $
     it "should post a list of send transactions" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -143,5 +139,4 @@ spec = do
       Right responses <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      [response | Right response <- responses]
-        `shouldSatisfy` all ((== "0") . postusersmethodresponseValues)
+      responses `shouldSatisfy` all ((== "0") . postmethodlistresponseReturnValue)

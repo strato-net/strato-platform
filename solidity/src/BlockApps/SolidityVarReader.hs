@@ -1,8 +1,6 @@
-{-# LANGUAGE
-    LambdaCase
-  , OverloadedStrings
-  , RecordWildCards
-#-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.SolidityVarReader (
   decodeValue,
@@ -12,32 +10,32 @@ module BlockApps.SolidityVarReader (
   valueToSolidityValue
   ) where
 
-import qualified Data.Bimap as Bimap
-import Data.Binary
-import Data.Bits
-import qualified Data.ByteArray as ByteArray
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import Data.LargeWord
-import qualified Data.Map as Map
-import Data.Maybe
-import Data.List
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as Text
-import Text.Printf
+import qualified Data.Bimap                       as Bimap
+import           Data.Binary
+import           Data.Bits
+import qualified Data.ByteArray                   as ByteArray
+import           Data.ByteString                  (ByteString)
+import qualified Data.ByteString                  as ByteString
+import qualified Data.ByteString.Char8            as BC
+import qualified Data.ByteString.Lazy             as BL
+import           Data.LargeWord
+import           Data.List
+import qualified Data.Map                         as Map
+import           Data.Maybe
+import           Data.Text                        (Text)
+import qualified Data.Text                        as T
+import qualified Data.Text.Encoding               as Text
+import           Text.Printf
 
-import BlockApps.Ethereum
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Storage (Storage)
-import BlockApps.Solidity.Contract
-import qualified BlockApps.Storage as Storage
-import BlockApps.Solidity.Struct
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.TypeDefs
-import BlockApps.Solidity.Value
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Struct
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.TypeDefs
+import           BlockApps.Solidity.Value
+import           BlockApps.Storage                (Storage)
+import qualified BlockApps.Storage                as Storage
 
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
@@ -151,12 +149,12 @@ decodeValues
   -> Storage
   -> Word256
   -> [(Text, Value)]
-decodeValues typeDefs' struct'@Struct{..} storage offset = 
+decodeValues typeDefs' struct'@Struct{..} storage offset =
   let
     varNames = Map.keys fields
   in
    --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
-   zip varNames $ catMaybes $ map (decodeValue typeDefs' storage offset struct') varNames
+   zip varNames $ mapMaybe (decodeValue typeDefs' storage offset struct') varNames
 
 decodeValue
   :: TypeDefs
@@ -165,11 +163,10 @@ decodeValue
   -> Struct
   -> Text
   -> Maybe Value
-decodeValue typeDefs' storage offset Struct{..} varName = do
-  case Map.lookup varName fields of
+decodeValue typeDefs' storage offset Struct{..} varName = case Map.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
-     Just $ decodeValue' typeDefs' storage (position `Storage.addBytes` (fromIntegral $ 32*offset)) theType
+     Just $ decodeValue' typeDefs' storage (position `Storage.addBytes` fromIntegral (32*offset)) theType
 
 
 decodeValue'
@@ -184,10 +181,10 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
       SimpleValue (ValueInt8 word8) = decodeValue' typeDefs' storage position (SimpleType TypeInt8)
     in
      SimpleValue $ ValueBool $ word8 /= 0
-     
-  SimpleType TypeUInt -> decodeValue' typeDefs' storage position $ SimpleType $ TypeUInt256
 
-  
+  SimpleType TypeUInt -> decodeValue' typeDefs' storage position $ SimpleType TypeUInt256
+
+
   SimpleType TypeInt8 -> decodeInt storage offset byte ValueInt8
   SimpleType TypeInt16 -> decodeInt storage offset byte ValueInt16
   SimpleType TypeInt24 -> decodeInt storage offset byte ValueInt24
@@ -359,7 +356,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
-      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize) $ map fromIntegral [0..fromIntegral (storage offset-1)::Int]
+      theList = (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [0..fromIntegral (storage offset-1)::Int]
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
@@ -374,7 +371,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
        in
         case Bimap.lookup val enumset of
          Nothing -> error "bad enum value"
-         Just x -> ValueEnum name x
+         Just x  -> ValueEnum name x
 
   TypeStruct name ->
     case Map.lookup name structDefs of
@@ -383,7 +380,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
 
 
 
-  
+
 --  x -> error $ "Missing case in decodeValue': " ++ show x
 
 

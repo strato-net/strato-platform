@@ -1,20 +1,18 @@
-{-# LANGUAGE
-    TypeApplications
-  , TypeFamilies
-  , TypeOperators
-#-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module BlockApps.Bloc.Server where
 
-import Data.Proxy
-import Servant
+import           Data.Proxy
+import           Servant
 
-import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Server.Users
-import BlockApps.Bloc.Server.Addresses
-import BlockApps.Bloc.Server.Contracts
-import BlockApps.Bloc.Server.Search
-import BlockApps.Bloc.API
+import           BlockApps.Bloc.API
+import           BlockApps.Bloc.Monad
+import           BlockApps.Bloc.Server.Addresses
+import           BlockApps.Bloc.Server.Contracts
+import           BlockApps.Bloc.Server.Search
+import           BlockApps.Bloc.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = getHomepage
@@ -42,7 +40,7 @@ bloc = getHomepage
   :<|> getSearchContractStateReduced
 
 getHomepage :: Bloc Homepage
-getHomepage = return whoWould'veThoughtThisIsActuallyTheHomepage
+getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
 
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc

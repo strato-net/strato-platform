@@ -1,53 +1,67 @@
-{-# LANGUAGE
-    DeriveGeneric
-#-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Bloc.Crypto where
 
-import Control.Monad.IO.Class
-import qualified Crypto.KDF.BCrypt as BCrypt
-import qualified Crypto.KDF.Scrypt as Scrypt
-import Crypto.Random.Entropy
-import Crypto.Secp256k1
-import qualified Crypto.Saltine.Core.SecretBox as SecretBox
+import           Control.Monad.IO.Class
+import qualified Crypto.KDF.BCrypt                 as BCrypt
+import qualified Crypto.KDF.Scrypt                 as Scrypt
+import           Crypto.Random.Entropy
+import qualified Crypto.Saltine.Class              as Saltine
+import qualified Crypto.Saltine.Core.SecretBox     as SecretBox
 import qualified Crypto.Saltine.Internal.ByteSizes as Saltine
-import qualified Crypto.Saltine.Class as Saltine
-import Data.Aeson
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as Char8
-import Data.Maybe
-import Data.String
-import qualified Data.Text.Encoding as Text
-import Generic.Random.Generic
-import GHC.Generics
-import Test.QuickCheck
-import Test.QuickCheck.Instances ()
-import Web.HttpApiData
+import           Crypto.Secp256k1
+import           Data.Aeson
+import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString.Char8             as Char8
+import           Data.Maybe
+import           Data.String
+import qualified Data.Text.Encoding                as Text
+import           Generic.Random.Generic
+import           GHC.Generics
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances         ()
+import           Web.HttpApiData
 
-import BlockApps.Ethereum
+
+import           BlockApps.Bloc.API.SwaggerSchema
+import           BlockApps.Ethereum
+
 
 newtype Password = Password ByteString
   deriving (Eq,Show,Generic)
+
+instance ToParamSchema Password where
+  toParamSchema = const passwordParamSchema
+
+instance ToSchema Password where
+  declareNamedSchema =  const . pure . named "Password" $ passwordSchema
+
 instance ToJSON Password where
   toJSON (Password pw) = toJSON $ Text.decodeUtf8 pw
+
 instance FromJSON Password where
   parseJSON = fmap (Password . Text.encodeUtf8) . parseJSON
+
 instance Arbitrary Password where
   arbitrary = genericArbitrary uniform
+
 instance IsString Password where
   fromString = Password . Char8.pack
+
 instance ToHttpApiData Password where
   toUrlPiece (Password pw) = Text.decodeUtf8 pw
+
 instance FromHttpApiData Password where
   parseUrlPiece = return . Password . Text.encodeUtf8
 
 data KeyStore = KeyStore
-  { keystoreSalt :: ByteString
-  , keystorePasswordHash :: ByteString
-  , keystoreAcctNonce :: SecretBox.Nonce
+  { keystoreSalt          :: ByteString
+  , keystorePasswordHash  :: ByteString
+  , keystoreAcctNonce     :: SecretBox.Nonce
   , keystoreAcctEncSecKey :: ByteString
-  , keystorePubKey :: PubKey
-  , keystoreAcctAddress :: Address
+  , keystorePubKey        :: PubKey
+  , keystoreAcctAddress   :: Address
   }
 
 decryptSecKey

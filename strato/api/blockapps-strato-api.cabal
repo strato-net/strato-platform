@@ -29,11 +29,13 @@ library
     , http-api-data
     , http-client
     , largeword
+    , lens
     , QuickCheck
     , quickcheck-instances
     , servant
     , servant-client
     , servant-docs
+    , swagger2
     , text
     , time
     , unordered-containers

@@ -1,31 +1,28 @@
-{-#
-  LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , RecursiveDo
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RecursiveDo       #-}
 
 
 module BlockApps.XAbiConverter where
 
-import qualified Data.Bimap as Bimap
-import Data.List
-import qualified Data.Map as Map
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Traversable
-import Data.Vector (Vector)
-import qualified Data.Vector as Vector
+import qualified Data.Bimap                        as Bimap
+import           Data.List
+import qualified Data.Map                          as Map
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
+import           Data.Traversable
+import           Data.Vector                       (Vector)
+import qualified Data.Vector                       as Vector
 
-import BlockApps.Solidity.Xabi
-import BlockApps.Solidity.Contract
-import BlockApps.Solidity.Parse.Selector
-import BlockApps.Solidity.Struct
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.TypeDefs
-import qualified BlockApps.Storage as Storage
-import qualified BlockApps.Solidity.Xabi.Def as XabiDef
-import qualified BlockApps.Solidity.Xabi.Type as Xabi
+import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Parse.Selector
+import           BlockApps.Solidity.Struct
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.TypeDefs
+import           BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi.Def       as XabiDef
+import qualified BlockApps.Solidity.Xabi.Type      as Xabi
+import qualified BlockApps.Storage                 as Storage
 
 
 fieldsToStruct::TypeDefs->[(Text, Type)]->Struct
@@ -47,7 +44,7 @@ addPositions typeDefs' p0 (theType:rest) =
   let
     (position, usedBytes) = getPositionAndSize typeDefs' p0 theType
   in
-   fmap (position:) $ addPositions typeDefs' (Storage.addBytes position usedBytes) rest
+   (position:) <$> addPositions typeDefs' (Storage.addBytes position usedBytes) rest
 
 intTypes::Vector SimpleType
 intTypes=Vector.fromList
@@ -94,7 +91,7 @@ xabiTypeToSimpleType Xabi.Address = TypeAddress
 xabiTypeToSimpleType Xabi.Int {Xabi.signed=signed, Xabi.bytes=Just b} =
   case signed of
    Just True -> intTypes Vector.! fromIntegral (b-1)
-   _ -> uintTypes Vector.! fromIntegral (b-1)
+   _         -> uintTypes Vector.! fromIntegral (b-1)
 xabiTypeToSimpleType (Xabi.Bytes _ (Just size)) =
    bytesTypes Vector.! fromIntegral (size-1)
 xabiTypeToSimpleType (Xabi.Bytes _ Nothing) = TypeBytes
@@ -137,7 +134,7 @@ funcToType xabi name Func{..} = do
          (name', XabiDef.Enum items _) <- Map.toList $ xabiTypes xabi]
 
   let selector = deriveSelector enumSizes name $ map snd $ Map.toList convertedFuncArgs
-  
+
   return $ TypeFunction
                 selector
                 (Map.toList convertedFuncArgs)
@@ -177,12 +174,11 @@ data FieldType = FieldType
 -}
 
 xabiFieldsToFields::Xabi->[(Text, Xabi.FieldType)]->Either String [(Text, Type)]
-xabiFieldsToFields xabi xabifields = do
-  for xabifields $ \(name, field) -> do
+xabiFieldsToFields xabi xabifields = for xabifields $ \(name, field) -> do
     theType <- xabiTypeToType xabi $ Xabi.fieldTypeType field
     return (name, theType)
 
-  
+
 
 xabiToTypeDefs::TypeDefs->Xabi->Either String TypeDefs
 xabiToTypeDefs typeDefs' xabi@Xabi{..} = do
@@ -192,47 +188,33 @@ xabiToTypeDefs typeDefs' xabi@Xabi{..} = do
     xabiStructs = [(structName, Map.toList fields) |
                    (structName, XabiDef.Struct{..}) <- Map.toList xabiTypes]::[(Text, [(Text, Xabi.FieldType)])]
 
-  
-  structDefs' <-
-    for xabiStructs $ \(name, fields) -> do
-      theStruct <- 
-        fmap (fieldsToStruct typeDefs') $ xabiFieldsToFields xabi 
+
+  structDefs' <- for xabiStructs $ \(name, fields) -> do
+      theStruct <-
+        fmap (fieldsToStruct typeDefs') $ xabiFieldsToFields xabi
         $ sortOn (Xabi.fieldTypeAtBytes . snd) fields
       return (name, theStruct)
-  
-  return $
-    TypeDefs{
-      enumDefs=
-        Map.fromList $
-          map (fmap (Bimap.fromList . zip [0..])) xabiEnums,
-      
-      structDefs=Map.fromList structDefs'::Map.Map Text Struct
 
-
-
-
-
-                 
---      flip Struct (Storage.positionAt 0) $ Map.fromList
---         [(name, (0, fields)) | (name, Xabi.Struct fields _) <- Map.toList xabiTypes]
-      } 
+  return TypeDefs { enumDefs   = Map.fromList $ fmap (Bimap.fromList . zip [0..]) <$> xabiEnums
+                  , structDefs = Map.fromList structDefs'::Map.Map Text Struct
+                  }
 
 
 xAbiToContract::Xabi->Either String Contract
 xAbiToContract contractXabi@Xabi{..} = mdo
   typeDefs' <- xabiToTypeDefs typeDefs' contractXabi
-  
+
   let vars' = sortOn (Xabi.varTypeAtBytes . snd) $ Map.toList xabiVars
   vars <- for vars' $ \(name, var) -> do
     var' <- (xabiTypeToType contractXabi . Xabi.varTypeType) var
     return (name, var')
-  
+
   funcs <-
     fmap Map.fromList $
     for (Map.toList xabiFuncs) $ \(name, func) -> do
       theFunction <- funcToType contractXabi name func
       return (name, theFunction)
-            
+
 
   return Contract{
     mainStruct=fieldsToStruct typeDefs' $ vars ++ Map.toList funcs,

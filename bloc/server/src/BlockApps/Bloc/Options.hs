@@ -1,10 +1,8 @@
-{-# LANGUAGE
-    TemplateHaskell
-#-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module BlockApps.Bloc.Options where
 
-import HFlags
+import           HFlags
 
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"

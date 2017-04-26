@@ -9,20 +9,17 @@ node ('cd9') {
       //}
    }
    stage('Build') {
-    echo 'doing build'
-    sh 'echo $pwd'
-      sh 'ls -ltr'
-      dir('blockapps-haskell') {
-        sh 'echo before stack build'
-        sh 'stack build'
-      }
-   slackSend (color: 'good', message: "Build Completed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
+    sh 'stack build'
    }
+   slackSend (color: 'good', message: "Build Completed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
    
-   stage ('Test')
-   {
+   stage ('Test') {
       sh 'echo test'
-    }
+   }
+   stage ('HLint') {
+     sh 'stack install hlint'
+     sh 'stack exec hlint -- .'
+   }
 }
 
 def cleanup() {

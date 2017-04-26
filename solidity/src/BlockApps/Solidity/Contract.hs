@@ -1,27 +1,22 @@
-{-#
-  LANGUAGE
-    RecordWildCards
-#-}
+{-# LANGUAGE RecordWildCards #-}
 module BlockApps.Solidity.Contract where
 
-import qualified Data.Bimap as Bimap
-import Data.Bits
-import Data.LargeWord
-import qualified Data.Map as Map
-import qualified Data.Text as T
+import qualified Data.Bimap                  as Bimap
+import           Data.Bits
+import           Data.LargeWord
+import qualified Data.Map                    as Map
+import qualified Data.Text                   as T
 
-import qualified BlockApps.Storage as Storage
-import BlockApps.Solidity.Struct (Struct)
-import qualified BlockApps.Solidity.Struct as Struct
-import BlockApps.Solidity.Type
-import BlockApps.Solidity.TypeDefs
+import           BlockApps.Solidity.Struct   (Struct)
+import qualified BlockApps.Solidity.Struct   as Struct
+import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.TypeDefs
+import qualified BlockApps.Storage           as Storage
 
-data Contract =
-  Contract{
-    mainStruct::Struct,
-    typeDefs::TypeDefs
-    } deriving (Show)
-  
+data Contract = Contract { mainStruct :: Struct
+                         , typeDefs   :: TypeDefs
+                         } deriving (Show)
+
 
 getNextAvailablePosition::Storage.Position->Word256->Storage.Position
 getNextAvailablePosition p _ | Storage.byte p == 0 = p
@@ -45,7 +40,7 @@ getPositionAndSize _ p (SimpleType TypeInt72)=(getNextAvailablePosition p 9, 9)
 getPositionAndSize _ p (SimpleType TypeInt80)=(getNextAvailablePosition p 10, 10)
 getPositionAndSize _ p (SimpleType TypeInt88)=(getNextAvailablePosition p 11, 11)
 getPositionAndSize _ p (SimpleType TypeInt96)=(getNextAvailablePosition p 12, 12)
-getPositionAndSize _ p (SimpleType TypeInt104)=(getNextAvailablePosition p 13, 13) 
+getPositionAndSize _ p (SimpleType TypeInt104)=(getNextAvailablePosition p 13, 13)
 getPositionAndSize _ p (SimpleType TypeInt112)=(getNextAvailablePosition p 14, 14)
 getPositionAndSize _ p (SimpleType TypeInt120)=(getNextAvailablePosition p 15, 15)
 getPositionAndSize _ p (SimpleType TypeInt128)=(getNextAvailablePosition p 16, 16)
@@ -177,7 +172,7 @@ getPositionAndSize TypeDefs{..} p (TypeStruct name) =
    Just struct -> nextAvail p $ Struct.size struct
 
 getPositionAndSize _ p (TypeArrayDynamic _) = (p,32)
-getPositionAndSize typeDefs' p (TypeArrayFixed size ty) = 
+getPositionAndSize typeDefs' p (TypeArrayFixed size ty) =
   let
     (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
     itemsPerWord = 32 `quot` elementSize
@@ -190,9 +185,9 @@ getPositionAndSize typeDefs' p (TypeArrayFixed size ty) =
        else d+1
   in
    (p, fromIntegral $ 32*size `divRoundUp` fromIntegral itemsPerWord)
-getPositionAndSize _ p (TypeMapping _ _) = (p,32)
-getPositionAndSize _ p (TypeFunction _ _ _) = (p,32)
-getPositionAndSize _ p (TypeContract _) = nextAvail p 20
+getPositionAndSize _ p TypeMapping{}  = (p,32)
+getPositionAndSize _ p TypeFunction{} = (p,32)
+getPositionAndSize _ p TypeContract{} = nextAvail p 20
 
 nextAvail::Storage.Position->Word256->(Storage.Position, Word256)
 nextAvail p x = (getNextAvailablePosition p x, x)

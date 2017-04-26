@@ -1,21 +1,19 @@
-{-# LANGUAGE
-    LambdaCase
-#-}
+{-# LANGUAGE LambdaCase #-}
 
 module BlockApps.Solidity.Storage where
 
-import Data.Binary (Binary)
-import Data.Bool
-import Data.ByteString (ByteString)
-import Data.Maybe      (fromMaybe)
+import           Data.Binary              (Binary)
+import           Data.Bool
+import           Data.ByteString          (ByteString)
+import           Data.Maybe               (fromMaybe)
 
-import qualified Data.Binary as Binary
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Lazy as Lazy.ByteString
-import qualified Data.Text.Encoding as Text
+import qualified Data.Binary              as Binary
+import qualified Data.ByteString          as ByteString
+import qualified Data.ByteString.Lazy     as Lazy.ByteString
+import qualified Data.Text.Encoding       as Text
 
-import BlockApps.Ethereum
-import BlockApps.Solidity.Value
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Value
 
 
 toStorage :: Value -> ByteString
@@ -30,9 +28,9 @@ toStorage = \case
   ValueArrayFixed _ vs ->
     let
       head' = map (\v -> if isDynamic v then Nothing else Just (toStorage v)) vs
-      tail' = map (\v -> if isDynamic v then (toStorage v) else ByteString.empty) vs
-      tailLengths = scanl (\b a -> (ByteString.length a) + b) 0 tail'
-      headLength = sum $ map (maybe 32 ByteString.length) head'
+      tail' = map (\v -> if isDynamic v then toStorage v else ByteString.empty) vs
+      tailLengths = scanl (\b a -> ByteString.length a + b) 0 tail'
+      headLength = sum $ maybe 32 ByteString.length <$> head'
       head'' =  zipWith f tailLengths  head'
         where
           f t = fromMaybe
@@ -45,10 +43,10 @@ toStorage = \case
     -- head ends with in order:
           -- length of head going to each dynamic a value
 
-  ValueContract _ -> error "toStorage for ValueContract not yet defined"
-  ValueFunction _ _ _ -> error "toStorage for ValueFunction not yet defined"
-  ValueEnum _ _ -> error "toStorage for ValueEnum not yet defined"
-  ValueStruct _ -> error "toStorage for ValueStruct not yet defined"
+  ValueContract{} -> error "toStorage for ValueContract not yet defined"
+  ValueFunction{} -> error "toStorage for ValueFunction not yet defined"
+  ValueEnum{}     -> error "toStorage for ValueEnum not yet defined"
+  ValueStruct{}   -> error "toStorage for ValueStruct not yet defined"
 
 simpleToStorage :: SimpleValue -> ByteString
 simpleToStorage =  \case
@@ -157,42 +155,33 @@ simpleToStorage =  \case
   where
     encodeStrict :: Binary x => x -> ByteString
     encodeStrict = Lazy.ByteString.toStrict . Binary.encode
-    pad32 bs =
+    paddingLen bs =
       let
         len = ByteString.length bs
         lenMod32 = len `mod` 32
-        padding = (32 - lenMod32) `mod` 32
       in
-        ByteString.replicate padding 0 `ByteString.append` bs
-    padRight32 bs =
-      let
-        len = ByteString.length bs
-        lenMod32 = len `mod` 32
-        padding = (32 - lenMod32) `mod` 32
-      in
-        bs `ByteString.append` ByteString.replicate padding 0
+        (32 - lenMod32) `mod` 32
+    pad32 bs         = ByteString.replicate (paddingLen bs) 0 `ByteString.append` bs
+    padRight32 bs    = bs `ByteString.append` ByteString.replicate (paddingLen bs) 0
     pad32Signed v bs =
       let
-        len = ByteString.length bs
-        lenMod32 = len `mod` 32
-        padding = (32 - lenMod32) `mod` 32
         padChar = bool 0xff 0 (signum v /= (-1))
       in
-        ByteString.replicate padding padChar `ByteString.append` bs
+        ByteString.replicate (paddingLen bs) padChar `ByteString.append` bs
 
 isDynamic :: Value -> Bool
 isDynamic = \case
-  ValueArrayDynamic _ -> True
-  -- ValueMapping _ -> True
+  ValueArrayDynamic{}  -> True
+  -- ValueMapping{} -> True
   ValueArrayFixed _ vs -> any isDynamic vs
-  SimpleValue v -> simpleIsDynamic v
-  ValueContract _ -> False
-  ValueFunction _ _ _ -> False
-  ValueEnum _ _ -> False
-  ValueStruct _ -> True -- Is this really True?
+  SimpleValue v        -> simpleIsDynamic v
+  ValueContract{}      -> False
+  ValueFunction{}      -> False
+  ValueEnum{}          -> False
+  ValueStruct{}        -> True -- Is this really True?
 
 simpleIsDynamic :: SimpleValue -> Bool
 simpleIsDynamic = \case
-  ValueBytes _ -> True
-  ValueString _ -> True
-  _ -> False
+  ValueBytes{}  -> True
+  ValueString{} -> True
+  _             -> False
