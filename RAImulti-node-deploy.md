@@ -1,0 +1,51 @@
+# MultiNode Deployment (Rai-style)
+
+## On All Nodes
+Clone the silo repo using `git`
+
+`git clone https://github.com/blockapps/silo.git -b 134180041_cirrus-silo`
+
+Create the genesis block JSON file in the `silo/` folder:
+```
+{
+    "logBloom":"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "accountInfo":[
+	["e1fd0d4a52b75a694de8b55528ad48e2e2cf7859",1809251394333065553493296640760748560207343510400633813116524750123642650624]
+    ],
+    "transactionRoot":"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "extraData":0,
+    "gasUsed":0,
+    "gasLimit":22517998136852480000000000000000,
+    "unclesHash":"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    "mixHash":"0000000000000000000000000000000000000000000000000000000000000000",
+    "receiptsRoot":"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "number":0,
+    "difficulty":8192,
+    "timestamp":"1970-01-01T00:00:00.000Z",
+    "coinbase":"00000000000000000000",
+    "parentHash":"0000000000000000000000000000000000000000000000000000000000000000",
+    "nonce":42
+}
+```
+
+## boot node
+Using the new and shiny deployment script `strato-admin.sh` we deploy strato:
+
+If the machine is new and doesn't have docker, use the `--bare` flag when deploying
+
+`genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129 --bare`
+
+Else, you can exlcude the `--bare` flag
+
+`genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129`
+
+## All nodes started after boot node
+
+If the machine is new and doesn't have docker, use the `--bare` flag when deploying
+
+
+`genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA bootnode=<IP.Of.Boot.Node> ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129 --bare`
+
+Else, you can exlcude the `--bare` flag
+
+`genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA bootnode=<IP.Of.Boot.Node> ./strato-admin.sh --run-tag 134180041_cirrus-silo-16mb-message-size-20161129`

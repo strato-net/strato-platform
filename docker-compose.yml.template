@@ -1,0 +1,133 @@
+version: '2'
+
+services:
+  zookeeper:
+    image: %REPO%zookeeper-packager
+    restart: always
+    ports:
+      - "2181:2181"
+  kafka:
+    image: %REPO%kafka-packager
+    restart: always
+    links:
+      - zookeeper
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_HOST_NAME: "kafka"
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_LOG_CLEANER_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 2147483647
+    ports:
+      - "9092:9092"
+  postgres:
+    image: %REPO%postgres-packager
+    restart: always
+    ports:
+      - "5432:5432"
+  strato:
+    image: %REPO%monstrato
+    volumes:
+      - /tmp/backup:/tmp/backup
+    links:
+      - zookeeper
+      - kafka
+      - postgres
+      - redis
+    depends_on:
+      - zookeeper
+      - kafka
+      - postgres
+      - redis
+    restart: always
+    ports:
+      - "30303:30303"
+      - "30303:30303/udp"
+    environment:
+      networkID : "${networkID}"
+      genesis: "${genesis}"
+      genesisBlock: "${genesisBlock}"
+      bootnode: "${bootnode}"
+      addBootnodes: "${addBootnodes}"
+      lazyBlocks: "${lazyBlocks}"
+      miningAlgorithm: "${miningAlgorithm}"
+      miningThreads: "${miningThreads}"
+      blockTime: "${blockTime}"
+      minBlockDifficulty: "${minBlockDifficulty}"
+      debugFail: "${debugFail}"
+      backupblocks: "${backupblocks}"
+      redisBDBNumber: "${redisBDBNumber}"
+      useSyncMode: "${useSyncMode}"
+  redis:
+    image: redis:3.2
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379" 
+  bloc:
+    image: %REPO%bloc
+    restart: always
+    environment:
+      ssl: "${ssl}"
+      stratoHost: "${stratoHost}"
+      apiUrlOverride: "${apiUrlOverride}"
+  postgres-cirrus:
+    image: postgres:9.6
+    restart: always
+    volumes:
+      - /tmp/backup:/tmp/backup
+    environment:
+      POSTGRES_DB: cirrus
+      POSTGRES_USER: postgres
+      PG_ENV_POSTGRES_DB: cirrus
+      PG_ENV_POSTGRES_USER: postgres
+      backupblocks: "${backupblocks}"
+    ports:
+      - '5434:5432'
+  postgrest:
+    image: %REPO%postgrest-packager
+    restart: always
+    environment:
+      POSTGRES_DB: cirrus
+      POSTGRES_USER: postgres
+      PG_ENV_POSTGRES_DB: cirrus
+      PG_ENV_POSTGRES_USER: postgres
+      PG_PORT_5433_TCP_PORT: 5432
+    links:
+      - postgres-cirrus:postgres
+    ports:
+      - '3001:3001'
+  cirrus:
+    image: %REPO%cirrus
+    links:
+      - strato:strato
+      - postgres-cirrus:postgres
+    restart: always
+  explorer:
+    image: %REPO%strato-explorer
+    ports:
+      - 9000:9000
+    restart: always
+    environment:
+      peers: "${peers}"
+    links:
+      - strato:strato
+      - bloc:bloc
+ 
+  nginx:
+    image: %REPO%nginx-packager
+    restart: always
+    volumes:
+      - /etc/ssl/private:/etc/ssl/private
+      - /etc/ssl/certs:/etc/ssl/certs
+    ports:
+      - "443:443"
+      - "80:80"
+    depends_on:
+      - strato
+      - bloc
+      - cirrus
+      - postgrest
+      - explorer
+    environment:
+      ssl: "${ssl}"
