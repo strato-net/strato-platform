@@ -5,6 +5,7 @@
 module BlockApps.Bloc.Server where
 
 import           Data.Proxy
+import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
 
@@ -47,4 +48,4 @@ serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
 
 appBloc :: BlocEnv -> Application
-appBloc = logStdoutDev . serve (Proxy @ BlocAPI) . serveBloc
+appBloc = simpleCors . logStdoutDev . serve (Proxy @ BlocAPI) . serveBloc
