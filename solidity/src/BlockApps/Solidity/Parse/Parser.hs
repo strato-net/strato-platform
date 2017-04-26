@@ -10,7 +10,6 @@ module BlockApps.Solidity.Parse.Parser (parseXabi) where
 
 import           Text.Parsec                          hiding (parse)
 
-import           Control.Arrow
 import qualified Data.Map                             as Map
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
@@ -27,8 +26,8 @@ import           BlockApps.Solidity.Xabi.Def
 -- 'Parsec'.
 parseXabi :: FileName -> String -> Either String [(Text, Xabi)]
 parseXabi filename input = do
-  xabis <- left show $ runParser solidityFile "" filename input
-  let inheritanceFullXabis = map (addInheritedDeclarations inheritanceFullXabis) xabis
+  xabis <- showError $ runParser solidityFile "" filename input
+  let inheritanceFullXabis = map (fmap $ addInheritedDeclarations inheritanceFullXabis) xabis
 
   xabis' <-
     for inheritanceFullXabis $ \(name, xabiOrError) -> do
@@ -42,15 +41,13 @@ addContractNames::[String]->Xabi->Xabi
 addContractNames contracts xabi =
   xabi{xabiTypes=xabiTypes xabi `Map.union` Map.fromList (map ((\x -> (x, Contract 0)) . Text.pack) contracts)}
 
-addInheritedDeclarations::[(Text, Either String Xabi)]->(Text, Xabi, [Text])->(Text, Either String Xabi)
-addInheritedDeclarations _ (name, xabi, []) =
-  (name, Right xabi)
-addInheritedDeclarations xabisWithInheritedDeclarations (name, xabi, (parent:_)) =
-  case lookup parent xabisWithInheritedDeclarations of
-   Nothing -> (name, Left "error")
-   Just (Left e) -> (name, Left e)
-   Just (Right parentXabi) ->
-     (name, Right $ xabiMerge xabi parentXabi)
+addInheritedDeclarations::[(Text, Either String Xabi)]->(Xabi, [Text])->Either String Xabi
+addInheritedDeclarations _ (xabi, []) = Right xabi
+addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:_) = do
+  parentXabi <-
+    errorMsg ("Contract was inherited from a non existant contract: " ++ Text.unpack parent)
+    $ lookup parent xabisWithInheritedDeclarations
+  fmap (xabiMerge xabi) parentXabi
 
 
 xabiMerge::Xabi->Xabi->Xabi
@@ -61,3 +58,16 @@ xabiMerge x y =
     xabiVars=xabiVars x `Map.union` xabiVars y,
     xabiTypes=xabiTypes x `Map.union` xabiTypes y
     }
+
+
+
+------------
+-- Some error conversion functions
+
+showError::Show a=>Either a b->Either String b
+showError (Left e) = Left $ show e
+showError (Right x) = Right x
+
+errorMsg::String->Maybe a->Either String a
+errorMsg msg Nothing = Left msg
+errorMsg _ (Just x) = Right x
