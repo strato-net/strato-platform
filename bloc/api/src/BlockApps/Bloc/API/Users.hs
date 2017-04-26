@@ -31,6 +31,7 @@ import           BlockApps.Bloc.API.SwaggerSchema
 import           BlockApps.Bloc.API.Utils
 import           BlockApps.Bloc.Crypto
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
@@ -137,7 +138,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc      :: Text
   , postuserscontractrequestPassword :: Password
   , postuserscontractrequestContract :: Text
-  , postuserscontractrequestArgs     :: Maybe (Map Text Text)
+  , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
   , postuserscontractrequestTxParams :: Maybe TxParams
   , postuserscontractrequestValue :: Maybe Natural
   } deriving (Eq,Show,Generic)
@@ -222,14 +223,14 @@ instance ToSchema UploadListRequest where
       exContract1 :: UploadListContract
       exContract1 = UploadListContract
         { uploadlistcontractContractName = "UserInfoContract"
-        , uploadlistcontractArgs = Map.fromList [("user", "Bob"), ("age","1")]
+        , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
         }
       exContract2 :: UploadListContract
       exContract2 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
-        , uploadlistcontractArgs = Map.fromList [("accountType", "Checking"), ("balance","10")]
+        , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
         }
@@ -238,7 +239,7 @@ instance ToSchema UploadListRequest where
 
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
-  , uploadlistcontractArgs         :: Map Text Text
+  , uploadlistcontractArgs         :: Map Text ArgValue
   , uploadlistcontractTxParams     :: Maybe TxParams
   , uploadlistcontractValue        :: Maybe Natural
   } deriving (Eq,Show,Generic)
@@ -259,7 +260,7 @@ instance ToSchema UploadListContract where
       ex :: UploadListContract
       ex = UploadListContract
         { uploadlistcontractContractName = "SampleContract"
-        , uploadlistcontractArgs = Map.fromList [("user", "Bob"), ("age","1")]
+        , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
         , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
         , uploadlistcontractValue = Nothing
         }
@@ -304,7 +305,7 @@ type PostUsersContractMethod = "users"
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod   :: Text
-  , postuserscontractmethodArgs     :: Map Text Text
+  , postuserscontractmethodArgs     :: Map Text ArgValue
   , postuserscontractmethodValue    :: Natural
   , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
@@ -331,7 +332,7 @@ instance ToSchema PostUsersContractMethodRequest where
       ex = PostUsersContractMethodRequest
        { postuserscontractmethodPassword = "MySecretPassword"
        , postuserscontractmethodMethod = "fireMissiles"
-       , postuserscontractmethodArgs = Map.fromList [("arg1", "accessCodes"), ("arg2", "target")]
+       , postuserscontractmethodArgs = Map.fromList [("arg1", ArgString "accessCodes"), ("arg2", ArgString "target")]
        , postuserscontractmethodValue = 0 :: Natural
        , postuserscontractmethodTxParams = Nothing
        }
@@ -503,7 +504,7 @@ instance ToSchema PostMethodListRequest where
       exMethodCall = MethodCall
         { methodcallTxParams = Nothing
         , methodcallValue = 10
-        , methodcallArgs = Map.fromList [("user", "Bob"), ("age", "52")]
+        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HorroscopeApp"
@@ -530,7 +531,7 @@ data MethodCall = MethodCall
   { methodcallContractName    :: Text
   , methodcallContractAddress :: Address
   , methodcallMethodName      :: Text
-  , methodcallArgs            :: Map Text Text
+  , methodcallArgs            :: Map Text ArgValue
   , methodcallValue           :: Natural
   , methodcallTxParams        :: Maybe TxParams
   } deriving (Eq,Show,Generic)
@@ -553,7 +554,7 @@ instance ToSchema MethodCall where
       ex = MethodCall
         { methodcallTxParams = Nothing
         , methodcallValue = 10
-        , methodcallArgs = Map.fromList [("user", "Bob"), ("age", "52")]
+        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HoroscopeApp"

@@ -34,6 +34,7 @@ import           BlockApps.Bloc.Database.Tables
 import           BlockApps.Bloc.Monad
 import           BlockApps.Bloc.Server.Utils
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Struct
@@ -90,7 +91,7 @@ postUsersContract userName addr
       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
     mFunctionId <- getConstructorId cmId
-    argsBin <- buildArgumentByteString args mFunctionId
+    argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
     tx <- prepareTx
       userName password addr Nothing (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral (fromMaybe 0 value))) (bin <> argsBin) 0
@@ -125,7 +126,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
       (bin,leftOver) = Base16.decode bin16
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
     mFunctionId <- getConstructorId cmId
-    argsBin <- buildArgumentByteString (Just args) mFunctionId
+    argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
     tx <- prepareTx
       userName pw addr Nothing (fromMaybe emptyTxParams txParams)
       (Wei (maybe 0 fromIntegral value)) (bin <> argsBin) nonceIncr
@@ -213,7 +214,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
 
 
 
-    argsBin <- buildArgumentByteString (Just methodcallArgs) (Just functionId)
+    argsBin <- buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
     tx <- prepareTx
       userName
       postmethodlistrequestPassword
@@ -272,7 +273,7 @@ postUsersContractMethod
       case maybeFunc of
        Just (_, TypeFunction selector _ _) -> return selector
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
-    argsBin <- buildArgumentByteString (Just args) (Just functionId)
+    argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
     tx <- prepareTx
       userName
       password
