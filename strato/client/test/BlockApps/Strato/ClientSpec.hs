@@ -1,19 +1,19 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE OverloadedStrings, TypeApplications #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Strato.ClientSpec where
 
-import Data.Either
-import Data.LargeWord
-import Generic.Random.Generic
-import Network.HTTP.Client
-import Servant.Client
-import Test.Hspec
-import Test.Hspec.QuickCheck
-import Test.QuickCheck
+import           Data.Either
+import           Data.LargeWord
+import           Generic.Random.Generic
+import           Network.HTTP.Client
+import           Servant.Client
+import           Test.Hspec
+import           Test.Hspec.QuickCheck
+import           Test.QuickCheck
 
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types
 
 spec :: Spec
 spec

@@ -2,15 +2,15 @@
 
 module BlockApps.Bloc.Server.Search where
 
-import Control.Monad.Except
-import Data.Text (Text)
+import           Control.Monad.Except
+import           Data.Text                       (Text)
 
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.API.Search
-import BlockApps.Bloc.Monad
-import BlockApps.Bloc.Database.Queries
-import BlockApps.Ethereum
-import BlockApps.Solidity.Xabi
+import           BlockApps.Bloc.API.Search
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Database.Queries
+import           BlockApps.Bloc.Monad
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Xabi
 
 getSearchContract :: ContractName -> Bloc [MaybeNamed Address]
 getSearchContract (ContractName contractName) = blocTransaction $

@@ -1,6 +1,4 @@
-{-# LANGUAGE
-    TypeApplications
-#-}
+{-# LANGUAGE TypeApplications #-}
 
 module BlockApps.Cirrus.Client
   ( postContract
@@ -9,14 +7,14 @@ module BlockApps.Cirrus.Client
   , cirrusUrl
   ) where
 
-import Data.Aeson
-import Data.Proxy
-import Data.Text (Text)
-import Servant.API
-import Servant.Client
+import           Data.Aeson
+import           Data.Proxy
+import           Data.Text               (Text)
+import           Servant.API
+import           Servant.Client
 
-import BlockApps.Cirrus.API
-import BlockApps.Solidity.Xabi
+import           BlockApps.Cirrus.API
+import           BlockApps.Solidity.Xabi
 
 postContract :: ContractDetails -> ClientM NoContent
 getSearch :: ClientM Value

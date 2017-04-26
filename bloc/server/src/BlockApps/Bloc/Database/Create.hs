@@ -1,12 +1,10 @@
-{-# LANGUAGE
-    OverloadedStrings
-  , QuasiQuotes
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 module BlockApps.Bloc.Database.Create where
 
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.SqlQQ
+import           Database.PostgreSQL.Simple
+import           Database.PostgreSQL.Simple.SqlQQ
 
 createDatabase :: Query
 createDatabase = [sql|

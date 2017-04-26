@@ -1,16 +1,14 @@
-{-# LANGUAGE
-    OverloadedStrings,
-    LambdaCase
-#-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Solidity.Type where
 
-import Data.ByteString (ByteString)
-import Data.Char
-import Data.List
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Text.Read
+import           Data.ByteString (ByteString)
+import           Data.Char
+import           Data.List
+import           Data.Text       (Text)
+import qualified Data.Text       as Text
+import           Text.Read
 
 data Type
   = SimpleType SimpleType
@@ -132,14 +130,14 @@ data SimpleType
 
 getTypeByteLength :: Type -> Maybe Int
 getTypeByteLength = \case
-  SimpleType ty -> getSimpleTypeByteLength ty
-  TypeArrayDynamic _ -> Nothing
-  TypeArrayFixed len ty -> (fromIntegral len *) <$> (getTypeByteLength ty)
-  TypeMapping _ _ -> Nothing
-  TypeFunction _ _ _ -> Nothing
-  TypeStruct _ -> Nothing
-  TypeEnum _ -> Nothing
-  TypeContract _ -> getSimpleTypeByteLength TypeAddress
+  SimpleType ty         -> getSimpleTypeByteLength ty
+  TypeArrayDynamic{}    -> Nothing
+  TypeArrayFixed len ty -> (fromIntegral len *) <$> getTypeByteLength ty
+  TypeMapping{}         -> Nothing
+  TypeFunction{}        -> Nothing
+  TypeStruct{}          -> Nothing
+  TypeEnum{}            -> Nothing
+  TypeContract{}        -> getSimpleTypeByteLength TypeAddress
 
 getSimpleTypeByteLength :: SimpleType -> Maybe Int
 getSimpleTypeByteLength = \case
@@ -168,7 +166,7 @@ formatType (TypeStruct name) = Text.unpack name
 
 textToSimpleArgType :: Text -> Maybe SimpleType
 textToSimpleArgType str = if Text.null str then Nothing
-  else readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack (Text.toLower (Text.tail str))))
+  else readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack . Text.toLower $ Text.tail str))
 
 textToArgType :: Text -> Bool -> Text -> Maybe Type
 textToArgType "Array" True str = TypeArrayDynamic . SimpleType <$> textToSimpleArgType str

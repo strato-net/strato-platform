@@ -1,24 +1,20 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
-{-# LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Bloc.API.ContractsSpec where
 
-import Data.Either
-import qualified Data.Map.Strict as Map
-import Servant.Client
-import Test.Hspec
+import           Data.Either
+import qualified Data.Map.Strict              as Map
+import           Servant.Client
+import           Test.Hspec
 
-import BlockApps.Bloc.API.Contracts
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Client
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi
+import           BlockApps.Bloc.API.Contracts
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Client
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
 spec = do
@@ -91,13 +87,11 @@ spec = do
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
-      contracts `shouldBe`
-        ( Map.fromList
+      contracts `shouldBe` Map.fromList
           [ ("get",SolidityValueAsString "function () returns (UInt256)")
           , ("set",SolidityValueAsString "function (UInt256) returns ()")
           , ("storedData",SolidityValueAsString "0")
           ]
-        )
   describe "getContractsStateMapping" $
     it "get contract state for a mapping within an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       pendingWith "state mapping endpoint not yet implemented"

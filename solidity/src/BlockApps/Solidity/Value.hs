@@ -1,27 +1,28 @@
-{-# LANGUAGE
-    LambdaCase
-  , OverloadedStrings
-#-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Solidity.Value where
 
 
-import Control.Monad (sequence)
-import Data.Binary (Binary)
-import qualified Data.Binary as Binary
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Lazy as ByteString.Lazy
-import Data.List (intersperse)
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Text.Read
+import           Control.Monad           (sequence)
+import           Data.Binary             (Binary)
+import qualified Data.Binary             as Binary
+import           Data.ByteString         (ByteString)
+import qualified Data.ByteString         as ByteString
+import qualified Data.ByteString.Base16  as Base16
+import qualified Data.ByteString.Lazy    as ByteString.Lazy
+import           Data.List               (intersperse)
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import qualified Data.Text.Encoding      as Text
+import           Data.Traversable        (for)
+import           Text.Read
 
-import BlockApps.Ethereum
-import BlockApps.Solidity.Int
-import BlockApps.Solidity.Type
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Int
+import           BlockApps.Solidity.Type
+
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 data Value
   = SimpleValue SimpleValue
@@ -139,8 +140,7 @@ data SimpleValue
   | ValueBytes32 ByteString
   | ValueBytes ByteString
   | ValueString Text
-  -- | ValueContract
-  deriving (Show)
+    deriving (Show)
 
 
 bytesToSimpleValue :: ByteString -> SimpleType -> Maybe SimpleValue
@@ -255,7 +255,7 @@ bytesToSimpleValue b = \case
 
 bytesToValue :: ByteString -> Type -> Maybe Value
 bytesToValue b = \case
-  SimpleType ty -> SimpleValue <$> bytesToSimpleValue b ty
+  SimpleType ty       -> SimpleValue <$> bytesToSimpleValue b ty
   TypeArrayDynamic ty ->
     let
       rb = ByteString.drop 32 b
@@ -264,15 +264,15 @@ bytesToValue b = \case
   TypeArrayFixed len ty ->
     let valArray = splitBytes b ty
     in ValueArrayFixed len <$> sequence valArray
-  TypeMapping _ _ -> Nothing -- TODO: Fixme
-  TypeFunction _ _ _ -> Nothing -- TODO: Fixme
-  TypeContract _ -> undefined
-  TypeEnum _ -> Nothing -- TODO: Fixme
-  TypeStruct _ -> Nothing  -- TODO: Fixme
+  TypeMapping{}  -> Nothing -- TODO: Fixme
+  TypeFunction{} -> Nothing -- TODO: Fixme
+  TypeContract{} -> undefined -- TODO: the one thing thats not Fixme
+  TypeEnum{}     -> Nothing -- TODO: Fixme
+  TypeStruct{}   -> Nothing  -- TODO: Fixme
   where
     splitBytes b' ty
       | ByteString.null b' = []
-      | otherwise = case (getTypeByteLength ty) of
+      | otherwise = case getTypeByteLength ty of
         Nothing -> [Nothing]
         Just size ->
           let (valBytes, rb) = ByteString.splitAt size b'
@@ -282,8 +282,7 @@ bytestringToValues :: ByteString -> [Type] -> Maybe [Value]
 bytestringToValues bs ts =
   case bytesToBytesTypePair bs ts of
     Nothing -> Nothing
-    Just (byteTypePairs) ->
-      sequence $ map (\ (b,t) ->  bytesToValue b t) byteTypePairs
+    Just byteTypePairs -> for byteTypePairs (uncurry bytesToValue)
 
 
 bytesToBytesTypePair :: ByteString -> [Type] -> Maybe [(ByteString,Type)]
@@ -296,23 +295,21 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
         headType = head types
         tailTypes = tail types
       in case headType of
-        TypeMapping _ _ -> Nothing
-        TypeFunction _ _ _ -> Nothing
-        TypeStruct _ -> Nothing
-        TypeEnum _ -> undefined -- TODO: Need to implement
-        TypeContract _ -> undefined -- TODO: Need to implement
+        TypeMapping{}       -> Nothing
+        TypeFunction{}      -> Nothing
+        TypeStruct{}        -> Nothing
+        TypeEnum{}          -> undefined -- TODO: Need to implement
+        TypeContract{}      -> undefined -- TODO: Need to implement
         TypeArrayDynamic ty -> case getTypeByteLength ty of
-          Nothing -> Nothing
+          Nothing   -> Nothing
           Just size -> do
             let
               (startingByte, restOfBytes) = ByteString.splitAt 32 b
               start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
-              (lengthBytes, rb) =
-                ByteString.splitAt
-                  32
+              (lengthBytes, rb) = ByteString.splitAt 32
                   (ByteString.drop (fromIntegral (start::Int256)) totalBytes)
               len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
-              lenAsInt = (fromIntegral (len::Int256))
+              lenAsInt = fromIntegral (len::Int256)
               valueBytes = ByteString.take (size * lenAsInt) rb
               arrayBytes = ByteString.append lengthBytes valueBytes
             rest <- toBytesTypePair restOfBytes tailTypes
@@ -321,9 +318,7 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
           let
             (startingByte, restOfBytes) = ByteString.splitAt 32 b
             start = Binary.decode (ByteString.Lazy.fromStrict startingByte)
-            (lengthBytes, rb) =
-              ByteString.splitAt
-                32
+            (lengthBytes, rb) = ByteString.splitAt 32
                 (ByteString.drop (fromIntegral (start::Int256)) totalBytes)
             len = Binary.decode (ByteString.Lazy.fromStrict lengthBytes)
             arrayBytes = ByteString.take (fromIntegral (len::Int256)) rb
@@ -355,16 +350,14 @@ valueToText :: Value -> Maybe Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
   ValueArrayDynamic vals ->
-    Text.concat <$> intersperse ("," ::Text) <$> sequence (valArrayToTextArray vals)
+    Text.concat . intersperse ("," ::Text) <$> sequence (valueToText <$> vals)
   ValueArrayFixed _ vals ->
-    Text.concat <$> intersperse ("," ::Text) <$> sequence (valArrayToTextArray vals)
-  ValueContract addr -> Just $ Text.pack $ addressString addr
-  ValueEnum _ _ -> undefined -- TODO
-  ValueFunction _ _ _ -> undefined -- TODO
-  ValueStruct _ -> undefined
-  where
-    valArrayToTextArray [] = []
-    valArrayToTextArray (val:vals) = valueToText val : valArrayToTextArray vals
+    Text.concat . intersperse ("," ::Text) <$> sequence (valueToText <$> vals)
+  ValueContract addr -> Just . Text.pack $ addressString addr
+  ValueEnum{}        -> undefined -- TODO
+  ValueFunction{}    -> undefined -- TODO
+  ValueStruct{}      -> undefined
+
 
 simpleValueToText :: SimpleValue -> Maybe Text
 simpleValueToText sv = Just $ case sv of
@@ -475,23 +468,23 @@ textToValue :: Text -> Type -> Maybe Value
 textToValue str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
   TypeArrayDynamic ty -> ValueArrayDynamic <$>
-    traverse (flip textToValue ty)
+    traverse (`textToValue` ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
   TypeArrayFixed len ty -> ValueArrayFixed len <$>
-    traverse (flip textToValue ty)
+    traverse (`textToValue` ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
-  TypeMapping _ _ -> Nothing -- TODO: Fixme
-  TypeFunction _ _ _ -> Nothing -- TODO: Fixme
-  TypeContract _ -> ValueContract <$> stringAddress (Text.unpack str)
-  TypeEnum _ -> Nothing -- TODO: Fixme
-  TypeStruct _ -> Nothing  -- TODO: Fixme
+  TypeMapping{}  -> Nothing -- TODO: Fixme
+  TypeFunction{} -> Nothing -- TODO: Fixme
+  TypeContract{} -> ValueContract <$> stringAddress (Text.unpack str)
+  TypeEnum{}     -> Nothing -- TODO: Fixme
+  TypeStruct{}   -> Nothing  -- TODO: Fixme
 
 textToSimpleValue :: Text -> SimpleType -> Maybe SimpleValue
 textToSimpleValue str = \case
   TypeBool -> case Text.toLower str of
-    "true" -> Just $ ValueBool True
+    "true"  -> Just $ ValueBool True
     "false" -> Just $ ValueBool False
-    _ -> Nothing
+    _       -> Nothing
   TypeUInt8 -> ValueUInt8 <$> readNum
   TypeUInt16 -> ValueUInt16 <$> readNum
   TypeUInt24 -> ValueUInt24 <$> readNum

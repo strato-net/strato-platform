@@ -27,12 +27,14 @@ library
     , hashable
     , http-api-data
     , largeword
+    , lens
     , memory
     , QuickCheck
     , relapse
     , secp256k1
     , servant
     , servant-docs
+    , swagger2
     , text
     , time
 

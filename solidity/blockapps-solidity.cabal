@@ -53,6 +53,7 @@ library
                , http-api-data
                , largeint
                , largeword
+               , lens
                , logging-effect
                , memory
                , parsec
@@ -60,6 +61,7 @@ library
                , quickcheck-instances
                , servant
                , servant-docs
+               , swagger2
                , text
                , unordered-containers
                , vector

@@ -1,55 +1,56 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    Arrows
-  , FlexibleInstances
-  , LambdaCase
-  , MultiParamTypeClasses
-  , OverloadedStrings
-  , RecordWildCards
-  , ScopedTypeVariables
-  , TupleSections
-#-}
+{-# LANGUAGE Arrows                #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
 module BlockApps.Bloc.Database.Queries where
 
-import Control.Arrow
-import Control.Monad
-import Control.Monad.Except
-import Crypto.Hash
-import qualified Crypto.Saltine.Class as Saltine
-import qualified Crypto.Saltine.Core.SecretBox as SecretBox
-import Crypto.Secp256k1
-import qualified Data.ByteArray as ByteArray
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as Char8
-import Data.Foldable
-import Data.Int (Int32,Int64)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Maybe
-import Data.Monoid
-import Data.Profunctor
-import Data.Profunctor.Product.Default
-import Data.Text (Text)
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import Data.Traversable
-import Database.PostgreSQL.Simple (Connection)
-import GHC.Stack
-import Opaleye hiding (not,null)
-import qualified Opaleye as Opaleye (not,null)
+import           Control.Arrow
+import           Control.Monad
+import           Control.Monad.Except
+import           Crypto.Hash
+import qualified Crypto.Saltine.Class            as Saltine
+import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
+import           Crypto.Secp256k1
+import qualified Data.ByteArray                  as ByteArray
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString.Char8           as Char8
+import           Data.Foldable
+import           Data.Int                        (Int32, Int64)
+import           Data.Map.Strict                 (Map)
+import qualified Data.Map.Strict                 as Map
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Profunctor
+import           Data.Profunctor.Product.Default
+import           Data.Text                       (Text)
+import qualified Data.Text                       as Text
+import qualified Data.Text.Encoding              as Text
+import           Data.Traversable
+import           Database.PostgreSQL.Simple      (Connection)
+import           GHC.Stack
+import           Opaleye                         hiding (not, null)
+import qualified Opaleye                         (not, null)
 
-import BlockApps.Bloc.Crypto
-import BlockApps.Bloc.Database.Tables
-import BlockApps.Ethereum
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.Monad
-import BlockApps.Solidity.Parse.Parser
-import BlockApps.Solidity.Xabi
-import qualified BlockApps.Solidity.Xabi.Type as Xabi
-import qualified BlockApps.Solidity.Xabi.Def as Xabi.Def
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Crypto
+import           BlockApps.Bloc.Database.Tables
+import           BlockApps.Bloc.Monad
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.Parse.Parser
+import           BlockApps.Solidity.Xabi
+import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
+import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types
+
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 {- |
 SELECT address from key_store;
@@ -104,7 +105,7 @@ postUsersUserQuery userName KeyStore{..} conn = do
     returnA -< userId
   userIds2 <- case listToMaybe userIds1 of
     Nothing -> runInsertReturning conn usersTable
-      (Nothing,constant userName) (\(userId,_) -> userId)
+      (Nothing,constant userName) fst
     Just userId -> return [userId::Int32]
   case listToMaybe userIds2 of
     Nothing -> return False
@@ -336,7 +337,7 @@ insertXabiFunctionArg funcId args = do
   argsWithIds <- for args $ \ (Xabi.IndexedType index xt) -> do
     xtid <- insertXabiType xt
     return (index,xtid)
-  blocModify $ \ conn -> do
+  blocModify $ \conn ->
     runInsertMany conn xabiFunctionArgumentsTable
       [ ( Nothing
         , constant funcId
@@ -355,7 +356,7 @@ insertXabiFunctionRet funcId vals = do
   valIds <- for vals $ \ (Xabi.IndexedType index xt) -> do
     xtid <- insertXabiType xt
     return (index,xtid)
-  blocModify $ \ conn -> do
+  blocModify $ \conn ->
     runInsertMany conn xabiFunctionReturnsTable
       [ ( Nothing
         , constant funcId
@@ -438,7 +439,7 @@ getContractsMetaDataIdByNameQuery
   -> Text
   -> Query (Column PGInt4)
 getContractsMetaDataIdByNameQuery contractName1 contractName2 =
-  limit 1 . orderBy (desc (\ cm2Id -> cm2Id)) $ proc () -> do
+  limit 1 . orderBy (desc id) $ proc () -> do
     (_,_,_,_,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
     restrict -< name1 .== constant contractName1
     restrict -< name2 .== constant contractName2
@@ -491,7 +492,7 @@ LIMIT 1;
 -}
 getContractsMetaDataIdBySameNameQuery :: Text -> Query (Column PGInt4)
 getContractsMetaDataIdBySameNameQuery contractName =
-  limit 1 . orderBy (desc (\ cmId -> cmId)) $ proc () -> do
+  limit 1 . orderBy (desc id) $ proc () -> do
     (cmId,name) <- joinTable -< ()
     restrict -< name .== constant contractName
     returnA -< cmId
@@ -776,7 +777,7 @@ createContractQuery contractName = do
     Just cId -> return cId
     Nothing -> blocModify1 $ \ conn -> runInsertReturning conn contractsTable
       (Nothing, constant contractName)
-      (\ (cId, _) -> cId)
+      fst
 
 {- |
 Insert metadata into contract metadata table if metadata table does not contain codehash
@@ -878,14 +879,14 @@ insertXabiVariables metadataId vars = do
       (vId,cmId,_,vname,_,_) <- queryTable xabiVariablesTable -< ()
       restrict -< cmId .== constant metadataId
         .&& vname .== constant name
-      returnA -< (vId)
+      returnA -< vId
     if null varIds
     then do
       xtid <- insertXabiType xt
       return $ Just (name,atBytes,ispublic,xtid)
     else
       return Nothing
-  blocModify $ \ conn -> do
+  blocModify $ \conn ->
     runInsertMany conn xabiVariablesTable
       [ ( Nothing
         , constant metadataId
@@ -911,7 +912,7 @@ insertXabiFunction metadataId (name,Func{..}) = do
     (fId,cmId,_,fname) <- queryTable xabiFunctionsTable -< ()
     restrict -< cmId .== constant metadataId
       .&& fname .== constant name
-    returnA -< (fId)
+    returnA -< fId
   when (null funcIds) $ do
     funcId <- blocModify1 $ \ conn -> runInsertReturning conn xabiFunctionsTable
       ( Nothing
@@ -1015,7 +1016,7 @@ compileContract source = do
 insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case
   Xabi.Int signed bytes ->
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Int"::Text)
@@ -1030,7 +1031,7 @@ insertXabiType = \case
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.String dynamic ->
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("String"::Text)
@@ -1045,7 +1046,7 @@ insertXabiType = \case
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Bytes dynamic bytes ->
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Bytes"::Text)
@@ -1060,7 +1061,7 @@ insertXabiType = \case
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Bool ->
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Bool"::Text)
@@ -1075,7 +1076,7 @@ insertXabiType = \case
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Address ->
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \ conn->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Address"::Text)
@@ -1089,8 +1090,8 @@ insertXabiType = \case
         , Opaleye.null
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Struct bytes typedef -> do
-    blocModify1 $ \ conn -> do
+  Xabi.Struct bytes typedef ->
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Struct"::Text)
@@ -1128,8 +1129,8 @@ insertXabiType = \case
     --       )
     --     | (name,(atby,tyid)) <- Map.toList fieldsWithIds]
     -- return parentTypeId
-  Xabi.Enum bytes typedef -> do
-    blocModify1 $ \ conn -> do
+  Xabi.Enum bytes typedef ->
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Enum"::Text)
@@ -1154,7 +1155,7 @@ insertXabiType = \case
     -- return tyid
   Xabi.Array dynamic len entry -> do
     entryId <- insertXabiType entry
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Array"::Text)
@@ -1168,8 +1169,8 @@ insertXabiType = \case
         , Opaleye.null
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
-  Xabi.Contract typedef -> do
-    blocModify1 $ \ conn -> do
+  Xabi.Contract typedef ->
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Contract"::Text)
@@ -1186,7 +1187,7 @@ insertXabiType = \case
   Xabi.Mapping dynamic key value -> do
     keyId <- insertXabiType key
     valueId <- insertXabiType value
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Mapping"::Text)
@@ -1201,7 +1202,7 @@ insertXabiType = \case
         )
         (\ (xtid,_,_,_,_,_,_,_,_,_) -> xtid)
   Xabi.Label name ->
-    blocModify1 $ \ conn -> do
+    blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
         , constant ("Label"::Text)
@@ -1312,15 +1313,14 @@ getXabiTypeDefs metadataId = do
     (tdid,name,cmid,ty,by) <- queryTable xabiTypeDefsTable -< ()
     restrict -< cmid .== constant metadataId
     returnA -< (name,(tdid,ty,by))
-  for typedefsWithIds $ \ (tdid,ty,by::Int32) -> do
-    case ty of
+  for typedefsWithIds $ \ (tdid,ty,by::Int32) -> case ty of
       "Struct" -> do
         fields <- getXabiStructFields tdid
         return $ Xabi.Def.Struct fields (fromIntegral by)
       "Enum" -> do
         names <- getXabiEnumNames tdid
         return $ Xabi.Def.Enum names (fromIntegral by)
-      "Contract" -> do
+      "Contract" ->
         return $ Xabi.Def.Contract $ fromIntegral by
       _ -> throwError $ DBError $
         "Invalid type def. Expected Struct or Enum, saw " <> ty
@@ -1369,7 +1369,7 @@ getContractXabi (ContractName contractName) contractId = do
   funcs <- getXabiFunctionsQuery metadataId
   constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
   constr <- case constrIdMaybe of
-    Nothing -> return Map.empty
+    Nothing       -> return Map.empty
     Just constrId -> getXabiFunctionsArgsQuery constrId
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId

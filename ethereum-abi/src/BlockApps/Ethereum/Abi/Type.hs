@@ -1,6 +1,4 @@
-{-# LANGUAGE
-    LambdaCase
-#-}
+{-# LANGUAGE LambdaCase #-}
 
 module BlockApps.Ethereum.Abi.Type
   ( Type(..)
@@ -10,7 +8,7 @@ module BlockApps.Ethereum.Abi.Type
   , typeBitSize
   ) where
 
-import Data.Maybe
+import           Data.Maybe
 
 data Type
   = TypeBool

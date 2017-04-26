@@ -5,11 +5,11 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module BlockApps.Solidity.Parse.Lexer where
 
-import Text.Parsec
-import Text.Parsec.Language (javaStyle)
-import qualified Text.Parsec.Token as P
+import           Text.Parsec
+import           Text.Parsec.Language                 (javaStyle)
+import qualified Text.Parsec.Token                    as P
 
-import BlockApps.Solidity.Parse.ParserTypes
+import           BlockApps.Solidity.Parse.ParserTypes
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String

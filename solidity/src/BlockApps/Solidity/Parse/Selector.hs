@@ -5,17 +5,17 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module BlockApps.Solidity.Parse.Selector (deriveSelector) where
-import Crypto.Hash
-import qualified Data.ByteArray as ByteArray
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import Data.Char
-import Data.List
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Text.Encoding
+import           Crypto.Hash
+import qualified Data.ByteArray          as ByteArray
+import           Data.ByteString         (ByteString)
+import qualified Data.ByteString         as ByteString
+import           Data.Char
+import           Data.List
+import           Data.Text               (Text)
+import qualified Data.Text               as Text
+import           Data.Text.Encoding
 
-import BlockApps.Solidity.Type
+import           BlockApps.Solidity.Type
 
 -- | The 'selector' function is responsible for producing the 4-byte
 -- hash that Solidity uses to identify functions.  It's essentially the
@@ -28,7 +28,7 @@ import BlockApps.Solidity.Type
 deriveSelector :: [(Text, Int)] -> Text -> [Type] -> ByteString
 deriveSelector enumSizes name args = hash4 $ signature enumSizes name args
   where
-    hash4 bs = ByteString.take 4 $ ByteArray.convert $ (hash bs::Digest Keccak_256)
+    hash4 bs = ByteString.take 4 . ByteArray.convert $ (hash bs::Digest Keccak_256)
 
 signature :: [(Text, Int)] -> Text -> [Type] -> ByteString
 signature enumSizes name args = encodeUtf8 $ Text.pack $ Text.unpack name ++ prettyArgTypes enumSizes args
@@ -41,6 +41,15 @@ prettyArgTypes enumSizes args =
 formatArg :: [(Text, Int)] -> Type -> String
 formatArg _ (SimpleType TypeInt) = "int256"
 formatArg _ (SimpleType x) = drop 4 $ map toLower $ show x --yeah, it is a hack, but it is way cleaner than writting out like 200 lines of the same thing
+formatArg enumSizes (TypeArrayFixed size x) = formatArg enumSizes x ++"[" ++ show size ++ "]"
+formatArg enumSizes (TypeArrayDynamic x) = formatArg enumSizes x ++"[]"
+formatArg enumSizes (TypeMapping x y) = "(" ++ formatArg enumSizes (SimpleType x) ++ "=>" ++ formatArg enumSizes y ++ ")"
+formatArg enumSizes (TypeEnum label) =
+  case lookup label enumSizes of
+   Nothing -> error "you are using an enum not defined"
+   Just x | x < 256 -> formatArg enumSizes (SimpleType TypeInt8)
+   Just x -> error $ "undefined case in formatArg for enum with more than 255 items: size=" ++ show x
+
 formatArg _ x = error $ "undefined value in formatArg: " ++ show x
 
 
@@ -61,7 +70,7 @@ formatArg typesL (FixedArray t l) = pretty typesL t <> text "[" <> natural l <> 
 formatArg typesL (DynamicArray t) = pretty typesL t <> text "[]"
 formatArg typesL (Mapping d c) =
   text "mapping" <+> parens (pretty typesL d <+> text "=>" <+> pretty typesL c)
-formatArg typesL (Typedef name) = 
+formatArg typesL (Typedef name) =
   case typesL Map.! name of
     EnumLayout s -> pretty typesL (UnsignedInt s)
     _ -> text name -}
@@ -100,7 +109,7 @@ pretty typesL (FixedArray t l) = pretty typesL t <> text "[" <> natural l <> tex
 pretty typesL (DynamicArray t) = pretty typesL t <> text "[]"
 pretty typesL (Mapping d c) =
   text "mapping" <+> parens (pretty typesL d <+> text "=>" <+> pretty typesL c)
-pretty typesL (Typedef name) = 
+pretty typesL (Typedef name) =
   case typesL Map.! name of
     EnumLayout s -> pretty typesL (UnsignedInt s)
     _ -> text name -}

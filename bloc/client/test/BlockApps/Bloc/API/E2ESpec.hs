@@ -1,35 +1,34 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE
-    OverloadedStrings
-  , RecordWildCards
-  , TypeApplications
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module BlockApps.Bloc.API.E2ESpec where
 
-import Control.Concurrent
-import Data.Either
-import qualified Data.Map as Map
-import Data.Maybe
-import Numeric.Natural
-import Servant.Client
-import Test.Hspec
+import           Control.Concurrent
+import           Data.Either
+import qualified Data.Map                         as Map
+import           Data.Maybe
+import           Numeric.Natural
+import           Servant.Client
+import           Test.Hspec
 
-import BlockApps.Bloc.API.Users
-import BlockApps.Bloc.API.Utils
-import BlockApps.Bloc.API.SpecUtils
-import BlockApps.Bloc.Client
-import BlockApps.Ethereum
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Xabi
-import BlockApps.Strato.Client
-import BlockApps.Strato.Types
+import           BlockApps.Bloc.API.SpecUtils
+import           BlockApps.Bloc.API.Users
+import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc.Client
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
+import           BlockApps.Strato.Client
+import           BlockApps.Strato.Types
+
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 etherToWei :: Natural -> Natural
 etherToWei x = 1000000000000000000 * x
 
 spec :: SpecWith TestConfig
-spec = do
+spec =
   describe "Integration Tests" $ do
     it "should send Ether between two users" $ \ TestConfig {..} -> do
       let
@@ -67,7 +66,7 @@ spec = do
       threadDelay 4000000
       let
         etherToSend = 100
-        postSendParameters = PostSendParameters (address2) (etherToWei etherToSend) pw txParams
+        postSendParameters = PostSendParameters address2 (etherToWei etherToSend) pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
@@ -78,7 +77,7 @@ spec = do
       let
         Right (account2AS : _) = accts2AfterSend
         balance2AS = unStrung (accountBalance account2AS)
-      balance2AS `shouldBe` (initialWei + (etherToWei etherToSend))
+      balance2AS `shouldBe` initialWei + etherToWei etherToSend
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
       let
@@ -96,11 +95,9 @@ spec = do
           , postuserscontractrequestContract = simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
-      eAccts1 <- runClientM
-        (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
@@ -131,7 +128,7 @@ spec = do
 
       let
         contractName = ContractName simpleStorageContractName
-        postUsersContractMethodRequestSet = PostUsersMethodRequest
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" "3"
@@ -146,7 +143,7 @@ spec = do
       -- call get value and verify
 
       let
-        postUsersContractMethodRequestGet = PostUsersMethodRequest
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
@@ -158,8 +155,8 @@ spec = do
         (ClientEnv mgr blocUrl)
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
-        Right (PostUsersMethodResponse values _) = postUsersContractMethodEitherGet
-      values `shouldBe` "3"
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe` "transaction returned: 3"
 
       -- get state and verify
 
@@ -196,15 +193,13 @@ spec = do
           , postuserscontractrequestContract = simpleConstructorName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "3"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
-      eAccts1 <- runClientM
-        (getAccountsFilter params1)
-        (ClientEnv mgr stratoUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
       let
         Right accts1 = eAccts1
-      length accts1 `shouldBe` 1
+      length accts1 `shouldBe` 1 -- todo: uh what?
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
       let
@@ -245,7 +240,7 @@ spec = do
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "[3,2,3]"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -276,7 +271,7 @@ spec = do
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "[1,2,3,4,5,6,7,8]"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -306,7 +301,7 @@ spec = do
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -340,7 +335,7 @@ spec = do
             )
           ]
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -379,7 +374,7 @@ spec = do
           , ("_uintArrSt", "[1,2,3]")
           ]
           , postuserscontractrequestTxParams = txParamsComplex
-          , postuserscontractrequestValue = 0
+          , postuserscontractrequestValue = Just 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)

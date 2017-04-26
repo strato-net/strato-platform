@@ -1,8 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-{-# LANGUAGE
-    TypeApplications
-#-}
+{-# LANGUAGE TypeApplications #-}
 
 module BlockApps.Bloc.Client
   ( getHomepage
@@ -30,16 +28,16 @@ module BlockApps.Bloc.Client
   , postUsersContractMethodList
   ) where
 
-import Data.Proxy
-import Data.Map.Strict (Map)
-import Data.Text (Text)
-import Servant.Client
+import           Data.Map.Strict                  (Map)
+import           Data.Proxy
+import           Data.Text                        (Text)
+import           Servant.Client
 
-import BlockApps.Bloc.API
-import BlockApps.Ethereum
-import BlockApps.Solidity.Xabi
-import BlockApps.Solidity.SolidityValue
-import BlockApps.Strato.Types
+import           BlockApps.Bloc.API
+import           BlockApps.Ethereum
+import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
+import           BlockApps.Strato.Types
 
 getHomepage :: ClientM Homepage
 getHomepage = client (Proxy @ GetHomepage)
