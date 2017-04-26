@@ -501,7 +501,7 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} r
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
       forM_ theLogs $ \log' ->
-        putLogDB $ LogDB theHash tAddr (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
+        putLogDB $ LogDB theHash (address log') (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
 
       void $ putTransactionResult
              TransactionResult { transactionResultBlockHash        = blockHeaderHash b
