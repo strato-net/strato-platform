@@ -76,6 +76,7 @@ library
                , time
                , transformers-base
                , unordered-containers
+               , wai-extra
                , warp
                , wl-pprint-text
 executable blockapps-bloc
