@@ -40,7 +40,7 @@ solidityContract = do
       return (name, consArgs)
   declarations <-
     braces (many solidityDeclaration)
-    
+
   let allFunctions = Map.fromList
                      [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
 
@@ -50,7 +50,7 @@ solidityContract = do
       (
         Xabi{
            xabiFuncs = Map.delete (Text.pack contractName') allFunctions
-           , xabiConstr = fromMaybe Map.empty $ fmap Xabi.funcArgs $ Map.lookup (Text.pack contractName') allFunctions
+           , xabiConstr = maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
            , xabiVars =
                 Map.fromList $
                 zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v)

@@ -791,7 +791,7 @@ insertContractMetaDataQuery
   -> Keccak256
   -> Bloc Int32
 insertContractMetaDataQuery
-  contractId bin binRuntime codeHash xcodeHash = blocModify1 $ \ conn -> do
+  contractId bin binRuntime codeHash xcodeHash = blocModify1 $ \ conn ->
     runInsertReturning conn contractsMetaDataTable
       ( Nothing
       , constant contractId

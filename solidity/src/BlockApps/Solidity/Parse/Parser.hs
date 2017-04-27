@@ -1,7 +1,3 @@
-{-# LANGUAGE
-      RecordWildCards
-#-}
-
 -- |
 -- Module: Parser
 -- Description: The Solidity source parser function
@@ -28,8 +24,8 @@ parseXabi filename input = do
   xabis <- showError $ runParser solidityFile "" filename input
   let inheritanceFullXabis = map (fmap $ addInheritedDeclarations inheritanceFullXabis) xabis
 
-  xabis' <- sequence $ map sequence inheritanceFullXabis
-     
+  xabis' <- traverse sequence inheritanceFullXabis
+
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
 addContractNames::[String]->Xabi->Xabi
