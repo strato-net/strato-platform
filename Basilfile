@@ -57,7 +57,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
       ports:
