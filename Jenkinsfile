@@ -1,29 +1,62 @@
-node ('cd9') {
-   slackSend (color: 'good', message: "Build Started: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})") 
-   stage('Code-Checkout') { // for display purposes
-   
-      checkout scm
-      //withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'blockapps-cd-github', passwordVariable: 'p', usernameVariable: 'u']]) {
-      //sh 'rm -rf blockapps-haskell'
-      //sh 'git clone https://$u:$p@github.com/blockapps/blockapps-haskell'
-      //}
-   }
-   stage('Build') {
-    sh 'stack build'
-   }
-   slackSend (color: 'good', message: "Build Completed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})")
-   
-   stage ('Test') {
-      sh 'echo test'
-   }
-   stage ('HLint') {
-     sh 'stack install hlint'
-     sh 'stack exec hlint -- .'
-   }
-}
+githubCredentials = [
+  [
+    $class: 'UsernamePasswordMultiBinding',
+    usernameVariable: 'USR',
+    passwordVariable: 'GITHUB_TOKEN',
+    credentialsId: 'blockapps-cd-github'
+  ]
+]
 
-def cleanup() {
-    sh "docker ps -q -a | xargs docker rm"
-   // sh "docker rmi $(docker images -f "dangling=true" -q)"
-//    sh "docker rmi $(docker images | grep '<none>' | awk '{print $3}')"
+pipeline {
+  agent {
+    label "cd9"
+  }
+
+  stages {
+    stage('Build') {
+      steps {
+        sh 'basil build'
+      }
+    }
+
+    stage ('HLint') {
+      steps {
+        sh 'stack install hlint'
+        sh 'stack exec hlint -- .'
+      }
+    }
+
+    stage('Test') {
+      steps {
+        echo "Running stack test"
+        sh 'stack test'
+        slackSend (
+          color: 'good',
+          message: "Build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        )
+      }
+    }
+
+  }
+
+  post {
+    success {
+      sh '''
+        echo "Git branch: $BRANCH_NAME"
+        if [ $BRANCH_NAME = master ]
+        then
+          echo "TODO: execute E2E tests here that depend on deployment"
+        fi
+        basil build --release
+        basil push
+      '''
+    }
+
+    failure {
+      slackSend (
+        color: 'danger',
+        message: "Build failed: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+      )
+    }
+  }
 }
