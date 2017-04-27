@@ -13,7 +13,7 @@ BUILDBASE_NAME=bloc-buildbase
 DEPLOYBASE_NAME=bloc-deploybase
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
 
-EXTRADEPS=doit.sh run_unit_tests.sh
+EXTRADEPS=doit.sh
 
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 STACKFLAGS=

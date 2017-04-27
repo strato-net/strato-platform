@@ -29,7 +29,7 @@ pipeline {
     stage('Test') {
       steps {
         echo "Running unit tests"
-        sh run_unit_tests.sh
+        sh 'eval "$(cat run_unit_tests.sh)"'
       }
     }
   }
