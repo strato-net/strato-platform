@@ -13,6 +13,7 @@ import           Numeric.Natural
 import           Servant.Client
 import           Test.Hspec
 
+import           BlockApps.Bloc.API.Contracts
 import           BlockApps.Bloc.API.SpecUtils
 import           BlockApps.Bloc.API.Users
 import           BlockApps.Bloc.API.Utils
@@ -176,6 +177,45 @@ spec =
       let
         Just storedData' = mStoredData'
       storedData' `shouldBe` SolidityValueAsString "3"
+
+    it "should disambiguate contracts with the same name using latest and address" $ \ TestConfig {..} -> do
+      sameName1Src <- readSolFile "SameName1.sol"
+      sameName2Src <- readSolFile "SameName2.sol"
+      let
+        sameName1ContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = sameName1Src
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = "SameName"
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Nothing
+          }
+        sameName2ContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = sameName2Src
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = "SameName"
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Nothing
+          }
+      Right sameName1Addr <- runClientM
+        (postUsersContract userName userAddress sameName1ContractRequest)
+        (ClientEnv mgr blocUrl)
+      Right sameName2Addr <- runClientM
+        (postUsersContract userName userAddress sameName2ContractRequest)
+        (ClientEnv mgr blocUrl)
+      Right sameName1Symbols <- runClientM
+        (getContractsSymbols "SameName" (Unnamed sameName1Addr))
+        (ClientEnv mgr blocUrl)
+      Right sameName2Symbols <- runClientM
+        (getContractsSymbols "SameName" (Unnamed sameName2Addr))
+        (ClientEnv mgr blocUrl)
+      Right sameNameLatestSymbols <- runClientM
+        (getContractsSymbols "SameName" (Named "Latest"))
+        (ClientEnv mgr blocUrl)
+      sameName1Symbols `shouldBe` [SymbolName "myString"]
+      sameName2Symbols `shouldBe` [SymbolName "myInt"]
+      sameNameLatestSymbols `shouldBe` [SymbolName "myInt"]
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
       let
