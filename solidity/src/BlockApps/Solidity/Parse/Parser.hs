@@ -13,7 +13,6 @@ import           Text.Parsec                          hiding (parse)
 import qualified Data.Map                             as Map
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
-import           Data.Traversable
 
 import           BlockApps.Solidity.Parse.File
 import           BlockApps.Solidity.Parse.ParserTypes
@@ -29,11 +28,7 @@ parseXabi filename input = do
   xabis <- showError $ runParser solidityFile "" filename input
   let inheritanceFullXabis = map (fmap $ addInheritedDeclarations inheritanceFullXabis) xabis
 
-  xabis' <-
-    for inheritanceFullXabis $ \(name, xabiOrError) -> do
-      case xabiOrError of
-       Left e -> Left e
-       Right v -> return (name, v)
+  xabis' <- sequence $ map sequence inheritanceFullXabis
      
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
