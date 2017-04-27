@@ -39,10 +39,12 @@ addContractNames contracts xabi =
 addInheritedDeclarations::[(Text, Either String Xabi)]->(Xabi, [Text])->Either String Xabi
 addInheritedDeclarations _ (xabi, []) = Right xabi
 addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:_) = do
-  parentXabi <- lookup parent xabisWithInheritedDeclarations
-                `orError`
-                ("Contract was inherited from a non existant contract: " ++ Text.unpack parent)
-  fmap (xabiMerge xabi) parentXabi
+  parentXabiOrError <-
+    lookup parent xabisWithInheritedDeclarations
+    `orError`
+    ("Contract was inherited from a non existant contract: " ++ Text.unpack parent)
+  parentXabi <- parentXabiOrError
+  return $ xabiMerge xabi parentXabi
 
 
 xabiMerge::Xabi->Xabi->Xabi
