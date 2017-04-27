@@ -41,6 +41,7 @@ setup = do
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"
+  putStrLn $ "Using Strato URL: " ++ showBaseUrl strato
   let
     testConfig = TestConfig
       { mgr = mgr'

@@ -27,13 +27,12 @@ import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
 
 
 -- | Parses an entire Solidity contract
-solidityContract :: SolidityParser (Text, Xabi)
+solidityContract :: SolidityParser (Text, (Xabi, [Text]))
 solidityContract = do
   reserved "contract" <|> reserved "library"
   contractName' <- identifier
   setContractName contractName'
---  baseConstrs <- option [] $ do
-  _ <- option [] $ do
+  baseConstrs <- option [] $ do
     reserved "is"
     commaSep1 $ do
       name <- intercalate "." <$> sepBy1 identifier dot
@@ -41,29 +40,34 @@ solidityContract = do
       return (name, consArgs)
   declarations <-
     braces (many solidityDeclaration)
+
+  let allFunctions = Map.fromList
+                     [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
+
   return
     (
       Text.pack contractName',
-      Xabi{
-        xabiFuncs =
-           Map.fromList
-           [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]
-      , xabiConstr = Map.fromList [] --undefined -- :: Map Text Xabi.IndexedType
-      , xabiVars =
+      (
+        Xabi{
+           xabiFuncs = Map.delete (Text.pack contractName') allFunctions
+           , xabiConstr = maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
+           , xabiVars =
+                Map.fromList $
+                zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v)
+                [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
+                [0..]
+           , xabiTypes =
              Map.fromList $
-             zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v)
-             [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
-             [0..]
-      , xabiTypes =
-          Map.fromList $
-          [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
-          ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
+             [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
+             ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
 
 --    contractName = contractName',
 --    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
 --    contractTypes = contractTypes',
 --    contractBaseNames = baseConstrs
-      }
+           },
+        map (Text.pack . fst) baseConstrs
+      )
     )
 
 

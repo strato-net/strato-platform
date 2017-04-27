@@ -9,6 +9,8 @@ module BlockApps.Bloc.Server where
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Proxy
 import           Data.Swagger
+import           Network.Wai.Middleware.Cors
+import           Network.Wai.Middleware.RequestLogger
 import           Servant
 import           Servant.Swagger
 import           Servant.Swagger.UI
@@ -67,4 +69,8 @@ serveBlocAndDocs blocEnv = serveBloc blocEnv
   :<|> swaggerSchemaUIServer blocSwagger
 
 appBloc :: BlocEnv -> Application
-appBloc = serve (Proxy @ (BlocAPI :<|> BlocDocsAPI)) . serveBlocAndDocs
+appBloc
+  = simpleCors
+  . logStdoutDev
+  . serve (Proxy @ (BlocAPI :<|> BlocDocsAPI))
+  . serveBlocAndDocs
