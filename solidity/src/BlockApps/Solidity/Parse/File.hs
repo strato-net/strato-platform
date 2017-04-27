@@ -36,7 +36,7 @@ solidityFile = do
 -}
 
 
-solidityFile :: SolidityParser [(Text, Xabi)]
+solidityFile :: SolidityParser [(Text, (Xabi, [Text]))]
 solidityFile = do
   whiteSpace
   contracts <- many solidityContract

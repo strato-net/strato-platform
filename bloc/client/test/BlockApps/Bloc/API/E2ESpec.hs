@@ -8,15 +8,18 @@ import           Control.Concurrent
 import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
+import qualified Data.Vector                      as Vector
 import           Numeric.Natural
 import           Servant.Client
 import           Test.Hspec
 
+import           BlockApps.Bloc.API.Contracts
 import           BlockApps.Bloc.API.SpecUtils
 import           BlockApps.Bloc.API.Users
 import           BlockApps.Bloc.API.Utils
 import           BlockApps.Bloc.Client
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Client
@@ -131,7 +134,7 @@ spec =
         postUsersContractMethodRequestSet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
-          , postuserscontractmethodArgs = Map.singleton "x" "3"
+          , postuserscontractmethodArgs = Map.singleton "x" (ArgInt 3)
           , postuserscontractmethodValue = 0
           , postuserscontractmethodTxParams = txParams
           }
@@ -175,6 +178,45 @@ spec =
         Just storedData' = mStoredData'
       storedData' `shouldBe` SolidityValueAsString "3"
 
+    it "should disambiguate contracts with the same name using latest and address" $ \ TestConfig {..} -> do
+      sameName1Src <- readSolFile "SameName1.sol"
+      sameName2Src <- readSolFile "SameName2.sol"
+      let
+        sameName1ContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = sameName1Src
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = "SameName"
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Nothing
+          }
+        sameName2ContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = sameName2Src
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = "SameName"
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Nothing
+          }
+      Right sameName1Addr <- runClientM
+        (postUsersContract userName userAddress sameName1ContractRequest)
+        (ClientEnv mgr blocUrl)
+      Right sameName2Addr <- runClientM
+        (postUsersContract userName userAddress sameName2ContractRequest)
+        (ClientEnv mgr blocUrl)
+      Right sameName1Symbols <- runClientM
+        (getContractsSymbols "SameName" (Unnamed sameName1Addr))
+        (ClientEnv mgr blocUrl)
+      Right sameName2Symbols <- runClientM
+        (getContractsSymbols "SameName" (Unnamed sameName2Addr))
+        (ClientEnv mgr blocUrl)
+      Right sameNameLatestSymbols <- runClientM
+        (getContractsSymbols "SameName" (Named "Latest"))
+        (ClientEnv mgr blocUrl)
+      sameName1Symbols `shouldBe` [SymbolName "myString"]
+      sameName2Symbols `shouldBe` [SymbolName "myInt"]
+      sameNameLatestSymbols `shouldBe` [SymbolName "myInt"]
+
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
@@ -191,7 +233,7 @@ spec =
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = simpleConstructorName
-          , postuserscontractrequestArgs = Just $ Map.singleton "x" "3"
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgInt 3)
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just 0
           }
@@ -238,7 +280,7 @@ spec =
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = testArrayStatName
-          , postuserscontractrequestArgs = Just $ Map.singleton "x" "[3,2,3]"
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList [ArgInt 3,ArgInt 2,ArgInt 3]))
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just 0
           }
@@ -269,7 +311,7 @@ spec =
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = testArrayStatName
-          , postuserscontractrequestArgs = Just $ Map.singleton "x" "[1,2,3,4,5,6,7,8]"
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList (map ArgInt [1,2,3,4,5,6,7,8])))
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just 0
           }
@@ -299,7 +341,7 @@ spec =
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = testArrayStatName
-          , postuserscontractrequestArgs = Just $ Map.singleton "x" "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" $ ArgString "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just 0
           }
@@ -330,8 +372,8 @@ spec =
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
-          [ ("x", "deadbeef")
-          , ( "y", "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
+          [ ("x", ArgString "deadbeef")
+          , ( "y", ArgString  "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
             )
           ]
           , postuserscontractrequestTxParams = txParams
@@ -365,13 +407,13 @@ spec =
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
-          [ ("_uint", "102344")
-          , ("_int", "-444444")
-          , ("_address", "deadbeef")
-          , ("_bool", "true")
-          , ("_string", "One Ring to rule them all, One Ring to find them. One Ring to bring them all, and in the darkenss bind them.")
-          , ("_bytes32St", "6af83ccf1dabb1a6117ff5ef95a7d3677e4c4cf047dbd3fd8bfccf5e8b1872fb")
-          , ("_uintArrSt", "[1,2,3]")
+          [ ("_uint", ArgInt 102344)
+          , ("_int", ArgInt (-444444))
+          , ("_address", ArgString "deadbeef")
+          , ("_bool", ArgBool True)
+          , ("_string", ArgString "One Ring to rule them all, One Ring to find them. One Ring to bring them all, and in the darkenss bind them.")
+          , ("_bytes32St", ArgString "6af83ccf1dabb1a6117ff5ef95a7d3677e4c4cf047dbd3fd8bfccf5e8b1872fb")
+          , ("_uintArrSt", ArgArray (Vector.fromList [ArgInt 1,ArgInt 2,ArgInt 3]))
           ]
           , postuserscontractrequestTxParams = txParamsComplex
           , postuserscontractrequestValue = Just 0

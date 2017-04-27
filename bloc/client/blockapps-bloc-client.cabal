@@ -48,16 +48,17 @@ test-suite blockapps-bloc-client-test
     , blockapps-strato-client
     , blockapps-solidity
     , blockapps-ethereum
+    , containers
     , directory
     , generic-random
     , hspec
     , http-client
     , QuickCheck
     , quickcheck-instances
-    , text
     -- , servant-aeson-specs
     , servant-client
-    , containers
+    , text
+    , vector
 
 source-repository head
   type: git

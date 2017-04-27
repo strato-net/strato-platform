@@ -47,6 +47,7 @@ main = do
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
   cirrusUrl <- parseBaseUrl flags_cirrusurl
   let blocEnv = BlocEnv stratoUrl cirrusUrl mgr conn
+  putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   run flags_port (appBloc blocEnv)
 
 dbExistsQuery :: Query
