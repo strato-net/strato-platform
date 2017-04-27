@@ -929,7 +929,7 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
   void $ insertXabiFunctionArg funcId constrArgs
 
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
-insertXabi metadataId contractName xabi@Xabi{..} = do
+insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
