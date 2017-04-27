@@ -792,19 +792,7 @@ insertContractMetaDataQuery
   -> Bloc Int32
 insertContractMetaDataQuery
   contractId bin binRuntime codeHash xcodeHash = blocModify1 $ \ conn -> do
-    cmIds <- runQuery conn $ proc () -> do
-      (cmId,_,_,_,ch,xch) <- queryTable contractsMetaDataTable -< ()
-      restrict -< ch .== constant codeHash .&& xch .== constant xcodeHash
-      returnA -< cmId
-    case listToMaybe cmIds of
-
-      Just cmId -> return [cmId]
-      Nothing ->
-        runInsertReturning conn contractsMetaDataTable
-          writeColumns
-          (\ (contractmetadataId,_,_,_,_,_) -> contractmetadataId)
-  where
-    writeColumns =
+    runInsertReturning conn contractsMetaDataTable
       ( Nothing
       , constant contractId
       , constant (Text.encodeUtf8 bin)
@@ -812,6 +800,7 @@ insertContractMetaDataQuery
       , constant codeHash
       , constant xcodeHash
       )
+      (\ (contractmetadataId,_,_,_,_,_) -> contractmetadataId)
 
 {- |
 INSERT INTO contracts_lookup (contract_metadata_id, linked_metadata_id)
@@ -940,7 +929,7 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
   void $ insertXabiFunctionArg funcId constrArgs
 
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
-insertXabi metadataId contractName Xabi{..} = do
+insertXabi metadataId contractName xabi@Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
   insertXabiConstr metadataId contractName xabiConstr
   void $ insertXabiVariables metadataId xabiVars
@@ -957,18 +946,11 @@ insertContract parentContr contr bin binRuntime xabi = do
   let
     codeHash = keccak256 (Text.encodeUtf8 binRuntime)
     xcodeHash = keccak256 (Text.encodeUtf8 bin)
-  cmIds <- blocQuery $ proc () -> do
-    (cmId,_,_,_,ch,xch) <- queryTable contractsMetaDataTable -< ()
-    restrict -< ch .== constant codeHash .&& xch .== constant xcodeHash
-    returnA -< cmId
-  case cmIds of
-    [] -> do
-      contrId <- createContractQuery contr
-      metadataId <- insertContractMetaDataQuery
-        contrId bin binRuntime codeHash xcodeHash
-      insertXabi metadataId parentContr xabi
-      return metadataId
-    cmId:_ -> return cmId
+  contrId <- createContractQuery contr
+  metadataId <- insertContractMetaDataQuery
+    contrId bin binRuntime codeHash xcodeHash
+  insertXabi metadataId parentContr xabi
+  return metadataId
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
 compileContract source = do
