@@ -38,16 +38,17 @@ pipeline {
 
   post {
     success {
+      withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {    
       sh '''
         echo "Git branch: $BRANCH_NAME"
         basil build --release
         basil push
+      '''
+      }
         slackSend (
           color: 'good',
           message: "Build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
         )
-
-      '''
     }
 
     failure {
