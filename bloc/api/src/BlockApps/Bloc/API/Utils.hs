@@ -68,7 +68,7 @@ instance MimeRender HTMLifiedAddress Address where
 
 --------------------------------------------------------------------------------
 
-newtype ContractName = ContractName Text deriving (Generic)
+newtype ContractName = ContractName Text deriving (Eq,Show,Generic)
 
 instance IsString ContractName where
   fromString = ContractName . Text.pack
