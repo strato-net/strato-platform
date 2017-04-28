@@ -17,5 +17,5 @@ blocserver="/usr/bin/blockapps-bloc"
 locale-gen "en_US.UTF-8"
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
-echo "Executing this: $blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="http://$stratourl/strato-api/eth/v1.2" --cirrusurl="$cirrusurl""
-$blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="http://$stratourl/strato-api/eth/v1.2" --cirrusurl="$cirrusurl" 2>&1
+echo "Executing this: $blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="http://$stratoHost/strato-api/eth/v1.2" --cirrusurl="$cirrusurl""
+$blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="http://$stratoHost/strato-api/eth/v1.2" --cirrusurl="$cirrusurl" 2>&1
