@@ -1,6 +1,6 @@
 # vim: syntax=yaml tabstop=2 shiftwidth=2 expandtab smarttab :
 metadata:
-  name: silo
+  name: bloch
   min_basil: "0.9.2"
   version: 1.0
   description: test bloch

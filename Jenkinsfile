@@ -19,13 +19,6 @@ pipeline {
       }
     }
 
-    stage ('HLint') {
-      steps {
-        sh 'stack install hlint'
-        sh 'stack exec hlint -- .'
-      }
-    }
-
     stage('Test') {
       steps {
         echo "Running unit tests"
@@ -34,12 +27,18 @@ pipeline {
     }
   }
 
+    stage ('HLint') {
+      steps {
+        sh 'stack install hlint'
+        sh 'stack exec hlint -- .'
+      }
+    }
   post {
     success {
       sh '''
         echo "Git branch: $BRANCH_NAME"
-        basil build --release
-        basil push
+        //basil build --release
+        //basil push
         slackSend (
           color: 'good',
           message: "Build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
