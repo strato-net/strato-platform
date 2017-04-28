@@ -15,16 +15,9 @@ pipeline {
   stages {
     stage('Build') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {    
+        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh 'basil build'
         }
-      }
-    }
-
-    stage ('HLint') {
-      steps {
-        sh 'stack install hlint'
-        sh 'stack exec hlint -- .'
       }
     }
 
@@ -34,15 +27,22 @@ pipeline {
         sh 'eval "$(cat run_unit_tests.sh)"'
       }
     }
+
+    stage ('HLint') {
+      steps {
+        sh 'stack install hlint'
+        sh 'stack exec hlint -- .'
+      }
+    }
   }
 
   post {
     success {
-      withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {    
+      withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
       sh '''
         echo "Git branch: $BRANCH_NAME"
-        basil build --release
-        basil push
+        # basil build --release
+        # basil push
       '''
       }
         slackSend (

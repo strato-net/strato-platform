@@ -50,7 +50,6 @@ library
                , http-client
                , http-media
                , http-types
-               , lens
                , lifted-async
                , lifted-base
                , logging-effect
@@ -72,10 +71,7 @@ library
                , servant-docs
                , servant-mock
                , servant-server
-               , servant-swagger
-               , servant-swagger-ui
                , stm
-               , swagger2
                , text
                , time
                , transformers-base
