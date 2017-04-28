@@ -10,6 +10,7 @@ module BlockApps.Bloc.API.Users where
 import           Control.Lens                     (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
+import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy             as ByteString.Lazy
 import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
 import           Data.Map                         (Map)
@@ -122,7 +123,8 @@ instance ToSchema PostSendParameters where
         { sendToAddress = Address 0xdeadbeef
         , sendValue = 10
         , sendPassword = "securePassword"
-        , sendTxParams = Nothing
+        , sendTxParams = Just $ TxParams
+            (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876))
         }
 
 --------------------------------------------------------------------------------
@@ -154,10 +156,10 @@ instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary u
 -- instance FromForm PostUsersContractRequest where
 --
 instance ToJSON PostUsersContractRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance FromJSON PostUsersContractRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance ToSample PostUsersContractRequest where
   toSamples _ = singleSample PostUsersContractRequest
@@ -247,10 +249,10 @@ data UploadListContract = UploadListContract
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
 
 instance ToJSON UploadListContract where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance FromJSON UploadListContract where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance ToSchema UploadListContract where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -312,9 +314,9 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
 
 instance Arbitrary PostUsersContractMethodRequest where arbitrary = genericArbitrary uniform
 instance ToJSON PostUsersContractMethodRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 instance FromJSON PostUsersContractMethodRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
 instance ToSample PostUsersContractMethodRequest where
   toSamples _ = noSamples
 
@@ -421,10 +423,10 @@ data SendTransaction = SendTransaction
 instance Arbitrary SendTransaction where arbitrary = genericArbitrary uniform
 
 instance ToJSON SendTransaction where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance FromJSON SendTransaction where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 newtype PostSendListResponse = PostSendListResponse
   { postsendlistresponseSenderBalance :: Text
@@ -539,10 +541,10 @@ data MethodCall = MethodCall
 instance Arbitrary MethodCall where arbitrary = genericArbitrary uniform
 
 instance ToJSON MethodCall where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance FromJSON MethodCall where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance ToSchema MethodCall where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
