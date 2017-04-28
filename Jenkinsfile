@@ -28,27 +28,23 @@ pipeline {
 
     stage('Test') {
       steps {
-        echo "Running stack test"
-        sh 'stack test'
-        slackSend (
-          color: 'good',
-          message: "Build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
-        )
+        echo "Running unit tests"
+        sh 'eval "$(cat run_unit_tests.sh)"'
       }
     }
-
   }
 
   post {
     success {
       sh '''
         echo "Git branch: $BRANCH_NAME"
-        if [ $BRANCH_NAME = master ]
-        then
-          echo "TODO: execute E2E tests here that depend on deployment"
-        fi
         basil build --release
         basil push
+        slackSend (
+          color: 'good',
+          message: "Build succeeded: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+        )
+
       '''
     }
 
