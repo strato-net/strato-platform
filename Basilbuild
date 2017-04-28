@@ -9,8 +9,8 @@ FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
-BUILDBASE_NAME=bloc-buildbase
-DEPLOYBASE_NAME=bloc-deploybase
+BUILDBASE_NAME=bloch-buildbase
+DEPLOYBASE_NAME=bloch-deploybase
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
 
 EXTRADEPS=doit.sh

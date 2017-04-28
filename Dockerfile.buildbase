@@ -1,4 +1,4 @@
-FROM bloc-deploybase:latest
+FROM bloch-deploybase:latest
 VOLUME /workspace
 WORKDIR /workspace
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 575159689BEFB442 && \
