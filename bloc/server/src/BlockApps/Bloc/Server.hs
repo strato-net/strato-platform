@@ -1,13 +1,19 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies     #-}
-{-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module BlockApps.Bloc.Server where
 
+import           Control.Lens             ((&), (.~), (?~))
 import           Data.Proxy
+import           Data.Swagger
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
 import           Servant
+import           Servant.Swagger
+import           Servant.Swagger.UI
 
 import           BlockApps.Bloc.API
 import           BlockApps.Bloc.Monad
@@ -47,5 +53,24 @@ getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
 
+blocSwagger :: Swagger
+blocSwagger = toSwagger (Proxy @BlocAPI)
+    & info.title   .~ "Bloc API"
+    & info.version .~ "0.1"
+    & info.description ?~ "This is the API for the BlocH"
+    & host ?~ Host "localhost" (Just 8000)
+
+type BlocDocsAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
+
+serveBlocAndDocs
+  :: BlocEnv
+  -> Server (BlocAPI :<|> BlocDocsAPI)
+serveBlocAndDocs blocEnv = serveBloc blocEnv
+  :<|> swaggerSchemaUIServer blocSwagger
+
 appBloc :: BlocEnv -> Application
-appBloc = simpleCors . logStdoutDev . serve (Proxy @ BlocAPI) . serveBloc
+appBloc
+  = simpleCors
+  . logStdoutDev
+  . serve (Proxy @ (BlocAPI :<|> BlocDocsAPI))
+  . serveBlocAndDocs

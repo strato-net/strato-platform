@@ -34,9 +34,9 @@ data Type
   | Mapping {dynamic::Maybe Bool, key::Type, value::Type} deriving (Eq, Show, Generic)
 
 instance ToJSON Type where
-  toJSON = genericToJSON typeAesonOptions
+  toJSON = genericToJSON typeAesonOptions{omitNothingFields = True}
 instance FromJSON Type where
-  parseJSON = genericParseJSON typeAesonOptions
+  parseJSON = genericParseJSON typeAesonOptions{omitNothingFields = True}
 instance Arbitrary Type where arbitrary = genericArbitrary uniform
 instance ToSchema Type where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
