@@ -15,7 +15,9 @@ pipeline {
   stages {
     stage('Build') {
       steps {
-        sh 'basil build'
+        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {    
+          sh 'basil build'
+        }
       }
     }
 
