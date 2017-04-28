@@ -27,7 +27,6 @@ pipeline {
         sh 'eval "$(cat run_unit_tests.sh)"'
       }
     }
-  }
 
     stage ('HLint') {
       steps {
@@ -35,13 +34,15 @@ pipeline {
         sh 'stack exec hlint -- .'
       }
     }
+  }
+
   post {
     success {
       withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
       sh '''
         echo "Git branch: $BRANCH_NAME"
-        //basil build --release
-        //basil push
+        # basil build --release
+        # basil push
       '''
       }
         slackSend (
