@@ -12,7 +12,6 @@ module BlockApps.Bloc.API.Utils where
 import           Control.Lens                     (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
-import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
 import           Data.Proxy
 import           Data.String
@@ -155,10 +154,10 @@ data TxParams = TxParams
 instance Arbitrary TxParams where arbitrary = genericArbitrary uniform
 
 instance ToJSON TxParams where
-  toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
+  toJSON = genericToJSON (aesonPrefix camelCase)
 
 instance FromJSON TxParams where
-  parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 
 instance ToSchema TxParams where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
