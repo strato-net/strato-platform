@@ -32,7 +32,7 @@ deployments:
         - "10001:8000"
       environment:
         ssl: "${ssl}"
-        stratourl: "${stratourl}"
+        stratoHost: "${stratoHost}"
         cirrusurl: "${cirrusurl}"
         pguser: "${pguser}"
         pgpasswd: "${pgpasswd}"
