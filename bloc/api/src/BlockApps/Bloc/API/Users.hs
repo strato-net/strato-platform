@@ -48,7 +48,7 @@ type GetUsersUser = "users"
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
-  :> ReqBody '[FormUrlEncoded, JSON] PostUsersUserRequest
+  :> ReqBody '[JSON, FormUrlEncoded] PostUsersUserRequest
   :> Post '[HTMLifiedAddress, JSON] Address
 
 data PostUsersUserRequest = PostUsersUserRequest
