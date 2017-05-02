@@ -372,7 +372,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
         argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
           then throwError (UserError "argument names don't match")
           else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
-        vals <- return $ toList argsVals
+        let vals = toList argsVals
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
 prepareTx

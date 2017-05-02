@@ -166,7 +166,7 @@ formatType (TypeContract name) = Text.unpack name
 formatType (TypeStruct name) = Text.unpack name
 
 textToSimpleArgType :: Text -> Either Text SimpleType
-textToSimpleArgType str = if Text.null str then (Left "textToSimpleArgType: null type string")
+textToSimpleArgType str = if Text.null str then Left "textToSimpleArgType: null type string"
   else case readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack . Text.toLower $ Text.tail str)) of
     Nothing -> Left $ "textToSimpleArgType: could not convert " <> str <> " to type"
     Just x -> return x
