@@ -5,8 +5,7 @@ import './App.css';
 
 class App extends Component {
   render() {
-    const nav = <Button key="nav" icon>menu</Button>;
-
+    const nav = <Button key="nav" icon>menu</Button>
     return (
       <Toolbar colored title="Strato Management Dashboard" nav={nav} />
     );
