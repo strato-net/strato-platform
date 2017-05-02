@@ -1,15 +1,47 @@
 import React, { Component } from 'react';
-import Toolbar from 'react-md/lib/Toolbars';
-import Button from 'react-md/lib/Buttons';
+import { connect } from 'react-redux';
+import NavigationDrawer from 'react-md/lib/NavigationDrawers';
+import FontIcon from 'react-md/lib/FontIcons';
+import { Link } from 'react-router';
 import './App.css';
 
 class App extends Component {
+
   render() {
-    const nav = <Button key="nav" icon>menu</Button>
+    const navItems = [];
+    const location = this.props.location;
+
+    if(this.props.routes.length > 0 && this.props.routes[0].childRoutes.length > 0) {
+      this.props.routes[0].childRoutes.forEach(function(route){
+        navItems.push({
+          component: Link,
+          to: route.path,
+          primaryText: route.name,
+          active: route.path === location.pathname,
+          leftIcon: <FontIcon>{route.icon}</FontIcon>
+        });
+      });
+    }
+
     return (
-      <Toolbar colored title="Strato Management Dashboard" nav={nav} />
+      <NavigationDrawer
+        navItems={navItems}
+        drawerTitle="Menu"
+        mobileDrawerType={NavigationDrawer.DrawerTypes.TEMPORARY}
+        tabletDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
+        desktopDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
+        toolbarTitle="Strato Management Dashboard"
+      >
+        {this.props.children}
+      </NavigationDrawer>
     );
   }
 }
 
-export default App;
+function mapStateToProps(state) {
+  return {
+    routing: state.routing
+  };
+}
+
+export default connect(mapStateToProps)(App);

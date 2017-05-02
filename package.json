@@ -7,7 +7,12 @@
     "react-addons-css-transition-group": "^15.5.2",
     "react-addons-transition-group": "^15.5.2",
     "react-dom": "15.5.4",
-    "react-md": "^1.0.12"
+    "react-md": "1.0.12",
+    "react-redux": "5.0.4",
+    "react-router": "3.0.2",
+    "react-router-redux": "4.0.8",
+    "redux": "^3.6.0",
+    "redux-saga": "^0.14.6"
   },
   "devDependencies": {
     "node-sass": "^4.5.2",
