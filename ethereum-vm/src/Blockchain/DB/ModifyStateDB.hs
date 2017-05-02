@@ -37,6 +37,9 @@ addToBalance address val = do
 pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m)=>
      String->Address->Address->Integer->m Bool
 pay description fromAddr toAddr val = do
+  -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
+  -- until this is resolved, I am commenting this out.
+  {- 
   when flags_debug $ do
     $logDebugS "pay" . T.pack $ "payment: from " ++ show (pretty fromAddr) ++ " to " ++ show (pretty toAddr) ++ ": " ++ show val ++ ", " ++ description
     fromAddressState <- getAddressState fromAddr
@@ -45,6 +48,7 @@ pay description fromAddr toAddr val = do
     $logDebugS "pay" . T.pack $ "to Funds: " ++ show (addressStateBalance toAddressState)
     when (addressStateBalance fromAddressState < val) $
         $logDebugS "pay" "insufficient funds"
+  -}
 
   fromAddressState <- getAddressState fromAddr
   if addressStateBalance fromAddressState < val
