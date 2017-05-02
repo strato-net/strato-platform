@@ -12,6 +12,7 @@ import qualified Data.ByteString         as ByteString
 import qualified Data.ByteString.Base16  as Base16
 import qualified Data.ByteString.Lazy    as ByteString.Lazy
 import           Data.List               (intersperse)
+import           Data.Monoid
 import           Data.Text               (Text)
 import qualified Data.Text               as Text
 import qualified Data.Text.Encoding      as Text
@@ -464,7 +465,7 @@ simpleValueToText sv = Just $ case sv of
   ValueBytes b -> Text.pack $ show . Base16.encode $ b
   ValueString tx -> tx
 
-textToValue :: Text -> Type -> Maybe Value
+textToValue :: Text -> Type -> Either Text Value
 textToValue str = \case
   SimpleType ty -> SimpleValue <$> textToSimpleValue str ty
   TypeArrayDynamic ty -> ValueArrayDynamic <$>
@@ -473,18 +474,20 @@ textToValue str = \case
   TypeArrayFixed len ty -> ValueArrayFixed len <$>
     traverse (`textToValue` ty)
       (Text.split (== ',') (Text.dropAround (\ c -> c == '[' || c == ']') str))
-  TypeMapping{}  -> Nothing -- TODO: Fixme
-  TypeFunction{} -> Nothing -- TODO: Fixme
-  TypeContract{} -> ValueContract <$> stringAddress (Text.unpack str)
-  TypeEnum{}     -> Nothing -- TODO: Fixme
-  TypeStruct{}   -> Nothing  -- TODO: Fixme
+  TypeMapping{}  -> Left "textToValue TODO: TypeMapping not yet implemented"
+  TypeFunction{} -> Left "textToValue TODO: TypeFunction not yet implemented"
+  TypeContract{} -> ValueContract <$> case stringAddress (Text.unpack str) of
+    Nothing -> Left $ "textToValue: could not decode as contract address: " <> str
+    Just x -> return x
+  TypeEnum{}     -> Left "textToValue TODO: TypeEnum not yet implemented"
+  TypeStruct{}   -> Left "textToValue TODO: TypeStruct not yet implemented"
 
-textToSimpleValue :: Text -> SimpleType -> Maybe SimpleValue
+textToSimpleValue :: Text -> SimpleType -> Either Text SimpleValue
 textToSimpleValue str = \case
   TypeBool -> case Text.toLower str of
-    "true"  -> Just $ ValueBool True
-    "false" -> Just $ ValueBool False
-    _       -> Nothing
+    "true"  -> return $ ValueBool True
+    "false" -> return $ ValueBool False
+    _       -> Left $ "textToSimpleValue: could not decode TypeBool: " <> str
   TypeUInt8 -> ValueUInt8 <$> readNum
   TypeUInt16 -> ValueUInt16 <$> readNum
   TypeUInt24 -> ValueUInt24 <$> readNum
@@ -551,7 +554,9 @@ textToSimpleValue str = \case
   TypeInt248 -> ValueInt248 <$> readNum
   TypeInt256 -> ValueInt256 <$> readNum
   TypeInt -> ValueInt <$> readNum
-  TypeAddress -> ValueAddress <$> stringAddress (Text.unpack str)
+  TypeAddress -> ValueAddress <$> case stringAddress (Text.unpack str) of
+    Nothing -> Left $ "textToSimpleValue: could not decode as address: " <> str
+    Just x -> return x
   TypeBytes1 -> ValueBytes1 . ByteString.head <$> readBytes 1
   TypeBytes2 -> ValueBytes <$> readBytes 2
   TypeBytes3 -> ValueBytes3 <$> readBytes 3
@@ -585,23 +590,25 @@ textToSimpleValue str = \case
   TypeBytes31 -> ValueBytes31 <$> readBytes 31
   TypeBytes32 -> ValueBytes32 <$> readBytes 32
   TypeBytes -> ValueBytes <$> readBytesDyn
-  TypeString -> Just $ ValueString str
+  TypeString -> return $ ValueString str
   where
-    readNum :: Num x => Maybe x
-    readNum = fromInteger <$> readMaybe (Text.unpack str)
-    readBytes :: Int -> Maybe ByteString
+    readNum :: Num x => Either Text x
+    readNum = fromInteger <$> case readMaybe (Text.unpack str) of
+      Nothing -> Left $ "textToSimpleValue: could not decode as number: " <> str
+      Just x -> return x
+    readBytes :: Int -> Either Text ByteString
     readBytes n =
       let
         (bytes, leftover) = Base16.decode (Text.encodeUtf8 str)
       in
         if leftover /= ByteString.empty || ByteString.length bytes /= n
-          then Nothing
-          else Just bytes
-    readBytesDyn :: Maybe ByteString
+          then Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str
+          else return bytes
+    readBytesDyn :: Either Text ByteString
     readBytesDyn =
       let
         (bytes, leftover) = Base16.decode (Text.encodeUtf8 str)
       in
         if leftover /= ByteString.empty
-          then Nothing
-          else Just bytes
+          then Left $ "textToSimpleValue: could not decode as dynamically sized bytes: " <> str
+          else return bytes

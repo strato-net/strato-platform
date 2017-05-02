@@ -360,8 +360,9 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
             Xabi.Mapping dy _ _ ->
               textToArgType "Mapping" (fromMaybe False dy) ""
             Xabi.Label _ -> undefined -- TODO - fill this in
-        in
-          textToValue valStr (fromMaybe (SimpleType TypeBytes) typeM)
+        in do
+          ty <- either (blocError . AnError) return typeM
+          either (blocError . AnError) return (textToValue valStr ty)
     case args of
       Nothing ->
         if Map.null argNamesTypes
@@ -370,9 +371,8 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
       Just argsMap -> do
         argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
           then throwError (AnError "argument names don't match")
-          else return $ Map.intersectionWith determineValue argsMap argNamesTypes
-        vals <- for (toList argsVals) $
-          maybe (throwError $ AnError "couldn't decode argument value") return
+          else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
+        vals <- return $ toList argsVals
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
 prepareTx
