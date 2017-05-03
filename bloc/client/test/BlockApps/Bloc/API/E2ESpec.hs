@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -8,6 +9,7 @@ import           Control.Concurrent
 import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
+import qualified Data.Text                        as Text
 import qualified Data.Vector                      as Vector
 import           Numeric.Natural
 import           Servant.Client
@@ -233,6 +235,102 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" (ArgString "deadbeef")
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+
+      -- call get value and verify
+
+      let
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "get"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe` "transaction returned: 00000000000000000000000000000000deadbeef"
+
+      -- get state and verify
+
+      contractStateEither' <- runClientM
+        (getContractsState contractName (Unnamed contractAddr))
+        (ClientEnv mgr blocUrl)
+      contractStateEither' `shouldSatisfy` isRight
+
+      let
+        Right contractStateMap' = contractStateEither'
+        mStoredData' = Map.lookup "storedData" contractStateMap'
+      mStoredData' `shouldSatisfy` isJust
+      let
+        Just storedData' = mStoredData'
+      storedData' `shouldBe` SolidityValueAsString "00000000000000000000000000000000deadbeef"
+
+    it "should create SimpleStorageBytes32Array contract, call methods and check state" $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps444"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = simpleStorageBytes32ArrayContractName
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName simpleStorageBytes32ArrayContractName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mStoredData = Map.lookup "storedData" contractStateMap
+      mStoredData `shouldSatisfy` isJust
+      let
+        Just storedData = mStoredData
+      storedData `shouldBe` SolidityArray []
+
+      -- call contract store value
+      let
+        contractName = ContractName simpleStorageBytes32ArrayContractName
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = Map.singleton "x" (ArgArray [ArgString (Text.replicate 32 "a"), ArgString (Text.replicate 32 "b")])
           , postuserscontractmethodValue = 0
           , postuserscontractmethodTxParams = txParams
           }

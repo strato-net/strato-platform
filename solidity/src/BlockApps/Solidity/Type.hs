@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module BlockApps.Solidity.Type where
 
@@ -173,5 +174,5 @@ textToSimpleArgType str = if Text.null str then Left "textToSimpleArgType: null 
 
 textToArgType :: Text -> Bool -> Text -> Either Text Type
 textToArgType "Array" True str = TypeArrayDynamic . SimpleType <$> textToSimpleArgType str
-textToArgType "Array" False str = TypeArrayFixed 0 . SimpleType <$> textToSimpleArgType str
+textToArgType (Text.unpack -> 'A':'r':'r':'a':'y':n) False str = TypeArrayFixed (read n) . SimpleType <$> textToSimpleArgType str
 textToArgType str _ _ = SimpleType <$> textToSimpleArgType str

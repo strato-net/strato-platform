@@ -5,6 +5,8 @@
 
 module BlockApps.Bloc.Server.Users where
 
+import Debug.Trace
+
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -305,6 +307,10 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
+    -- xabi <- getContractXabiByMetadataId cmId
+    -- traceM "xabi family"
+    -- traceShowM xabi
+
     return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
@@ -328,8 +334,8 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
               textToArgType "Int" False ""
             Xabi.String dy ->
               textToArgType "String" (fromMaybe False dy) ""
-            Xabi.Bytes dy _ ->
-              textToArgType "Bytes" (fromMaybe False dy) ""
+            Xabi.Bytes dy by ->
+              textToArgType ("Bytes" <> maybe "" (Text.pack . show) by) (fromMaybe False dy) ""
             Xabi.Bool ->
               textToArgType "Bool" False ""
             Xabi.Address ->
@@ -338,12 +344,12 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
               textToArgType "Struct" False ""
             Xabi.Enum _ _ ->
               textToArgType "Enum" False ""
-            Xabi.Array dy _ ety ->
+            Xabi.Array dy len ety ->
               let
                 ettyty = case ety of
                   Xabi.Int{} -> "Int"
                   Xabi.String{} -> "String"
-                  Xabi.Bytes{} -> "Bytes"
+                  Xabi.Bytes _ by -> "Bytes" <> maybe "" (Text.pack . show) by
                   Xabi.Bool -> "Bool"
                   Xabi.Address -> "Address"
                   Xabi.Struct{} -> "Struct"
@@ -354,7 +360,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
                   Xabi.Mapping{} -> "Mapping"
                   Xabi.Label{} -> undefined -- TODO - fill this in
               in
-                textToArgType "Array" (fromMaybe False dy) ettyty
+                textToArgType ("Array" <> maybe "" (Text.pack . show) len) (fromMaybe False dy) ettyty
             Xabi.Contract{} ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
@@ -373,6 +379,12 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
           then throwError (UserError "argument names don't match")
           else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
         let vals = toList argsVals
+        traceM "argsVals"
+        traceShowM argsVals
+        traceM "vals"
+        traceShowM vals
+        traceM "toStorage vals"
+        traceShowM $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
 prepareTx
