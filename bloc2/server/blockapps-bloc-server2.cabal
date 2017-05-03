@@ -1,4 +1,4 @@
-name: blockapps-bloc-server
+name: blockapps-bloc-server2
 version: 0.1.0.0
 synopsis: Bloc microservice
 description: Bloc microservice
@@ -15,16 +15,17 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Bloc.Database.Create
-    BlockApps.Bloc.Database.Queries
-    BlockApps.Bloc.Database.Tables
-    BlockApps.Bloc.Monad
-    BlockApps.Bloc.Server
-    BlockApps.Bloc.Server.Addresses
-    BlockApps.Bloc.Server.Contracts
-    BlockApps.Bloc.Server.Search
-    BlockApps.Bloc.Server.Users
-    BlockApps.Bloc.Server.Utils
+    BlockApps.Bloc2.Database.Create
+    BlockApps.Bloc2.Database.Queries
+    BlockApps.Bloc2.Database.Tables
+    BlockApps.Bloc2.Monad
+    BlockApps.Bloc2.Options
+    BlockApps.Bloc2.Server
+    BlockApps.Bloc2.Server.Addresses
+    BlockApps.Bloc2.Server.Contracts
+    BlockApps.Bloc2.Server.Search
+    BlockApps.Bloc2.Server.Users
+    BlockApps.Bloc2.Server.Utils
   default-language: Haskell2010
   ghc-options: -Wall -Werror -fsimpl-tick-factor=15000
   build-depends: base
@@ -35,7 +36,7 @@ library
                , blockapps-cirrus-client
                , blockapps-ethereum
                , blockapps-solidity
-               , blockapps-bloc-api
+               , blockapps-bloc-api2
                , blockapps-strato-api
                , blockapps-strato-client
                , containers
@@ -83,7 +84,7 @@ library
                , wai-extra
                , warp
                , wl-pprint-text
-
+               
 source-repository head
   type: git
   location: https://github.com/blockapps/blockapps-haskell/blockapps-bloc

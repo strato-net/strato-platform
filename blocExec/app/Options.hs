@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module BlockApps.Bloc.Options where
+module Options where
 
 import           HFlags
 

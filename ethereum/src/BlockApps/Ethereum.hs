@@ -80,6 +80,13 @@ import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
 newtype Address = Address { unAddress :: Word160 }
   deriving (Eq, Ord, Show, Generic, Bounded)
 
+
+instance ToJSONKey Address where
+  toJSONKey = ToJSONKeyText f g
+    where f x = Text.pack $ addressString x
+          g x = AesonEnc.text . Text.pack $ addressString x
+
+
 addressString :: Address -> String
 addressString (Address address) = padZeros 40 (showHex address "")
   where

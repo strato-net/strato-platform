@@ -1,4 +1,4 @@
-name: blockapps-bloc-api
+name: blockapps-bloc-api2
 version: 0.1.0.0
 synopsis: Bloc microservice
 description: Bloc microservice
@@ -15,14 +15,14 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
-    BlockApps.Bloc.API
-    BlockApps.Bloc.Crypto
-    BlockApps.Bloc.API.Addresses
-    BlockApps.Bloc.API.SwaggerSchema
-    BlockApps.Bloc.API.Contracts
-    BlockApps.Bloc.API.Search
-    BlockApps.Bloc.API.Users
-    BlockApps.Bloc.API.Utils
+    BlockApps.Bloc2.API
+    BlockApps.Bloc2.Crypto
+    BlockApps.Bloc2.API.Addresses
+    BlockApps.Bloc2.API.SwaggerSchema
+    BlockApps.Bloc2.API.Contracts
+    BlockApps.Bloc2.API.Search
+    BlockApps.Bloc2.API.Users
+    BlockApps.Bloc2.API.Utils
   default-language: Haskell2010
   ghc-options: -Wall -Werror
   build-depends: base
@@ -50,6 +50,7 @@ library
                , servant-mock
                , swagger2
                , text
+
 
 source-repository head
   type: git

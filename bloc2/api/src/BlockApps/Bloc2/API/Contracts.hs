@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
-module BlockApps.Bloc.API.Contracts where
+module BlockApps.Bloc2.API.Contracts where
 
 
 import           Control.Lens                     (mapped, (&), (?~))
@@ -27,8 +27,8 @@ import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
 
-import           BlockApps.Bloc.API.SwaggerSchema
-import           BlockApps.Bloc.API.Utils
+import           BlockApps.Bloc2.API.SwaggerSchema
+import           BlockApps.Bloc2.API.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi

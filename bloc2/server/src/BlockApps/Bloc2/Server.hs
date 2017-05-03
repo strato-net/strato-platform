@@ -4,21 +4,23 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE TypeOperators     #-}
 
-module BlockApps.Bloc.Server where
+module BlockApps.Bloc2.Server where
 
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Proxy
 import           Data.Swagger
+--import           Network.Wai.Middleware.Cors
+--import           Network.Wai.Middleware.RequestLogger
 import           Servant
 import           Servant.Swagger
 import           Servant.Swagger.UI
 
-import           BlockApps.Bloc.API
-import           BlockApps.Bloc.Monad
-import           BlockApps.Bloc.Server.Addresses
-import           BlockApps.Bloc.Server.Contracts
-import           BlockApps.Bloc.Server.Search
-import           BlockApps.Bloc.Server.Users
+import           BlockApps.Bloc2.API
+import           BlockApps.Bloc2.Monad
+import           BlockApps.Bloc2.Server.Addresses
+import           BlockApps.Bloc2.Server.Contracts
+import           BlockApps.Bloc2.Server.Search
+import           BlockApps.Bloc2.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = getHomepage
@@ -66,3 +68,9 @@ serveBlocAndDocs
 serveBlocAndDocs blocEnv = serveBloc blocEnv
   :<|> swaggerSchemaUIServer blocSwagger
 
+--appBloc :: BlocEnv -> Application
+--appBloc
+--  = simpleCors
+--  . logStdoutDev
+--  . serve (Proxy @ (BlocAPI :<|> BlocDocsAPI))
+--  . serveBlocAndDocs

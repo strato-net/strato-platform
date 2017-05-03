@@ -3,6 +3,10 @@ packages:
 - bloc/api
 - bloc/client
 - bloc/server
+- bloc2/api
+- bloc2/client
+- bloc2/server
+- blocExec
 - cirrus/api
 - cirrus/client
 - ethereum
