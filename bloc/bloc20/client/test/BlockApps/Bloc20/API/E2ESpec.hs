@@ -178,6 +178,102 @@ spec =
         Just storedData' = mStoredData'
       storedData' `shouldBe` SolidityValueAsString "3"
 
+    it "should create SimpleStorageAddress contract, call methods and check state" $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps999"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      simpleStorageAddressSrc <- readSolFile "SimpleStorageAddress.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        simpleStorageAddressContractName = "SimpleStorageAddress"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleStorageAddressSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = simpleStorageAddressContractName
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName simpleStorageAddressContractName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mStoredData = Map.lookup "storedData" contractStateMap
+      mStoredData `shouldSatisfy` isJust
+      let
+        Just storedData = mStoredData
+      storedData `shouldBe` SolidityValueAsString "0000000000000000000000000000000000000000"
+
+      -- call contract store value
+      let
+        contractName = ContractName simpleStorageAddressContractName
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = Map.singleton "x" (ArgString "deadbeef")
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+
+      -- call get value and verify
+
+      let
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "get"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe` "transaction returned: 00000000000000000000000000000000deadbeef"
+
+      -- get state and verify
+
+      contractStateEither' <- runClientM
+        (getContractsState contractName (Unnamed contractAddr))
+        (ClientEnv mgr blocUrl)
+      contractStateEither' `shouldSatisfy` isRight
+
+      let
+        Right contractStateMap' = contractStateEither'
+        mStoredData' = Map.lookup "storedData" contractStateMap'
+      mStoredData' `shouldSatisfy` isJust
+      let
+        Just storedData' = mStoredData'
+      storedData' `shouldBe` SolidityValueAsString "00000000000000000000000000000000deadbeef"
+
     it "should disambiguate contracts with the same name using latest and address" $ \ TestConfig {..} -> do
       sameName1Src <- readSolFile "SameName1.sol"
       sameName2Src <- readSolFile "SameName2.sol"
