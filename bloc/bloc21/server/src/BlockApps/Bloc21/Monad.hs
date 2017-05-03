@@ -1,0 +1,326 @@
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ImplicitParams             #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TypeFamilies               #-}
+
+module BlockApps.Bloc21.Monad where
+
+
+import           Control.Exception.Lifted           hiding (Handler, handle)
+import           Control.Monad.Base
+import           Control.Monad.Except
+import           Control.Monad.Log                  hiding (Handler)
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Control
+import qualified Data.Aeson                         as JSON
+import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
+import           Data.Foldable
+import qualified Data.HashMap.Lazy                  as HashMap
+import           Data.Maybe                         (fromMaybe)
+import           Data.Profunctor.Product.Default
+import           Data.String
+import           Data.Text                          (Text)
+import qualified Data.Text                          as Text
+import           Data.Time.Format
+import           Database.PostgreSQL.Simple         (Connection,
+                                                     withTransaction)
+import           GHC.Stack
+import           Network.HTTP.Client
+import           Network.HTTP.Media
+import           Network.HTTP.Types.Status
+import           Opaleye
+import           Servant
+import           Servant.Client
+import           Servant.Server.Internal.ServantErr
+import qualified Text.PrettyPrint.Leijen.Text       as Leijen
+
+newtype Bloc x = Bloc
+  { runBloc ::
+      ReaderT BlocEnv -- global immutable environment variable
+        ( LoggingT (WithSeverity (WithCallStack (WithTimestamp Text))) -- log all the things
+          ( ExceptT BlocError IO ) -- throw and catch errors
+        ) x
+  } deriving
+  ( Functor
+  , Applicative
+  , Monad
+  , MonadIO
+  , MonadBase IO
+  , MonadReader BlocEnv
+  , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
+  )
+
+instance MonadError BlocError Bloc where
+  throwError err@(RuntimeError _) = do
+    logWith logError (Text.pack $ formatError err ++ "\n  callstack missing for runtime errors")
+    Bloc $ throwError err
+  throwError err = do
+    logWith logError (Text.pack (formatError err))
+    Bloc $ throwError err
+  catchError m handle = do
+    logWith logError "catching error"
+    Bloc $ catchError (runBloc m) (runBloc . handle)
+
+-- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
+formatError::BlocError->String
+formatError (StratoError FailureResponse{responseBody=e}) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
+formatError e = show e
+
+
+--prettyCallStack' is the same idea as prettyCallStack, but with formatting more suitable for out project.  In particular, package names a very mangled by stack, making prettyCallStack unreadable.
+prettyCallStack'::CallStack->String
+prettyCallStack' cs =
+  "CallStack:\n" ++ unlines (map formatCSLine $ getCallStack cs)
+  where
+    formatCSLine (funcName, SrcLoc{..}) =
+      "  " ++ funcName ++ ", called at " ++ srcLocModule ++ ":" ++ show srcLocStartLine ++ ":" ++ show srcLocStartCol
+
+blocError::HasCallStack=>BlocError->Bloc y
+blocError err = do
+    logWithCallStack ?callStack logError (Text.pack (show err ++ "\n" ++ prettyCallStack' ?callStack))
+    Bloc $ throwError err
+
+
+
+instance MonadBaseControl IO Bloc where
+  type StM Bloc x = Either BlocError x
+  liftBaseWith f = Bloc $ liftBaseWith $ \q -> f (q . runBloc)
+  restoreM = Bloc . restoreM
+
+data BlocEnv = BlocEnv
+  { urlStrato    :: BaseUrl
+  , urlCirrus    :: BaseUrl
+  , httpManager  :: Manager
+  , dbConnection :: Connection
+  }
+
+data BlocError
+  = StratoError ServantError
+  | CirrusError ServantError
+  | DBError Text
+  | UserError Text
+  | CouldNotFind Text
+  | AnError Text
+  | Unimplemented Text
+  | RuntimeError SomeException
+  deriving Show
+
+
+
+
+
+
+
+
+
+
+
+
+
+--------------------------------------------------------------------------------
+boxIt::String->String
+boxIt string =
+  replicate (len+4) '=' ++ "\n"
+  ++ unlines (map (\x -> "| " ++ x ++ " |") theLines)
+  ++ replicate (len+4) '='
+  where
+    len = Prelude.maximum $ map length theLines
+    theLines = lines string
+
+enterBloc :: BlocEnv -> Bloc x -> Handler x
+enterBloc env x
+  = Handler
+  $ withExceptT reThrowError
+  $ flip runLoggingT (liftIO . print . render Leijen.stringStrict)
+  $ flip runReaderT env $ runBloc
+  $ convertRuntimeErrors x
+  where
+    convertRuntimeErrors::Bloc x->Bloc x
+    convertRuntimeErrors f = do
+      val <- try f
+      case val of
+       Left e  -> throwError $ RuntimeError e
+       Right v -> return v
+    reThrowError :: BlocError -> ServantErr
+    reThrowError
+      = \case
+          StratoError (FailureResponse Status{statusCode=404} responseContentType' responseBody') | mainType responseContentType' == "text" && subType responseContentType' == "plain" ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "Response from server:",
+                     boxIt $ Lazy.Char8.unpack responseBody'
+                   ]}
+          StratoError (FailureResponse Status{statusCode=404} _ _) ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc seems to be improperly configured (Strato pages are missing.)",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          StratoError FailureResponse{..} | statusIsClientError responseStatus ->
+            err400{errBody= Lazy.Char8.pack $ compensateForTheOddStratoApiFormattingAndPullOutTheMessage responseBody}
+          StratoError (ConnectionError _) ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc can not connect to Strato.",
+                     "This probably is a configuration error, but can also mean the Strato peer is down.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          StratoError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Error!",
+                     "Bloc recieved a malformed response from Strato.",
+                     "This is probably a backend configuration problem.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          DBError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "Something is broken in the Bloc Server database.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
+          UserError err -> err422{errBody = fromString $ show err}
+          CouldNotFind err -> err404{errBody = fromString $ show err}
+          AnError _ ->
+            err500{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "Something is broken in the Bloc Server.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+          Unimplemented err ->
+            err501{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "You are using a feature of the Bloc Server that has not yet been implemented.",
+                     Text.unpack err
+                   ]}
+          RuntimeError _ -> err500{errBody = fromString $ unlines
+                   [
+                     "Internal Error!",
+                     "Something wrong has happened inside of bloc.",
+                     "Please contact your network administrator to have this problem fixed.",
+                     "(More information can be found in the Bloc logs.)"
+                   ]}
+    render::(a0 -> Leijen.Doc)
+            -> WithSeverity (WithCallStack (WithTimestamp a0))
+            -> Leijen.Doc
+    render
+      = renderWithSeverity
+      . renderLocation
+      . renderWithTimestamp
+          (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+
+
+--This is an annoyingly named and poorly written function, deliberately designed that way to remind us that we need to clean up the response from strato-api/solc.
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage::Lazy.Char8.ByteString->String
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage x | "Invalid Arguments" `Lazy.Char8.isPrefixOf` x =
+   case JSON.decode $ Lazy.Char8.drop 18 x of
+     Nothing -> error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+     Just o -> fromMaybe errMsg (HashMap.lookup ("error" :: Text) o)
+                  where errMsg = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+compensateForTheOddStratoApiFormattingAndPullOutTheMessage x = error $ "the server has given me another odd response I did not expect, please add code to deal with this: " ++ show x
+
+
+
+renderLocation::(a -> Leijen.Doc)->WithCallStack a->Leijen.Doc
+renderLocation k (WithCallStack stack msg) =
+  Leijen.fill 40 (Leijen.string (fromString $ formatTopLocation $ getCallStack stack)) Leijen.<> k msg
+
+formatTopLocation::[(String, SrcLoc)]->String
+formatTopLocation [] = "[-]"
+formatTopLocation ((_, x):_) = "[" ++ srcLocModule x ++ ":" ++ show (srcLocStartLine x) ++ "]"
+
+
+logWithCallStack
+  :: CallStack
+  -> (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
+logWithCallStack stack logFn x = logFn . WithCallStack stack =<< timestamp x
+
+logWith
+  :: HasCallStack
+  => (WithCallStack (WithTimestamp x) -> Bloc ()) -> x -> Bloc ()
+logWith = logWithCallStack callStack
+
+blocQuery
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  => Query x
+  -> Bloc [y]
+blocQuery q = do
+  traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
+  conn <- asks dbConnection
+  liftIO $ runQuery conn q
+
+blocQueryMaybe
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  => Query x
+  -> Bloc (Maybe y)
+blocQueryMaybe q = blocQuery q >>= \case
+    [] -> return Nothing
+    [y] -> return (Just y)
+    _:_:_ -> throwError $ DBError "blocQueryMaybe: Multiple results, expected one row"
+
+blocQuery1
+  :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
+  => Query x
+  -> Bloc y
+blocQuery1 q = blocQuery q >>= \case
+    [] -> blocError $ DBError "No result, expected one row"
+    [y] -> return y
+    _:_:_ -> throwError $ DBError "blocQuery1: Multiple results, expected one row"
+
+blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
+blocModify modify = do
+  logWithCallStack callStack logNotice "Updating the database"
+  conn <- asks dbConnection
+  liftIO $ modify conn
+
+blocModify1 :: HasCallStack => (Connection -> IO [x]) -> Bloc x
+blocModify1 modify = do
+  logWithCallStack callStack logNotice "Updating the database"
+  conn <- asks dbConnection
+  results <- liftIO $ modify conn
+  case results of
+    []    -> throwError $ DBError "No result, expected one row"
+    [y]   -> return y
+    _:_:_ -> throwError $ DBError "Multiple results, expected one row"
+
+blocTransaction :: Bloc x -> Bloc x
+blocTransaction bloc = do
+  conn <- asks dbConnection
+  liftBaseOp_ (withTransaction conn) bloc
+
+blocStrato :: HasCallStack => ClientM x -> Bloc x
+blocStrato client' = do
+  logWithCallStack callStack logNotice "Querying Strato"
+  url <- asks urlStrato
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  either (blocError . StratoError) return resultEither
+
+blocCirrus :: HasCallStack => ClientM x -> Bloc x
+blocCirrus client' = do
+  logWithCallStack callStack logNotice "Querying Strato"
+  url <- asks urlCirrus
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  either (throwError . CirrusError) return resultEither
+
+blocMaybe :: Text -> Maybe x -> Bloc x
+blocMaybe msg = maybe (throwError (CouldNotFind msg)) return
