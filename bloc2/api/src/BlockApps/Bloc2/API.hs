@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators    #-}
 
 module BlockApps.Bloc2.API
