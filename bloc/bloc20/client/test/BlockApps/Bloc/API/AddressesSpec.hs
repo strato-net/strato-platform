@@ -1,13 +1,13 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BlockApps.Bloc.API.AddressesSpec where
+module BlockApps.Bloc20.API.AddressesSpec where
 
 import           Servant.Client
 import           Test.Hspec
 
-import           BlockApps.Bloc.API.SpecUtils
-import           BlockApps.Bloc.Client
+import           BlockApps.Bloc20.API.SpecUtils
+import           BlockApps.Bloc20.Client
 
 spec :: SpecWith TestConfig
 spec =

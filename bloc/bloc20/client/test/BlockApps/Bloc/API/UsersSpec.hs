@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module BlockApps.Bloc.API.UsersSpec where
+module BlockApps.Bloc20.API.UsersSpec where
 
 import           Control.Concurrent
 import           Data.Either
@@ -11,9 +11,9 @@ import qualified Data.Text                    as Text
 import           Servant.Client
 import           Test.Hspec
 
-import           BlockApps.Bloc.API
-import           BlockApps.Bloc.API.SpecUtils
-import           BlockApps.Bloc.Client
+import           BlockApps.Bloc20.API
+import           BlockApps.Bloc20.API.SpecUtils
+import           BlockApps.Bloc20.Client
 import           BlockApps.Ethereum
 import           BlockApps.Strato.Types
 

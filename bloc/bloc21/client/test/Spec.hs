@@ -8,18 +8,18 @@ import           Network.HTTP.Client              hiding (Proxy)
 import           Servant.Client
 import           Test.Hspec
 
-import qualified BlockApps.Bloc.API.AddressesSpec as Addresses
-import           BlockApps.Bloc.API.Contracts
-import qualified BlockApps.Bloc.API.ContractsSpec as Contracts
-import           BlockApps.Bloc.API.E2ESpec       as E2E
-import qualified BlockApps.Bloc.API.SearchSpec    as Search
-import           BlockApps.Bloc.API.SpecUtils
-import           BlockApps.Bloc.API.Users
-import qualified BlockApps.Bloc.API.UsersSpec     as Users
-import           BlockApps.Bloc.API.Utils
-import           BlockApps.Bloc.Client
+import qualified BlockApps.Bloc21.API.AddressesSpec as Addresses
+import           BlockApps.Bloc21.API.Contracts
+import qualified BlockApps.Bloc21.API.ContractsSpec as Contracts
+import           BlockApps.Bloc21.API.E2ESpec       as E2E
+import qualified BlockApps.Bloc21.API.SearchSpec    as Search
+import           BlockApps.Bloc21.API.SpecUtils
+import           BlockApps.Bloc21.API.Users
+import qualified BlockApps.Bloc21.API.UsersSpec     as Users
+import           BlockApps.Bloc21.API.Utils
+import           BlockApps.Bloc21.Client
 import           BlockApps.Ethereum
--- import BlockApps.Bloc.Server.Utils
+-- import BlockApps.Bloc21.Server.Utils
 import           BlockApps.Solidity.Xabi
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}

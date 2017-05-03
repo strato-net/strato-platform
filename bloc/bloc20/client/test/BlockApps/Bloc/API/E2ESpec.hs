@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module BlockApps.Bloc.API.E2ESpec where
+module BlockApps.Bloc20.API.E2ESpec where
 
 import           Control.Concurrent
 import           Data.Either
@@ -13,11 +13,11 @@ import           Numeric.Natural
 import           Servant.Client
 import           Test.Hspec
 
-import           BlockApps.Bloc.API.Contracts
-import           BlockApps.Bloc.API.SpecUtils
-import           BlockApps.Bloc.API.Users
-import           BlockApps.Bloc.API.Utils
-import           BlockApps.Bloc.Client
+import           BlockApps.Bloc20.API.Contracts
+import           BlockApps.Bloc20.API.SpecUtils
+import           BlockApps.Bloc20.API.Users
+import           BlockApps.Bloc20.API.Utils
+import           BlockApps.Bloc20.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.SolidityValue

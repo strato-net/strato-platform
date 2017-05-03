@@ -42,8 +42,8 @@ test-suite blockapps-bloc20-client-test
     BlockApps.Bloc20.API.SpecUtils
   other-modules:
   build-depends: base >=4 && < 5
-    , blockapps-bloc-api2
-    , blockapps-bloc-client2
+    , blockapps-bloc20-api
+    , blockapps-bloc20-client
     , blockapps-strato-api
     , blockapps-strato-client
     , blockapps-solidity

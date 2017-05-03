@@ -4,15 +4,15 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-module BlockApps.Bloc.API.SpecUtils where
+module BlockApps.Bloc21.API.SpecUtils where
 
 import           Data.Text                 (Text, pack)
 import           GHC.Generics
 import           Servant.Client
 import           Test.QuickCheck.Instances ()
 
-import           BlockApps.Bloc.API.Utils
-import           BlockApps.Bloc.Crypto
+import           BlockApps.Bloc21.API.Utils
+import           BlockApps.Bloc21.Crypto
 import           BlockApps.Ethereum
 import           Network.HTTP.Client
 

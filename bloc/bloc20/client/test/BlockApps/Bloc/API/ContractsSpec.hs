@@ -2,17 +2,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module BlockApps.Bloc.API.ContractsSpec where
+module BlockApps.Bloc20.API.ContractsSpec where
 
 import           Data.Either
 import qualified Data.Map.Strict              as Map
 import           Servant.Client
 import           Test.Hspec
 
-import           BlockApps.Bloc.API.Contracts
-import           BlockApps.Bloc.API.SpecUtils
-import           BlockApps.Bloc.API.Utils
-import           BlockApps.Bloc.Client
+import           BlockApps.Bloc20.API.Contracts
+import           BlockApps.Bloc20.API.SpecUtils
+import           BlockApps.Bloc20.API.Utils
+import           BlockApps.Bloc20.Client
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 
