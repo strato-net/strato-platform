@@ -57,14 +57,14 @@ main = do
   dbCreateConn <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=postgres password=" ++ flags_password
     
-  doesNotExist <- null <$>
-    (query_ dbCreateConn dbExistsQuery :: IO [Only Int])
-  when doesNotExist . void $
+  doesNotExist21 <- null <$>
+    (query_ dbCreateConn dbExistsQuery21 :: IO [Only Int])
+  when doesNotExist21 . void $
     execute_ dbCreateConn Bloc21.createDatabase
     
-  doesNotExist2 <- null <$>
-    (query_ dbCreateConn dbExistsQuery2 :: IO [Only Int])
-  when doesNotExist2 . void $
+  doesNotExist20 <- null <$>
+    (query_ dbCreateConn dbExistsQuery20 :: IO [Only Int])
+  when doesNotExist20 . void $
     execute_ dbCreateConn Bloc20.createDatabase
     
   close dbCreateConn
@@ -72,28 +72,28 @@ main = do
 
 
 
-  conn <- connectPostgreSQL $ fromString $
-    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc password=" ++ flags_password
+  conn21 <- connectPostgreSQL $ fromString $
+    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc21 password=" ++ flags_password
     
-  conn2 <- connectPostgreSQL $ fromString $
-    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc2 password=" ++ flags_password
+  conn20 <- connectPostgreSQL $ fromString $
+    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc20 password=" ++ flags_password
 
   -- TODO: database connection resource management
-  void $ execute_ conn Bloc21.createTables
-  void $ execute_ conn2 Bloc20.createTables
+  void $ execute_ conn21 Bloc21.createTables
+  void $ execute_ conn20 Bloc20.createTables
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
   cirrusUrl <- parseBaseUrl flags_cirrusurl
-  let blocEnv = Bloc21.BlocEnv stratoUrl cirrusUrl mgr conn
-  let bloc2Env = Bloc20.BlocEnv stratoUrl cirrusUrl mgr conn2
+  let blocEnv = Bloc21.BlocEnv stratoUrl cirrusUrl mgr conn21
+  let bloc2Env = Bloc20.BlocEnv stratoUrl cirrusUrl mgr conn20
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   run flags_port (appBloc blocEnv bloc2Env)
 
-dbExistsQuery :: Query
-dbExistsQuery = "SELECT 1 FROM pg_database WHERE datname='bloc20';"
+dbExistsQuery21 :: Query
+dbExistsQuery21 = "SELECT 1 FROM pg_database WHERE datname='bloc21';"
 
-dbExistsQuery2 :: Query
-dbExistsQuery2 = "SELECT 1 FROM pg_database WHERE datname='bloc21';"
+dbExistsQuery20 :: Query
+dbExistsQuery20 = "SELECT 1 FROM pg_database WHERE datname='bloc20';"
 
 appBloc :: Bloc21.BlocEnv -> Bloc20.BlocEnv -> Application
 appBloc env21 env20 = 
