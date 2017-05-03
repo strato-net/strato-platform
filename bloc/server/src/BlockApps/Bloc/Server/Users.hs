@@ -5,8 +5,6 @@
 
 module BlockApps.Bloc.Server.Users where
 
-import Debug.Trace
-
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -307,10 +305,6 @@ postUsersContractMethod
 
     formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
 
-    -- xabi <- getContractXabiByMetadataId cmId
-    -- traceM "xabi family"
-    -- traceShowM xabi
-
     return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
@@ -379,12 +373,6 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
           then throwError (UserError "argument names don't match")
           else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
         let vals = toList argsVals
-        traceM "argsVals"
-        traceShowM argsVals
-        traceM "vals"
-        traceShowM vals
-        traceM "toStorage vals"
-        traceShowM $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
 prepareTx
