@@ -6,6 +6,7 @@ module BlockApps.Solidity.Type where
 import           Data.ByteString (ByteString)
 import           Data.Char
 import           Data.List
+import           Data.Monoid
 import           Data.Text       (Text)
 import qualified Data.Text       as Text
 import           Text.Read
@@ -164,11 +165,13 @@ formatType (TypeEnum name) = Text.unpack name
 formatType (TypeContract name) = Text.unpack name
 formatType (TypeStruct name) = Text.unpack name
 
-textToSimpleArgType :: Text -> Maybe SimpleType
-textToSimpleArgType str = if Text.null str then Nothing
-  else readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack . Text.toLower $ Text.tail str))
+textToSimpleArgType :: Text -> Either Text SimpleType
+textToSimpleArgType str = if Text.null str then Left "textToSimpleArgType: null type string"
+  else case readMaybe ("Type" ++ toUpper (Text.head str) : (Text.unpack . Text.toLower $ Text.tail str)) of
+    Nothing -> Left $ "textToSimpleArgType: could not convert " <> str <> " to type"
+    Just x -> return x
 
-textToArgType :: Text -> Bool -> Text -> Maybe Type
+textToArgType :: Text -> Bool -> Text -> Either Text Type
 textToArgType "Array" True str = TypeArrayDynamic . SimpleType <$> textToSimpleArgType str
 textToArgType "Array" False str = TypeArrayFixed 0 . SimpleType <$> textToSimpleArgType str
 textToArgType str _ _ = SimpleType <$> textToSimpleArgType str
