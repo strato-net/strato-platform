@@ -6,10 +6,13 @@
 module BlockApps.Bloc.API.E2ESpec where
 
 import           Control.Concurrent
+import qualified Data.ByteString.Base16           as Base16
+import qualified Data.ByteString.Char8            as Char8
 import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
-import qualified Data.Text                        as Text
+import           Data.Monoid
+import qualified Data.Text.Encoding               as Text
 import qualified Data.Vector                      as Vector
 import           Numeric.Natural
 import           Servant.Client
@@ -326,11 +329,13 @@ spec =
 
       -- call contract store value
       let
+        arg1 = Text.decodeUtf8 (Base16.encode (Char8.replicate 32 'a'))
+        arg2 = Text.decodeUtf8 (Base16.encode (Char8.replicate 32 'b'))
         contractName = ContractName simpleStorageBytes32ArrayContractName
         postUsersContractMethodRequestSet = PostUsersContractMethodRequest
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
-          , postuserscontractmethodArgs = Map.singleton "x" (ArgArray [ArgString (Text.replicate 32 "a"), ArgString (Text.replicate 32 "b")])
+          , postuserscontractmethodArgs = Map.singleton "x" (ArgArray [ArgString arg1, ArgString arg2])
           , postuserscontractmethodValue = 0
           , postuserscontractmethodTxParams = txParams
           }
@@ -355,7 +360,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 00000000000000000000000000000000deadbeef"
+      values `shouldBe` ("transaction returned: \"" <> arg1 <> "\",\"" <> arg2 <> "\"")
 
       -- get state and verify
 
@@ -370,7 +375,10 @@ spec =
       mStoredData' `shouldSatisfy` isJust
       let
         Just storedData' = mStoredData'
-      storedData' `shouldBe` SolidityValueAsString "00000000000000000000000000000000deadbeef"
+      storedData' `shouldBe` SolidityArray
+        [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ]
 
     it "should disambiguate contracts with the same name using latest and address" $ \ TestConfig {..} -> do
       sameName1Src <- readSolFile "SameName1.sol"
