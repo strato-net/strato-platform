@@ -715,7 +715,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` ("transaction returned: 2,4")
+      values `shouldBe` "transaction returned: 2,4"
 
       -- get state and verify
 
