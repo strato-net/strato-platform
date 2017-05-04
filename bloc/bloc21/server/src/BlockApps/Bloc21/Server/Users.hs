@@ -303,7 +303,7 @@ postUsersContractMethod
       mFormattedResponse = Text.intercalate "," <$>
         convertResultResToTexts txResp orderedResultTypes
 
-    formattedResponse <- blocMaybe ("Failed to parse response" <> txResp) mFormattedResponse
+    formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
 
     return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
 
