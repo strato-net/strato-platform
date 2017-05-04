@@ -61,6 +61,7 @@ pipeline {
             sh '''#!/bin/bash -le
               cd silo
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+              basil build --release
               basil push
               ./docker-publish-images.sh
               RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
