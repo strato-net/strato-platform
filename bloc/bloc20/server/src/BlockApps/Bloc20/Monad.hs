@@ -35,7 +35,6 @@ import           Network.HTTP.Types.Status
 import           Opaleye
 import           Servant
 import           Servant.Client
-import           Servant.Server.Internal.ServantErr
 import qualified Text.PrettyPrint.Leijen.Text       as Leijen
 
 newtype Bloc x = Bloc
@@ -194,7 +193,7 @@ enterBloc env x
                      "(More information can be found in the Bloc logs.)"
                    ]}
           CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
-          UserError err -> err422{errBody = fromString $ show err}
+          UserError err -> err400{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
           AnError _ ->
             err500{errBody = fromString $ unlines
