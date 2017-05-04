@@ -1,8 +1,12 @@
 resolver: nightly-2017-04-21
 packages:
-- bloc/api
-- bloc/client
-- bloc/server
+- bloc/bloc20/api
+- bloc/bloc20/client
+- bloc/bloc20/server
+- bloc/bloc21/api
+- bloc/bloc21/client
+- bloc/bloc21/server
+- bloc/exe
 - cirrus/api
 - cirrus/client
 - ethereum
