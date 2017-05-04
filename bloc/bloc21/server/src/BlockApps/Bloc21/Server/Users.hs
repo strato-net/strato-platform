@@ -242,8 +242,9 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
                               either (throwError . UserError . Text.pack) return $
                                 xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
-      let mFormattedResponse = Text.concat <$> convertResultResToTexts (transactionresultResponse txResult) orderedResultTypes
-      blocMaybe "Failed to parse response" mFormattedResponse
+      let txResp = transactionresultResponse txResult
+      let mFormattedResponse = Text.concat <$> convertResultResToTexts txResp orderedResultTypes
+      blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
   else return $ map (Text.pack . keccak256String) hashes
 
 postUsersContractMethod
@@ -298,12 +299,11 @@ postUsersContractMethod
     txResult <- pollTxResult hash
 
     let
-      mFormattedResponse = Text.concat <$>
-        convertResultResToTexts
-          (transactionresultResponse txResult)
-          orderedResultTypes
+      txResp = transactionresultResponse txResult
+      mFormattedResponse = Text.intercalate "," <$>
+        convertResultResToTexts txResp orderedResultTypes
 
-    formattedResponse <- blocMaybe "Failed to parse response" mFormattedResponse
+    formattedResponse <- blocMaybe ("Failed to parse response" <> txResp) mFormattedResponse
 
     return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
 
