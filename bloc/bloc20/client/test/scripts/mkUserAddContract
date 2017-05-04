@@ -12,9 +12,9 @@ function setEnv {
   echo "$1 = ${!1}"
 }
 
-setEnv blocHost localhost
-setEnv blocPort 8000
-setEnv stratoUrl "http://tester13.eastus.cloudapp.azure.com/strato-api/eth/v1.2"
+setEnv blocUrl "http://localhost:10001/bloc/v2.0"
+setEnv stratoUrl "http://localhost/strato-api/eth/v1.2"
+#setEnv stratoUrl "http://tester13.eastus.cloudapp.azure.com/strato-api/eth/v1.2"
 
 contractName=`basename ${1%.*}`
 
@@ -39,7 +39,7 @@ echo "#################################################"
 echo "# Creating a new address and running the faucet #"
 echo "#################################################"
 
-address=`customHttp --form http://$blocHost:$blocPort/users/fred password=qqqq faucet=1`
+address=`customHttp --form $blocUrl/users/fred password=qqqq faucet=1`
 
 echo "Here are the details of the new address '$address':"
 
@@ -57,7 +57,7 @@ echo "########################"
 echo "# Uploading a contract #"
 echo "########################"
 
-echo "$request" | customHttp POST http://$blocHost:$blocPort/users/fred/$address/contract "Accept: */*"
+echo "$request" | customHttp POST $blocUrl/users/fred/$address/contract "Accept: */*"
 
 echo ""
 
@@ -65,4 +65,4 @@ echo "##################################"
 echo "# querying state in new contract #"
 echo "##################################"
 
-customHttp http://$blocHost:$blocPort/contracts/$contractName/Latest/state | jq .
+customHttp $blocUrl/contracts/$contractName/Latest/state | jq .
