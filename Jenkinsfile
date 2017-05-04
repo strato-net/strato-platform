@@ -6,38 +6,37 @@ pipeline {
 
   stages {
     stage('Prepare') {
-        steps {
-               sh '''#!/bin/bash -l
-                docker-compose kill && docker-compose -v down
-                docker ps
-                sudo rm -rf repos silo
-                '''
-         }
+      steps {
+        sh '''#!/bin/bash -le
+          docker-compose kill && docker-compose -v down
+          docker ps
+          sudo rm -rf repos silo
+        '''
+       }
     }
     
     stage('Build') {
-         steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
-                  sh '''#!/bin/bash -l
-                    docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                    git config --global credential.helper store
-                    git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
-                    cd silo
-                    cp /home/blockapps/basil .
-                    basil clone
-                    basil compose --release > docker-compose.release.yml
-                    basil snapshot > Basilfile.snapshot
-                    basil build
-                  '''
-                 }
-          }
-     }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+          sh '''#!/bin/bash -le
+            docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+            git config --global credential.helper store
+            git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+            cd silo
+            basil clone
+            basil compose --release > docker-compose.release.yml
+            basil snapshot > Basilfile.snapshot
+            basil build
+          '''
+        }
+      }
+    }
     stage('Deploy') {
       steps {
-        sh '''#!/bin/bash -l
+        sh '''#!/bin/bash -le
           cd silo
           basil compose > docker-compose.yml
-          genesisBlock=$(< gb.json) && stratoHost=nginx && ssl=false && exec docker-compose up -d
+          genesisBlock=$(< gb.json) && stratoHost=nginx && ssl=false && docker-compose up -d
           docker ps
         '''
       }
@@ -45,7 +44,7 @@ pipeline {
 
     stage('E2E-Test') {
       steps {
-      sh '''#!/bin/bash -l
+      sh '''#!/bin/bash -le
         cd silo
         ./test
       '''
@@ -59,7 +58,7 @@ pipeline {
             usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
           ]) {
-            sh '''#!/bin/bash -l
+            sh '''#!/bin/bash -le
               cd silo
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               basil push
