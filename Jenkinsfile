@@ -37,7 +37,7 @@ pipeline {
         sh '''#!/bin/bash -l
           cd silo
           basil compose > docker-compose.yml
-          genesisBlock=$(< gb.json) lazyBlocks=false miningAlgorithm=SHA apiUrlOverride=http://strato:3000 blockTime=2 minBlockDifficulty=8192 docker-compose up -d
+          genesisBlock=$(< gb.json) && stratoHost=nginx && ssl=false && exec docker-compose up -d
           docker ps
         '''
       }
