@@ -46,7 +46,7 @@ pipeline {
       steps {
       sh '''#!/bin/bash -le
         cd silo
-        ./test
+        suite="e2e/smoke.test.js" ./test
       '''
       }
     }

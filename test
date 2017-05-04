@@ -9,7 +9,7 @@ enableSsl=false
 testDir="e2e"
 rootDir=$PWD
 
-suite=${1:-$testDir}
+suite="${suite:-$testDir}"
 
 # Parse command line arguments
 for arg in "$@"
