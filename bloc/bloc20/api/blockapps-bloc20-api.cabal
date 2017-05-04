@@ -1,0 +1,57 @@
+name: blockapps-bloc20-api
+version: 0.1.0.0
+synopsis: Bloc microservice
+description: Bloc microservice
+homepage: https://github.com/blockapps/blockapps-haskell/blockapps-bloc
+license: BSD3
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    BlockApps.Bloc20.API
+    BlockApps.Bloc20.Crypto
+    BlockApps.Bloc20.API.Addresses
+    BlockApps.Bloc20.API.SwaggerSchema
+    BlockApps.Bloc20.API.Contracts
+    BlockApps.Bloc20.API.Search
+    BlockApps.Bloc20.API.Users
+    BlockApps.Bloc20.API.Utils
+  default-language: Haskell2010
+  ghc-options: -Wall -Werror
+  build-depends: base
+               , aeson
+               , aeson-casing
+               , blockapps-ethereum
+               , blockapps-solidity
+               , blockapps-strato-api
+               , containers
+               , cryptonite
+               , bytestring
+               , generic-random
+               , http-api-data
+               , http-media
+               , lens
+               , QuickCheck
+               , quickcheck-instances
+               , saltine
+               , secp256k1
+               , servant
+               , servant-server
+               , servant-swagger
+               , servant-swagger-ui
+               , servant-docs
+               , servant-mock
+               , swagger2
+               , text
+
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/bloc/bloc
