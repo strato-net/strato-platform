@@ -99,13 +99,13 @@ instance ToSample GetContractsResponse where
 
 type GetContractsData = "contracts"
   :> Capture "contractName" ContractName
-  :> Get '[OctetStream, JSON] [MaybeNamed Address]
+  :> Get '[JSON] [MaybeNamed Address]
 
 -- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
 type GetContractsContract = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
-  :> Get '[HTMLifiedJSON, JSON] ContractDetails
+  :> Get '[JSON] ContractDetails
 --------------------------------------------------------------------------------
 type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
@@ -132,7 +132,7 @@ type GetContractsFunctions = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "functions"
-  :> Get '[HTMLifiedJSON, JSON] [FunctionName]
+  :> Get '[JSON] [FunctionName]
 
 newtype FunctionName = FunctionName Text deriving (Eq,Show,Generic)
 
@@ -160,7 +160,7 @@ type GetContractsSymbols = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "symbols"
-  :> Get '[HTMLifiedJSON,JSON] [SymbolName]
+  :> Get '[JSON] [SymbolName]
 
 --------------------------------------------------------------------------------
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key

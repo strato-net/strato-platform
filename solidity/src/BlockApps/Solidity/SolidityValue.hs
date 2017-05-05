@@ -56,4 +56,3 @@ instance ToSchema SolidityValue where
   declareNamedSchema = pure . pure $ NamedSchema (Just "Solidity Value") $ mempty
       & description ?~ "A Solidity return type value"
       & example ?~ toJSON (SolidityBool True)
-

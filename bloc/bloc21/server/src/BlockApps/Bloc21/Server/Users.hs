@@ -36,17 +36,17 @@ import           BlockApps.Bloc21.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
 import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types          hiding (Transaction (..))
 import           BlockApps.XAbiConverter
-
--- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
 
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
@@ -55,14 +55,14 @@ getUsersUser :: UserName -> Bloc [Address]
 getUsersUser (UserName name) = blocTransaction $
   blocQuery $ getUsersUserQuery name
 
-postUsersUser :: UserName -> PostUsersUserRequest -> Bloc Address
-postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransaction $ do
+postUsersUser :: UserName -> Bool -> Password -> Bloc Address
+postUsersUser (UserName name) faucet pass = blocTransaction $ do
   keyStore <- newKeyStore pass
   createdUser <- blocModify $ postUsersUserQuery name keyStore
   unless createdUser (throwError (DBError "failed to create user"))
   let
     addr = keystoreAcctAddress keyStore
-  when (faucet == "1") $ do
+  when faucet $ do
     logWith logNotice "Waiting for faucet transaction to be mined"
     blocStrato $ do
       void $ postFaucet addr
@@ -194,7 +194,7 @@ postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> Bloc [PostMethodListResponse]
+  -> Bloc [PostUsersContractMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
@@ -229,7 +229,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  map PostMethodListResponse <$> if postmethodlistrequestResolve
+  if postmethodlistrequestResolve
   then do
     -- TODO: use `ensureMostRecentSuccessfulTx`
     txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
@@ -243,9 +243,11 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
                               either (throwError . UserError . Text.pack) return $
                                 xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
       let txResp = transactionresultResponse txResult
-      let mFormattedResponse = Text.concat <$> convertResultResToTexts txResp orderedResultTypes
-      blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-  else return $ map (Text.pack . keccak256String) hashes
+      let mFormattedResponse = convertResultResToVals txResp orderedResultTypes
+      methodReturn <-
+        blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+      return $ MethodResolved methodReturn
+  else return $ map MethodHash hashes
 
 postUsersContractMethod
   :: UserName
@@ -300,20 +302,17 @@ postUsersContractMethod
 
     let
       txResp = transactionresultResponse txResult
-      mFormattedResponse = Text.intercalate "," <$>
-        convertResultResToTexts txResp orderedResultTypes
+      mFormattedResponse =
+        convertResultResToVals txResp orderedResultTypes
 
     formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
 
-    return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
+    return $ PostUsersContractMethodResponse formattedResponse
 
-convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
-convertResultResToTexts txResp responseTypes =
-  let
-    byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
-  in case bytestringToValues byteResp responseTypes of
-    Nothing   -> Nothing
-    Just vals -> traverse valueToText vals
+convertResultResToVals :: Text -> [Type] -> Maybe [SolidityValue]
+convertResultResToVals txResp responseTypes =
+  let byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
+  in map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 buildArgumentByteString :: Maybe (Map Text Text) -> Maybe Int32 -> Bloc ByteString
 buildArgumentByteString args mFunctionId = case mFunctionId of

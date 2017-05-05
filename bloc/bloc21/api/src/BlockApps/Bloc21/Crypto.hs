@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Bloc21.Crypto where
@@ -19,8 +20,10 @@ import           Data.String
 import qualified Data.Text.Encoding                as Text
 import           Generic.Random.Generic
 import           GHC.Generics
+import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances         ()
+import           Web.FormUrlEncoded
 import           Web.HttpApiData
 
 
@@ -54,6 +57,15 @@ instance ToHttpApiData Password where
 
 instance FromHttpApiData Password where
   parseUrlPiece = return . Password . Text.encodeUtf8
+
+instance ToForm Password where
+  toForm pw = [ ("password", toQueryParam pw) ]
+
+instance FromForm Password where
+  fromForm = parseUnique "password"
+
+instance ToSample Password where
+  toSamples _ = singleSample $ Password "p4$$w0rd"
 
 data KeyStore = KeyStore
   { keystoreSalt          :: ByteString

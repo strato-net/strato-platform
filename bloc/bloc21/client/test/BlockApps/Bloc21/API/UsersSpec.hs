@@ -15,6 +15,7 @@ import           BlockApps.Bloc21.API
 import           BlockApps.Bloc21.API.SpecUtils
 import           BlockApps.Bloc21.Client
 import           BlockApps.Ethereum
+import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Strato.Types
 
 -- TODO: user/contract methods Addresses may need to be Maybe (Named Address)
@@ -32,8 +33,7 @@ spec = do
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
         username = "blockapps"
-        postUsersUserRequest = PostUsersUserRequest "1" pw
-      postUsersEither <- runClientM (postUsersUser username postUsersUserRequest) (ClientEnv mgr blocUrl)
+      postUsersEither <- runClientM (postUsersUser username True pw) (ClientEnv mgr blocUrl)
       postUsersEither `shouldSatisfy` isRight
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
@@ -99,7 +99,7 @@ spec = do
       Right (PostUsersContractMethodResponse response) <- runClientM
         (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
         (ClientEnv mgr blocUrl)
-      response `shouldBe` "transaction returned: 0"
+      response `shouldBe` [SolidityValueAsString "0"]
   describe "postUsersSendList" $
     it "should post a list of send transactions" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -139,4 +139,4 @@ spec = do
       Right responses <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      responses `shouldSatisfy` all ((== "0") . postmethodlistresponseReturnValue)
+      responses `shouldSatisfy` all (== MethodResolved [SolidityValueAsString "0"])
