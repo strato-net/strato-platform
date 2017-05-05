@@ -12,7 +12,7 @@ metadata:
 deployments:
   - name: bloc
     repo: https://github.com/blockapps/bloc.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
       environment:
@@ -45,6 +45,18 @@ deployments:
       command: redis-server --appendonly yes
       ports:
        - "6379:6379"
+
+  - name: strato-sync
+    repo: https://github.com/blockapps/strato-sync.git
+    ref: develop
+    compose:
+      restart: always
+      ports:
+      - "9001:9001"
+      - "3000:3000"
+      environment:
+        ENV: "${env}"
+        PORT: "9001"
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
