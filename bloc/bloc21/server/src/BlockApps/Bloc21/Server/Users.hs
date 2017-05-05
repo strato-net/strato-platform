@@ -46,8 +46,6 @@ import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types          hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 
--- Following imported for HTMLifiedPlainText. TODO: Remove when refactoring.
-
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
@@ -194,7 +192,7 @@ postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> Bloc [PostMethodListResponse]
+  -> Bloc [PostUsersContractMethodResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
@@ -229,7 +227,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
   let (txs,funcIds) = unzip txsFuncIds
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  map PostMethodListResponse <$> if postmethodlistrequestResolve
+  map PostUsersContractMethodResponse <$> if postmethodlistrequestResolve
   then do
     -- TODO: use `ensureMostRecentSuccessfulTx`
     txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash

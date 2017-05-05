@@ -5,10 +5,9 @@ module BlockApps.Bloc21.API.Addresses where
 
 import           Servant.API
 
-import           BlockApps.Bloc21.API.Utils
 import           BlockApps.Ethereum
 
 --------------------------------------------------------------------------------
 -- Routes and Types
 --------------------------------------------------------------------------------
-type GetAddresses = "addresses" :> Get '[HTMLifiedJSON, JSON] [Address]
+type GetAddresses = "addresses" :> Get '[JSON] [Address]

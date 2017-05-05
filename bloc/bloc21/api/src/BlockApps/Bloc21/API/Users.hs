@@ -14,15 +14,12 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy             as ByteString.Lazy
-import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Text                        (Text)
-import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
 import           Generic.Random.Generic
 import           GHC.Generics
-import qualified Network.HTTP.Media               as M
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
@@ -34,6 +31,7 @@ import           BlockApps.Bloc21.API.Utils
 import           BlockApps.Bloc21.Crypto
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
+import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
@@ -41,17 +39,17 @@ import           BlockApps.Strato.Types
 -- | Routes and types
 --------------------------------------------------------------------------------
 
-type GetUsers = "users" :> Get '[HTMLifiedJSON, JSON] [UserName]
+type GetUsers = "users" :> Get '[JSON] [UserName]
 
 type GetUsersUser = "users"
   :> Capture "user" UserName
-  :> Get '[HTMLifiedJSON, JSON] [Address]
+  :> Get '[JSON] [Address]
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
   :> QueryFlag "faucet"
   :> ReqBody '[JSON, FormUrlEncoded] Password
-  :> Post '[HTMLifiedAddress, JSON] Address
+  :> Post '[JSON] Address
 
 instance ToParam (QueryFlag "faucet") where
   toParam _ =
@@ -64,7 +62,7 @@ type PostUsersSend = "users"
   :> Capture "address" Address
   :> "send"
   :> ReqBody '[JSON] PostSendParameters
-  :> Post '[HTMLifiedJSON, JSON] PostTransaction
+  :> Post '[JSON] PostTransaction
 
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
@@ -110,7 +108,7 @@ type PostUsersContract = "users"
   :> Capture "address" Address
   :> "contract"
   :> ReqBody '[JSON] PostUsersContractRequest
-  :> Post '[HTMLifiedAddress, JSON] Address
+  :> Post '[JSON] Address
 
 data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc      :: Text
@@ -278,7 +276,7 @@ type PostUsersContractMethod = "users"
   :> Capture "contractAddress" Address
   :> "call"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
-  :> Post '[HTMLifiedPlainText, JSON] PostUsersContractMethodResponse
+  :> Post '[JSON] PostUsersContractMethodResponse
 
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
@@ -296,9 +294,16 @@ instance FromJSON PostUsersContractMethodRequest where
 instance ToSample PostUsersContractMethodRequest where
   toSamples _ = noSamples
 
-newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse Text deriving (Eq,Show,FromJSON,ToJSON,Arbitrary)
+newtype PostUsersContractMethodResponse = PostUsersContractMethodResponse
+  { postusercontractmethodresponseReturns :: [SolidityValue]
+  } deriving (Eq,Show,Generic,Arbitrary)
+instance ToJSON PostUsersContractMethodResponse where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+instance FromJSON PostUsersContractMethodResponse where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
 instance ToSample PostUsersContractMethodResponse where
-  toSamples _ = noSamples --hack because endpoints are returning random text
+  toSamples _ = singleSample $
+    PostUsersContractMethodResponse [SolidityValueAsString "return"]
 
 instance ToSchema PostUsersContractMethodRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -314,34 +319,10 @@ instance ToSchema PostUsersContractMethodRequest where
        , postuserscontractmethodValue = 0 :: Natural
        , postuserscontractmethodTxParams = Nothing
        }
-data PostUsersMethodResponse
-  = PostUsersMethodResponse
-  { postusersmethodresponseValues            :: Text
-  , postusersmethodresponseTransactionResult :: TransactionResult
-  }
-  deriving (Eq,Show,Generic)
-instance FromJSON PostUsersMethodResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-instance ToJSON PostUsersMethodResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+
 instance ToSchema PostUsersContractMethodResponse where
     declareNamedSchema = const . pure . named "Post contract response" $
-      sketchSchema (PostUsersMethodResponse "I am a contract response" exampleTxResult)
-instance ToSample PostUsersMethodResponse where
-  toSamples _ = noSamples --hack because endpoints are returning random text
-
-data HTMLifiedPlainText
-
-instance Accept HTMLifiedPlainText where
-  contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
-
-instance MimeUnrender HTMLifiedPlainText PostUsersContractMethodResponse where
-  mimeUnrender _ = return . PostUsersContractMethodResponse . Text.pack . Lazy.Char8.unpack
-instance MimeRender HTMLifiedPlainText PostUsersContractMethodResponse where
-  mimeRender _ (PostUsersContractMethodResponse resp) =  Lazy.Char8.pack $ Text.unpack resp
-
-instance MimeUnrender HTMLifiedPlainText PostUsersMethodResponse where
-  mimeUnrender _ = error "why would you pay money for this. really, why?"
+      sketchSchema (PostUsersContractMethodResponse [SolidityValueAsString "I am a contract response"])
 
 --------------------------------------------------------------------------------
 
@@ -447,7 +428,7 @@ type PostUsersContractMethodList = "users"
   :> Capture "address" Address
   :> "callList"
   :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [PostMethodListResponse]
+  :> Post '[JSON] [PostUsersContractMethodResponse]
 
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password
@@ -487,23 +468,6 @@ instance ToSchema PostMethodListRequest where
         , methodcallContractAddress = Address 0xdeadbeef
         , methodcallContractName = "HorroscopeApp"
         }
-
-newtype PostMethodListResponse = PostMethodListResponse
-  { postmethodlistresponseReturnValue :: Text
-  } deriving (Eq,Show,Generic)
-
-instance ToJSON PostMethodListResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostMethodListResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToSample PostMethodListResponse where
-  toSamples _ = noSamples
-
-instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary uniform
-
-instance ToSchema PostMethodListResponse
 
 data MethodCall = MethodCall
   { methodcallContractName    :: Text
