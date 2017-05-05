@@ -62,7 +62,7 @@ instance ToForm Password where
   toForm pw = [ ("password", toQueryParam pw) ]
 
 instance FromForm Password where
-  fromForm f = parseUnique "password" f
+  fromForm = parseUnique "password"
 
 instance ToSample Password where
   toSamples _ = singleSample $ Password "p4$$w0rd"

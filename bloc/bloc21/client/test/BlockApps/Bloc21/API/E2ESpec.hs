@@ -278,7 +278,6 @@ spec =
     it "should create SimpleStorageBytes32Array contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps444"
-
       postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
