@@ -84,8 +84,8 @@ main = do
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
   cirrusUrl <- parseBaseUrl flags_cirrusurl
-  let blocEnv = Bloc21.BlocEnv stratoUrl cirrusUrl mgr conn21
-  let bloc2Env = Bloc20.BlocEnv stratoUrl cirrusUrl mgr conn20
+  let blocEnv = Bloc21.BlocEnv stratoUrl cirrusUrl mgr conn21 $ toEnum flags_loglevel
+  let bloc2Env = Bloc20.BlocEnv stratoUrl cirrusUrl mgr conn20 $ toEnum flags_loglevel
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   run flags_port (appBloc blocEnv bloc2Env)
 

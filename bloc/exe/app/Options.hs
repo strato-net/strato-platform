@@ -11,3 +11,5 @@ defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "port" (8000::Int) "The port which the server runs on"
 defineFlag "stratourl" ("stratoDev"::String) "URL of the Strato server Bloc will connect to"
 defineFlag "cirrusurl" ("http://tester11.eastus.cloudapp.azure.com/cirrus"::String) "URL of the Cirrus server Bloc will connect to"
+defineFlag "loglevel" (4::Int) "The log level for output messages"
+
