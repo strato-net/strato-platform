@@ -120,15 +120,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
--- TODO: This end point needs to support form url encoding
--- instance ToForm PostUsersContractRequest where
---     toForm PostUsersContractRequest{..} = Map.fromList
---       [ ("src", toQueryParam postuserscontractrequestSrc)
---       , ("password", toQueryParam postuserscontractrequestPassword)
---
---       ]
--- instance FromForm PostUsersContractRequest where
---
+
 instance ToJSON PostUsersContractRequest where
   toJSON = genericToJSON (aesonPrefix camelCase){omitNothingFields = True}
 
@@ -428,7 +420,25 @@ type PostUsersContractMethodList = "users"
   :> Capture "address" Address
   :> "callList"
   :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [PostUsersContractMethodResponse]
+  :> Post '[JSON] [PostUsersContractMethodListResponse]
+
+data PostUsersContractMethodListResponse
+  = MethodHash Keccak256
+  | MethodResolved [SolidityValue]
+  deriving (Eq,Show,Generic)
+
+instance ToJSON PostUsersContractMethodListResponse
+instance FromJSON PostUsersContractMethodListResponse
+
+instance ToSample PostUsersContractMethodListResponse where
+  toSamples _ = samples
+    [ MethodHash (keccak256 "foo")
+    , MethodResolved [SolidityValueAsString "result"]
+    ]
+
+instance ToSchema PostUsersContractMethodListResponse where
+ declareNamedSchema = const . pure . named "Post contract response" $
+   sketchSchema (MethodResolved [SolidityValueAsString "I am a contract response"])
 
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password

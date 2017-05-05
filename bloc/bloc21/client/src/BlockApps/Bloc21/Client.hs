@@ -132,5 +132,5 @@ postUsersContractMethodList
   :: UserName
   -> Address
   -> PostMethodListRequest
-  -> ClientM [PostUsersContractMethodResponse]
+  -> ClientM [PostUsersContractMethodListResponse]
 postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
