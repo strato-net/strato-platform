@@ -11,7 +11,6 @@ import qualified Data.ByteString.Char8            as Char8
 import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
-import           Data.Monoid
 import qualified Data.Text.Encoding               as Text
 import qualified Data.Vector                      as Vector
 import           Numeric.Natural
@@ -161,7 +160,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 3"
+      values `shouldBe` [SolidityValueAsString "3"]
 
       -- get state and verify
 
@@ -258,7 +257,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 00000000000000000000000000000000deadbeef"
+      values `shouldBe` [SolidityValueAsString "00000000000000000000000000000000deadbeef"]
 
       -- get state and verify
 
@@ -355,7 +354,12 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` ("transaction returned: \"" <> arg1 <> "\",\"" <> arg2 <> "\"")
+      values `shouldBe`
+        [ SolidityArray
+          [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        ]
 
       -- get state and verify
 
@@ -710,7 +714,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 2,4"
+      values `shouldBe` [SolidityValueAsString "2", SolidityValueAsString "4"]
 
       -- get state and verify
 
