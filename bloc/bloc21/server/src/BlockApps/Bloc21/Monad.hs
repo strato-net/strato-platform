@@ -95,6 +95,7 @@ data BlocEnv = BlocEnv
   , urlCirrus    :: BaseUrl
   , httpManager  :: Manager
   , dbConnection :: Connection
+  , logLevel     :: Severity
   }
 
 data BlocError
@@ -130,11 +131,25 @@ boxIt string =
     len = Prelude.maximum $ map length theLines
     theLines = lines string
 
+filterPrintLog::MonadIO m=>Severity->WithSeverity (WithCallStack (WithTimestamp Text))->m ()
+filterPrintLog minSeverity x | msgSeverity x >= minSeverity = return ()
+filterPrintLog _ x =
+  liftIO . print . render Leijen.stringStrict $ x
+  where
+    render::(a0 -> Leijen.Doc)
+            -> WithSeverity (WithCallStack (WithTimestamp a0))
+            -> Leijen.Doc
+    render
+      = renderWithSeverity
+      . renderLocation
+      . renderWithTimestamp
+          (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
+
 enterBloc :: BlocEnv -> Bloc x -> Handler x
 enterBloc env x
   = Handler
   $ withExceptT reThrowError
-  $ flip runLoggingT (liftIO . print . render Leijen.stringStrict)
+  $ flip runLoggingT (filterPrintLog $ logLevel env)
   $ flip runReaderT env $ runBloc
   $ convertRuntimeErrors x
   where
@@ -217,14 +232,6 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
-    render::(a0 -> Leijen.Doc)
-            -> WithSeverity (WithCallStack (WithTimestamp a0))
-            -> Leijen.Doc
-    render
-      = renderWithSeverity
-      . renderLocation
-      . renderWithTimestamp
-          (formatTime defaultTimeLocale $ iso8601DateFormat (Just "%H:%M:%S"))
 
 
 --This is an annoyingly named and poorly written function, deliberately designed that way to remind us that we need to clean up the response from strato-api/solc.
