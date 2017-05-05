@@ -48,6 +48,8 @@ test-suite blockapps-bloc21-client-test
     , blockapps-strato-client
     , blockapps-solidity
     , blockapps-ethereum
+    , base16-bytestring
+    , bytestring
     , containers
     , directory
     , generic-random
