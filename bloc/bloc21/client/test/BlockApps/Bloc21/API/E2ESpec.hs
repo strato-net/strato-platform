@@ -42,11 +42,9 @@ spec =
       let
           userName1 = UserName "blockapps1"
           userName2 = UserName "blockapps2"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-          postUsersUserRequest2 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       threadDelay 3000000
-      postUsersEither2 <- runClientM (postUsersUser userName2 postUsersUserRequest2) (ClientEnv mgr blocUrl)
+      postUsersEither2 <- runClientM (postUsersUser userName2 True pw) (ClientEnv mgr blocUrl)
       threadDelay 3000000
       postUsersEither1 `shouldSatisfy` isRight
       postUsersEither2 `shouldSatisfy` isRight
@@ -90,8 +88,7 @@ spec =
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -186,8 +183,7 @@ spec =
     it "should create SimpleStorageAddress contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps999"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       simpleStorageAddressSrc <- readSolFile "SimpleStorageAddress.sol"
       threadDelay 4000000
@@ -282,8 +278,8 @@ spec =
     it "should create SimpleStorageBytes32Array contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps444"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
       threadDelay 4000000
@@ -422,10 +418,10 @@ spec =
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           simpleConstructorName = "SimpleConstructor"
       simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -469,10 +465,10 @@ spec =
     it "should create TestArrayStatCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestArrayStatCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -500,10 +496,10 @@ spec =
     it "should create TestArrayDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestArrayDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -530,10 +526,10 @@ spec =
     it "should create TestBytesDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestBytesDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -560,10 +556,10 @@ spec =
     it "should create TestAddressBytesCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestAddressBytesCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -594,10 +590,10 @@ spec =
     it "should create TestLessComplexCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestLessComplexCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -633,8 +629,8 @@ spec =
     it "should create SimpleTuple contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps455"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       simpleTupleSrc <- readSolFile "SimpleTuple.sol"
       threadDelay 4000000

@@ -95,8 +95,8 @@ setup = do
       , uploadlistResolve = True
       }
     clients = do
-      addr1 <- postUsersUser (userName testConfig) (PostUsersUserRequest "1" (pw testConfig))
-      addr2 <- postUsersUser (toUserName testConfig) (PostUsersUserRequest "1" (pw testConfig))
+      addr1 <- postUsersUser (userName testConfig) True (pw testConfig)
+      addr2 <- postUsersUser (toUserName testConfig) True (pw testConfig)
       _ <- postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
       PostUsersUploadListResponse simpleStorageDetails
         : PostUsersUploadListResponse testDetails
