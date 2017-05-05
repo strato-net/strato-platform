@@ -1,4 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 module BlockApps.Bloc21.Server.Utils where
 
@@ -6,9 +9,12 @@ import           Control.Concurrent
 import           Control.Monad.IO.Class
 import           Control.Monad.Log
 import           Control.Monad.Loops
+import           Data.Aeson
 import           Data.Maybe
 import qualified Data.Text                as Text
 import           Servant.Client
+import           Servant.API.ContentTypes
+
 
 import           BlockApps.Bloc21.API.Utils
 import           BlockApps.Bloc21.Monad
@@ -74,3 +80,9 @@ pollTxResultBatch keccaks = go 1 where
                  else return resolutions
 emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
+
+instance FromJSON x => MimeUnrender OctetStream x where
+  mimeUnrender _ = eitherDecode
+
+instance ToJSON x => MimeRender OctetStream x where
+  mimeRender _ = encode
