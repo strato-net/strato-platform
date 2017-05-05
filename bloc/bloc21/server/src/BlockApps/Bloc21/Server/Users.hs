@@ -55,14 +55,14 @@ getUsersUser :: UserName -> Bloc [Address]
 getUsersUser (UserName name) = blocTransaction $
   blocQuery $ getUsersUserQuery name
 
-postUsersUser :: UserName -> PostUsersUserRequest -> Bloc Address
-postUsersUser (UserName name) (PostUsersUserRequest faucet pass) = blocTransaction $ do
+postUsersUser :: UserName -> Bool -> Password -> Bloc Address
+postUsersUser (UserName name) faucet pass = blocTransaction $ do
   keyStore <- newKeyStore pass
   createdUser <- blocModify $ postUsersUserQuery name keyStore
   unless createdUser (throwError (DBError "failed to create user"))
   let
     addr = keystoreAcctAddress keyStore
-  when (faucet == "1") $ do
+  when faucet $ do
     logWith logNotice "Waiting for faucet transaction to be mined"
     blocStrato $ do
       void $ postFaucet addr

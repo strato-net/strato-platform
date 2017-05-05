@@ -97,7 +97,7 @@ getUsers = client (Proxy @ GetUsers)
 getUsersUser :: UserName -> ClientM [Address]
 getUsersUser = client (Proxy @ GetUsersUser)
 
-postUsersUser :: UserName -> PostUsersUserRequest -> ClientM Address
+postUsersUser :: UserName -> Bool -> Password -> ClientM Address
 postUsersUser = client (Proxy @ PostUsersUser)
 
 postUsersSend

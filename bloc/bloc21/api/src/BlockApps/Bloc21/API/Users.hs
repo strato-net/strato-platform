@@ -1,5 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -26,7 +28,6 @@ import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances        ()
-import           Web.FormUrlEncoded
 
 import           BlockApps.Bloc21.API.SwaggerSchema
 import           BlockApps.Bloc21.API.Utils
@@ -48,38 +49,13 @@ type GetUsersUser = "users"
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
-  :> ReqBody '[JSON, FormUrlEncoded] PostUsersUserRequest
+  :> QueryFlag "faucet"
+  :> ReqBody '[JSON, FormUrlEncoded] Password
   :> Post '[HTMLifiedAddress, JSON] Address
 
-data PostUsersUserRequest = PostUsersUserRequest
-  { userFaucet :: Text
-  , userPassword :: Password
-  } deriving (Eq, Show, Generic)
-
-instance Arbitrary PostUsersUserRequest where arbitrary = genericArbitrary uniform
-
-instance ToJSON PostUsersUserRequest where
-  toJSON = genericToJSON (aesonPrefix camelCase)
-
-instance FromJSON PostUsersUserRequest where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
-
-instance ToForm PostUsersUserRequest where
-  toForm = genericToForm (FormOptions (camelCase . drop 4))
-
-instance FromForm PostUsersUserRequest where
-  fromForm = genericFromForm (FormOptions (camelCase . drop 4))
-
-instance ToSample PostUsersUserRequest where
-  toSamples _ = singleSample PostUsersUserRequest
-    { userFaucet = "1"
-    , userPassword = "securePassword"
-    }
-
-instance ToSchema PostUsersUserRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Form to create a user"
-    & mapped.schema.example ?~ toJSON (PostUsersUserRequest "1" "myPassword")
+instance ToParam (QueryFlag "faucet") where
+  toParam _ =
+    DocQueryParam "faucet" ["0","1",""] "flag for fauceting a new user" Flag
 
 --------------------------------------------------------------------------------
 
