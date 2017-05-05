@@ -391,7 +391,7 @@ prepareTx userName password addr toAddr TxParams{..} value code nonceIncr = do
     restrict -< name .== constant userName
     returnA -< uId
   cryptos <- case listToMaybe uIds of
-    Nothing -> throwError . DBError $
+    Nothing -> throwError . UserError $
       "no user found with name: " <> getUserName userName
     Just uId -> blocQuery $ proc () -> do
       (_,salt,_,nonce,encSecKey,_,addr',uId') <-
@@ -400,7 +400,7 @@ prepareTx userName password addr toAddr TxParams{..} value code nonceIncr = do
         .&& addr' .== constant addr
       returnA -< (salt,nonce,encSecKey)
   skMaybe <- case listToMaybe cryptos of
-    Nothing -> throwError . DBError $
+    Nothing -> throwError . UserError $
       "address does not exist for user:" <> getUserName userName
     Just (salt,nonce,encSecKey) -> return $
       decryptSecKey password salt nonce encSecKey
