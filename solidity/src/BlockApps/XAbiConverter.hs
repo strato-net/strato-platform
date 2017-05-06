@@ -123,7 +123,11 @@ xabiTypeToType _ v = return $ SimpleType $ xabiTypeToSimpleType v
 funcToType::Xabi->Text->Func->Either String Type
 funcToType xabi name Func{..} = do
 
-  convertedFuncArgs <- for funcArgs $ xabiTypeToType xabi . Xabi.indexedTypeType
+  let orderedFuncArgs = sortOn (Xabi.indexedTypeIndex . snd) $ Map.toList funcArgs
+  
+  convertedFuncArgs <- for orderedFuncArgs $ \(name', theType) -> do
+    theType' <- xabiTypeToType xabi . Xabi.indexedTypeType $ theType
+    return (name', theType')
 
   convertedFuncVals <- for (Map.toList funcVals) $ \(name', val) -> do
     val' <- xabiTypeToType xabi $ Xabi.indexedTypeType val
@@ -133,11 +137,11 @@ funcToType xabi name Func{..} = do
         [(name', length items) |
          (name', XabiDef.Enum items _) <- Map.toList $ xabiTypes xabi]
 
-  let selector = deriveSelector enumSizes name $ map snd $ Map.toList convertedFuncArgs
+  let selector = deriveSelector enumSizes name $ map snd convertedFuncArgs
 
   return $ TypeFunction
                 selector
-                (Map.toList convertedFuncArgs)
+                convertedFuncArgs
                 convertedFuncVals
 
 

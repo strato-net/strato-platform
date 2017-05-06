@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedLists   #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -11,7 +11,6 @@ import qualified Data.ByteString.Char8            as Char8
 import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
-import           Data.Monoid
 import qualified Data.Text.Encoding               as Text
 import qualified Data.Vector                      as Vector
 import           Numeric.Natural
@@ -42,11 +41,9 @@ spec =
       let
           userName1 = UserName "blockapps1"
           userName2 = UserName "blockapps2"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-          postUsersUserRequest2 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       threadDelay 3000000
-      postUsersEither2 <- runClientM (postUsersUser userName2 postUsersUserRequest2) (ClientEnv mgr blocUrl)
+      postUsersEither2 <- runClientM (postUsersUser userName2 True pw) (ClientEnv mgr blocUrl)
       threadDelay 3000000
       postUsersEither1 `shouldSatisfy` isRight
       postUsersEither2 `shouldSatisfy` isRight
@@ -90,8 +87,7 @@ spec =
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -164,7 +160,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 3"
+      values `shouldBe` [SolidityValueAsString "3"]
 
       -- get state and verify
 
@@ -186,8 +182,7 @@ spec =
     it "should create SimpleStorageAddress contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps999"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       simpleStorageAddressSrc <- readSolFile "SimpleStorageAddress.sol"
       threadDelay 4000000
@@ -262,7 +257,7 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` "transaction returned: 00000000000000000000000000000000deadbeef"
+      values `shouldBe` [SolidityValueAsString "00000000000000000000000000000000deadbeef"]
 
       -- get state and verify
 
@@ -282,8 +277,7 @@ spec =
     it "should create SimpleStorageBytes32Array contract, call methods and check state" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps444"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
       threadDelay 4000000
@@ -360,7 +354,12 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe` ("transaction returned: \"" <> arg1 <> "\",\"" <> arg2 <> "\"")
+      values `shouldBe`
+        [ SolidityArray
+          [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        ]
 
       -- get state and verify
 
@@ -422,10 +421,10 @@ spec =
     it "should create SimpleConstructor contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           simpleConstructorName = "SimpleConstructor"
       simpleConstructorSrc <- readSolFile "SimpleConstructor.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -469,10 +468,10 @@ spec =
     it "should create TestArrayStatCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestArrayStatCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -500,10 +499,10 @@ spec =
     it "should create TestArrayDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestArrayDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -530,10 +529,10 @@ spec =
     it "should create TestBytesDynCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestBytesDynCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -560,10 +559,10 @@ spec =
     it "should create TestAddressBytesCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestAddressBytesCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -594,10 +593,10 @@ spec =
     it "should create TestLessComplexCons contract and check state after constructor" $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
-          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+
           testArrayStatName = "TestLessComplexCons"
       simpleConstructorSrc <- readSolFile "ConstructorTest.sol"
-      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -629,3 +628,109 @@ spec =
       length accts1 `shouldBe` 1
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
+
+    it "should create SimpleTuple contract, call methods and check state" $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps455"
+
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      simpleTupleSrc <- readSolFile "SimpleTuple.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        simpleTupleContractName = "SimpleTuple"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleTupleSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = simpleTupleContractName
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName simpleTupleContractName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mStoredData1 = Map.lookup "storedData1" contractStateMap
+        mStoredData2 = Map.lookup "storedData2" contractStateMap
+      mStoredData1 `shouldSatisfy` isJust
+      mStoredData2 `shouldSatisfy` isJust
+      let
+        Just storedData1 = mStoredData1
+        Just storedData2 = mStoredData2
+      storedData1 `shouldBe` SolidityValueAsString "0"
+      storedData2 `shouldBe` SolidityValueAsString "0"
+
+      -- call contract store value
+      let
+        argVal1 = 2
+        argVal2 = 4
+        contractName = ContractName simpleTupleContractName
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = [("argVal1", ArgInt argVal1), ("argVal2", ArgInt argVal2)]
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+
+      -- call get value and verify
+
+      let
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "get"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe` [SolidityValueAsString "2", SolidityValueAsString "4"]
+
+      -- get state and verify
+
+      contractStateEither' <- runClientM
+        (getContractsState contractName (Unnamed contractAddr))
+        (ClientEnv mgr blocUrl)
+      contractStateEither' `shouldSatisfy` isRight
+
+      let
+        Right contractStateMap' = contractStateEither'
+        mStoredData1' = Map.lookup "storedData1" contractStateMap'
+        mStoredData2' = Map.lookup "storedData2" contractStateMap'
+      mStoredData1' `shouldSatisfy` isJust
+      mStoredData2' `shouldSatisfy` isJust
+      let
+        Just storedData1' = mStoredData1'
+        Just storedData2' = mStoredData2'
+      storedData1' `shouldBe` SolidityValueAsString "2"
+      storedData2' `shouldBe` SolidityValueAsString "4"

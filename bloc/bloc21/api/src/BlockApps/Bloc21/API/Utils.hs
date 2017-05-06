@@ -13,14 +13,12 @@ import           Control.Lens                     (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
 import           Data.Proxy
 import           Data.String
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import           Generic.Random.Generic
 import           GHC.Generics
-import qualified Network.HTTP.Media               as M
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
@@ -41,31 +39,6 @@ instance Arbitrary Homepage where -- seriously, lmfao
     arbitrary = return whoWouldveThoughtThisIsActuallyTheHomepage
 instance ToSchema Homepage where
     declareNamedSchema _ = declareNamedSchema $ Proxy @ Text
-
-data HTMLifiedJSON
-
-instance Accept HTMLifiedJSON where
-  contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
-
-instance FromJSON x => MimeUnrender HTMLifiedJSON x where
-  mimeUnrender _ = eitherDecode
-
-instance ToJSON x => MimeRender HTMLifiedJSON x where
-  mimeRender _ = encode
---------------------------------------------------------------------------------
-
-data HTMLifiedAddress
-
-instance Accept HTMLifiedAddress where
-  contentType _ = "text" M.// "html" M./: ("charset", "utf-8")
-
-instance MimeUnrender HTMLifiedAddress Address where
-  mimeUnrender _
-    = maybe (Left "could not unrender Address") Right
-    . stringAddress . Lazy.Char8.unpack
-
-instance MimeRender HTMLifiedAddress Address where
-  mimeRender _ = Lazy.Char8.pack . addressString
 
 --------------------------------------------------------------------------------
 
@@ -96,16 +69,6 @@ instance ToSchema ContractName where
     & mapped.schema.description ?~ "The name of the smart contract."
     & mapped.schema.paramSchema.type_ .~ SwaggerString
     & mapped.schema.example ?~ toJSON (ContractName "MySmartContract")
-
---------------------------------------------------------------------------------
-
--- hack because endpoints are returning stringified json
--- as application/octet-stream
-instance FromJSON x => MimeUnrender OctetStream x where
-  mimeUnrender _ = eitherDecode
-
-instance ToJSON x => MimeRender OctetStream x where
-  mimeRender _ = encode
 
 --------------------------------------------------------------------------------
 
