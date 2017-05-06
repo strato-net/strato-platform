@@ -427,6 +427,9 @@ data PostUsersContractMethodListResponse
   | MethodResolved [SolidityValue]
   deriving (Eq,Show,Generic)
 
+instance Arbitrary PostUsersContractMethodListResponse where
+  arbitrary = genericArbitrary uniform
+
 instance ToJSON PostUsersContractMethodListResponse
 instance FromJSON PostUsersContractMethodListResponse
 
