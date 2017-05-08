@@ -735,3 +735,182 @@ spec =
         Just storedData2' = mStoredData2'
       storedData1' `shouldBe` SolidityValueAsString "2"
       storedData2' `shouldBe` SolidityValueAsString "4"
+
+    it "should create EnumTest contract, call methods and check state" $ \ TestConfig {..} -> do
+      pendingWith "In progress"
+      let
+          userName1 = UserName "blockapps2"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      enumTestSrc <- readSolFile "EnumTest.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        enumTestContractName = "EnumTest"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = enumTestSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = enumTestContractName
+          , postuserscontractrequestArgs = Just $ Map.singleton "value" (ArgInt 1)
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName enumTestContractName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mVal = Map.lookup "val" contractStateMap
+      mVal `shouldSatisfy` isJust
+      let
+        Just val = mVal
+      val `shouldBe` SolidityValueAsString "1"
+
+      -- call contract store value
+      let
+        argVal = 2
+        contractName = ContractName enumTestContractName
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = Map.singleton "value" (ArgInt argVal)
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+
+      -- call get value and verify
+
+      let
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "get"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe` "transaction returned: 2"
+
+      -- get state and verify
+
+      contractStateEither' <- runClientM
+        (getContractsState contractName (Unnamed contractAddr))
+        (ClientEnv mgr blocUrl)
+      contractStateEither' `shouldSatisfy` isRight
+
+      let
+        Right contractStateMap' = contractStateEither'
+        mVal' = Map.lookup "val" contractStateMap'
+      mVal' `shouldSatisfy` isJust
+      let
+        Just val' = mVal'
+      val' `shouldBe` SolidityValueAsString "2"
+
+
+    it "should create Bytes32Test contract, call methods and check state" $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps2"
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      testSrc' <- readSolFile "Bytes32Test.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        testContractName' = "Bytes32Test"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = testSrc'
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testContractName'
+          , postuserscontractrequestArgs = Just $ [("b", (ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"))]
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+
+      -- -- call contract store value
+      let
+        argVal =
+          [ ("a" , (ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"))
+          , ("c" , (ArgString "Deep roots are not reached by the frost."))
+          , ("b"
+            , ArgArray
+                ( Vector.fromList
+                  [ ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  ]
+                )
+            )
+          ]
+        contractName = ContractName testContractName'
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = argVal
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse vs) = postUsersContractMethodEitherSet
+      vs `shouldBe` "transaction returned: \"81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89\""
+
+      -- call get value and verify
+
+      let
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "get"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe` "transaction returned: \"81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89\""
