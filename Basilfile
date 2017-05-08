@@ -60,7 +60,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
       links:
@@ -121,7 +121,7 @@ deployments:
 
   - name: postgrest
     repo: https://github.com/blockapps/postgrest-packager.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
       environment:
@@ -137,13 +137,13 @@ deployments:
 
   - name: postgres
     repo: https://github.com/blockapps/postgres-packager.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
 
   - name: explorer
     repo: https://github.com/blockapps/strato-explorer.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       ports:
         - "9000:9000"
@@ -156,7 +156,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
       volumes:
@@ -185,7 +185,7 @@ deployments:
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
-    ref: monostrato-cutover
+    ref: master
     compose:
       restart: always
       links:
