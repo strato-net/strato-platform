@@ -851,7 +851,7 @@ spec =
           { postuserscontractrequestSrc = testSrc'
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = testContractName'
-          , postuserscontractrequestArgs = Just $ [("b", (ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"))]
+          , postuserscontractrequestArgs = Just  [("b", ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")]
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just 0
           }
@@ -870,8 +870,8 @@ spec =
       -- -- call contract store value
       let
         argVal =
-          [ ("a" , (ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"))
-          , ("c" , (ArgString "Deep roots are not reached by the frost."))
+          [ ("a" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+          , ("c" , ArgString "Deep roots are not reached by the frost.")
           , ("b"
             , ArgArray
                 ( Vector.fromList
