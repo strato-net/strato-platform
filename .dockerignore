@@ -1,0 +1,6 @@
+pkg/
+.git/
+.gitignore
+.gitattributes
+Basilbuild
+Dockerfile

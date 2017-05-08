@@ -372,8 +372,8 @@ const EthereumQuery = new GraphQLObjectType({
             {
               where: { 
                 //args.map(toSolidity)
-                //'key': toSolidity(args['key'])
-                'value': toSolidity(args['value'])
+                'key': toSolidity(args['key'])
+                //'value': toSolidity(args['value'])
               }, attributes: ['id', 'address_state_ref_id', 'value', 'key']
             }
           );
