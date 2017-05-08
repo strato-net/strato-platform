@@ -3,8 +3,9 @@
 
 module BlockApps.Bloc20.API
   ( BlocAPI
---  , markdownBloc
---  , layoutBloc
+  , markdownBloc
+  , layoutBloc
+  , mockBloc
   , blocApi
   , module BlockApps.Bloc20.API.Users
   , module BlockApps.Bloc20.API.Addresses
@@ -15,9 +16,10 @@ module BlockApps.Bloc20.API
   ) where
 
 import           Data.Proxy
---import           Data.Text
+import           Data.Text
 import           Servant
---import           Servant.Docs
+import           Servant.Docs
+import           Servant.Mock
 
 import           BlockApps.Bloc20.API.Addresses
 import           BlockApps.Bloc20.API.Contracts
@@ -56,11 +58,14 @@ type BlocAPI =
   :<|> GetSearchContractState
   :<|> GetSearchContractStateReduced
 
---markdownBloc :: String
---markdownBloc = markdown $ docs (Proxy @BlocAPI)
+markdownBloc :: String
+markdownBloc = markdown $ docs blocApi
 
---layoutBloc :: Text
---layoutBloc = layout (Proxy @ BlocAPI)
+layoutBloc :: Text
+layoutBloc = layout blocApi
+
+mockBloc :: Server BlocAPI
+mockBloc = mock blocApi Proxy
 
 blocApi :: Proxy BlocAPI
 blocApi = Proxy

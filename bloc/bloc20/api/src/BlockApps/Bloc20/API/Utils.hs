@@ -104,8 +104,8 @@ instance ToSchema ContractName where
 instance FromJSON x => MimeUnrender OctetStream x where
   mimeUnrender _ = eitherDecode
 
---instance ToJSON x => MimeRender OctetStream x where
---  mimeRender _ = encode
+instance ToJSON x => MimeRender OctetStream x where
+ mimeRender _ = encode
 
 --------------------------------------------------------------------------------
 
