@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 module BlockApps.Bloc21.Server.Users where
 
@@ -320,7 +321,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
   Just functionId -> do
     argNamesTypes <- getXabiFunctionsArgsQuery functionId
     let
-      determineValue valStr (Xabi.IndexedType _ xabiType) =
+      determineValue valStr (Xabi.IndexedType ix xabiType) =
         let
           typeM = case xabiType of
             Xabi.Int _ _ ->
@@ -361,7 +362,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
             Xabi.Label _ -> undefined -- TODO - fill this in
         in do
           ty <- either (blocError . UserError) return typeM
-          either (blocError . UserError) return (textToValue valStr ty)
+          either (blocError . UserError) (return . (ix,)) (textToValue valStr ty)
     case args of
       Nothing ->
         if Map.null argNamesTypes
@@ -371,7 +372,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
         argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
           then throwError (UserError "argument names don't match")
           else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
-        let vals = toList argsVals
+        let vals = map snd (sortOn fst (toList argsVals))
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
 prepareTx
