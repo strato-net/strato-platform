@@ -103,7 +103,7 @@ postUsersContract userName addr
     argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
     tx <- prepareTx
       userName password addr Nothing (fromMaybe emptyTxParams txParams)
-      (eth (fromIntegral (fromMaybe 0 $ fmap unStrung value))) (bin <> argsBin) 0
+      (eth (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     txResult <- pollTxResult hash
@@ -290,7 +290,7 @@ postUsersContractMethod
       userAddr
       (Just contractAddr)
       (fromMaybe emptyTxParams txParams)
-      (eth (fromMaybe 0 $ fmap (fromIntegral . unStrung) value))
+      (eth (maybe 0 (fromIntegral . unStrung) value))
       ((sel::ByteString) <> (argsBin::ByteString))
       0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
