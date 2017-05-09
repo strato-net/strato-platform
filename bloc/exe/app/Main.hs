@@ -56,17 +56,17 @@ main = do
   _ <- $initHFlags "Setup EthereumH DBs"
   dbCreateConn <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=postgres password=" ++ flags_password
-    
+
   doesNotExist21 <- null <$>
     (query_ dbCreateConn dbExistsQuery21 :: IO [Only Int])
   when doesNotExist21 . void $
     execute_ dbCreateConn Bloc21.createDatabase
-    
+
   doesNotExist20 <- null <$>
     (query_ dbCreateConn dbExistsQuery20 :: IO [Only Int])
   when doesNotExist20 . void $
     execute_ dbCreateConn Bloc20.createDatabase
-    
+
   close dbCreateConn
 
 
@@ -74,7 +74,7 @@ main = do
 
   conn21 <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc21 password=" ++ flags_password
-    
+
   conn20 <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc20 password=" ++ flags_password
 
@@ -87,6 +87,7 @@ main = do
   let blocEnv = Bloc21.BlocEnv stratoUrl cirrusUrl mgr conn21 $ toEnum flags_loglevel
   let bloc2Env = Bloc20.BlocEnv stratoUrl cirrusUrl mgr conn20 $ toEnum flags_loglevel
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
+  putStrLn $ "Using Cirrus URL: " ++ showBaseUrl cirrusUrl
   run flags_port (appBloc blocEnv bloc2Env)
 
 dbExistsQuery21 :: Query
@@ -96,7 +97,7 @@ dbExistsQuery20 :: Query
 dbExistsQuery20 = "SELECT 1 FROM pg_database WHERE datname='bloc20';"
 
 appBloc :: Bloc21.BlocEnv -> Bloc20.BlocEnv -> Application
-appBloc env21 env20 = 
+appBloc env21 env20 =
   simpleCors
   . logStdoutDev
   . serve (Proxy @ (
@@ -109,4 +110,3 @@ appBloc env21 env20 =
      :<|> swaggerSchemaUIServer Bloc21.blocSwagger
      :<|> Bloc20.serveBloc env20
      :<|> swaggerSchemaUIServer Bloc20.blocSwagger)
-

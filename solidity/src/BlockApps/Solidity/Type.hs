@@ -175,4 +175,5 @@ textToSimpleArgType str = if Text.null str then Left "textToSimpleArgType: null 
 textToArgType :: Text -> Bool -> Text -> Either Text Type
 textToArgType "Array" True str = TypeArrayDynamic . SimpleType <$> textToSimpleArgType str
 textToArgType (Text.unpack -> 'A':'r':'r':'a':'y':n) False str = TypeArrayFixed (read n) . SimpleType <$> textToSimpleArgType str
+textToArgType "Enum" _ str = return $ TypeEnum str
 textToArgType str _ _ = SimpleType <$> textToSimpleArgType str

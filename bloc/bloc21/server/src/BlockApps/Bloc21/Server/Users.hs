@@ -21,11 +21,12 @@ import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.RLP
+import           Data.Set                        (isSubsetOf)
 import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
-import           Opaleye
+import           Opaleye hiding (not)
 
 import           BlockApps.Bloc21.API.Users
 import           BlockApps.Bloc21.API.Utils
@@ -352,14 +353,15 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
                     error "Array of array not supported"
                   Xabi.Contract{} -> "Contract"
                   Xabi.Mapping{} -> "Mapping"
-                  Xabi.Label{} -> undefined -- TODO - fill this in
+                  Xabi.Label{} -> "Int" -- since Enums are converted to Ints
               in
                 textToArgType ("Array" <> maybe "" (Text.pack . show) len) (fromMaybe False dy) ettyty
             Xabi.Contract{} ->
               textToArgType "Contract" False ""
             Xabi.Mapping dy _ _ ->
               textToArgType "Mapping" (fromMaybe False dy) ""
-            Xabi.Label _ -> undefined -- TODO - fill this in
+            Xabi.Label _ ->
+              textToArgType "Int" False "" -- since Enums are converted to Ints
         in do
           ty <- either (blocError . UserError) return typeM
           either (blocError . UserError) (return . (ix,)) (textToValue valStr ty)
@@ -369,8 +371,12 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
           then return ByteString.empty
           else throwError (UserError "no arguments provided to function.")
       Just argsMap -> do
-        argsVals <- if Map.keys argsMap /= Map.keys argNamesTypes
-          then throwError (UserError "argument names don't match")
+        argsVals <- if not (Map.keysSet argNamesTypes `isSubsetOf` Map.keysSet argsMap)
+          then do
+            let
+              argNames1 = "(" <> Text.intercalate ", " (Map.keys argNamesTypes) <> ")"
+              argNames2 = "(" <> Text.intercalate ", " (Map.keys argsMap) <> ")"
+            throwError (UserError ("argument names don't match: " <> argNames1 <> " " <> argNames2))
           else sequence $ Map.intersectionWith determineValue argsMap argNamesTypes
         let vals = map snd (sortOn fst (toList argsVals))
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
