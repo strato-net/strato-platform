@@ -181,7 +181,7 @@ runPeer connectedPeers peer myPriv = do
         runResourceT $ do
             let connectedPeer = ConnectedPeer peer 
             void $ modifyTVar connectedPeers $ S.insert connectedPeer
-            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr flags_maxConn 
+            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20 
 
             let kafkaState = mkConfiguredKafkaState "strato-p2p-client"
 
@@ -237,7 +237,7 @@ stratoP2PClient :: LoggingT IO ()
 stratoP2PClient = do
   connectedPeers <- newTVar S.empty
   _ <- liftIO . forkIO $ runStratoP2PComm clientCommPort connectedPeers
-  activePeersSem <- liftIO (SSem.new 20) -- todo: flag/variable for max running peers at once. 20 is mainnet convention amongst REAL clients #realclientshavepeers
+  activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     peers <- liftIO getAvailablePeers
     case flags_mode of
