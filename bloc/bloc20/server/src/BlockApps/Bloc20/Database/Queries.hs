@@ -34,6 +34,7 @@ import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple      (Connection)
+import           Debug.Trace
 import           GHC.Stack
 import           Opaleye                         hiding (not, null)
 import qualified Opaleye                         (not, null)
@@ -42,6 +43,7 @@ import           BlockApps.Bloc20.API.Utils
 import           BlockApps.Bloc20.Crypto
 import           BlockApps.Bloc20.Database.Tables
 import           BlockApps.Bloc20.Monad
+import           BlockApps.Bloc20.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
@@ -944,7 +946,7 @@ insertContract
   -> Bloc Int32
 insertContract parentContr contr bin binRuntime xabi = do
   let
-    codeHash = keccak256 (Text.encodeUtf8 binRuntime)
+    codeHash = binRuntimeToCodeHash binRuntime
     xcodeHash = keccak256 (Text.encodeUtf8 bin)
   contrId <- createContractQuery contr
   metadataId <- insertContractMetaDataQuery
@@ -971,11 +973,12 @@ compileContract source = do
       { contractdetailsBin = bin
       , contractdetailsAddress = Just (Named "Latest")
       , contractdetailsBinRuntime = binRuntime
-      , contractdetailsCodeHash = keccak256 (Text.encodeUtf8 binRuntime)
+      , contractdetailsCodeHash = binRuntimeToCodeHash binRuntime
       , contractdetailsName = contrName
       , contractdetailsXabi = xabi
       }
-
+  traceShowM ("codeHash ========" :: String)
+  traceShowM details
   metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
     let
       xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)

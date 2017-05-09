@@ -26,6 +26,7 @@ import           Data.Text                       (Text)
 import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
+import           Debug.Trace
 import           Opaleye hiding (not)
 
 import           BlockApps.Bloc21.API.Users
@@ -86,6 +87,8 @@ postUsersContract userName addr
   (PostUsersContractRequest src password maybeContract args txParams value) = blocTransaction $ do
     --TODO: check what happens with mismatching args
     idsAndDetails <- compileContract src
+    traceShowM ("idsAndDetails ====== " :: String)
+    traceShowM idsAndDetails
     logWith logNotice ("constructor arguments: " <> Text.pack (show args))
     (cmId,ContractDetails{..}) <-
       case maybeContract of
