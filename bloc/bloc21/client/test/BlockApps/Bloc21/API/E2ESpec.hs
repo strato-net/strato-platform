@@ -939,7 +939,7 @@ spec =
         (ClientEnv mgr blocUrl)
       identityAgentEither `shouldSatisfy` isRight
       let
-        Right (PostUsersContractMethodResponse  ([SolidityArray [SolidityValueAsString storeAddr, _]]))  = identityAgentEither
+        Right (PostUsersContractMethodResponse  [SolidityArray [SolidityValueAsString storeAddr, _]])  = identityAgentEither
         cName = ContractName "BasicUserStorage"
         storeArgs =
           [ ("_author" , ArgString "4d25aa9471ce573fcd260e36255cfbcdd6dd591b")
