@@ -602,7 +602,7 @@ textToSimpleValue str = \case
         (bytes, leftover) = Base16.decode (Text.encodeUtf8 str)
       in
         if leftover /= ByteString.empty || ByteString.length bytes /= n
-          then Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str
+          then Left $ "textToSimpleValue: could not decode as statically sized bytes: " <> str <> ", expected a Base16 encoded string of length " <> Text.pack (show $ 2 * n) <> ", which represents a bytestring of length " <> Text.pack (show n)
           else return bytes
     readBytesDyn :: Either Text ByteString
     readBytesDyn =

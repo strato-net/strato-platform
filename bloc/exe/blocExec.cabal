@@ -27,6 +27,7 @@ executable blockapps-bloc
                , http-client
                , postgresql-simple
                , servant-client
+               , servant-options
                , servant-server
                , servant-swagger
                , servant-swagger-ui

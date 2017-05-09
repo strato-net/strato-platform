@@ -5,6 +5,7 @@
 
 module BlockApps.Bloc21.API.E2ESpec where
 
+
 import           Control.Concurrent
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Char8            as Char8
@@ -12,6 +13,7 @@ import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
 import qualified Data.Text.Encoding               as Text
+import qualified Data.Text                        as Text
 import qualified Data.Vector                      as Vector
 import           Numeric.Natural
 import           Servant.Client
@@ -71,7 +73,7 @@ spec =
       threadDelay 4000000
       let
         etherToSend = 100
-        postSendParameters = PostSendParameters address2 (etherToWei etherToSend) pw txParams
+        postSendParameters = PostSendParameters address2 (Strung etherToSend) pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
@@ -96,10 +98,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = simpleStorageContractName
+          , postuserscontractrequestContract = Just simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -136,7 +138,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" (ArgInt 3)
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherSet <- runClientM
@@ -151,7 +153,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherGet <- runClientM
@@ -193,10 +195,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageAddressSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = simpleStorageAddressContractName
+          , postuserscontractrequestContract = Just simpleStorageAddressContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -233,7 +235,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" (ArgString "deadbeef")
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherSet <- runClientM
@@ -248,7 +250,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherGet <- runClientM
@@ -288,10 +290,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = simpleStorageBytes32ArrayContractName
+          , postuserscontractrequestContract = Just simpleStorageBytes32ArrayContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -330,7 +332,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = Map.singleton "x" (ArgArray [ArgString arg1, ArgString arg2])
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherSet <- runClientM
@@ -345,7 +347,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherGet <- runClientM
@@ -386,7 +388,7 @@ spec =
         sameName1ContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = sameName1Src
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = "SameName"
+          , postuserscontractrequestContract = Just "SameName"
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Nothing
@@ -394,7 +396,7 @@ spec =
         sameName2ContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = sameName2Src
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = "SameName"
+          , postuserscontractrequestContract = Just "SameName"
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Nothing
@@ -433,10 +435,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = simpleConstructorName
+          , postuserscontractrequestContract = Just simpleConstructorName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgInt 3)
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -480,10 +482,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList [ArgInt 3,ArgInt 2,ArgInt 3]))
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -511,10 +513,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList (map ArgInt [1,2,3,4,5,6,7,8])))
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -541,10 +543,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.singleton "x" $ ArgString "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -571,14 +573,14 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
           [ ("x", ArgString "deadbeef")
           , ( "y", ArgString  "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
             )
           ]
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -606,7 +608,7 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = testArrayStatName
+          , postuserscontractrequestContract = Just testArrayStatName
           , postuserscontractrequestArgs = Just $ Map.fromList
           [ ("_uint", ArgInt 102344)
           , ("_int", ArgInt (-444444))
@@ -617,7 +619,7 @@ spec =
           , ("_uintArrSt", ArgArray (Vector.fromList [ArgInt 1,ArgInt 2,ArgInt 3]))
           ]
           , postuserscontractrequestTxParams = txParamsComplex
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM
         (getAccountsFilter params1)
@@ -644,10 +646,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleTupleSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = simpleTupleContractName
+          , postuserscontractrequestContract = Just simpleTupleContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -690,7 +692,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = [("argVal1", ArgInt argVal1), ("argVal2", ArgInt argVal2)]
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherSet <- runClientM
@@ -705,7 +707,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherGet <- runClientM
@@ -750,10 +752,10 @@ spec =
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = testSrc'
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = testContractName'
+          , postuserscontractrequestContract = Just testContractName'
           , postuserscontractrequestArgs = Just [("b", ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")]
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
@@ -771,7 +773,7 @@ spec =
       let
         argVal =
           [ ("a" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
-          , ("c" , ArgString "Deep roots are not reached by the frost.")
+          , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
           , ("b"
             , ArgArray
                 ( Vector.fromList
@@ -786,7 +788,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "set"
           , postuserscontractmethodArgs = argVal
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherSet <- runClientM
@@ -804,7 +806,7 @@ spec =
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       postUsersContractMethodEitherGet <- runClientM
@@ -814,3 +816,146 @@ spec =
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
       values `shouldBe` [SolidityValueAsString "\129\167ePH\SOn=\154M\241{\159\&6\131\182l\237\169\136\&9\ns\193DlBqs\191j\137"]
+
+    it "should create StorageBlob contract, call methods " $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps2"
+          -- postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      testSrc' <- readSolFile "StorageBlob.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        testContractName' = "StorageDepolyer"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = testSrc'
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = Just testContractName'
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just $ Strung 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- call get value and verify
+
+      let
+        contractNameDeployer = ContractName testContractName'
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "deployBlob"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = Just $ Strung 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractNameDeployer contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse [SolidityValueAsString storageAddr]) = postUsersContractMethodEitherGet
+
+
+      -- -- call contract store value
+      let
+        storageName = ContractName "StorageBlob"
+        argVal =
+          [ ("a" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+          , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
+          , ("b"
+            , ArgArray
+                ( Vector.fromList
+                  [ ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  ]
+                )
+            )
+          ]
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = argVal
+          , postuserscontractmethodValue = Just $ Strung 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 storageName (fromJust . stringAddress . Text.unpack $ storageAddr) postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse vs) = postUsersContractMethodEitherSet
+      vs `shouldBe` [SolidityValueAsString "Account Data should be able to be as long as you want ideally 12343432442431"]
+
+    it "should create IAM contracts and run them all" $ \ TestConfig {..} -> do
+      let
+          iamUsername = UserName "IAM"
+      postIAMEither <- runClientM (postUsersUser iamUsername True pw) (ClientEnv mgr blocUrl)
+      postIAMEither `shouldSatisfy` isRight
+      iamBlob <- readSolFile "BadgerIam.sol"
+      threadDelay 4000000
+      let
+        Right iamUserAddr = postIAMEither
+        paramsIAM = accountsFilterParams {qaAddress = Just iamUserAddr}
+        iamName = "IdentityAccessManager"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = iamBlob
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = Just iamName
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just $ Strung 0
+          }
+      eAccts2 <- runClientM (getAccountsFilter paramsIAM) (ClientEnv mgr stratoUrl)
+      eAccts2 `shouldSatisfy` isRight
+      let
+        Right accts2 = eAccts2
+      length accts2 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract iamUsername iamUserAddr postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right iamAddr = postUsersContractEither
+        bobName = UserName "bob"
+      postBobEither <- runClientM (postUsersUser bobName True pw) (ClientEnv mgr blocUrl)
+      postBobEither `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        Right bobAddr = postBobEither
+        args = Map.singleton "userKey" $ ArgString . Text.pack . addressString $ bobAddr
+        contrMethodReq = PostUsersContractMethodRequest pw "createIdentityAgent" args (Just $ Strung 0) Nothing
+      identityAgentEither <- runClientM
+        (postUsersContractMethod iamUsername iamUserAddr (ContractName "IdentityAccessManager") iamAddr contrMethodReq)
+        (ClientEnv mgr blocUrl)
+      identityAgentEither `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse  [SolidityArray [SolidityValueAsString storeAddr, _]])  = identityAgentEither
+        cName = ContractName "BasicUserStorage"
+        storeArgs =
+          [ ("_author" , ArgString "4d25aa9471ce573fcd260e36255cfbcdd6dd591b")
+          , ("_hash" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+          , ("_tags"
+            , ArgArray
+                ( Vector.fromList
+                  [ ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  ]
+                )
+            )
+          , ("_contents" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
+          ]
+        storeMethodReq = PostUsersContractMethodRequest pw "writeDataToStorage" storeArgs (Just $ Strung 0) Nothing
+      storeEither <- runClientM
+        (postUsersContractMethod iamUsername iamUserAddr cName (fromJust . stringAddress . Text.unpack $ storeAddr)  storeMethodReq)
+        (ClientEnv mgr blocUrl)
+      storeEither `shouldSatisfy` isRight
