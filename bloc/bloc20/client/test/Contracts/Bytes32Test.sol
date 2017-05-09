@@ -6,7 +6,7 @@ contract Bytes32Test {
   }
 
   function set(bytes32 a, bytes32[] b, string c) returns(bytes32) {
-      bites = a;
+      /*bites = a;*/
       return bites;
   }
 
