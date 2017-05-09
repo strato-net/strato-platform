@@ -16,6 +16,7 @@ import           Network.HTTP.Client hiding (Proxy)
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Middleware.Cors
 import           Network.Wai.Middleware.RequestLogger
+import           Network.Wai.Middleware.Servant.Options
 import           Servant
 import           Servant.Common.BaseUrl
 import           Servant.Swagger.UI
@@ -97,8 +98,9 @@ dbExistsQuery20 = "SELECT 1 FROM pg_database WHERE datname='bloc20';"
 
 appBloc :: Bloc21.BlocEnv -> Bloc20.BlocEnv -> Application
 appBloc env21 env20 = 
-  simpleCors
-  . logStdoutDev
+  logStdoutDev
+  . cors (const $ Just policy)
+  . provideOptions (Proxy @ (Bloc21.BlocAPI :<|> Bloc20.BlocAPI))
   . serve (Proxy @ (
               "bloc" :> "v2.1" :> Bloc21.BlocAPI :<|>
               "bloc" :> "v2.1" :> Bloc21.BlocDocsAPI :<|>
@@ -109,4 +111,8 @@ appBloc env21 env20 =
      :<|> swaggerSchemaUIServer Bloc21.blocSwagger
      :<|> Bloc20.serveBloc env20
      :<|> swaggerSchemaUIServer Bloc20.blocSwagger)
+  where
+    policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
+
+
 

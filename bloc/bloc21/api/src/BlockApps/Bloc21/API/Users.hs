@@ -66,7 +66,7 @@ type PostUsersSend = "users"
 
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
-  , sendValue     :: Natural
+  , sendValue     :: Strung Natural
   , sendPassword  :: Password
   , sendTxParams  :: Maybe TxParams
   } deriving (Eq, Show, Generic)
@@ -82,7 +82,7 @@ instance FromJSON PostSendParameters where
 instance ToSample PostSendParameters where
   toSamples _ = singleSample PostSendParameters
     { sendToAddress = Address 0xdeadbeef
-    , sendValue = 10
+    , sendValue = Strung 10
     , sendPassword = "securePassword"
     , sendTxParams = Nothing
     }
@@ -95,7 +95,7 @@ instance ToSchema PostSendParameters where
       ex :: PostSendParameters
       ex = PostSendParameters
         { sendToAddress = Address 0xdeadbeef
-        , sendValue = 10
+        , sendValue = Strung 10
         , sendPassword = "securePassword"
         , sendTxParams = Just $ TxParams
             (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876))
@@ -113,10 +113,10 @@ type PostUsersContract = "users"
 data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc      :: Text
   , postuserscontractrequestPassword :: Password
-  , postuserscontractrequestContract :: Text
+  , postuserscontractrequestContract :: Maybe Text
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
   , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue :: Maybe Natural
+  , postuserscontractrequestValue :: Maybe (Strung Natural)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
@@ -134,10 +134,10 @@ instance ToSample PostUsersContractRequest where
       \{ storedData = x; } function get() returns (uint retVal) \
       \{ return storedData; } }"
     , postuserscontractrequestPassword = "securePassword"
-    , postuserscontractrequestContract = "SimpleStorage"
+    , postuserscontractrequestContract = Just "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = Nothing
-    , postuserscontractrequestValue = Just 1000000
+    , postuserscontractrequestValue = Just $ Strung 1000000
     }
 
 instance ToSchema PostUsersContractRequest where
@@ -151,10 +151,10 @@ instance ToSchema PostUsersContractRequest where
           \{ storedData = x; } function get() returns (uint retVal) \
           \{ return storedData; } }"
         , postuserscontractrequestPassword = "securePassword"
-        , postuserscontractrequestContract = "SimpleStorage"
+        , postuserscontractrequestContract = Just "SimpleStorage"
         , postuserscontractrequestArgs = Nothing
         , postuserscontractrequestTxParams = Nothing
-        , postuserscontractrequestValue = Just 1000000
+        , postuserscontractrequestValue = Just $ Strung 1000000
         }
 
 --------------------------------------------------------------------------------
@@ -209,7 +209,7 @@ data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
   , uploadlistcontractArgs         :: Map Text ArgValue
   , uploadlistcontractTxParams     :: Maybe TxParams
-  , uploadlistcontractValue        :: Maybe Natural
+  , uploadlistcontractValue        :: Maybe (Strung Natural)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary UploadListContract where arbitrary = genericArbitrary uniform
@@ -274,7 +274,7 @@ data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
   , postuserscontractmethodMethod   :: Text
   , postuserscontractmethodArgs     :: Map Text ArgValue
-  , postuserscontractmethodValue    :: Natural
+  , postuserscontractmethodValue    :: Maybe (Strung Natural)
   , postuserscontractmethodTxParams :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
@@ -308,7 +308,7 @@ instance ToSchema PostUsersContractMethodRequest where
        { postuserscontractmethodPassword = "MySecretPassword"
        , postuserscontractmethodMethod = "fireMissiles"
        , postuserscontractmethodArgs = Map.fromList [("arg1", ArgString "accessCodes"), ("arg2", ArgString "target")]
-       , postuserscontractmethodValue = 0 :: Natural
+       , postuserscontractmethodValue = Just $ Strung 0
        , postuserscontractmethodTxParams = Nothing
        }
 
@@ -358,14 +358,14 @@ instance ToSchema PostSendListRequest where
       sendEx :: SendTransaction
       sendEx = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
-        , sendtransactionValue = 12
+        , sendtransactionValue = Strung 12
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         }
 
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address
-  , sendtransactionValue     :: Natural
+  , sendtransactionValue     :: Strung Natural
   , sendtransactionTxParams  :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
@@ -407,7 +407,7 @@ instance ToSchema SendTransaction where
       ex :: SendTransaction
       ex = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
-        , sendtransactionValue = 12
+        , sendtransactionValue = Strung 12
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         }
@@ -475,7 +475,7 @@ instance ToSchema PostMethodListRequest where
       exMethodCall :: MethodCall
       exMethodCall = MethodCall
         { methodcallTxParams = Nothing
-        , methodcallValue = 10
+        , methodcallValue = Strung 10
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
@@ -487,7 +487,7 @@ data MethodCall = MethodCall
   , methodcallContractAddress :: Address
   , methodcallMethodName      :: Text
   , methodcallArgs            :: Map Text ArgValue
-  , methodcallValue           :: Natural
+  , methodcallValue           :: Strung Natural
   , methodcallTxParams        :: Maybe TxParams
   } deriving (Eq,Show,Generic)
 
@@ -508,7 +508,7 @@ instance ToSchema MethodCall where
       ex ::MethodCall
       ex = MethodCall
         { methodcallTxParams = Nothing
-        , methodcallValue = 10
+        , methodcallValue = Strung 10
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef

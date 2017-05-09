@@ -30,7 +30,7 @@ import           BlockApps.Bloc20.API.SwaggerSchema
 import           BlockApps.Ethereum
 --------------------------------------------------------------------------------
 
-type GetHomepage = Get '[PlainText] Homepage
+type GetHomepage = Get '[PlainText, JSON] Homepage
 whoWouldveThoughtThisIsActuallyTheHomepage :: Homepage
 whoWouldveThoughtThisIsActuallyTheHomepage = Homepage "home page!"
 newtype Homepage = Homepage { unHomepage :: Text }
@@ -41,6 +41,8 @@ instance Arbitrary Homepage where -- seriously, lmfao
     arbitrary = return whoWouldveThoughtThisIsActuallyTheHomepage
 instance ToSchema Homepage where
     declareNamedSchema _ = declareNamedSchema $ Proxy @ Text
+instance ToJSON Homepage
+instance FromJSON Homepage
 
 data HTMLifiedJSON
 
