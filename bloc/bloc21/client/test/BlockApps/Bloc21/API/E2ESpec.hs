@@ -5,6 +5,7 @@
 
 module BlockApps.Bloc21.API.E2ESpec where
 
+
 import           Control.Concurrent
 import qualified Data.ByteString.Base16           as Base16
 import qualified Data.ByteString.Char8            as Char8
@@ -12,6 +13,7 @@ import           Data.Either
 import qualified Data.Map                         as Map
 import           Data.Maybe
 import qualified Data.Text.Encoding               as Text
+import qualified Data.Text                        as Text
 import qualified Data.Vector                      as Vector
 import           Numeric.Natural
 import           Servant.Client
@@ -771,7 +773,7 @@ spec =
       let
         argVal =
           [ ("a" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
-          , ("c" , ArgString "Deep roots are not reached by the frost.")
+          , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
           , ("b"
             , ArgArray
                 ( Vector.fromList
@@ -814,3 +816,146 @@ spec =
       let
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
       values `shouldBe` [SolidityValueAsString "\129\167ePH\SOn=\154M\241{\159\&6\131\182l\237\169\136\&9\ns\193DlBqs\191j\137"]
+
+    it "should create StorageBlob contract, call methods " $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps2"
+          -- postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      testSrc' <- readSolFile "StorageBlob.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        testContractName' = "StorageDepolyer"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = testSrc'
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = testContractName'
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- call get value and verify
+
+      let
+        contractNameDeployer = ContractName testContractName'
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "deployBlob"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractNameDeployer contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse [SolidityValueAsString storageAddr]) = postUsersContractMethodEitherGet
+
+
+      -- -- call contract store value
+      let
+        storageName = ContractName "StorageBlob"
+        argVal =
+          [ ("a" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+          , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
+          , ("b"
+            , ArgArray
+                ( Vector.fromList
+                  [ ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  ]
+                )
+            )
+          ]
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = argVal
+          , postuserscontractmethodValue = 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 storageName (fromJust . stringAddress . Text.unpack $ storageAddr) postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse vs) = postUsersContractMethodEitherSet
+      vs `shouldBe` [SolidityValueAsString "Account Data should be able to be as long as you want ideally 12343432442431"]
+
+    it "should create IAM contracts and run them all" $ \ TestConfig {..} -> do
+      let
+          iamUsername = UserName "IAM"
+      postIAMEither <- runClientM (postUsersUser iamUsername True pw) (ClientEnv mgr blocUrl)
+      postIAMEither `shouldSatisfy` isRight
+      iamBlob <- readSolFile "BadgerIam.sol"
+      threadDelay 4000000
+      let
+        Right iamUserAddr = postIAMEither
+        paramsIAM = accountsFilterParams {qaAddress = Just iamUserAddr}
+        iamName = "IdentityAccessManager"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = iamBlob
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = iamName
+          , postuserscontractrequestArgs = Nothing
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just 0
+          }
+      eAccts2 <- runClientM (getAccountsFilter paramsIAM) (ClientEnv mgr stratoUrl)
+      eAccts2 `shouldSatisfy` isRight
+      let
+        Right accts2 = eAccts2
+      length accts2 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract iamUsername iamUserAddr postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right iamAddr = postUsersContractEither
+        bobName = UserName "bob"
+      postBobEither <- runClientM (postUsersUser bobName True pw) (ClientEnv mgr blocUrl)
+      postBobEither `shouldSatisfy` isRight
+      threadDelay 4000000
+      let
+        Right bobAddr = postBobEither
+        args = Map.singleton "userKey" $ ArgString . Text.pack . addressString $ bobAddr
+        contrMethodReq = PostUsersContractMethodRequest pw "createIdentityAgent" args 0 Nothing
+      identityAgentEither <- runClientM
+        (postUsersContractMethod iamUsername iamUserAddr (ContractName "IdentityAccessManager") iamAddr contrMethodReq)
+        (ClientEnv mgr blocUrl)
+      identityAgentEither `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse  [SolidityArray [SolidityValueAsString storeAddr, _]])  = identityAgentEither
+        cName = ContractName "BasicUserStorage"
+        storeArgs =
+          [ ("_author" , ArgString "4d25aa9471ce573fcd260e36255cfbcdd6dd591b")
+          , ("_hash" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+          , ("_tags"
+            , ArgArray
+                ( Vector.fromList
+                  [ ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  ]
+                )
+            )
+          , ("_contents" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
+          ]
+        storeMethodReq = PostUsersContractMethodRequest pw "writeDataToStorage" storeArgs 0 Nothing
+      storeEither <- runClientM
+        (postUsersContractMethod iamUsername iamUserAddr cName (fromJust . stringAddress . Text.unpack $ storeAddr)  storeMethodReq)
+        (ClientEnv mgr blocUrl)
+      storeEither `shouldSatisfy` isRight
