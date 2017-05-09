@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import Blockchain.EthConf
 import Blockchain.ServOptions
 import Blockchain.TCPServer
-import Executable.StratoP2PServerComm
+import Executable.StratoP2PComm
 
 stratoP2PServer:: LoggingT IO ()
 stratoP2PServer = do
@@ -26,7 +26,7 @@ stratoP2PServer = do
 
   connectedPeers <- newTVar S.empty
 
-  _ <- liftIO $ forkIO $ runStratoP2PServerComm connectedPeers
+  _ <- liftIO $ forkIO $ runStratoP2PComm serverCommPort connectedPeers
 
   _ <- runResourceT $ do
           runEthServer connectedPeers myPriv flags_listen

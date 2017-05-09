@@ -47,25 +47,26 @@ import qualified Database.Persist.Postgresql as SQL
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.P2PUtil
+import           Executable.StratoP2PComm
                
 theCurve::Curve
 theCurve = getCurveByName SEC_p256k1
 
 runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
-             => TVar (S.Set String) -> PrivateNumber -> Int -> m ()
-runEthServer connectedPeers  myPriv listenPort = do  
+             => TVar (S.Set ConnectedPeer) -> PrivateNumber -> Int -> m ()
+runEthServer connectedPeers myPriv listenPort = do  
     cxt <- initContextLite 
 
     let myPubkey = calculatePublic theCurve myPriv
        
     runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
       logInfoN $ T.pack $ "|||| Incoming connection from " ++ show (appSockAddr app)
-      _ <- modifyTVar connectedPeers (S.insert $ show $ appSockAddr app)
       peer <- fmap fst $ runResourceT $ flip runStateT cxt $ getPeerByIP (sockAddrToIP $ appSockAddr app)
       let unwrappedPeer = case (SQL.entityVal <$> peer) of 
                             Nothing -> error "peer is nothing after call to getPeerByIP"
                             Just peer' -> peer'
-                          
+          cp = ConnectedPeer unwrappedPeer                    
+      _ <- modifyTVar connectedPeers (S.insert cp)
       (_, (outCxt, inCxt)) <-
             liftIO $
             appSource app $$+
@@ -95,7 +96,7 @@ runEthServer connectedPeers  myPriv listenPort = do
 
         logInfoN "server session ended"
 
-        _ <- modifyTVar connectedPeers (S.delete $ show $ appSockAddr app)
+        _ <- modifyTVar connectedPeers (S.delete cp)
 
         return ()
 

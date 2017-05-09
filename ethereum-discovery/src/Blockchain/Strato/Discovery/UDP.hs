@@ -109,11 +109,13 @@ stringToIAddr x
 
 instance RLPSerializable IAddr where
   rlpEncode (IPV4Addr x) = rlpEncode $ fromBE32 x
-  rlpEncode x = error $ "case not yet covered for rlpEncode for IAddr: " ++ show x
+  rlpEncode x@(IPV6Addr _) = error $ "case not yet covered for rlpEncode for IPV6: " ++ format x
+  rlpEncode (HostName s) = rlpEncode $ (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
   rlpDecode o@(RLPString s)
       | B.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o
       --TODO- verify the order of this
       | B.length s == 16 = IPV6Addr (fromIntegral word128, fromIntegral $ word128 `shiftR` 32, fromIntegral $ word128 `shiftR` 64, fromIntegral $ word128 `shiftR` 96)
+      | B.pack [255, 255, 255, 255] `B.isPrefixOf` s = stringToIAddr . BC.unpack $ B.drop 4 s
       --what a mess!  Sometimes address is array of address bytes, sometimes a string representation of the address.  I need to figure this out someday
       | otherwise = stringToIAddr $ BC.unpack s
     where word128 = rlpDecode o::Word128

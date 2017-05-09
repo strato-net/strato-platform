@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -43,6 +44,9 @@ PPeer
     version T.Text
     deriving Show Read Eq
 |]
+
+pPeerString :: PPeer -> String
+pPeerString PPeer{..} = T.unpack pPeerIp ++ ":" ++ show pPeerTcpPort
 
 jamshidBirth::UTCTime
 jamshidBirth = posixSecondsToUTCTime 0

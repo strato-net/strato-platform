@@ -60,6 +60,7 @@ addPeersIfNeeded::(MonadIO m, MonadLogger m)=>
                   H.PrvKey->Socket->m ()
 addPeersIfNeeded prv sock= do
   numAvailablePeers <- liftIO getNumAvailablePeers
+  logInfoN . T.pack $ "Number of available peers: " ++ show numAvailablePeers
   when (numAvailablePeers < minAvailablePeers (discoveryConfig ethConf)) $ do
     bondedPeers <- liftIO getBondedPeersForUDP
     if length bondedPeers /= 0

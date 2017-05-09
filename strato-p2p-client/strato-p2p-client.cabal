@@ -65,6 +65,7 @@ library
                  , postgresql-simple
                  , random
                  , resourcet
+                 , SafeSemaphore
                  , stm
                  , stm-conduit
                  , strato-conf
@@ -90,9 +91,9 @@ library
                    Blockchain.SeqEventNotify
                    Blockchain.TCPClientWithTimeout
                    Executable.StratoP2PClient
+                   Executable.StratoP2PComm
     other-modules:
                    Blockchain.TimerSource
-                   Executable.StratoP2PClientComm
     ghc-options: -Wall -O2
     buildable: True
     hs-source-dirs: src
