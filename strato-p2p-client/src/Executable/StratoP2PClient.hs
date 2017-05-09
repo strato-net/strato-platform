@@ -181,7 +181,7 @@ runPeer connectedPeers peer myPriv = do
         runResourceT $ do
             let connectedPeer = ConnectedPeer peer 
             void $ modifyTVar connectedPeers $ S.insert connectedPeer
-            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20
+            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr flags_maxConn 
 
             let kafkaState = mkConfiguredKafkaState "strato-p2p-client"
 
