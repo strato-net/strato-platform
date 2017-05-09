@@ -13,7 +13,6 @@ import           Data.Swagger
 --import           Network.Wai.Middleware.RequestLogger
 import           Servant
 import           Servant.Swagger
-import           Servant.Swagger.UI
 
 import           BlockApps.Bloc20.API
 import           BlockApps.Bloc20.Monad
@@ -61,13 +60,13 @@ blocSwagger = toSwagger (Proxy @BlocAPI)
     & host ?~ Host "localhost" (Just 8000) -- this should not be hard coded
     & basePath ?~ "/bloc/v2.0"
 
-type BlocDocsAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
+type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
 serveBlocAndDocs
   :: BlocEnv
   -> Server (BlocAPI :<|> BlocDocsAPI)
 serveBlocAndDocs blocEnv = serveBloc blocEnv
-  :<|> swaggerSchemaUIServer blocSwagger
+  :<|> return blocSwagger
 
 --appBloc :: BlocEnv -> Application
 --appBloc

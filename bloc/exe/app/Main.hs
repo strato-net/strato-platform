@@ -19,7 +19,6 @@ import           Network.Wai.Middleware.RequestLogger
 import           Network.Wai.Middleware.Servant.Options
 import           Servant
 import           Servant.Common.BaseUrl
-import           Servant.Swagger.UI
 import           System.IO                          (BufferMode (..),
                                                      hSetBuffering, stderr,
                                                      stdout)
@@ -109,8 +108,8 @@ appBloc env21 env20 =
               "bloc" :> "v2.0" :> Bloc20.BlocDocsAPI
               ))
   $ (Bloc21.serveBloc env21
-     :<|> swaggerSchemaUIServer Bloc21.blocSwagger
+     :<|> return Bloc21.blocSwagger
      :<|> Bloc20.serveBloc env20
-     :<|> swaggerSchemaUIServer Bloc20.blocSwagger)
+     :<|> return Bloc20.blocSwagger)
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
