@@ -56,9 +56,10 @@ serveBloc env = enter (NT (enterBloc env)) bloc
 blocSwagger :: Swagger
 blocSwagger = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
-    & info.version .~ "0.1"
-    & info.description ?~ "This is the API for the BlocH"
+    & info.version .~ "2.0"
+    & info.description ?~ "This is the V2.0 API for the BlocH"
     & host ?~ Host "localhost" (Just 8000)
+    & basePath ?~ "/bloc/v2.0"
 
 type BlocDocsAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
 
