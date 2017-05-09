@@ -40,6 +40,7 @@ module BlockApps.Ethereum
   , Nonce (..)
   , incrNonce
   , Wei (..)
+  , eth
   , Gas (..)
   , BloomFilter (..)
   ) where
@@ -432,6 +433,10 @@ incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n+1)
 
 newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
+
+--TODO- this might be unsafe, since it could lead to an overflow.  A Word256 * 10^18 certainly can be much higer than a Word256
+eth::Word256->Wei
+eth x = Wei $ 10^(18::Integer) * x
 
 instance Arbitrary Wei where arbitrary = Wei . fromInteger <$> arbitrary
 

@@ -76,19 +76,27 @@ postUsersSend userName addr
   (PostSendParameters toAddr value password txParams) = do
     tx <- prepareTx
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-      (Wei (fromIntegral value)) ByteString.empty 0
+      (eth (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
     void $ pollTxResult hash
     return tx
 
 postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
 postUsersContract userName addr
-  (PostUsersContractRequest src password contract args txParams value) = blocTransaction $ do
+  (PostUsersContractRequest src password maybeContract args txParams value) = blocTransaction $ do
     --TODO: check what happens with mismatching args
     idsAndDetails <- compileContract src
     logWith logNotice ("constructor arguments: " <> Text.pack (show args))
-    (cmId,ContractDetails{..}) <- blocMaybe "Could not find global contract metadataId" $
-      Map.lookup contract idsAndDetails
+    (cmId,ContractDetails{..}) <-
+      case maybeContract of
+       Nothing ->
+         case Map.toList idsAndDetails of
+           [] -> throwError $ UserError "You need to supply at least one contract in the source"
+           [(_, x)] -> return x
+           _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
+       Just contract ->
+         blocMaybe "Could not find global contract metadataId" $
+         Map.lookup contract idsAndDetails
     let
       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
@@ -96,7 +104,7 @@ postUsersContract userName addr
     argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
     tx <- prepareTx
       userName password addr Nothing (fromMaybe emptyTxParams txParams)
-      (Wei (fromIntegral (fromMaybe 0 value))) (bin <> argsBin) 0
+      (eth (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     txResult <- pollTxResult hash
@@ -131,7 +139,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
     tx <- prepareTx
       userName pw addr Nothing (fromMaybe emptyTxParams txParams)
-      (Wei (maybe 0 fromIntegral value)) (bin <> argsBin) nonceIncr
+      (eth (maybe 0 fromIntegral $ fmap unStrung value)) (bin <> argsBin) nonceIncr
     return ((name,cmId),tx)
   let
     namesCmIds = map fst namesCmIdsTxs
@@ -163,7 +171,7 @@ postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSen
 postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
   txs' <- for (zip txs [0..]) $ \ (SendTransaction toAddr value txParams,nonceIncr) -> prepareTx
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-    (Wei (fromIntegral value)) ByteString.empty nonceIncr
+    (eth (fromIntegral $ unStrung value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
   ret <- if resolve
     then do
@@ -223,7 +231,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       userAddr
       (Just methodcallContractAddress)
       (fromMaybe emptyTxParams methodcallTxParams)
-      (Wei (fromIntegral methodcallValue))
+      (eth (fromIntegral $ unStrung methodcallValue))
       (sel <> argsBin)
       nonceIncr
     -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
@@ -283,7 +291,7 @@ postUsersContractMethod
       userAddr
       (Just contractAddr)
       (fromMaybe emptyTxParams txParams)
-      (Wei (fromIntegral value))
+      (eth (maybe 0 (fromIntegral . unStrung) value))
       ((sel::ByteString) <> (argsBin::ByteString))
       0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
