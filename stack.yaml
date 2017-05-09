@@ -4,7 +4,7 @@ packages:
 - strato-conf/
 - miner-ethash/
 - merkle-patricia-db/
-- strato-p2p-client/
+- strato-p2p/
 - solidity-abi/
 - blockapps-data/
 - ecrecover/
@@ -15,7 +15,6 @@ packages:
 - ethereum-vm/
 - blockapps-util/
 - strato-api/
-- strato-p2p-server/
 - blockapps-tools/
 - strato-quarry/
 - strato-adit/

@@ -1,4 +1,4 @@
-name: strato-p2p-client
+name: strato-p2p
 version: 0.0.4
 cabal-version: >=1.10
 build-type: Simple
@@ -18,20 +18,35 @@ source-repository this
   tag:      v0.0.4
 
 executable strato-p2p-client
-    default-language: Haskell98
+    default-language: Haskell2010
     build-depends:
                    base >= 4 && < 5
                  , blockapps-util
                  , hflags
                  , monad-logger
-                 , strato-p2p-client
-    main-is: Main.hs
+                 , strato-p2p
+    main-is: StratoP2PClientMain.hs
+    ghc-options: -Wall -threaded
+    buildable: True
+    hs-source-dirs: exec_src
+
+
+executable strato-p2p-server
+    default-language: Haskell2010
+    build-depends:
+                   base >= 4 && < 5
+                 , blockapps-util
+                 , ethereum-discovery
+                 , hflags
+                 , monad-logger
+                 , strato-p2p
+    main-is: StratoP2PServerMain.hs
     ghc-options: -Wall -threaded
     buildable: True
     hs-source-dirs: exec_src
 
 library
-    default-language: Haskell98
+    default-language: Haskell2010
     build-depends:
                    base >= 4 && < 5
                  , base16-bytestring
@@ -90,10 +105,17 @@ library
                    Blockchain.Options
                    Blockchain.SeqEventNotify
                    Blockchain.TCPClientWithTimeout
+                   Blockchain.ServOptions
                    Executable.StratoP2PClient
+                   Executable.StratoP2PServer
                    Executable.StratoP2PComm
     other-modules:
                    Blockchain.TimerSource
+                   Blockchain.TCPServer
+                   Blockchain.CommunicationConduit
+                   Blockchain.ContextLite
+                   Blockchain.BlockSynchronizerSql
+                   Blockchain.P2PUtil
     ghc-options: -Wall -O2
     buildable: True
     hs-source-dirs: src

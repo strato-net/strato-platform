@@ -51,7 +51,7 @@ executable test-suite-exe
                  , resourcet
                  , strato-conf
                  , strato-model
-                 , strato-p2p-client
+                 , strato-p2p
                  , strato-redis-blockdb
                  , strato-sequencer
                  , text
@@ -109,7 +109,7 @@ Test-suite vm-tests
                  , resourcet
                  , strato-conf
                  , strato-model
-                 , strato-p2p-client
+                 , strato-p2p
                  , strato-redis-blockdb
                  , strato-sequencer
                  , text
