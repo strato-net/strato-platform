@@ -183,15 +183,23 @@ deployments:
       ports:
         - "2181:2181"
 
-  - name: bloch-docs 
+  - name: bloch-docs-21 
     compose:
       image: swaggerapi/swagger-ui
       restart: always
       environment:
-        ZOO_MY_ID: "1"
-        API_URL: "http://generator.swagger.io/api/swagger.json"
+        API_URL: "http://bloch:8000/bloc/v2.1/swagger.json"
       ports:
         - "8080:8080"
+        
+  - name: bloch-docs-20 
+    compose:
+      image: swaggerapi/swagger-ui
+      restart: always
+      environment:
+        API_URL: "http://bloch:8000/bloc/v2.0/swagger.json"
+      ports:
+        - "8081:8080"
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
