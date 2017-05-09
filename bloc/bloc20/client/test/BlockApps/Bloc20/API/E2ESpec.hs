@@ -74,7 +74,7 @@ spec =
       threadDelay 4000000
       let
         etherToSend = 100
-        postSendParameters = PostSendParameters address2 (etherToWei etherToSend) pw txParams
+        postSendParameters = PostSendParameters address2 (Strung $ etherToWei etherToSend) pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
