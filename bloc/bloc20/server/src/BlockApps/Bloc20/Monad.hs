@@ -130,7 +130,7 @@ boxIt string =
   where
     len = Prelude.maximum $ map length theLines
     theLines = lines string
-    
+
 filterPrintLog::MonadIO m=>Severity->WithSeverity (WithCallStack (WithTimestamp Text))->m ()
 filterPrintLog minSeverity x | msgSeverity x >= minSeverity = return ()
 filterPrintLog _ x =
@@ -321,7 +321,7 @@ blocStrato client' = do
 
 blocCirrus :: HasCallStack => ClientM x -> Bloc x
 blocCirrus client' = do
-  logWithCallStack callStack logNotice "Querying Strato"
+  logWithCallStack callStack logNotice "Querying Cirrus"
   url <- asks urlCirrus
   mngr <- asks httpManager
   resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
