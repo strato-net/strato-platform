@@ -38,8 +38,8 @@ spec = do
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ TestConfig {..} -> do
       let
-        postSendParameters = PostSendParameters toUserAddress 100 pw txParams
-        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) 100 "12345" txParams
+        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParams
+        postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" txParams
       Right postSend <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
       postSend `shouldSatisfy` (== Strung 100) . posttransactionValue
       postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr blocUrl)
@@ -51,10 +51,10 @@ spec = do
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageSrc
           , postuserscontractrequestPassword = pw
-          , postuserscontractrequestContract = simpleStorageContractName
+          , postuserscontractrequestContract = Just simpleStorageContractName
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
-          , postuserscontractrequestValue = Just 0
+          , postuserscontractrequestValue = Just $ Strung 0
           }
       postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
@@ -93,7 +93,7 @@ spec = do
           { postuserscontractmethodPassword = pw
           , postuserscontractmethodMethod = "get"
           , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = 0
+          , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
       Right (PostUsersContractMethodResponse response) <- runClientM
@@ -110,7 +110,7 @@ spec = do
           , postsendlistrequestTxs = replicate 3
               SendTransaction
               { sendtransactionToAddress = toUserAddress
-              , sendtransactionValue = 100
+              , sendtransactionValue = Strung 100
               , sendtransactionTxParams = txParams
               }
           }
@@ -132,7 +132,7 @@ spec = do
               , methodcallContractAddress = simpleStorageContractAddress
               , methodcallMethodName = "get"
               , methodcallArgs = Map.empty
-              , methodcallValue = 0
+              , methodcallValue = Strung 0
               , methodcallTxParams = txParams
               }
           }
