@@ -148,6 +148,12 @@ spec =
         (ClientEnv mgr blocUrl)
       postUsersContractMethodEitherSet `shouldSatisfy` isRight
 
+      let
+        Right (PostUsersContractMethodResponse postUsersContractMethodSet) =
+          postUsersContractMethodEitherSet
+
+      postUsersContractMethodSet `shouldBe` "transaction returned: null"
+
       -- call get value and verify
 
       let

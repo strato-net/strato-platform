@@ -6,8 +6,10 @@ import           Control.Concurrent
 import           Control.Monad.IO.Class
 import           Control.Monad.Log
 import           Control.Monad.Loops
+import qualified Data.ByteString.Base16   as BS16
 import           Data.Maybe
 import qualified Data.Text                as Text
+import qualified Data.Text.Encoding       as Text
 import           Servant.Client
 
 import           BlockApps.Bloc20.API.Utils
@@ -74,3 +76,6 @@ pollTxResultBatch keccaks = go 1 where
                  else return resolutions
 emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing
+
+binRuntimeToCodeHash :: Text.Text -> Keccak256
+binRuntimeToCodeHash = keccak256 . fst . BS16.decode . Text.encodeUtf8
