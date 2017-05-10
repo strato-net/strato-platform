@@ -3,6 +3,7 @@
 
 module Blockchain.Data.PubKey (
   stringToPoint,
+  pointToString,
   pointToBytes,
   bytesToPoint,
   pubKeyToBytes
@@ -27,6 +28,9 @@ stringToPoint string =
   case B16.decode $ BC.pack string of
    (val, "") -> bytesToPoint $ B.unpack val
    _ -> error $ "stringToPoint called with malformed string: " ++ string
+
+pointToString :: Point -> String
+pointToString = BC.unpack . B16.encode . B.pack . pointToBytes
 
 instance Format Point where
   format x = 

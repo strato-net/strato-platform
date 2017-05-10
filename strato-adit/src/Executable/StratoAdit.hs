@@ -4,11 +4,19 @@ module Executable.StratoAdit (
   stratoAdit
 ) where
 
-import           Control.Concurrent.Lifted
+import           Prelude hiding (lookup) 
+import           Control.Concurrent.Lifted hiding (yield)
 import           Control.Concurrent.STM
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.State
+import           Control.Exception
+import qualified Data.Aeson as AE
+import           Data.Maybe
+import           Data.ByteString hiding (zip, length, take)
+import qualified Data.ByteString.Lazy as BL
+import           Data.Conduit
+import           Data.Conduit.Network
 import qualified Data.Text as T
 import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 import           System.CPUTime
@@ -31,6 +39,26 @@ import           Blockchain.Sequencer.Kafka
 import qualified Blockchain.Data.TXOrigin as TO
 
 import           Executable.AditM
+
+getPeers :: Int -> IO (Maybe Int)
+getPeers port = do
+  runTCPClient (clientSettings port "127.0.0.1") $ \appData -> do
+    appSource appData $$ getPeersRPC `fuseUpstream` appSink appData
+
+getPeersRPC :: ConduitM ByteString ByteString IO (Maybe Int) 
+getPeersRPC = do
+  yield "{\"jsonrpc\": \"2.0\", \"method\": \"getNumPeers\", \"id\": 1}"
+  response <- await
+  -- toLog $ "getNumPeers: " ++ BL.unpack response
+  return $ AE.decode $ BL.fromStrict $ fromJust response
+
+getNumConn :: IO Int
+getNumConn = do
+  clientResponse <- try $ liftIO $ getPeers 14001 :: IO (Either SomeException (Maybe Int))
+  return $ case clientResponse of
+        Left _         -> -2
+        Right Nothing  -> -1
+        Right (Just v) -> v
 
 lookupMiner :: MinerType -> Miner
 lookupMiner = \case
@@ -84,7 +112,9 @@ doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
+    numPeers <- liftIO getNumConn
     forM_ blocks $ \b -> do
+        $logInfoS "numPeers: " . T.pack $ show numPeers
         liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
         $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #" ++ (show . blockDataNumber $ blockBlockData b)
     doConsume (offset + fromIntegral (length blocks)) c

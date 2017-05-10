@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import Blockchain.EthConf
 import Blockchain.ServOptions
 import Blockchain.TCPServer
-import Executable.StratoP2PComm
+import Blockchain.P2PRPC
 
 stratoP2PServer:: LoggingT IO ()
 stratoP2PServer = do

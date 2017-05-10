@@ -50,6 +50,7 @@ library
     build-depends:
                    base >= 4 && < 5
                  , base16-bytestring
+                 , aeson
                  , blockapps-data
                  , blockapps-util
                  , bytestring
@@ -106,9 +107,9 @@ library
                    Blockchain.SeqEventNotify
                    Blockchain.TCPClientWithTimeout
                    Blockchain.ServOptions
+                   Blockchain.P2PRPC
                    Executable.StratoP2PClient
                    Executable.StratoP2PServer
-                   Executable.StratoP2PComm
     other-modules:
                    Blockchain.TimerSource
                    Blockchain.TCPServer

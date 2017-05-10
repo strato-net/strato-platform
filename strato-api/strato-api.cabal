@@ -150,6 +150,8 @@ library
                  , temporary
                  , strato-conf
                  , strato-sequencer
+                 , strato-p2p
+                 , json-rpc-client
 
 executable         strato-api
     if flag(library-only)

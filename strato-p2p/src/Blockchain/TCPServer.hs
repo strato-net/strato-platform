@@ -47,7 +47,7 @@ import qualified Database.Persist.Postgresql as SQL
 
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.P2PUtil
-import           Executable.StratoP2PComm
+import           Blockchain.P2PRPC
                
 theCurve::Curve
 theCurve = getCurveByName SEC_p256k1

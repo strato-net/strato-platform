@@ -22,7 +22,10 @@ library
   other-extensions:    OverloadedStrings
   default-language:    Haskell2010
   build-depends:       base >=4.9 && <4.10,
+                       aeson,
                        bytestring,
+                       conduit-extra,
+                       conduit,
                        monad-logger,
                        blockapps-data,
                        merkle-patricia-db,
@@ -50,7 +53,9 @@ library
                        strato-conf,
                        strato-sequencer,
                        mtl,
-                       resourcet
+                       resourcet,
+                       strato-p2p,
+                       unordered-containers
 
   exposed-modules: 
                        Blockchain.Mining

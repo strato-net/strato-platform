@@ -54,6 +54,7 @@ extra-deps:
 - tuple-th-0.2.5
 - bytestring-arbitrary-0.1.1
 - json-rpc-server-0.2.5.0
+- json-rpc-client-0.2.5.0
 - monadIO-0.10.1.4
 - monad-logger-0.3.20.1
 - esqueleto-2.5.1

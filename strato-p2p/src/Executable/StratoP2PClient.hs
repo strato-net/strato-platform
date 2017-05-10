@@ -61,7 +61,7 @@ import           Blockchain.Stream.VMEvent
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
 import           Blockchain.Util
-import           Executable.StratoP2PComm
+import           Blockchain.P2PRPC
 
 import           Data.Maybe
 
