@@ -68,6 +68,7 @@ library
                  , blockapps-haskoin
                  , hflags
                  , json-rpc-server
+                 , json-rpc-client
                  , lifted-base
                  , merkle-patricia-db
                  , monad-control

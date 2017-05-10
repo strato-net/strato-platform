@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.P2PRPC
   ( runStratoP2PComm
@@ -10,23 +11,30 @@ module Blockchain.P2PRPC
   , RPCPeer(..)
   , clientCommPort
   , serverCommPort
+  , getPeersSignature
+  , getNumPeersSignature
   ) where
 
-import Blockchain.Data.PubKey
-import Crypto.Types.PubKey.ECC
-import Control.Monad.Trans (liftIO)
-import Control.Concurrent.STM.MonadIO
-import Data.Aeson
-import Blockchain.Strato.Discovery.Data.Peer
-import qualified Data.ByteString as B
+import           Control.Monad.Trans.Except (runExceptT)
+import           Blockchain.Data.PubKey
+import           Crypto.Types.PubKey.ECC
+import           Control.Monad.Trans (liftIO)
+import           Control.Concurrent.STM.MonadIO
+import           Data.Aeson
+import           Blockchain.Strato.Discovery.Data.Peer
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import Data.Conduit
-import Data.Conduit.Network
+import           Data.Conduit
+import           Data.Conduit.Network
 import qualified Data.Set as S
-import Data.Text (Text)
+import           Data.Text (Text)
 import qualified Data.Text as Text
 
 import Network.JsonRpc.Server
+import Network.JsonRpc.ServerAdapter
+import Network.JsonRpc.Client
+
 import GHC.Generics
 
 newtype ConnectedPeer = ConnectedPeer { unConnectedPeer :: PPeer }
@@ -49,7 +57,8 @@ data RPCPeer = RPCPeer { rpcPeerIP :: String
                        } deriving (Eq, Read, Show, Generic)
 
 
-instance ToJSON RPCPeer                       
+instance ToJSON RPCPeer
+instance FromJSON RPCPeer
 
 connectedPeerToRPCPeer :: ConnectedPeer -> RPCPeer
 connectedPeerToRPCPeer (ConnectedPeer PPeer{..}) = RPCPeer { rpcPeerIP = Text.unpack pPeerIp
@@ -68,22 +77,54 @@ runStratoP2PComm cp addresses =
   runTCPServer (serverSettings (unCommPort cp) "*") $ \app ->
     appSource app =$= serve addresses $$ appSink app
 
-serve :: TVar (S.Set ConnectedPeer) -> Conduit B.ByteString IO B.ByteString
+serve :: TVar (S.Set ConnectedPeer) -> Conduit BS.ByteString IO BS.ByteString
 serve addresses = do
   Just request <- await
   Just response <- liftIO $ call [getPeers addresses, getNumPeers addresses] $ BLC.fromStrict request
   yield $ BLC.toStrict response
 
+
+mkConn :: BS.ByteString -> CommPort -> Connection IO
+mkConn host (CommPort port) input = liftIO $ (fmap BL.fromStrict) <$> runTCPClient (clientSettings port host) c 
+  where runRPCInput = yield (BL.toStrict input) >> await
+        c app = appSource app $$ (runRPCInput `fuseUpstream` appSink app)
+
+-- makeRPC :: (ToJSON t) => Signature ps t -> BS.ByteString -> CommPort -> IO (Either RpcError t)
+-- makeRPC sig host port = runExceptT $ toFunction (mkConn host port) sig
+
+-----------------
+-- concat :: String -> String -> String
+-- concat x y = x ++ y
+-- concatSignature :: Signature (String ::: String ::: ()) String
+-- concatSignature = Signature "concat" ("x" ::: "y" ::: ())
+
+getPeersSignature :: Signature () [RPCPeer]
+getPeersSignature =  Signature "getPeers" ()
+
 getPeers :: TVar (S.Set ConnectedPeer) -> Method IO
-getPeers theSet = toMethod "getPeers" f ()
+getPeers theSet = toServerMethod getPeersSignature f
   where f :: RpcResult IO [RPCPeer]
         f = do
           val <- readTVar theSet
           return $ connectedPeerToRPCPeer <$> S.toList val
 
+-- getPeersIO :: BS.ByteString -> CommPort -> IO (Either RpcError [RPCPeer])
+-- getPeersIO = makeRPC getPeersSignature
+
+getPeersIO :: BS.ByteString -> CommPort -> IO (Either RpcError [RPCPeer])
+getPeersIO host port = runExceptT $ toFunction (mkConn host port) getPeersSignature
+
+--------------
+
+getNumPeersSignature :: Signature () Int
+getNumPeersSignature =  Signature "getNumPeers" ()
+
 getNumPeers :: TVar (S.Set ConnectedPeer) -> Method IO
-getNumPeers theSet = toMethod "getNumPeers" f ()
+getNumPeers theSet = toServerMethod getNumPeersSignature f
   where f :: RpcResult IO Int
         f = do
           val <- readTVar theSet
           return $ S.size val
+
+getNumPeersIO :: BS.ByteString -> CommPort -> IO (Either RpcError Int)
+getNumPeersIO host port = runExceptT $ toFunction (mkConn host port) getNumPeersSignature
