@@ -34,7 +34,6 @@ import qualified Data.Text                       as Text
 import qualified Data.Text.Encoding              as Text
 import           Data.Traversable
 import           Database.PostgreSQL.Simple      (Connection)
-import           Debug.Trace
 import           GHC.Stack
 import           Opaleye                         hiding (not, null)
 import qualified Opaleye                         (not, null)
@@ -977,8 +976,6 @@ compileContract source = do
       , contractdetailsName = contrName
       , contractdetailsXabi = xabi
       }
-  traceShowM ("codeHash ========" :: String)
-  traceShowM details
   metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
     let
       xcodeHash = keccak256 (Text.encodeUtf8 contractdetailsBin)
