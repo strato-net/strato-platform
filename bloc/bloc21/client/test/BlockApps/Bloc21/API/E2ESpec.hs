@@ -287,6 +287,10 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
+        postCompileRequest = PostCompileRequest
+          [simpleStorageBytes32ArrayContractName]
+          simpleStorageBytes32ArrayContractName
+          simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
@@ -295,6 +299,7 @@ spec =
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
           }
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
       let
