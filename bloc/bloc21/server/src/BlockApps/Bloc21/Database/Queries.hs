@@ -42,6 +42,7 @@ import           BlockApps.Bloc21.API.Utils
 import           BlockApps.Bloc21.Crypto
 import           BlockApps.Bloc21.Database.Tables
 import           BlockApps.Bloc21.Monad
+import           BlockApps.Bloc21.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
@@ -944,7 +945,7 @@ insertContract
   -> Bloc Int32
 insertContract parentContr contr bin binRuntime xabi = do
   let
-    codeHash = keccak256 (Text.encodeUtf8 binRuntime)
+    codeHash = binRuntimeToCodeHash binRuntime
     xcodeHash = keccak256 (Text.encodeUtf8 bin)
   contrId <- createContractQuery contr
   metadataId <- insertContractMetaDataQuery
@@ -971,7 +972,7 @@ compileContract source = do
       { contractdetailsBin = bin
       , contractdetailsAddress = Just (Named "Latest")
       , contractdetailsBinRuntime = binRuntime
-      , contractdetailsCodeHash = keccak256 (Text.encodeUtf8 binRuntime)
+      , contractdetailsCodeHash =  binRuntimeToCodeHash binRuntime
       , contractdetailsName = contrName
       , contractdetailsXabi = xabi
       }
