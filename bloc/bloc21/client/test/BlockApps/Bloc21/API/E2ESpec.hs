@@ -287,6 +287,10 @@ spec =
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
+        postCompileRequest = PostCompileRequest
+          [simpleStorageBytes32ArrayContractName]
+          simpleStorageBytes32ArrayContractName
+          simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
           , postuserscontractrequestPassword = pw
@@ -295,6 +299,131 @@ spec =
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
           }
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- get contract state
+
+      contractStateEither <- runClientM
+        (getContractsState
+          (ContractName simpleStorageBytes32ArrayContractName)
+          (Unnamed contractAddr)
+        )
+        (ClientEnv mgr blocUrl)
+      contractStateEither `shouldSatisfy` isRight
+      let
+        Right contractStateMap = contractStateEither
+        mStoredData = Map.lookup "storedData" contractStateMap
+      mStoredData `shouldSatisfy` isJust
+      let
+        Just storedData = mStoredData
+      storedData `shouldBe` SolidityArray []
+
+      -- call contract store value
+      let
+        arg1 = Text.decodeUtf8 (Base16.encode (Char8.replicate 32 'a'))
+        arg2 = Text.decodeUtf8 (Base16.encode (Char8.replicate 32 'b'))
+        contractName = ContractName simpleStorageBytes32ArrayContractName
+        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "set"
+          , postuserscontractmethodArgs = Map.singleton "x" (ArgArray [ArgString arg1, ArgString arg2])
+          , postuserscontractmethodValue = Just $ Strung 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherSet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherSet `shouldSatisfy` isRight
+
+      -- call get value and verify
+
+      let
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "get"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = Just $ Strung 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
+      values `shouldBe`
+        [ SolidityArray
+          [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        ]
+
+      -- get state and verify
+
+      contractStateEither' <- runClientM
+        (getContractsState contractName (Unnamed contractAddr))
+        (ClientEnv mgr blocUrl)
+      contractStateEither' `shouldSatisfy` isRight
+
+      let
+        Right contractStateMap' = contractStateEither'
+        mStoredData' = Map.lookup "storedData" contractStateMap'
+      mStoredData' `shouldSatisfy` isJust
+      let
+        Just storedData' = mStoredData'
+      storedData' `shouldBe` SolidityArray
+        [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ]
+
+    it "should create BytesComboTest contract, call methods and check state" $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps444"
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      simpleStorageBytes32ArraySrc <- readSolFile "BytesComboTest.sol"
+      threadDelay 4000000
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        simpleStorageBytes32ArrayContractName = "BytesComboTest"
+        storeArgs =
+          [ ("_a1" , ArgString "4d25aa9471ce573fcd260e36255cfbcdd6dd591b")
+          , ("_a2" , ArgString "4d25aa9471ce573fcd260e36255cfbcdd6dd591b")
+          , ("a" , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89")
+          , ("b"
+            , ArgArray
+                ( Vector.fromList
+                  [ ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ArgString "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  ]
+                )
+            )
+          , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
+          ]
+        postCompileRequest = PostCompileRequest
+          [simpleStorageBytes32ArrayContractName]
+          simpleStorageBytes32ArrayContractName
+          simpleStorageBytes32ArraySrc
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = Just simpleStorageBytes32ArrayContractName
+          , postuserscontractrequestArgs = Just storeArgs
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just $ Strung 0
+          }
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
       eAccts1 `shouldSatisfy` isRight
       let
