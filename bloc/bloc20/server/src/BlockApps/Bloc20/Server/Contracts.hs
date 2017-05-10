@@ -124,7 +124,7 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
   where
     compileOneContract PostCompileRequest{..} = do
       idsAndDetails <- compileContract postcompilerequestSource
-      for_ (maybe [] id postcompilerequestSearchable) $ \ contractName -> do
+      for_ (fromMaybe [] postcompilerequestSearchable) $ \ contractName -> do
         contractDetails <-
           getContractsContract (ContractName contractName) (Named "Latest")
         blocCirrus $ postContract contractDetails
