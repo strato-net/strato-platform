@@ -254,7 +254,8 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
                                 xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
       let txResp = transactionresultResponse txResult
       let mFormattedResponse = Text.concat <$> convertResultResToTexts txResp orderedResultTypes
-      blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+      formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+      return $ if Text.null formattedResponse then "null" else formattedResponse
   else return $ map (Text.pack . keccak256String) hashes
 
 postUsersContractMethod
@@ -314,8 +315,9 @@ postUsersContractMethod
         convertResultResToTexts txResp orderedResultTypes
 
     formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+    let ret = if Text.null formattedResponse then "null" else formattedResponse
 
-    return $ PostUsersContractMethodResponse $ "transaction returned: " <> formattedResponse
+    return $ PostUsersContractMethodResponse $ "transaction returned: " <> ret
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =
