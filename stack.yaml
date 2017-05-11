@@ -39,3 +39,9 @@ extra-package-dbs: []
 
 ghc-options:
   blockapps-bloc: -fsimpl-tick-factor=20000
+
+extra-include-dirs:
+- /usr/local/include
+
+extra-lib-dirs:
+- /usr/local/lib
