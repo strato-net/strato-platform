@@ -6,12 +6,15 @@
 
 module BlockApps.XAbiConverterSpec where
 
-import Test.Hspec
-import Data.Aeson
+import           Test.Hspec
+import           Data.Aeson
 import qualified Data.ByteString.Lazy as ByteString
-import Data.Maybe
-import BlockApps.Solidity.Xabi
-import BlockApps.XAbiConverter
+--import           Data.List
+--import qualified Data.Map as Map
+import           Data.Maybe
+import           BlockApps.Solidity.Xabi
+--import           BlockApps.Solidity.Xabi.Type
+import           BlockApps.XAbiConverter
 
 import Text.RawString.QQ
 
@@ -23,6 +26,7 @@ spec =
           secondPass = fromMaybe undefined $ decode secondPassString::Xabi
       print firstPass
       print secondPass
+      -- (sortOn (varTypeAtBytes . snd) $ Map.toList $ xabiVars $ contractToXabi $ either undefined id $ xAbiToContract firstPass) `shouldBe` sortOn (varTypeAtBytes . snd) (Map.toList (xabiVars secondPass))
       (contractToXabi $ either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass
 
 secondPassString::ByteString.ByteString

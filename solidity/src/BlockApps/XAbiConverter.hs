@@ -8,11 +8,13 @@ module BlockApps.XAbiConverter where
 import qualified Data.Bimap                        as Bimap
 import           Data.List
 import qualified Data.Map                          as Map
+import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Traversable
 import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
+import           GHC.Int
 
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Selector
@@ -232,7 +234,7 @@ xAbiToContract contractXabi@Xabi{..} = mdo
 contractToXabi::Contract->Xabi
 contractToXabi Contract{..} =
   let
-    functions = Map.fromList [(name, Func (Map.fromList $ argsToIndexedTypes args) (Map.fromList $ varsToIndexedTypes rets)) | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct]
+    functions = Map.fromList [(name, Func (Map.fromList $ map argToIndexedTypes $ zip [0..] args) (Map.fromList $ map varToIndexedTypes $ zip [0..] rets)) | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct]
     vars = filter (not . isFunction . snd . snd) $ Map.toList $ fields mainStruct::[(Text, (Storage.Position, Type))]
     isFunction::Type->Bool
     isFunction (TypeFunction _ _ _) = True
@@ -247,12 +249,12 @@ contractToXabi Contract{..} =
       }
 
 fieldToVarType::(Storage.Position, Type)->Xabi.VarType
-fieldToVarType (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) Nothing $ typeToXabiType theType
+fieldToVarType (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) (Just True) $ typeToXabiType theType
 
 typeToXabiType::Type->Xabi.Type
 typeToXabiType (SimpleType x) = simpleTypeToXabiType x
-typeToXabiType (TypeArrayDynamic theType) = Xabi.Array Nothing Nothing (typeToXabiType theType)
-typeToXabiType (TypeMapping from to) = Xabi.Mapping Nothing (simpleTypeToXabiType from) (typeToXabiType to)
+typeToXabiType (TypeArrayDynamic theType) = Xabi.Array (Just True) Nothing (typeToXabiType theType)
+typeToXabiType (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType to)
 typeToXabiType (TypeFunction _ _ _) = error "typeToXabiType was called with function type, which isn't allowed"
 typeToXabiType x = error $ "Missing type in call to typeToXabiType: " ++ show x
 
@@ -328,7 +330,7 @@ simpleTypeToXabiType TypeUInt256 = Xabi.Int (Just True) $ Just 256
 simpleTypeToXabiType TypeUInt = Xabi.Int (Just True) Nothing
 
 simpleTypeToXabiType TypeAddress = Xabi.Address
-simpleTypeToXabiType TypeString = Xabi.String Nothing
+simpleTypeToXabiType TypeString = Xabi.String $ Just True
 
 
 simpleTypeToXabiType TypeBytes1 = Xabi.Bytes Nothing $ Just 1
@@ -365,11 +367,11 @@ simpleTypeToXabiType TypeBytes31 = Xabi.Bytes Nothing $ Just 31
 simpleTypeToXabiType TypeBytes32 = Xabi.Bytes Nothing $ Just 32
 simpleTypeToXabiType TypeBytes = Xabi.Bytes Nothing Nothing
 
-argsToIndexedTypes::[(Text, Type)]->[(Text, Xabi.IndexedType)]
-argsToIndexedTypes _ = []
+argToIndexedTypes::(Int32, (Text, Type))->(Text, Xabi.IndexedType)
+argToIndexedTypes (i, (name, theType)) = (name, Xabi.IndexedType i $ typeToXabiType theType)
 
-varsToIndexedTypes::[(Maybe Text, Type)]->[(Text, Xabi.IndexedType)]
-varsToIndexedTypes _ = []
+varToIndexedTypes::(Int32, (Maybe Text, Type))->(Text, Xabi.IndexedType)
+varToIndexedTypes (i, (maybeName, theType)) = (fromMaybe (Text.pack $ "#" ++ show i) maybeName, Xabi.IndexedType i $ typeToXabiType theType)
 
 
 
