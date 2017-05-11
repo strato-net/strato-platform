@@ -20,13 +20,11 @@ var scaffoldApp = {
     },
 
     apiURL: {
-      description: `Enter the BlockApps API URL you are using.
-To obtain a Strato instance, see our getting started repository
-at https://github.com/blockapps/strato-getting-started`,
+      description: `Enter the BlockApps API URL you are using`,
       required: true,
       pattern: '[^,\/]$',
       message: 'make sure to leave off the trailing slash',
-      default: '<strato-instance-IP:localhost/strato-api>'
+      default: 'http://MACHINE_IP/strato-api'
     },
 
     profile: {

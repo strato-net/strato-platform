@@ -54,31 +54,39 @@ function makeConfig(result) {
   } else {
     scaffold(result.appName, result.developer);
 
-    if ((result.email !== undefined) && (result.email != "")) { 
+    if ((result.email !== undefined) && (result.email != "")) {
       var reportObj = {
         initName: result.developer,
         initEmail: result.email,
         initTimestamp:  Math.floor(new Date() / 1000).toString()
-      };                    
+      };
       console.log("report obj: " + JSON.stringify(reportObj));
-      request({ 
+      request({
         method: "POST",
         uri: "http://strato-license.eastus.cloudapp.azure.com:8081/init",
         headers: {
           "Content-Type": "application/json"
         },
         body:  JSON.stringify(reportObj),
-      }, function (err, res, _) { 
+      }, function (err, res, _) {
         console.log("thanks for registering with BlockApps!");
       });
     }
-    
-    yamlConfig.writeYaml(result.appName + "/config.yaml", result);   
+
+    yamlConfig.writeYaml(result.appName + "/config.yaml", result);
   }
 }
 
 function blocinit(cmdArgv) {
   console.log(icon());
+
+  console.log(`
+  Bloc is the interface to an Ethereum Blockchain, runnig on the BlockApps Strato Instance.
+To obtain a Strato instance, see our getting-started repository
+or just spin-up a STRATO instance on Azure and get the strato-api to use here
+https://azuremarketplace.microsoft.com/en-us/marketplace/apps/blockapps.strato-blockchain-lts-vm
+`);
+
 
   analytics.insight.trackEvent("init");
 
@@ -113,7 +121,7 @@ function checkForProject() {
     config = yamlConfig.readYaml('config.yaml');
   } catch (e){
     throw 'Cannot open config.yaml - are you in the project directory?';
-  } 
+  }
 }
 
 function setApiProfile() {
@@ -139,7 +147,7 @@ function main (){
       return blocinit(cmd.argv);
     }
   }
-    
+
   switch(cmdArr[0]) {
 
     case 'compile':
@@ -174,7 +182,7 @@ function main (){
       Promise.all(solSrcFiles).
           map(function (filename) {
             return fs.readFileSync(path.join(solSrcDir, filename)).toString()
-          }).  
+          }).
           map(compile);
       break;
 
@@ -193,14 +201,14 @@ function main (){
       var address = cmd.argv.a;
 
       var keyStream;
-      if (address === undefined) { 
+      if (address === undefined) {
         keyStream = helper.userKeysStream(userName);
         if (!keyStream) {
           console.log(chalk.red("ERROR: Key Not Found"));
           console.log(chalk.yellow("Try command: ") + "bloc genkey");
           return;
         }
-      } else { 
+      } else {
         keyStream = helper.userKeysAddressStream(userName,address);
       }
 
@@ -211,10 +219,10 @@ function main (){
       else {
         argObj = cmd.argv;
       }
-        
+
       keyStream
           .pipe(helper.collect())
-          .on('data', function (data) { 
+          .on('data', function (data) {
             var store = lw.keystore.deserialize(JSON.stringify(data[0]));
             var address = store.addresses[0];
 
@@ -227,9 +235,9 @@ function main (){
                .spread(upload)
                .then(function (_) {
                  console.log("creating metadata for " + contractName);
-               });      
+               });
           })
-        
+
       break;
 
     case 'genkey':
@@ -243,7 +251,7 @@ function main (){
       prompt.getAsync(createPassword).get("password").then(function(password) {
         if (userName === undefined)
           key.generateKey(password,'admin');
-        else key.generateKey(password,userName); 
+        else key.generateKey(password,userName);
       });
       break;
 
@@ -281,15 +289,15 @@ function main (){
       var address = cmd.argv.a;
 
       var keyStream;
-      if (address === undefined) { 
+      if (address === undefined) {
         keyStream = helper.userKeysStream(userName);
-      } else { 
+      } else {
         keyStream = helper.userKeysAddressStream(userName,address);
       }
 
       keyStream
           .pipe(helper.collect())
-          .on('data', function (data) { 
+          .on('data', function (data) {
             var store = lw.keystore.deserialize(JSON.stringify(data[0]));
 
             prompt.start();
@@ -307,7 +315,7 @@ function main (){
                   address = privkeyFrom.toAddress();
                 }
 
-                var valueTX = Transaction({"value" : ethValue(result.value).in(result.unit), 
+                var valueTX = Transaction({"value" : ethValue(result.value).in(result.unit),
                                                "gasLimit" : Int(result.gasLimit),
                                                "gasPrice" : Int(result.gasPrice)});
 
@@ -315,7 +323,7 @@ function main (){
 
                 valueTX.send(privkeyFrom, addressTo).then(function(txResult) {
                   console.log("transaction result: " + txResult.message);
-                });                 
+                });
               });
             });
           });
@@ -339,12 +347,12 @@ function main (){
 
       server.on('error', function (err) {
         throw err;
-      }); 
+      });
 
       server.stdout.on('data', function(data) {
         console.log(data.toString("utf-8"));
       });
-      
+
       break;
 
     case 'version':
