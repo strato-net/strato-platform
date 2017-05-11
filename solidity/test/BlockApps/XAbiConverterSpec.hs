@@ -10,6 +10,7 @@ import Test.Hspec
 import Data.Aeson
 import qualified Data.ByteString.Lazy as ByteString
 import Data.Maybe
+import BlockApps.Solidity.Xabi
 import BlockApps.XAbiConverter
 
 import Text.RawString.QQ
@@ -17,19 +18,18 @@ import Text.RawString.QQ
 spec :: Spec
 spec =
   describe "Xabi" $ do
-    it "should decode simple xabi json correctly" $ do
+    it "should convert a first pass xabi to a contract, then to a second pass xabi" $ do
       let firstPass = fromMaybe undefined $ decode firstPassString
-          secondPass = fromMaybe undefined $ decode secondPassString
-          
+          secondPass = fromMaybe undefined $ decode secondPassString::Xabi
+      print firstPass
+      print secondPass
       (contractToXabi $ either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass
 
 secondPassString::ByteString.ByteString
 secondPassString = 
   [r|
 
-{  
-   "codeHash":"09de50f8187dc434af842791468703719a7821f048efc72c6cd203719c826b5b",
-   "xabi":{  
+   {  
       "funcs":{  
          "isReader":{  
             "args":{  
@@ -172,9 +172,7 @@ secondPassString =
             "public":true
          }
       }
-   },
-   "name":"StorageBlob"
-}
+   }
 
 |]
 
@@ -184,11 +182,7 @@ firstPassString =
   [r|
 
 
-{  
-   "address":null,
-   "codeHash":"09de50f8187dc434af842791468703719a7821f048efc72c6cd203719c826b5b",
-   "name":"StorageBlob",
-   "xabi":{  
+   {  
       "funcs":{  
          "isReader":{  
             "args":{  
@@ -361,7 +355,6 @@ firstPassString =
          }
       }
    }
-}
 
 |]
 
