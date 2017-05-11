@@ -59,7 +59,7 @@ import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
 import           Debug.Trace                           (trace)
 
-data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt deriving (Show)
+data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt | AbortEvt String deriving (Show)
 
 -- MonadBaseControl IO m, MonadIO m
 setTitleAndProduceBlocks :: (MonadLogger m, HasSQLDB m, RBDB.HasRedisBlockDB m) => [Block] -> m Int
@@ -281,6 +281,9 @@ handleEvents mode peer = awaitForever $ \case
                     error "Peer did not respond"
             Nothing -> return ()
 
+    AbortEvt reason -> do
+      $logInfoS "handleEvent/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
+      yield $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
 
 numFromRedis :: Maybe RedisBestBlock -> Integer

@@ -107,6 +107,7 @@ library
                    Blockchain.ExtMergeSources
                    Blockchain.Options
                    Blockchain.SeqEventNotify
+                   Blockchain.DeLoopNotify
                    Blockchain.TCPClientWithTimeout
                    Blockchain.ServOptions
                    Blockchain.P2PRPC

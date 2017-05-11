@@ -21,6 +21,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
 import           Crypto.Types.PubKey.ECC
+import           Data.ByteString                       (ByteString)
 import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
 import qualified Data.ByteString.Lazy                  as BL
@@ -33,9 +34,6 @@ import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import qualified Database.Persist.Postgresql           as SQL
-import           Network.DNS.Lookup
-import           Network.DNS.Resolver
-import           Network.DNS.Utils                     (normalize)
 import qualified Network.Haskoin.Internals             as H
 import           System.Random
 
@@ -52,6 +50,7 @@ import           Blockchain.Data.Wire
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.DeLoopNotify
 import           Blockchain.Display
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
@@ -62,6 +61,7 @@ import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.Output                     (printLogMsg')
 import           Blockchain.P2PRPC
+import           Blockchain.P2PUtil
 import           Blockchain.SeqEventNotify
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TCPClientWithTimeout
@@ -128,14 +128,14 @@ handleMsg myId peer = do
               throwIO . maybe PeerDisconnected EventBeforeHandshake $ m
           ourNetworkID    = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
-cbSafeTake::Monad m=>Int->ConduitM BC.ByteString o m BC.ByteString
+cbSafeTake :: Monad m => Int -> ConduitM BC.ByteString o m BC.ByteString
 cbSafeTake i = do
     ret <- BL.toStrict <$> CB.take i
     if B.length ret /= i
        then error "safeTake: not enough data"
        else return ret
 
-getRLPData::Monad m=>Consumer B.ByteString m B.ByteString
+getRLPData :: Monad m => Consumer B.ByteString m B.ByteString
 getRLPData = do
     first <- fmap (fromMaybe $ error "no rlp data") CB.head
     case first of
@@ -169,8 +169,10 @@ runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
         => TVar (S.Set ConnectedPeer)
         -> PPeer
         -> PrivateNumber
+        -> ByteString
+        -> CommPort
         -> m ()
-runPeer connectedPeers peer myPriv = do
+runPeer connectedPeers peer myPriv otherServiceCommHost otherServiceCommPort = do
     let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
     logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
     logInfoN . T.pack $ C.blue "============================"
@@ -202,6 +204,7 @@ runPeer connectedPeers peer myPriv = do
                       =$= CL.map MsgEvt
                   , seqEventNotifictationSource =$= CL.map NewSeqEvent
                   , timerSource
+                  , deLoopSource otherServiceCommHost otherServiceCommPort (T.unpack $ pPeerIp peer)
                   ] 2
 
                 _ <- eventSource
@@ -214,8 +217,12 @@ runPeer connectedPeers peer myPriv = do
                 void $ modifyTVar connectedPeers $ S.delete connectedPeer
 
 getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
-                 => TVar (S.Set ConnectedPeer) -> PPeer -> m ()
-getPubKeyRunPeer connectedPeers peer = do
+                 => TVar (S.Set ConnectedPeer)
+                 -> PPeer
+                 -> ByteString
+                 -> CommPort
+                 -> m ()
+getPubKeyRunPeer connectedPeers peer otherServiceCommHost otherServiceCommPort = do
   let PrivKey myPriv = privKey ethConf
 
   case (pPeerPubkey peer) of
@@ -225,18 +232,20 @@ getPubKeyRunPeer connectedPeers peer = do
       case eitherOtherPubKey of
             Right otherPubKey -> do
               logInfoN $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
-              runPeer connectedPeers peer{pPeerPubkey=Just otherPubKey} myPriv
+              runPeer connectedPeers peer{pPeerPubkey=Just otherPubKey} myPriv otherServiceCommHost otherServiceCommPort
             Left e -> logInfoN $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
-    Just _ -> runPeer connectedPeers peer myPriv
+    Just _ -> runPeer connectedPeers peer myPriv otherServiceCommHost otherServiceCommPort
 
 
 runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
               => TVar (S.Set ConnectedPeer)
               -> PPeer
+              -> ByteString
+              -> CommPort
               -> m ()
-runPeerInList connectedPeers thePeer = do
+runPeerInList connectedPeers thePeer otherServiceHost otherServicePort = do
   liftIO $ disablePeerForSeconds thePeer 60 --don't connect to a peer more than once per minute, out of politeness
-  getPubKeyRunPeer connectedPeers thePeer
+  getPubKeyRunPeer connectedPeers thePeer otherServiceHost otherServicePort
 
 stratoP2PClient :: LoggingT IO ()
 stratoP2PClient = do
@@ -262,7 +271,7 @@ stratoP2PClient = do
         singleThreadedClient connectedPeers peers = do
           peerNumber <- liftIO $ randomRIO (0, length peers - 1)
           let thePeer = peers !! peerNumber
-          try (runPeerInList connectedPeers thePeer) >>= handleRunPeerResult thePeer
+          try (runPeerInList connectedPeers thePeer osch oscp) >>= handleRunPeerResult thePeer
 
         multiThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> SSem -> LoggingT IO ()
         multiThreadedClient connectedPeers peers sem = liftIO . void . for peers $ \p -> do
@@ -271,7 +280,7 @@ stratoP2PClient = do
             (liftIO (SSem.tryWait sem)) >>= \case
               Nothing -> return ()
               Just _  -> void . forkIO . flip runLoggingT (printLogMsg' True True) $ do
-                result <- try $ runPeerInList connectedPeers p
+                result <- try $ runPeerInList connectedPeers p osch oscp
                 liftIO (SSem.signal sem)
                 handleRunPeerResult p result
 
@@ -291,28 +300,18 @@ stratoP2PClient = do
           Right _ -> return ()
 
         notAlreadyConnectedToServer :: (MonadLogger m, MonadIO m) => [RPCPeer] -> PPeer -> m Bool
-        notAlreadyConnectedToServer serverPeers PPeer{..} =
-            if looksLikeHostname
-              then do
-                asIps <- resolveHostname (T.unpack pPeerIp)
-                let found = any (`elem` serverPeerIPs) asIps
-                $logInfoS "checkConnectedToServer" . T.pack $ T.unpack pPeerIp <> " -> " <> show asIps <> " / " <> show serverPeerIPs <> " -> " <> show found
+        notAlreadyConnectedToServer serverPeers PPeer{..} = do
+            let stringyIP = T.unpack pPeerIp
+            resolveIPOrHost stringyIP >>= \case
+              Left err -> do
+                $logInfoS "checkConnectedToServer" . T.pack $ "Failed to resolve " ++ show stringyIP ++ ": " ++ err
+                return True -- pretend the connection already exists, for safety's sake
+              Right asIPs -> do
+                let found = any (`elem` serverPeerIPs) asIPs
+                    serverPeerIPs = rpcPeerIP <$> serverPeers
+                $logInfoS "checkConnectedToServer" . T.pack $ T.unpack pPeerIp <> " -> " <> show asIPs <> " / " <> show serverPeerIPs <> " -> " <> show found
                 return (not found)
-              else return (T.unpack pPeerIp `elem` serverPeerIPs)
 
-            where serverPeerIPs :: [String]
-                  serverPeerIPs = rpcPeerIP <$> serverPeers -- todo: will it always be the case that server reports as IPs?
-
-                  looksLikeHostname :: Bool
-                  looksLikeHostname = case stringToIAddr (T.unpack pPeerIp) of
-                    HostName _ -> True
-                    _          -> False
-
-                  resolveHostname :: (MonadIO m, MonadLogger m) => String -> m [String]
-                  resolveHostname hn = do
-                    rs <- liftIO (makeResolvSeed defaultResolvConf)
-                    liftIO (withResolver rs (flip lookupA (normalize $ BC.pack hn))) >>= \case
-                      Left err  -> do
-                        $logInfoS "resolveHostname" . T.pack $ "Couldnt resolve hostname \"" <> hn <> "\": " <> show err
-                        return []
-                      Right ips -> return $ show <$> ips
+        -- otherServiceCommHost / otherServiceCommPort
+        osch = "localhost"
+        oscp = serverCommPort
