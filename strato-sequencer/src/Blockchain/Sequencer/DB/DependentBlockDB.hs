@@ -1,18 +1,20 @@
-{-# LANGUAGE DeriveGeneric, TemplateHaskell, OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Blockchain.Sequencer.DB.DependentBlockDB where
 
-import Control.Monad (join)
-import Data.Binary
+import           Control.Monad                (join)
+import           Data.Binary
 
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Resource
 
-import qualified GHC.Generics as GHCG
-import qualified Database.LevelDB as LDB
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy         as B
+import qualified Database.LevelDB             as LDB
+import qualified GHC.Generics                 as GHCG
 
-import Blockchain.SHA
-import Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Event
+import           Blockchain.SHA
 
 type DependentBlockDB = LDB.DB
 
@@ -84,7 +86,7 @@ class (MonadLogger m, MonadResource m) => HasDependentBlockDB m where
         children     <- LDB.get db readOptions thisBlockHash
         case (decode . B.fromStrict) <$> children of
             Nothing -> return [theRet]
-            Just (Emitted _) -> return [] -- we already emitted this hash somehow? wtf???
+            Just (Emitted _) -> return []
             Just (DependentBlocks blocks') -> do
                 subChains <- sequence $ flip buildEmissionChain totalDifficulty' <$> blocks'
                 return $ theRet : join subChains
