@@ -8,11 +8,13 @@ module BlockApps.XAbiConverter where
 import qualified Data.Bimap                        as Bimap
 import           Data.List
 import qualified Data.Map                          as Map
+import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
 import           Data.Traversable
 import           Data.Vector                       (Vector)
 import qualified Data.Vector                       as Vector
+import           GHC.Int
 
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Parse.Selector
@@ -124,7 +126,7 @@ funcToType::Xabi->Text->Func->Either String Type
 funcToType xabi name Func{..} = do
 
   let orderedFuncArgs = sortOn (Xabi.indexedTypeIndex . snd) $ Map.toList funcArgs
-  
+
   convertedFuncArgs <- for orderedFuncArgs $ \(name', theType) -> do
     theType' <- xabiTypeToType xabi . Xabi.indexedTypeType $ theType
     return (name', theType')
@@ -224,3 +226,154 @@ xAbiToContract contractXabi@Xabi{..} = mdo
     mainStruct=fieldsToStruct typeDefs' $ vars ++ Map.toList funcs,
     typeDefs=typeDefs'
     }
+
+
+--------------------------------------------
+--Inverse Conversion
+
+contractToXabi::Contract->Xabi
+contractToXabi Contract{..} =
+  let
+    functions = Map.fromList [(name, Func (Map.fromList $ zipWith argToIndexedTypes [0..] args) (Map.fromList $ zipWith varToIndexedTypes [0..] rets)) | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct]
+    vars = filter (not . isFunction . snd . snd) $ Map.toList $ fields mainStruct::[(Text, (Storage.Position, Type))]
+    isFunction::Type->Bool
+    isFunction TypeFunction{} = True
+    isFunction _ = False
+
+  in
+    Xabi{
+      xabiFuncs = functions,
+      xabiConstr = Map.empty,
+      xabiVars = Map.fromList $ map (fmap fieldToVarType) vars,
+      xabiTypes = Map.empty
+      }
+
+fieldToVarType::(Storage.Position, Type)->Xabi.VarType
+fieldToVarType (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) (Just True) $ typeToXabiType theType
+
+-- Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
+typeToXabiType::Type->Xabi.Type
+typeToXabiType (SimpleType x) = simpleTypeToXabiType x
+typeToXabiType (TypeArrayDynamic theType) = Xabi.Array (Just True) Nothing (typeToXabiType theType)
+typeToXabiType (TypeArrayFixed size theType) = Xabi.Array (Just False) (Just size) (typeToXabiType theType)
+typeToXabiType (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType to)
+typeToXabiType (TypeStruct structName) = Xabi.Struct Nothing structName
+typeToXabiType (TypeEnum enumName) = Xabi.Enum Nothing enumName
+typeToXabiType (TypeContract contractName) = Xabi.Contract contractName
+typeToXabiType TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
+
+simpleTypeToXabiType::SimpleType->Xabi.Type
+simpleTypeToXabiType TypeBool = Xabi.Bool
+simpleTypeToXabiType TypeInt8 = Xabi.Int Nothing $ Just 8
+simpleTypeToXabiType TypeInt16 = Xabi.Int Nothing $ Just 16
+simpleTypeToXabiType TypeInt24 = Xabi.Int Nothing $ Just 24
+simpleTypeToXabiType TypeInt32 = Xabi.Int Nothing $ Just 32
+simpleTypeToXabiType TypeInt40 = Xabi.Int Nothing $ Just 40
+simpleTypeToXabiType TypeInt48 = Xabi.Int Nothing $ Just 48
+simpleTypeToXabiType TypeInt56 = Xabi.Int Nothing $ Just 56
+simpleTypeToXabiType TypeInt64 = Xabi.Int Nothing $ Just 64
+simpleTypeToXabiType TypeInt72 = Xabi.Int Nothing $ Just 72
+simpleTypeToXabiType TypeInt80 = Xabi.Int Nothing $ Just 80
+simpleTypeToXabiType TypeInt88 = Xabi.Int Nothing $ Just 88
+simpleTypeToXabiType TypeInt96 = Xabi.Int Nothing $ Just 96
+simpleTypeToXabiType TypeInt104 = Xabi.Int Nothing $ Just 104
+simpleTypeToXabiType TypeInt112 = Xabi.Int Nothing $ Just 112
+simpleTypeToXabiType TypeInt120 = Xabi.Int Nothing $ Just 120
+simpleTypeToXabiType TypeInt128 = Xabi.Int Nothing $ Just 128
+simpleTypeToXabiType TypeInt136 = Xabi.Int Nothing $ Just 136
+simpleTypeToXabiType TypeInt144 = Xabi.Int Nothing $ Just 144
+simpleTypeToXabiType TypeInt152 = Xabi.Int Nothing $ Just 152
+simpleTypeToXabiType TypeInt160 = Xabi.Int Nothing $ Just 160
+simpleTypeToXabiType TypeInt168 = Xabi.Int Nothing $ Just 168
+simpleTypeToXabiType TypeInt176 = Xabi.Int Nothing $ Just 176
+simpleTypeToXabiType TypeInt184 = Xabi.Int Nothing $ Just 184
+simpleTypeToXabiType TypeInt192 = Xabi.Int Nothing $ Just 192
+simpleTypeToXabiType TypeInt200 = Xabi.Int Nothing $ Just 200
+simpleTypeToXabiType TypeInt208 = Xabi.Int Nothing $ Just 208
+simpleTypeToXabiType TypeInt216 = Xabi.Int Nothing $ Just 216
+simpleTypeToXabiType TypeInt224 = Xabi.Int Nothing $ Just 224
+simpleTypeToXabiType TypeInt232 = Xabi.Int Nothing $ Just 232
+simpleTypeToXabiType TypeInt240 = Xabi.Int Nothing $ Just 240
+simpleTypeToXabiType TypeInt248 = Xabi.Int Nothing $ Just 248
+simpleTypeToXabiType TypeInt256 = Xabi.Int Nothing $ Just 256
+simpleTypeToXabiType TypeInt = Xabi.Int Nothing Nothing
+
+
+simpleTypeToXabiType TypeUInt8 = Xabi.Int (Just True) $ Just 8
+simpleTypeToXabiType TypeUInt16 = Xabi.Int (Just True) $ Just 16
+simpleTypeToXabiType TypeUInt24 = Xabi.Int (Just True) $ Just 24
+simpleTypeToXabiType TypeUInt32 = Xabi.Int (Just True) $ Just 32
+simpleTypeToXabiType TypeUInt40 = Xabi.Int (Just True) $ Just 40
+simpleTypeToXabiType TypeUInt48 = Xabi.Int (Just True) $ Just 48
+simpleTypeToXabiType TypeUInt56 = Xabi.Int (Just True) $ Just 56
+simpleTypeToXabiType TypeUInt64 = Xabi.Int (Just True) $ Just 64
+simpleTypeToXabiType TypeUInt72 = Xabi.Int (Just True) $ Just 72
+simpleTypeToXabiType TypeUInt80 = Xabi.Int (Just True) $ Just 80
+simpleTypeToXabiType TypeUInt88 = Xabi.Int (Just True) $ Just 88
+simpleTypeToXabiType TypeUInt96 = Xabi.Int (Just True) $ Just 96
+simpleTypeToXabiType TypeUInt104 = Xabi.Int (Just True) $ Just 104
+simpleTypeToXabiType TypeUInt112 = Xabi.Int (Just True) $ Just 112
+simpleTypeToXabiType TypeUInt120 = Xabi.Int (Just True) $ Just 120
+simpleTypeToXabiType TypeUInt128 = Xabi.Int (Just True) $ Just 128
+simpleTypeToXabiType TypeUInt136 = Xabi.Int (Just True) $ Just 136
+simpleTypeToXabiType TypeUInt144 = Xabi.Int (Just True) $ Just 144
+simpleTypeToXabiType TypeUInt152 = Xabi.Int (Just True) $ Just 152
+simpleTypeToXabiType TypeUInt160 = Xabi.Int (Just True) $ Just 160
+simpleTypeToXabiType TypeUInt168 = Xabi.Int (Just True) $ Just 168
+simpleTypeToXabiType TypeUInt176 = Xabi.Int (Just True) $ Just 176
+simpleTypeToXabiType TypeUInt184 = Xabi.Int (Just True) $ Just 184
+simpleTypeToXabiType TypeUInt192 = Xabi.Int (Just True) $ Just 192
+simpleTypeToXabiType TypeUInt200 = Xabi.Int (Just True) $ Just 200
+simpleTypeToXabiType TypeUInt208 = Xabi.Int (Just True) $ Just 208
+simpleTypeToXabiType TypeUInt216 = Xabi.Int (Just True) $ Just 216
+simpleTypeToXabiType TypeUInt224 = Xabi.Int (Just True) $ Just 224
+simpleTypeToXabiType TypeUInt232 = Xabi.Int (Just True) $ Just 232
+simpleTypeToXabiType TypeUInt240 = Xabi.Int (Just True) $ Just 240
+simpleTypeToXabiType TypeUInt248 = Xabi.Int (Just True) $ Just 248
+simpleTypeToXabiType TypeUInt256 = Xabi.Int (Just True) $ Just 256
+simpleTypeToXabiType TypeUInt = Xabi.Int (Just True) Nothing
+
+simpleTypeToXabiType TypeAddress = Xabi.Address
+simpleTypeToXabiType TypeString = Xabi.String $ Just True
+
+
+simpleTypeToXabiType TypeBytes1 = Xabi.Bytes Nothing $ Just 1
+simpleTypeToXabiType TypeBytes2 = Xabi.Bytes Nothing $ Just 2
+simpleTypeToXabiType TypeBytes3 = Xabi.Bytes Nothing $ Just 3
+simpleTypeToXabiType TypeBytes4 = Xabi.Bytes Nothing $ Just 4
+simpleTypeToXabiType TypeBytes5 = Xabi.Bytes Nothing $ Just 5
+simpleTypeToXabiType TypeBytes6 = Xabi.Bytes Nothing $ Just 6
+simpleTypeToXabiType TypeBytes7 = Xabi.Bytes Nothing $ Just 7
+simpleTypeToXabiType TypeBytes8 = Xabi.Bytes Nothing $ Just 8
+simpleTypeToXabiType TypeBytes9 = Xabi.Bytes Nothing $ Just 9
+simpleTypeToXabiType TypeBytes10 = Xabi.Bytes Nothing $ Just 10
+simpleTypeToXabiType TypeBytes11 = Xabi.Bytes Nothing $ Just 11
+simpleTypeToXabiType TypeBytes12 = Xabi.Bytes Nothing $ Just 12
+simpleTypeToXabiType TypeBytes13 = Xabi.Bytes Nothing $ Just 13
+simpleTypeToXabiType TypeBytes14 = Xabi.Bytes Nothing $ Just 14
+simpleTypeToXabiType TypeBytes15 = Xabi.Bytes Nothing $ Just 15
+simpleTypeToXabiType TypeBytes16 = Xabi.Bytes Nothing $ Just 16
+simpleTypeToXabiType TypeBytes17 = Xabi.Bytes Nothing $ Just 17
+simpleTypeToXabiType TypeBytes18 = Xabi.Bytes Nothing $ Just 18
+simpleTypeToXabiType TypeBytes19 = Xabi.Bytes Nothing $ Just 19
+simpleTypeToXabiType TypeBytes20 = Xabi.Bytes Nothing $ Just 20
+simpleTypeToXabiType TypeBytes21 = Xabi.Bytes Nothing $ Just 21
+simpleTypeToXabiType TypeBytes22 = Xabi.Bytes Nothing $ Just 22
+simpleTypeToXabiType TypeBytes23 = Xabi.Bytes Nothing $ Just 23
+simpleTypeToXabiType TypeBytes24 = Xabi.Bytes Nothing $ Just 24
+simpleTypeToXabiType TypeBytes25 = Xabi.Bytes Nothing $ Just 25
+simpleTypeToXabiType TypeBytes26 = Xabi.Bytes Nothing $ Just 26
+simpleTypeToXabiType TypeBytes27 = Xabi.Bytes Nothing $ Just 27
+simpleTypeToXabiType TypeBytes28 = Xabi.Bytes Nothing $ Just 28
+simpleTypeToXabiType TypeBytes29 = Xabi.Bytes Nothing $ Just 29
+simpleTypeToXabiType TypeBytes30 = Xabi.Bytes Nothing $ Just 30
+simpleTypeToXabiType TypeBytes31 = Xabi.Bytes Nothing $ Just 31
+simpleTypeToXabiType TypeBytes32 = Xabi.Bytes Nothing $ Just 32
+simpleTypeToXabiType TypeBytes = Xabi.Bytes Nothing Nothing
+
+argToIndexedTypes::Int32->(Text, Type)->(Text, Xabi.IndexedType)
+argToIndexedTypes i (name, theType) = (name, Xabi.IndexedType i $ typeToXabiType theType)
+
+varToIndexedTypes::Int32->(Maybe Text, Type)->(Text, Xabi.IndexedType)
+varToIndexedTypes i (maybeName, theType) = (fromMaybe (Text.pack $ "#" ++ show i) maybeName, Xabi.IndexedType i $ typeToXabiType theType)
+

@@ -14,7 +14,7 @@ contract Owned {
   }
 }
 contract ReadPermissioned is Owned {
-
+  
   mapping(address => bool) readers;
   modifier onlyReader() { if (isReader(msg.sender)) _ }
 
@@ -45,8 +45,6 @@ contract StorageBlob is ReadPermissioned {
     contents = _contents;
   }
 
-  // note: this can only be called by an external function, not from another
-  // contract as it returns a string.
   function getContents() onlyReader returns(string) {
     return contents;
   }

@@ -55,7 +55,7 @@ solidityContract = do
                 Map.fromList $
                 zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v)
                 [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
-                [0..]
+                [0, 32..]
            , xabiTypes =
              Map.fromList $
              [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]

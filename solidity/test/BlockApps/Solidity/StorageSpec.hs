@@ -4,7 +4,7 @@
 module BlockApps.Solidity.StorageSpec where
 
 import qualified Data.ByteString.Base16 as Base16
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Test.Hspec
 
 import BlockApps.Ethereum
@@ -122,6 +122,22 @@ spec = do
                     ]
                   ]
           (dataBytestring,_) = Base16.decode "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000003"
+        toStorage args `shouldBe` dataBytestring
+      it "should convert 5args address, address, bytes32, bytes32[], string" $ do
+
+        let
+          args = ValueArrayFixed 5
+                  [ SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
+                  , SimpleValue . ValueAddress . fromJust . stringAddress $ "fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62"
+                  , SimpleValue . ValueBytes32 . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                  , ValueArrayDynamic 
+                      [ SimpleValue . ValueBytes32 . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                      , SimpleValue . ValueBytes32 . fst . Base16.decode $ "81a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89"
+                      ]
+                  , SimpleValue . ValueString $ "Account Data should be able to be as long as you want ideally 12343432442431"
+                  ]
+          (dataBytestring,_) = Base16.decode "000000000000000000000000fdb2eea0003ec6de4f8bc1fe63307b730d5b7e62000000000000000000000000fdb2eea0003ec6de4f8bc1fe63307b730d5b7e6281a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a8900000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000281a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a8981a76550480e6e3d9a4df17b9f3683b66ceda988390a73c1446c427173bf6a89000000000000000000000000000000000000000000000000000000000000004c4163636f756e7420446174612073686f756c642062652061626c6520746f206265206173206c6f6e6720617320796f752077616e7420696465616c6c792031323334333433323434323433310000000000000000000000000000000000000000"
+        print . Base16.encode . toStorage $ args
         toStorage args `shouldBe` dataBytestring
       it "should convert 1 arg with type enum" $ do
         pendingWith "enum has not been implemented for toStorage"

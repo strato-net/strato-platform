@@ -22,8 +22,8 @@ spec = do
     it "compiles a contract" $ \ TestConfig {..} -> do
       let
         postCompileRequest = PostCompileRequest
-          []
-          simpleStorageContractName
+          (Just [])
+          (Just simpleStorageContractName)
           simpleStorageSrc
       Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       contracts `shouldSatisfy` any
