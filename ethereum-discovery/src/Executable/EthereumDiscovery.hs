@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Executable.EthereumDiscovery (
   ethereumDiscovery
@@ -28,10 +29,10 @@ privateKey = fromMaybe (error "Bad value for hardcoded private key in ethconf.ya
 
 ethereumDiscovery :: LoggingT IO ()
 ethereumDiscovery = do
-  _ <- logInfoN $ T.pack $ CL.blue "Welcome to ethereum-discovery"
-  _ <- logInfoN $ T.pack $ CL.blue "============================="
   let Right pubKey = hPubKeyToPubKey $ H.derivePubKey privateKey
-  _ <- logInfoN $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ B.pack $ pointToBytes pubKey)
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "Welcome to ethereum-discovery"
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.blue "============================="
+  _ <- $logInfoS "ethereumDiscovery" $ T.pack $ CL.green " * My NodeID is " ++ show (B16.encode $ B.pack $ pointToBytes pubKey)
   _ <- runResourceT $ do
     cxt <- initContextLite
 
@@ -39,6 +40,5 @@ ethereumDiscovery = do
       (connectMe $ discoveryPort $ discoveryConfig ethConf)
       (liftIO . S.sClose)
       (runEthUDPServer cxt privateKey (discoveryPort $ discoveryConfig ethConf))
-
 
   return ()

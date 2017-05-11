@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.Strato.Discovery.UDP (
   dataToPacket,
@@ -207,7 +208,7 @@ sendPacket :: (MonadIO m, MonadLogger m)
            -> NodeDiscoveryPacket
            -> m ()
 sendPacket sock prv addr packet = do
-  logInfoN $ T.pack $ CL.green ">>>>" ++ " (" ++ show addr ++ ") " ++ format packet
+  $logInfoS "sendPacket" $ T.pack $ CL.green ">>>>" ++ " (" ++ show addr ++ ") " ++ format packet
   let (theType', theRLP) = ndPacketToRLP packet
       theData = B.unpack $ rlpSerialize theRLP
       SHA theMsgHash = hash $ B.pack $ theType' : theData

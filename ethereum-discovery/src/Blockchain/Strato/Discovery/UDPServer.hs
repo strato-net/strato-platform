@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.UDPServer (
       runEthUDPServer,
@@ -62,7 +63,7 @@ addPeersIfNeeded::(MonadIO m, MonadLogger m)=>
                   H.PrvKey->Socket->m ()
 addPeersIfNeeded prv sock= do
   numAvailablePeers <- liftIO getNumAvailablePeers
-  logInfoN . T.pack $ "Number of available peers: " ++ show numAvailablePeers
+  $logInfoS "addPeersIfNeeded" $ T.pack $ "Number of available peers: " ++ show numAvailablePeers
   when (numAvailablePeers < minAvailablePeers (discoveryConfig ethConf)) $ do
     bondedPeers <- liftIO getBondedPeersForUDP
     if length bondedPeers /= 0
@@ -74,7 +75,7 @@ addPeersIfNeeded prv sock= do
         randomBytes <- liftIO $ getEntropy 64
         sendPacket sock prv (addrAddress peeraddr) $ FindNeighbors (NodeID randomBytes) (time + 50)
         liftIO $ disableUDPPeerForSeconds thePeer 10
-      else logInfoN "no peers available to bootstrap from, will try again soon."
+      else $logInfoS "addPeersIfNeeded" "no peers available to bootstrap from, will try again soon."
 
 attemptBond :: (MonadIO m, MonadLogger m)
             => H.PrvKey
@@ -96,7 +97,7 @@ attemptBond prv sock portNum = do
                                     (Just (show portNum))
       ehostAddress <- return $ getHostAddress $ addrAddress serveraddr
       case ehostAddress of
-        Left err -> logInfoN $ T.pack . show $ err
+        Left err -> $logInfoS "attemptBond" $ T.pack . show $ err
         Right hostAddress -> do
           sendPacket sock prv (addrAddress peeraddr) $
                 Ping 4
@@ -122,16 +123,16 @@ udpHandshakeServer prv sock portNum = do
     _ <- attemptBond prv sock portNum
     maybePacketData <- liftIO $ timeout 10000000 $ NB.recvFrom sock 1280
     _ <- case maybePacketData of
-      Nothing -> logInfoN "timeout triggered"
+      Nothing -> $logInfoS "udpHandshakeServer" "timeout triggered"
       Just (msg, addr) -> do
-        _ <- logInfoN $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
-        catch (handler msg addr) $ \(e :: SomeException) -> logInfoN $ "malformed UDP packet: " <> (T.pack $ show e)
+        _ <- $logInfoS "udpHandshakeServer" $ T.pack $ "received bytes: len=" ++ (show $ B.length msg)
+        catch (handler msg addr) $ \(e :: SomeException) -> $logInfoS "udpHandshakeServer" $ "malformed UDP packet: " <> (T.pack $ show e)
     udpHandshakeServer prv sock portNum
   where
     handler msg addr = case argValidator msg addr of
-      Left msgErr -> logInfoN . T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
+      Left msgErr -> $logInfoS "udpHandshakeServer/handler" $ T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
       Right (packet, otherPubKey, otherPort) -> do
-        _ <- logInfoN $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
+        _ <- $logInfoS "udpHandshakeServer/handler" $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
         handleValidPacket prv sock addr otherPort packet otherPubKey
     argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, PortNumber)
     argValidator msg addr = do

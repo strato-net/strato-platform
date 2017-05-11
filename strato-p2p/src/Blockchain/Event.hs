@@ -119,7 +119,7 @@ handleEvents mode peer = awaitForever $ \case
         return ()
 
     MsgEvt (NewBlock block' tdiff) -> do
-        liftIO . putStrLn $ "newBlock with tdiff " ++ show tdiff
+        $logInfoS "handleEvents/NewBlock" $ "newBlock with tdiff " ++ show tdiff
         lift $ putNewBlk $ blockToNewBlk block' -- todo delete this?
         let sha         = blockHash block'
         let header      = blockHeader block'
@@ -131,8 +131,8 @@ handleEvents mode peer = awaitForever $ \case
             Nothing -> do
                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
                 let fetchNumber = numFromRedis bestBlock - 1
-                logInfoN . T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-                logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber
+                $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+                $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber
             Just _  -> do
                 void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                 lift . void $ setTitleAndProduceBlocks [block']
@@ -141,7 +141,7 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (NewBlockHashes _) -> do
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
         let fetchNumber = numFromRedis bestBlock -1
-        logInfoN . T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
+        $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> case dir of
@@ -185,11 +185,11 @@ handleEvents mode peer = awaitForever $ \case
             unless (null missingParents) $ do
                  bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
                  let fetchNumber = numFromRedis bestBlock + 1
-                 logInfoN . T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
+                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "blockHeaders :: fetchNumber is " ++ show fetchNumber
                  let lastParent = case length existingParents of
                                       0 -> fetchNumber
                                       _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
-                 (logInfoN $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)) >> syncFetch Reverse lastParent
+                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents) >> syncFetch Reverse lastParent
 
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
@@ -201,12 +201,12 @@ handleEvents mode peer = awaitForever $ \case
             --     neededParents = filter (not . (`elem` blockOffsets)) $ map parentHash neededHeaders
             --     unfoundParents = S.toList $ S.fromList neededParents S.\\ S.fromList neededHashes
             -- unless (null unfoundParents) $ do
-            --     -- logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
-            --     logInfoN . T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
-            --     logInfoN "### calling syncFetch again" >> syncFetch
+            --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
+            --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
+            --     $logInfoN "handleEvents/BlockHeaders" $ T.pack $ "### calling syncFetch again" >> syncFetch
 
             lift $ putBlockHeaders neededHeaders
-            logInfoN $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
+            $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
             yield . GetBlockBodies $ headerHash <$> neededHeaders
             stampActionTimestamp
 
@@ -239,7 +239,7 @@ handleEvents mode peer = awaitForever $ \case
         headers <- lift getBlockHeaders
         let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
         unless verified $ error "headers don't match bodies"
-        logInfoN $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
+        $logInfoS "handleEvents/BlockBodies" $ T.pack $ "len headers is " ++ show (length headers) ++ ", len bodies is " ++ show (length bodies)
         let blocks' = zipWith createBlockFromHeaderAndBody headers bodies
         newCount <- lift $ setTitleAndProduceBlocks blocks'
         forM_ blocks' $ lift . emitKafkaBlock (Origin.PeerString $ peerString peer)
@@ -254,7 +254,7 @@ handleEvents mode peer = awaitForever $ \case
                 stampActionTimestamp
 
     MsgEvt (Disconnect _) -> do
-            logInfoN $ T.pack $ "Disconnect event received in Event handler"
+            $logInfoS "handleEvents/Disconnect" $ T.pack $ "Disconnect event received in Event handler"
             throwIO PeerDisconnected
 
     NewSeqEvent oe -> case oe of
@@ -282,7 +282,7 @@ handleEvents mode peer = awaitForever $ \case
             Nothing -> return ()
 
     AbortEvt reason -> do
-      $logInfoS "handleEvent/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
+      $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
       yield $ Disconnect AlreadyConnected
     event -> liftIO . error $ "unrecognized event: " ++ show event
 

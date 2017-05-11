@@ -666,10 +666,6 @@ runOperation DELEGATECALL = do
       left MalformedOpcodeException
 
 
-
-
-
-
 runOperation SUICIDE = do
   address' <- pop
   owner <- getEnvVar envOwner
@@ -693,7 +689,7 @@ runOperation x = error $ "Missing case in runOperation: " ++ show x
 
 -------------------
 
-opGasPriceAndRefund::Operation->VMM (Integer, Integer)
+opGasPriceAndRefund :: Operation -> VMM (Integer, Integer)
 
 opGasPriceAndRefund LOG0 = do
   size <- getStackItem 1::VMM Word256
@@ -765,9 +761,7 @@ opGasPriceAndRefund CALLCODE = do
 
 opGasPriceAndRefund DELEGATECALL = do
   gas <- getStackItem 0::VMM Word256
-
   return (toInteger gas + gCALL, 0)
-
 
 opGasPriceAndRefund CODECOPY = do
     size <- getStackItem 2::VMM Word256
@@ -832,7 +826,7 @@ printTrace _ _ _15 _ op stateBefore stateAfter = do
   lift $ $logInfoS "printTrace" . T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
 -}
 
-runCode::Int->VMM ()
+runCode :: Int -> VMM ()
 runCode c = do
   memBefore <- getSizeInWords
   code <- getEnvVar envCode
@@ -909,9 +903,19 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
---bool Executive::create(Address _sender, u256 _endowment, u256 _gasPrice, u256 _gas, bytesConstRef _init, Address _origin)
-
-create::Bool->Bool->S.Set Address->BlockData->Int->Address->Address->Integer->Integer->Integer->Address->Code->ContextM (Either VMException Code, VMState)
+create :: Bool
+       -> Bool
+       -> S.Set Address
+       -> BlockData
+       -> Int
+       -> Address
+       -> Address
+       -> Integer
+       -> Integer
+       -> Integer
+       -> Address
+       -> Code
+       -> ContextM (Either VMException Code, VMState)
 create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender origin value' gasPrice' availableGas newAddress init' = do
   let env =
         Environment{
@@ -964,7 +968,7 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
 
 
 
-create'::VMM Code
+create' :: VMM Code
 create' = do
 
   runCodeFromStart
@@ -1003,12 +1007,21 @@ create' = do
       newAddressState <- getAddressState address'
       putAddressState address' newAddressState{addressStateCodeHash=hash codeBytes'}
 
-
-
-
---bool Executive::call(Address _receiveAddress, Address _codeAddress, Address _senderAddress, u256 _value, u256 _gasPrice, bytesConstRef _data, u256 _gas, Address _originAddress)
-
-call::Bool->Bool->Bool->S.Set Address->BlockData->Int->Address->Address->Address->Word256->Word256->B.ByteString->Integer->Address->ContextM (Either VMException B.ByteString, VMState)
+call :: Bool
+     -> Bool
+     -> Bool
+     -> S.Set Address
+     -> BlockData
+     -> Int
+     -> Address
+     -> Address
+     -> Address
+     -> Word256
+     -> Word256
+     -> B.ByteString
+     -> Integer
+     -> Address
+     -> ContextM (Either VMException B.ByteString, VMState)
 call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth' receiveAddress (Address codeAddress) sender value' gasPrice' theData availableGas origin = do
 
   addressState <- getAddressState $ Address codeAddress
@@ -1033,12 +1046,7 @@ call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDe
 
   runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas $ call' noValueTransfer
 
-
-
---bool Executive::call(Address _receiveAddress, Address _codeAddress, Address _senderAddress, u256 _value, u256 _gasPrice, bytesConstRef _data, u256 _gas, Address _originAddress)
-
-call'::Bool->VMM B.ByteString
---call' callDepth' address codeAddress sender value' gasPrice' theData availableGas origin = do
+call' :: Bool -> VMM B.ByteString
 call' noValueTransfer = do
   value' <- getEnvVar envValue
   receiveAddress <- getEnvVar envOwner
@@ -1048,8 +1056,6 @@ call' noValueTransfer = do
   unless noValueTransfer $ do
     _ <- pay "call value transfer" sender receiveAddress (fromIntegral value')
     return ()
-
-  --whenM isDebugEnabled $ lift $ logInfoN $ "availableGas: " ++ show availableGas
 
   runCodeFromStart
 
@@ -1062,10 +1068,6 @@ call' noValueTransfer = do
       --putStrLn $ show (pretty address) ++ ": " ++ format result
 
   return (fromMaybe B.empty $ returnVal vmState)
-
-
-
-
 
 create_debugWrapper :: BlockData -> Address -> Word256 -> B.ByteString -> VMM (Maybe Address)
 create_debugWrapper block owner value initCodeBytes = do
@@ -1105,7 +1107,7 @@ create_debugWrapper block owner value initCodeBytes = do
 
       case result of
         Left e -> do
-          when flags_debug $ lift $ logInfoN $ T.pack $ CL.red $ show e
+          when flags_debug $ lift $ $logInfoS "create_debugWrapper" $ T.pack $ CL.red $ show e
           return Nothing
         Right _ -> do
 
@@ -1116,14 +1118,8 @@ create_debugWrapper block owner value initCodeBytes = do
 
           return $ Just newAddress
 
-
-
-
-
 nestedRun_debugWrapper :: Bool -> Integer -> Address -> Address -> Address -> Word256 -> B.ByteString -> VMM (Int, Maybe B.ByteString)
 nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sender value inputData = do
-
---  theAddressExists <- lift $ lift $ lift $ addressStateExists (Address address')
 
   currentCallDepth <- getCallDepth
 
@@ -1153,10 +1149,10 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           state' <- lift get
           lift $ put state'{suicideList = suicideList finalVMState}
           when flags_debug $
-            lift $ logInfoN $ T.pack $ "Refunding: " ++ show (vmGasRemaining finalVMState)
+            lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Refunding: " ++ show (vmGasRemaining finalVMState)
           useGas (- vmGasRemaining finalVMState)
           addToRefund (refund finalVMState)
           return (1, Just retVal)
         Left e -> do
-          when flags_debug $ lift $ logInfoN $ T.pack $ CL.red $ show e
+          when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)

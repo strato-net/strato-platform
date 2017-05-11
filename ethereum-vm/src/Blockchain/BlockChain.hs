@@ -414,7 +414,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             s1 <- lift $ addToBalance (blockDataCoinbase b) (intrinsicGas' * transactionGasPrice bt)
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
-            lift . logInfoN . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
+            lift . $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
             return ExecResults { erRemainingBlockGas=remainingBlockGas
                                , erReturnVal=Nothing
                                , erTrace=error "theTrace not set" -- todo: seriously?
@@ -422,9 +422,16 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                                , erNewContractAddress=Nothing
                                }
 
-runCodeForTransaction::Bool->Bool->BlockData->Integer->Address->Address->OutputTx->ContextM (Either VMException B.ByteString, VMState)
+runCodeForTransaction :: Bool
+                      -> Bool
+                      -> BlockData
+                      -> Integer
+                      -> Address
+                      -> Address
+                      -> OutputTx
+                      -> ContextM (Either VMException B.ByteString, VMState)
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddress OutputTx{otBaseTx=ut} | isContractCreationTX ut = do
-  when flags_debug $ logInfoN "runCodeForTransaction: ContractCreationTX"
+  when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
 
   !(result, vmState) <-
     create isRunningTests' isHomestead S.empty b 0 tAddr tAddr (transactionValue ut) (transactionGasPrice ut) availableGas newAddress (transactionInit ut)
@@ -432,7 +439,7 @@ runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr newAddres
   return (const B.empty <$> result, vmState)
 
 runCodeForTransaction isRunningTests' isHomestead b availableGas tAddr owner OutputTx{otBaseTx=ut} = do --MessageTX
-  when flags_debug $ logInfoN $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
+  when flags_debug $ $logInfoS "runCodeForTransaction"  $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ show (pretty tAddr) ++ ", address: " ++ show (pretty $ transactionTo ut)
 
   call isRunningTests' isHomestead False S.empty b 0 owner owner tAddr
           (fromIntegral $ transactionValue ut) (fromIntegral $ transactionGasPrice ut)

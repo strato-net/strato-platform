@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Executable.StratoP2PServer (
   stratoP2PServer
@@ -19,8 +20,8 @@ import           Blockchain.TCPServer
 
 stratoP2PServer:: LoggingT IO ()
 stratoP2PServer = do
-  logInfoN $ T.pack $ "connect address: " ++ (flags_address)
-  logInfoN $ T.pack $ "listen port:     " ++ (show flags_listen)
+  $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ (flags_address)
+  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ (show flags_listen)
 
   let PrivKey myPriv = privKey ethConf
 

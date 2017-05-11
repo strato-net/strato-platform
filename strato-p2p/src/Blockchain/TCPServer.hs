@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Blockchain.TCPServer (
   runEthServer
@@ -60,7 +61,7 @@ runEthServer connectedPeers myPriv listenPort = do
     let myPubkey = calculatePublic theCurve myPriv
 
     runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
-      logInfoN $ T.pack $ "|||| Incoming connection from " ++ show (appSockAddr app)
+      $logInfoS "runEthServer" $ T.pack $ "|||| Incoming connection from " ++ show (appSockAddr app)
       peer <- fmap fst $ runResourceT $ flip runStateT cxt $ getPeerByIP (sockAddrToIP $ appSockAddr app)
       let unwrappedPeer = case (SQL.entityVal <$> peer) of
                             Nothing    -> error "peer is nothing after call to getPeerByIP"
@@ -84,7 +85,7 @@ runEthServer connectedPeers myPriv listenPort = do
             , seqEventNotifictationSource =$= CL.map NewSeqEvent
           ] 2
 
-        logInfoN "server session starting"
+        $logInfoS "runEthServer" "server session starting"
 
         (_::Either SomeException ()) <- try $
               eventSource
@@ -94,7 +95,7 @@ runEthServer connectedPeers myPriv listenPort = do
                 =$= ethEncrypt outCxt
                  $$ transPipe liftIO (appSink app)
 
-        logInfoN "server session ended"
+        $logInfoS "runEthServer" "server session ended"
 
         _ <- modifyTVar connectedPeers (S.delete cp)
 

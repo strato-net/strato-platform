@@ -124,7 +124,7 @@ handleMsg myId peer = do
           handleEvents (if flags_debugFail then Fail else Log) peer
 
     where assertHandshake m = do
-              logInfoN $ T.pack $ "asserHandshake: " ++ show m
+              $logInfoS "handleMsg/assertHandshake" $ T.pack $ "asserHandshake: " ++ show m
               throwIO . maybe PeerDisconnected EventBeforeHandshake $ m
           ourNetworkID    = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
@@ -174,15 +174,15 @@ runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
         -> m ()
 runPeer connectedPeers peer myPriv otherServiceCommHost otherServiceCommPort = do
     let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
-    logInfoN . T.pack $ C.blue "Welcome to strato-p2p-client"
-    logInfoN . T.pack $ C.blue "============================"
-    logInfoN . T.pack $ C.blue "now on steroids too "
-    logInfoN . T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
-
     let myPublic = calculatePublic theCurve myPriv
-    logInfoN . T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
 
-    logInfoN . T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+    $logInfoS "runPeer" $ T.pack $ C.blue "Welcome to strato-p2p-client"
+    $logInfoS "runPeer" $ T.pack $ C.blue "============================"
+    $logInfoS "runPeer" $ T.pack $ C.blue "now on steroids too "
+    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
+    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+
     redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
     runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server ->
         runResourceT $ do
@@ -227,13 +227,13 @@ getPubKeyRunPeer connectedPeers peer otherServiceCommHost otherServiceCommPort =
 
   case (pPeerPubkey peer) of
     Nothing -> do
-      logInfoN $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
+      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
       eitherOtherPubKey <- liftIO $ getServerPubKey (fromMaybe (error "invalid private number in main") $ H.makePrvKey $ fromIntegral myPriv) (T.unpack $ pPeerIp peer) (fromIntegral $ pPeerTcpPort peer)
       case eitherOtherPubKey of
             Right otherPubKey -> do
-              logInfoN $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
+              $logInfoS "getPubKeyRunPeer" $ T.pack $ "#### Success, the pubkey has been obtained: " ++ format otherPubKey
               runPeer connectedPeers peer{pPeerPubkey=Just otherPubKey} myPriv otherServiceCommHost otherServiceCommPort
-            Left e -> logInfoN $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
+            Left e -> $logInfoS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
     Just _ -> runPeer connectedPeers peer myPriv otherServiceCommHost otherServiceCommPort
 
 
@@ -266,7 +266,7 @@ stratoP2PClient = do
 
   where singleThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> LoggingT IO ()
         singleThreadedClient _  [] = do
-          logInfoN "No available peers, will try again in 10 seconds"
+          $logInfoS "stratoP2PClient/singleThreadedClient" "No available peers, will try again in 10 seconds"
           liftIO $ threadDelay 10000000
         singleThreadedClient connectedPeers peers = do
           peerNumber <- liftIO $ randomRIO (0, length peers - 1)
@@ -291,7 +291,7 @@ stratoP2PClient = do
         handleRunPeerResult thePeer = \case
           Left e | Just (ErrorCall x) <- fromException e -> error x
           Left e -> do
-            logInfoN $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
+            $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
             case e of
              e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
              e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
