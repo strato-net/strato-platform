@@ -257,8 +257,10 @@ typeToXabiType (SimpleType x) = simpleTypeToXabiType x
 typeToXabiType (TypeArrayDynamic theType) = Xabi.Array (Just True) Nothing (typeToXabiType theType)
 typeToXabiType (TypeArrayFixed size theType) = Xabi.Array (Just False) (Just size) (typeToXabiType theType)
 typeToXabiType (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType to)
+typeToXabiType (TypeStruct structName) = Xabi.Struct Nothing structName
+typeToXabiType (TypeEnum enumName) = Xabi.Enum Nothing enumName
+typeToXabiType (TypeContract contractName) = Xabi.Contract contractName
 typeToXabiType (TypeFunction _ _ _) = error "typeToXabiType was called with function type, which isn't allowed"
-typeToXabiType x = error $ "Missing type in call to typeToXabiType: " ++ show x
 
 simpleTypeToXabiType::SimpleType->Xabi.Type
 simpleTypeToXabiType TypeBool = Xabi.Bool
@@ -375,15 +377,3 @@ argToIndexedTypes (i, (name, theType)) = (name, Xabi.IndexedType i $ typeToXabiT
 varToIndexedTypes::(Int32, (Maybe Text, Type))->(Text, Xabi.IndexedType)
 varToIndexedTypes (i, (maybeName, theType)) = (fromMaybe (Text.pack $ "#" ++ show i) maybeName, Xabi.IndexedType i $ typeToXabiType theType)
 
-
-
-{-
-
-data Struct = Struct { fields::Map Text (Storage.Position, Type) , size::Word256 } deriving (Show)
-
-data Func = Func
-  { funcArgs :: Map Text Xabi.IndexedType
-  , funcVals :: Map Text Xabi.IndexedType
-  } deriving (Eq,Show,Generic)
-
--}
