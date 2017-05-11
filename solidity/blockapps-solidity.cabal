@@ -77,13 +77,16 @@ test-suite blockapps-solidity-test
     BlockApps.SoliditySpec
     BlockApps.Solidity.StorageSpec
     BlockApps.Solidity.Parse.SelectorSpec
+    BlockApps.XAbiConverterSpec
   build-depends: base >=4 && < 5
                , aeson
                , base16-bytestring
                , blockapps-ethereum
                , blockapps-solidity
                , bytestring
+               , containers
                , hspec
+               , raw-strings-qq
                , text
 
 source-repository head

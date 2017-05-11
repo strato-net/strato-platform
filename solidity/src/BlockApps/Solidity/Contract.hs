@@ -171,7 +171,7 @@ getPositionAndSize TypeDefs{..} p (TypeStruct name) =
    Nothing -> error $ "Contract is using an struct that wasn't defined: " ++ T.unpack name ++ "\nstructs is " ++ show structDefs
    Just struct -> nextAvail p $ Struct.size struct
 
-getPositionAndSize _ p (TypeArrayDynamic _) = (p,32)
+getPositionAndSize _ p (TypeArrayDynamic _) = (getNextAvailablePosition p 32, 32)
 getPositionAndSize typeDefs' p (TypeArrayFixed size ty) =
   let
     (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
@@ -185,7 +185,7 @@ getPositionAndSize typeDefs' p (TypeArrayFixed size ty) =
        else d+1
   in
    (p, fromIntegral $ 32*size `divRoundUp` fromIntegral itemsPerWord)
-getPositionAndSize _ p TypeMapping{}  = (p,32)
+getPositionAndSize _ p TypeMapping{}  = (getNextAvailablePosition p 32, 32)
 getPositionAndSize _ p TypeFunction{} = (p,32)
 getPositionAndSize _ p TypeContract{} = nextAvail p 20
 
