@@ -234,10 +234,10 @@ xAbiToContract contractXabi@Xabi{..} = mdo
 contractToXabi::Contract->Xabi
 contractToXabi Contract{..} =
   let
-    functions = Map.fromList [(name, Func (Map.fromList $ map argToIndexedTypes $ zip [0..] args) (Map.fromList $ map varToIndexedTypes $ zip [0..] rets)) | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct]
+    functions = Map.fromList [(name, Func (Map.fromList $ zipWith argToIndexedTypes [0..] args) (Map.fromList $ zipWith varToIndexedTypes [0..] rets)) | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct]
     vars = filter (not . isFunction . snd . snd) $ Map.toList $ fields mainStruct::[(Text, (Storage.Position, Type))]
     isFunction::Type->Bool
-    isFunction (TypeFunction _ _ _) = True
+    isFunction TypeFunction{} = True
     isFunction _ = False
 
   in
@@ -260,7 +260,7 @@ typeToXabiType (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXab
 typeToXabiType (TypeStruct structName) = Xabi.Struct Nothing structName
 typeToXabiType (TypeEnum enumName) = Xabi.Enum Nothing enumName
 typeToXabiType (TypeContract contractName) = Xabi.Contract contractName
-typeToXabiType (TypeFunction _ _ _) = error "typeToXabiType was called with function type, which isn't allowed"
+typeToXabiType TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
 
 simpleTypeToXabiType::SimpleType->Xabi.Type
 simpleTypeToXabiType TypeBool = Xabi.Bool
@@ -371,9 +371,9 @@ simpleTypeToXabiType TypeBytes31 = Xabi.Bytes Nothing $ Just 31
 simpleTypeToXabiType TypeBytes32 = Xabi.Bytes Nothing $ Just 32
 simpleTypeToXabiType TypeBytes = Xabi.Bytes Nothing Nothing
 
-argToIndexedTypes::(Int32, (Text, Type))->(Text, Xabi.IndexedType)
-argToIndexedTypes (i, (name, theType)) = (name, Xabi.IndexedType i $ typeToXabiType theType)
+argToIndexedTypes::Int32->(Text, Type)->(Text, Xabi.IndexedType)
+argToIndexedTypes i (name, theType) = (name, Xabi.IndexedType i $ typeToXabiType theType)
 
-varToIndexedTypes::(Int32, (Maybe Text, Type))->(Text, Xabi.IndexedType)
-varToIndexedTypes (i, (maybeName, theType)) = (fromMaybe (Text.pack $ "#" ++ show i) maybeName, Xabi.IndexedType i $ typeToXabiType theType)
+varToIndexedTypes::Int32->(Maybe Text, Type)->(Text, Xabi.IndexedType)
+varToIndexedTypes i (maybeName, theType) = (fromMaybe (Text.pack $ "#" ++ show i) maybeName, Xabi.IndexedType i $ typeToXabiType theType)
 

@@ -20,12 +20,12 @@ import Text.RawString.QQ
 
 spec :: Spec
 spec =
-  describe "Xabi" $ do
+  describe "Xabi" $ 
     it "should convert a first pass xabi to a contract, then to a second pass xabi" $ do
       let firstPass = fromMaybe undefined $ decode firstPassString
           secondPass = fromMaybe undefined $ decode secondPassString::Xabi
       --We don't yet put constructors in the contract to xabi conversion, so I remove this field for the test.
-      (contractToXabi $ either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass{xabiConstr=Map.empty}
+      contractToXabi (either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass{xabiConstr=Map.empty}
 
 secondPassString::ByteString.ByteString
 secondPassString = 

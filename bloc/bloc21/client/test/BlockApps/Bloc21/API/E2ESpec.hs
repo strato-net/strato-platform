@@ -289,7 +289,7 @@ spec =
         simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
         postCompileRequest = PostCompileRequest
           (Just [simpleStorageBytes32ArrayContractName])
-          (Just $ simpleStorageBytes32ArrayContractName)
+          (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
