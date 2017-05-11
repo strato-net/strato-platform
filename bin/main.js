@@ -81,8 +81,9 @@ function blocinit(cmdArgv) {
   console.log(icon());
 
   console.log(`
-  Bloc is the interface to an Ethereum Blockchain, runnig on the BlockApps Strato Instance.
-To obtain a Strato instance, see our getting-started repository
+Bloc is the interface to a BlockApps Strato Instnace running an Ethereum Blockchain. Before using Bloc, be sure to have access
+to a Strato Instance. To obtain a Strato instance, see our getting-started repository at
+https://github.com/blockapps/strato-getting-started
 or just spin-up a STRATO instance on Azure and get the strato-api to use here
 https://azuremarketplace.microsoft.com/en-us/marketplace/apps/blockapps.strato-blockchain-lts-vm
 `);
