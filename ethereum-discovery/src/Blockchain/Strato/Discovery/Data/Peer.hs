@@ -2,30 +2,28 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module Blockchain.Strato.Discovery.Data.Peer where
 
-import Control.Monad.Logger
-import Crypto.Types.PubKey.ECC
-import qualified Data.Text as T
-import Data.Time
-import Data.Time.Clock.POSIX
-import qualified Database.Persist.Postgresql as SQL
-import Database.Persist.TH
-import Network.URI (URI(..), URIAuth(..))
-import qualified Network.URI as URI
+import           Crypto.Types.PubKey.ECC
+import qualified Data.Text                    as T
+import           Data.Time
+import           Data.Time.Clock.POSIX
+import qualified Database.Persist.Postgresql  as SQL
+import           Database.Persist.TH
+import           Network.URI                  (URI (..), URIAuth (..))
+import qualified Network.URI                  as URI
 
 
-import Blockchain.Data.PersistTypes ()
-import Blockchain.Data.PubKey
-import Blockchain.EthConf
-import Blockchain.MiscJSON ()
-import Blockchain.DB.SQLDB (createPostgresqlPool')
-import Blockchain.SHA
+import           Blockchain.Data.PersistTypes ()
+import           Blockchain.Data.PubKey
+import           Blockchain.DB.SQLDB          (withGlobalSQLPool)
+import           Blockchain.MiscJSON          ()
+import           Blockchain.SHA
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 PPeer
@@ -75,19 +73,19 @@ buildPeer (pubKeyMaybe, ip, port') =
 parseEnode :: String -> Either String (Maybe String, String, Int)
 parseEnode enode =
     case mUriAuth of
-        Nothing -> Left $ "Invalid enode: " ++ enode
+        Nothing        -> Left $ "Invalid enode: " ++ enode
         (Just uriAuth) -> Right (parsePublicKey uriAuth, parseHostname uriAuth, parsePort uriAuth)
     where
         mUriAuth = URI.parseURI enode >>= validateURIScheme >>= URI.uriAuthority
 
 validateURIScheme :: URI -> Maybe URI
 validateURIScheme uri = case URI.uriScheme uri == "enode:" of
-    True -> Just uri
+    True  -> Just uri
     False -> Nothing
 
 parsePublicKey :: URIAuth -> Maybe String
 parsePublicKey uriAuth = case filter (/= '@') $ URI.uriUserInfo uriAuth of
-    [] -> Nothing
+    []        -> Nothing
     publicKey -> Just publicKey
 
 parseHostname :: URIAuth -> String
@@ -97,37 +95,32 @@ parsePort :: URIAuth -> Int
 parsePort uriAuth = read $ filter (/= ':') (URI.uriPort uriAuth)
 
 getAvailablePeers::IO [PPeer]
-getAvailablePeers = do
+getAvailablePeers = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO ()
-setPeerBondingState ip port' state = do
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
+setPeerBondingState ip port' state = withGlobalSQLPool $ \sqldb -> do
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. T.pack ip, PPeerUdpPort SQL.==. port'] [PPeerBondState SQL.=. state]
   return ()
 
 getBondedPeers::IO [PPeer]
-getBondedPeers = do
+getBondedPeers = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
 getBondedPeersForUDP::IO [PPeer]
-getBondedPeersForUDP = do
+getBondedPeersForUDP = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
 
 getUnbondedPeers::IO [PPeer]
-getUnbondedPeers = do
+getUnbondedPeers = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerBondState SQL.==. 0, PPeerEnableTime SQL.<. currentTime] []
 
@@ -149,17 +142,15 @@ defaultPeer = PPeer{
   }
 
 disablePeerForSeconds::PPeer->Int->IO ()
-disablePeerForSeconds peer seconds = do
+disablePeerForSeconds peer seconds = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()
 
 disableUDPPeerForSeconds::PPeer->Int->IO ()
-disableUDPPeerForSeconds peer seconds = do
+disableUDPPeerForSeconds peer seconds = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
-  sqldb <- runNoLoggingT $ createPostgresqlPool' connStr 20
   flip SQL.runSqlPool sqldb $
     SQL.updateWhere [PPeerIp SQL.==. pPeerIp peer, PPeerTcpPort SQL.==. pPeerTcpPort peer] [PPeerUdpEnableTime SQL.=. fromIntegral seconds `addUTCTime` currentTime]
   return ()

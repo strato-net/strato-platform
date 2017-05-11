@@ -5,22 +5,22 @@ module Blockchain.Display (
   ) where
 
 
-import Control.Monad.Logger
-import Control.Monad.IO.Class
-import Control.Monad.Trans
-import Data.Conduit
-import qualified Data.Text as T
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans
+import           Data.Conduit
+import qualified Data.Text                   as T
 
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Data.BlockHeader
-import Blockchain.Format
-import Blockchain.Data.Wire
+import qualified Blockchain.Colors           as CL
+import           Blockchain.Data.BlockHeader
+import           Blockchain.Data.Wire
+import           Blockchain.Format
 
 prefix::Bool->String->String
-prefix True "" = CL.green "msg >>>>>: "
-prefix False "" = CL.cyan "msg <<<<<: "
-prefix True peerName = CL.green $ peerName ++ " >>>>>: "
+prefix True ""        = CL.green "msg >>>>>: "
+prefix False ""       = CL.cyan "msg <<<<<: "
+prefix True peerName  = CL.green $ peerName ++ " >>>>>: "
 prefix False peerName = CL.cyan $ peerName ++ " <<<<<: "
 
 --This must exist somewhere already
@@ -29,7 +29,7 @@ tap f = do
   awaitForever $ \x -> do
       lift $ f x
       yield x
-      
+
 displayMessage::MonadLogger m=>Bool->String->Message->m ()
 displayMessage _ _ Ping = return ()
 displayMessage _ _ Pong = return ()

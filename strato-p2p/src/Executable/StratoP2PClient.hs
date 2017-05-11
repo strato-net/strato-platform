@@ -9,11 +9,11 @@
 module Executable.StratoP2PClient (stratoP2PClient) where
 
 import           Control.Concurrent                    hiding (yield)
+import           Control.Concurrent.SSem               (SSem)
+import qualified Control.Concurrent.SSem               as SSem
 import           Control.Concurrent.STM.MonadIO
+import           Control.Concurrent.STM.TVar           (readTVarIO)
 import           Control.Exception.Lifted
-import           Control.Concurrent.SSem              (SSem)
-import qualified Control.Concurrent.SSem              as SSem
-import           Control.Concurrent.STM.TVar          (readTVarIO)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
@@ -48,25 +48,26 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Display
-import           Blockchain.EthConf                    hiding (port, genesisHash)
+import           Blockchain.EthConf                    hiding (genesisHash,
+                                                        port)
 import           Blockchain.EthEncryptionException
 import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
 import           Blockchain.Format
 import           Blockchain.Options
-import           Blockchain.Output                    (printLogMsg')
+import           Blockchain.Output                     (printLogMsg')
+import           Blockchain.P2PRPC
 import           Blockchain.SeqEventNotify
 import           Blockchain.Stream.VMEvent
 import           Blockchain.TCPClientWithTimeout
 import           Blockchain.TimerSource
 import           Blockchain.Util
-import           Blockchain.P2PRPC
 
 import           Data.Maybe
 
-import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models
 import qualified Database.Redis                        as Redis
 
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -104,9 +105,9 @@ handleMsg myId peer = do
                               genesisHash     = genHash
                           }
               other -> assertHandshake other
-    
+
           awaitMsg >>= \case
-              Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do 
+              Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
                       genHash <- lift getGenesisHash
                       when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                       void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
@@ -115,7 +116,7 @@ handleMsg myId peer = do
                       yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
                       stampActionTimestamp
               other -> assertHandshake other
-    
+
           handleEvents (if flags_debugFail then Fail else Log) peer
 
     where assertHandshake m = do
@@ -179,9 +180,9 @@ runPeer connectedPeers peer myPriv = do
     redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
     runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server ->
         runResourceT $ do
-            let connectedPeer = ConnectedPeer peer 
+            let connectedPeer = ConnectedPeer peer
             void $ modifyTVar connectedPeers $ S.insert connectedPeer
-            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20 
+            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20
 
             let kafkaState = mkConfiguredKafkaState "strato-p2p-client"
 
@@ -193,7 +194,7 @@ runPeer connectedPeers peer myPriv = do
                     appSource server
                       =$= ethDecrypt inCxt
                       =$= bytesToMessages
-                      =$= tap (displayMessage False "")
+                      =$= tap (displayMessage False (pPeerString peer))
                       =$= CL.map MsgEvt
                   , seqEventNotifictationSource =$= CL.map NewSeqEvent
                   , timerSource
@@ -201,7 +202,7 @@ runPeer connectedPeers peer myPriv = do
 
                 _ <- eventSource
                       =$= handleMsg myPublic peer
-                      =$= transPipe lift (tap (displayMessage True ""))
+                      =$= transPipe lift (tap (displayMessage True (pPeerString peer)))
                       =$= messagesToBytes
                       =$= ethEncrypt outCxt
                        $$ transPipe liftIO (appSink server)
@@ -226,8 +227,8 @@ getPubKeyRunPeer connectedPeers peer = do
 
 
 runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
-              => TVar (S.Set ConnectedPeer) 
-              -> PPeer 
+              => TVar (S.Set ConnectedPeer)
+              -> PPeer
               -> m ()
 runPeerInList connectedPeers thePeer = do
   liftIO $ disablePeerForSeconds thePeer 60 --don't connect to a peer more than once per minute, out of politeness
@@ -239,7 +240,10 @@ stratoP2PClient = do
   _ <- liftIO . forkIO $ runStratoP2PComm clientCommPort connectedPeers
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
-    peers <- liftIO getAvailablePeers
+    peers' <- liftIO getAvailablePeers
+    serverPeers' <- liftIO (getPeersIO "localhost" serverCommPort)
+    let serverPeers = either (const []) id serverPeers'
+    peers <- filterM (notAlreadyConnectedToServer serverPeers) peers'
     case flags_mode of
       SingleThreaded -> singleThreadedClient connectedPeers peers
       MultiThreaded  -> multiThreadedClient connectedPeers peers activePeersSem
@@ -252,7 +256,7 @@ stratoP2PClient = do
           peerNumber <- liftIO $ randomRIO (0, length peers - 1)
           let thePeer = peers !! peerNumber
           try (runPeerInList connectedPeers thePeer) >>= handleRunPeerResult thePeer
-            
+
         multiThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> SSem -> LoggingT IO ()
         multiThreadedClient connectedPeers peers sem = liftIO . void . for peers $ \p -> do
           isRunning <- ((ConnectedPeer p) `S.member`) <$> readTVarIO connectedPeers
@@ -264,7 +268,7 @@ stratoP2PClient = do
                 liftIO (SSem.signal sem)
                 handleRunPeerResult p result
 
-        disablePeerForHours :: MonadIO m => PPeer -> Int -> m () 
+        disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
         disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
 
         handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
@@ -278,4 +282,21 @@ stratoP2PClient = do
              e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
              _ -> return ()
           Right _ -> return ()
+
+        notAlreadyConnectedToServer :: (MonadIO m) => [RPCPeer] -> PPeer -> m Bool
+        notAlreadyConnectedToServer serverPeers PPeer{..} =
+            if looksLikeHostname
+              then do
+                asIp <- resolveHostname (T.unpack pPeerIp)
+                return (asIp `elem` serverPeerIPs)
+              else return (T.unpack pPeerIp `elem` serverPeerIPs)
+
+            where serverPeerIPs :: [String]
+                  serverPeerIPs = rpcPeerIP <$> serverPeers -- todo: will it always be the case that server reports as IPs?
+
+                  looksLikeHostname :: Bool
+                  looksLikeHostname = True
+
+                  resolveHostname :: (MonadIO m) => String -> m String
+                  resolveHostname hn = error $ "todo: resolveHostname " ++ hn
 
