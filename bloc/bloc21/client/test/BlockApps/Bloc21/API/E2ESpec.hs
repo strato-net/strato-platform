@@ -288,8 +288,8 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
         postCompileRequest = PostCompileRequest
-          [simpleStorageBytes32ArrayContractName]
-          simpleStorageBytes32ArrayContractName
+          (Just [simpleStorageBytes32ArrayContractName])
+          (Just $ simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
@@ -412,8 +412,8 @@ spec =
           , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
           ]
         postCompileRequest = PostCompileRequest
-          [simpleStorageBytes32ArrayContractName]
-          simpleStorageBytes32ArrayContractName
+          (Just [simpleStorageBytes32ArrayContractName])
+          (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc
@@ -1029,6 +1029,7 @@ spec =
     it "should create IAM contracts and run them all" $ \ TestConfig {..} -> do
       let
           iamUsername = UserName "IAM"
+
       postIAMEither <- runClientM (postUsersUser iamUsername True pw) (ClientEnv mgr blocUrl)
       postIAMEither `shouldSatisfy` isRight
       iamBlob <- readSolFile "BadgerIam.sol"
@@ -1037,6 +1038,10 @@ spec =
         Right iamUserAddr = postIAMEither
         paramsIAM = accountsFilterParams {qaAddress = Just iamUserAddr}
         iamName = "IdentityAccessManager"
+        postCompileRequest = PostCompileRequest
+          (Just [iamName, "StorageBlob"])
+          (Just iamName)
+          iamBlob
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = iamBlob
           , postuserscontractrequestPassword = pw
@@ -1045,6 +1050,7 @@ spec =
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
           }
+      _ <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       eAccts2 <- runClientM (getAccountsFilter paramsIAM) (ClientEnv mgr stratoUrl)
       eAccts2 `shouldSatisfy` isRight
       let

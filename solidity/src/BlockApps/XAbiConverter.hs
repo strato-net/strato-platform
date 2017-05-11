@@ -126,7 +126,7 @@ funcToType::Xabi->Text->Func->Either String Type
 funcToType xabi name Func{..} = do
 
   let orderedFuncArgs = sortOn (Xabi.indexedTypeIndex . snd) $ Map.toList funcArgs
-  
+
   convertedFuncArgs <- for orderedFuncArgs $ \(name', theType) -> do
     theType' <- xabiTypeToType xabi . Xabi.indexedTypeType $ theType
     return (name', theType')
@@ -239,7 +239,7 @@ contractToXabi Contract{..} =
     isFunction::Type->Bool
     isFunction (TypeFunction _ _ _) = True
     isFunction _ = False
-    
+
   in
     Xabi{
       xabiFuncs = functions,
@@ -251,9 +251,11 @@ contractToXabi Contract{..} =
 fieldToVarType::(Storage.Position, Type)->Xabi.VarType
 fieldToVarType (Storage.Position{..}, theType) = Xabi.VarType (fromIntegral $ 32*offset+fromIntegral byte) (Just True) $ typeToXabiType theType
 
+-- Array {dynamic::Maybe Bool, length::Maybe Word, entry::Type}
 typeToXabiType::Type->Xabi.Type
 typeToXabiType (SimpleType x) = simpleTypeToXabiType x
 typeToXabiType (TypeArrayDynamic theType) = Xabi.Array (Just True) Nothing (typeToXabiType theType)
+typeToXabiType (TypeArrayFixed size theType) = Xabi.Array (Just False) (Just size) (typeToXabiType theType)
 typeToXabiType (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType to)
 typeToXabiType (TypeFunction _ _ _) = error "typeToXabiType was called with function type, which isn't allowed"
 typeToXabiType x = error $ "Missing type in call to typeToXabiType: " ++ show x
