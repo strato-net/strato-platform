@@ -224,3 +224,7 @@ xAbiToContract contractXabi@Xabi{..} = mdo
     mainStruct=fieldsToStruct typeDefs' $ vars ++ Map.toList funcs,
     typeDefs=typeDefs'
     }
+
+
+contractToXabi::Contract->Xabi
+contractToXabi = undefined

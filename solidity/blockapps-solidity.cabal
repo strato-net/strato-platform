@@ -84,6 +84,7 @@ test-suite blockapps-solidity-test
                , blockapps-solidity
                , bytestring
                , hspec
+               , raw-strings-qq
                , text
 
 source-repository head
