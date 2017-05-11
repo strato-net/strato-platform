@@ -7,7 +7,6 @@ import           Blockchain.Data.RLP
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.Database.MerklePatricia.Internal
 import           Blockchain.Database.MerklePatricia.InternalMem
-import           Blockchain.Database.MerklePatricia.MPDB
 import           Blockchain.Database.MerklePatriciaMem
 import           Blockchain.Util
 import           Control.Monad.Trans.Resource

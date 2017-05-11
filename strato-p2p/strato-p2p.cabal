@@ -61,6 +61,7 @@ library
                  , crypto-pubkey
                  , crypto-pubkey-types
                  , crypto-random
+                 , dns
                  , esqueleto
                  , ethereum-discovery
                  , ethereum-encryption

@@ -5,6 +5,7 @@
 {-# LANGUAGE PatternGuards         #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
 
 module Executable.StratoP2PClient (stratoP2PClient) where
 
@@ -27,10 +28,14 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary                   as CB
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Network
+import           Data.Semigroup
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import qualified Database.Persist.Postgresql           as SQL
+import           Network.DNS.Lookup
+import           Network.DNS.Resolver
+import           Network.DNS.Utils                     (normalize)
 import qualified Network.Haskoin.Internals             as H
 import           System.Random
 
@@ -245,7 +250,10 @@ stratoP2PClient = do
     peers <- filterM (notAlreadyConnectedToServer serverPeers) peers'
     case flags_mode of
       SingleThreaded -> singleThreadedClient connectedPeers peers
-      MultiThreaded  -> multiThreadedClient connectedPeers peers activePeersSem
+      MultiThreaded  -> do
+        multiThreadedClient connectedPeers peers activePeersSem
+        $logInfoS "stratoP2PClient" "Waiting 15 seconds before looping over peers again"
+        liftIO $ threadDelay 50000000
 
   where singleThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> LoggingT IO ()
         singleThreadedClient _  [] = do
@@ -282,20 +290,29 @@ stratoP2PClient = do
              _  -> return ()
           Right _ -> return ()
 
-        notAlreadyConnectedToServer :: (MonadIO m) => [RPCPeer] -> PPeer -> m Bool
+        notAlreadyConnectedToServer :: (MonadLogger m, MonadIO m) => [RPCPeer] -> PPeer -> m Bool
         notAlreadyConnectedToServer serverPeers PPeer{..} =
             if looksLikeHostname
               then do
-                asIp <- resolveHostname (T.unpack pPeerIp)
-                return (asIp `elem` serverPeerIPs)
+                asIps <- resolveHostname (T.unpack pPeerIp)
+                let found = any (`elem` serverPeerIPs) asIps
+                $logInfoS "checkConnectedToServer" . T.pack $ T.unpack pPeerIp <> " -> " <> show asIps <> " / " <> show serverPeerIPs <> " -> " <> show found
+                return (not found)
               else return (T.unpack pPeerIp `elem` serverPeerIPs)
 
             where serverPeerIPs :: [String]
                   serverPeerIPs = rpcPeerIP <$> serverPeers -- todo: will it always be the case that server reports as IPs?
 
                   looksLikeHostname :: Bool
-                  looksLikeHostname = True
+                  looksLikeHostname = case stringToIAddr (T.unpack pPeerIp) of
+                    HostName _ -> True
+                    _          -> False
 
-                  resolveHostname :: (MonadIO m) => String -> m String
-                  resolveHostname hn = error $ "todo: resolveHostname " ++ hn
-
+                  resolveHostname :: (MonadIO m, MonadLogger m) => String -> m [String]
+                  resolveHostname hn = do
+                    rs <- liftIO (makeResolvSeed defaultResolvConf)
+                    liftIO (withResolver rs (flip lookupA (normalize $ BC.pack hn))) >>= \case
+                      Left err  -> do
+                        $logInfoS "resolveHostname" . T.pack $ "Couldnt resolve hostname \"" <> hn <> "\": " <> show err
+                        return []
+                      Right ips -> return $ show <$> ips

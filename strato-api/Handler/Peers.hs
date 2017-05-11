@@ -24,10 +24,10 @@ getPeersR = do
   let fields = [("serverPeers", (host, serverCommPort)), ("clientPeers", (host, clientCommPort))]
 
   qs <- for fields $ \(k, (host', port)) -> liftIO . try $ ((k,) <$> (getPeersIO host' port))
-  let fails = [q | q <- qs, isLeft q]
+  let fails = [q | Left q <- qs]
   if null fails
     then return . object $ pairify <$> qs
-    else sendResponseStatus status504 (T.pack "RPC call to p2p unsuccessful") -- error "500"
+    else sendResponseStatus status504 (T.pack $ "RPC calls to p2p unsuccessful: " ++ show fails) -- error "500"
 
   where pairify :: (ToJSON b) => Either SomeException (Text, Either a b) -> (Text, Value)
         pairify (Right (k, Right v)) = k .= v
