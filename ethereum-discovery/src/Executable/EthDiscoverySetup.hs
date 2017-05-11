@@ -1,17 +1,18 @@
-{-# LANGUAGE FlexibleContexts, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Executable.EthDiscoverySetup (
   setup
   ) where
 
-import Control.Monad
-import Control.Monad.Logger
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Control
-import qualified Data.Text as T
-import Database.Persist.Postgresql
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Control
+import qualified Data.Text                             as T
+import           Database.Persist.Postgresql
 
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.EthConf
+import           Blockchain.EthConf
+import           Blockchain.Strato.Discovery.Data.Peer
 
 setup :: (MonadLogger m, MonadBaseControl IO m, MonadIO m) => Maybe [String] -> m ()
 setup maybeStratoNodes = do
@@ -44,4 +45,4 @@ setup maybeStratoNodes = do
         let peer = createPeer $ "enode://" ++ (if null pubkey then "" else pubkey ++ "@") ++ node ++ ":30303"
         case peer of
             (Left err) -> logWarnN (T.pack err)
-            (Right p) -> void $ insert p
+            (Right p)  -> void $ insert p

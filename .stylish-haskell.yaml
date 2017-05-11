@@ -195,3 +195,10 @@ language_extensions:
    - ScopedTypeVariables
    - FlexibleContexts
    - FlexibleInstances
+   - FunctionalDependencies
+   - LambdaCase
+   - NamedFieldPuns
+   - RecordWildCards
+   - BangPatterns
+   - ViewPatterns
+   - CPP

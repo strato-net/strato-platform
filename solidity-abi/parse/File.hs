@@ -9,16 +9,16 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module File (solidityFile) where
 
-import Data.Either
+import           Data.Either
 
-import Text.Parsec
+import           Text.Parsec
 
-import Prelude hiding (lookup)
+import           Prelude      hiding (lookup)
 
-import Declarations
-import Lexer
-import ParserTypes
-import Pragma
+import           Declarations
+import           Lexer
+import           ParserTypes
+import           Pragma
 
 -- | Parses a full Solidity file's contracts and imports
 solidityFile :: SolidityParser SolidityFile
@@ -32,7 +32,7 @@ solidityFile = do
     eitherImport <|> eitherContract
   eof
   return $ uncurry SolidityFile $ partitionEithers toplevel
- 
+
 -- | Parses any of the various kinds of import statements
 solidityImport :: SolidityParser (FileName, ImportAs)
 solidityImport = do
@@ -40,7 +40,7 @@ solidityImport = do
   i <- simpleImport <|> es6Import
   semi
   return i
- 
+
 -- | Parses 'import "File"' and 'import "File" as name' statements
 simpleImport :: SolidityParser (FileName, ImportAs)
 simpleImport = do
@@ -60,15 +60,15 @@ es6Import = do
 
 -- | Parses the '{sym1 as alias, sym2}' or '*" part of an es6 style import
 es6ImportAs :: SolidityParser ImportAs
-es6ImportAs = 
+es6ImportAs =
   (do
     importAs <- es6As
     case importAs of
       ("*", "*") -> return Unqualified
-      ("*", p) -> return $ StarPrefix p
-      _ -> parserFail "ES6-style import without braces must import \"*\""
+      ("*", p)   -> return $ StarPrefix p
+      _          -> parserFail "ES6-style import without braces must import \"*\""
   ) <|>
-  braces 
+  braces
   (do
     importsAs <- commaSep1 es6As
     return $ Aliases importsAs

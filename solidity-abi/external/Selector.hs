@@ -6,20 +6,20 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Selector (selector) where
 
-import qualified Data.ByteString as BS
-import Data.ByteString (ByteString)
+import           Data.ByteString    (ByteString)
+import qualified Data.ByteString    as BS
 
-import qualified Data.Map as Map
-import Data.Maybe
-import qualified Data.Text as T
-import Data.Text.Encoding
-import Text.PrettyPrint
+import qualified Data.Map           as Map
+import           Data.Maybe
+import qualified Data.Text          as T
+import           Data.Text.Encoding
+import           Text.PrettyPrint
 
-import qualified Crypto.Hash.SHA3 as SHA3 (hash)
-import Numeric
+import qualified Crypto.Hash.SHA3   as SHA3 (hash)
+import           Numeric
 
-import ParserTypes
-import LayoutTypes
+import           LayoutTypes
+import           ParserTypes
 
 -- | The 'selector' function is responsible for producing the 4-byte
 -- hash that Solidity uses to identify functions.  It's essentially the
@@ -35,7 +35,7 @@ selector typesL name args vals = hash4 $ signature typesL name args vals
     hash4 bs = concatMap toHex $ BS.unpack $ BS.take 4 $ SHA3.hash 256 bs
     toHex = zeroPad . flip showHex ""
     zeroPad [c] = ['0',c]
-    zeroPad x = x
+    zeroPad x   = x
 
 signature :: SolidityTypesLayout -> Identifier -> [SolidityObjDef] -> [SolidityObjDef] -> ByteString
 signature typesL name args _ = encodeUtf8 $ T.pack $ name ++ prettyArgTypes typesL args
@@ -47,7 +47,7 @@ prettyArgTypes typesL args =
 
 varType :: SolidityObjDef -> Maybe SolidityBasicType
 varType (ObjDef _ (SingleValue t) NoValue _ _) = Just t
-varType _ = Nothing
+varType _                                      = Nothing
 
 pretty :: SolidityTypesLayout -> SolidityBasicType -> Doc
 pretty _ Boolean = text "bool"
@@ -61,9 +61,9 @@ pretty typesL (FixedArray t l) = pretty typesL t <> text "[" <> natural l <> tex
 pretty typesL (DynamicArray t) = pretty typesL t <> text "[]"
 pretty typesL (Mapping d c) =
   text "mapping" <+> parens (pretty typesL d <+> text "=>" <+> pretty typesL c)
-pretty typesL (Typedef name) = 
+pretty typesL (Typedef name) =
   case typesL Map.! name of
     EnumLayout s -> pretty typesL (UnsignedInt s)
-    _ -> text name
+    _            -> text name
 
 natural = integer . toInteger

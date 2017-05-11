@@ -9,10 +9,10 @@ module Blockchain.Bagger.TransactionList
  , toList
  ) where
 
-import Blockchain.Data.Address
-import Blockchain.Data.TransactionDef
-import Blockchain.Sequencer.Event (OutputTx(..))
-import qualified Data.Map.Strict as M
+import           Blockchain.Data.Address
+import           Blockchain.Data.TransactionDef
+import           Blockchain.Sequencer.Event     (OutputTx (..))
+import qualified Data.Map.Strict                as M
 
 type TransactionList = M.Map Integer OutputTx
 

@@ -2,12 +2,12 @@
 
 module Blockchain.Strato.Discovery.UDPSpec where
 
-import Data.Bits
-import Network.Socket (inet_addr, tupleToHostAddress6)
-import Test.Hspec
+import           Data.Bits
+import           Network.Socket                  (inet_addr, tupleToHostAddress6)
+import           Test.Hspec
 
-import Blockchain.Format
-import Blockchain.Strato.Discovery.UDP
+import           Blockchain.Format
+import           Blockchain.Strato.Discovery.UDP
 
 spec :: Spec
 spec = do

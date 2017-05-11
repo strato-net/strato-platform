@@ -4,11 +4,11 @@
 module BlockApps.ECRecover.Pointers
 where
 
-import BlockApps.ECRecover.Prelude
-import qualified Data.ByteString.Short as B
+import           BlockApps.ECRecover.Prelude
+import qualified Data.ByteString.Internal       as D
+import qualified Data.ByteString.Short          as B
 import qualified Data.ByteString.Short.Internal as A
-import qualified Data.ByteString.Unsafe as C
-import qualified Data.ByteString.Internal as D
+import qualified Data.ByteString.Unsafe         as C
 
 
 -- |

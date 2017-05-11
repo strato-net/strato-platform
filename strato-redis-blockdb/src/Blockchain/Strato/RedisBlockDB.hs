@@ -32,8 +32,8 @@ import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as Set
-import           System.Random                         (randomIO)
 import           Database.Redis
+import           System.Random                         (randomIO)
 
 -- todo: move this somewhere?
 zipMapM :: (Traversable t, Monad m)
@@ -71,7 +71,7 @@ bestBlockInfoKey = S8.pack "<best>"
 {-# INLINE bestBlockInfoKey #-}
 
 getGenesisHash :: Redis (Maybe SHA)
-getGenesisHash = getCanonical 0 
+getGenesisHash = getCanonical 0
 
 getInNamespace :: (RedisDBKeyable key)
                => BlockDBNamespace
@@ -271,7 +271,7 @@ putHeader h = do
         number    = blockHeaderBlockNumber h
         storeHead = morphBlockHeader h :: RedisHeader
         inNS'     = flip inNamespace sha
-    
+
     res <- multiExec $ do
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
@@ -281,7 +281,7 @@ putHeader h = do
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
         TxError e   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Error" ++ e)
-    
+
 putHeaders :: (Traversable f, BlockHeaderLike h)
            => f h
            -> Redis (f (Either Reply Status))
@@ -332,7 +332,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
             case helper' of
                 Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
-                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates) 
+                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                     res <- multiExec $ do
                         forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
@@ -347,7 +347,7 @@ commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
                      -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
-        where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], []) 
+        where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
               helper (_:(oldSha'':_)) (_:(newSha'':_)) _ | oldSha'' == newSha'' = return $ Right ([(newSha'', newNum)], [oldNum])
               helper oldShaChain newShaChain seen = do
                   let oldSha = head oldShaChain
@@ -374,10 +374,10 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 
               complete :: SHA -> [SHA] -> Redis (Either Reply ([(SHA, Integer)], [Integer]))
               complete lca newShaChain = getHeader lca >>= \case
-                      Nothing -> if lca /= (SHA 0) -- genesis block is sha 0 
+                      Nothing -> if lca /= (SHA 0) -- genesis block is sha 0
                                      then return . Left . SingleLine . S8.pack $
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
-                                     else complete (head newShaChain) newShaChain 
+                                     else complete (head newShaChain) newShaChain
                       Just (ancestor :: RedisHeader) -> do
                           -- liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
@@ -392,7 +392,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
-        forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,) 
+        forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
 forceBestBlockInfo' key = set key . toValue

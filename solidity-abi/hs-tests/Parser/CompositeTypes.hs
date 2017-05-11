@@ -1,17 +1,17 @@
 module Parser.CompositeTypes (test) where
 
-import Blockchain.Ethereum.Solidity.Parse
-import Parser.BasicTypes hiding (test)
-import Test.Combinators
-import Test.Common 
-import Parser.Common
+import           Blockchain.Ethereum.Solidity.Parse
+import           Parser.BasicTypes                  hiding (test)
+import           Parser.Common
+import           Test.Combinators
+import           Test.Common
 
 test :: TestTree
 test = doTests "compositeTypes" parserTest [
   enumVar,
   arrayOfBasic, arrayOfNewType, sizedArray, arithmeticInSizedArray,
   arrayOfArray, sizedArrayOfArray, arrayOfSizedArray, sizedArrayOfSizedArray,
-  mappingFromBasicToBasic, 
+  mappingFromBasicToBasic,
   mappingFromNewType, mappingFromArray,
   mappingToNewType, mappingToArray, mappingToMapping,
   structOfBasic, structOfComposite
@@ -19,71 +19,71 @@ test = doTests "compositeTypes" parserTest [
 
 enumVar :: ParserTestInput
 enumVar =
-  compositeNewTypeTestInput "enumVar" tName id (`enumDefn` names) 
+  compositeNewTypeTestInput "enumVar" tName id (`enumDefn` names)
     (Typedef tName) (Enum names)
-   
+
   where
     tName = "E"
     names = map (:[]) ['A' .. 'Z']
 
 arrayOfBasic :: ParserTestInput
-arrayOfBasic = 
-  compositeBasicTypeTestInput "arrayOfBasic" (arrayDeclType "uint64" "") 
+arrayOfBasic =
+  compositeBasicTypeTestInput "arrayOfBasic" (arrayDeclType "uint64" "")
     (DynamicArray $ UnsignedInt 8)
 
 arrayOfNewType :: ParserTestInput
-arrayOfNewType = 
+arrayOfNewType =
   compositeNewTypeTestInput "arrayOfNewType" tName
     (`arrayDeclType` "") (`enumDefn` names) (DynamicArray $ Typedef tName) (Enum names)
-  
-  where 
+
+  where
     tName = "E"
     names = map (:[]) ['A' .. 'Z']
 
 sizedArray :: ParserTestInput
-sizedArray = 
+sizedArray =
   compositeBasicTypeTestInput "sizedArray" (arrayDeclType "uint64" "17")
     (FixedArray (UnsignedInt 8) 17)
 
 arithmeticInSizedArray :: ParserTestInput
-arithmeticInSizedArray = 
+arithmeticInSizedArray =
   compositeBasicTypeTestInput "arithmeticInSizedArray"
     (arrayDeclType "uint64" "2**4 + 1") (FixedArray (UnsignedInt 8) 17)
 
 arrayOfArray :: ParserTestInput
-arrayOfArray = 
-  compositeBasicTypeTestInput "arrayOfArray" 
+arrayOfArray =
+  compositeBasicTypeTestInput "arrayOfArray"
     (arrayDeclType (arrayDeclType "uint64" "") "")
     (DynamicArray $ DynamicArray $ UnsignedInt 8)
 
 sizedArrayOfArray :: ParserTestInput
-sizedArrayOfArray = 
-  compositeBasicTypeTestInput "sizedArrayOfArray" 
+sizedArrayOfArray =
+  compositeBasicTypeTestInput "sizedArrayOfArray"
     (arrayDeclType (arrayDeclType "uint64" "") "17")
     (FixedArray (DynamicArray $ UnsignedInt 8) 17)
 
 arrayOfSizedArray :: ParserTestInput
-arrayOfSizedArray = 
-  compositeBasicTypeTestInput "arrayOfSizedArray" 
+arrayOfSizedArray =
+  compositeBasicTypeTestInput "arrayOfSizedArray"
     (arrayDeclType (arrayDeclType "uint64" "17") "")
     (DynamicArray $ FixedArray (UnsignedInt 8) 17)
 
 sizedArrayOfSizedArray :: ParserTestInput
-sizedArrayOfSizedArray = 
-  compositeBasicTypeTestInput "sizedArrayOfSizedArray" 
+sizedArrayOfSizedArray =
+  compositeBasicTypeTestInput "sizedArrayOfSizedArray"
     (arrayDeclType (arrayDeclType "uint64" "17") "17")
     (FixedArray (FixedArray (UnsignedInt 8) 17) 17)
 
 mappingFromBasicToBasic :: ParserTestInput
 mappingFromBasicToBasic =
-  compositeBasicTypeTestInput "mappingFromBasicToBasic" 
-    (mappingDeclType "int" "uint")  
+  compositeBasicTypeTestInput "mappingFromBasicToBasic"
+    (mappingDeclType "int" "uint")
     Mapping{domType = SignedInt 32, codType = UnsignedInt 32}
 
 mappingFromNewType :: ParserTestInput
 mappingFromNewType =
-  compositeNewTypeTestInput "mappingFromNewType" tName 
-    (`mappingDeclType` "uint") (`enumDefn` names)  
+  compositeNewTypeTestInput "mappingFromNewType" tName
+    (`mappingDeclType` "uint") (`enumDefn` names)
     Mapping{domType = Typedef tName, codType = UnsignedInt 32}
     Enum{names}
 
@@ -92,15 +92,15 @@ mappingFromNewType =
     names = map (:[]) ['A' .. 'Z']
 
 mappingFromArray :: ParserTestInput
-mappingFromArray = 
-  compositeBasicTypeTestInput "mappingFromArrray" 
-    (mappingDeclType (arrayDeclType "int" "") "uint")  
+mappingFromArray =
+  compositeBasicTypeTestInput "mappingFromArrray"
+    (mappingDeclType (arrayDeclType "int" "") "uint")
     Mapping{domType = DynamicArray (SignedInt 32), codType = UnsignedInt 32}
 
 mappingToNewType :: ParserTestInput
-mappingToNewType = 
-  compositeNewTypeTestInput "mappingToNewType" tName 
-    (mappingDeclType "uint") (`enumDefn` names)  
+mappingToNewType =
+  compositeNewTypeTestInput "mappingToNewType" tName
+    (mappingDeclType "uint") (`enumDefn` names)
     Mapping{codType = Typedef tName, domType = UnsignedInt 32}
     Enum{names}
 
@@ -109,15 +109,15 @@ mappingToNewType =
     names = map (:[]) ['A' .. 'Z']
 
 mappingToArray :: ParserTestInput
-mappingToArray = 
-  compositeBasicTypeTestInput "mappingToArrray" 
-    (mappingDeclType "uint" (arrayDeclType "int" ""))  
+mappingToArray =
+  compositeBasicTypeTestInput "mappingToArrray"
+    (mappingDeclType "uint" (arrayDeclType "int" ""))
     Mapping{codType = DynamicArray (SignedInt 32), domType = UnsignedInt 32}
 
 mappingToMapping :: ParserTestInput
 mappingToMapping =
-  compositeBasicTypeTestInput "mappingToArrray" 
-    (mappingDeclType "uint" (mappingDeclType "int" "uint"))  
+  compositeBasicTypeTestInput "mappingToArrray"
+    (mappingDeclType "uint" (mappingDeclType "int" "uint"))
     Mapping{codType = Mapping (SignedInt 32) (UnsignedInt 32), domType = UnsignedInt 32}
 
 structOfBasic :: ParserTestInput
@@ -136,7 +136,7 @@ structOfBasic =
         FixedBytes 1,
         Address
       ]
-    makeObjDef n t = 
+    makeObjDef n t =
       ObjDef {
         objName = "f" ++ show n,
         objValueType = SingleValue t,
@@ -152,10 +152,10 @@ structOfComposite =
 
   where
     tName = "S"
-    types = 
+    types =
       [
-        arrayDeclType "int" "", 
-        arrayDeclType "uint64" "3", 
+        arrayDeclType "int" "",
+        arrayDeclType "uint64" "3",
         mappingDeclType "bool" "byte"
       ]
     typeObjs = zipWith makeObjDef [0::Integer ..]
@@ -164,7 +164,7 @@ structOfComposite =
         FixedArray (UnsignedInt 8) 3,
         Mapping Boolean $ FixedBytes 1
       ]
-    makeObjDef n t = 
+    makeObjDef n t =
       ObjDef {
         objName = "f" ++ show n,
         objValueType = SingleValue t,
@@ -180,6 +180,6 @@ compositeNewTypeTestInput :: String -> String -> (String -> String) ->(String ->
                              SolidityBasicType -> SolidityNewType -> ParserTestInput
 compositeNewTypeTestInput cName tName vConstr tConstr v t = (cName, source, tester) where
   source = contractDefn cName $ tConstr tName ## varDecl (vConstr tName) "x"
-  tester solFile = 
+  tester solFile =
     varTypeIs cName solFile cName "x" v >>
     typeDefnIs cName solFile cName tName t

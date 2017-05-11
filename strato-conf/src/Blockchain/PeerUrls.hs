@@ -3,9 +3,9 @@
 
 module Blockchain.PeerUrls where
 
-import qualified Data.ByteString as B
-import Data.Yaml
-import Network
+import qualified Data.ByteString  as B
+import           Data.Yaml
+import           Network
 import qualified System.IO.Unsafe as STOP_TORTURING_INNOCENT_CHILDREN
 
 ipAddresses::[(String, PortNumber)]

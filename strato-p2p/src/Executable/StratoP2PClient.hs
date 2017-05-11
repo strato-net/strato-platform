@@ -48,8 +48,7 @@ import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.Display
-import           Blockchain.EthConf                    hiding (genesisHash,
-                                                        port)
+import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
 import           Blockchain.Event
 import           Blockchain.EventException
@@ -280,7 +279,7 @@ stratoP2PClient = do
              e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
              e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
              e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
-             _ -> return ()
+             _  -> return ()
           Right _ -> return ()
 
         notAlreadyConnectedToServer :: (MonadIO m) => [RPCPeer] -> PPeer -> m Bool

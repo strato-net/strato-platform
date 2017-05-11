@@ -27,8 +27,7 @@ import           Control.Monad.Trans.Either
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
-import           Data.IORef                              (newIORef, readIORef,
-                                                          writeIORef)
+import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
@@ -81,8 +80,7 @@ import           Blockchain.Output                       (rightPad)
 import           Blockchain.SHA                          (formatSHAWithoutColor)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
-import           Blockchain.Strato.StateDiff             hiding
-                                                          (StateDiff (blockHash))
+import           Blockchain.Strato.StateDiff             hiding (StateDiff (blockHash))
 import           Blockchain.Strato.StateDiff.Database
 import           Blockchain.Strato.StateDiff.Event
 import           Blockchain.Strato.StateDiff.Kafka

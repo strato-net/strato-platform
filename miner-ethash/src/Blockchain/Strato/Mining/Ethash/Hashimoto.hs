@@ -2,19 +2,19 @@
 
 module Blockchain.Strato.Mining.Ethash.Hashimoto where
 
-import Control.Monad
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.Array.IO as MA
-import Data.Binary.Get
-import Data.Binary.Put
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Word
+import           Control.Monad
+import qualified Crypto.Hash.SHA3                          as SHA3
+import qualified Data.Array.IO                             as MA
+import           Data.Binary.Get
+import           Data.Binary.Put
+import           Data.Bits
+import qualified Data.ByteString                           as B
+import qualified Data.ByteString.Lazy                      as BL
+import           Data.Word
 
-import Blockchain.Strato.Mining.Ethash.Constants
-import Blockchain.Strato.Mining.Ethash.Dataset
-import Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Mining.Ethash.Constants
+import           Blockchain.Strato.Mining.Ethash.Dataset
+import           Blockchain.Strato.Mining.Ethash.Util
 
 --import Debug.Trace
 
@@ -49,7 +49,7 @@ import Blockchain.Strato.Mining.Ethash.Util
 -}
 
 wordPack::[Word32]->B.ByteString
-wordPack = B.concat . fmap (BL.toStrict . runPut . putWord32le) 
+wordPack = B.concat . fmap (BL.toStrict . runPut . putWord32le)
 
 hashimoto::B.ByteString->B.ByteString->Int->(Word32->IO Slice)->IO (B.ByteString, B.ByteString)
 hashimoto header nonce fullSize' dataset = do
@@ -74,7 +74,7 @@ hashimoto header nonce fullSize' dataset = do
 
   cmix <- fmap repair $ sequence $ map f2 [0,4..31]
   return (cmix, SHA3.hash 256 (s `B.append` cmix))
-  
+
 
 f::(Word32->IO Slice, Int, Integer, B.ByteString)->Word32->MA.IOUArray Word32 Word32->IO ()
 f (dataset, fullSize', mixhashes, s) i mix = do
@@ -82,12 +82,12 @@ f (dataset, fullSize', mixhashes, s) i mix = do
       w = mixBytes `div` wordBytes
 
   mixVal <- MA.readArray mix (i `mod` fromInteger w)
-  
+
   let p = (fnv (i `xor` (runGet getWord32le $ BL.fromStrict $ B.take 4 s))
            mixVal) `mod` (fromIntegral n `div` fromInteger mixhashes) * fromInteger mixhashes
   data1 <- dataset p
   data2 <- dataset $ p + 1
-  
+
   forM_ [0..15] $ \k -> do
     v1 <- MA.readArray mix k
     v2 <- MA.readArray data1 k

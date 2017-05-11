@@ -4,12 +4,12 @@ module Blockchain.Data.Extra
     , putGenesisHash
     ) where
 
-import Control.Monad (void)
-import qualified Database.Persist.Sql as SQL
+import           Control.Monad               (void)
+import qualified Database.Persist.Sql        as SQL
 
-import Blockchain.Data.DataDefs
-import Blockchain.DB.SQLDB
-import Blockchain.Strato.Model.SHA
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.SHA
 
 getGenesisHash :: HasSQLDB m => m SHA
 getGenesisHash = sqlQuery $ read . extraValue <$> SQL.getJust (ExtraKey "genesisHash")

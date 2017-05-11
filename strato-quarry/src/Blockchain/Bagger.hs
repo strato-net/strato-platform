@@ -13,8 +13,7 @@ import qualified Data.Text                          as T
 import           Data.Time.Clock
 import           Numeric                            (readHex)
 
-import           Blockchain.CoreFlags               (flags_difficultyBomb,
-                                                     flags_testnet)
+import           Blockchain.CoreFlags               (flags_difficultyBomb, flags_testnet)
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
@@ -28,8 +27,7 @@ import qualified Blockchain.Data.TXOrigin           as TO
 import           Blockchain.Database.MerklePatricia (StateRoot (..))
 import qualified Blockchain.EthConf                 as Conf
 import           Blockchain.Format
-import           Blockchain.Sequencer.Event         (OutputBlock (..),
-                                                     OutputTx (..))
+import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx (..))
 import           Blockchain.SHA                     hiding (hash)
 import qualified Blockchain.Verification            as V
 

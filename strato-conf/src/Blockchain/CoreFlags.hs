@@ -3,7 +3,7 @@
 
 module Blockchain.CoreFlags where
 
-import HFlags
+import           HFlags
 
 -- unclear if we need this now http://ghc.haskell.org/trac/ghc/ticket/7867
 {-# RULES "make_this_orphan" id = id :: MakeThisOrphan -> MakeThisOrphan #-}

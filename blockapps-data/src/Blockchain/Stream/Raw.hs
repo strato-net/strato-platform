@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Stream.Raw (
   produceBytes,
@@ -9,18 +10,18 @@ module Blockchain.Stream.Raw (
   setDefaultKafkaState
   ) where
 
-import Control.Lens
-import Control.Monad.IO.Class
-import Control.Monad (void)
-import qualified Data.ByteString as B
+import           Control.Lens
+import           Control.Monad          (void)
+import           Control.Monad.IO.Class
+import qualified Data.ByteString        as B
 
-import Network.Kafka
-import Network.Kafka.Consumer
-import Network.Kafka.Producer
-import Network.Kafka.Protocol hiding (Message)
+import           Network.Kafka
+import           Network.Kafka.Consumer
+import           Network.Kafka.Producer
+import           Network.Kafka.Protocol hiding (Message)
 
-import Blockchain.EthConf
-import Blockchain.KafkaTopics
+import           Blockchain.EthConf
+import           Blockchain.KafkaTopics
 
 
 produceBytes :: MonadIO m => String -> [B.ByteString] -> m ()
@@ -52,16 +53,16 @@ fetchBytesIO topic offset = do
         else setDefaultKafkaState >> Just <$> fetchBytes topic offset
 
   case ret of
-   Left e -> error $ show e
+   Left e  -> error $ show e
    Right v -> return v
-              
+
 fetchBytesOneIO::TopicName->Offset->IO (Maybe B.ByteString)
 fetchBytesOneIO topic offset = do
   res <- fetchBytesIO topic offset
   case res of
-   Nothing -> return Nothing
+   Nothing    -> return Nothing
    Just (x:_) -> return $ Just x
-   Just [] -> error "something impossible happened in fetchBytesOneIO"              
+   Just []    -> error "something impossible happened in fetchBytesOneIO"
 
 setDefaultKafkaState :: Kafka k => k ()
 setDefaultKafkaState = do

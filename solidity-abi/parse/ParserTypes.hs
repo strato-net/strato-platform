@@ -1,12 +1,12 @@
--- | 
+-- |
 -- Module: ParserTypes
 -- Description: Types used throughout solidity-abi, primarily the ones
---   containing the structure of a parsed contract.  
+--   containing the structure of a parsed contract.
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module ParserTypes where
 
-import Text.Parsec
-import Numeric.Natural
+import           Numeric.Natural
+import           Text.Parsec
 
 -- | Source file names; also source file /paths/.
 type FileName = SourceName
@@ -40,16 +40,16 @@ data ImportAs =
     StarPrefix ContractName |
     -- | Import a name by an unrelated alias
     Aliases [(ContractName, ContractName)]
-   
+
 -- | A parsed file.  It's important to remember which file contained
 -- a contract, because it may be imported multiple times in different ways.
-data SolidityFile = 
-  SolidityFile {  
+data SolidityFile =
+  SolidityFile {
     -- | Contracts declared in a file.  The order actually doesn't matter.
     fileContracts :: [SolidityContract],
     -- | All imports declared in a file.  The order actually doesn't
     -- matter.
-    fileImports :: [(FileName, ImportAs)]
+    fileImports   :: [(FileName, ImportAs)]
   }
 
 -- | The structure of a parsed contract.
@@ -58,14 +58,14 @@ data SolidityContract =
     -- | In the future, this type will not store the name directly.  It is
     -- only useful for knowing which function is the constructor, and
     -- otherwise can change under imports
-    contractName :: ContractName,
+    contractName      :: ContractName,
     -- | The variables, functions, and function-like things declared in
     -- this contract.  They occur in order because for variables, the order
     -- is important.
-    contractObjs :: [SolidityObjDef],
+    contractObjs      :: [SolidityObjDef],
     -- | The order of types doesn't actually matter.  In fact, we allow
     -- forward references to types in our declarations.
-    contractTypes :: [SolidityTypeDef],
+    contractTypes     :: [SolidityTypeDef],
     -- | Contracts from which this contract inherits.  The source code is
     -- ignored; it refers to the constructor arguments that may be given to
     -- a base contract.
@@ -82,18 +82,18 @@ data SolidityObjDef =
     -- | In the future, the name will not be stored in this type.  It is
     -- not useful at all, and any \"object\" can have its name shadowed by
     -- inheritance.
-    objName :: Identifier,
+    objName      :: Identifier,
     -- | Solidity doesn't properly have tuple values, but in principle...
     objValueType :: SolidityTuple,
     -- | My soon-to-be-revised attempt at \"everything is a function\"
-    objArgType :: SolidityTuple,
+    objArgType   :: SolidityTuple,
     -- | The code for a variable's initialization or a function's body.
     -- Ignored.
-    objDefn :: String,
-    objIsPublic :: Bool -- These variables have accessor functions
+    objDefn      :: String,
+    objIsPublic  :: Bool -- These variables have accessor functions
     }
   deriving (Show, Eq)
-           
+
 -- | A new type definition, i.e. struct and enum
 data SolidityTypeDef =
   TypeDef {
@@ -104,7 +104,7 @@ data SolidityTypeDef =
     typeDecl :: SolidityNewType
     }
   deriving (Show, Eq)
-           
+
 -- | Solidity doesn't have tuple types, but it does have comma-separated
 -- lists of function arguments and return values.  Also, although we don't
 -- compile executable code, it has structured assignments via tuples.
@@ -121,7 +121,7 @@ data SolidityTuple =
 -- are looking at.
 tupleHasValue :: SolidityTuple -> Bool
 tupleHasValue NoValue = False
-tupleHasValue _ = True
+tupleHasValue _       = True
 
 -- | What can appear as the type of a variable.
 data SolidityBasicType =
@@ -154,7 +154,7 @@ data SolidityBasicType =
   -- | The name of a new type, whose definition is kept in 'contractTypes'.
   Typedef     { typedefName :: Identifier }
   deriving (Show, Eq)
-  
+
 -- | Types that can be defined by the programmer.
 data SolidityNewType =
   -- | Order of names is important, because they are numbered consecutively
@@ -170,6 +170,6 @@ data SolidityNewType =
   -- when resolving 'Typedef's while assigning variable locations.
   ContractT
   deriving (Show, Eq)
-  
+
 -- | Not actually used.
 type SolidityValue = String

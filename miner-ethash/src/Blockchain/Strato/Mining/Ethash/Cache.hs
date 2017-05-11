@@ -6,16 +6,16 @@ module Blockchain.Strato.Mining.Ethash.Cache (
   getCacheWidth
   ) where
 
-import Control.Monad
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.Array.Unboxed as A
-import qualified Data.Array.IO as MA
-import qualified Data.Array.IO.Internals as MA
-import qualified Data.ByteString as B
-import Data.Word
+import           Control.Monad
+import qualified Crypto.Hash.SHA3                          as SHA3
+import qualified Data.Array.IO                             as MA
+import qualified Data.Array.IO.Internals                   as MA
+import qualified Data.Array.Unboxed                        as A
+import qualified Data.ByteString                           as B
+import           Data.Word
 
-import Blockchain.Strato.Mining.Ethash.Constants
-import Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Mining.Ethash.Constants
+import           Blockchain.Strato.Mining.Ethash.Util
 
 type Cache = A.UArray (Word32, Word32) Word32
 
@@ -39,12 +39,12 @@ getIOUArrayWidth::MA.IOUArray (Word32, Word32) Word32->IO Word32
 getIOUArrayWidth mx = do
   ((0, _), (n, _)) <- MA.getBounds mx
   return $ n + 1
-  
+
 getCacheWidth::Cache->Word32
 getCacheWidth array =
   let ((0, _), (n, _)) = A.bounds array
   in n + 1
-  
+
 
 mix::MA.IOUArray (Word32, Word32) Word32->IO ()
 mix mx = do
@@ -55,7 +55,7 @@ mix mx = do
       idex <-  MA.readArray mx (i, 0)
 
       let v = fromIntegral idex `mod` n
-      
+
       m1 <- fmap repair $ sequence $ map (MA.readArray mx . (v,)) $ [0..15]
       m2 <- fmap repair $ sequence $ map (MA.readArray mx . ((i-1+n) `mod` n,)) [0..15]
       sequence $
@@ -66,4 +66,4 @@ initDataSet::Integer->B.ByteString->Cache
 initDataSet n | n > toInteger (maxBound::Word32) =
   error "initDataSet called for value too large, you can no longer use Word32 for cache index"
 initDataSet n = A.listArray ((0,0), (fromIntegral n-1,15)) . concat . map shatter . iterate (SHA3.hash 512)
-              
+

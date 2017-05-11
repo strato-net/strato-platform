@@ -1,36 +1,35 @@
-{-# LANGUAGE DeriveDataTypeable
-           , EmptyDataDecls
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
-           , MultiParamTypeClasses
-           , TypeFamilies
-           , UndecidableInstances
-           , GADTs
- #-}
+{-# LANGUAGE DeriveDataTypeable     #-}
+{-# LANGUAGE EmptyDataDecls         #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 
 module Handler.TransactionInfo where
 
-import           System.Clock
 import           Data.Aeson
-import qualified Database.Esqueleto as E
 import           Data.List
-import qualified Data.Map as Map
-import qualified Prelude as P
-import qualified Data.Text as T 
+import qualified Data.Map                    as Map
+import qualified Data.Text                   as T
+import qualified Database.Esqueleto          as E
+import qualified Prelude                     as P
+import           System.Clock
 
-import           Import
-import           Handler.Common 
-import           Handler.Filters
-import           Blockchain.Data.TXOrigin
 import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
 import           Blockchain.DBM
+import           Blockchain.EthConf          (runKafkaConfigured)
 import           Blockchain.Format
-import           Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
-import           Blockchain.Sequencer.Kafka (writeUnseqEvents)
-import           Blockchain.EthConf (runKafkaConfigured)
-import           Blockchain.Util (getCurrentMicrotime)
+import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
+import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
+import           Blockchain.Util             (getCurrentMicrotime)
+import           Handler.Common
+import           Handler.Filters
+import           Import
 
 instance NFData RawTransaction'
 
@@ -48,7 +47,7 @@ postTransactionR :: Handler ()
 postTransactionR = do
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
-  
+
    tx <- parseJsonBody :: Handler (Result RawTransaction')
    case tx of
        (Success (RawTransaction' raw "")) -> do
@@ -60,7 +59,7 @@ postTransactionR = do
             (String h') -> do
               $logDebug $ "Successfully inserted tx: " Import.++ (T.pack $ format $ transactionHash tx')
               sendResponseStatus status200 (h' :: Text)
-            _ -> invalidArgs ["invalid transaction hash"]   
+            _ -> invalidArgs ["invalid transaction hash"]
        _ -> invalidArgs ["couldn't decode transaction"]
 
 postTransactionListR :: Handler ()
@@ -69,7 +68,7 @@ postTransactionListR = do
 
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
-  
+
    parserStart <- liftIO $ getTime Realtime
    tx <- parseJsonBody :: Handler (Result [RawTransaction'])
    case tx of
@@ -86,11 +85,11 @@ postTransactionListR = do
           ecRecoverTime <- do
             a <- insertTX Log API Nothing (fmap snd txr)
             return a
-          $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr)) 
+          $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
           let times = (P.map toNanoSecs $
-                [parserStart - handlerStart, 
+                [parserStart - handlerStart,
                  txHashStart - parserStart,
                  insertTXStart - txHashStart,
                  sendResponseStart - insertTXStart
@@ -116,7 +115,7 @@ getTransactionR = do
                  getParameters <- reqGetParams <$> getRequest
                  appNameMaybe <- lookupGetParam "appname"
                  case appNameMaybe of
-                   (Just t) -> liftIO $ putStrLn $ t
+                   (Just t)  -> liftIO $ putStrLn $ t
                    (Nothing) -> liftIO $ putStrLn "anon"
 
                  limit <- liftIO $ myFetchLimit
@@ -135,16 +134,16 @@ getTransactionR = do
                  let raw    = (fromIntegral $ (maybe 0 id $ extractPage "raw" getParameters) :: Integer) > 0
                  let paramMap = Map.fromList getParameters
                      paramMapRemoved = P.foldr (\param mp -> (Map.delete param mp)) paramMap transactionQueryParams
-               
+
                  addHeader "Access-Control-Allow-Origin" "*"
-                 txs <- case ((paramMapRemoved == Map.empty) && (paramMap /= Map.empty)) of 
+                 txs <- case ((paramMapRemoved == Map.empty) && (paramMap /= Map.empty)) of
                            False -> invalidArgs [T.concat ["Need one of: ", T.intercalate " , " $ transactionQueryParams]]
                            True ->  runDB $ E.select $
                                         E.from $ \(rawTx) -> do
-                        
+
                                         E.where_ ((P.foldl1 (E.&&.) $ P.map (getTransFilter (rawTx)) $ getParameters ))
 
-                                        let criteria = P.map (getTransFilter rawTx) $ getParameters 
+                                        let criteria = P.map (getTransFilter rawTx) $ getParameters
                                         let allCriteria = ((rawTx E.^. RawTransactionBlockNumber) E.>=. E.val index') : criteria
 
                                         -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
@@ -152,7 +151,7 @@ getTransactionR = do
 
                                         -- E.offset $ (limit * offset)
                                         E.limit $ (limit)
-                                        E.orderBy $ [(sortToOrderBy sortParam) $ (rawTx E.^. RawTransactionBlockNumber), 
+                                        E.orderBy $ [(sortToOrderBy sortParam) $ (rawTx E.^. RawTransactionBlockNumber),
                                                      (sortToOrderBy sortParam) $ (rawTx E.^. RawTransactionNonce)]
 
                                         return rawTx
@@ -166,6 +165,6 @@ getTransactionR = do
                  toRet raw (P.map E.entityVal modTxs) (next $ appendIndex getParameters)
 
                where
-                   toRet raw bs gp = case if' raw bs (P.map rtToRtPrime (P.zip (P.repeat gp) bs)) of 
-                              Left a -> returnJson a
+                   toRet raw bs gp = case if' raw bs (P.map rtToRtPrime (P.zip (P.repeat gp) bs)) of
+                              Left a  -> returnJson a
                               Right b -> returnJson b -- bandaid

@@ -13,59 +13,55 @@ module Application
     ) where
 
 
-import Control.Monad.Logger      
-import Database.Persist.Postgresql
-import qualified Database.PostgreSQL.Simple as PG
+import           Control.Monad.Logger
+import           Database.Persist.Postgresql
+import qualified Database.PostgreSQL.Simple           as PG
 
-import Import 
-import Language.Haskell.TH.Syntax           (qLocation)
-import Network.Wai.Handler.Warp             (Settings, defaultSettings,
-                                             defaultShouldDisplayException,
-                                             setHost,
-                                             setOnException, setPort, getPort)
-import Network.Wai.Handler.WarpTLS          
-import Network.Wai.Middleware.RequestLogger (Destination (Logger),
-                                             IPAddrSource (..),
-                                             OutputFormat (..), destination,
-                                             mkRequestLogger, outputFormat)
-import System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
+import           Import
+import           Language.Haskell.TH.Syntax           (qLocation)
+import           Network.Wai.Handler.Warp             (Settings, defaultSettings, defaultShouldDisplayException,
+                                                       getPort, setHost, setOnException, setPort)
+import           Network.Wai.Handler.WarpTLS
+import           Network.Wai.Middleware.RequestLogger (Destination (Logger), IPAddrSource (..), OutputFormat (..),
+                                                       destination, mkRequestLogger, outputFormat)
+import           System.Log.FastLogger                (defaultBufSize, newStdoutLoggerSet)
 
-import Handler.Common
-import Handler.Home
-import Handler.TransactionInfo
-import Handler.AccountInfo
-import Handler.BlockInfo
-import Handler.Demo
-import Handler.Help
-import Handler.TxLast
-import Handler.BlkLast
-import Handler.Test
-import Handler.QueuedTransactions
-import Handler.PushTransaction
-import Handler.Solc
-import Handler.AfterSubmission
-import Handler.TransactionDemo
-import Handler.StorageInfo
-import Handler.BatchTransactionResult
-import Handler.TransactionResult
-import Handler.Faucet
-import Handler.ExtABI
-import Handler.Wallet
-import Handler.Login
-import Handler.RegisterApp
-import Handler.Developer
-import Handler.Stats
-import Handler.Tutorial
-import Handler.ApiDocs
-import Handler.Raml
-import Handler.AppCreate
-import Handler.Version
-import Handler.Coinbase
-import Handler.LogInfo
-import Handler.UUIDInfo
-import Handler.Peers
+import           Handler.AccountInfo
+import           Handler.AfterSubmission
+import           Handler.ApiDocs
+import           Handler.AppCreate
+import           Handler.BatchTransactionResult
+import           Handler.BlkLast
+import           Handler.BlockInfo
+import           Handler.Coinbase
+import           Handler.Common
+import           Handler.Demo
+import           Handler.Developer
+import           Handler.ExtABI
+import           Handler.Faucet
+import           Handler.Help
+import           Handler.Home
+import           Handler.Login
+import           Handler.LogInfo
+import           Handler.Peers
+import           Handler.PushTransaction
+import           Handler.QueuedTransactions
+import           Handler.Raml
+import           Handler.RegisterApp
+import           Handler.Solc
+import           Handler.Stats
+import           Handler.StorageInfo
+import           Handler.Test
+import           Handler.TransactionDemo
+import           Handler.TransactionInfo
+import           Handler.TransactionResult
+import           Handler.Tutorial
+import           Handler.TxLast
+import           Handler.UUIDInfo
+import           Handler.Version
+import           Handler.Wallet
 
-import Blockchain.EthConf
+import           Blockchain.EthConf
 
 mkYesodDispatch "App" resourcesApp
 
@@ -118,7 +114,7 @@ prePool conn = withConnection conn $ const $ do
                             return ()
 -}
 
-myPool :: (MonadBaseControl IO m, MonadLogger m, MonadIO m) 
+myPool :: (MonadBaseControl IO m, MonadLogger m, MonadIO m)
        => ConnectionString -> Int -> m ConnectionPool
 myPool = createPostgresqlPoolModified $ noPool
 
@@ -155,7 +151,7 @@ warpSettings foundation =
             "yesod"
             LevelError
             (toLogStr $ "Exception from Warp: " ++ show e))
-      defaultSettings 
+      defaultSettings
 
 -- | For yesod devel, return the Warp settings and WAI Application.
 getApplicationDev :: IO (Settings, Application)
@@ -187,8 +183,8 @@ appMain = do
   {- CONFIG gradual change -}
 
     let oldDbSettings = appDatabaseConf settings
-        settings' = settings { 
-                      appDatabaseConf = oldDbSettings { 
+        settings' = settings {
+                      appDatabaseConf = oldDbSettings {
                         pgConnStr = connStr
                     }
                   }
@@ -201,7 +197,7 @@ appMain = do
     -- Run the application with Warp
     -- runSettings (warpSettings foundation) app
     runTLS tls (warpSettings foundation) app
-  where 
+  where
     tls = (tlsSettingsChain "certs/star_blockapps_net.pem" ["certs/TrustedRoot.pem", "certs/DigiCertCA2.pem"] "certs/key.pem"){onInsecure=AllowInsecure}
 
 

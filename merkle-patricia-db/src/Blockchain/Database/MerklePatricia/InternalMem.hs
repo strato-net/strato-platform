@@ -12,23 +12,23 @@ module Blockchain.Database.MerklePatricia.InternalMem (
   keyToSafeKeyMem
   ) where
 
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.ByteString as B
-import Data.Function
-import Data.List
-import Data.Maybe
-import qualified Data.NibbleString as N
-import qualified Data.Map as Map
+import qualified Crypto.Hash.SHA3                             as SHA3
+import qualified Data.ByteString                              as B
+import           Data.Function
+import           Data.List
+import qualified Data.Map                                     as Map
+import           Data.Maybe
+import qualified Data.NibbleString                            as N
 
-import Blockchain.Data.RLP
-import Blockchain.Database.MerklePatricia.NodeData
-import Blockchain.Database.MerklePatricia.StateRoot
-import Blockchain.Format
+import           Blockchain.Data.RLP
+import           Blockchain.Database.MerklePatricia.NodeData
+import           Blockchain.Database.MerklePatricia.StateRoot
+import           Blockchain.Format
 
-type MPMap = Map.Map B.ByteString B.ByteString 
+type MPMap = Map.Map B.ByteString B.ByteString
 
-data MPMem = MPMem { 
-    mpMap :: MPMap,
+data MPMem = MPMem {
+    mpMap       :: MPMap,
     mpStateRoot :: StateRoot
   } deriving Show
 
@@ -38,7 +38,7 @@ unsafePutKeyValMem db key val = do
   dbNodeData <- getNodeDataMem db (PtrRef $ mpStateRoot db)
   dbPutNodeData <- putKV_NodeDataMem db key val dbNodeData
   putNodeDataMem (fst dbPutNodeData) (snd dbPutNodeData)
- 
+
 unsafeGetKeyValsMem::Monad m=>MPMem->Key->m [(Key,Val)]
 unsafeGetKeyValsMem db =
   let dbNodeRef = PtrRef $ mpStateRoot db
@@ -71,7 +71,7 @@ putKV_NodeDataMem db key val (FullNodeData options nodeValue)
     do
       tailNode <- newShortcutMem db (N.tail key) $ Right val
       return $ (fst tailNode, FullNodeData (replace options (N.head key) (snd tailNode)) nodeValue)
-      
+
   | otherwise =
       do
         let conflictingNodeRef = options!!fromIntegral (N.head key)
@@ -85,7 +85,7 @@ putKV_NodeDataMem db key1 val1 (ShortcutNodeData key2 val2)
       Left ref -> do
         newNodeRef <- putKV_NodeRefMem db key1 val1 ref
         return $ (fst newNodeRef, ShortcutNodeData key2 (Left . snd $ newNodeRef))
-        
+
   | N.null key1 = do
       newNodeRef <- newShortcutMem db (N.tail key2) val2
       return $ (fst newNodeRef, FullNodeData (list2Options 0 [(N.head key2, snd newNodeRef)]) $ Just val1)
@@ -108,8 +108,8 @@ putKV_NodeDataMem db key1 val1 (ShortcutNodeData key2 val2)
     in do
       nodeAfterCommonBeforePut <- newShortcutMem db (N.pack suffix2) val2
       nodeAfterCommon <- putKV_NodeRefMem (fst nodeAfterCommonBeforePut)
-                                          (N.pack suffix1) 
-                                          val1 
+                                          (N.pack suffix1)
+                                          val1
                                           (snd nodeAfterCommonBeforePut)
 
       return $ (fst nodeAfterCommon,
@@ -119,7 +119,7 @@ putKV_NodeDataMem db key1 val1 (ShortcutNodeData key2 val2)
       tailNode1 <- newShortcutMem db (N.tail key1) $ Right val1
       tailNode2 <- newShortcutMem (fst tailNode1) (N.tail key2) val2
       return $ (fst tailNode2, FullNodeData
-          (list2Options 0 $ sortBy (compare `on` fst) [(N.head key1, snd tailNode1), 
+          (list2Options 0 $ sortBy (compare `on` fst) [(N.head key1, snd tailNode1),
                                                        (N.head key2, snd tailNode2)])
            Nothing)
 
@@ -151,7 +151,7 @@ getKeyVals_NodeDataMem _ ShortcutNodeData{nextNibbleString=s, nextVal=Right val}
     if key `N.isPrefixOf` s
     then [(s,val)]
     else []
-                
+
 -----
 
 deleteKey_NodeDataMem::Monad m=>MPMem->Key->NodeData-> m (MPMem,NodeData)
@@ -160,9 +160,9 @@ deleteKey_NodeDataMem db _ EmptyNodeData = return (db,EmptyNodeData)
 
 deleteKey_NodeDataMem db key nd@(FullNodeData options val)
   | N.null key = return $ (db,FullNodeData options Nothing)
-    
+
   | options `slotIsEmpty` N.head key = return (db,nd)
-    
+
   | otherwise = do
     let nodeRef = options!!fromIntegral (N.head key)
     newNodeRef <- deleteKey_NodeRefMem db (N.tail key) nodeRef
@@ -202,7 +202,7 @@ deleteKey_NodeRefMem::Monad m=>MPMem->Key->NodeRef->m (MPMem,NodeRef)
 deleteKey_NodeRefMem db key nodeRef = do
   ref <- getNodeDataMem db nodeRef
   db'<- deleteKey_NodeDataMem db key ref
-  
+
   nodeData2NodeRefMem (fst db') ref
 
 -----
@@ -233,23 +233,23 @@ simplify_NodeDataMem db nd@(ShortcutNodeData key (Left ref)) = do
   refNodeData <- getNodeDataMem db ref
   case refNodeData of
     (ShortcutNodeData key2 v2) -> return $ (db,ShortcutNodeData (key `N.append` key2) v2)
-    _ -> return (db,nd)
+    _                          -> return (db,nd)
 simplify_NodeDataMem db (FullNodeData options Nothing) = do
     case options2List options of
       [(n, nodeRef)] ->
           simplify_NodeDataMem db $ ShortcutNodeData (N.singleton n) $ Left nodeRef
       _ -> return $ (db,FullNodeData options Nothing)
 simplify_NodeDataMem db x = return (db,x)
- 
+
 newShortcutMem::Monad m=>MPMem->Key->Either NodeRef Val->m (MPMem,NodeRef)
 newShortcutMem db "" (Left ref) = return (db,ref)
-newShortcutMem db key val = nodeData2NodeRefMem db $ ShortcutNodeData key val
+newShortcutMem db key val       = nodeData2NodeRefMem db $ ShortcutNodeData key val
 
 nodeData2NodeRefMem::Monad m=>MPMem->NodeData->m (MPMem,NodeRef)
 nodeData2NodeRefMem db nodeData =
   case rlpSerialize $ rlpEncode nodeData of
     bytes | B.length bytes < 32 -> return $ (db,SmallRef bytes)
-    _ -> do 
+    _ -> do
       new <- putNodeDataMem db nodeData
       return (new, PtrRef . mpStateRoot $ new)
 
@@ -263,7 +263,7 @@ list2Options start ((firstNibble, firstPtr):rest) =
     replicate (fromIntegral $ firstNibble - start) emptyRef ++ [firstPtr] ++ list2Options (firstNibble+1) rest
 
 options2List::[NodeRef]->[(N.Nibble, NodeRef)]
-options2List theList = filter ((/= emptyRef) . snd) $ zip [0..] theList 
+options2List theList = filter ((/= emptyRef) . snd) $ zip [0..] theList
 
 prependToKey::Key->(Key, Val)->(Key, Val)
 prependToKey prefix (key, val) = (prefix `N.append` key, val)

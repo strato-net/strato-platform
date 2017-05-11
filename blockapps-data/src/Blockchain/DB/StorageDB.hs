@@ -7,22 +7,22 @@ module Blockchain.DB.StorageDB (
   flushMemStorageDB
   ) where
 
-import Control.Monad.State
-import Control.Monad.Trans.Resource
-import qualified Data.Map as M
-import qualified Database.LevelDB as DB
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import qualified Data.Map                                    as M
+import qualified Database.LevelDB                            as DB
 
-import qualified Data.NibbleString as N
-import Blockchain.Data.Address
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.RLP
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.StateDB
-import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia          as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import Blockchain.ExtWord
-  
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.StateDB
+import           Blockchain.ExtWord
+import qualified Data.NibbleString                           as N
+
 class MonadResource m => HasStorageDB m where
   getStorageDB  :: m (DB.DB, M.Map (Address, Word256) Word256)
   putStorageMap :: M.Map (Address, Word256) Word256->m ()
@@ -48,15 +48,15 @@ putStorageKeyValMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHa
 putStorageKeyValMC owner key val = do
   theMap <- fmap snd getStorageDB
   putStorageMap $ M.insert (owner, key) val theMap
-  
+
 getStorageKeyValMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                    Address->Word256->m Word256
 getStorageKeyValMC owner key = do
   theMap <- fmap snd getStorageDB
   case M.lookup (owner, key) theMap of
    Just val -> return val
-   Nothing -> getStorageKeyValDB owner key
-    
+   Nothing  -> getStorageKeyValDB owner key
+
 getAllStorageKeyValsMC::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                        Address->m [(MP.Key, Word256)]
 getAllStorageKeyValsMC = getAllStorageKeyValsDB
@@ -87,7 +87,7 @@ putStorageKeyValDB owner key 0 = do --when val=0, we actually delete the key fro
   let mpdb = MP.MPDB{MP.ldb=db, MP.stateRoot=addressStateContractRoot addressState}
   newContractRoot <- fmap MP.stateRoot $ MP.deleteKey mpdb (N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key)
   putAddressState owner addressState{addressStateContractRoot=newContractRoot}
-  
+
 putStorageKeyValDB owner key val = do
   hashDBPut storageKeyNibbles
   addressState <- getAddressState owner
@@ -106,7 +106,7 @@ getStorageKeyValDB owner key = do
   maybeVal <- MP.getKeyVal mpdb (N.pack $ (N.byte2Nibbles =<<) $ word256ToBytes key)
   case maybeVal of
     Nothing -> return 0
-    Just x -> return $ fromInteger $ rlpDecode $ rlpDeserialize $ rlpDecode x
+    Just x  -> return $ fromInteger $ rlpDecode $ rlpDeserialize $ rlpDecode x
 
 getAllStorageKeyValsDB::(HasMemAddressStateDB m, HasStorageDB m, HasStateDB m, HasHashDB m)=>
                        Address->m [(MP.Key, Word256)]

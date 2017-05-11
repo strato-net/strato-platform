@@ -2,10 +2,10 @@
 
 module Handler.TxLast where
 
-import Import
-import Handler.Common
 import qualified Database.Esqueleto as E
-import qualified Prelude as P
+import           Handler.Common
+import           Import
+import qualified Prelude            as P
 
 getTxLastR ::  Integer -> Handler Value
 getTxLastR  num = do

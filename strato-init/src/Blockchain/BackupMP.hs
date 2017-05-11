@@ -4,30 +4,30 @@ module Blockchain.BackupMP (
   backupMP
   ) where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Database.LevelDB as LDB
+import           Control.Monad
+import           Control.Monad.IO.Class
+import qualified Crypto.Hash.SHA3                   as SHA3
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Lazy               as BL
+import qualified Data.ByteString.Lazy.Char8         as BLC
+import qualified Database.LevelDB                   as LDB
 --import Network.Kafka
 --import Network.Kafka.Producer
-import Numeric
+import           Numeric
 
-import Blockchain.Data.BlockDB
-import Blockchain.Data.Extra
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.SQLDB
-import Blockchain.DB.StateDB
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Extra
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DB.StateDB
 --import Blockchain.EthConf
 --import Blockchain.KafkaTopics
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MPDB
-import Blockchain.Data.RLP
-import Blockchain.SHA
-import Blockchain.Stream.VMEvent
+import           Blockchain.SHA
+import           Blockchain.Stream.VMEvent
 
 addBlock::(HasSQLDB m)=>BL.ByteString->m ()
 addBlock blockData = do
@@ -58,7 +58,7 @@ decodeWithCheck::B.ByteString->B.ByteString
 decodeWithCheck x =
   case B16.decode x of
    (result, "") -> result
-   _ -> error $ "bad data passed to decodeWithCheck: " ++ show x
+   _            -> error $ "bad data passed to decodeWithCheck: " ++ show x
 
 backupMP::(HasSQLDB m, HasStateDB m, HasCodeDB m, HasHashDB m)=>m Block
 backupMP = do

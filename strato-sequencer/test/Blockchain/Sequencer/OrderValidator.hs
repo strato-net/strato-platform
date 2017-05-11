@@ -4,18 +4,18 @@ module Blockchain.Sequencer.OrderValidator ( OrderValidateable
                                            , isValid
                                            ) where
 
-import Control.Monad.State hiding (runState)
+import           Control.Monad.State        hiding (runState)
 
-import qualified Data.Map.Strict as Map
+import qualified Data.Map.Strict            as Map
 
-import Blockchain.Data.DataDefs
-import Blockchain.Data.BlockDB (blockHeaderHash)
+import           Blockchain.Data.BlockDB    (blockHeaderHash)
+import           Blockchain.Data.DataDefs
 import qualified Blockchain.Sequencer.Event as SE
-import Blockchain.SHA
+import           Blockchain.SHA
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Format
-import Blockchain.Util (tab)
+import qualified Blockchain.Colors          as CL
+import           Blockchain.Format
+import           Blockchain.Util            (tab)
 
 class OrderValidateable t where
     getBlockHash   :: t -> SHA

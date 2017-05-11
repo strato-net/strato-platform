@@ -1,4 +1,8 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, LambdaCase, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Blockchain.Event (
   Event(..),
@@ -7,54 +11,53 @@ module Blockchain.Event (
   getBestKafkaBlockNumber
   ) where
 
-import Control.Arrow ((&&&))
-import Control.Exception.Lifted
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.State
-import Data.Conduit
-import Data.List
+import           Control.Arrow                         ((&&&))
+import           Control.Exception.Lifted
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Data.Conduit
+import           Data.List
 --import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.ByteString             as BS
-import qualified Data.ByteString.Char8       as BS8
-import qualified Data.ByteString.Base16      as BC16
-import Data.Time.Clock
-import Network.Kafka as K
+import qualified Data.ByteString                       as BS
+import qualified Data.ByteString.Base16                as BC16
+import qualified Data.ByteString.Char8                 as BS8
+import qualified Data.Text                             as T
+import           Data.Time.Clock
+import           Network.Kafka                         as K
 
-import Blockchain.Colors
-import Blockchain.Context
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Wire
-import Blockchain.Data.BlockDB
-import Blockchain.Data.BlockHeader
-import Blockchain.Data.NewBlk
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Data.Transaction
-import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.DB.SQLDB
-import Blockchain.EventException
-import Blockchain.Format
-import Blockchain.SHA
-import Blockchain.Stream.VMEvent
-import Blockchain.Verification
-import Blockchain.DBM
-import Blockchain.Data.PubKey
+import           Blockchain.Colors
+import           Blockchain.Context
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.BlockHeader
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.NewBlk
+import           Blockchain.Data.PubKey
+import           Blockchain.Data.Transaction
+import qualified Blockchain.Data.TXOrigin              as Origin
+import           Blockchain.Data.Wire
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EventException
+import           Blockchain.Format
+import           Blockchain.SHA
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Stream.VMEvent
+import           Blockchain.Verification
 
-import Blockchain.Sequencer.Event ( IngestTx(..), IngestEvent(..), OutputEvent(..), OutputTx(..)
-                                  , blockToIngestBlock, obTotalDifficulty, outputBlockToBlock
-                                  , otBaseTx
-                                  )
-import Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import           Blockchain.Sequencer.Event            (IngestEvent (..), IngestTx (..), OutputEvent (..),
+                                                        OutputTx (..), blockToIngestBlock, obTotalDifficulty, otBaseTx,
+                                                        outputBlockToBlock)
+import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
 
-import Blockchain.Util (getCurrentMicrotime)
+import           Blockchain.Util                       (getCurrentMicrotime)
 
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import           Blockchain.Strato.Model.Class
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import           Blockchain.Strato.RedisBlockDB.Models hiding (Transactions)
 
-import Debug.Trace (trace) -- yes i know you shouldn't, but its for just one thing that ill really want to know one day
+import           Debug.Trace                           (trace)
 
 data Event = MsgEvt Message | NewSeqEvent OutputEvent | TimerEvt deriving (Show)
 
@@ -78,7 +81,7 @@ skipEntries :: Int -> [a] -> [a]
 skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
     where helper xs' = case drop n xs' of
                            (y:ys) -> y : helper ys
-                           [] -> []
+                           []     -> []
 
 -- todo: seriously???
 maxReturnedHeaders :: Int
@@ -89,7 +92,7 @@ peerString peer = key ++ "@" ++ T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcp
     where
         key = p2s (pPeerPubkey peer)
         p2s (Just p) = BS8.unpack . BC16.encode . BS.pack $ pointToBytes p
-        p2s _                    = ""
+        p2s _        = ""
 
 emitKafkaTransactions :: (MonadIO m, K.HasKafkaState m, MonadLogger m) => Origin.TXOrigin -> [Transaction] -> m ()
 emitKafkaTransactions origin txs = do
@@ -129,7 +132,7 @@ handleEvents mode peer = awaitForever $ \case
                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
                 let fetchNumber = numFromRedis bestBlock - 1
                 logInfoN . T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-                logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber 
+                logInfoN "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber
             Just _  -> do
                 void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                 lift . void $ setTitleAndProduceBlocks [block']
@@ -175,8 +178,8 @@ handleEvents mode peer = awaitForever $ \case
             --     parentHashes = S.fromList $ map parentHash headers
             --     allNeeded = headerHashes `S.union` parentHashes
 
-            -- check if blockheaders we recieved have parents.  
-            parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers 
+            -- check if blockheaders we recieved have parents.
+            parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
             let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
             let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
             unless (null missingParents) $ do
@@ -187,11 +190,11 @@ handleEvents mode peer = awaitForever $ \case
                                       0 -> fetchNumber
                                       _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
                  (logInfoN $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)) >> syncFetch Reverse lastParent
-           
+
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers
             let neededHeaders = filter (\x -> (headerHash x) `elem` [sha | (sha, Nothing) <- headersInDB]) headers
-            
+
             -- blockOffsets <- lift $ fmap (map blockOffsetHash) $ getBlockOffsetsForHashes $ S.toList allNeeded
             -- let neededHeaders = filter (not . (`elem` blockOffsets) . headerHash) headers
             --     neededHashes = map headerHash neededHeaders
@@ -201,7 +204,7 @@ handleEvents mode peer = awaitForever $ \case
             --     -- logInfoN . T.pack $ "neededHashes: " ++ unlines (map format neededHashes)
             --     logInfoN . T.pack $ "incoming blocks don't seem to have existing parents: " ++ unlines (map format unfoundParents)
             --     logInfoN "### calling syncFetch again" >> syncFetch
-            
+
             lift $ putBlockHeaders neededHeaders
             logInfoN $ T.pack $ "putBlockHeaders called with length " ++ show (length neededHeaders)
             yield . GetBlockBodies $ headerHash <$> neededHeaders
@@ -253,8 +256,8 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt (Disconnect _) -> do
             logInfoN $ T.pack $ "Disconnect event received in Event handler"
             throwIO PeerDisconnected
-    
-    NewSeqEvent oe -> case oe of 
+
+    NewSeqEvent oe -> case oe of
             -- todo: use shouldSend here, to make sure we don't send back block
             -- to peer we got it from
             OEBlock b  -> do
@@ -264,7 +267,7 @@ handleEvents mode peer = awaitForever $ \case
                 $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ format tx ++ " at " ++ show ts
                 when (shouldSend peer tx) . yield $ Transactions [tx'] where
                     tx' = otBaseTx $ tx
-            _          -> return () -- shouldn't happen but our types don't prohibit us 
+            _          -> return () -- shouldn't happen but our types don't prohibit us
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
@@ -287,15 +290,15 @@ numFromRedis = \case
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
-syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m) 
+syncFetch :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, MonadLogger m)
           => Direction -> Integer -> Conduit Event m Message
 syncFetch d num = do
     blockHeaders' <- lift getBlockHeaders -- get blockHeaders from Context
     when (null blockHeaders') $ do
-        yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d 
+        yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d
         stampActionTimestamp
 
-shouldSend :: PPeer -> OutputTx -> Bool 
+shouldSend :: PPeer -> OutputTx -> Bool
 shouldSend peer tx = case otOrigin tx of
     Origin.PeerString ps -> ps /= peerString peer
     Origin.API           -> True

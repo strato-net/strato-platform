@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.SHA (
   module Blockchain.Strato.Model.SHA,
@@ -6,31 +7,31 @@ module Blockchain.SHA (
   hash
   ) where
 
-import Control.Monad
-import qualified Crypto.Hash.SHA3 as C
-import qualified Data.Aeson as JSON
-import Data.Binary
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Text as T
-import Numeric
-import Web.PathPieces
-import Web.HttpApiData
+import           Control.Monad
+import qualified Crypto.Hash.SHA3            as C
+import qualified Data.Aeson                  as JSON
+import           Data.Binary
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Base16      as B16
+import qualified Data.ByteString.Char8       as BC
+import qualified Data.ByteString.Lazy        as BL
+import qualified Data.Text                   as T
+import           Numeric
+import           Web.HttpApiData
+import           Web.PathPieces
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Data.RLP
-import Blockchain.ExtWord
-import Blockchain.Format
-import Blockchain.Util
+import qualified Blockchain.Colors           as CL
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord
+import           Blockchain.Format
+import           Blockchain.Util
 
-import GHC.Generics
+import           GHC.Generics
 
-import Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.SHA
 
 formatSHAWithoutColor :: SHA -> String
-formatSHAWithoutColor s@(SHA x)  
+formatSHAWithoutColor s@(SHA x)
   | s == hash "" = "<blank>"
   | otherwise    = padZeros 64 $ showHex x ""
 
@@ -52,10 +53,10 @@ instance PathPiece SHA where
 
 instance PathPiece SHA where
   toPathPiece = T.pack . show
-  fromPathPiece t = 
+  fromPathPiece t =
     case readHex $ T.unpack t of
       [(x, "")] -> Just $ SHA x
-      _ -> Nothing
+      _         -> Nothing
 
 instance ToHttpApiData SHA where
     toUrlPiece = toPathPiece

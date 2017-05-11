@@ -1,32 +1,34 @@
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
 {-# OPTIONS_GHC -Wall #-}
 
-import System.Console.CmdArgs
+import           System.Console.CmdArgs
 
-import State
-import Block
-import BlockGO
-import Hash
-import Code
-import Checkpoints
-import DumpKafkaBlocks
-import DumpKafkaUnminedBlocks
-import DumpKafkaSequencer
-import DumpKafkaUnSequencer
-import DumpKafkaStateDiff
-import DumpKafkaRaw
-import DumpRedis
-import FRawMP
-import Raw
-import RLP
-import RawMP
-import Psql
-import InsertTX
+import           Block
+import           BlockGO
+import           Checkpoints
+import           Code
+import           DumpKafkaBlocks
+import           DumpKafkaRaw
+import           DumpKafkaSequencer
+import           DumpKafkaStateDiff
+import           DumpKafkaUnminedBlocks
+import           DumpKafkaUnSequencer
+import           DumpRedis
+import           FRawMP
+import           Hash
+import           InsertTX
+import           Psql
+import           Raw
+import           RawMP
+import           RLP
+import           State
 
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8  as BC
-import           Data.Int
 import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as BC
+import           Data.Int
 
 data Options = State{root::String, db::String}
              | Block{hash::String, db::String}
@@ -50,67 +52,67 @@ data Options = State{root::String, db::String}
              deriving (Show, Data, Typeable)
 
 stateOptions::Annotate Ann
-stateOptions = 
+stateOptions =
   record State{root=undefined, db=undefined} [
     root := def += typ "StateRoot" += argPos 1,
     db := def += typ "DBSTRING" += argPos 0
     ]
 
 redisOptions :: Annotate Ann
-redisOptions = 
+redisOptions =
   record DumpRedis{databaseNumber=undefined} [
     databaseNumber := 0 += typ "INT"
   ]
 
 blockOptions::Annotate Ann
-blockOptions = 
+blockOptions =
   record Block{hash=undefined, db=undefined} [
     hash := def += typ "FILENAME" += argPos 1 += opt ("-"::String),
     db := def += typ "DBSTRING" += argPos 0
     ]
 
 blockGoOptions::Annotate Ann
-blockGoOptions = 
+blockGoOptions =
   record BlockGO{hash=undefined, db=undefined} [
     hash := def += typ "FILENAME" += argPos 1 += opt ("-"::String),
     db := def += typ "DBSTRING" += argPos 0
     ]
 
 hashOptions::Annotate Ann
-hashOptions = 
+hashOptions =
   record Hash{hash=undefined, db=undefined} [
     hash := def += typ "FILENAME" += argPos 1 += opt ("-"::String),
     db := def += typ "DBSTRING" += argPos 0
     ]
 
 codeOptions::Annotate Ann
-codeOptions = 
+codeOptions =
   record Code{hash=undefined, db=undefined} [
     hash := def += typ "USERAGENT" += argPos 1,
     db := def += typ "DBSTRING" += argPos 0
     ]
 
 rawOptions::Annotate Ann
-rawOptions = 
+rawOptions =
   record Raw{filename=undefined} [
     filename := def += typ "DBSTRING" += argPos 0
     ]
 
 rlpOptions::Annotate Ann
-rlpOptions = 
+rlpOptions =
   record RLP{filename=undefined} [
     filename := def += typ "DBSTRING" += argPos 0
     ]
 
 rawMPOptions::Annotate Ann
-rawMPOptions = 
+rawMPOptions =
   record RawMP{stateRoot=undefined, filename=undefined} [
     stateRoot := def += typ "USERAGENT" += argPos 1,
     filename := def += typ "DBSTRING" += argPos 0
     ]
 
 fRawMPOptions::Annotate Ann
-fRawMPOptions = 
+fRawMPOptions =
   record FRawMP{stateRoot=undefined, filename=undefined} [
     stateRoot := def += typ "USERAGENT" += argPos 1,
     filename := def += typ "DBSTRING" += argPos 0
@@ -198,7 +200,7 @@ main::IO ()
 main = do
   opts <- cmdArgs_ options
   run opts
-    
+
 -------------------
 
 run::Options->IO ()
@@ -218,7 +220,7 @@ run DumpKafkaBlocks{..}        = dumpKafkaBlocks (fromIntegral startingBlock)
 run DumpKafkaUnminedBlocks{..} = dumpKafkaUnminedBlocks (fromIntegral startingBlock)
 run DumpKafkaRaw{..}           = dumpKafkaRaw streamName (fromIntegral startingBlock)
 run DumpKafkaStateDiff{..}     = dumpKafkaStateDiff $ fromIntegral startingBlock
-run Psql{}                     = psql                                  
+run Psql{}                     = psql
 run InsertTX{}                 = insertTX
 run Checkpoints{..}            = case operation of
     Get           -> doCheckpointGet service

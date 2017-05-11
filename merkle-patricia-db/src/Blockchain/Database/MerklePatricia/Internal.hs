@@ -22,21 +22,21 @@ module Blockchain.Database.MerklePatricia.Internal (
   prependToKey
   ) where
 
-import Control.Monad.Trans.Resource
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.ByteString as B
-import Data.Default
-import Data.Function
-import Data.List
-import Data.Maybe
-import qualified Data.NibbleString as N
-import qualified Database.LevelDB as DB
+import           Control.Monad.Trans.Resource
+import qualified Crypto.Hash.SHA3                             as SHA3
+import qualified Data.ByteString                              as B
+import           Data.Default
+import           Data.Function
+import           Data.List
+import           Data.Maybe
+import qualified Data.NibbleString                            as N
+import qualified Database.LevelDB                             as DB
 
-import Blockchain.Data.RLP
-import Blockchain.Database.MerklePatricia.MPDB
-import Blockchain.Database.MerklePatricia.NodeData
-import Blockchain.Database.MerklePatricia.StateRoot
-import Blockchain.Format
+import           Blockchain.Data.RLP
+import           Blockchain.Database.MerklePatricia.MPDB
+import           Blockchain.Database.MerklePatricia.NodeData
+import           Blockchain.Database.MerklePatricia.StateRoot
+import           Blockchain.Format
 
 unsafePutKeyVal::MonadResource m=>MPDB->Key->Val->m MPDB
 unsafePutKeyVal db key val = do
@@ -78,7 +78,7 @@ putKV_NodeData db key val (FullNodeData options nodeValue)
     do
       tailNode <- newShortcut db (N.tail key) $ Right val
       return $ FullNodeData (replace options (N.head key) tailNode) nodeValue
-      
+
   | otherwise =
       do
         let conflictingNodeRef = options!!fromIntegral (N.head key)
@@ -92,7 +92,7 @@ putKV_NodeData db key1 val1 (ShortcutNodeData key2 val2)
       Left ref -> do
         newNodeRef <- putKV_NodeRef db key1 val1 ref
         return $ ShortcutNodeData key2 (Left newNodeRef)
-        
+
   | N.null key1 = do
       newNodeRef <- newShortcut db (N.tail key2) val2
       return $ FullNodeData (list2Options 0 [(N.head key2, newNodeRef)]) $ Just val1
@@ -153,7 +153,7 @@ getKeyVals_NodeData _ ShortcutNodeData{nextNibbleString=s, nextVal=Right val} ke
     if key `N.isPrefixOf` s
     then [(s,val)]
     else []
-                
+
 -----
 
 deleteKey_NodeData::MonadResource m=>MPDB->Key->NodeData->m NodeData
@@ -162,9 +162,9 @@ deleteKey_NodeData _ _ EmptyNodeData = return EmptyNodeData
 
 deleteKey_NodeData db key nd@(FullNodeData options val)
   | N.null key = return $ FullNodeData options Nothing
-    
+
   | options `slotIsEmpty` N.head key = return nd
-    
+
   | otherwise = do
     let nodeRef = options!!fromIntegral (N.head key)
     newNodeRef <- deleteKey_NodeRef db (N.tail key) nodeRef
@@ -245,7 +245,7 @@ simplify_NodeData db nd@(ShortcutNodeData key (Left ref)) = do
   refNodeData <- getNodeData db ref
   case refNodeData of
     (ShortcutNodeData key2 v2) -> return $ ShortcutNodeData (key `N.append` key2) v2
-    _ -> return nd
+    _                          -> return nd
 simplify_NodeData db (FullNodeData options Nothing) = do
     case options2List options of
       [(n, nodeRef)] ->
@@ -257,13 +257,13 @@ simplify_NodeData _ x = return x
 
 newShortcut::MonadResource m=>MPDB->Key->Either NodeRef Val->m NodeRef
 newShortcut _ "" (Left ref) = return ref
-newShortcut db key val = nodeData2NodeRef db $ ShortcutNodeData key val
+newShortcut db key val      = nodeData2NodeRef db $ ShortcutNodeData key val
 
 nodeData2NodeRef::MonadResource m=>MPDB->NodeData->m NodeRef
 nodeData2NodeRef db nodeData =
   case rlpSerialize $ rlpEncode nodeData of
     bytes | B.length bytes < 32 -> return $ SmallRef bytes
-    _ -> PtrRef <$> putNodeData db nodeData
+    _     -> PtrRef <$> putNodeData db nodeData
 
 list2Options::N.Nibble->[(N.Nibble, NodeRef)]->[NodeRef]
 list2Options start [] = replicate (fromIntegral $ 0x10 - start) emptyRef
@@ -275,7 +275,7 @@ list2Options start ((firstNibble, firstPtr):rest) =
     replicate (fromIntegral $ firstNibble - start) emptyRef ++ [firstPtr] ++ list2Options (firstNibble+1) rest
 
 options2List::[NodeRef]->[(N.Nibble, NodeRef)]
-options2List theList = filter ((/= emptyRef) . snd) $ zip [0..] theList 
+options2List theList = filter ((/= emptyRef) . snd) $ zip [0..] theList
 
 prependToKey::Key->(Key, Val)->(Key, Val)
 prependToKey prefix (key, val) = (prefix `N.append` key, val)

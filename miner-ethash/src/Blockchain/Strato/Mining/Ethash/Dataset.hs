@@ -1,4 +1,5 @@
-{-# LANGUAGE TupleSections, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections    #-}
 
 module Blockchain.Strato.Mining.Ethash.Dataset (
   Slice,
@@ -6,16 +7,16 @@ module Blockchain.Strato.Mining.Ethash.Dataset (
 --  calcDataset
   ) where
 
-import Control.Monad
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.Array.Base as A
-import qualified Data.Array.IO as A
-import Data.Bits
-import Data.Word
+import           Control.Monad
+import qualified Crypto.Hash.SHA3                          as SHA3
+import qualified Data.Array.Base                           as A
+import qualified Data.Array.IO                             as A
+import           Data.Bits
+import           Data.Word
 
-import Blockchain.Strato.Mining.Ethash.Cache
-import Blockchain.Strato.Mining.Ethash.Constants
-import Blockchain.Strato.Mining.Ethash.Util
+import           Blockchain.Strato.Mining.Ethash.Cache
+import           Blockchain.Strato.Mining.Ethash.Constants
+import           Blockchain.Strato.Mining.Ethash.Util
 
 
 type Slice = A.IOUArray Word32 Word32

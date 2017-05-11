@@ -4,4 +4,4 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net
 module Blockchain.Ethereum.Solidity.External.JSON (jsonABI) where
 
-import JSON
+import           JSON

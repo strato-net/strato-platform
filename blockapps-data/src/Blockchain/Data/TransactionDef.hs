@@ -1,4 +1,6 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Blockchain.Data.TransactionDef (
   Transaction(..),
@@ -6,44 +8,44 @@ module Blockchain.Data.TransactionDef (
   partialRLPDecode
   ) where
 
-import qualified Data.ByteString as B
-import Data.Word
-import Database.Persist.TH
-import GHC.Generics
+import qualified Data.ByteString              as B
+import           Data.Word
+import           Database.Persist.TH
+import           GHC.Generics
 
-import Text.PrettyPrint.ANSI.Leijen
+import           Text.PrettyPrint.ANSI.Leijen
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Data.Address
-import Blockchain.Data.Code
-import Blockchain.Data.RLP
-import Blockchain.Format
-import Blockchain.Util
-import Blockchain.SHA
+import qualified Blockchain.Colors            as CL
+import           Blockchain.Data.Address
+import           Blockchain.Data.Code
+import           Blockchain.Data.RLP
+import           Blockchain.Format
+import           Blockchain.SHA
+import           Blockchain.Util
 
 derivePersistField "Transaction"
 
-data Transaction = 
+data Transaction =
   MessageTX {
-    transactionNonce::Integer,
-    transactionGasPrice::Integer,
-    transactionGasLimit::Integer,
-    transactionTo::Address,
-    transactionValue::Integer,
-    transactionData::B.ByteString,
-    transactionR::Integer,
-    transactionS::Integer,
-    transactionV::Word8
+    transactionNonce    :: Integer,
+    transactionGasPrice :: Integer,
+    transactionGasLimit :: Integer,
+    transactionTo       :: Address,
+    transactionValue    :: Integer,
+    transactionData     :: B.ByteString,
+    transactionR        :: Integer,
+    transactionS        :: Integer,
+    transactionV        :: Word8
    } |
   ContractCreationTX {
-    transactionNonce::Integer,
-    transactionGasPrice::Integer,
-    transactionGasLimit::Integer,
-    transactionValue::Integer,
-    transactionInit::Code,
-    transactionR::Integer,
-    transactionS::Integer,
-    transactionV::Word8
+    transactionNonce    :: Integer,
+    transactionGasPrice :: Integer,
+    transactionGasLimit :: Integer,
+    transactionValue    :: Integer,
+    transactionInit     :: Code,
+    transactionR        :: Integer,
+    transactionS        :: Integer,
+    transactionV        :: Word8
     } deriving (Show, Read, Eq, Ord, Generic)
 
 instance Format Transaction where
@@ -69,9 +71,9 @@ instance Format Transaction where
       "tInit: " ++ codeToString theCode ++ "\n" ++
       "hash: " ++ format (hash . rlpSerialize . rlpEncode $ t) ++ "\n")
     where
-      codeToString (Code init') = format init'
+      codeToString (Code init')        = format init'
       codeToString (PrecompiledCode _) = "<precompiledCode>"
- 
+
 instance RLPSerializable Transaction where
   rlpDecode (RLPArray [n, gp, gl, toAddr, val, i, vVal, rVal, sVal]) =
     partial {
@@ -95,7 +97,7 @@ instance RLPSerializable Transaction where
 
 
 --partialRLP(De|En)code are used for the signing algorithm
-partialRLPDecode::RLPObject->Transaction
+partialRLPDecode :: RLPObject->Transaction
 partialRLPDecode (RLPArray [n, gp, gl, RLPString "", val, i, _, _, _]) = --Note- Address 0 /= Address 000000....  Only Address 0 yields a ContractCreationTX
     ContractCreationTX {
       transactionNonce = rlpDecode n,
@@ -121,7 +123,7 @@ partialRLPDecode (RLPArray [n, gp, gl, toAddr, val, i, _, _, _]) =
       }
 partialRLPDecode x = error ("rlp object has wrong format in call to partialRLPDecode: " ++ show x)
 
-partialRLPEncode::Transaction->RLPObject
+partialRLPEncode :: Transaction->RLPObject
 partialRLPEncode MessageTX{transactionNonce=n, transactionGasPrice=gp, transactionGasLimit=gl, transactionTo=to', transactionValue=v, transactionData=d} =
       RLPArray [
         rlpEncode n,
@@ -136,7 +138,7 @@ partialRLPEncode ContractCreationTX{transactionNonce=n, transactionGasPrice=gp, 
         rlpEncode n,
         rlpEncode gp,
         rlpEncode gl,
-        rlpEncode (0::Integer),
+        rlpEncode (0 :: Integer),
         rlpEncode v,
         rlpEncode init'
         ]

@@ -1,17 +1,17 @@
 module Json.Common where
 
-import Data.Aeson hiding (json)
-import Data.Map (Map)
+import           Data.Aeson                                 hiding (json)
+import           Data.Map                                   (Map)
 
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import qualified Data.Map                                   as Map
+import qualified Data.Set                                   as Set
 
-import Blockchain.Ethereum.Solidity.Parse
-import Blockchain.Ethereum.Solidity.External.JSON
-import Parser.Common (parserStage)
-import Test.Combinators
-import Test.Common
-import Test.ErrorMessages
+import           Blockchain.Ethereum.Solidity.External.JSON
+import           Blockchain.Ethereum.Solidity.Parse
+import           Parser.Common                              (parserStage)
+import           Test.Combinators
+import           Test.Common
+import           Test.ErrorMessages
 
 type ValueVerifier = Value -> Assertion
 type JSONTestInput = (String, Map FileName SourceCode, ValueVerifier)
@@ -29,10 +29,10 @@ jsonHasContracts fName cNames json =
   Set.fromList cNames == Set.fromList (Map.keys jsonMap)
   |! fileError fName ## theError
 
-  where 
-    jsonMap :: Map ContractName Value 
+  where
+    jsonMap :: Map ContractName Value
     jsonMap = case fromJSON json of
-      Error s -> error s
+      Error s   -> error s
       Success x -> x
     theError = isMissingError $ "contracts" ## show cNames
 

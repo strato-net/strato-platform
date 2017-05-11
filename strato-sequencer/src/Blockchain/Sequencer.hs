@@ -10,8 +10,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Stats                       hiding (prefix)
 
 import           Data.Function                             ((&))
-import           Data.Maybe                                (catMaybes,
-                                                            fromMaybe)
+import           Data.Maybe                                (catMaybes, fromMaybe)
 import qualified Data.Text                                 as T
 
 import           Blockchain.Format
@@ -131,7 +130,7 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                       prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
 
                       shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
-                      shortOrigin x = format x
+                      shortOrigin x                    = format x
 
 assertTopicCreation' :: SequencerM ()
 assertTopicCreation' = void $ K.withKafkaViolently assertTopicCreation

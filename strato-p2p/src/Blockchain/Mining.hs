@@ -4,27 +4,27 @@ module Blockchain.Mining (
   ) where
 
 
-import Control.Monad.IO.Class
-import Control.Monad.Trans.State
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.Array.IO as A
-import qualified Data.Binary as Bin
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Time.Clock.POSIX
-import Data.Word
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.State
+import qualified Crypto.Hash.SHA3          as SHA3
+import qualified Data.Array.IO             as A
+import qualified Data.Binary               as Bin
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Lazy      as BL
+import           Data.Time.Clock.POSIX
+import           Data.Word
 
-import Blockchain.Context
-import Blockchain.Data.BlockDB
-import Blockchain.Data.RLP
-import Blockchain.ExtWord
+import           Blockchain.Context
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord
 --import Blockchain.SHA
-import Blockchain.Util
+import           Blockchain.Util
 
 --import Cache
-import Constants
+import           Constants
 --import Dataset
-import Hashimoto
+import           Hashimoto
 
 --import Debug.Trace
 
@@ -35,7 +35,7 @@ word32Unpack s | B.length s >= 4 = Bin.decode (BL.fromStrict $ B.take 4 s) : wor
 word32Unpack _ = error "word32Unpack called for ByteString of length not a multiple of 4"
 
 powFunc'::B.ByteString->Block->IO Integer
-powFunc' dataset b = 
+powFunc' dataset b =
   --trace (show $ headerHashWithoutNonce b) $
   fmap (byteString2Integer . snd) $
   hashimoto
@@ -52,7 +52,7 @@ nonceIsValid' b = do
   val <- liftIO $ powFunc' (miningDataset cxt) b
 
 {-
-  liftIO $ putStrLn (showHex val "") 
+  liftIO $ putStrLn (showHex val "")
   liftIO $ putStrLn (showHex (
                         val *
                         blockDataDifficulty (blockBlockData b)

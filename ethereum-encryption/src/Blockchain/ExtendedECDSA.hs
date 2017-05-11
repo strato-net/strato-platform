@@ -2,17 +2,17 @@
 module Blockchain.ExtendedECDSA (
   ExtendedSignature(..),
   extSignMsg,
-  getPubKeyFromSignature 
+  getPubKeyFromSignature
   ) where
 
-import Control.Monad
-import qualified Control.Monad.State as S
-import Control.Monad.Trans (lift)
-import Data.Bits
+import           Control.Monad
+import qualified Control.Monad.State       as S
+import           Control.Monad.Trans       (lift)
+import           Data.Bits
 
-import Network.Haskoin.Constants
-import Network.Haskoin.Crypto
-import Network.Haskoin.Internals
+import           Network.Haskoin.Constants
+import           Network.Haskoin.Crypto
+import           Network.Haskoin.Internals
 
 --import Debug.Trace
 
@@ -35,7 +35,7 @@ nextSecret = do
 
 genKeyPair :: Monad m => SecretT m (FieldN, Point)
 genKeyPair = do
-    -- 3.2.1.1 
+    -- 3.2.1.1
     d <- nextSecret
     -- 3.2.1.2
     let q = mulPoint d curveG
@@ -84,7 +84,7 @@ recoverPoint :: FieldN -> Bool -> Maybe Point
 recoverPoint r yIsOdd = do
   firstY:secondY:_ <- case quadraticResidue $ (fromIntegral r)^(3::Integer) + 7 of
     [] -> Nothing
-    l -> Just l
+    l  -> Just l
   makePoint (fromIntegral r) $ if odd firstY == yIsOdd then firstY else secondY
 
 getPubKeyFromSignature :: ExtendedSignature->Word256-> Maybe PubKey

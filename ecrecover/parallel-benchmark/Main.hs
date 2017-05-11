@@ -1,10 +1,10 @@
 module Main where
 
-import Prelude
-import Criterion.Main
-import qualified BlockApps.ECRecover.BytesFormat as A
+import qualified BlockApps.ECRecover.BytesFormat   as A
 import qualified BlockApps.ECRecover.IntegerFormat as C
-import qualified Control.Parallel.Strategies as B
+import qualified Control.Parallel.Strategies       as B
+import           Criterion.Main
+import           Prelude
 
 
 main =

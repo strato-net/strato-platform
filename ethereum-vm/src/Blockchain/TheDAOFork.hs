@@ -1,18 +1,18 @@
 
 module Blockchain.TheDAOFork where
 
-import Control.Monad
+import           Control.Monad
 
-import Blockchain.Data.Address
-import Blockchain.Data.DataDefs
-import Blockchain.DB.AddressStateDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.StateDB
+import           Blockchain.Data.Address
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.AddressStateDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.StateDB
 
 
 addresses::[Address]
 addresses = map Address
-  [  
+  [
     0xd4fe7bc31cedb7bfb8a345f31e668033056b2728,
     0xb3fb0e5aba0e20e5c49d252dfd30e102b171a425,
     0x2c19c7f9ae8b751e37aeb2d93a699722395ae18f,
@@ -146,5 +146,5 @@ runTheDAOFork = do
 
   recipAddressState <- getAddressState recipAddr
   putAddressState recipAddr recipAddressState{addressStateBalance=addressStateBalance recipAddressState + sum values}
-               
+
   return ()

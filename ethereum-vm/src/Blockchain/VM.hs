@@ -131,7 +131,7 @@ swapn n = do
 
 getByte::Word256->Word256->Word256
 getByte whichByte val | whichByte < 32 = val `shiftR` (8*(31 - fromIntegral whichByte)) .&. 0xFF
-getByte _ _ = 0;
+getByte _ _           = 0;
 
 signExtend::Word256->Word256->Word256
 signExtend numBytes val | numBytes > 31 = val
@@ -537,7 +537,7 @@ runOperation CALL = do
         return (1, Nothing)
 
   case maybeBytes of
-    Nothing -> return ()
+    Nothing    -> return ()
     Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) bytes
 
   push result
@@ -595,7 +595,7 @@ runOperation CALLCODE = do
         return (1, Nothing)
 
   case maybeBytes of
-    Nothing -> return ()
+    Nothing    -> return ()
     Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) bytes
 
   push result
@@ -655,7 +655,7 @@ runOperation DELEGATECALL = do
               return (1, Nothing)
 
       case maybeBytes of
-        Nothing -> return ()
+        Nothing    -> return ()
         Just bytes -> mStoreByteString outOffset $ B.take (fromIntegral outSize) bytes
 
       push result

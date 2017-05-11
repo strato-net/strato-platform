@@ -19,11 +19,11 @@ import           Network.Kafka.Protocol
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.DB.SQLDB
-import           Blockchain.EthConf (lookupConsumerGroup)
-import           Blockchain.Strato.Model.SHA
+import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
+import           Blockchain.Strato.Model.SHA
 
 import           Blockchain.Sequencer.Event
 

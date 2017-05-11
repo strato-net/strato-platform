@@ -1,11 +1,11 @@
 
 module Pragma where
 
-import Data.Maybe
-import Text.Parsec
+import           Data.Maybe
+import           Text.Parsec
 
-import Lexer
-import ParserTypes
+import           Lexer
+import           ParserTypes
 
 --Pragma param is currently just a generic string of chars up to the ';'
 --see https://github.com/ethereum/solidity/blob/develop/docs/grammar.txt for confirmation

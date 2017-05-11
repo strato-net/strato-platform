@@ -17,10 +17,10 @@ module Blockchain.VMOptions (
   flags_miner,
   ) where
 
-import Blockchain.Mining
+import           Blockchain.Mining
 
-import HFlags
-import Blockchain.CoreFlags
+import           Blockchain.CoreFlags
+import           HFlags
 
 defineFlag "debug" False "turn debug info on or off"
 defineFlag "trace" False "turn trace info on or off"

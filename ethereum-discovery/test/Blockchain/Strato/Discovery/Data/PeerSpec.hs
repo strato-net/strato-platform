@@ -1,9 +1,9 @@
 module Blockchain.Strato.Discovery.Data.PeerSpec where
 
-import Data.Monoid ((<>))
-import Test.Hspec
+import           Data.Monoid                           ((<>))
+import           Test.Hspec
 
-import Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.Data.Peer
 
 publicKey :: String
 publicKey = take 128 (repeat '1')
@@ -20,7 +20,7 @@ mkIPv6Address host = mkAddress' (Just publicKey) ("[" <> host <> "]") port
 mkAddress' :: Maybe String -> String -> Int -> String
 mkAddress' mPubKey host portNum =
     case mPubKey of
-        Nothing -> "enode://" <> host <> ":" <> show portNum
+        Nothing    -> "enode://" <> host <> ":" <> show portNum
         (Just key) -> "enode://" <> key <> "@" <> host <> ":" <> show portNum
 
 spec :: Spec

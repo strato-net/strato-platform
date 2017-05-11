@@ -4,43 +4,43 @@ module Commands (
   methods
   ) where
 
-import Control.Monad.Error
-import Control.Monad.IO.Class
-import qualified Crypto.Hash.SHA3 as SHA3
-import qualified Data.Aeson as JSON
-import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy.Char8 as BLC
-import qualified Data.HashMap.Strict as H
-import qualified Data.Map as M
-import qualified Data.Text as T
-import qualified Data.Vector as V
-import qualified Network.Haskoin.Internals as H
-import Network.HTTP.Client
-import Network.JsonRpc.Server
-import Network.Kafka
-import Network.Kafka.Protocol
-import Numeric
-import System.Random
+import           Control.Monad.Error
+import           Control.Monad.IO.Class
+import qualified Crypto.Hash.SHA3            as SHA3
+import qualified Data.Aeson                  as JSON
+import           Data.Binary
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Base16      as B16
+import qualified Data.ByteString.Char8       as BC
+import qualified Data.ByteString.Lazy.Char8  as BLC
+import qualified Data.HashMap.Strict         as H
+import qualified Data.Map                    as M
+import qualified Data.Text                   as T
+import qualified Data.Vector                 as V
+import qualified Network.Haskoin.Internals   as H
+import           Network.HTTP.Client
+import           Network.JsonRpc.Server
+import           Network.Kafka
+import           Network.Kafka.Protocol
+import           Numeric
+import           System.Random
 
-import Blockchain.Constants
-import Blockchain.Data.Json
-import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
-import Blockchain.Data.TXOrigin
-import Blockchain.DB.DetailsDB
-import Blockchain.EthConf
-import Blockchain.KafkaTopics
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
-import Blockchain.SHA
-import Blockchain.Stream.Raw
+import           Blockchain.Constants
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
+import           Blockchain.DB.DetailsDB
+import           Blockchain.EthConf
+import           Blockchain.KafkaTopics
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Kafka
+import           Blockchain.SHA
+import           Blockchain.Stream.Raw
 
-import qualified APIProxy as API
-import Binary
+import qualified APIProxy                    as API
+import           Binary
 
 type Server = IO
 
@@ -139,7 +139,7 @@ web3_sha3 = toMethod "web3_sha3" f (Required "value" :+: ())
         f val = do
           case strToByteString val of
            Left err -> throwError $ rpcError (-32602) $ T.pack err
-           Right bytes -> 
+           Right bytes ->
              return $ "0x" ++ BC.unpack (B16.encode $ SHA3.hash 256 bytes)
 
 net_peerCount::Method Server
@@ -206,11 +206,11 @@ getBlockNumber (JSON.Array val) =
       Just (JSON.Object v) ->
         case H.lookup "number" v of
          Just (JSON.Number n) -> Just $ round n
-         Nothing -> Nothing
+         Nothing              -> Nothing
       _ -> Nothing
    _ -> Nothing
-  
-  
+
+
 eth_blockNumber::Method Server
 eth_blockNumber = toMethod "eth_blockNumber" f ()
   where f::RpcResult Server String
@@ -245,26 +245,26 @@ waitForResponse id offset = do
   let responses = map (decode . BLC.fromStrict) $
         case maybeResponses of
          Nothing -> error "can't connect to Kafka"
-         Just v -> v
+         Just v  -> v
 
   putStrLn $ "fetched " ++ show responses
-  
+
   case filter ((id ==) . fst) responses of
-   [] -> waitForResponse id (offset + fromIntegral (length responses))
+   []         -> waitForResponse id (offset + fromIntegral (length responses))
    [(_, val)] -> return val
-   _ -> error "you should not have more than one response with the same id"
+   _          -> error "you should not have more than one response with the same id"
 
 callVM::JsonRpcCommand->IO B.ByteString
 callVM c = do
-  lastOffsetOrError <- liftIO $ runKafkaConfigured "ethereum-jsonrpc" $ 
+  lastOffsetOrError <- liftIO $ runKafkaConfigured "ethereum-jsonrpc" $
                        getLastOffset LatestTime 0 (lookupTopic "jsonrpcresponse")
   let lastOffset =
         case lastOffsetOrError of
-         Left e -> error $ show e
+         Left e    -> error $ show e
          Right val -> val
 
   emitKafkaJsonRlpCommand c
-         
+
   waitForResponse (jrcId c) lastOffset
 
 eth_getBalance::Method Server
@@ -299,7 +299,7 @@ eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" 
                          }
              return $ BC.unpack result
 
-          
+
 eth_getTransactionCount::Method Server
 eth_getTransactionCount = toMethod "eth_getTransactionCount" f (Required "address" :+: Required "block" :+: ())
   where f::String->String->RpcResult Server String
@@ -854,7 +854,7 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getBlockByHash","params":["0
     "gasLimit": "0x9f759", // 653145
     "gasUsed": "0x9f759", // 653145
     "timestamp": "0x54e34e8e" // 1424182926
-    "transactions": [{...},{ ... }] 
+    "transactions": [{...},{ ... }]
     "uncles": ["0x1606e5...", "0xd5145a9..."]
   }
 }

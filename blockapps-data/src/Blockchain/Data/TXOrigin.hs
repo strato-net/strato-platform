@@ -1,20 +1,21 @@
-{-# LANGUAGE TemplateHaskell, DeriveGeneric #-}
-    
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module Blockchain.Data.TXOrigin where
 
-import Data.Binary
+import           Data.Binary
 
-import Database.Persist.TH
+import           Database.Persist.TH
 
-import Data.Aeson
+import           Data.Aeson
 
-import Blockchain.Data.PersistTypes ()
-import Blockchain.MiscJSON ()
+import           Blockchain.Data.PersistTypes ()
+import           Blockchain.MiscJSON          ()
 
-import Blockchain.Format
-import Blockchain.SHA
+import           Blockchain.Format
+import           Blockchain.SHA
 
-import GHC.Generics
+import           GHC.Generics
 
 data TXOrigin = Direct | API | Quarry | BlockHash SHA | PeerString String | Morphism deriving (Show, Read, Eq, Generic)
 

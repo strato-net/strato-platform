@@ -1,12 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import Blockchain.Output
-import Blockchain.Mining.Options ()
+import           Blockchain.Mining.Options ()
+import           Blockchain.Output
 
-import Control.Monad.Logger
-import HFlags
+import           Control.Monad.Logger
+import           HFlags
 
-import Executable.StratoAdit
+import           Executable.StratoAdit
 
 main :: IO ()
 main = do

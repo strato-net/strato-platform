@@ -1,8 +1,8 @@
 module Blockchain.Strato.Model.Class where
 
-import qualified Data.ByteString as B
-import           Data.Word
+import qualified Data.ByteString                 as B
 import           Data.Time.Clock
+import           Data.Word
 
 import           Blockchain.Data.RLP
 import           Blockchain.Strato.Model.Address
@@ -23,8 +23,8 @@ class (RLPSerializable b, BlockHeaderLike h, TransactionLike t) => BlockLike h t
     buildBlock' :: (BlockHeaderLike h2, TransactionLike t2) => h2 -> [t2] -> [h2] -> b
     buildBlock' head' txs' uncles' =
         buildBlock (morphBlockHeader head') (morphTx <$> txs') (morphBlockHeader <$> uncles')
-    
-    morphBlock :: (BlockHeaderLike h2, TransactionLike t2, BlockLike h2 t2 b2) => b2 -> b 
+
+    morphBlock :: (BlockHeaderLike h2, TransactionLike t2, BlockLike h2 t2 b2) => b2 -> b
     morphBlock b2 = buildBlock' (blockHeader b2) (blockTransactions b2) (blockUncleHeaders b2)
 
 class RLPSerializable h => BlockHeaderLike h where

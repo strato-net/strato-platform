@@ -20,14 +20,14 @@ import           Database.Persist.TH
 import           Data.Time
 
 import           Blockchain.Data.Address
-import           Blockchain.Data.PersistTypes       ()
+import           Blockchain.Data.PersistTypes            ()
 import           Blockchain.Data.TransactionDef
-import           Blockchain.Data.TXOrigin
 import           Blockchain.Data.TransactionResultStatus
+import           Blockchain.Data.TXOrigin
 import           Blockchain.Database.MerklePatricia
-import           Blockchain.MiscJSON                ()
+import           Blockchain.MiscJSON                     ()
 
-import qualified Data.ByteString                    as BS
+import qualified Data.ByteString                         as BS
 
 import           Blockchain.ExtWord
 import           Blockchain.SHA

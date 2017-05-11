@@ -1,14 +1,15 @@
-{-# LANGUAGE NoImplicitPrelude, OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- |
 -- Use the Integer encoding of bytes with a presumption that those store 256 bits.
--- 
+--
 -- This function is mainly created for compatibility with the bizarre encoding of Haskoin.
 module BlockApps.ECRecover.IntegerFormat
 where
 
-import BlockApps.ECRecover.Prelude
+import qualified BlockApps.ECRecover.Foreign  as B
 import qualified BlockApps.ECRecover.Pointers as A
-import qualified BlockApps.ECRecover.Foreign as B
+import           BlockApps.ECRecover.Prelude
 
 
 {-# INLINABLE recoverUncompressed #-}

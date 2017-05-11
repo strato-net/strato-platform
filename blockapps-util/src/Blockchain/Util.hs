@@ -1,21 +1,21 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.Util where
 
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.NibbleString as N
-import Data.ByteString.Internal
-import Data.Char
-import Data.List
-import Data.Word
-import Numeric
+import           Data.Bits
+import qualified Data.ByteString          as B
+import           Data.ByteString.Internal
+import           Data.Char
+import           Data.List
+import qualified Data.NibbleString        as N
+import           Data.Word
+import           Numeric
 
-import Blockchain.ExtWord
+import           Blockchain.ExtWord
 
-import Data.Ratio (numerator)
-import Data.Time.Clock.POSIX (POSIXTime, getPOSIXTime)
+import           Data.Ratio               (numerator)
+import           Data.Time.Clock.POSIX    (POSIXTime, getPOSIXTime)
 
-import qualified Data.Binary as Binary
+import qualified Data.Binary              as Binary
 
 showHex4 :: Word256 -> String
 showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput
@@ -25,7 +25,7 @@ showHexU :: Integer -> String
 showHexU = map toUpper . flip showHex ""
 
 nibbleString2ByteString::N.NibbleString->B.ByteString
-nibbleString2ByteString (N.EvenNibbleString s) = s
+nibbleString2ByteString (N.EvenNibbleString s)  = s
 nibbleString2ByteString (N.OddNibbleString c s) = c `B.cons` s
 
 byteString2NibbleString::B.ByteString->N.NibbleString
@@ -38,7 +38,7 @@ byteString2Integer::B.ByteString->Integer
 byteString2Integer x = bytes2Integer $ B.unpack x
 
 bytes2Integer::[Word8]->Integer
-bytes2Integer [] = 0
+bytes2Integer []          = 0
 bytes2Integer (byte:rest) = fromIntegral byte `shift` (8 * length rest) + bytes2Integer rest
 
 integer2Bytes::Integer->[Word8]
@@ -54,9 +54,9 @@ padZeros::Int->String->String
 padZeros n s = replicate (n - length s) '0' ++ s
 
 tab::String->String
-tab [] = []
+tab []          = []
 tab ('\n':rest) = '\n':' ':' ':' ':' ':tab rest
-tab (c:rest) = c:tab rest
+tab (c:rest)    = c:tab rest
 
 showWord8::Word8->Char
 showWord8 c | c >= 32 && c < 127 = w2c c
@@ -64,9 +64,9 @@ showWord8 _ = '?'
 
 showMem::Int->[Word8]->String
 showMem _ x | length x > 1000 = " mem size greater than 1000 bytes"
-showMem _ [] = "" 
-showMem p (v1:v2:v3:v4:v5:v6:v7:v8:rest) = 
-    padZeros 4 (showHex p "") ++ " " 
+showMem _ [] = ""
+showMem p (v1:v2:v3:v4:v5:v6:v7:v8:rest) =
+    padZeros 4 (showHex p "") ++ " "
              ++ [showWord8 v1] ++ [showWord8 v2] ++ [showWord8 v3] ++ [showWord8 v4]
              ++ [showWord8 v5] ++ [showWord8 v6] ++ [showWord8 v7] ++ [showWord8 v8] ++ " "
              ++ padZeros 2 (showHex v1 "") ++ " " ++ padZeros 2 (showHex v2 "") ++ " " ++ padZeros 2 (showHex v3 "") ++ " " ++ padZeros 2 (showHex v4 "") ++ " "
@@ -87,10 +87,10 @@ safeDrop i s = B.drop (fromIntegral i) s
 
 
 isContiguous::(Eq a, Num a)=>[a]->Bool
-isContiguous [] = True
-isContiguous [_] = True
+isContiguous []         = True
+isContiguous [_]        = True
 isContiguous (x:y:rest) | y == x + 1 = isContiguous $ y:rest
-isContiguous _ = False
+isContiguous _          = False
 
 newtype Microtime = Microtime Integer deriving (Read, Show, Eq, Ord, Num, Enum, Real, Integral)
 

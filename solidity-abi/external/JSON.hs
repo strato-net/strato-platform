@@ -1,30 +1,31 @@
--- | 
+-- |
 -- Module: JSON
 -- Description: Source for the JSON ABI creator
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module JSON (jsonABI) where
 
-import Data.Aeson hiding (String)
-import qualified Data.Aeson as Aeson (Value(String))
-import Data.Aeson.Types (Pair)
-import qualified Data.Map as Map
-import Data.Map (Map)
-import qualified Data.List as List
-import Data.Maybe
-import Data.String
+import           Data.Aeson          hiding (String)
+import qualified Data.Aeson          as Aeson (Value (String))
+import           Data.Aeson.Types    (Pair)
+import qualified Data.List           as List
+import           Data.Map            (Map)
+import qualified Data.Map            as Map
+import           Data.Maybe
+import           Data.String
 
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Vector as Vector
-import qualified Data.Text as Text
+import qualified Data.Text           as Text
+import qualified Data.Vector         as Vector
 
-import Imports
-import Layout
-import DefnTypes
-import LayoutTypes
-import ParserTypes
-import Selector
+import           DefnTypes
+import           Imports
+import           Layout
+import           LayoutTypes
+import           ParserTypes
+import           Selector
 
 instance ToJSON SolidityFile where
   toJSON f = either id id $ jsonABI "" (Map.singleton "" f)
@@ -97,7 +98,7 @@ varsABI layout' objs = object $ mapMaybe (varABI layout') objs
 
 funcsABI :: SolidityTypesLayout -> [SolidityObjDef] -> Value
 funcsABI typesL objs = object $ mapMaybe (funcABI typesL) objs
-              
+
 typesABI :: SolidityTypesLayout -> SolidityTypesDef -> Value
 typesABI layout' types =
   object $ mapMaybe snd $ Map.toList $
@@ -112,7 +113,7 @@ constrABI name objs = object $ maybe [] listABI argsM
       | name == name' && name == name'' = True
     isConstr _ = False
     getArgs (ObjDef _ _ (TupleValue args) _ _) = Just args
-    getArgs _ = Nothing
+    getArgs _                                  = Nothing
 
 listABI :: [SolidityObjDef] -> [Pair]
 listABI objs = do

@@ -74,7 +74,7 @@ instance RLPSerializable Word512 where
     rlpEncode val = RLPString $ BL.toStrict $ encode val
 
     rlpDecode (RLPString s) | B.length s == 64 = decode $ BL.fromStrict s
-    rlpDecode x = error ("Missing case in rlp2Word512: " ++ show x)
+    rlpDecode x             = error ("Missing case in rlp2Word512: " ++ show x)
 
 instance RLPSerializable Word256 where
     rlpEncode = rlpEncode . toInteger
@@ -85,7 +85,7 @@ instance RLPSerializable Word128 where
 
     rlpDecode (RLPString s) | B.null s = 0
     rlpDecode (RLPString s) | B.length s <= 16 = decode $ BL.fromStrict s
-    rlpDecode x = error ("Missing case in rlp2Word128: " ++ show x)
+    rlpDecode x             = error ("Missing case in rlp2Word128: " ++ show x)
 
 instance RLPSerializable Word32 where
     rlpEncode val = RLPString $ BL.toStrict $ encode val

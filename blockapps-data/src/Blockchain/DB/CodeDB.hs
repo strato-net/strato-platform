@@ -9,15 +9,15 @@ module Blockchain.DB.CodeDB (
   ) where
 
 
-import Control.Monad.Trans.Resource
-import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Default
-import qualified Database.LevelDB as DB
+import           Control.Monad.Trans.Resource
+import           Data.Binary
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Lazy               as BL
+import           Data.Default
+import qualified Database.LevelDB                   as DB
 
-import Blockchain.SHA
-import Blockchain.Database.MerklePatricia
+import           Blockchain.Database.MerklePatricia
+import           Blockchain.SHA
 
 type CodeDB = DB.DB
 
@@ -28,14 +28,14 @@ addCode :: (HasCodeDB m, MonadResource m) => B.ByteString -> m ()
 addCode = codeDBPut
 
 getCode :: (HasCodeDB m, MonadResource m) => SHA -> m (Maybe B.ByteString)
-getCode theHash = 
+getCode theHash =
   codeDBGet (BL.toStrict $ encode $ sha2StateRoot theHash)
 
 codeDBPut :: HasCodeDB m => B.ByteString -> m ()
 codeDBPut code = do
   db <- getCodeDB
   DB.put db def (BL.toStrict $ encode $ hash code) code
-    
+
 
 codeDBGet :: HasCodeDB m => B.ByteString -> m (Maybe B.ByteString)
 codeDBGet key = do

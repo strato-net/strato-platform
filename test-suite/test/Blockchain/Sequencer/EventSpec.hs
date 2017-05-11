@@ -1,12 +1,12 @@
 module Blockchain.Sequencer.EventSpec where
 
-import Data.Binary
-import Test.Hspec
-import Test.QuickCheck
+import           Data.Binary
+import           Test.Hspec
+import           Test.QuickCheck
 
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.ArbitraryInstances()
-import Blockchain.Data.ArbitraryInstances()
+import           Blockchain.Data.ArbitraryInstances      ()
+import           Blockchain.Sequencer.ArbitraryInstances ()
+import           Blockchain.Sequencer.Event
 
 spec :: Spec
 spec = parallel $ do

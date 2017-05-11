@@ -8,7 +8,7 @@ byteString2Integer :: B.ByteString -> Integer
 byteString2Integer = bytes2Integer . B.unpack
 
 bytes2Integer :: [Word8] -> Integer
-bytes2Integer [] = 0
+bytes2Integer []          = 0
 bytes2Integer (byte:rest) = fromIntegral byte `shift` (8 * length rest) + bytes2Integer rest
 
 padZeros :: Int -> String -> String

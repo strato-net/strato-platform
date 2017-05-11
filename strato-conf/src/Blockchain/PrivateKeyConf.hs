@@ -10,17 +10,18 @@
 - communications when different components would represent the entire node
 - to a peer at different times.
 -}
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.PrivateKeyConf where
 
-import Crypto.PubKey.ECC.DH
-import Crypto.Types.PubKey.ECC
-import Crypto.Random
-import Data.Bifunctor
-import Data.Yaml
-import GHC.Generics
+import           Crypto.PubKey.ECC.DH
+import           Crypto.Random
+import           Crypto.Types.PubKey.ECC
+import           Data.Bifunctor
+import           Data.Yaml
+import           GHC.Generics
 
-import Numeric
+import           Numeric
 
 newtype PrivKey = PrivKey { unPrivKey :: PrivateNumber } deriving (Eq, Generic)
 

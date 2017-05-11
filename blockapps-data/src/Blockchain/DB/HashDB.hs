@@ -6,14 +6,14 @@ module Blockchain.DB.HashDB (
   hashDBGet
   ) where
 
-import Control.Monad.State
-import Control.Monad.Trans.Resource
-import Data.Default
-import qualified Database.LevelDB as DB
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import           Data.Default
+import qualified Database.LevelDB                            as DB
 
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
-import Blockchain.Util
-import qualified Data.NibbleString as N
+import           Blockchain.Util
+import qualified Data.NibbleString                           as N
 
 type HashDB = DB.DB
 

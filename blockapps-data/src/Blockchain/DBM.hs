@@ -15,13 +15,13 @@ module Blockchain.DBM (
   ) where
 
 
-import Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Resource
 
-import           Control.Monad.Logger    (runNoLoggingT)
-import qualified Database.Persist.Postgresql as SQL
+import           Control.Monad.Logger         (runNoLoggingT)
+import qualified Database.Persist.Postgresql  as SQL
 
-import Blockchain.DB.SQLDB
-import Blockchain.EthConf
+import           Blockchain.DB.SQLDB
+import           Blockchain.EthConf
 
 data DebugMode = Log | Fail deriving (Eq)
 

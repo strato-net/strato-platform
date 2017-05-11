@@ -1,21 +1,21 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Blockchain.Strato.Model.BlockHeaderModel where
 
-import qualified Data.ByteString as B
-import Data.String
-import Data.Time
-import Data.Time.Clock.POSIX
-import Data.Word
+import qualified Data.ByteString                      as B
+import           Data.String
+import           Data.Time
+import           Data.Time.Clock.POSIX
+import           Data.Word
 
-import Blockchain.Data.RLP
-import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
-import Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.ExtendedWord
+import           Blockchain.Strato.Model.SHA
 
-import GHC.Generics
+import           GHC.Generics
 
 newtype StateRoot = StateRoot B.ByteString deriving (Show, Eq, Read, Generic, IsString)
 
@@ -31,21 +31,21 @@ unboxStateRoot (StateRoot b) = b
 
 data BlockHeader =
   BlockHeader {
-    parentHash            :: SHA,
-    ommersHash            :: SHA,
-    beneficiary           :: Address,
-    stateRoot             :: StateRoot,
-    transactionsRoot      :: StateRoot,
-    receiptsRoot          :: StateRoot,
-    logsBloom             :: B.ByteString,
-    difficulty            :: Integer,
-    number                :: Integer,
-    gasLimit              :: Integer,
-    gasUsed               :: Integer,
-    timestamp             :: UTCTime,
-    extraData             :: Integer,
-    mixHash               :: SHA,
-    nonce                 :: Word64
+    parentHash       :: SHA,
+    ommersHash       :: SHA,
+    beneficiary      :: Address,
+    stateRoot        :: StateRoot,
+    transactionsRoot :: StateRoot,
+    receiptsRoot     :: StateRoot,
+    logsBloom        :: B.ByteString,
+    difficulty       :: Integer,
+    number           :: Integer,
+    gasLimit         :: Integer,
+    gasUsed          :: Integer,
+    timestamp        :: UTCTime,
+    extraData        :: Integer,
+    mixHash          :: SHA,
+    nonce            :: Word64
     } deriving (Eq, Read, Show)
 
 instance RLPSerializable BlockHeader where
@@ -67,7 +67,7 @@ instance RLPSerializable BlockHeader where
       rlpEncode mh,
       rlpEncode $ B.pack $ word64ToBytes nonce'
       ]
-  rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) = 
+  rlpDecode (RLPArray [ph, oh, b, sr, tr, rr, lb, d, number', gl, gu, ts, ed, mh, nonce']) =
     BlockHeader {
       parentHash=rlpDecode ph,
       ommersHash=rlpDecode oh,
@@ -90,18 +90,18 @@ instance RLPSerializable BlockHeader where
 instance BlockHeaderLike BlockHeader where
     blockHeaderBlockNumber      = number
     blockHeaderParentHash       = parentHash
-    blockHeaderOmmersHash       = ommersHash 
-    blockHeaderBeneficiary      = beneficiary 
-    blockHeaderStateRoot        = unboxStateRoot . stateRoot 
+    blockHeaderOmmersHash       = ommersHash
+    blockHeaderBeneficiary      = beneficiary
+    blockHeaderStateRoot        = unboxStateRoot . stateRoot
     blockHeaderTransactionsRoot = unboxStateRoot . transactionsRoot
     blockHeaderReceiptsRoot     = unboxStateRoot . receiptsRoot
     blockHeaderLogsBloom        = logsBloom
     blockHeaderGasLimit         = gasLimit
     blockHeaderGasUsed          = gasUsed
     blockHeaderDifficulty       = difficulty
-    blockHeaderNonce            = nonce 
+    blockHeaderNonce            = nonce
     blockHeaderExtraData        = extraData
-    blockHeaderTimestamp        = timestamp 
+    blockHeaderTimestamp        = timestamp
     blockHeaderMixHash          = mixHash
 
     morphBlockHeader b          = BlockHeader { number           = blockHeaderBlockNumber b
@@ -119,7 +119,7 @@ instance BlockHeaderLike BlockHeader where
                                               , extraData        = blockHeaderExtraData b
                                               , timestamp        = blockHeaderTimestamp b
                                               , mixHash          = blockHeaderMixHash b
-                                              } 
+                                              }
 
 headerHash :: BlockHeader->SHA
 headerHash = blockHeaderHash

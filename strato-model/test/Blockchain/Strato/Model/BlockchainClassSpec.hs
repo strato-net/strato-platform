@@ -1,49 +1,49 @@
 
 module Blockchain.Strato.Model.BlockchainClassSpec where
 
-import Test.Hspec
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.SHA
-import Blockchain.Strato.Model.BlockHeaderModel
-import Blockchain.Strato.Model.BlockModel
-import Blockchain.Strato.Model.BlockHeaderModel
-import Blockchain.Strato.Model.TransactionModel
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.BlockHeaderModel
+import           Blockchain.Strato.Model.BlockHeaderModel
+import           Blockchain.Strato.Model.BlockModel
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Strato.Model.TransactionModel
+import           Test.Hspec
 
 
-import qualified Data.ByteString as B
-import qualified Data.Map as Map
-import Data.Time
-import Data.Word
+import qualified Data.ByteString                          as B
+import qualified Data.Map                                 as Map
+import           Data.Time
+import           Data.Word
 
-data BlockHeaderModel = 
+data BlockHeaderModel =
   BlockHeaderModel {
-     blockNumber :: Integer,
-     parentHash  :: SHA,
-     ommersHash  :: SHA,
-     beneficiary :: Address,
-     stateRoot :: B.ByteString,
-     receiptsRoot     :: B.ByteString, 
+     blockNumber      :: Integer,
+     parentHash       :: SHA,
+     ommersHash       :: SHA,
+     beneficiary      :: Address,
+     stateRoot        :: B.ByteString,
+     receiptsRoot     :: B.ByteString,
      transactionsRoot :: B.ByteString,
-     logsBloom :: B.ByteString, 
-     gasLimit :: Integer, 
-     gasUsed :: Integer,
-     difficulty :: Integer,
-     nonce :: Word64,
-     extraData :: Integer,
-     timestamp :: UTCTime,
-     mixHash :: SHA
+     logsBloom        :: B.ByteString,
+     gasLimit         :: Integer,
+     gasUsed          :: Integer,
+     difficulty       :: Integer,
+     nonce            :: Word64,
+     extraData        :: Integer,
+     timestamp        :: UTCTime,
+     mixHash          :: SHA
   }
 
 data BlockBodyModel =
-  BlockBodyModel { 
+  BlockBodyModel {
      transactions :: [TransactionModel],
      uncleHeaders :: BlockHeaderModel
   }
 
-data BlockModel = 
+data BlockModel =
   BlockModel {
      header :: BlockHeaderModel,
-     body :: BlockBodyModel
+     body   :: BlockBodyModel
   }
 
 data TransactionType = MessageTransaction
@@ -53,21 +53,21 @@ type Code = B.ByteString
 
 data TransactionModel =
   TransactionModel {
-     txHash :: SHA,
+     txHash        :: SHA,
      txPartialHash :: SHA,
-     txSigner :: Maybe Address,
-     txNonce :: Integer,
-     txType :: TransactionType,
-     txSignature :: (Integer, Integer, Word8),
-     txValue :: Integer,
+     txSigner      :: Maybe Address,
+     txNonce       :: Integer,
+     txType        :: TransactionType,
+     txSignature   :: (Integer, Integer, Word8),
+     txValue       :: Integer,
      txDestination :: Maybe Address,
-     txGasPrice :: Integer,
-     txGasLimit :: Integer,
-     txCode :: Maybe Code,
-     txData :: Maybe B.ByteString
+     txGasPrice    :: Integer,
+     txGasLimit    :: Integer,
+     txCode        :: Maybe Code,
+     txData        :: Maybe B.ByteString
   }
 
-{-  
+{-
 class (RLPSerializable t) => TransactionLike t where
     txHash        :: t -> SHA
     txPartialHash :: t -> SHA
@@ -98,17 +98,17 @@ class (RLPSerializable t) => TransactionLike t where
 
 data BlockchainModel =
   BlockchainModel {
-    bestBlock :: BlockModel,
-    blockBodyByHash :: Map.Map BlockHeaderModel BlockBodyModel,
-    blockHeaderByNumber :: Map.Map Int BlockHeaderModel,
-    parentChildByHash :: Map.Map SHA SHA,
+    bestBlock                  :: BlockModel,
+    blockBodyByHash            :: Map.Map BlockHeaderModel BlockBodyModel,
+    blockHeaderByNumber        :: Map.Map Int BlockHeaderModel,
+    parentChildByHash          :: Map.Map SHA SHA,
     transactionHashByBlockHash :: Map.Map SHA SHA,
-    transactionByHash :: Map.Map SHA TransactionModel
+    transactionByHash          :: Map.Map SHA TransactionModel
   }
-  
--- instance  
 
-spec :: Spec 
+-- instance
+
+spec :: Spec
 spec = do
   describe "can get and put blocks in memory" $ do
     it "puts a block" $ do

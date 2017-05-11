@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GADTs                      #-}
@@ -6,11 +6,10 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-    
+
 module Blockchain.Data.Address (
   Address(..),
   prvKey2Address,
@@ -21,31 +20,31 @@ module Blockchain.Data.Address (
   formatAddressWithoutColor
   ) where
 
-import Control.Monad
-       
-import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.NibbleString as N
-import Network.Haskoin.Crypto hiding (Address)
-import Numeric
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           Control.Monad
 
-import Blockchain.Data.RLP
-import Blockchain.ExtWord
+import           Data.Binary
+import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Lazy            as BL
+import qualified Data.NibbleString               as N
+import           Network.Haskoin.Crypto          hiding (Address)
+import           Numeric
+import           Text.PrettyPrint.ANSI.Leijen    hiding ((<$>))
 
-import qualified Data.Text as T
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord
 
-import qualified Data.Aeson as AS
-import Data.Aeson.Types
-       
-import qualified Blockchain.Colors as C
-import Blockchain.Format
-import Blockchain.SHA
-import Blockchain.Util
-import Web.PathPieces
+import qualified Data.Text                       as T
 
-import Blockchain.Strato.Model.Address
+import qualified Data.Aeson                      as AS
+import           Data.Aeson.Types
+
+import qualified Blockchain.Colors               as C
+import           Blockchain.Format
+import           Blockchain.SHA
+import           Blockchain.Util
+import           Web.PathPieces
+
+import           Blockchain.Strato.Model.Address
 
 {-
  Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
@@ -59,10 +58,10 @@ instance PathPiece Address where
 
 {-
  make into a string rather than an object
--}                   
+-}
 instance AS.ToJSON Address where
   toJSON (Address x) = String $ T.pack $ padZeros 20 $ showHex x ""
-         
+
 instance AS.FromJSON Address where
 -- TODO- put this tighter definition back in again....  I needed to loosten the definition because genesis.json breaks some of the format.
 --  parseJSON (String s)
@@ -70,8 +69,8 @@ instance AS.FromJSON Address where
 --      not (T.length s == 40) =
 --        error $ "error converting json to Address: " ++ show s
   parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ T.unpack s
-  parseJSON _ = mzero
-   
+  parseJSON _          = mzero
+
 instance Pretty Address where
   pretty (Address x) = yellow $ text $ padZeros 40 $ showHex x ""
 
@@ -103,7 +102,7 @@ addressAsNibbleString (Address s) =
   byteString2NibbleString $ BL.toStrict $ encode s
 
 addressFromNibbleString::N.NibbleString->Address
-addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString 
+addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
 
 formatAddressWithoutColor::Address->String
 formatAddressWithoutColor (Address x) = padZeros 40 $ showHex x ""

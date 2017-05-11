@@ -1,8 +1,8 @@
 module Handler.TransactionDemo where
 
-import Text.Julius
+import           Text.Julius
 
-import Import
+import           Import
 
 postTransactionDemoR :: Handler Html
 postTransactionDemoR = do
@@ -14,6 +14,6 @@ postTransactionDemoR = do
     (_, Nothing) -> invalidArgs ["Missing 'contractAddress'"]
     (Just abi, Just contractAddress) -> defaultLayout $ do
       addScriptRemote "/static/js/pushtx.js"
-  
+
       setTitle "Transaction Demo"
       $(widgetFile "transactionDemo")

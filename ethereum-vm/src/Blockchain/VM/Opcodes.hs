@@ -1,25 +1,25 @@
 
 module Blockchain.VM.Opcodes where
 
-import Prelude hiding (LT, GT, EQ)
+import           Prelude                      hiding (EQ, GT, LT)
 
-import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.Map as M
-import Data.Maybe
-import Network.Haskoin.Internals
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           Data.Binary
+import qualified Data.ByteString              as B
+import qualified Data.Map                     as M
+import           Data.Maybe
+import           Network.Haskoin.Internals
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import Blockchain.Util
+import           Blockchain.Util
 
 --import Debug.Trace
 
-data Operation = 
-    STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG | LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE | SHA3 | 
+data Operation =
+    STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG | LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE | SHA3 |
     ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY |
-    BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT | POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | 
-    JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST | 
-    PUSH [Word8] | 
+    BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT | POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE |
+    JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
+    PUSH [Word8] |
     DUP1 | DUP2 | DUP3 | DUP4 |
     DUP5 | DUP6 | DUP7 | DUP8 |
     DUP9 | DUP10 | DUP11 | DUP12 |
@@ -36,9 +36,9 @@ data Operation =
     MalformedOpcode Word8 deriving (Show, Eq, Ord)
 
 instance Pretty Operation where
-  pretty x@JUMPDEST = text $ "------" ++ show x
+  pretty x@JUMPDEST    = text $ "------" ++ show x
   pretty x@(PUSH vals) = text $ show x ++ " --" ++ show (bytes2Integer vals)
-  pretty x = text $ show x
+  pretty x             = text $ show x
 
 data OPData = OPData Word8 Operation Int Int String
 
@@ -48,7 +48,7 @@ singleOp::Operation->([Word8]->Operation, Int)
 singleOp o = (const o, 1)
 
 opDatas::[OPData]
-opDatas = 
+opDatas =
   [
     OPData 0x00 STOP 0 0 "Halts execution.",
     OPData 0x01 ADD 2 1 "Addition operation.",
@@ -175,12 +175,12 @@ op2OpCode (DATA bytes) = B.unpack bytes
 op2OpCode (MalformedOpcode byte) = [byte]
 op2OpCode op =
   case M.lookup op op2CodeMap of
-    Just x -> [x]
+    Just x  -> [x]
     Nothing -> error $ "op is missing in op2CodeMap: " ++ show op
 
 opLen::Operation->Int
 opLen (PUSH x) = 1 + length x
-opLen _ = 1
+opLen _        = 1
 
 opCode2Op::B.ByteString->(Operation, Word256)
 opCode2Op rom | B.null rom = (STOP, 1) --according to the yellowpaper, should return STOP if outside of the code bytestring

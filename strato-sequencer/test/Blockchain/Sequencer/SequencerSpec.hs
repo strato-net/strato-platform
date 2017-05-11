@@ -1,30 +1,31 @@
 module Blockchain.Sequencer.SequencerSpec where
 
-import Numeric (showHex)
-import Data.Time.Clock.POSIX
+import           Data.Time.Clock.POSIX
+import           Numeric                             (showHex)
 
-import Control.Monad.Stats
-import Control.Monad.Logger
-import Control.Exception (finally)
+import           Control.Exception                   (finally)
+import           Control.Monad.Logger
+import           Control.Monad.Stats
 
-import Blockchain.EthConf (lookupConsumerGroup, runStatsTConfigured)
-import Blockchain.Sequencer
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Monad
-import Blockchain.Sequencer.ChainHelpers
-import Blockchain.Sequencer.OrderValidator
-import Blockchain.Format
-import Blockchain.Output
+import           Blockchain.EthConf                  (lookupConsumerGroup, runStatsTConfigured)
+import           Blockchain.Format
+import           Blockchain.Output
+import           Blockchain.Sequencer
+import           Blockchain.Sequencer.ChainHelpers
+import           Blockchain.Sequencer.Event
+import           Blockchain.Sequencer.Monad
+import           Blockchain.Sequencer.OrderValidator
 
-import qualified Data.ByteString.Char8  as C8
-import qualified Network.Kafka.Protocol as KP
+import qualified Data.ByteString.Char8               as C8
+import qualified Network.Kafka.Protocol              as KP
 
-import Test.Hspec
-import Test.Hspec.Contrib.HUnit()
-import Test.HUnit
-import Test.QuickCheck
+import           Test.Hspec
+import           Test.Hspec.Contrib.HUnit            ()
+import           Test.HUnit
+import           Test.QuickCheck
 
-import System.Directory (createDirectoryIfMissing, removeDirectoryRecursive, getCurrentDirectory, setCurrentDirectory)
+import           System.Directory                    (createDirectoryIfMissing, getCurrentDirectory,
+                                                      removeDirectoryRecursive, setCurrentDirectory)
 
 stripTransactionsAndUncles :: IngestBlock -> IngestBlock
 stripTransactionsAndUncles b = b { ibReceiptTransactions = [], ibBlockUncles = [] }

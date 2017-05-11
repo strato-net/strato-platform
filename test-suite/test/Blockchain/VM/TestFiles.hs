@@ -27,7 +27,7 @@ module Blockchain.VM.TestFiles where
 --    "./tests/PoWTests/ethash_tests.json",
 
 vmTests::[String]
-vmTests = 
+vmTests =
   [
     "./tests/VMTests/vmArithmeticTest.json",
     "./tests/VMTests/vmBitwiseLogicOperationTest.json",
@@ -35,7 +35,7 @@ vmTests =
 --    "./tests/VMTests/vmEnvironmentalInfoTest.json", -- seem to need strato-setup
 --    "./tests/VMTests/vmInputLimits.json",           -- seem to need strato-setup
 --    "./tests/VMTests/vmInputLimitsLight.json",      -- seem to need strato-setup
-    "./tests/VMTests/vmIOandFlowOperationsTest.json", 
+    "./tests/VMTests/vmIOandFlowOperationsTest.json",
     "./tests/VMTests/vmLogTest.json",
 --    "./tests/VMTests/vmPerformanceTest.json",       -- seem to need strato-setup
 --    "./tests/VMTests/vmPushDupSwapTest.json",       -- seem to need strato-setup
@@ -65,7 +65,7 @@ stateTests::[String]
 stateTests =
   [
     "./tests/StateTests/stBlockHashTest.json",
-    "./tests/StateTests/stCallCodes.json", 
+    "./tests/StateTests/stCallCodes.json",
     "./tests/StateTests/stCallCreateCallCodeTest.json",
 --    "./tests/StateTests/stDelegatecallTest.json", -- this file doesn't exist anymore
     "./tests/StateTests/stExample.json",

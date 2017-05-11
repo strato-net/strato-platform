@@ -1,8 +1,8 @@
 module Handler.HomeSpec (spec) where
 
-import TestImport
+import           TestImport
 
-import Blockchain.Data.DataDefs
+import           Blockchain.Data.DataDefs
 
 spec :: Spec
 spec = withApp $ do

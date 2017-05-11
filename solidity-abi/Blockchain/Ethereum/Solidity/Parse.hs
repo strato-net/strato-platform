@@ -4,5 +4,5 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module Blockchain.Ethereum.Solidity.Parse (parseSolidity, module ParserTypes) where
 
-import Parser
-import ParserTypes
+import           Parser
+import           ParserTypes

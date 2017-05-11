@@ -1,6 +1,6 @@
 module Handler.Help where
 
-import Import
+import           Import
 
 getHelpR :: Handler Html
 getHelpR = do

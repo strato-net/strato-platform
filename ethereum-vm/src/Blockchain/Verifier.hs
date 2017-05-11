@@ -1,32 +1,33 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Verifier (
   checkValidity,
   isNonceValid
   ) where
 
-import Control.Monad
-import Control.Monad.Trans.Resource
+import           Control.Monad
+import           Control.Monad.Trans.Resource
 
 import           Blockchain.Constants
 import           Blockchain.Data.AddressStateDB
-import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 import           Blockchain.Mining
-import           Blockchain.Mining.Normal
 import           Blockchain.Mining.Instant
+import           Blockchain.Mining.Normal
 import           Blockchain.Mining.SHA
 import           Blockchain.Sequencer.Event
 import           Blockchain.SHA
 import           Blockchain.Util
+import           Blockchain.Verification
 import           Blockchain.VMContext
 import           Blockchain.VMOptions
-import           Blockchain.Verification
 
 {-
 nextGasLimit::Integer->Integer->Integer
@@ -47,7 +48,7 @@ instance Format BlockValidityError where
     format (BlockDifficultyWrong d expected) = "Block difficulty is wrong, is '" ++ show d ++ "', expected '" ++ show expected ++ "'"
 -}
 
-checkParentChildValidity :: (Monad m) 
+checkParentChildValidity :: (Monad m)
                          => Bool -> OutputBlock -> BlockSummary -> m ()
 checkParentChildValidity isHomestead OutputBlock{obBlockData=c} parentBSum = do
     let nextDifficulty' = if isHomestead then homesteadNextDifficulty flags_difficultyBomb else nextDifficulty flags_difficultyBomb
@@ -95,7 +96,7 @@ checkValidity partialBlock isHomestead parentBSum b = do
            trVerified <- verifyTransactionRoot b
            let trVerifiedMem = verifyTransactionRoot' b
 
-           when (not (fst trVerifiedMem)) $ error "memTransactionRoot doesn't match transactions" 
+           when (not (fst trVerifiedMem)) $ error "memTransactionRoot doesn't match transactions"
            when (not (fst trVerified)) $ error "transactionRoot doesn't match transactions"
 
 

@@ -1,21 +1,21 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
-{-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module Handler.Stats where
 
-import Import
+import           Import
 
-import Handler.Common
 import qualified Database.Esqueleto as E
+import           Handler.Common
 
 data Stats = Stats
-    { name :: Text
-    , version  :: Int
+    { name    :: Text
+    , version :: Int
     , genesis :: String
     } deriving Generic
 
@@ -32,25 +32,25 @@ getStatsR = selectRep $ do
     stats@Stats {..} = Stats "Strato" 1 "genesis"
 
 getStatDiffR :: Handler Value
-getStatDiffR  = do 
+getStatDiffR  = do
                    addHeader "Access-Control-Allow-Origin" "*"
                    blks <- runDB $ E.select $
                         E.from $ \(a, t) -> do
                         E.where_ (  a E.^. BlockDataRefBlockId E.==. t E.^. BlockId)
                         let sum' = E.sum_ (a E.^. BlockDataRefDifficulty)
-                        -- E.limit $ P.min (fromIntegral n :: Int64) fetchLimit 
+                        -- E.limit $ P.min (fromIntegral n :: Int64) fetchLimit
                         -- E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
                         return sum'
-                   return $ myval (blks :: [E.Value (Maybe Integer)]) 
+                   return $ myval (blks :: [E.Value (Maybe Integer)])
             where
               myval ((E.Value (Just v)):_) = object ["difficulty" .= (v :: Integer)]
-              myval _                       = object ["difficulty" .= ("0" :: String)]
+              myval _                      = object ["difficulty" .= ("0" :: String)]
 
 getStatTxR :: Handler Value
-getStatTxR  = do 
+getStatTxR  = do
                    addHeader "Access-Control-Allow-Origin" "*"
                    tx <- runDB $ E.select $ E.from $ \(_ :: E.SqlExpr (Entity RawTransaction)) -> return E.countRows
-                   return $ myval (tx :: [E.Value Integer]) 
+                   return $ myval (tx :: [E.Value Integer])
             where
               myval ((E.Value v):_) = object ["transactionCount" .= (v :: Integer)]
-              myval _                       = object ["transactionCount" .= ("0" :: String)]
+              myval _               = object ["transactionCount" .= ("0" :: String)]

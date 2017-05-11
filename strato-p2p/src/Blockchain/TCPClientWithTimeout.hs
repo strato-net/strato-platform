@@ -7,11 +7,11 @@ module Blockchain.TCPClientWithTimeout (
   TCPClientWithTimeoutException(..)
   ) where
 
-import Control.Concurrent.Lifted
-import Control.Exception.Lifted
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Control
-import Data.Conduit.Network
+import           Control.Concurrent.Lifted
+import           Control.Exception.Lifted
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Control
+import           Data.Conduit.Network
 
 data TCPClientWithTimeoutException = TimeoutException deriving (Show)
 
@@ -26,11 +26,11 @@ runTCPClientWithConnectTimeout::(MonadIO m, MonadBaseControl IO m)=>
 runTCPClientWithConnectTimeout settings secs cont = do
   race <- liftIO newChan
   resultMVar <- liftIO newEmptyMVar
-  
+
   timerThreadID <- fork $ liftIO $ do
     threadDelaySeconds secs
     writeChan race False
-    
+
   clientThreadID <- fork $ do
     result <-
       try $
@@ -39,15 +39,15 @@ runTCPClientWithConnectTimeout settings secs cont = do
         cont appData
     liftIO $ writeChan race True --second call needed because first call won't be hit in the case of an error caught by try
     liftIO $ putMVar resultMVar result
-      
+
   timedOut <- liftIO $ readChan race
-  
+
   if timedOut
     then do
       liftIO $ killThread timerThreadID --don't want a buildup of timer threads....
       result' <- liftIO $ readMVar resultMVar
       case result' of
-       Left e -> throw (e::SomeException)
+       Left e  -> throw (e::SomeException)
        Right x -> return x
     else do
       _ <- throwIO $ TimeoutException

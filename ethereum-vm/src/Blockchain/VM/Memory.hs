@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Blockchain.VM.Memory (
   Memory(..),
   getSizeInBytes,
@@ -14,23 +15,23 @@ module Blockchain.VM.Memory (
   mStoreByteString
   ) where
 
-import Control.Monad
-import Control.Monad.Trans
-import Control.Monad.Trans.Either
-import Control.Monad.Trans.State hiding (state)
+import           Control.Monad
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Either
+import           Control.Monad.Trans.State    hiding (state)
+import qualified Data.ByteString              as B
+import qualified Data.ByteString.Base16       as B16
+import           Data.IORef
 import qualified Data.Vector.Storable.Mutable as V
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import Data.IORef
-import Data.Word
-import Foreign
+import           Data.Word
+import           Foreign
 --import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import qualified Blockchain.Colors as CL
-import Blockchain.ExtWord
-import Blockchain.VM.OpcodePrices
-import Blockchain.VM.VMState
-import Blockchain.VM.VMM
+import qualified Blockchain.Colors            as CL
+import           Blockchain.ExtWord
+import           Blockchain.VM.OpcodePrices
+import           Blockchain.VM.VMM
+import           Blockchain.VM.VMState
 
 safeRead::V.IOVector Word8->Word256->IO Word8
 safeRead _ x | x > 0x7fffffffffffffff = return 0 --There is no way that memory will be filled up this high, it would cost too much gas.  I think it is safe to assume it is zero.
@@ -43,7 +44,7 @@ safeRead mem x = do
 
 --Word256 is too big to use for [first..first+size-1], so use safeRange instead
 safeRange::Word256->Word256->[Word256]
-safeRange _ 0 = []
+safeRange _ 0        = []
 safeRange first size = first:safeRange (first+1) (size-1)
 
 getSizeInWords::VMM Word256
@@ -109,13 +110,13 @@ setNewMaxSize newSize' = do
 getShow::Memory->IO String
 getShow (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
-  --fmap (show . B16.encode . B.pack) $ sequence $ V.read arr <$> fromIntegral <$> [0..fromIntegral msize-1] 
-  fmap (show . B16.encode . B.pack) $ sequence $ safeRead arr <$> [0..fromIntegral msize-1] 
+  --fmap (show . B16.encode . B.pack) $ sequence $ V.read arr <$> fromIntegral <$> [0..fromIntegral msize-1]
+  fmap (show . B16.encode . B.pack) $ sequence $ safeRead arr <$> [0..fromIntegral msize-1]
 
 getMemAsByteString::Memory->IO B.ByteString
 getMemAsByteString (Memory arr sizeRef) = do
   msize <- readIORef sizeRef
-  liftIO $ fmap B.pack $ sequence $ safeRead arr <$> [0..fromIntegral msize-1] 
+  liftIO $ fmap B.pack $ sequence $ safeRead arr <$> [0..fromIntegral msize-1]
 
 mLoad::Word256->VMM [Word8]
 mLoad p = do
@@ -134,7 +135,7 @@ mLoadByteString _ 0 = return B.empty --no need to charge gas for mem change if n
 mLoadByteString p size = do
   setNewMaxSize (fromIntegral p+fromIntegral size)
   state <- lift get
-  val <- liftIO $ fmap B.pack $ sequence $ safeRead (mVector $ memory state) <$> fromIntegral <$> safeRange p size 
+  val <- liftIO $ fmap B.pack $ sequence $ safeRead (mVector $ memory state) <$> fromIntegral <$> safeRange p size
   return val
 
 unsafeSliceByteString::Word256->Word256->VMM B.ByteString
@@ -145,7 +146,7 @@ unsafeSliceByteString p size = do
   let (fptr, len) = V.unsafeToForeignPtr0 (V.slice (fromIntegral p) (fromIntegral size) $ mVector $ memory state)
   liftIO $ withForeignPtr fptr $ \ptr ->
     B.packCStringLen (castPtr ptr, len * sizeOf (undefined :: Word8))
-    
+
 
 mStore::Word256->Word256->VMM ()
 mStore p val = do

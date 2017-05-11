@@ -5,13 +5,13 @@ module Blockchain.P2PUtil (
   sockAddrToIP
   ) where
 
-import qualified Network.Socket as S
-import           Network.Haskoin.Crypto 
+import           Network.Haskoin.Crypto
+import qualified Network.Socket            as S
 
 import           Blockchain.ExtendedECDSA
 
 import           Data.Maybe
-import           Prelude 
+import           Prelude
 
 import           Crypto.Types.PubKey.ECC
 import qualified Network.Haskoin.Internals as H
@@ -25,12 +25,12 @@ hPubKeyToPubKey pubKey = Point (fromIntegral x) (fromIntegral y)
 
 ecdsaSign::H.PrvKey->Word256->H.SecretT IO ExtendedSignature
 ecdsaSign prvKey' theHash = do
-    extSignMsg theHash prvKey'    
+    extSignMsg theHash prvKey'
 
 sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host
-sockAddrToIP (S.SockAddrUnix str) = str
-sockAddrToIP addr' = takeWhile (\t -> t /= ':') (show addr')
+sockAddrToIP (S.SockAddrUnix str)         = str
+sockAddrToIP addr'                        = takeWhile (\t -> t /= ':') (show addr')
 
 
-  
+

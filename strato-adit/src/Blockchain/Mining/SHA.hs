@@ -2,18 +2,18 @@
 
 module Blockchain.Mining.SHA (shaMiner, findNonce, shaify) where
 
-import qualified Data.ByteString as BS
-import qualified Crypto.Hash.SHA256 as SHA256
-import Data.Time.Clock.POSIX
-import Debug.Trace
-import System.Random
+import qualified Crypto.Hash.SHA256       as SHA256
+import qualified Data.ByteString          as BS
+import           Data.Time.Clock.POSIX
+import           Debug.Trace
+import           System.Random
 
-import Blockchain.Data.BlockDB
-import Blockchain.Data.RLP
-import Blockchain.Data.DataDefs()
-import Blockchain.Util
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs ()
+import           Blockchain.Data.RLP
+import           Blockchain.Util
 
-import Blockchain.Mining
+import           Blockchain.Mining
 
 shaMiner :: Miner
 shaMiner = Miner mineSHA verifySHA
@@ -26,7 +26,7 @@ invDiff d = round diff' :: Integer
    where diff' = (2^(256::Integer)) / (fromIntegral d) :: Double
 -- invDiff d = quot (2^(256::Integer)) d
 
--- mine = foldl (&&) (repeat verify) -- (if verify could live in a monad keeping state..) 
+-- mine = foldl (&&) (repeat verify) -- (if verify could live in a monad keeping state..)
 mineSHA :: Block -> IO (Maybe Integer)
 mineSHA b@Block{blockBlockData=bd} = do
 
@@ -42,10 +42,10 @@ mineSHA b@Block{blockBlockData=bd} = do
 
 verifySHA :: Block -> Bool
 verifySHA b = trace ("n: " ++ (show n) ++ "\nnonce: " ++ (show nonce) ++ "\n(2^256/diff): " ++ (show diff) ++ "\n(diff): " ++ (show diff')) n <= diff
-  where 
+  where
         n     = byteString2Integer $ headerHash b nonce
         bd    = blockBlockData b
-        nonce = toInteger $ blockDataNonce bd 
+        nonce = toInteger $ blockDataNonce bd
         diff  = invDiff $ diff'
         diff' = blockDataDifficulty bd
 

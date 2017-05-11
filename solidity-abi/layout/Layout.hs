@@ -5,20 +5,20 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module Layout (makeContractsLayout) where
 
-import qualified Data.Map as Map
+import qualified Data.Map    as Map
 
-import Data.Maybe
+import           Data.Maybe
 
-import DefnTypes
-import ParserTypes
-import LayoutTypes
+import           DefnTypes
+import           LayoutTypes
+import           ParserTypes
 
 -- | 'makeContractsLayout' analyzes the ordered list of global storage
 -- variables and assigns them byte locations in the blockchain contract's
 -- storage.
 --
 -- Here are the rather picky rules for this:
--- 
+--
 -- * Every type has a size.  Most of the basic types have fixed sizes, in
 -- many cases given in the declaration, but a few of them are "dynamic",
 -- meaning that their actual values are stored in runtime-determined
@@ -41,7 +41,7 @@ makeContractLayout contractsL (ContractDef objs types _) =
   ContractLayout {
     objsLayout = makeObjsLayout typesL objs,
     typesLayout = typesL
-    }      
+    }
   where typesL = Map.map (makeTypeLayout contractsL typesL) types
 
 makeTypeLayout :: SolidityContractsLayout -> SolidityTypesLayout -> SolidityNewType
@@ -56,9 +56,9 @@ makeTypeLayout contractsL typesL t = case t of
       getType name' = Map.findWithDefault (error $ "type " ++ show name' ++ "not found in typesLayout") name'
   Struct fields' ->
     let objsLayout' = makeObjsLayout typesL fields'
-        lastEnd = objEndBytes $ getObj (objName $ last fields') objsLayout' 
+        lastEnd = objEndBytes $ getObj (objName $ last fields') objsLayout'
         getObj name' = Map.findWithDefault (error $ "struct name " ++ show name' ++ " not found in objsLayout'") name'
-        usedBytes = nextLayoutStart lastEnd keyBytes        
+        usedBytes = nextLayoutStart lastEnd keyBytes
     in StructLayout objsLayout' usedBytes
 
 makeObjsLayout :: SolidityTypesLayout -> [SolidityObjDef] -> SolidityObjsLayout

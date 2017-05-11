@@ -1,14 +1,14 @@
 module Main where
 
-import Prelude
-import Criterion.Main
-import qualified Blockchain.ExtendedECDSA as F
-import qualified Blockchain.SHA as J
-import qualified Blockchain.ExtWord as K
-import qualified Blockchain.FastECRecover as N
-import qualified Data.ByteString as M
-import qualified Network.Haskoin.Crypto as A
+import qualified Blockchain.ExtendedECDSA  as F
+import qualified Blockchain.ExtWord        as K
+import qualified Blockchain.FastECRecover  as N
+import qualified Blockchain.SHA            as J
+import           Criterion.Main
+import qualified Data.ByteString           as M
+import qualified Network.Haskoin.Crypto    as A
 import qualified Network.Haskoin.Internals as G
+import           Prelude
 
 
 main =

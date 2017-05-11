@@ -2,10 +2,10 @@
 
 module Handler.AppCreate where
 
-import Import
-import Handler.Common
-import qualified Data.Text as T
+import qualified Data.Text          as T
 import qualified Data.Text.Encoding as T
+import           Handler.Common
+import           Import
 
 getAppCreateR :: Handler Html
 getAppCreateR = do
@@ -36,7 +36,7 @@ appCreateForm = renderDivs $ createBlockApp
     <*> areq emailField "email" Nothing
     <*> areq urlField "appUrl" Nothing
     <*> aopt urlField "repoUrl" Nothing
-    <*> areq passwordField "loginpass" Nothing 
+    <*> areq passwordField "loginpass" Nothing
     <*> pure False
     <*> pure " "
   -- unfortunate

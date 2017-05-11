@@ -6,13 +6,13 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Expression where
 
-import Text.Parsec
-import Text.Parsec.Expr
+import           Text.Parsec
+import           Text.Parsec.Expr
 
-import Data.Functor.Identity
+import           Data.Functor.Identity
 
-import Lexer
-import ParserTypes
+import           Lexer
+import           ParserTypes
 
 -- | Parses an arithmetic expression involving integer values and
 -- operations
@@ -32,9 +32,9 @@ intTable = [ [prefix "-" negate, prefix "+" id ],
               binary "/" div AssocLeft,
               binary "%" mod AssocLeft],
              [binary "+" (+) AssocLeft, binary "-" (-) AssocLeft ]]
-         
+
 -- | Convenience function for specifying a binary operation
-binary  name fun = Infix (do{ reservedOp name; return fun }) 
+binary  name fun = Infix (do{ reservedOp name; return fun })
 -- | Convenience function for specifying a prefix operator
 prefix  name fun       = Prefix (do{ reservedOp name; return fun })
 -- | Convenience function for specifying a postfix operator

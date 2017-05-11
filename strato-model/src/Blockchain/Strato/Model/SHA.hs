@@ -12,7 +12,7 @@ import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as S8
 import qualified Data.ByteString.Lazy                 as BL
 import           GHC.Generics
-import           Numeric                              (showHex, readHex)
+import           Numeric                              (readHex, showHex)
 
 import           Blockchain.Data.RLP
 
@@ -25,7 +25,7 @@ instance Binary SHA where
 instance RLPSerializable SHA where
     rlpDecode (RLPString s) | B.length s == 32 = SHA $ decode $ BL.fromStrict s
     rlpDecode (RLPScalar 0) = SHA 0 --special case seems to be allowed, even if length of zeros is wrong
-    rlpDecode x = error ("Missing case in rlpDecode for SHA: " ++ show x)
+    rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
     rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ S8.pack $ padZeros 64 $ showHex val ""
 

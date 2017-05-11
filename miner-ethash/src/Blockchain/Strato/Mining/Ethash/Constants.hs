@@ -2,9 +2,9 @@
 
 module Blockchain.Strato.Mining.Ethash.Constants where
 
-import Math.NumberTheory.Primes.Testing
-import Data.List
-import Data.Maybe
+import           Data.List
+import           Data.Maybe
+import           Math.NumberTheory.Primes.Testing
 
 numBits = 512
 wordBytes = 4
@@ -31,7 +31,7 @@ def get_cache_size(block_number):
 -}
 
 cacheSize::Integer->Integer
-cacheSize blockNumber = 
+cacheSize blockNumber =
     fromMaybe (error "Waaaaa?  There were no primes in call to cacheSize") $
     find (\t -> isPrime (t `div` hashBytes)) [(size - hashBytes),(size-3*hashBytes)..0]
   where
@@ -46,7 +46,7 @@ def get_full_size(block_number):
 -}
 
 fullSize::Integer->Integer
-fullSize blockNumber = 
+fullSize blockNumber =
     fromMaybe (error "Waaaaa?  There were no primes in call to fullSize") $
     find (\t -> isPrime (t `div` mixBytes)) [(size - mixBytes),(size-3*mixBytes)..0]
   where

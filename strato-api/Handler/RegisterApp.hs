@@ -2,28 +2,28 @@
 
 module Handler.RegisterApp where
 
-import Import
-import Handler.Common
+import           Handler.Common
+import           Import
 
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.ByteString.Base16        as B16
+import qualified Data.Text                     as T
+import qualified Data.Text.Encoding            as T
 
-import Data.Text.Lazy.Encoding
-import Text.Shakespeare.Text
-import Text.Blaze
-import Text.Blaze.Html.Renderer.Text (renderHtml)
-import Text.Julius
-import Crypto.BCrypt
-import qualified Network.Mail.Mime as M
-import System.Entropy
+import           Crypto.BCrypt
+import           Data.Text.Lazy.Encoding
+import qualified Network.Mail.Mime             as M
+import           System.Entropy
+import           Text.Blaze
+import           Text.Blaze.Html.Renderer.Text (renderHtml)
+import           Text.Julius
+import           Text.Shakespeare.Text
 
-import qualified Database.Esqueleto as E
-import qualified Database.Persist.Sql as SQL
+import qualified Database.Esqueleto            as E
+import qualified Database.Persist.Sql          as SQL
 
-import qualified Prelude as P
+import qualified Prelude                       as P
 
-sendMailDev :: (ToText a, ToMarkup a, MonadIO m) 
+sendMailDev :: (ToText a, ToMarkup a, MonadIO m)
             => Text -> a -> m ()
 sendMailDev email verurl =  liftIO $ M.renderSendMail (M.emptyMail $ M.Address Nothing "noreply")
             { M.mailTo = [M.Address Nothing email]
@@ -64,7 +64,7 @@ sendMailDev email verurl =  liftIO $ M.renderSendMail (M.emptyMail $ M.Address N
 getRegisterAppR :: Handler Html
 getRegisterAppR = do
   maybeVerkey <- lookupGetParam "p"
-  appEnt <- case maybeVerkey of 
+  appEnt <- case maybeVerkey of
     Nothing -> invalidArgs ["Missing 'not registered'"]
     Just verkey -> do appLookup <-  runDB $ E.select $
                                         E.from $ \(a) -> do
@@ -77,16 +77,16 @@ getRegisterAppR = do
   let app = E.entityVal . P.head $ appEnt
       appName = blockAppName $ app
       developer = blockAppDeveloperName $ app
-      url = blockAppAppUrl $ app      
+      url = blockAppAppUrl $ app
 
   defaultLayout $(widgetFile "appRegister")
-  
-    
+
+
 
 postRegisterAppR :: Handler Text
 postRegisterAppR = do
   addHeader "Access-Control-Allow-Origin" "*"
-  
+
   maybeAppName <- lookupPostParam "app"
   maybeDeveloper <- lookupPostParam "developer"
   maybeEmail <- lookupPostParam "email"
@@ -94,37 +94,37 @@ postRegisterAppR = do
   maybeRepoUrl <- lookupPostParam "repourl"
   maybeLoginPass <- lookupPostParam "loginpass"
 
-  developerDB <- case maybeDeveloper of 
+  developerDB <- case maybeDeveloper of
     (Just dev) -> return $ dev
-    Nothing -> invalidArgs ["Missing 'developer'"]
+    Nothing    -> invalidArgs ["Missing 'developer'"]
 
-  emailDB <- case maybeEmail of 
+  emailDB <- case maybeEmail of
     (Just email) -> return $ email
-    Nothing -> invalidArgs ["Missing 'email'"]
+    Nothing      -> invalidArgs ["Missing 'email'"]
 
-  appNameDB <- case maybeAppName of 
+  appNameDB <- case maybeAppName of
     (Just app) -> do appLookup <-  runDB $ E.select $
                                         E.from $ \(a) -> do
                                         E.where_ (  a E.^. BlockAppName E.==. (E.val $ T.unpack app))
                                         E.limit $ 1 -- appnames are unique
                                         return a
-                     case appLookup of 
+                     case appLookup of
                        [] -> return app
-                       _ -> permissionDenied $ "app: " ++ app ++ " already registered"
- 
+                       _  -> permissionDenied $ "app: " ++ app ++ " already registered"
+
     Nothing -> invalidArgs ["Missing 'app'"]
 
-  appUrlDB <- case maybeAppUrl of 
+  appUrlDB <- case maybeAppUrl of
     (Just url) -> return $ url
-    Nothing -> invalidArgs ["Missing 'appurl'"]
+    Nothing    -> invalidArgs ["Missing 'appurl'"]
 
-  
-  pass <- case maybeLoginPass of 
+
+  pass <- case maybeLoginPass of
           (Just loginPass) ->
-             liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy { preferredHashCost = 10 } 
+             liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy { preferredHashCost = 10 }
                                               (T.encodeUtf8 loginPass)
           Nothing -> invalidArgs ["Missing 'loginpass'"]
-  _ <- case pass of 
+  _ <- case pass of
                (Just pass') -> do
                    verkey <- liftIO $ getEntropy 64
                    _ <- runDB $ E.insert $ BlockApp { blockAppName = T.unpack $ appNameDB,
@@ -135,7 +135,7 @@ postRegisterAppR = do
                                                  blockAppLoginPassHash = pass',
                                                  blockAppVerified = False,
                                                  blockAppVerkey = verkey
-                                                } 
+                                                }
                    root <- appRoot . appSettings <$> getYesod
                    sendMailDev emailDB ("http://" ++ root ++ "/eth/v1.0/register?p=" ++ (T.decodeUtf8 $ B16.encode $ verkey)) -- probably shouldn't hardcode url
                Nothing -> permissionDenied $ "password failure"

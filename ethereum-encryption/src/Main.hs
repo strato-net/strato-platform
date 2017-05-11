@@ -4,25 +4,25 @@ module Main (
   main
   ) where
 
-import Control.Monad.IO.Class
-import Crypto.PubKey.ECC.DH
-import Crypto.Types.PubKey.ECC
-import Crypto.Random
-import qualified Data.ByteString as B
+import           Control.Monad.IO.Class
+import           Crypto.PubKey.ECC.DH
+import           Crypto.Random
+import           Crypto.Types.PubKey.ECC
+import qualified Data.ByteString           as B
 --import qualified Data.ByteString.Base16 as B16
 --import qualified Data.ByteString.Char8 as BC
-import Data.Maybe
+import           Data.Maybe
 import qualified Network.Haskoin.Internals as H
 --import Numeric
 
-import Blockchain.Format
-import Blockchain.Data.RLP
-import Blockchain.Data.Wire
-import Blockchain.SHA (SHA(..))
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Wire
+import           Blockchain.Format
+import           Blockchain.SHA            (SHA (..))
 
-import Blockchain.Frame
-import Blockchain.UDP
-import Blockchain.RLPx
+import           Blockchain.Frame
+import           Blockchain.RLPx
+import           Blockchain.UDP
 
 --import Debug.Trace
 
@@ -58,8 +58,8 @@ hPubKeyToPubKey (H.PubKey hPoint) =
 hPubKeyToPubKey (H.PubKeyU _) = error "PubKeyU not supported in hPubKeyToPUbKey yet"
 
 
-  
-main::IO ()    
+
+main::IO ()
 main = do
   entropyPool <- createEntropyPool
   let g = cprgCreate entropyPool :: SystemRNG

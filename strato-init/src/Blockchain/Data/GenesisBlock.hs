@@ -31,9 +31,8 @@ import           Blockchain.DB.StateDB
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
-import           Blockchain.Strato.StateDiff            hiding
-                                                       (StateDiff (blockHash))
-import qualified Blockchain.Strato.StateDiff            as StateDiff (StateDiff (blockHash))
+import           Blockchain.Strato.StateDiff          hiding (StateDiff (blockHash))
+import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (blockHash))
 import           Blockchain.Strato.StateDiff.Database
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
@@ -47,8 +46,7 @@ import qualified Network.Kafka.Protocol               as KP
 
 import qualified Data.Map                             as Map
 
-import           Blockchain.EthConf                   (lookupConsumerGroup,
-                                                       runKafkaConfigured)
+import           Blockchain.EthConf                   (lookupConsumerGroup, runKafkaConfigured)
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
@@ -135,7 +133,7 @@ initializeGenesisBlock backupType genesisBlockName = do
                 backupBlocks
                 putGenesisHash $ blockHash gb
                 return (gb, obGB)
-            MPBackup -> error "MPBackup called" 
+            MPBackup -> error "MPBackup called"
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
             --    return (gb, undefined)
@@ -151,7 +149,7 @@ initializeGenesisBlock backupType genesisBlockName = do
     }
     commitSqlDiffs diff
     -- $logInfoS "Inserting genesis block into RedisDB"
-    void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo 
+    void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)

@@ -2,17 +2,17 @@
 
 module Blockchain.Trigger where
 
-import Data.Int
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.Notification
-import Data.ByteString.Char8 (unpack)
+import           Data.ByteString.Char8                   (unpack)
+import           Data.Int
+import           Database.PostgreSQL.Simple
+import           Database.PostgreSQL.Simple.Notification
 
 waitForNewBlock::Connection->IO ()
 waitForNewBlock conn = do
   Notification _ notifChannel notifData <- getNotification conn
   putStr $ "Trigger on " ++ (unpack notifChannel) ++ " data is: " ++ (unpack notifData) ++ "\n"
   return ()
-                  
+
 setupTrigger::Connection->IO Int64
 setupTrigger conn = do
     withTransaction conn $ execute conn
@@ -26,4 +26,4 @@ setupTrigger conn = do
                         \create trigger newBlock after insert on Unprocessed for each row execute procedure newBlock();\n\
                         \listen new_block;\n" ()
 
-                            
+

@@ -1,28 +1,31 @@
-{-# LANGUAGE FlexibleContexts, DataKinds, TypeFamilies, NamedFieldPuns #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 module Blockchain.Strato.StateDiff.Database
     ( sqlDiff
     , commitSqlDiffs
     ) where
 
-import Database.Persist hiding (get, Update)
-import qualified Database.Persist.Postgresql as SQL hiding (get, Update)
+import           Database.Persist                            hiding (Update, get)
+import qualified Database.Persist.Postgresql                 as SQL hiding (Update, get)
 
-import Blockchain.Database.MerklePatricia.Internal
-import Blockchain.Data.Address
-import Blockchain.Data.DataDefs
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.SQLDB
-import Blockchain.DB.StateDB
-import Blockchain.ExtWord
-import Blockchain.Util
-import Blockchain.SHA
+import           Blockchain.Data.Address
+import           Blockchain.Data.DataDefs
+import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DB.StateDB
+import           Blockchain.ExtWord
+import           Blockchain.SHA
+import           Blockchain.Util
 
-import Control.Monad.Trans.Resource
-import qualified Data.Map as Map
+import           Control.Monad.Trans.Resource
+import qualified Data.Map                                    as Map
 
-import Blockchain.Strato.StateDiff
+import           Blockchain.Strato.StateDiff
 
 type SqlDbM m = SQL.SqlPersistT m
 
@@ -67,7 +70,7 @@ getField :: a -> Maybe (Diff a 'Eventual) -> a
 getField def field =
   case field of
     Just (Value x) -> x
-    Nothing -> def
+    Nothing        -> def
 
 deleteAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
                  Address -> SQL.SqlPersistT m ()
@@ -89,7 +92,7 @@ updateAccount blockNumber address diff = do
   where
     setField field sqlField = maybe id (\v -> ((sqlField =. takeIncremental v) :)) $ field diff
     takeIncremental Create{newValue} = newValue
-    takeIncremental Delete{} = 0
+    takeIncremental Delete{}         = 0
     takeIncremental Update{newValue} = newValue
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>

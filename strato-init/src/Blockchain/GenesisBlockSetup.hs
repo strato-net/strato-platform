@@ -1,23 +1,26 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Blockchain.GenesisBlockSetup (
   genesisBlockSetup,
   retrieveRandomPrivKey
   ) where
 
-import Control.Monad (forM,forM_)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Binary
-import qualified Data.Aeson as J
+import           Control.Monad               (forM, forM_)
+import qualified Data.Aeson                  as J
+import           Data.Binary
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Lazy        as BL
 
-import System.Directory
-import System.Entropy
+import           System.Directory
+import           System.Entropy
 
-import Network.Haskoin.Crypto hiding (Address)
+import           Network.Haskoin.Crypto      hiding (Address)
 
-import Blockchain.Data.GenesisInfo
-import Blockchain.Data.Address
+import           Blockchain.Data.Address
+import           Blockchain.Data.GenesisInfo
 
 
 bigBalance::Integer
@@ -30,7 +33,7 @@ genesisBlockSetup n = do
     setCurrentDirectory "priv"
     writePrvKeys pairs
     let pairs' = map (\(_,_,z) -> (z,bigBalance)) pairs
-        genesis = defaultGenesisInfo { genesisInfoAccountInfo = pairs' } 
+        genesis = defaultGenesisInfo { genesisInfoAccountInfo = pairs' }
 
     B.writeFile "hackathonGenesis.json" $ BL.toStrict $ J.encode genesis
     return ()

@@ -1,4 +1,10 @@
-{-# LANGUAGE FlexibleContexts, GADTs, MultiParamTypeClasses, OverloadedStrings, TypeFamilies, ScopedTypeVariables, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 module Blockchain.Stream.VMEvent (
@@ -15,35 +21,35 @@ module Blockchain.Stream.VMEvent (
   getBestKafkaBlockNumber
 ) where
 
-import Control.Exception.Lifted
+import           Control.Exception.Lifted
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Lazy        as BL
 
 
-import Network.Kafka
-import Network.Kafka.Producer
-import Network.Kafka.Protocol hiding (Key)
+import           Network.Kafka
+import           Network.Kafka.Producer
+import           Network.Kafka.Protocol      hiding (Key)
 
-import Blockchain.DB.SQLDB
+import           Blockchain.DB.SQLDB
 
-import Blockchain.Format
-import Blockchain.Stream.Raw
-import Blockchain.Data.BlockOffset
-import Blockchain.Data.BlockDB
-import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP
-import Blockchain.KafkaTopics
-import Blockchain.EthConf
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.BlockOffset
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RLP
+import           Blockchain.EthConf
+import           Blockchain.Format
+import           Blockchain.KafkaTopics
+import           Blockchain.Stream.Raw
 
-import Control.Monad.State
+import           Control.Monad.State
 
-import qualified Data.Binary as Binary
+import qualified Data.Binary                 as Binary
 
 data VMEvent = ChainBlock Block | NewUnminedBlockAvailable
 
 instance Format VMEvent where
-  format (ChainBlock b) = "Block: " ++ format b
+  format (ChainBlock b)           = "Block: " ++ format b
   format NewUnminedBlockAvailable = "<NewUnminedBlockAvailable>"
 
 instance Binary.Binary VMEvent where
@@ -136,20 +142,20 @@ fetchLastVMEvents n = do
       fetchVMEvents offset
 
   case ret of
-    Left e -> error $ show e
+    Left e  -> error $ show e
     Right v -> return v
 
 lookback :: Offset
 lookback = 1000
 
 getBestKafkaBlockNumber:: IO Integer
-getBestKafkaBlockNumber = do 
-  lastOffset <- 
+getBestKafkaBlockNumber = do
+  lastOffset <-
     runKafkaConfigured "strato-p2p-client" $
       setDefaultKafkaState >> getLastOffset LatestTime 0 (lookupTopic "block")
-      
-  case lastOffset of 
-    Left e -> error $ show e
+
+  case lastOffset of
+    Left e       -> error $ show e
     Right offset -> go (max (offset-lookback) 0) offset
 
   where
@@ -157,9 +163,9 @@ getBestKafkaBlockNumber = do
       maybeBestBlockNumber <- getBestKafkaBlockHelper m n
       case maybeBestBlockNumber of
         (Just n') -> return n'
-        Nothing -> go (max (m-lookback) 0) m
+        Nothing   -> go (max (m-lookback) 0) m
 
-    
+
 getBestKafkaBlockHelper::Offset->Offset->IO (Maybe Integer)
 getBestKafkaBlockHelper lower upper = do
   vmEventsErr <-

@@ -1,6 +1,6 @@
 module Handler.Home where
 
-import Import
+import           Import
 
 getHomeR :: Handler Html
 getHomeR = do

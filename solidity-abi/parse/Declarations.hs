@@ -5,16 +5,16 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Declarations (solidityContract) where
 
-import Data.Either
-import Data.List
-import Data.Maybe
+import           Data.Either
+import           Data.List
+import           Data.Maybe
 
-import Text.Parsec
-import Text.Parsec.Perm
+import           Text.Parsec
+import           Text.Parsec.Perm
 
-import Lexer
-import ParserTypes
-import Types
+import           Lexer
+import           ParserTypes
+import           Types
 
 -- | Parses an entire Solidity contract
 solidityContract :: SolidityParser SolidityContract

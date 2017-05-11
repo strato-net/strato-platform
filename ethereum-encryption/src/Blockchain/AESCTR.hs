@@ -6,9 +6,9 @@ module Blockchain.AESCTR (
   aesIV_
   ) where
 
-import Data.Bits
-import qualified Data.ByteString as B
-import Crypto.Cipher.AES
+import           Crypto.Cipher.AES
+import           Data.Bits
+import qualified Data.ByteString   as B
 
 
 data AESCTRState = AESCTRState AES AESIV Int

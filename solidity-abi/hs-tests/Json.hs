@@ -1,6 +1,6 @@
 module Json (test) where
 
-import Test.Common
+import           Test.Common
 
 import qualified Json.Imports as Imports
 

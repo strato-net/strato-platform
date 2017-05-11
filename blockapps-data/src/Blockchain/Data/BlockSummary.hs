@@ -1,30 +1,36 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, UndecidableInstances, GeneralizedNewtypeDeriving, FlexibleContexts, MultiParamTypeClasses, TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Blockchain.Data.BlockSummary (
     BlockSummary(..),
     blockHeaderToBSum
   ) where
 
-import Data.Time
-import Data.Time.Clock.POSIX
-    
-import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP
+import           Data.Time
+import           Data.Time.Clock.POSIX
+
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.SHA
-                
+import           Blockchain.SHA
+
 data BlockSummary = BlockSummary {
-  bSumParentHash::SHA,
-  bSumDifficulty::Difficulty,
-  bSumTotalDifficulty::Difficulty,
-  bSumStateRoot::MP.StateRoot,
-  bSumGasLimit::Integer,
-  bSumTimestamp::UTCTime,
-  bSumNumber::Integer,
-  bSumTxCount::Integer
+                      bSumParentHash      :: SHA,
+                      bSumDifficulty      :: Difficulty,
+                      bSumTotalDifficulty :: Difficulty,
+                      bSumStateRoot       :: MP.StateRoot,
+                      bSumGasLimit        :: Integer,
+                      bSumTimestamp       :: UTCTime,
+                      bSumNumber          :: Integer,
+                      bSumTxCount         :: Integer
   }
 
-blockHeaderToBSum::BlockData->Difficulty->Integer->BlockSummary
+blockHeaderToBSum :: BlockData->Difficulty->Integer->BlockSummary
 blockHeaderToBSum b totalDiff txCount =
     BlockSummary {
       bSumParentHash = blockDataParentHash b,
@@ -45,7 +51,7 @@ instance RLPSerializable BlockSummary where
       rlpEncode td,
       rlpEncode sr,
       rlpEncode gl,
-      rlpEncode (round $ utcTimeToPOSIXSeconds ts::Integer),
+      rlpEncode (round $ utcTimeToPOSIXSeconds ts :: Integer),
       rlpEncode n,
       rlpEncode txcnt
       ]

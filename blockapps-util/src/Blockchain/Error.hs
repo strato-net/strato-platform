@@ -1,10 +1,10 @@
 
 module Blockchain.Error where
 
-import System.Exit
-import System.IO
-import System.IO.Unsafe
-import System.Posix.Process
+import           System.Exit
+import           System.IO
+import           System.IO.Unsafe
+import           System.Posix.Process
 
 --Same as `error`, but works in threads also.
 error'::String->a

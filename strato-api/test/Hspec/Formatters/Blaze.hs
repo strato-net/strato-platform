@@ -21,14 +21,14 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 module Hspec.Formatters.Blaze (blazeFormatter) where
-import Data.List (intercalate)
-import Test.Hspec.Formatters
-import Test.Hspec.Runner (Path)
-import Text.Blaze.Renderer.String (renderMarkup)
-import Text.Blaze.Internal
-import Text.Blaze.Html5
-import Text.Blaze.Html5.Attributes hiding (title)
-import Prelude hiding (head, id, div)
+import           Data.List                   (intercalate)
+import           Prelude                     hiding (div, head, id)
+import           Test.Hspec.Formatters
+import           Test.Hspec.Runner           (Path)
+import           Text.Blaze.Html5
+import           Text.Blaze.Html5.Attributes hiding (title)
+import           Text.Blaze.Internal
+import           Text.Blaze.Renderer.String  (renderMarkup)
 
 failure, skipped :: Markup -> Markup
 failure = customParent "failure"
@@ -41,17 +41,17 @@ message v = customAttribute "message" $ stringValue v
 -- A tuple that represents the location of an example within a spec.
 -- It consists of a list of group descriptions and a requirement description.
 
-testcase' :: Path -> String -> Markup 
+testcase' :: Path -> String -> Markup
 testcase' (xs, x) m = do
                     --div ! class_ "row" $ ""
                     div ! id "testcase" !   class_ "col-sm-6 bg-success" $ toHtml x
-                    div ! id "testresult" ! class_ "col-sm-6 bg-success" $ toHtml m --toHtml (intercalate "." xs) 
+                    div ! id "testresult" ! class_ "col-sm-6 bg-success" $ toHtml m --toHtml (intercalate "." xs)
 
-testfail' :: Path -> String -> Markup 
+testfail' :: Path -> String -> Markup
 testfail' (xs, x)  m = do
                     --div ! class_ "row" $ ""
                     div ! id "testcase" !   class_ "col-sm-6 bg-danger" $ toHtml x
-                    div ! id "testresult" ! class_ "col-sm-6 bg-danger" $ toHtml m --toHtml (intercalate "." xs) 
+                    div ! id "testresult" ! class_ "col-sm-6 bg-danger" $ toHtml m --toHtml (intercalate "." xs)
 
 -- page1 :: Markup
 -- page1 = html $ do
@@ -87,6 +87,6 @@ blazeFormatter css = silent {
         -- $
   --         case mdesc of
   --           Just desc -> skipped ! message desc  $ ""
-  --           Nothing -> skipped "" 
+  --           Nothing -> skipped ""
   ,footerFormatter = do writeLine "</html>"
   }

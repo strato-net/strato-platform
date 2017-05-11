@@ -2,11 +2,11 @@
 
 module Blockchain.MiscJSON where
 
-import Data.Aeson
-import qualified Data.ByteString as B
+import           Data.Aeson
+import           Data.Aeson.Types
+import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
-import Data.Text.Encoding
-import Data.Aeson.Types
+import           Data.Text.Encoding
 
 instance FromJSON B.ByteString where
     parseJSON (String t) = pure . fst . B16.decode $ encodeUtf8 t

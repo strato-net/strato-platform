@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.GenesisInfo (
@@ -6,40 +9,40 @@ module Blockchain.Data.GenesisInfo (
   defaultGenesisInfo
   ) where
 
-import Data.Aeson
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import Data.Time
-import Data.Word
+import           Data.Aeson
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import           Data.Time
+import           Data.Word
 
-import Blockchain.Data.Address
+import           Blockchain.Data.Address
 --import Blockchain.MiscJSON
-import Blockchain.SHA
-import Blockchain.Database.MerklePatricia
+import           Blockchain.Database.MerklePatricia
+import           Blockchain.SHA
 
 data GenesisInfo =
   GenesisInfo {
-    genesisInfoParentHash::SHA,
-    genesisInfoUnclesHash::SHA,
-    genesisInfoCoinbase::Address,
-    genesisInfoAccountInfo::[(Address, Integer)],
-    genesisInfoTransactionsRoot::StateRoot,
-    genesisInfoReceiptsRoot::StateRoot,
-    genesisInfoLogBloom::B.ByteString,
-    genesisInfoDifficulty::Integer,
-    genesisInfoNumber::Integer,
-    genesisInfoGasLimit::Integer,
-    genesisInfoGasUsed::Integer,
-    genesisInfoTimestamp::UTCTime,
-    genesisInfoExtraData::Integer,
-    genesisInfoMixHash::SHA,
-    genesisInfoNonce::Word64
+    genesisInfoParentHash       :: SHA,
+    genesisInfoUnclesHash       :: SHA,
+    genesisInfoCoinbase         :: Address,
+    genesisInfoAccountInfo      :: [(Address, Integer)],
+    genesisInfoTransactionsRoot :: StateRoot,
+    genesisInfoReceiptsRoot     :: StateRoot,
+    genesisInfoLogBloom         :: B.ByteString,
+    genesisInfoDifficulty       :: Integer,
+    genesisInfoNumber           :: Integer,
+    genesisInfoGasLimit         :: Integer,
+    genesisInfoGasUsed          :: Integer,
+    genesisInfoTimestamp        :: UTCTime,
+    genesisInfoExtraData        :: Integer,
+    genesisInfoMixHash          :: SHA,
+    genesisInfoNonce            :: Word64
 } deriving (Show)
 
 
-defaultGenesisInfo::GenesisInfo
+defaultGenesisInfo :: GenesisInfo
 defaultGenesisInfo =
-  GenesisInfo { 
+  GenesisInfo {
     genesisInfoParentHash = SHA 0,
     genesisInfoUnclesHash = SHA 13478047122767188135818125966132228187941283477090363246179690878162135454535,
     genesisInfoCoinbase = Address 0,
@@ -51,9 +54,9 @@ defaultGenesisInfo =
     genesisInfoNumber = 0,
     genesisInfoGasLimit = 3141592,
     genesisInfoGasUsed = 0,
-    genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC" :: UTCTime,
+    genesisInfoTimestamp = read "1970-01-01 00:00:00 UTC"  ::  UTCTime,
     genesisInfoExtraData = 0,
-    genesisInfoMixHash = SHA 0, 
+    genesisInfoMixHash = SHA 0,
     genesisInfoNonce = 42
 }
 
@@ -76,7 +79,7 @@ instance FromJSON GenesisInfo where
     o .: "mixHash" <*>
     o .: "nonce"
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
-  
+
 instance ToJSON GenesisInfo where
   toJSON x =
     object [

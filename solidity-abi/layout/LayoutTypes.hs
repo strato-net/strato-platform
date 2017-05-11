@@ -5,10 +5,10 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module LayoutTypes where
 
-import Data.Map (Map)
-import Numeric.Natural
+import           Data.Map        (Map)
+import           Numeric.Natural
 
-import ParserTypes
+import           ParserTypes
 
 -- | The same as in DefnTypes
 type IdentT a = Map Identifier a
@@ -29,7 +29,7 @@ type SolidityTypesLayout = IdentT SolidityTypeLayout
 -- record the storage representation of those types as well.
 data SolidityContractLayout =
   ContractLayout {
-    objsLayout :: SolidityObjsLayout,
+    objsLayout  :: SolidityObjsLayout,
     typesLayout :: SolidityTypesLayout
     }
   deriving (Show,Eq)
@@ -43,7 +43,7 @@ data SolidityObjLayout =
     -- | Position of the first byte of the byte's storage
     objStartBytes :: StorageBytes,
     -- | Position of the last byte (/not/ off-the-end)
-    objEndBytes :: StorageBytes
+    objEndBytes   :: StorageBytes
     }
   deriving (Show,Eq)
 
@@ -60,7 +60,7 @@ data SolidityTypeLayout =
     -- | Total number of bytes occupied by the struct.  This is a little
     -- tricky because the individual fields may be separated by gaps due to
     -- rounding, so it's not just the sum of their sizes.
-    typeUsedBytes :: StorageBytes
+    typeUsedBytes      :: StorageBytes
     } |
   -- | Layout of an enum type
   EnumLayout {

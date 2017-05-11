@@ -23,7 +23,7 @@ import           Util
 
 nibbleStringToByteString :: N.NibbleString -> B.ByteString
 nibbleStringToByteString (N.EvenNibbleString x) = x
-nibbleStringToByteString _ = error "nibbleStringToByteString called for Odd length nibblestring"
+nibbleStringToByteString _                      = error "nibbleStringToByteString called for Odd length nibblestring"
 
 showVals :: DB.DB -> MP.StateRoot -> ResourceT IO ()
 showVals sdb sr = do

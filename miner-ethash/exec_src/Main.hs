@@ -1,19 +1,20 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
-import Control.Monad
-import qualified Data.Array.IO as A
-import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.ByteString.Internal
-import Numeric
-import System.IO.MMap
+import           Control.Monad
+import qualified Data.Array.IO                             as A
+import           Data.Binary
+import qualified Data.ByteString                           as B
+import           Data.ByteString.Internal
+import qualified Data.ByteString.Lazy                      as BL
+import           Numeric
+import           System.IO.MMap
 
-import Blockchain.Strato.Mining.Ethash.Constants
-import Blockchain.Strato.Mining.Ethash.Hashimoto
-import Blockchain.Strato.Mining.Ethash.TimeIt
+import           Blockchain.Strato.Mining.Ethash.Constants
+import           Blockchain.Strato.Mining.Ethash.Hashimoto
+import           Blockchain.Strato.Mining.Ethash.TimeIt
 
 encodeWord8::Word8->String
 encodeWord8 c | c < 0x20 || c > 0x7e = "\\x" ++ showHex c ""

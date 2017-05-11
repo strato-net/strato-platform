@@ -4,18 +4,18 @@ module Executable.StratoP2PServer (
   stratoP2PServer
   ) where
 
-import Control.Concurrent
-import Control.Concurrent.STM.MonadIO
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource
-import qualified Data.Set as S
-import qualified Data.Text as T
+import           Control.Concurrent
+import           Control.Concurrent.STM.MonadIO
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Resource
+import qualified Data.Set                       as S
+import qualified Data.Text                      as T
 
-import Blockchain.EthConf
-import Blockchain.ServOptions
-import Blockchain.TCPServer
-import Blockchain.P2PRPC
+import           Blockchain.EthConf
+import           Blockchain.P2PRPC
+import           Blockchain.ServOptions
+import           Blockchain.TCPServer
 
 stratoP2PServer:: LoggingT IO ()
 stratoP2PServer = do

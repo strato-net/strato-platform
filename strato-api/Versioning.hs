@@ -1,22 +1,22 @@
 --{-# LANGUAGE TypeHoles #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Versioning where
 
-import Import hiding ((</>), readFile, def, index)
+import           Import                     hiding (def, index, readFile, (</>))
 
-import qualified Prelude as P
+import qualified Prelude                    as P
 
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax
-import System.Directory
-import System.Exit
-import System.FilePath
-import System.Process
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8      as BS
+import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax
+import           System.Directory
+import           System.Exit
+import           System.FilePath
+import           System.Process
 
-import qualified Data.Yaml as Y
+import qualified Data.Yaml                  as Y
 
 data StackRepo = StackRepo { package :: Package } deriving (Show, Generic)
 data Package = Package {location :: String} deriving (Show, Generic)
@@ -54,7 +54,7 @@ getStackInfo = runIO $ do
         stackRef <- P.readFile ("stack.yaml" :: String)
         let parsedContent = Y.decode $ BS.pack $ stackRef :: Maybe [StackRepo]
         case parsedContent of
-          Nothing -> return $ ("Could not parse stack config file." :: String)
+          Nothing  -> return $ ("Could not parse stack config file." :: String)
           (Just r) -> return (show . toJSON $ (r))
           --(Just r@p) -> return (show . toJSON $ (configPackageIndices r))
           --(Just r@p) -> return (Versioning.location $ package r)

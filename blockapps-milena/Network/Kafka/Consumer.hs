@@ -1,18 +1,20 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts, LambdaCase #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Network.Kafka.Consumer where
 
-import Control.Applicative
-import Control.Lens
-import Control.Monad.Except (throwError)
-import Control.Monad.IO.Class
-import System.IO
-import Prelude
+import           Control.Applicative
+import           Control.Lens
+import           Control.Monad.Except   (throwError)
+import           Control.Monad.IO.Class
+import           Prelude
+import           System.IO
 
-import Network.Kafka
-import Network.Kafka.Protocol
+import           Network.Kafka
+import           Network.Kafka.Protocol
 
-import Control.Concurrent (threadDelay)
+import           Control.Concurrent     (threadDelay)
 
 -- * Fetching
 
@@ -58,12 +60,12 @@ fetchSingleOffset groupName topic partition = do
         retry = fetchSingleOffset groupName topic partition
     (OffsetFetchResp [(_, [(_, ofs, md, err)])]) <- fetchOffsets req
     case (err, ofs) of
-        (NoError, -1) -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
-        (NoError, _)  -> return $ Right (ofs, md)
+        (NoError, -1)                            -> return $ Left UnknownTopicOrPartition -- todo: stop simulating ZK behavior!
+        (NoError, _)                             -> return $ Right (ofs, md)
         (NotCoordinatorForConsumerCode, _)       -> retry
         (ConsumerCoordinatorNotAvailableCode, _) -> retry
         (OffsetsLoadInProgressCode, _)           -> retry
-        (err', _) -> return $ Left err'
+        (err', _)                                -> return $ Left err'
 
 commitSingleOffset :: Kafka m => ConsumerGroup -> TopicName -> Partition -> Offset -> Metadata -> m (Either KafkaError ())
 commitSingleOffset groupName topic partition offset ofsMetadata = do

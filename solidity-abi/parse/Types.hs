@@ -5,12 +5,12 @@
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Types where
 
-import Data.Maybe
-import Text.Parsec
+import           Data.Maybe
+import           Text.Parsec
 
-import Expression
-import Lexer
-import ParserTypes
+import           Expression
+import           Lexer
+import           ParserTypes
 
 -- | A type expression is either a composite type (arrays and mappings) or
 -- a simple type (builtins and user-defined names)

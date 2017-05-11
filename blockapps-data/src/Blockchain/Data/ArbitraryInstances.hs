@@ -2,26 +2,26 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Data.ArbitraryInstances where
 
-import Data.DeriveTH
-import Data.Maybe (fromJust, isJust)
-import Test.QuickCheck
+import           Data.DeriveTH
+import           Data.Maybe                         (fromJust, isJust)
+import           Test.QuickCheck
 
-import Data.ByteString.Arbitrary
-import qualified Data.ByteString.Internal as IB
-import Data.Time
+import           Data.ByteString.Arbitrary
+import qualified Data.ByteString.Internal           as IB
+import           Data.Time
 
-import System.IO.Unsafe (unsafePerformIO)
+import           System.IO.Unsafe                   (unsafePerformIO)
 
-import Blockchain.Data.Address
-import Blockchain.Data.BlockDB
-import Blockchain.Data.Code
-import Blockchain.Data.Transaction
-import Blockchain.Data.TXOrigin
-import Blockchain.Database.MerklePatricia
-import Blockchain.SHA
-import Blockchain.Util
+import           Blockchain.Data.Address
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.Code
+import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
+import           Blockchain.Database.MerklePatricia
+import           Blockchain.SHA
+import           Blockchain.Util
 
-import qualified Network.Haskoin.Crypto as H
+import qualified Network.Haskoin.Crypto             as H
 
 
 -- via https://gist.github.com/agrafix/2b48ec069693e3ab851e
@@ -95,8 +95,8 @@ instance Arbitrary BlockData where
 
 instance Arbitrary Block where
     arbitrary = do
-        txCount       <- choose (0, 20) 
-        uncleCount    <- choose (0, 2) 
+        txCount       <- choose (0, 20)
+        uncleCount    <- choose (0, 2)
         bData         <- arbitrary
         bTransactions <- vectorOf txCount arbitrary
         bUncles       <- vectorOf uncleCount arbitrary

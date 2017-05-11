@@ -2,10 +2,10 @@
 
 module Blockchain.Constants where
 
-import System.FilePath
+import           System.FilePath
 
-import Blockchain.Data.DataDefs (Difficulty(..))
-import Blockchain.EthConf
+import           Blockchain.Data.DataDefs (Difficulty (..))
+import           Blockchain.EthConf
 
 --TODO choose a better Identifier string, add version number
 stratoVersionString="Ethereum(G)/v?.?.?/linux/Haskell"
@@ -85,7 +85,7 @@ dbDir "c" = ".ethereum"
 --dbDir "c" = "Library/Application Support/Ethereum"
 dbDir "h" = ".ethereumH"
 dbDir "t" = "/tmp/tmpDB"
-dbDir x = error $ "Unknown DB specifier: " ++ show x
+dbDir x   = error $ "Unknown DB specifier: " ++ show x
 
 
 --"/Users/hutong/Library/Application Support/Ethereum/state/"

@@ -1,10 +1,10 @@
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS  -fno-warn-orphans          #-}
 module Blockchain.Data.Transaction (
 {-  Transaction(transactionNonce,
@@ -31,38 +31,38 @@ module Blockchain.Data.Transaction (
   partialTransactionHash
   ) where
 
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import Data.ByteString.Internal
-import Data.Maybe
-import Data.Time.Clock
-import qualified Database.Persist.Postgresql as SQL
-import Numeric
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                as B
+import qualified Data.ByteString.Base16         as B16
+import           Data.ByteString.Internal
+import           Data.Maybe
+import           Data.Time.Clock
+import qualified Database.Persist.Postgresql    as SQL
+import           Numeric
 
-import Blockchain.Data.Address
-import Blockchain.Data.Code
-import Blockchain.Data.DataDefs
-import Blockchain.Data.RawTransaction
-import Blockchain.Data.RLP
-import Blockchain.Data.TransactionDef
-import Blockchain.Data.TXOrigin
-import Blockchain.DB.SQLDB
-import Blockchain.EthConf
-import Blockchain.FastECRecover
-import Blockchain.SHA
-import Blockchain.Util
-import Blockchain.DBM
+import           Blockchain.Data.Address
+import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RawTransaction
+import           Blockchain.Data.RLP
+import           Blockchain.Data.TransactionDef
+import           Blockchain.Data.TXOrigin
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EthConf
+import           Blockchain.FastECRecover
+import           Blockchain.SHA
+import           Blockchain.Util
 
-import Network.Haskoin.Internals hiding (Address, txSignature, txHash)
-import Blockchain.ExtendedECDSA
+import           Blockchain.ExtendedECDSA
+import           Network.Haskoin.Internals      hiding (Address, txHash, txSignature)
 
-import Control.DeepSeq
-import System.Clock
+import           Control.DeepSeq
+import           System.Clock
 
-import Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.Class
 
 instance NFData Address
 instance NFData Code
@@ -170,16 +170,16 @@ createMessageTX n gp gl to' val theData prvKey = do
                    }
   let SHA theHash = partialTransactionHash unsignedTX
   ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
-  return 
+  return
     unsignedTX {
-      transactionR = 
+      transactionR =
         case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
           (val', "") -> byteString2Integer val'
-          _ -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
-      transactionS = 
+          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
+      transactionS =
         case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
           (val', "") -> byteString2Integer val'
-          _ -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
+          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
       transactionV = if yIsOdd then 0x1c else 0x1b
     }
 
@@ -198,16 +198,16 @@ createContractCreationTX n gp gl val init' prvKey = do
 
   let SHA theHash = partialTransactionHash unsignedTX
   ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
-  return 
+  return
     unsignedTX {
-      transactionR = 
+      transactionR =
         case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
           (val', "") -> byteString2Integer val'
-          _ -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
-      transactionS = 
+          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
+      transactionS =
         case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
           (val', "") -> byteString2Integer val'
-          _ -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
+          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
       transactionV = if yIsOdd then 0x1c else 0x1b
     }
 
@@ -226,11 +226,11 @@ whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature' xSignatu
 
 isMessageTX::Transaction->Bool
 isMessageTX MessageTX{} = True
-isMessageTX _ = False
+isMessageTX _           = False
 
 isContractCreationTX::Transaction->Bool
 isContractCreationTX ContractCreationTX{} = True
-isContractCreationTX _ = False
+isContractCreationTX _                    = False
 
 transactionHash::Transaction->SHA
 transactionHash = hash . rlpSerialize . rlpEncode

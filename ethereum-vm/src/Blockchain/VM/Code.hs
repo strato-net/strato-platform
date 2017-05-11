@@ -1,20 +1,20 @@
 
 module Blockchain.VM.Code where
 
-import qualified Data.ByteString as B
-import Network.Haskoin.Internals
-import Numeric
-import Text.PrettyPrint.ANSI.Leijen
+import qualified Data.ByteString              as B
+import           Network.Haskoin.Internals
+import           Numeric
+import           Text.PrettyPrint.ANSI.Leijen
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Data.Code
-import Blockchain.Format
-import Blockchain.Util
-import Blockchain.VM.Opcodes
+import qualified Blockchain.Colors            as CL
+import           Blockchain.Data.Code
+import           Blockchain.Format
+import           Blockchain.Util
+import           Blockchain.VM.Opcodes
 
 
 getOperationAt::Code->Word256->(Operation, Word256)
-getOperationAt (Code bytes) p = getOperationAt' bytes p
+getOperationAt (Code bytes) p        = getOperationAt' bytes p
 getOperationAt (PrecompiledCode _) _ = error "getOperationAt called for precompilded code"
 
 getOperationAt'::B.ByteString->Word256->(Operation, Word256)
@@ -43,7 +43,7 @@ getValidJUMPDESTs (PrecompiledCode _) = error "getValidJUMPDESTs called on preco
 
 
 codeLength::Code->Int
-codeLength (Code bytes) = B.length bytes
+codeLength (Code bytes)        = B.length bytes
 codeLength (PrecompiledCode _) = error "codeLength called on precompiled code"
 
 compile::[Operation]->Code

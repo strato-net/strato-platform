@@ -1,19 +1,19 @@
 module Handler.SolidityCommon where
 
-import Control.Monad.Trans.Either
-import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString as BS
-import Data.Conduit
-import Data.Conduit.List (consume)
-import qualified Data.List as List
-import qualified Data.Map as Map
-import qualified Data.Text as Text
-import qualified Data.Text.Encoding as Text
-import qualified Data.Traversable as Trv
+import           Control.Monad.Trans.Either
+import qualified Data.Aeson                 as Aeson
+import qualified Data.ByteString            as BS
+import qualified Data.ByteString.Lazy       as BL
+import           Data.Conduit
+import           Data.Conduit.List          (consume)
+import qualified Data.List                  as List
+import qualified Data.Map                   as Map
+import qualified Data.Text                  as Text
+import qualified Data.Text.Encoding         as Text
+import qualified Data.Traversable           as Trv
 
-import Import
-import qualified Prelude as P
+import           Import
+import qualified Prelude                    as P
 
 aesonEncodeUtf8 :: (ToJSON a) => a -> Text
 aesonEncodeUtf8 = Text.decodeUtf8 . BL.toStrict . Aeson.encode

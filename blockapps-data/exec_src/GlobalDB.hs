@@ -1,9 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 
-import Blockchain.Data.Blockchain
-import Blockchain.EthConf
-import HFlags 
+import           Blockchain.Data.Blockchain
+import           Blockchain.EthConf
+import           HFlags
 
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
 defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"

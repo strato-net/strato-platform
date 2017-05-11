@@ -1,23 +1,24 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Stream.UnminedBlock (
   produceUnminedBlocks,
   produceUnminedBlocksM,
   fetchUnminedBlocks,
   fetchUnminedBlocksIO
-) where 
+) where
 
-import Network.Kafka
-import Network.Kafka.Producer
-import Network.Kafka.Protocol hiding (Key)
+import           Network.Kafka
+import           Network.Kafka.Producer
+import           Network.Kafka.Protocol  hiding (Key)
 
-import Blockchain.Stream.Raw
-import Blockchain.Data.BlockDB
-import Blockchain.Data.RLP
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.RLP
+import           Blockchain.Stream.Raw
 
-import Control.Monad.State
-import Blockchain.KafkaTopics
-import Blockchain.EthConf
+import           Blockchain.EthConf
+import           Blockchain.KafkaTopics
+import           Control.Monad.State
 
 produceUnminedBlocks :: MonadIO m => [Block] -> m ()
 produceUnminedBlocks = void . liftIO . runKafkaConfigured "blockapps-data" . produceUnminedBlocksM

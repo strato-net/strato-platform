@@ -1,17 +1,17 @@
 module Json.Imports (test, importTest, importTestInheritance) where
 
-import Test.Tasty
+import           Test.Tasty
 
-import Data.Aeson hiding (Result(Error, Success), json)
-import qualified Data.Aeson as Aeson (Result(Error, Success))
+import           Data.Aeson         hiding (Result (Error, Success), json)
+import qualified Data.Aeson         as Aeson (Result (Error, Success))
 
-import Data.Map (Map)
-import qualified Data.Map as Map
+import           Data.Map           (Map)
+import qualified Data.Map           as Map
 
-import Test.ErrorMessages
-import Test.Combinators
-import Test.Common ((|!))
-import Json.Common
+import           Json.Common
+import           Test.Combinators
+import           Test.Common        ((|!))
+import           Test.ErrorMessages
 
 test :: TestTree
 test = testGroup "imports" $ map jsonTest [
@@ -26,7 +26,7 @@ basicImport :: JSONTestInput
 basicImport = importTest "basicImport" (justFile importFile) noAliaser
 
 qualifiedBasicImport :: JSONTestInput
-qualifiedBasicImport = 
+qualifiedBasicImport =
   importTest "qualifiedBasicImport" (justFile2 importFileAs prefix) (dotAliaser prefix)
   where prefix = "Imported"
 
@@ -34,19 +34,19 @@ basicStarImport :: JSONTestInput
 basicStarImport = importTest "basicStarImport" (justFile importStarFile) noAliaser
 
 qualifiedBasicStarImport :: JSONTestInput
-qualifiedBasicStarImport = 
-  importTest "qualifiedBasicStarImport" 
-    (justFile2 importStarFileAs prefix) 
+qualifiedBasicStarImport =
+  importTest "qualifiedBasicStarImport"
+    (justFile2 importStarFileAs prefix)
     (dotAliaser prefix)
   where prefix = "Imported"
 
 es6Import :: JSONTestInput
-es6Import = 
+es6Import =
   importTest "es6Import" (\cName fName -> importFileES6Aliases fName [cName] [""]) noAliaser
 
 es6AliasImport :: JSONTestInput
 es6AliasImport =
-  importTest "es6AliasImport" 
+  importTest "es6AliasImport"
     (\cName fName -> importFileES6Aliases fName [cName] [alias])
     (constAliaser alias)
 
@@ -56,14 +56,14 @@ missingImport :: JSONTestInput
 missingImport = (name, Map.fromList [(name, source)], tester) where
   name = "missingImport"
   source = importFile importName
-  tester json = 
+  tester json =
     Map.lookup name jsonMap == Just importName
     |! fileError name ## theError
 
     where
       jsonMap :: Map String String
       jsonMap = case fromJSON json of
-        Aeson.Error s -> error s
+        Aeson.Error s   -> error s
         Aeson.Success x -> x
 
   importName = "missing"
@@ -94,7 +94,7 @@ diamondImport = jsonTestInput names sources cNames
 
 es6AliasImportInheritance :: JSONTestInput
 es6AliasImportInheritance =
-  importTestInheritance "es6AliasImportInheritance" 
+  importTestInheritance "es6AliasImportInheritance"
     (\cName fName -> importFileES6Aliases fName [cName] [alias])
     (constAliaser alias)
 
@@ -103,8 +103,8 @@ es6AliasImportInheritance =
 importTestInheritance :: String -> (String -> String -> String) -> (String -> String) ->
                          JSONTestInput
 importTestInheritance name importer aliaser =
-  jsonTestInput names sources cNames 
-  
+  jsonTestInput names sources cNames
+
   where
     names = [name, importName]
     sources = [
@@ -130,14 +130,14 @@ dotAliaser prefix s = prefix ++ "." ++ s
 
 {-# ANN constAliaser "HLint: ignore Redundant bracket" #-}
 constAliaser :: String -> (String -> String)
-constAliaser = const 
+constAliaser = const
 
 noAliaser :: String -> String
 noAliaser = id
 
 {-# ANN justFile "HLint: ignore Redundant bracket" #-}
 justFile :: (String -> String) -> (String -> String -> String)
-justFile = const 
+justFile = const
 
 {-# ANN justFile2 "HLint: ignore Redundant bracket" #-}
 justFile2 :: (String -> String -> String) -> String -> (String -> String -> String)

@@ -1,16 +1,16 @@
 module Blockchain.Sequencer.ChainHelpers where
 
-import Blockchain.SHA
-import Blockchain.Data.DataDefs
-import Blockchain.Sequencer.Event
+import           Blockchain.Data.DataDefs
+import           Blockchain.Sequencer.Event
+import           Blockchain.SHA
 
-import Blockchain.Verification (ommersVerificationValue)
+import           Blockchain.Verification                 (ommersVerificationValue)
 
-import Blockchain.Sequencer.ArbitraryInstances()
+import           Blockchain.Sequencer.ArbitraryInstances ()
 
-import Control.Monad
+import           Control.Monad
 
-import Test.QuickCheck
+import           Test.QuickCheck
 
 -- todo should genesis block make somebody exceptionally wealthy?
 makeGenesisBlock :: IO IngestBlock

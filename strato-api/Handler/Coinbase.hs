@@ -1,11 +1,11 @@
 
 module Handler.Coinbase where
 
-import Import hiding ((</>), readFile)
+import           Import             hiding (readFile, (</>))
 
-import Blockchain.EthConf
+import           Blockchain.EthConf
 
 getCoinbaseR :: Handler Value
-getCoinbaseR = do 
+getCoinbaseR = do
   addHeader "Access-Control-Allow-Origin" "*"
   return $ object ["coinbase" .= coinbaseAddress (quarryConfig ethConf)]

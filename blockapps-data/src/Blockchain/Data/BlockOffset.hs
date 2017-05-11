@@ -6,14 +6,14 @@ module Blockchain.Data.BlockOffset (
   getBlockOffsetsForHashes
   ) where
 
-import Control.Monad
-import Control.Monad.Trans.Resource
-import qualified Database.Esqueleto as E
-import qualified Database.Persist.Postgresql as SQL
+import           Control.Monad
+import           Control.Monad.Trans.Resource
+import qualified Database.Esqueleto           as E
+import qualified Database.Persist.Postgresql  as SQL
 
-import Blockchain.Data.DataDefs
-import Blockchain.DB.SQLDB
-import Blockchain.SHA
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
+import           Blockchain.SHA
 
 putBlockOffsets::HasSQLDB m=>[BlockOffset]->m ()
 putBlockOffsets blockOffsets = do
@@ -38,12 +38,12 @@ getOffsetsForHashes hashes = do
   db <- getSQLDB
   offsets <-
     runResourceT $
-    flip SQL.runSqlPool db $ 
+    flip SQL.runSqlPool db $
     E.select $
     E.from $ \blockOffset -> do
       E.where_ ((blockOffset E.^. BlockOffsetHash) `E.in_` E.valList hashes)
       return $ blockOffset E.^. BlockOffsetOffset
-      
+
   return $ map E.unValue offsets
 
 getBlockOffsetsForHashes::HasSQLDB m=>[SHA]->m [BlockOffset]
@@ -51,11 +51,11 @@ getBlockOffsetsForHashes hashes = do
   db <- getSQLDB
   blockOffsets <-
     runResourceT $
-    flip SQL.runSqlPool db $ 
+    flip SQL.runSqlPool db $
     E.select $
     E.from $ \blockOffset -> do
       E.where_ ((blockOffset E.^. BlockOffsetHash) `E.in_` E.valList hashes)
       return blockOffset
-      
+
   return $ map E.entityVal blockOffsets
 

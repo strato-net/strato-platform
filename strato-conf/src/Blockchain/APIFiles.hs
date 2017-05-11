@@ -1,18 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.APIFiles 
-    ( 
+module Blockchain.APIFiles
+    (
       stratoAPIStaticDir,
       stratoAPIConfigDir,
       stratoAPICerts,
       inflateDir
     ) where
 
-import Data.FileEmbed
-import System.FilePath
-import System.Directory
+import           Data.FileEmbed
+import           System.Directory
+import           System.FilePath
 
-import qualified Data.ByteString as B
+import qualified Data.ByteString  as B
 
 
 stratoAPIStaticDir' :: [(FilePath, B.ByteString)]
@@ -22,16 +22,16 @@ stratoAPIConfigDir' :: [(FilePath, B.ByteString)]
 stratoAPIConfigDir' = $(embedDir (".." </> "strato-api" </> "config"))
 
 stratoAPIStaticDir :: [(FilePath, B.ByteString)]
-stratoAPIStaticDir = map (\(t,b) -> ("static" </> t, b)) stratoAPIStaticDir' 
+stratoAPIStaticDir = map (\(t,b) -> ("static" </> t, b)) stratoAPIStaticDir'
 
 stratoAPIConfigDir :: [(FilePath, B.ByteString)]
-stratoAPIConfigDir = map (\(t,b) -> ("config" </> t, b)) stratoAPIConfigDir' 
+stratoAPIConfigDir = map (\(t,b) -> ("config" </> t, b)) stratoAPIConfigDir'
 
 stratoAPICerts' :: [(FilePath, B.ByteString)]
 stratoAPICerts' = $(embedDir (".." </> "strato-api" </> "certs"))
 
 stratoAPICerts :: [(FilePath, B.ByteString)]
-stratoAPICerts = map (\(t,b) -> ("certs" </> t, b)) stratoAPICerts' 
+stratoAPICerts = map (\(t,b) -> ("certs" </> t, b)) stratoAPICerts'
 
 inflateDir :: [(FilePath, B.ByteString)] -> IO ()
 inflateDir = mapM_ $ \(file,contents) -> do

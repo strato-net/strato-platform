@@ -1,14 +1,14 @@
 module Main where
 
-import Control.Monad (forM_)
-import Test.Tasty
-import Test.Tasty.Runners
-import Test.Tasty.HUnit
-import Test.Tasty.QuickCheck
-import qualified BlockApps.ECRecover.BytesFormat as A
+import qualified BlockApps.ECRecover.BytesFormat   as A
 import qualified BlockApps.ECRecover.IntegerFormat as D
-import qualified Main.Samples as B
-import qualified Control.Parallel.Strategies as C
+import           Control.Monad                     (forM_)
+import qualified Control.Parallel.Strategies       as C
+import qualified Main.Samples                      as B
+import           Test.Tasty
+import           Test.Tasty.HUnit
+import           Test.Tasty.QuickCheck
+import           Test.Tasty.Runners
 
 
 main =

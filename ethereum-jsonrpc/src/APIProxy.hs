@@ -3,9 +3,9 @@ module APIProxy (
   call
   ) where
 
-import Control.Monad.IO.Class
+import           Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy.Char8 as BLC
-import Network.HTTP.Client
+import           Network.HTTP.Client
 
 apiBaseUrl::String
 apiBaseUrl="http://localhost:3000/eth/v1.2/"

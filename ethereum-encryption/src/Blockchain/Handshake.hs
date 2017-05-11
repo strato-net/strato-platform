@@ -6,22 +6,22 @@ module Blockchain.Handshake (
   bytesToAckMsg
   ) where
 
-import qualified Crypto.Hash.SHA3 as SHA3
-import Crypto.PubKey.ECC.DH
-import Crypto.Types.PubKey.ECC
-import Data.Binary
-import Data.Binary.Get
-import Data.Binary.Put
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Maybe
+import qualified Crypto.Hash.SHA3          as SHA3
+import           Crypto.PubKey.ECC.DH
+import           Crypto.Types.PubKey.ECC
+import           Data.Binary
+import           Data.Binary.Get
+import           Data.Binary.Put
+import           Data.Bits
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Lazy      as BL
+import           Data.Maybe
 import qualified Network.Haskoin.Internals as H
 
-import Blockchain.Data.PubKey
-import Blockchain.ExtendedECDSA
-import Blockchain.ExtWord
-import qualified Blockchain.ECIES as ECIES
+import           Blockchain.Data.PubKey
+import qualified Blockchain.ECIES          as ECIES
+import           Blockchain.ExtendedECDSA
+import           Blockchain.ExtWord
 
 
 -- import Debug.Trace
@@ -36,12 +36,11 @@ sigToBytes (ExtendedSignature signature yIsOdd) =
   [if yIsOdd then 1 else 0]
 
 
-data AckMessage =
-  AckMessage {
-    ackEphemeralPubKey::Point,
-    ackNonce::Word256,
-    ackKnownPeer::Bool
-    } deriving (Show)
+data AckMessage = AckMessage {
+    ackEphemeralPubKey :: Point,
+    ackNonce           :: Word256,
+    ackKnownPeer       :: Bool
+} deriving (Show)
 
 
 knownPeer :: Word8 -> Bool
@@ -52,25 +51,25 @@ knownPeer b =
     _ -> error "byte is neither 0 nor 1"
 
 boolToWord8 :: Bool -> Word8
-boolToWord8 True = 1
+boolToWord8 True  = 1
 boolToWord8 False = 0
 
 errorHead::String->[a]->a
 errorHead _ (x:_) = x
-errorHead msg _ = error msg
+errorHead msg _   = error msg
 
 instance Binary AckMessage where
   get = do
     point <- fmap (bytesToPoint . B.unpack) $ getByteString 64
-    nonce <- fmap (bytesToWord256 . B.unpack) $ getByteString 32                   
+    nonce <- fmap (bytesToWord256 . B.unpack) $ getByteString 32
     kp <- fmap (knownPeer . errorHead "head error in instance Binary AckMessage" . B.unpack) $ getByteString 1
     return $ (AckMessage point nonce kp)
-    
+
   put (AckMessage point nonce kp) = do
     putByteString $ (B.pack . pointToBytes) $ point
     putByteString (B.pack . word256ToBytes $ nonce)
     putByteString (B.pack $ [(boolToWord8 kp)])
-    
+
 bytesToAckMsg::[Word8]->AckMessage
 bytesToAckMsg bytes | length bytes == 97 =
   AckMessage {
@@ -89,7 +88,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
   let
     myPublic = calculatePublic theCurve myPriv
     SharedKey sharedKey = getShared theCurve myPriv otherPubKey
-   
+
     msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack myNonce)
 
 
@@ -99,7 +98,7 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
   let
     ephemeral =
       fromMaybe (error "malformed signature given to call getHandshakeBytes") $
-      getPubKeyFromSignature sig msg  
+      getPubKeyFromSignature sig msg
     hepubk = SHA3.hash 256 $ B.pack $ pubKeyToBytes ephemeral
     pubk = B.pack $ pointToBytes myPublic
     theData = B.pack (sigToBytes sig) `B.append`
@@ -113,13 +112,13 @@ getHandshakeBytes myPriv otherPubKey myNonce = do
   -- putStrLn $ "theData: " ++ show theData
 
   eciesMsgBytes <- fmap BL.toStrict $ ECIES.encrypt myPriv otherPubKey theData B.empty
-  
+
   -- putStrLn $ "eciesMsg: "
   -- putStrLn $ show eciesMsg
 
   -- putStrLn $ "length ciphertext: " ++ (show . B.length $ eciesCipher eciesMsg)
   -- putStrLn $ "length of wire message: " ++ (show . B.length $ eciesMsgBytes)
-  
+
   return $ eciesMsgBytes
 
 

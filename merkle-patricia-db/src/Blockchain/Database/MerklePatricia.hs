@@ -25,14 +25,14 @@ module Blockchain.Database.MerklePatricia (
   initializeBlank, blankStateRoot
   ) where
 
-import qualified Crypto.Hash.SHA3 as SHA3
-import Control.Monad.Trans.Resource
-import Data.Default
-import Data.Maybe (isJust)
-import qualified Database.LevelDB as DB
+import           Control.Monad.Trans.Resource
+import qualified Crypto.Hash.SHA3                            as SHA3
+import           Data.Default
+import           Data.Maybe                                  (isJust)
+import qualified Database.LevelDB                            as DB
 
-import Blockchain.Data.RLP
-import Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Data.RLP
+import           Blockchain.Database.MerklePatricia.Internal
 
 
 -- | Adds a new key/value pair.
@@ -56,7 +56,7 @@ getKeyVal db key = do
     else Nothing
 
 -- | Deletes a key (and its corresponding data) from the database.
--- 
+--
 -- Note that the key/value pair will still be present in the history, and
 -- can be accessed by using an older 'MPDB' object.
 deleteKey::MonadResource m=>MPDB -- ^ The object containing the current stateRoot.

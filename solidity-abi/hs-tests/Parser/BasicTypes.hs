@@ -1,9 +1,9 @@
 module Parser.BasicTypes (test, basicTypeTestInput) where
 
-import Blockchain.Ethereum.Solidity.Parse hiding (bytes)
-import Parser.Common
-import Test.Combinators
-import Test.Common
+import           Blockchain.Ethereum.Solidity.Parse hiding (bytes)
+import           Parser.Common
+import           Test.Combinators
+import           Test.Common
 
 test :: TestTree
 test = doTests "basicTypes" parserTest [

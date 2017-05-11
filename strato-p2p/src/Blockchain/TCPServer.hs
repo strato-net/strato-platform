@@ -1,30 +1,30 @@
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Blockchain.TCPServer (
   runEthServer
   ) where
 
-import Control.Exception.Lifted
+import           Control.Exception.Lifted
 
 import           Conduit
-import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Binary                   as CB
+import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Network
-import qualified Data.Conduit.Binary as CB
-import qualified Data.Text as T
+import qualified Data.Text                             as T
 
-import Crypto.Types.PubKey.ECC
+import           Crypto.Types.PubKey.ECC
 
 import           Control.Applicative
-import Control.Concurrent.STM.MonadIO
+import           Control.Concurrent.STM.MonadIO
 import           Control.Monad
 import           Control.Monad.Logger
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.Set as S
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Char8                 as BC
+import qualified Data.Set                              as S
 
 import           Blockchain.CommunicationConduit
 import           Blockchain.ContextLite
@@ -32,40 +32,40 @@ import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire
 import           Blockchain.Display
 import           Blockchain.Event
-import           Blockchain.Frame
 import           Blockchain.ExtMergeSources
-import           Blockchain.SeqEventNotify
+import           Blockchain.Frame
 import           Blockchain.RLPx
+import           Blockchain.SeqEventNotify
 import           Blockchain.Util
 
-import qualified Data.ByteString.Lazy as BL
-import           Data.Maybe
 import           Control.Monad.State
-import           Prelude 
 import           Crypto.PubKey.ECC.DH
-import qualified Database.Persist.Postgresql as SQL
+import qualified Data.ByteString.Lazy                  as BL
+import           Data.Maybe
+import qualified Database.Persist.Postgresql           as SQL
+import           Prelude
 
-import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.P2PUtil
 import           Blockchain.P2PRPC
-               
+import           Blockchain.P2PUtil
+import           Blockchain.Strato.Discovery.Data.Peer
+
 theCurve::Curve
 theCurve = getCurveByName SEC_p256k1
 
 runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
              => TVar (S.Set ConnectedPeer) -> PrivateNumber -> Int -> m ()
-runEthServer connectedPeers myPriv listenPort = do  
-    cxt <- initContextLite 
+runEthServer connectedPeers myPriv listenPort = do
+    cxt <- initContextLite
 
     let myPubkey = calculatePublic theCurve myPriv
-       
+
     runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
       logInfoN $ T.pack $ "|||| Incoming connection from " ++ show (appSockAddr app)
       peer <- fmap fst $ runResourceT $ flip runStateT cxt $ getPeerByIP (sockAddrToIP $ appSockAddr app)
-      let unwrappedPeer = case (SQL.entityVal <$> peer) of 
-                            Nothing -> error "peer is nothing after call to getPeerByIP"
+      let unwrappedPeer = case (SQL.entityVal <$> peer) of
+                            Nothing    -> error "peer is nothing after call to getPeerByIP"
                             Just peer' -> peer'
-          cp = ConnectedPeer unwrappedPeer                    
+          cp = ConnectedPeer unwrappedPeer
       _ <- modifyTVar connectedPeers (S.insert cp)
       (_, (outCxt, inCxt)) <-
             liftIO $
@@ -80,13 +80,13 @@ runEthServer connectedPeers myPriv listenPort = do
                 =$= ethDecrypt inCxt
                 =$= transPipe liftIO bytesToMessages
                 =$= transPipe lift (tap (displayMessage False (show $ appSockAddr app)))
-                =$= CL.map MsgEvt 
-            , seqEventNotifictationSource =$= CL.map NewSeqEvent 
+                =$= CL.map MsgEvt
+            , seqEventNotifictationSource =$= CL.map NewSeqEvent
           ] 2
 
         logInfoN "server session starting"
 
-        (_::Either SomeException ()) <- try $ 
+        (_::Either SomeException ()) <- try $
               eventSource
                 =$= handleMsgConduit myPubkey unwrappedPeer
                 =$= transPipe lift (tap (displayMessage True (show $ appSockAddr app)))
@@ -107,7 +107,7 @@ cbSafeTake i = do
   if B.length ret /= i
     then error "safeTake: not enough data"
     else return ret
-                                             
+
 getRLPData::Monad m=>Consumer B.ByteString m B.ByteString
 getRLPData = do
   first <- fmap (fromMaybe $ error "no rlp data") CB.head

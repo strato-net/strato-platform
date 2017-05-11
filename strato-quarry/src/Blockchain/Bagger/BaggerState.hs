@@ -2,19 +2,19 @@
 
 module Blockchain.Bagger.BaggerState where
 
-import Control.Applicative (Alternative, empty)
+import           Control.Applicative                (Alternative, empty)
 
-import qualified Data.Map.Strict as M
-import Data.Time.Clock
+import qualified Data.Map.Strict                    as M
+import           Data.Time.Clock
 
-import Blockchain.Bagger.TransactionList
-import Blockchain.Sequencer.Event (OutputTx(..))
+import           Blockchain.Bagger.TransactionList
+import           Blockchain.Sequencer.Event         (OutputTx (..))
 
-import Blockchain.Data.Address
-import Blockchain.Database.MerklePatricia (StateRoot(..), blankStateRoot)
-import qualified Blockchain.Data.DataDefs as DD
-import qualified Blockchain.Data.TransactionDef as TD
-import Blockchain.SHA
+import           Blockchain.Data.Address
+import qualified Blockchain.Data.DataDefs           as DD
+import qualified Blockchain.Data.TransactionDef     as TD
+import           Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
+import           Blockchain.SHA
 
 {-# NOINLINE upsertPT #-}
 
@@ -37,10 +37,10 @@ data BaggerState = BaggerState { miningCache           :: !MiningCache
                                , calculateIntrinsicGas :: Integer -> OutputTx -> Integer -- fn that calculates intrinsic
                                                                                          -- gas cost for a given Tx and
                                                                                          -- block number
-                               } 
+                               }
 
 instance Show BaggerState where
-    show b =    "BBBBB\n" 
+    show b =    "BBBBB\n"
              ++ "B miningCache: " ++ show (miningCache b) ++ "\n"
              ++ "B pending:     " ++ show (pending b)     ++ "\n"
              ++ "B queued:      " ++ show (queued b)      ++ "\n"

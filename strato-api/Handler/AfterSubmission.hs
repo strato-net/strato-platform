@@ -1,11 +1,14 @@
-{-# LANGUAGE OverloadedStrings, QuasiQuotes, TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeFamilies      #-}
 
 module Handler.AfterSubmission where
 
-import qualified Data.Text as T
+import qualified Data.Text   as T
 
-import Text.Julius
-import Import
+import           Import
+import           Text.Julius
 
 postAfterSubmissionR::Handler Html
 postAfterSubmissionR = do

@@ -7,16 +7,16 @@ module Blockchain.Output (
     rightPad  -- todo: not enough NPM
 ) where
 
-import Control.Monad.Logger
+import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Text as Text
-import System.GlobalLock
-import System.Log.FastLogger (fromLogStr)
-import System.IO
+import qualified Data.Text             as Text
+import           System.GlobalLock
+import           System.IO
+import           System.Log.FastLogger (fromLogStr)
 
-import Text.Printf
+import           Text.Printf
 
-import Data.Time
+import           Data.Time
 
 leftPad :: Int -> a -> [a] -> [a]
 leftPad n x xs = replicate (max 0 (n - length xs)) x ++ xs

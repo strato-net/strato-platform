@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.Sequencer.Metrics where
 
-import Control.Monad.Stats
+import           Control.Monad.Stats
 
 defineCounter "ctr.sequencer.blocks.released"         []
 defineCounter "ctr.sequencer.blocks.enqueued"         []

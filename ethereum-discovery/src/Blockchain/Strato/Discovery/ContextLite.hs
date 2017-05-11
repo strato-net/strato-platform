@@ -1,7 +1,7 @@
-{-# LANGUAGE FlexibleContexts               #-}
-{-# LANGUAGE FlexibleInstances              #-}
-{-# LANGUAGE TypeSynonymInstances           #-}
-{-# LANGUAGE GADTs                          #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.ContextLite (
   ContextLite, -- (..),
@@ -10,15 +10,15 @@ module Blockchain.Strato.Discovery.ContextLite (
   ) where
 
 
-import Control.Monad.State
-import Control.Monad.Trans.Resource
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
 
-import Blockchain.DBM
-import Blockchain.DB.SQLDB
-import qualified Database.Persist.Postgresql as SQL
-import qualified Data.Text as T
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import qualified Data.Text                             as T
+import qualified Database.Persist.Postgresql           as SQL
 
-import Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.Data.Peer
 
 data ContextLite =
   ContextLite { liteSQLDB::SQLDB }
@@ -39,20 +39,20 @@ addPeer peer = do
     SQL.runSqlPool (actions maybePeer) db
   where actions mp = case mp of
             Nothing -> SQL.insert peer
-            Just peer'-> do 
-              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]  
+            Just peer'-> do
+              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
               return (SQL.entityKey peer')
 
 getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>String->m (Maybe (SQL.Entity PPeer))
 getPeerByIP ip = do
   db <- getSQLDB
   entPeer <- runResourceT $ SQL.runSqlPool actions db
-  
-  case entPeer of 
-    [] -> return Nothing
+
+  case entPeer of
+    []  -> return Nothing
     lst -> return $ Just . head $ lst
 
   where actions = SQL.selectList [ PPeerIp SQL.==. (T.pack ip) ] []
 
-  
+
 

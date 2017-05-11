@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -6,31 +7,30 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE Rank2Types                 #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds  #-}
-    
+
 module Blockchain.Data.Blockchain
-    ( 
+    (
       createDB, migrateDB, insertBlockchain
     ) where
 
-import qualified Blockchain.Colors as CL
+import qualified Blockchain.Colors           as CL
 
-import Database.Persist
-import Database.Persist.TH
-import Database.Persist.Postgresql hiding (get)
+import           Database.Persist
+import           Database.Persist.Postgresql hiding (get)
+import           Database.Persist.TH
 
-import Control.Monad.Logger (runNoLoggingT, MonadLogger)
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Control
-import Control.Monad.IO.Class
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger        (MonadLogger, runNoLoggingT)
+import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Reader
 
-import Blockchain.DB.SQLDB (runPostgresConn)
+import           Blockchain.DB.SQLDB         (runPostgresConn)
 
-import qualified Data.Text as T
+import qualified Data.Text                   as T
 
 {- global registry of blockchains -}
 

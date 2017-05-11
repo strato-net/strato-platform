@@ -3,31 +3,31 @@
 
 module Main (main) where
 
-import           Control.Exception (bracket)
-import           Data.Maybe
-import           Data.Either
-import           Data.Tree
-import           Data.Ord
-import           Data.List
-import           Data.Foldable
-import           Data.Traversable
+import           Control.Exception                         (bracket)
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Test.HUnit as HUnit
-import           Database.Redis hiding (sortBy)
-import           Test.Hspec
-import           Test.QuickCheck
+import           Data.Either
+import           Data.Foldable
+import           Data.List
+import           Data.Maybe
+import           Data.Ord
+import           Data.Traversable
+import           Data.Tree
+import           Database.Redis                            hiding (sortBy)
 import           Lens.Family2
+import           Test.Hspec
+import qualified Test.HUnit                                as HUnit
+import           Test.QuickCheck
 
-import qualified Blockchain.Strato.RedisBlockDB as RDB
+import           Blockchain.Data.ArbitraryInstances        ()
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Transaction
-import           Blockchain.Data.ArbitraryInstances()
-import           Blockchain.Strato.Model.SHA
-import           Blockchain.Strato.Model.Class
 import           Blockchain.Format
-import           Blockchain.Strato.RedisBlockDB.Test.Chain
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
+import qualified Blockchain.Strato.RedisBlockDB            as RDB
 import           Blockchain.Strato.RedisBlockDB.Models
+import           Blockchain.Strato.RedisBlockDB.Test.Chain
 
 ------------------------------------------------------------------------------
 -- Main and helpers
@@ -38,7 +38,7 @@ main = hspec specTest
 openConn :: Integer -> IO Connection
 openConn num = do
     let connInfo = defaultConnectInfo{connectHost="localhost", connectDatabase = num}
-    -- liftIO $ putStrLn $ "Opening connection to Redis database: " ++ show connInfo 
+    -- liftIO $ putStrLn $ "Opening connection to Redis database: " ++ show connInfo
     connect connInfo
 
 closeConn :: Connection -> IO ()
@@ -52,7 +52,7 @@ withConn num = bracket (openConn num) closeConn
 --     beforeAll $ \conn -> runRedis conn flushdb
 --     tests
 
-flushDB :: SpecWith Connection 
+flushDB :: SpecWith Connection
 flushDB = it "Should flush the db" $ \conn -> do
               res <- runRedis conn flushdb
               HUnit.assertBool "Couldn't flush the db" (isRight res)
@@ -77,7 +77,7 @@ specTest = around (withConn 1) $ do
         it "Should put and get a header" $ \c -> do
             b <- generate arbitrary :: IO BlockData
             let theHash = blockHeaderHash b
-            r <- runRedis c $ do 
+            r <- runRedis c $ do
                 void $ RDB.putHeader b
                 b' <- RDB.getHeader theHash :: Redis (Maybe BlockData)
                 return $ isJust b'
@@ -87,8 +87,8 @@ specTest = around (withConn 1) $ do
             p <- generate arbitrary :: IO BlockData
             let pHash = blockHeaderHash p
             c <- generate arbitrary :: IO BlockData
-            let c' = over _blockDataParentHash (const $ blockHeaderHash p) c 
-            let cHash = blockHeaderParentHash c'  
+            let c' = over _blockDataParentHash (const $ blockHeaderHash p) c
+            let cHash = blockHeaderParentHash c'
             p' <- runRedis conn $ do
                 void $ RDB.putHeader p
                 void $ RDB.putHeader c'
@@ -100,35 +100,35 @@ specTest = around (withConn 1) $ do
         it "Should put and get a block" $ \c -> do
             b <- generate arbitrary :: IO Block
             let theHash = blockHash b
-            r <- runRedis c $ do 
+            r <- runRedis c $ do
                 void $ RDB.putBlock b
                 b' <- RDB.getBlock theHash :: Redis (Maybe Block)
                 return $ isJust b'
             HUnit.assertBool ("Couldn't recover block after put for hash: " ++ format theHash) r
 
         it "Should put a block and get its transactions" $ \c -> do
-            b <- generate arbitrary :: IO Block 
+            b <- generate arbitrary :: IO Block
             let theHash = blockHash b
             let txCount = length $ blockTransactions b
             r <- runRedis c $ do
                 void $ RDB.putBlock b
                 ts <- RDB.getTransactions theHash :: Redis (Maybe [Transaction])
                 return $ case ts of
-                    Nothing -> -1
+                    Nothing  -> -1
                     Just tss -> length tss
             HUnit.assertEqual
-                ("Couldn't recover tranasctions from block with hash: " ++ format theHash) 
+                ("Couldn't recover tranasctions from block with hash: " ++ format theHash)
                 txCount r
 
         it "Should put a block and get its uncles" $ \c -> do
-            b <- generate arbitrary :: IO Block 
+            b <- generate arbitrary :: IO Block
             let theHash = blockHash b
             let uCount = length $ blockUncleHeaders b
             r <- runRedis c $ do
                 void $ RDB.putBlock b
                 ts <- RDB.getUncles theHash :: Redis (Maybe [BlockData])
                 return $ case ts of
-                    Nothing -> -1
+                    Nothing  -> -1
                     Just tss -> length tss
             HUnit.assertEqual
                 ("Couldn't recover uncles from block with hash: " ++ format theHash)
@@ -145,7 +145,7 @@ specTest = around (withConn 1) $ do
                 void $ RDB.putBlock c'
                 cph <- RDB.getParent cHash :: Redis (Maybe SHA)
                 case cph of
-                    Nothing -> pure Nothing 
+                    Nothing -> pure Nothing
                     Just pp -> RDB.getBlock pp :: Redis (Maybe Block)
             HUnit.assertEqual
                 ("Couldn't recover parent hash for child " ++ format cHash ++ " and parent " ++ format pHash)
@@ -155,7 +155,7 @@ specTest = around (withConn 1) $ do
             g <- liftIO $ makeGenesisBlock
             let genHash = blockHeaderHash g
             chain <- liftIO $ buildChain g 2 2
-            r <- runRedis conn $ do 
+            r <- runRedis conn $ do
                 void $ RDB.putHeaders chain
                 RDB.getHeader genHash :: Redis (Maybe BlockData)
             HUnit.assertEqual
@@ -163,7 +163,7 @@ specTest = around (withConn 1) $ do
                 (Just genHash) (blockHeaderHash <$> r)
 
     describe "ChainTest" $ do
-        
+
         flushDB
         it "Should get back best block after putting it" $ \conn -> do
             g <- liftIO $ makeGenesisBlock
@@ -197,8 +197,8 @@ specTest = around (withConn 1) $ do
                             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
                             res <- RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
                             return $ bestBlockHash <$> res
-        
-                    let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb) 
+
+                    let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb)
                     HUnit.assertBool
                         ("Couldn't get best block iterated from chain (" ++ (show . length $ tree) ++ ", " ++ (show . length . leaves $ tree) ++ ")")
                         (bbs ==  r)
@@ -220,8 +220,8 @@ specTest = around (withConn 1) $ do
                             workChain' RDB.putBestBlockInfo $ (reverse $ chain)
                             res <- RDB.getBestBlockInfo :: Redis (Maybe RedisBestBlock)
                             return $ bestBlockHash <$> res
-        
-                    let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb) 
+
+                    let bbs = flip map bestBlocks $ \bb -> Just $ (blockHeaderHash bb)
                     HUnit.assertBool
                         ("Couldn't get best block iterated from chain (" ++ (show . length $ tree) ++ ", " ++ (show . length . leaves $ tree) ++ ")")
                         (bbs ==  r)
@@ -242,10 +242,10 @@ specTest = around (withConn 1) $ do
                 workChain RDB.putBestBlockInfo $ last chains -- insert longest best chain
                 let maxN = fromIntegral . blockDataNumber . head . last $ chains
                 RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
-            
+
             HUnit.assertEqual
                 "Couldn't get the longest best chain"
-                ((reverse . drop 1) (pb <$> last chains)) (pb <$> map snd r) 
+                ((reverse . drop 1) (pb <$> last chains)) (pb <$> map snd r)
 
 
 workChain :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
@@ -254,14 +254,14 @@ workChain g chain = forM_ zC f
         f (b, i) = g (blockHeaderHash b) (blockDataNumber b) i
         zC       = zip (reverse chain) [1..]
 
-workChain' :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis () 
+workChain' :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
 workChain' g = foldM_ f 0
     where
         f d b = do
             void $ g (blockHeaderHash b) (blockDataNumber b) d
             pure $ d + (blockDataDifficulty b)
 
-pb :: BlockData -> (Integer, Integer, String, String) 
+pb :: BlockData -> (Integer, Integer, String, String)
 pb x = ( blockDataNumber x
        , blockDataDifficulty x
        , "h:" ++ (showHash . blockHeaderHash $ x)

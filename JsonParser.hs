@@ -1,18 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
-import Control.Monad
-import Data.Aeson
-import Data.ByteString.Lazy.Char8 (pack, concat)
-import Data.List hiding (concat)
-import qualified Data.Map as Map
-import qualified Data.Text as T
-import System.CPUTime
-import System.Environment
-import System.IO
-import Prelude hiding (concat)
+import           Control.Monad
+import           Data.Aeson
+import           Data.ByteString.Lazy.Char8  (concat, pack)
+import           Data.List                   hiding (concat)
+import qualified Data.Map                    as Map
+import qualified Data.Text                   as T
+import           Prelude                     hiding (concat)
+import           System.CPUTime
+import           System.Environment
+import           System.IO
 
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
-import Blockchain.Data.Transaction
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Json
+import           Blockchain.Data.Transaction
 
 main = do
     args <- getArgs

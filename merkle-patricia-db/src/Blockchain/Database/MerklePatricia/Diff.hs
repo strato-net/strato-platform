@@ -1,14 +1,14 @@
 module Blockchain.Database.MerklePatricia.Diff (dbDiff, DiffOp(..)) where
 
-import Blockchain.Database.MerklePatricia.NodeData
-import Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.NodeData
 
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Resource
-import Data.Function
-import qualified Data.NibbleString as N
+import           Control.Monad
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import           Data.Function
+import qualified Data.NibbleString                           as N
 
 -- Probably the entire MPDB system ought to be in this monad
 type MPReaderM a = ReaderT MPDB a
@@ -18,7 +18,7 @@ data MPChoice = Data NodeData | Ref NodeRef | Value Val | None deriving (Eq)
 node :: MonadResource m=>MPChoice -> MPReaderM m NodeData
 node (Data nd) = return nd
 node (Ref nr) = do
-  derefNode <- asks getNodeData 
+  derefNode <- asks getNodeData
   lift $ derefNode nr
 node _ = return EmptyNodeData
 
@@ -62,7 +62,7 @@ diffChoice n ch1 ch2 = case (ch1, ch2) of
 
 diffChoices :: MonadResource m=>[MPChoice] -> [MPChoice] -> MPReaderM m [DiffOp]
 diffChoices =
-  liftM concat .* sequence .* zipWith3 diffChoice maybeNums 
+  liftM concat .* sequence .* zipWith3 diffChoice maybeNums
   where maybeNums = Nothing : map Just [0..]
 
 recurse :: MonadResource m=>MPChoice -> MPChoice -> MPReaderM m [DiffOp]

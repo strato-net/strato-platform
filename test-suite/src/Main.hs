@@ -1,13 +1,16 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings, FlexibleInstances, TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
-import Control.Monad
-import Control.Monad.Logger
-import HFlags
-import System.Directory
+import           Control.Monad
+import           Control.Monad.Logger
+import           HFlags
+import           System.Directory
 
-import Blockchain.VMOptions()
-import Blockchain.VMContext
-import Blockchain.VM.TestEthereum
+import           Blockchain.VM.TestEthereum
+import           Blockchain.VMContext
+import           Blockchain.VMOptions       ()
 
 main::IO ()
 main = do
@@ -17,14 +20,14 @@ main = do
   when (not testsExist) $
     error "You need to clone the git repository at https://github.com/ethereum/tests.git"
 
-  let (maybeFileName, maybeTestName) = 
+  let (maybeFileName, maybeTestName) =
         case args of
-          [] -> (Nothing, Nothing)
-          [x] -> (Just x, Nothing)
+          []     -> (Nothing, Nothing)
+          [x]    -> (Just x, Nothing)
           [x, y] -> (Just x, Just y)
-          _ -> error "You can only supply 2 parameters"
-  
+          _      -> error "You can only supply 2 parameters"
+
   _ <- flip runLoggingT noLog $ runContextM $ do
     runAllTests maybeFileName maybeTestName
-    
+
   return ()

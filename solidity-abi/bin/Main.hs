@@ -1,16 +1,16 @@
-import Blockchain.Ethereum.Solidity.Parse
-import Blockchain.Ethereum.Solidity.External.JSON
+import           Blockchain.Ethereum.Solidity.External.JSON
+import           Blockchain.Ethereum.Solidity.Parse
 
-import qualified Data.Aeson.Encode.Pretty as Aeson
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Lazy.Char8 as BSC
+import qualified Data.Aeson.Encode.Pretty                   as Aeson
+import qualified Data.ByteString.Lazy                       as BS
+import qualified Data.ByteString.Lazy.Char8                 as BSC
 
-import Data.List
-import Data.Maybe
+import           Data.List
+import           Data.Maybe
 
-import qualified Data.Map as Map
+import qualified Data.Map                                   as Map
 
-import System.Environment
+import           System.Environment
 
 main :: IO ()
 main = do
@@ -19,7 +19,7 @@ main = do
     let (mainFile, imports) = fromMaybe (error "No source files given") $ uncons sourceFiles
     mainSrc <- case mainFile of
       "--stdin" -> getContents
-      f -> readFile f
+      f         -> readFile f
     importMap <- sequence $ Map.fromList $ zip imports $ map readFile imports
     return (mainFile, Map.insert mainFile mainSrc importMap)
   either putStrLn (BS.putStr . Aeson.encodePretty) $ do

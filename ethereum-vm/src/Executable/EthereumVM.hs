@@ -34,8 +34,7 @@ import qualified Blockchain.Bagger                     as Bagger
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
-import           Blockchain.Util                       (getCurrentMicrotime,
-                                                        secondsToMicrotime)
+import           Blockchain.Util                       (getCurrentMicrotime, secondsToMicrotime)
 
 uncurry3 :: (a -> b -> c -> d) -> ((a, b, c) -> d)
 uncurry3 f (a, b, c) = f a b c

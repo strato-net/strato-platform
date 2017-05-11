@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Blockchain.VMMetrics where
 
-import Control.Monad.Stats
+import           Control.Monad.Stats
 
 defineCounter "ctr.vm.blocks.processed"         []
 defineCounter "ctr.vm.blocks.mined"             []

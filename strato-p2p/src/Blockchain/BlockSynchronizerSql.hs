@@ -3,13 +3,13 @@ module Blockchain.BlockSynchronizerSql (
    getBestBlockHash
   ) where
 
-import Blockchain.SHA
-import Blockchain.Data.DataDefs
-import Blockchain.DB.SQLDB
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
+import           Blockchain.SHA
 
-import Control.Arrow ((&&&))
+import           Control.Arrow            ((&&&))
 
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto       as E
 
 getBestBlockHash :: HasSQLDB m => m (SHA, Integer)
 getBestBlockHash = do
@@ -18,7 +18,7 @@ getBestBlockHash = do
 
   return . head $
     (blockDataRefHash &&& blockDataRefTotalDifficulty) <$> (E.entityVal <$> (blks :: [E.Entity BlockDataRef]))
-  
+
   where actions = E.select $
                     E.from $ \bdRef -> do
                         E.limit 1

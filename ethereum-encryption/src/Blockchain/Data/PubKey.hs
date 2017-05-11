@@ -9,31 +9,31 @@ module Blockchain.Data.PubKey (
   pubKeyToBytes
   ) where
 
-import Crypto.Types.PubKey.ECC
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.Maybe
-import Data.Word
+import           Crypto.Types.PubKey.ECC
+import           Data.Bits
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Base16    as B16
+import qualified Data.ByteString.Char8     as BC
+import           Data.Maybe
+import           Data.Word
 import qualified Network.Haskoin.Internals as H
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Data.RLP
-import Blockchain.ExtWord
-import Blockchain.Format
+import qualified Blockchain.Colors         as CL
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord
+import           Blockchain.Format
 
 stringToPoint::String->Point
 stringToPoint string =
   case B16.decode $ BC.pack string of
    (val, "") -> bytesToPoint $ B.unpack val
-   _ -> error $ "stringToPoint called with malformed string: " ++ string
+   _         -> error $ "stringToPoint called with malformed string: " ++ string
 
 pointToString :: Point -> String
 pointToString = BC.unpack . B16.encode . B.pack . pointToBytes
 
 instance Format Point where
-  format x = 
+  format x =
     CL.yellow (take 30 (format $ B.pack $ pointToBytes x) ++ "...")
 
 instance RLPSerializable Point where
@@ -53,7 +53,7 @@ instance Format Point where
 
 pointToBytes::Point->[Word8]
 pointToBytes (Point x y) = intToBytes x ++ intToBytes y
-pointToBytes PointO = error "pointToBytes got value PointO, I don't know what to do here"
+pointToBytes PointO      = error "pointToBytes got value PointO, I don't know what to do here"
 
 hPointToBytes::H.Point->[Word8]
 hPointToBytes point =

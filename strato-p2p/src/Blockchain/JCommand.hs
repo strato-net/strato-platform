@@ -7,37 +7,37 @@ module Blockchain.JCommand (
                  jcompile
                 ) where
 
-import Prelude hiding (LT, GT, EQ)
+import           Prelude               hiding (EQ, GT, LT)
 
-import Control.Applicative
-import Control.Monad
+import           Control.Applicative
+import           Control.Monad
 
-import Blockchain.Data.Code
-import Blockchain.Util
-import Blockchain.VM.Opcodes
+import           Blockchain.Data.Code
+import           Blockchain.Util
+import           Blockchain.VM.Opcodes
 
-import Blockchain.ExtWord
+import           Blockchain.ExtWord
 
 data Storage = PermStorage Word | MemStorage Word deriving (Show)
 
-data Word = 
-    Number Word256 | 
-    TheAddress | 
-    Origin | 
-    Caller | 
-    CallDataSize | 
-    Input Word | 
-    PermVal Word | 
-    MemVal Word | 
-    Abs Word | 
+data Word =
+    Number Word256 |
+    TheAddress |
+    Origin |
+    Caller |
+    CallDataSize |
+    Input Word |
+    PermVal Word |
+    MemVal Word |
+    Abs Word |
     Word :+: Word | Word :-: Word | Word :*: Word | Neg Word | Signum Word deriving (Show)
 
-data JBool = JTrue | JFalse | 
-             Word :==: Word | 
-             Word :>: Word | 
+data JBool = JTrue | JFalse |
+             Word :==: Word |
+             Word :>: Word |
              Word :<: Word |
-             Word :>=: Word | 
-             Word :<=: Word 
+             Word :>=: Word |
+             Word :<=: Word
                   deriving (Show)
 
 instance Num Word where
@@ -48,17 +48,17 @@ instance Num Word where
     Number x * Number y = Number $ x*y
     x * y = x :*: y
     abs (Number x) = Number $ abs x
-    abs x = Abs x
+    abs x          = Abs x
     negate (Number x) = Number (-x)
-    negate x = Neg x
+    negate x          = Neg x
 
     signum (Number x) = Number (signum x)
-    signum x = Signum x
+    signum x          = Signum x
 
 
-data JCommand = Storage :=: Word | 
-                If JBool [JCommand] | 
-                While JBool [JCommand] | 
+data JCommand = Storage :=: Word |
+                If JBool [JCommand] |
+                While JBool [JCommand] |
                 ReturnCode Code deriving (Show)
 
 infixl 6 :+:
@@ -91,34 +91,34 @@ getUnique::String->Unique String
 getUnique s = Unique $ \val -> (val+1, s ++ show val)
 
 pushVal::Word->[Operation]
-pushVal (Number x) = [PUSH $ integer2Bytes1 $ toInteger x]
-pushVal TheAddress = [ADDRESS]
-pushVal Caller = [CALLER]
+pushVal (Number x)   = [PUSH $ integer2Bytes1 $ toInteger x]
+pushVal TheAddress   = [ADDRESS]
+pushVal Caller       = [CALLER]
 pushVal CallDataSize = [CALLDATASIZE]
-pushVal Origin = [ORIGIN]
-pushVal (Input x) = pushVal x ++ [CALLDATALOAD]
-pushVal (PermVal x) = pushVal x ++ [SLOAD]
-pushVal (MemVal x) = pushVal x ++ [MLOAD]
-pushVal (x :+: y) = pushVal y ++ pushVal x ++ [ADD]
-pushVal (x :-: y) = pushVal y ++ pushVal x ++ [SUB]
-pushVal (x :*: y) = pushVal y ++ pushVal x ++ [MUL]
-pushVal (Abs x) = pushVal x ++ pushVal (Signum x) ++ [MUL]
-pushVal (Signum x) = pushVal x ++ pushVal (Number 0) ++ [GT] ++ pushVal x ++ pushVal (Number 0) ++ [LT, SUB]
-pushVal (Neg x) = pushVal x ++ [NEG]
+pushVal Origin       = [ORIGIN]
+pushVal (Input x)    = pushVal x ++ [CALLDATALOAD]
+pushVal (PermVal x)  = pushVal x ++ [SLOAD]
+pushVal (MemVal x)   = pushVal x ++ [MLOAD]
+pushVal (x :+: y)    = pushVal y ++ pushVal x ++ [ADD]
+pushVal (x :-: y)    = pushVal y ++ pushVal x ++ [SUB]
+pushVal (x :*: y)    = pushVal y ++ pushVal x ++ [MUL]
+pushVal (Abs x)      = pushVal x ++ pushVal (Signum x) ++ [MUL]
+pushVal (Signum x)   = pushVal x ++ pushVal (Number 0) ++ [GT] ++ pushVal x ++ pushVal (Number 0) ++ [LT, SUB]
+pushVal (Neg x)      = pushVal x ++ [NEG]
 
 pushBoolVal::JBool->[Operation]
 pushBoolVal (x :==: y) = pushVal y ++ pushVal x ++ [EQ]
-pushBoolVal (x :>: y) = pushVal y ++ pushVal x ++ [GT]
-pushBoolVal (x :<: y) = pushVal y ++ pushVal x ++ [LT]
+pushBoolVal (x :>: y)  = pushVal y ++ pushVal x ++ [GT]
+pushBoolVal (x :<: y)  = pushVal y ++ pushVal x ++ [LT]
 pushBoolVal (x :>=: y) = pushVal y ++ pushVal x ++ [ISZERO, LT]
 pushBoolVal (x :<=: y) = pushVal y ++ pushVal x ++ [ISZERO, GT]
-pushBoolVal JTrue = [PUSH [1]]
-pushBoolVal JFalse = [PUSH [0]]
+pushBoolVal JTrue      = [PUSH [1]]
+pushBoolVal JFalse     = [PUSH [0]]
 
 jCommand2Op::JCommand->Unique [Operation]
-jCommand2Op (PermStorage sPosition :=: val) = 
+jCommand2Op (PermStorage sPosition :=: val) =
     return $ pushVal val ++ pushVal sPosition ++ [SSTORE]
-jCommand2Op (MemStorage sPosition :=: val) = 
+jCommand2Op (MemStorage sPosition :=: val) =
     return $ pushVal val ++ pushVal sPosition ++ [MSTORE]
 jCommand2Op (If cond code) = do
     after <- getUnique "after"
@@ -132,8 +132,8 @@ jCommand2Op (While cond code) = do
 jCommand2Op (ReturnCode (Code codeBytes')) = do
   codeBegin <- getUnique "begin"
   codeEnd <- getUnique "end"
-  return $ 
-             [ 
+  return $
+             [
               PUSHDIFF codeBegin codeEnd,
               PUSHLABEL codeBegin,
               PUSH [0],

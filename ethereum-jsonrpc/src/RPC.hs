@@ -4,12 +4,12 @@ module RPC (
   doRPC
   ) where
 
-import Network.JsonRpc.Server
 import qualified Data.ByteString.Lazy.Char8 as B
+import           Network.JsonRpc.Server
 
-import Data.Maybe
+import           Data.Maybe
 
-import Commands
+import           Commands
 
 doRPC::B.ByteString->IO B.ByteString
 doRPC request = do

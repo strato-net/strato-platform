@@ -1,12 +1,15 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleContexts, FlexibleInstances, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 module Executable.AditM where
 
-import Control.Monad.Logger
-import Control.Monad.State
-import Control.Monad.Trans.Resource
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
 
-import Blockchain.EthConf (mkConfiguredKafkaState)
-import Network.Kafka
+import           Blockchain.EthConf           (mkConfiguredKafkaState)
+import           Network.Kafka
 
 data AditState = AditState {
     aditKafkaState  :: KafkaState

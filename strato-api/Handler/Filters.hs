@@ -1,35 +1,35 @@
 module Handler.Filters where
 
-import qualified Database.Esqueleto as E
+import qualified Database.Esqueleto          as E
 
-import qualified Prelude as P
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Text                   as T
+import qualified Data.Text.Encoding          as T
+import qualified Prelude                     as P
 
-import Data.Binary as Bin
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString.Char8 as BS8
-import Data.ByteString.Base16 as B16
-import Database.Persist
-import Database.Persist.Postgresql
-import Numeric
+import           Data.Binary                 as Bin
+import           Data.ByteString.Base16      as B16
+import qualified Data.ByteString.Char8       as BS8
+import qualified Data.ByteString.Lazy        as BS
+import           Database.Persist
+import           Database.Persist.Postgresql
+import           Numeric
 
-import Blockchain.SHA
-import Blockchain.ExtWord
-import Blockchain.Util
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Address
+import           Blockchain.Data.Address
+import           Blockchain.Data.DataDefs
+import           Blockchain.ExtWord
+import           Blockchain.SHA
+import           Blockchain.Util
 
-import Control.Monad
-import Data.Set
+import           Control.Monad
+import           Data.Set
 
-import Import
+import           Import
 
-sortToOrderBy :: (E.Esqueleto query expr backend, PersistField a) 
+sortToOrderBy :: (E.Esqueleto query expr backend, PersistField a)
             => Maybe Text -> expr (E.Value a) -> (expr E.OrderBy)
-sortToOrderBy (Just "asc")  x  = E.asc  x
-sortToOrderBy (Just "desc") x  = E.desc x
-sortToOrderBy _             x  = E.asc  x
+sortToOrderBy (Just "asc")  x = E.asc  x
+sortToOrderBy (Just "desc") x = E.desc x
+sortToOrderBy _             x = E.asc  x
 
 blockQueryParams:: [Text]
 blockQueryParams = [ "txaddress",
@@ -47,16 +47,16 @@ blockQueryParams = [ "txaddress",
                      "mingaslim",
                      "maxgaslim",
                      "number",
-                     "minnumber", 
+                     "minnumber",
                      "maxnumber",
                      "index" ]
 
 -- todo: eliminate the Entity Block from this function
 getBlkFilter :: (E.Esqueleto query expr backend) => (expr (Entity BlockDataRef), expr (Entity AddressStateRef), expr (Entity RawTransaction), expr (Entity Block))-> (Text, Text) -> expr (E.Value Bool)
 
-getBlkFilter  _                               ("page", _)    = E.val True 
-getBlkFilter  _                               ("index", _)    = E.val True 
-getBlkFilter  _                               ("raw", _)    = E.val True 
+getBlkFilter  _                               ("page", _)    = E.val True
+getBlkFilter  _                               ("index", _)    = E.val True
+getBlkFilter  _                               ("raw", _)    = E.val True
 getBlkFilter  _                               ("next", _)    = E.val True
 getBlkFilter  _                               ("prev", _)    = E.val True
 getBlkFilter  _                               ("appname", _) = E.val True
@@ -66,17 +66,17 @@ getBlkFilter (bdRef, _, _, _)                 ("number", v)    = bdRef E.^. Bloc
 getBlkFilter (bdRef, _, _, _)                 ("minnumber", v)    = bdRef E.^. BlockDataRefNumber E.>=. E.val (toInteger' v)
 getBlkFilter (bdRef, _, _, _)                 ("maxnumber", v)    = bdRef E.^. BlockDataRefNumber E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("gaslim", v)    = bdRef E.^. BlockDataRefGasLimit E.==. E.val (toInteger' v) 
-getBlkFilter (bdRef, _, _, _)                 ("mingaslim", v) = bdRef E.^. BlockDataRefGasLimit E.>=. E.val (toInteger' v) 
-getBlkFilter (bdRef, _, _, _)                 ("maxgaslim", v) = bdRef E.^. BlockDataRefGasLimit E.<=. E.val (toInteger' v) 
+getBlkFilter (bdRef, _, _, _)                 ("gaslim", v)    = bdRef E.^. BlockDataRefGasLimit E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _, _)                 ("mingaslim", v) = bdRef E.^. BlockDataRefGasLimit E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _, _)                 ("maxgaslim", v) = bdRef E.^. BlockDataRefGasLimit E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("gasused", v)    = bdRef E.^. BlockDataRefGasUsed E.==. E.val (toInteger' v) 
-getBlkFilter (bdRef, _, _, _)                 ("mingasused", v) = bdRef E.^. BlockDataRefGasUsed E.>=. E.val (toInteger' v) 
-getBlkFilter (bdRef, _, _, _)                 ("maxgasused", v) = bdRef E.^. BlockDataRefGasUsed E.<=. E.val (toInteger' v) 
+getBlkFilter (bdRef, _, _, _)                 ("gasused", v)    = bdRef E.^. BlockDataRefGasUsed E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _, _)                 ("mingasused", v) = bdRef E.^. BlockDataRefGasUsed E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _, _)                 ("maxgasused", v) = bdRef E.^. BlockDataRefGasUsed E.<=. E.val (toInteger' v)
 
-getBlkFilter (bdRef, _, _, _)                 ("diff", v)      = bdRef E.^. BlockDataRefDifficulty E.==. E.val (toInteger' v) 
-getBlkFilter (bdRef, _, _, _)                 ("mindiff", v)   = bdRef E.^. BlockDataRefDifficulty E.>=. E.val (toInteger' v) 
-getBlkFilter (bdRef, _, _, _)                 ("maxdiff", v)   = bdRef E.^. BlockDataRefDifficulty E.<=. E.val (toInteger' v) 
+getBlkFilter (bdRef, _, _, _)                 ("diff", v)      = bdRef E.^. BlockDataRefDifficulty E.==. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _, _)                 ("mindiff", v)   = bdRef E.^. BlockDataRefDifficulty E.>=. E.val (toInteger' v)
+getBlkFilter (bdRef, _, _, _)                 ("maxdiff", v)   = bdRef E.^. BlockDataRefDifficulty E.<=. E.val (toInteger' v)
 
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("time", v)      = bdRef E.^. BlockDataRefTimestamp E.==. E.val (stringToDate v)
 -- getBlkFilter (bdRef, accStateRef, rawTX, blk) ("mintime", v)   = bdRef E.^. BlockDataRefTimestamp E.>=. E.val (stringToDate v)
@@ -91,7 +91,7 @@ getBlkFilter (_, accStateRef, _, _) ("address", v)   = accStateRef E.^. AddressS
 getBlkFilter (bdRef, _, _, blk) ("blockid", v)   = bdRef E.^. BlockDataRefBlockId E.==. E.val (toBlockId v)
                                                               E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
 getBlkFilter (bdRef, _, _, blk) ("hash", v)   = (bdRef E.^. BlockDataRefHash E.==. E.val (toSHA v) ) E.&&. ( bdRef E.^. BlockDataRefBlockId E.==. blk E.^. BlockId)
-                            
+
 
 getBlkFilter _ _ = P.undefined ("no match in getBlkFilter"::String)
 
@@ -104,7 +104,7 @@ accountQueryParams = [ "address",
                        "maxbalance",
                        "nonce",
                        "minnonce",
-                       "maxnonce", 
+                       "maxnonce",
                        "maxnumber",
                        "code",
                        "index",
@@ -112,27 +112,27 @@ accountQueryParams = [ "address",
 
 
 getAccFilter :: (E.Esqueleto query expr backend) => (expr (Entity AddressStateRef))-> (Text, Text) -> expr (E.Value Bool)
-getAccFilter  _            ("page", _)         =  E.val True
-getAccFilter  _            ("index", _)        =  E.val True
-getAccFilter  _            ("raw", _)          =  E.val True
-getAccFilter  _            ("next", _)         =  E.val True
-getAccFilter  _            ("prev", _)         =  E.val True
-getAccFilter  _            ("appname", _)      =  E.val True
+getAccFilter  _            ("page", _)       =  E.val True
+getAccFilter  _            ("index", _)      =  E.val True
+getAccFilter  _            ("raw", _)        =  E.val True
+getAccFilter  _            ("next", _)       =  E.val True
+getAccFilter  _            ("prev", _)       =  E.val True
+getAccFilter  _            ("appname", _)    =  E.val True
 
-getAccFilter (accStateRef) ("balance", v)      = accStateRef E.^. AddressStateRefBalance E.==. E.val (toInteger' v) 
-getAccFilter (accStateRef) ("minbalance", v)   = accStateRef E.^. AddressStateRefBalance E.>=. E.val (toInteger' v) 
-getAccFilter (accStateRef) ("maxbalance", v)   = accStateRef E.^. AddressStateRefBalance E.<=. E.val (toInteger' v) 
+getAccFilter (accStateRef) ("balance", v)    = accStateRef E.^. AddressStateRefBalance E.==. E.val (toInteger' v)
+getAccFilter (accStateRef) ("minbalance", v) = accStateRef E.^. AddressStateRefBalance E.>=. E.val (toInteger' v)
+getAccFilter (accStateRef) ("maxbalance", v) = accStateRef E.^. AddressStateRefBalance E.<=. E.val (toInteger' v)
 
-getAccFilter (accStateRef) ("nonce", v)        = accStateRef E.^. AddressStateRefNonce E.==. E.val (toInteger' v)
-getAccFilter (accStateRef) ("minnonce", v)     = accStateRef E.^. AddressStateRefNonce E.>=. E.val (toInteger' v)
-getAccFilter (accStateRef) ("maxnonce", v)     = accStateRef E.^. AddressStateRefNonce E.<=. E.val (toInteger' v)
+getAccFilter (accStateRef) ("nonce", v)      = accStateRef E.^. AddressStateRefNonce E.==. E.val (toInteger' v)
+getAccFilter (accStateRef) ("minnonce", v)   = accStateRef E.^. AddressStateRefNonce E.>=. E.val (toInteger' v)
+getAccFilter (accStateRef) ("maxnonce", v)   = accStateRef E.^. AddressStateRefNonce E.<=. E.val (toInteger' v)
 
-getAccFilter (accStateRef) ("address", v)      = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
+getAccFilter (accStateRef) ("address", v)    = accStateRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
 
-getAccFilter (accStateRef) ("code", v)         = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v) 
-getAccFilter (accStateRef) ("codeHash", v)     = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v) 
+getAccFilter (accStateRef) ("code", v)       = accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)
+getAccFilter (accStateRef) ("codeHash", v)   = accStateRef E.^. AddressStateRefCodeHash E.==. E.val (toSHA v)
 
-getAccFilter _             _                   = P.undefined ("no match in getAccFilter"::String)
+getAccFilter _             _                 = P.undefined ("no match in getAccFilter"::String)
 
 transactionQueryParams:: [Text]
 transactionQueryParams = [ "address",
@@ -146,10 +146,10 @@ transactionQueryParams = [ "address",
                            "mingaslimit",
                            "maxgaslimit",
                            "value",
-                           "minvalue", 
+                           "minvalue",
                            "maxvalue",
                            "blocknumber",
-                           "index", 
+                           "index",
                            "rejected"]
 
 getTransFilter :: (E.Esqueleto query expr backend) => (expr (Entity RawTransaction))-> (Text, Text) -> expr (E.Value Bool)
@@ -190,7 +190,7 @@ getStorageFilter _ ("index",_) = E.val True
 getStorageFilter (storage,_) ("key", v)
   = storage E.^. StorageKey E.==. E.val (P.fromIntegral (toInteger' v) :: Word256)
 getStorageFilter (storage,_) ("minkey", v)
-  = storage E.^. StorageKey E.>=. E.val (P.fromIntegral (toInteger' v) :: Word256) 
+  = storage E.^. StorageKey E.>=. E.val (P.fromIntegral (toInteger' v) :: Word256)
 getStorageFilter (storage,_) ("maxkey", v)
   = storage E.^. StorageKey E.<=. E.val (P.fromIntegral (toInteger' v) :: Word256)
 getStorageFilter (storage,_) ("keystring", v)
@@ -208,13 +208,13 @@ getStorageFilter (storage,_) ("valuestring", v)
 getStorageFilter (storage,_) ("addressid", v)
   = storage E.^. StorageAddressStateRefId E.==. E.val (toAddrId v)
 getStorageFilter (_,addrStRef) ("address", v)      -- Note: a join is done in StorageInfo
-  = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)  
+  = addrStRef E.^. AddressStateRefAddress E.==. E.val (toAddr v)
 getStorageFilter _           _                   = P.undefined ("no match in getStorageFilter"::String)
 
 getLogFilter :: (E.Esqueleto query expr backend) => expr (Entity LogDB) -> (Text, Text) -> expr (E.Value Bool)
 getLogFilter _ ("index",_) = E.val True         -- indexes are intercepted in handlers. We should probably deal with them here in the future
-getLogFilter log' ("address",v) = log' E.^. LogDBAddress E.==. E.val (toAddr v)  
-getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v ) 
+getLogFilter log' ("address",v) = log' E.^. LogDBAddress E.==. E.val (toAddr v)
+getLogFilter log' ("hash",v) = log' E.^. LogDBTransactionHash  E.==. E.val ( SHA . fromIntegral . byteString2Integer . fst. B16.decode $ T.encodeUtf8 $ v )
 getLogFilter _           _  = P.undefined ("no match in getLogFilter"::String)
 
 toAddrId :: Text -> Key AddressStateRef
@@ -241,29 +241,29 @@ toCode v = fst $ B16.decode $ BS8.pack $ (T.unpack v)
 
 extractValue :: String -> [(Text, Text)] -> String -> Maybe String
 extractValue name ts zero = Control.Monad.foldM toFold zero (P.map selectPage ts)
-     where 
+     where
        toFold :: String -> Maybe String -> Maybe String
-       toFold n Nothing = Just n
+       toFold n Nothing  = Just n
        toFold n (Just m) = Just (P.maximum [n, m])
        selectPage :: (Text, Text) -> Maybe String
        selectPage (s, v) | T.unpack s == name = Just $ T.unpack v
                          | otherwise = Nothing
 
 fromHexText :: T.Text -> Word256
-fromHexText v = res 
+fromHexText v = res
   where ((res,_):_) = readHex $ T.unpack $ v :: [(Word256,String)]
 
 extractHash :: String -> [(Text, Text)] ->  Maybe String
-extractHash _ _ = Just "" 
+extractHash _ _ = Just ""
 
 extractPage :: String -> [(Text, Text)] -> Maybe Integer
 extractPage name ts = extractPage' 0 name ts
 
-extractPage' :: Integer -> String -> [(Text, Text)] -> Maybe Integer 
+extractPage' :: Integer -> String -> [(Text, Text)] -> Maybe Integer
 extractPage' i name ts = Control.Monad.foldM toFold i (P.map selectPage ts)
-     where 
+     where
        toFold :: Integer -> Maybe Integer -> Maybe Integer
-       toFold n Nothing = Just n
+       toFold n Nothing  = Just n
        toFold n (Just m) = Just (P.maximum [n, m])
        selectPage :: (Text, Text) -> Maybe Integer
        selectPage (s, v) | T.unpack s == name = Just (toInteger' v)
@@ -289,7 +289,7 @@ extraFilter ("index", _) v' = ("index", v')
 extraFilter (a,b) _'        = (a,b)
 
 getBlockNum :: Block -> Integer
-getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _) = num 
+getBlockNum (Block (BlockData _ _ (Address _) _ _ _ _ _ num _ _ _ _ _ _) _ _) = num
 
 getTxNum :: RawTransaction -> Int
 getTxNum (RawTransaction _ (Address _) _ _ _ _ _ _ _ _ _ bn _ _) = bn

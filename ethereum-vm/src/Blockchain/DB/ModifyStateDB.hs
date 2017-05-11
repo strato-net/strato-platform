@@ -1,23 +1,24 @@
-{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.DB.ModifyStateDB (
   addToBalance,
   pay
 ) where
 
-import Control.Monad
-import Control.Monad.Logger
-import Control.Monad.Trans
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           Control.Monad
+import           Control.Monad.Logger
+import           Control.Monad.Trans
+import           Text.PrettyPrint.ANSI.Leijen    hiding ((<$>))
 
-import Blockchain.Data.Address
-import Blockchain.Data.AddressStateDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StateDB
-import Blockchain.VMOptions
+import           Blockchain.Data.Address
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.StateDB
+import           Blockchain.VMOptions
 
-import qualified Data.Text as T
+import qualified Data.Text                       as T
 
 --import Debug.Trace
 
@@ -39,7 +40,7 @@ pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger 
 pay description fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
   -- until this is resolved, I am commenting this out.
-  {- 
+  {-
   when flags_debug $ do
     $logDebugS "pay" . T.pack $ "payment: from " ++ show (pretty fromAddr) ++ " to " ++ show (pretty toAddr) ++ ": " ++ show val ++ ", " ++ description
     fromAddressState <- getAddressState fromAddr
@@ -61,7 +62,7 @@ pay description fromAddr toAddr val = do
 
 
 
-  
+
 
 
 

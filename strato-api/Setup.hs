@@ -1,12 +1,12 @@
 module Main where
-import Distribution.Simple
-import Distribution.Simple.LocalBuildInfo
-import Distribution.Simple.Setup
-import Distribution.PackageDescription
-import System.Process (runCommand,  waitForProcess )
+import           Distribution.PackageDescription
+import           Distribution.Simple
+import           Distribution.Simple.LocalBuildInfo
+import           Distribution.Simple.Setup
+import           System.Process                     (runCommand, waitForProcess)
 
 main :: IO ()
-main = defaultMainWithHooks $ simpleUserHooks 
+main = defaultMainWithHooks $ simpleUserHooks
          { preBuild = genTests }
 
 genTests :: Args -> BuildFlags -> IO HookedBuildInfo

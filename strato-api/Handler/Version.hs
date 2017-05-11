@@ -2,20 +2,20 @@
 
 module Handler.Version where
 
-import Import hiding ((</>), readFile)
+import           Import     hiding (readFile, (</>))
 
-import Versioning
+import           Versioning
 
-data Repo = Repo { name :: String
-                 , url :: String  
-                 , sha :: String  
-                 , branch :: String 
+data Repo = Repo { name   :: String
+                 , url    :: String
+                 , sha    :: String
+                 , branch :: String
                  } deriving (Show, Generic)
 
 instance ToJSON Repo
 
 getVersionR :: Handler Value
-getVersionR = do 
+getVersionR = do
               addHeader "Access-Control-Allow-Origin" "*"
               return $ object ["monostrato" .= Repo "monostrato" "" $(gitHashMonostrato) $(gitBranchMonostrato)
                               --,"stack.yaml" .= ("stack" :: String, $(stackYaml) :: String) --(liftIO $ getStackInfo)

@@ -1,6 +1,6 @@
 module Test.Combinators where
 
-import Data.List
+import           Data.List
 
 infixr 3 ##
 (##) :: String -> String -> String
@@ -47,8 +47,8 @@ importFileES6Aliases fName oldNames newNames = semi'd $
   "import" ## braced (comma'd $ zipWith doAlias oldNames newNames) ##
   "from" ## quoted fName
 
-  where 
-    doAlias name "" = name
+  where
+    doAlias name ""    = name
     doAlias name alias = name ## "as" ## alias
 
 varDecl :: String -> String -> String
@@ -69,10 +69,10 @@ structDefn name types = "struct" ## name ## braced (concatMap semi'd fields)
     fields = zipWith (\t n -> t ## "f" ++ show n) types [0::Integer ..]
 
 functionSignature :: String -> [String] -> [String] -> String
-functionSignature name args vals = 
+functionSignature name args vals =
   "function" ## name ## paren'd (comma'd args) ##
-  if null vals 
-  then "" 
+  if null vals
+  then ""
   else "returns" ## paren'd (comma'd vals)
 
 functionDecl :: String -> [String] -> [String] -> String

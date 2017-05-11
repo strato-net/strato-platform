@@ -4,15 +4,15 @@ module Blockchain.Data.TransactionReceipt(
   PostTransactionState(..)
   ) where
 
-import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Format
-import Blockchain.SHA
-import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
+import qualified Blockchain.Colors            as CL
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction
+import           Blockchain.Format
+import           Blockchain.SHA
 
-import Debug.Trace
+import           Debug.Trace
 
 data PostTransactionState = PostTransactionState SHA deriving (Show)
 
@@ -22,9 +22,9 @@ instance RLPSerializable PostTransactionState where
 
 data TransactionReceipt =
   TransactionReceipt {
-    theTransaction::Transaction,
-    postTransactionState::PostTransactionState,
-    cumulativeGasUsed::Integer
+    theTransaction       :: Transaction,
+    postTransactionState :: PostTransactionState,
+    cumulativeGasUsed    :: Integer
     } deriving (Show)
 
 
@@ -61,7 +61,7 @@ instance RLPSerializable TransactionReceipt where
       cumulativeGasUsed = rlpDecode gasUsed
       }
   rlpDecode x = error $ "Missing case in rlpDecode for TransactionReceipt: " ++ show (pretty x)
-  
+
   rlpEncode TransactionReceipt{
     theTransaction=t,
     postTransactionState=p,

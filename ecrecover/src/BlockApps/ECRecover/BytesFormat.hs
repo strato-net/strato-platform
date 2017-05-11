@@ -1,10 +1,12 @@
-{-# LANGUAGE NoImplicitPrelude, OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module BlockApps.ECRecover.BytesFormat
 where
 
-import BlockApps.ECRecover.Prelude
+import qualified BlockApps.ECRecover.Foreign  as B
 import qualified BlockApps.ECRecover.Pointers as A
-import qualified BlockApps.ECRecover.Foreign as B
+import           BlockApps.ECRecover.Prelude
 
 
 {-# INLINABLE recoverUncompressed #-}

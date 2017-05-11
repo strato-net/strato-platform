@@ -5,11 +5,11 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Lexer where
 
-import Text.Parsec
-import Text.Parsec.Language (javaStyle)
-import qualified Text.Parsec.Token as P
+import           Text.Parsec
+import           Text.Parsec.Language (javaStyle)
+import qualified Text.Parsec.Token    as P
 
-import ParserTypes
+import           ParserTypes
 
 -- | A common pattern: code enclosed in braces, allowing nested braces.
 bracedCode :: SolidityParser String

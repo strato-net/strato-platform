@@ -1,6 +1,6 @@
 module Handler.Raml where
 
-import Import
+import           Import
 
 getRamlR :: Handler Html
 getRamlR = do

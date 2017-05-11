@@ -11,16 +11,16 @@ module Blockchain.Sequencer.Kafka (
     writeSeqEvents
 ) where
 
-import Data.Binary (Binary, decode, encode)
+import           Data.Binary                (Binary, decode, encode)
 
-import Blockchain.Sequencer.Event
-import Blockchain.KafkaTopics (lookupTopic)
-import Blockchain.Stream.Raw
+import           Blockchain.KafkaTopics     (lookupTopic)
+import           Blockchain.Sequencer.Event
+import           Blockchain.Stream.Raw
 
-import qualified Network.Kafka          as K
-import qualified Network.Kafka.Protocol as KP
-import qualified Network.Kafka.Producer as KW
-import qualified Data.ByteString.Lazy   as BL
+import qualified Data.ByteString.Lazy       as BL
+import qualified Network.Kafka              as K
+import qualified Network.Kafka.Producer     as KW
+import qualified Network.Kafka.Protocol     as KP
 
 unseqEventsTopicName :: KP.TopicName
 unseqEventsTopicName = lookupTopic "unseqevents"

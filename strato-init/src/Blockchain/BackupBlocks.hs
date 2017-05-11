@@ -1,30 +1,30 @@
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.BackupBlocks (
   backupBlocks
   ) where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC8
+import           Control.Monad
+import           Control.Monad.IO.Class
+import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
-import Network.Kafka
-import Network.Kafka.Producer
+import qualified Data.ByteString.Char8  as BC8
+import           Network.Kafka
+import           Network.Kafka.Producer
 
 
-import Blockchain.DB.SQLDB
-import Blockchain.EthConf
-import Blockchain.KafkaTopics
+import           Blockchain.DB.SQLDB
+import           Blockchain.EthConf
+import           Blockchain.KafkaTopics
 
-import qualified System.IO.Unsafe as YOUR_CODE_IS_SHIT
-import qualified Data.IORef as IORef
+import qualified Data.IORef             as IORef
+import qualified System.IO.Unsafe       as YOUR_CODE_IS_SHIT
 
 decodeWithCheck::B.ByteString->B.ByteString
 decodeWithCheck x =
   case B16.decode x of
    (result, "") -> result
-   _ -> error "bad data passed to decodeWithCheck"
+   _            -> error "bad data passed to decodeWithCheck"
 
 {-# NOINLINE blockCounter #-}
 blockCounter :: IORef.IORef Integer

@@ -130,7 +130,7 @@ addDebugCallCreate::DebugCallCreate->VMM ()
 addDebugCallCreate callCreate = do
   state' <- lift $ get
   case debugCallCreates state' of
-    Just x -> lift $ put state'{debugCallCreates = Just (callCreate:x)}
+    Just x  -> lift $ put state'{debugCallCreates = Just (callCreate:x)}
     Nothing -> error "You are trying to add a call create during a non-debug run"
 
 addSuicideList::Address->VMM ()

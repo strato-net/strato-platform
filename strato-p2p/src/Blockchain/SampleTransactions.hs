@@ -1,25 +1,25 @@
 
 module Blockchain.SampleTransactions where
 
-import Prelude  hiding (EQ)
+import           Prelude                     hiding (EQ)
 
-import qualified Data.ByteString as B
-import Network.Haskoin.Internals hiding (Address)
+import qualified Data.ByteString             as B
+import           Network.Haskoin.Internals   hiding (Address)
 
-import Blockchain.Data.Address
-import Blockchain.Data.Code
-import Blockchain.Data.Transaction
-import Blockchain.Constants
-import Blockchain.ExtWord
-import Blockchain.JCommand
-import Blockchain.VM.Code
-import Blockchain.VM.Labels
-import Blockchain.VM.Opcodes
+import           Blockchain.Constants
+import           Blockchain.Data.Address
+import           Blockchain.Data.Code
+import           Blockchain.Data.Transaction
+import           Blockchain.ExtWord
+import           Blockchain.JCommand
+import           Blockchain.VM.Code
+import           Blockchain.VM.Labels
+import           Blockchain.VM.Opcodes
 
 --import Debug.Trace
 
 createContract::Monad m=>Integer->Integer->Code->PrvKey->SecretT m Transaction
-createContract val gl code prvKey = 
+createContract val gl code prvKey =
     createContractCreationTX 0 0x9184e72a000 gl val code prvKey
 
 createMessage::Monad m=>Integer->Integer->Address->B.ByteString->PrvKey->SecretT m Transaction
@@ -53,7 +53,7 @@ outOfGasTX =
 simpleStorageTX::Monad m=>PrvKey->SecretT m Transaction
 simpleStorageTX =
   createContract 3 1000
-  $ compile 
+  $ compile
     [
       PUSH [1],
       PUSH [0],
@@ -94,12 +94,12 @@ paymentContract =
                                 val = Input (1*32)
                             in
                               [
-                               If (PermVal fromAddr :>=: val) 
+                               If (PermVal fromAddr :>=: val)
                                       [
                                        PermStorage fromAddr :=: PermVal fromAddr - val,
                                        PermStorage toAddr :=: PermVal toAddr + val
                                       ]
-                             
+
                               ]
                            )
 
@@ -112,7 +112,7 @@ sendCoinTX =
 
 
 keyValuePublisher::Monad m=>PrvKey->SecretT m Transaction
-keyValuePublisher = 
+keyValuePublisher =
   createContract (1000*finney) 2000
                      $ createInit
                             [
@@ -124,7 +124,7 @@ keyValuePublisher =
                                 inputPr = MemVal (Number 0)
                             in
                               [
-                               If (Caller :==: PermVal (Number 69)) 
+                               If (Caller :==: PermVal (Number 69))
                                       [
                                        While (inputPr :<: CallDataSize)
                                                  [
@@ -132,7 +132,7 @@ keyValuePublisher =
                                                   inputP :=: inputPr + 64
                                                  ]
                                       ]
-                             
+
                               ]
                            )
 
@@ -591,5 +591,5 @@ mysteryCode =
   ]
 
 createMysteryContract::Monad m=>PrvKey->SecretT m Transaction
-createMysteryContract prvKey = 
+createMysteryContract prvKey =
     createContractCreationTX  0 0x9184e72a000 8000 0 (compile mysteryCode) prvKey

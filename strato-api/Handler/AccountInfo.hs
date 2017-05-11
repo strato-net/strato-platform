@@ -1,34 +1,33 @@
-{-# LANGUAGE DeriveDataTypeable
-           , EmptyDataDecls
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
-           , MultiParamTypeClasses
-           , TypeFamilies
-           , UndecidableInstances
-           , GADTs
- #-}
+{-# LANGUAGE DeriveDataTypeable     #-}
+{-# LANGUAGE EmptyDataDecls         #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Handler.AccountInfo where
 
-import Import
+import           Import
 
-import Handler.Common 
-import Handler.Filters
+import           Handler.Common
+import           Handler.Filters
 
+import           Data.List
+import qualified Data.Map           as Map
 import qualified Database.Esqueleto as E
-import Data.List
-import qualified Data.Map as Map
 
-import qualified Prelude as P
-import qualified Data.Text as T
+import qualified Data.Text          as T
+import qualified Prelude            as P
 
 accountInfo :: [(Text, Text)] -> Handler Value
 accountInfo params = do
     appNameMaybe <- lookupGetParam "appname"
 
     case appNameMaybe of
-       (Just t) -> liftIO $ putStrLn $ t
+       (Just t)  -> liftIO $ putStrLn $ t
        (Nothing) -> liftIO $ putStrLn "anon"
 
     limit <- liftIO $ myFetchLimit
@@ -45,7 +44,7 @@ accountInfo params = do
             True ->  runDB $ E.select . E.distinct $
               E.from $ \(accStateRef) -> do
 
-              let criteria = P.map (getAccFilter (accStateRef)) $ params 
+              let criteria = P.map (getAccFilter (accStateRef)) $ params
               let allCriteria = ((accStateRef E.^. AddressStateRefId) E.>=. E.val (E.toSqlKey index')) : criteria
 
               E.where_ (P.foldl1 (E.&&.) allCriteria)
@@ -64,8 +63,8 @@ accountInfo params = do
     toRet raw (P.map E.entityVal modAccounts) (next $ appendIndex params)
   where
     toRet :: Bool -> [AddressStateRef] -> String -> Handler Value
-    toRet raw as gp = case if' raw as (P.map asrToAsrPrime (P.zip (P.repeat gp) as)) of 
-              Left a -> returnJson a
+    toRet raw as gp = case if' raw as (P.map asrToAsrPrime (P.zip (P.repeat gp) as)) of
+              Left a  -> returnJson a
               Right b -> returnJson b
 
 getAccountInfoR :: Handler Value

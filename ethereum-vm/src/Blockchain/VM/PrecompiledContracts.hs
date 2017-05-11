@@ -4,21 +4,21 @@ module Blockchain.VM.PrecompiledContracts (
   callPrecompiledContract
   ) where
 
-import Prelude hiding (LT, GT, EQ)
+import           Prelude                    hiding (EQ, GT, LT)
 
-import qualified Crypto.Hash.SHA256 as SHA2
-import qualified Crypto.Hash.RIPEMD160 as RIPEMD
-import Data.Binary hiding (get, put)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Network.Haskoin.Internals (Signature(..))
+import qualified Crypto.Hash.RIPEMD160      as RIPEMD
+import qualified Crypto.Hash.SHA256         as SHA2
+import           Data.Binary                hiding (get, put)
+import qualified Data.ByteString            as B
+import qualified Data.ByteString.Lazy       as BL
+import           Network.Haskoin.Internals  (Signature (..))
 
-import Blockchain.Data.Address
-import Blockchain.ExtendedECDSA
-import Blockchain.ExtWord
-import Blockchain.Util
-import Blockchain.VM.OpcodePrices
-import Blockchain.VM.VMM
+import           Blockchain.Data.Address
+import           Blockchain.ExtendedECDSA
+import           Blockchain.ExtWord
+import           Blockchain.Util
+import           Blockchain.VM.OpcodePrices
+import           Blockchain.VM.VMM
 
 
 --import Debug.Trace

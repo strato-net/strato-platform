@@ -1,11 +1,11 @@
 module Handler.ApiDocs where
 
-import Import
+import           Import
 
 getApiDocsR :: Handler Html
 getApiDocsR = do
 
     defaultLayout $ do
-        _ <- newIdent                        
+        _ <- newIdent
         setTitle "BlockApps.net - API docs"
         sendFile "text/html" "apidocs/index.html"

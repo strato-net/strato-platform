@@ -2,8 +2,8 @@
 
 module Blockchain.Mining.Options where
 
-import Blockchain.Mining
-import HFlags
+import           Blockchain.Mining
+import           HFlags
 
 defineEQFlag "aMiner" [| Instant :: MinerType |] "MINER" "What mining algorithm"
 

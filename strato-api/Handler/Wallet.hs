@@ -3,31 +3,31 @@
 module Handler.Wallet where
 
 
-import Import
-import Handler.Common
-import Handler.Filters
+import           Handler.Common
+import           Handler.Filters
+import           Import
 
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Text                     as T
+import qualified Data.Text.Encoding            as T
 
-import Crypto.BCrypt
+import           Crypto.BCrypt
 
-import System.Entropy
-import Network.Wai
-import Data.Text.Lazy.Encoding
-import Text.Shakespeare.Text
-import Text.Blaze 
-import Text.Blaze.Html.Renderer.Text --(renderHtml)
-import qualified Network.Mail.Mime as M
+import           Data.Text.Lazy.Encoding
+import qualified Network.Mail.Mime             as M
+import           Network.Wai
+import           System.Entropy
+import           Text.Blaze
+import           Text.Blaze.Html.Renderer.Text
+import           Text.Shakespeare.Text
 
-import qualified Data.Aeson as J
-import qualified Data.ByteString.Base16 as B16
-import qualified Database.Esqueleto as E
-import qualified Database.Persist.Sql as SQL
+import qualified Data.Aeson                    as J
+import qualified Data.ByteString.Base16        as B16
+import qualified Database.Esqueleto            as E
+import qualified Database.Persist.Sql          as SQL
 
-import qualified Prelude as P
+import qualified Prelude                       as P
 
-sendMailNewUser :: (ToText a1, ToText a, ToMarkup a1, ToMarkup a, MonadIO m) 
+sendMailNewUser :: (ToText a1, ToText a, ToMarkup a1, ToMarkup a, MonadIO m)
                 => Text -> a1 -> a -> m ()
 sendMailNewUser email keyJsonString verurl =  liftIO $ M.renderSendMail (M.emptyMail $ M.Address Nothing "noreply")
             { M.mailTo = [M.Address Nothing email]
@@ -69,7 +69,7 @@ sendMailNewUser email keyJsonString verurl =  liftIO $ M.renderSendMail (M.empty
             }
 
 
-sendMailNewWallet :: (ToText a, ToMarkup a, MonadIO m) 
+sendMailNewWallet :: (ToText a, ToMarkup a, MonadIO m)
                   => Text -> a -> m ()
 sendMailNewWallet email keyJsonString =  liftIO $ M.renderSendMail (M.emptyMail $ M.Address Nothing "noreply")
             { M.mailTo = [M.Address Nothing email]
@@ -108,7 +108,7 @@ sendMailNewWallet email keyJsonString =  liftIO $ M.renderSendMail (M.emptyMail 
 getWalletR :: Handler Html
 getWalletR = do
   maybeVerkey <- lookupGetParam "p"
-  userEnt <- case maybeVerkey of 
+  userEnt <- case maybeVerkey of
     Nothing -> invalidArgs ["Missing 'user'"]
     Just verkey -> do userLookup <-  runDB $ E.select $
                                         E.from $ \(a) -> do
@@ -120,14 +120,14 @@ getWalletR = do
 
   let user = E.entityVal . P.head $ userEnt
       userEmail = userNEmail $ user
-  
+
   defaultLayout $(widgetFile "userRegister")
-  
+
 -- creates the wallet or user identity
 postWalletR :: Handler Value
 postWalletR = do
   addHeader "Access-Control-Allow-Origin" "*"
- 
+
   liftIO $ P.putStrLn $ "creating wallet"
 
   maybeEmail <- lookupPostParam "email"
@@ -136,13 +136,13 @@ postWalletR = do
   maybeEncKey <- lookupPostParam "enckey" -- key, assumed encrypted on the client side as in our libraries
   maybeLoginPass <- lookupPostParam "loginpass" -- needs to be salted and bcrypted
 
-  emailDB <- case maybeEmail of 
+  emailDB <- case maybeEmail of
     (Just email) -> return $ email
-    Nothing -> invalidArgs ["Missing 'email'"]
+    Nothing      -> invalidArgs ["Missing 'email'"]
 
   liftIO $ putStrLn $ "email for the database: " ++ emailDB
-  liftIO $ P.putStrLn $ "about lookup address"  
-  addressDB <- case maybeAddress of 
+  liftIO $ P.putStrLn $ "about lookup address"
+  addressDB <- case maybeAddress of
     (Just address) ->  do addressLookup <- runDB $ E.select $
                                         E.from $ \(ud) -> do
                                         E.where_ (  ud E.^. UserDataAddress E.==. (E.val $ toAddr address))
@@ -150,12 +150,12 @@ postWalletR = do
                                         return ud
                           case addressLookup of
                             [] -> return address
-                            _ -> permissionDenied $ "address " ++ address ++ " already exists"
-   
+                            _  -> permissionDenied $ "address " ++ address ++ " already exists"
+
     Nothing -> invalidArgs ["Missing 'address'"]
 
-  liftIO $ P.putStrLn $ "about lookup app"  
-  (_,appId) <- case maybeAppName of 
+  liftIO $ P.putStrLn $ "about lookup app"
+  (_,appId) <- case maybeAppName of
     (Just app) -> do appLookup <- runDB $ E.select $
                                         E.from $ \(a) -> do
                                         E.where_ (  a E.^. BlockAppName E.==. (E.val $ T.unpack app) E.&&.
@@ -164,17 +164,17 @@ postWalletR = do
                                         return a
                      case appLookup of
                             [] -> permissionDenied $ "app: " ++ app ++ " not registered"
-                            x -> return (app,E.entityKey $ P.head x)
+                            x  -> return (app,E.entityKey $ P.head x)
            -- check if app exists
     Nothing -> invalidArgs ["Missing 'app'"]
 
-  encKeyDB <- case maybeEncKey of 
+  encKeyDB <- case maybeEncKey of
     (Just encKey) -> return $ encKey
-    Nothing -> invalidArgs ["Missing 'enckey'"]
+    Nothing       -> invalidArgs ["Missing 'enckey'"]
 
   -- allow users to have multiple keys and associated apps, but only one email and password
-  liftIO $ P.putStrLn $ "about to register user and pass"  
-  newUser <- case maybeLoginPass of 
+  liftIO $ P.putStrLn $ "about to register user and pass"
+  newUser <- case maybeLoginPass of
     Nothing -> invalidArgs ["missing 'loginpass'"]
     (Just loginPass) -> do emailLookup <- runDB $ E.select $
                                         E.from $ \(u) -> do
@@ -185,41 +185,41 @@ postWalletR = do
                            case emailLookup of
                              [] -> do liftIO $ P.putStrLn $ "email not found, registering"
                                       now <- liftIO $ getCurrentTime
-                                      pass <- liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy { preferredHashCost = 10 } 
+                                      pass <- liftIO $ hashPasswordUsingPolicy slowerBcryptHashingPolicy { preferredHashCost = 10 }
                                                                                 (T.encodeUtf8 loginPass)
                                       liftIO $ P.putStrLn $ "hashed password"
                                       verkey <- liftIO $ getEntropy 64
-                                      userEnt <- case pass of 
+                                      userEnt <- case pass of
                                                (Just pass') -> do
                                                     liftIO $ P.putStrLn $ "registering user with entropy"
-                                                    runDB $ E.insert $ UserN { 
+                                                    runDB $ E.insert $ UserN {
                                                                               userNEmail = T.unpack $ emailDB,
                                                                               userNLoginPassHash = pass',
                                                                               userNLastLogin = now,
-                                                                              userNNumLogins = 0, 
-                                                                              userNVerified = False, 
+                                                                              userNNumLogins = 0,
+                                                                              userNVerified = False,
                                                                               userNVerkey = verkey }
-                                                
+
                                                Nothing -> permissionDenied $ "password failure"
                                       liftIO $ P.putStrLn $ "inserted user"
-                                      let userData = UserData { 
+                                      let userData = UserData {
                                                                 userDataEncryptedWallet = T.unpack $ encKeyDB,
                                                                 userDataAddress = toAddr addressDB,
-                                                                userDataUserId = userEnt 
+                                                                userDataUserId = userEnt
                                                               }
                                       _ <- runDB $ E.insert $ userData
                                       liftIO $ P.putStrLn $ "inserted user data"
                                       ip <- fmap (show . remoteHost . reqWaiRequest) getRequest
-                                      _ <- runDB $ E.insert $ BlockAppLogin { 
+                                      _ <- runDB $ E.insert $ BlockAppLogin {
                                                                         blockAppLoginUserId = userEnt,
                                                                         blockAppLoginBlockAppId = appId,
                                                                         blockAppLoginTimestamp = now,
                                                                         blockAppLoginIp = show ip
-                                                                      } 
+                                                                      }
                                       liftIO $ P.putStrLn $ "inserted login data"
                                       root <- appRoot . appSettings <$> getYesod
-                                      sendMailNewUser emailDB (show $ J.encode userData) (root ++ "/eth/v1.0/wallet?p=" ++ (T.decodeUtf8 $ B16.encode $ verkey)) 
-                                      return $ userData      
+                                      sendMailNewUser emailDB (show $ J.encode userData) (root ++ "/eth/v1.0/wallet?p=" ++ (T.decodeUtf8 $ B16.encode $ verkey))
+                                      return $ userData
 
                              -- no need to register
                              x -> do now <- liftIO $ getCurrentTime
@@ -227,28 +227,28 @@ postWalletR = do
                                          user = E.entityVal $ userEnt
                                          userKey = E.entityKey $ userEnt
                                          numLogins = userNNumLogins $ user
-                                         passHash = userNLoginPassHash $ user 
+                                         passHash = userNLoginPassHash $ user
                                          valid = validatePassword passHash (T.encodeUtf8 loginPass)
-                                         userData = UserData { 
+                                         userData = UserData {
                                                                userDataEncryptedWallet = T.unpack $ encKeyDB,
                                                                userDataAddress = toAddr addressDB,
                                                                userDataUserId = userKey
                                                              }
 
-                                     case valid of 
+                                     case valid of
                                        False -> permissionDenied $ "invalid email or password"
                                        True  -> do _ <- runDB $ SQL.update userKey [ UserNLastLogin SQL.=. now,
                                                                                          UserNNumLogins SQL.=. (numLogins+1) ]
                                                    _ <- runDB $ E.insert $ userData
                                                    ip <- fmap (show . remoteHost . reqWaiRequest) getRequest
-                                                   _  <- runDB $ E.insert $ BlockAppLogin { 
+                                                   _  <- runDB $ E.insert $ BlockAppLogin {
                                                                         blockAppLoginUserId = userKey,
                                                                         blockAppLoginBlockAppId = appId,
                                                                         blockAppLoginTimestamp = now,
                                                                         blockAppLoginIp = show ip
                                                                       }
-                                                   sendMailNewWallet emailDB (show $ J.encode userData) 
+                                                   sendMailNewWallet emailDB (show $ J.encode userData)
                                                    return $ userData
-   
+
 --  sendResponse $ addressDB1
   returnJson $ newUser

@@ -1,30 +1,30 @@
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes        #-}
 
 module Blockchain.CommunicationConduit
     ( handleMsgConduit
     ) where
 
-import Conduit
-import Control.Monad.Logger
-import Control.Monad.State
-import Crypto.Types.PubKey.ECC
+import           Conduit
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Crypto.Types.PubKey.ECC
 
-import Blockchain.Constants hiding (ethVersion)
-import Blockchain.Context
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Data.Wire
-import Blockchain.DB.DetailsDB hiding (getBestBlockHash)
-import Blockchain.DB.SQLDB
-import Blockchain.DBM
-import Blockchain.Event
-import Blockchain.ServOptions
-import Blockchain.Options
+import           Blockchain.Constants                  hiding (ethVersion)
+import           Blockchain.Context
+import           Blockchain.Data.Wire
+import           Blockchain.DB.DetailsDB               hiding (getBestBlockHash)
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.Event
+import           Blockchain.Options
+import           Blockchain.ServOptions
+import           Blockchain.Strato.Discovery.Data.Peer
 
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 
 ethVersion :: Int
 ethVersion = 62
@@ -35,7 +35,7 @@ awaitMsg = await >>= \case
     Just (MsgEvt msg) -> return $ Just msg
     Nothing           -> return Nothing
     _                 -> awaitMsg
-      
+
 handleMsgConduit :: (MonadIO m, MonadResource m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
                  => Point
                  -> PPeer

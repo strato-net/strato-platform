@@ -1,21 +1,21 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Blockchain.Sequencer.BinaryInstances() where
 
-import Data.Binary
+import           Data.Binary
 
+import           Blockchain.Data.Address     ()
 import qualified Blockchain.Data.DataDefs    as DD
 import qualified Blockchain.Data.Transaction as TX
-import Blockchain.Data.Address()
-import Blockchain.Data.TXOrigin()
-import GHC.Generics()
+import           Blockchain.Data.TXOrigin    ()
+import           GHC.Generics                ()
 
-import Blockchain.SHA()
-import Blockchain.Data.RLP
-import Blockchain.ExtWord()
+import           Blockchain.Data.RLP
+import           Blockchain.ExtWord          ()
+import           Blockchain.SHA              ()
 
-import Data.Time.Clock.POSIX
+import           Data.Time.Clock.POSIX
 
-import Data.ByteString()
+import           Data.ByteString             ()
 
 instance Binary TX.Transaction where
     put = put . rlpSerialize . rlpEncode

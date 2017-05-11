@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
-import Control.Monad.Logger
-import HFlags
+import           Control.Monad.Logger
+import           HFlags
 
-import Blockchain.Options ()
-import Blockchain.Output
-import Executable.StratoP2PClient
+import           Blockchain.Options         ()
+import           Blockchain.Output
+import           Executable.StratoP2PClient
 
 main :: IO ()
 main = do

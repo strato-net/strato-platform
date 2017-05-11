@@ -1,6 +1,6 @@
 module Handler.Tutorial where
 
-import Import
+import           Import
 
 getTutorialR :: Handler Html
 getTutorialR = do

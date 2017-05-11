@@ -1,6 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -8,23 +8,23 @@
 
 module Blockchain.Data.Json where
 
-import Blockchain.Data.Address
-import Blockchain.Data.Code
-import Blockchain.Data.DataDefs
-import Blockchain.Data.Transaction
-import Blockchain.Data.TXOrigin
-import Blockchain.Format
+import           Blockchain.Data.Address
+import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Transaction
+import           Blockchain.Data.TXOrigin
+import           Blockchain.Format
 
 import           Data.Aeson
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.Text.Encoding as T
+import qualified Data.ByteString             as B
+import qualified Data.ByteString.Base16      as B16
+import           Data.Maybe
+import qualified Data.Text.Encoding          as T
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import qualified Data.ByteString as B
-import           Numeric
 import           Data.Word
-import           Data.Maybe
 import           GHC.Generics
+import           Numeric
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
@@ -33,14 +33,14 @@ data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show,
 
 {- fix these later -}
 instance FromJSON Code
-instance ToJSON Code 
+instance ToJSON Code
 
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
 
 instance ToJSON RawTransaction' where
     toJSON (RawTransaction' rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod r s v bn h o) next) =
         object ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
-        "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod, 
+        "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod,
         "r" .= showHex r "",
         "s" .= showHex s "",
         "v" .= showHex v "",
@@ -79,7 +79,7 @@ instance FromJSON RawTransaction' where
       h <- (t .: "hash")
       time <- t .:? "timestamp" .!= UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
       o <- t .:? "origin" .!= API
-      
+
       return (RawTransaction' (RawTransaction time (Address fa)
                                               (tnon :: Integer)
                                               (tgp :: Integer)
@@ -98,7 +98,7 @@ instance FromJSON RawTransaction' where
 instance ToJSON RawTransaction where
     toJSON rt@(RawTransaction t (Address fa) non gp gl (Just (Address ta)) val cod r s v bn h o) =
         object ["from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
-        "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod, 
+        "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod,
         "r" .= showHex r "",
         "s" .= showHex s "",
         "v" .= showHex v "",
@@ -130,7 +130,7 @@ instance FromJSON RawTransaction where
       tto <- (t .:? "to")
       let toFld = case tto of
             (Just str) -> fmap (Address . fst . head . readHex) str
-            Nothing -> Nothing
+            Nothing    -> Nothing
       tval <- fmap read (t .: "value")
       tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .: "codeOrData")
       (tr :: Integer) <- fmap (fst . head . readHex) (t .: "r")
@@ -141,9 +141,9 @@ instance FromJSON RawTransaction where
       time <- t .:? "timestamp" .!= UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
       o <- t .: "origin"
       let bn = case mbn of
-            Just b -> b
+            Just b  -> b
             Nothing -> -1
-      
+
       return (RawTransaction time (Address fa)
                                               (fromIntegral tnon :: Integer)
                                               (fromIntegral $ tgp :: Integer)
@@ -156,7 +156,7 @@ instance FromJSON RawTransaction where
                                               (tv :: Word8)
                                               bn
                                               h
-                                              o) 
+                                              o)
     parseJSON _ = error "bad param when calling parseJSON for RawTransaction"
 
 rtToRtPrime :: (String , RawTransaction) -> RawTransaction'
@@ -168,31 +168,31 @@ rtToRtPrime' x = RawTransaction' x ""
 data Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
-    toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tr ts tv)) = 
-        object ["kind" .= ("Transaction" :: String), 
+    toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tr ts tv)) =
+        object ["kind" .= ("Transaction" :: String),
                 "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
-                "nonce" .= tnon, 
-                "gasPrice" .= tgp, 
-                "gasLimit" .= tgl, 
-                "to" .= showHex tto "", 
+                "nonce" .= tnon,
+                "gasPrice" .= tgp,
+                "gasLimit" .= tgl,
+                "to" .= showHex tto "",
                 "value" .= tval,
-                "data" .= td, 
-                "r" .= showHex tr "", 
-                "s" .= showHex ts "", 
+                "data" .= td,
+                "r" .= showHex tr "",
+                "s" .= showHex ts "",
                 "v" .= showHex tv "",
                 "hash" .= transactionHash tx,
                 "transactionType" .= (show $ transactionSemantics $ tx)]
     toJSON (Transaction' (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _)) = error "error in ToJSON for Transaction': You can't serialize a precompiled code"
-    toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval (Code ti) tr ts tv)) = 
-        object ["kind" .= ("Transaction" :: String), 
-                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),      
-                "nonce" .= tnon, 
-                "gasPrice" .= tgp, 
-                "gasLimit" .= tgl, 
-                "value" .= tval, 
+    toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval (Code ti) tr ts tv)) =
+        object ["kind" .= ("Transaction" :: String),
+                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
+                "nonce" .= tnon,
+                "gasPrice" .= tgp,
+                "gasLimit" .= tgl,
+                "value" .= tval,
                 "init" .= ti,
-                "r" .= showHex tr "", 
-                "s" .= showHex ts "", 
+                "r" .= showHex tr "",
+                "s" .= showHex ts "",
                 "v" .= showHex tv "",
                 "hash" .= transactionHash tx,
                 "transactionType" .= (show $ transactionSemantics $ tx)]
@@ -220,31 +220,31 @@ instance FromJSON Transaction' where
 
 
 instance ToJSON Transaction where
-    toJSON (tx@(MessageTX tnon tgp tgl (Address tto) tval td tr ts tv)) = 
-        object ["kind" .= ("Transaction" :: String), 
+    toJSON (tx@(MessageTX tnon tgp tgl (Address tto) tval td tr ts tv)) =
+        object ["kind" .= ("Transaction" :: String),
                 "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
-                "nonce" .= tnon, 
-                "gasPrice" .= tgp, 
-                "gasLimit" .= tgl, 
-                "to" .= showHex tto "", 
+                "nonce" .= tnon,
+                "gasPrice" .= tgp,
+                "gasLimit" .= tgl,
+                "to" .= showHex tto "",
                 "value" .= tval,
-                "data" .= td, 
-                "r" .= showHex tr "", 
-                "s" .= showHex ts "", 
+                "data" .= td,
+                "r" .= showHex tr "",
+                "s" .= showHex ts "",
                 "v" .= showHex tv "",
                 "hash" .= transactionHash tx,
                 "transactionType" .= (show $ transactionSemantics $ tx)]
     toJSON (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) = error "error in ToJSON for Transaction: You can't serialize a precompiled code"
-    toJSON (tx@(ContractCreationTX tnon tgp tgl tval (Code ti) tr ts tv)) = 
-        object ["kind" .= ("Transaction" :: String), 
-                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),      
-                "nonce" .= tnon, 
-                "gasPrice" .= tgp, 
-                "gasLimit" .= tgl, 
-                "value" .= tval, 
+    toJSON (tx@(ContractCreationTX tnon tgp tgl tval (Code ti) tr ts tv)) =
+        object ["kind" .= ("Transaction" :: String),
+                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
+                "nonce" .= tnon,
+                "gasPrice" .= tgp,
+                "gasLimit" .= tgl,
+                "value" .= tval,
                 "init" .= ti,
-                "r" .= showHex tr "", 
-                "s" .= showHex ts "", 
+                "r" .= showHex tr "",
+                "s" .= showHex ts "",
                 "v" .= showHex tv "",
                 "hash" .= transactionHash tx,
                 "transactionType" .= (show $ transactionSemantics $ tx)]
@@ -281,12 +281,12 @@ bToBPrime' x = Block' x ""
 data BlockData' = BlockData' BlockData deriving (Eq, Show)
 
 instance ToJSON BlockData' where
-      toJSON (BlockData' (BlockData ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh)) = 
+      toJSON (BlockData' (BlockData ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh)) =
         object ["kind" .= ("BlockData" :: String), "parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
         "mixHash" .= mh]
-      
+
       --TODO- check if this next case is needed
       --toJSON _ = object ["malformed BlockData" .= True]
 
@@ -296,7 +296,7 @@ bdToBdPrime = BlockData'
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 
 instance ToJSON BlockDataRef' where
-      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh bi h pow isConf td)) = 
+      toJSON (BlockDataRef' (BlockDataRef ph uh (Address a) sr tr rr _ d num gl gu ts ed non mh bi h pow isConf td)) =
         object ["parentHash" .= ph, "unclesHash" .= uh, "coinbase" .= (showHex a ""), "stateRoot" .= sr,
         "transactionsRoot" .= tr, "receiptsRoot" .= rr, "difficulty" .= d, "number" .= num,
         "gasLimit" .= gl, "gasUsed" .= gu, "timestamp" .= ts, "extraData" .= ed, "nonce" .= non,
@@ -310,13 +310,13 @@ bdrToBdrPrime = BlockDataRef'
 data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Show)
 
 instance ToJSON AddressStateRef' where
-    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch bNum) next) = 
-        object ["next" .= next, "kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b, 
+    toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch bNum) next) =
+        object ["next" .= next, "kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
         "contractRoot" .= cr, "code" .= c, "codeHash" .= ch, "latestBlockNum" .= bNum]
 
 instance ToJSON AddressStateRef where
-    toJSON (AddressStateRef (Address x) n b cr c ch bNum) = 
-        object ["kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b, 
+    toJSON (AddressStateRef (Address x) n b cr c ch bNum) =
+        object ["kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
         "contractRoot" .= cr, "code" .= c, "codeHash" .= ch, "latestBlockNum" .= bNum]
 
 instance FromJSON AddressStateRef' where
@@ -324,7 +324,7 @@ instance FromJSON AddressStateRef' where
       kind <- s .: "kind"
       if kind /= ("AddressStateRef" :: String)
         then fail "JSON is not AddressStateRef"
-        else asrToAsrPrime' <$> 
+        else asrToAsrPrime' <$>
               (AddressStateRef . Address . fst . head . readHex <$> s .: "address"
                 <*> s .: "nonce"
                 <*> (read <$> (s .: "balance"))
@@ -346,7 +346,7 @@ instance ToJSON LogDB where
                   maybeTopic3
                   maybeTopic4
                   dataBS
-                  bloomW512) = 
+                  bloomW512) =
         object ["hash" .= h,
                 "address" .= (showHex x ""),
                 "topic1" .= (maybe "" showHexSimple maybeTopic1 :: String),
@@ -362,7 +362,7 @@ Not needed yet.
 
 instance FromJSON LogDB where
     parseJSON (Object s) = do
-  
+
     parseJSON _ = fail "malformed log"
 -}
 
@@ -385,7 +385,7 @@ adToAdPrime x = Address' x ""
 
 data TransactionType = Contract | FunctionCall | Transfer  deriving (Eq, Show)
 
---instance ToJSON TransactionType where 
+--instance ToJSON TransactionType where
 --   toJSON x = object ["transactionType" .= show x]
 
 transactionSemantics :: Transaction -> TransactionType
@@ -396,8 +396,8 @@ transactionSemantics _ = Contract
 
 isAddr :: Maybe Address -> Bool
 isAddr a = case a of
-      Just _   -> True
-      Nothing  -> False
+      Just _  -> True
+      Nothing -> False
 
 rawTransactionSemantics :: RawTransaction -> TransactionType
 rawTransactionSemantics (RawTransaction _ _ _ _ _ ta _ cod _ _ _ _ _ _) = work

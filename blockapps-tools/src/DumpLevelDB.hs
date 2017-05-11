@@ -52,7 +52,7 @@ showKeyVal f dbType dbName maybeKey = do
       Just key -> do
                    maybeVal <- DB.get db def $ fst $ B16.decode $ BC.pack key
                    case maybeVal of
-                     Nothing -> error $ "Missing value in database: " ++ show key
+                     Nothing  -> error $ "Missing value in database: " ++ show key
                      Just val -> liftIO $ putStrLn $ f val
 
 typeToDB :: String -> IO String

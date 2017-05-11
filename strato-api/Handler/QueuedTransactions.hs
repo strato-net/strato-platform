@@ -2,9 +2,9 @@
 
 module Handler.QueuedTransactions where
 
-import Import
-import Handler.Common
-import qualified Prelude as P
+import           Handler.Common
+import           Import
+import qualified Prelude        as P
 
 
 getQueuedTransactionsR :: Handler Value

@@ -6,13 +6,13 @@ module Blockchain.Strato.Mining.Ethash.Util (
   repair
   ) where
 
-import Control.Monad
-import Data.Binary.Get
-import Data.Binary.Put
-import Data.Bits
-import qualified Data.ByteString as B
+import           Control.Monad
+import           Data.Binary.Get
+import           Data.Binary.Put
+import           Data.Bits
+import qualified Data.ByteString      as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Word
+import           Data.Word
 
 xorBS :: B.ByteString -> B.ByteString -> B.ByteString
 xorBS x y = B.pack $ B.zipWith xor x y
@@ -28,7 +28,7 @@ shatter::B.ByteString->[Word32]
 shatter x = runGet (replicateM len getWord32le) . BL.fromStrict $ x
   where
     len = B.length x `div` 4
-    
+
 
 repair::[Word32]->B.ByteString
-repair = B.concat . fmap (BL.toStrict . runPut . putWord32le) 
+repair = B.concat . fmap (BL.toStrict . runPut . putWord32le)

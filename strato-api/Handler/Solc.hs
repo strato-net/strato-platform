@@ -1,25 +1,26 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Handler.Solc (postSolcR) where
 
-import Control.Monad hiding (mapM_)
-import Control.Monad.Trans.Either
-import qualified Data.Aeson as Aeson
-import qualified Data.List as List
-import qualified Data.Map as Map
-import Data.Map ()
-import qualified Data.Text as Text
-import qualified Data.Traversable as Trv
+import           Control.Monad              hiding (mapM_)
+import           Control.Monad.Trans.Either
+import qualified Data.Aeson                 as Aeson
+import qualified Data.List                  as List
+import           Data.Map                   ()
+import qualified Data.Map                   as Map
+import qualified Data.Text                  as Text
+import qualified Data.Traversable           as Trv
 
-import Import
-import Handler.SolidityCommon
+import           Handler.SolidityCommon
+import           Import
 
-import System.Directory
-import System.Exit
-import System.FilePath
-import System.IO as IO
-import System.IO.Temp
-import System.Process
+import           System.Directory
+import           System.Exit
+import           System.FilePath
+import           System.IO                  as IO
+import           System.IO.Temp
+import           System.Process
 
 -- Query parameters allowed:
 --   src: solidity source code to be compiled, as a (url-encoded) string
@@ -36,7 +37,7 @@ postSolcR = do
   addHeader "Access-Control-Allow-Origin" "*"
   (postParams, mainFiles, importFiles) <- getSolSrc
   eitherErrEncode $ runSolc postParams mainFiles importFiles
-  
+
 runSolc :: Map String String -> Map String String -> Map String String
            -> EitherT String IO (Map String Aeson.Value)
 runSolc optsObj mainSrc importsSrc =
@@ -50,7 +51,7 @@ runSolc optsObj mainSrc importsSrc =
     solcOParam = optNoArg "optimize" optsObj
     solcORunsParam = optWithArg "optimize-runs" optsObj
     solcStdParam = optNoArg "add-std" optsObj
-    
+
     solcLinkParam = optNoArg "link" optsObj
     solcLibsParam = optWithArg "libraries" optsObj
 
@@ -63,14 +64,14 @@ execSolc compileOpts linkOpts mainSrc importsSrc =
     return $ Map.filter
       (\file -> case file of
           Aeson.Null -> False
-          _ -> True)
+          _          -> True)
       compiledFiles
 
 solcFile :: [String] -> [String] -> String -> String -> EitherT String IO Aeson.Value
 solcFile compileOpts linkOpts dir fileName = do
   solcOutput <- callSolc compileOpts dir fileName
   solcJSON0 <- hoistEither $ aesonDecodeUtf8 $ Text.pack solcOutput
-  let solcJSON1 = Map.lookup ("contracts" :: String) solcJSON0 
+  let solcJSON1 = Map.lookup ("contracts" :: String) solcJSON0
 
   let nullOutput n = liftM $ either (maybe (Right n) Left) Right
   mapEitherT (nullOutput $ Aeson.Null) $ do
@@ -78,7 +79,7 @@ solcFile compileOpts linkOpts dir fileName = do
       case Aeson.fromJSON <$> solcJSON1 of
         Just (Aeson.Error err) -> left $ Just err
         Just (Aeson.Success m) -> right m
-        Nothing -> left Nothing
+        Nothing                -> left Nothing
 
     let linkBin binabi bin tag =
           if (not . null $ linkOpts)
@@ -90,15 +91,15 @@ solcFile compileOpts linkOpts dir fileName = do
     linkJSON <- Trv.forM solcJSON $ \binabi ->
       bimapEitherT Just id $ mapEitherT (nullOutput Map.empty) $ do
         let lookupTag tag = case Aeson.fromJSON <$> Map.lookup tag binabi of
-              Just (Aeson.Error err) -> left $ Just err
+              Just (Aeson.Error err)  -> left $ Just err
               Just (Aeson.Success "") -> left Nothing
-              Just (Aeson.Success s) -> right s
-              Nothing -> left Nothing
+              Just (Aeson.Success s)  -> right s
+              Nothing                 -> left Nothing
         bin <- lookupTag "bin"
-        binabiL <- linkBin binabi bin "bin" 
+        binabiL <- linkBin binabi bin "bin"
         binr <- lookupTag "bin-runtime"
         linkBin binabiL binr "bin-runtime"
-    
+
     return $ Aeson.toJSON $ Map.filter (not . Map.null) linkJSON
 
 callSolc :: [String] -> String -> String -> EitherT String IO String
@@ -128,7 +129,7 @@ execWithEitherT op = do
   (exitCode, stdOut, stdErr) <- liftIO op
   case exitCode of
     ExitSuccess -> right stdOut
-    _ -> left stdErr
+    _           -> left stdErr
 
 withTempDir :: (String -> IO a) -> IO a
 withTempDir act = withSystemTempDirectory "solc" act

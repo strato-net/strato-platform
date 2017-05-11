@@ -2,22 +2,22 @@
 
 module Main where
 
-import Data.Functor
-import Data.Either (isRight, isLeft)
-import qualified Data.List.NonEmpty as NE
-import Control.Lens
-import Control.Monad.Except (catchError, throwError)
-import Control.Monad.Trans (liftIO)
-import Network.Kafka
-import Network.Kafka.Consumer
-import Network.Kafka.Producer
-import Network.Kafka.Protocol (ProduceResponse(..), KafkaError(..))
-import Test.Tasty
-import Test.Tasty.Hspec
-import Test.Tasty.QuickCheck
-import qualified Data.ByteString.Char8 as B
+import           Control.Lens
+import           Control.Monad.Except   (catchError, throwError)
+import           Control.Monad.Trans    (liftIO)
+import qualified Data.ByteString.Char8  as B
+import           Data.Either            (isLeft, isRight)
+import           Data.Functor
+import qualified Data.List.NonEmpty     as NE
+import           Network.Kafka
+import           Network.Kafka.Consumer
+import           Network.Kafka.Producer
+import           Network.Kafka.Protocol (KafkaError (..), ProduceResponse (..))
+import           Test.Tasty
+import           Test.Tasty.Hspec
+import           Test.Tasty.QuickCheck
 
-import Prelude
+import           Prelude
 
 main :: IO ()
 main = testSpec "the specs" specs >>= defaultMain

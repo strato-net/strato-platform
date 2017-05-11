@@ -7,31 +7,31 @@ module Imports (
   ImportError(..),
   getImportDefs,
   validateImports,
-  collapse  
+  collapse
   ) where
 
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Foldable ()
-import Data.Monoid
-import Data.Traversable ()
-import System.FilePath
+import           Data.Foldable    ()
+import           Data.Map         (Map)
+import qualified Data.Map         as Map
+import           Data.Monoid
+import           Data.Traversable ()
+import           System.FilePath
 
-import ParserTypes
+import           ParserTypes
 
 -- | A logical error type.  We need to report missing imports, at least, so
 -- that client code can known to look for them.
-data ImportError = 
+data ImportError =
   ImportCycle {
     importErrMainFile :: FileName
     } |
   MissingImport {
-    importErrMainFile :: FileName,
+    importErrMainFile  :: FileName,
     importErrRelImport :: FileName
     } |
   MissingSymbol {
-    importErrMainFile :: FileName,
-    importErrSymbol :: Identifier,
+    importErrMainFile  :: FileName,
+    importErrSymbol    :: Identifier,
     importErrRelImport :: FileName
     }
 
@@ -68,9 +68,9 @@ mp <//> fn = collapse $ prependIfRelative mp fn
 prependIfRelative :: FilePath -> FilePath -> FilePath
 prependIfRelative mp fn =
   case splitDirectories fn of
-    "." : _ -> mp </> fn
+    "." : _  -> mp </> fn
     ".." : _ -> mp </> fn
-    _ -> fn
+    _        -> fn
 
 -- | Transforms file paths into a canonical form with no . or ..
 -- components.  No standard function does this, because removing .. can
@@ -80,19 +80,19 @@ prependIfRelative mp fn =
 -- idea to have symlinks in your source directory structure.
 collapse :: FilePath -> FilePath
 collapse path = joinPath $ collapse' $ splitDirectories path
-  where collapse' [] = []
+  where collapse' []                = []
         collapse' (_ : ".." : rest) = collapse' rest
-        collapse' ("." : x : rest) = collapse' $ x : rest
-        collapse' (x : rest) = x : collapse' rest
+        collapse' ("." : x : rest)  = collapse' $ x : rest
+        collapse' (x : rest)        = x : collapse' rest
 
 data ImportState a = Go a | Err ImportError | Done deriving (Functor)
 
 instance (Monoid a) => Monoid (ImportState a) where
-  mappend x@(Err _) _ = x
-  mappend _ x@(Err _) = x
+  mappend x@(Err _) _   = x
+  mappend _ x@(Err _)   = x
   mappend (Go x) (Go y) = Go (x <> y)
-  mappend Done x = x
-  mappend x Done = x
+  mappend Done x        = x
+  mappend x Done        = x
   mempty = Done
 
 -- | Checks that the file import graph is actually well-defined and
@@ -103,17 +103,17 @@ validateImports files = slurp $ Map.map Go $ makeImportsRelative $ Map.map (map 
   where
     slurp importStateMap =
       case foldMap (const [] <$>) shiftedStateMap of
-        Done -> Right files
+        Done  -> Right files
         Err e -> Left e
-        _ -> slurp shiftedStateMap
+        _     -> slurp shiftedStateMap
       where shiftedStateMap = shift importStateMap
 
     shift importStateMap = Map.mapWithKey shiftState importStateMap
       where
         shiftState mainFile (Go imports) = checkCycles $ foldMap id $ map getImport imports
-          where 
+          where
             getImport fileName = Map.findWithDefault (Err $ MissingImport mainFile fileName) fileName importStateMap
-            checkCycles x@(Go newImports) = 
+            checkCycles x@(Go newImports) =
               if mainFile `elem` newImports
               then Err $ ImportCycle mainFile
               else x

@@ -2,7 +2,7 @@
 
 module Blockchain.Options where
 
-import HFlags
+import           HFlags
 
 data P2PClientMode = SingleThreaded | MultiThreaded
         deriving (Eq, Ord, Read, Show)

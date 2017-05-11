@@ -1,23 +1,23 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Network.Kafka.Producer where
 
-import Data.Bits ((.&.))
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.Digest.Murmur32 as Murmur32
-import Control.Applicative
-import Control.Lens
-import Control.Monad.Trans (liftIO)
-import Data.Monoid ((<>))
-import Data.Set (Set)
-import qualified Data.Set as Set
-import System.IO
-import qualified Data.Map as M
-import System.Random (getStdRandom, randomR)
+import           Control.Applicative
+import           Control.Lens
+import           Control.Monad.Trans    (liftIO)
+import           Data.Bits              ((.&.))
+import           Data.ByteString.Char8  (ByteString)
+import qualified Data.Digest.Murmur32   as Murmur32
+import qualified Data.Map               as M
+import           Data.Monoid            ((<>))
+import           Data.Set               (Set)
+import qualified Data.Set               as Set
+import           System.IO
+import           System.Random          (getStdRandom, randomR)
 
-import Prelude
+import           Prelude
 
-import Network.Kafka
-import Network.Kafka.Protocol
+import           Network.Kafka
+import           Network.Kafka.Protocol
 
 -- * Producing
 
@@ -50,7 +50,7 @@ partitionAndCollate ks = recurse ks M.empty
               topicPartitionsList <- brokerPartitionInfo $ _tamTopic x
               let maybeKey = x ^. tamMessage . messageKey . keyBytes
               pal <- case maybeKey of
-                Nothing -> getRandPartition topicPartitionsList
+                Nothing  -> getRandPartition topicPartitionsList
                 Just key -> return $ getPartitionByKey (_kafkaByteString key) topicPartitionsList
               let leader = maybe (Leader Nothing) _palLeader pal
                   tp = TopicAndPartition <$> pal ^? folded . palTopic <*> pal ^? folded . palPartition

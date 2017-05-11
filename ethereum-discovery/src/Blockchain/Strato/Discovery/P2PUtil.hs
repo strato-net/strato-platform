@@ -9,26 +9,23 @@ module Blockchain.Strato.Discovery.P2PUtil (
   DiscoverException(..)
   ) where
 
-import           Control.Error                (note)
-import           Control.Exception.Base       (Exception)
+import           Control.Error             (note)
+import           Control.Exception.Base    (Exception)
 
-import           Data.Bits                    (shiftR)
+import           Data.Bits                 (shiftR)
 import qualified Data.ByteString           as B
-import           Data.Word                    (Word8)
-import           Data.Typeable                (Typeable)
+import           Data.Typeable             (Typeable)
+import           Data.Word                 (Word8)
 
-import           Blockchain.ExtendedECDSA     (ExtendedSignature,
-                                               extSignMsg)
+import           Blockchain.ExtendedECDSA  (ExtendedSignature, extSignMsg)
 
 
-import           Crypto.PubKey.ECC.DH
-import           Crypto.Types.PubKey.ECC      (getCurveByName,
-                                              CurveName(SEC_p256k1),
-                                              Point(..))
 import qualified Crypto.Hash.SHA3          as SHA3
+import           Crypto.PubKey.ECC.DH
+import           Crypto.Types.PubKey.ECC   (CurveName (SEC_p256k1), Point (..), getCurveByName)
+import           Network.Haskoin.Crypto    (Word256)
 import qualified Network.Haskoin.Internals as H
 import qualified Network.Socket            as S
-import           Network.Haskoin.Crypto       (Word256)
 
 
 data DiscoverException = AffineException
@@ -72,5 +69,5 @@ intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
 sockAddrToIP :: S.SockAddr -> String
 sockAddrToIP (S.SockAddrInet6 _ _ host _) = show host
-sockAddrToIP (S.SockAddrUnix str) = str
-sockAddrToIP addr' = takeWhile (/= ':') (show addr')
+sockAddrToIP (S.SockAddrUnix str)         = str
+sockAddrToIP addr'                        = takeWhile (/= ':') (show addr')

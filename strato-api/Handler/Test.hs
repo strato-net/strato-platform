@@ -1,6 +1,6 @@
 module Handler.Test where
 
-import Import
+import           Import
 
 getTestR :: Handler Html
 getTestR = defaultLayout $ do

@@ -29,8 +29,7 @@ import           HFlags
 import           Network.Haskoin.Crypto                      (withSource)
 import qualified Network.Haskoin.Internals                   as Haskoin
 import           Numeric
-import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>),
-                                                              (</>))
+import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>))
 
 import           Blockchain.BlockChain
 import qualified Blockchain.Colors                           as C
@@ -333,7 +332,7 @@ runTestsInFile maybeTestName theFile = do
     Left err -> liftIO $ putStrLn err
     Right val ->
       case val of
-        Error err' -> liftIO $ putStrLn err'
+        Error err'    -> liftIO $ putStrLn err'
         Success tests -> runTests (filter ((matchName maybeTestName) . fst) (M.toList tests))
   where
     matchName::Maybe String->String->Bool

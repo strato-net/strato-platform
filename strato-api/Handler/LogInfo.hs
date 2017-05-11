@@ -1,32 +1,31 @@
-{-# LANGUAGE DeriveDataTypeable
-           , EmptyDataDecls
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
-           , MultiParamTypeClasses
-           , TypeFamilies
-           , UndecidableInstances
-           , GADTs
- #-}
+{-# LANGUAGE DeriveDataTypeable     #-}
+{-# LANGUAGE EmptyDataDecls         #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Handler.LogInfo where
 
-import Import
+import           Import
 
-import Handler.Common 
-import Handler.Filters
+import           Handler.Common
+import           Handler.Filters
 
+import           Data.List
 import qualified Database.Esqueleto as E
-import Data.List
 
-import qualified Prelude as P
+import qualified Prelude            as P
 
 
 
 getLogInfoR :: Handler Value
 getLogInfoR = do
                  getParameters <- reqGetParams <$> getRequest
-                 
+
                  let index' = fromIntegral (maybe 0 id $  extractPage "index" getParameters)  :: Int64
 
                  addHeader "Access-Control-Allow-Origin" "*"
@@ -37,7 +36,7 @@ getLogInfoR = do
 
                  logs <- runDB $ E.select $
                                         E.from $ \(lg) -> do
-                                        let criteria = P.map (getLogFilter lg) $ getParameters 
+                                        let criteria = P.map (getLogFilter lg) $ getParameters
                                         let allCriteria = ((lg E.^. LogDBId) E.>=. E.val (E.toSqlKey index')) : criteria
                                         E.where_ (P.foldl1 (E.&&.) allCriteria)
                                         E.limit $ limit

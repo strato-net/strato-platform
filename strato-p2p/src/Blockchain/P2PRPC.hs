@@ -1,8 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE TypeOperators              #-}
 
 module Blockchain.P2PRPC
   ( runStratoP2PComm
@@ -18,27 +18,27 @@ module Blockchain.P2PRPC
   , mkConn
   ) where
 
-import           Control.Monad.Trans.Except (runExceptT)
 import           Blockchain.Data.PubKey
-import           Crypto.Types.PubKey.ECC
-import           Control.Monad.Trans (liftIO)
-import           Control.Concurrent.STM.MonadIO
-import           Data.Aeson
 import           Blockchain.Strato.Discovery.Data.Peer
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Lazy.Char8 as BLC
+import           Control.Concurrent.STM.MonadIO
+import           Control.Monad.Trans                   (liftIO)
+import           Control.Monad.Trans.Except            (runExceptT)
+import           Crypto.Types.PubKey.ECC
+import           Data.Aeson
+import qualified Data.ByteString                       as BS
+import qualified Data.ByteString.Lazy                  as BL
+import qualified Data.ByteString.Lazy.Char8            as BLC
 import           Data.Conduit
 import           Data.Conduit.Network
-import qualified Data.Set as S
-import           Data.Text (Text)
-import qualified Data.Text as Text
+import qualified Data.Set                              as S
+import           Data.Text                             (Text)
+import qualified Data.Text                             as Text
 
-import Network.JsonRpc.Server
-import Network.JsonRpc.ServerAdapter
-import Network.JsonRpc.Client
+import           Network.JsonRpc.Client
+import           Network.JsonRpc.Server
+import           Network.JsonRpc.ServerAdapter
 
-import GHC.Generics
+import           GHC.Generics
 
 newtype ConnectedPeer = ConnectedPeer { unConnectedPeer :: PPeer }
 
@@ -48,14 +48,14 @@ instance Eq ConnectedPeer where
 instance Ord ConnectedPeer where
   a `compare` b = unMaybePoint (pPeerPubkey $ unConnectedPeer a) `compare` unMaybePoint (pPeerPubkey $ unConnectedPeer b)
     where unPoint (Point a'''STFUGHC''' b'''STFUGHC''') = (a'''STFUGHC''', b'''STFUGHC''')
-          unPoint PointO      = (0, 0) 
+          unPoint PointO                                = (0, 0)
           unMaybePoint = fmap unPoint
 
 newtype CommPort = CommPort { unCommPort :: Int }
         deriving (Eq, Ord, Read, Show)
 
-data RPCPeer = RPCPeer { rpcPeerIP :: String
-                       , rpcPeerPort :: Int
+data RPCPeer = RPCPeer { rpcPeerIP     :: String
+                       , rpcPeerPort   :: Int
                        , rpcPeerPubKey :: Maybe String
                        } deriving (Eq, Read, Show, Generic)
 
@@ -88,7 +88,7 @@ serve addresses = do
 
 
 mkConn :: BS.ByteString -> CommPort -> Connection IO
-mkConn host (CommPort port) input = liftIO $ (fmap BL.fromStrict) <$> runTCPClient (clientSettings port host) c 
+mkConn host (CommPort port) input = liftIO $ (fmap BL.fromStrict) <$> runTCPClient (clientSettings port host) c
   where runRPCInput = yield (BL.toStrict input) >> await
         c app = appSource app $$ (runRPCInput `fuseUpstream` appSink app)
 

@@ -2,17 +2,17 @@
 
 module Main where
 
-import Control.Monad
-import qualified Data.Array.IO as A
-import Data.Binary
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.ByteString.Internal
-import Numeric
+import           Control.Monad
+import qualified Data.Array.IO                             as A
+import           Data.Binary
+import qualified Data.ByteString                           as B
+import           Data.ByteString.Internal
+import qualified Data.ByteString.Lazy                      as BL
+import           Numeric
 
-import Blockchain.Strato.Mining.Ethash.Cache
-import Blockchain.Strato.Mining.Ethash.Constants
-import Blockchain.Strato.Mining.Ethash.Dataset
+import           Blockchain.Strato.Mining.Ethash.Cache
+import           Blockchain.Strato.Mining.Ethash.Constants
+import           Blockchain.Strato.Mining.Ethash.Dataset
 
 encodeWord8::Word8->String
 encodeWord8 c | c < 0x20 || c > 0x7e = "\\x" ++ showHex c ""

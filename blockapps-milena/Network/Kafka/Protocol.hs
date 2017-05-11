@@ -1,30 +1,30 @@
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE TemplateHaskell            #-}
 
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where
 
-import Control.Applicative
-import Control.Category (Category(..))
-import Control.Lens
-import Control.Monad (replicateM, liftM, liftM2, liftM3, liftM4, liftM5, unless)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.ByteString.Char8 (ByteString)
-import Data.ByteString.Lens (unpackedChars)
-import Data.Digest.CRC32
-import Data.Int
-import Data.Serialize.Get
-import Data.Serialize.Put
-import GHC.Exts (IsString(..))
-import System.IO
-import Numeric.Lens
-import Prelude hiding ((.), id)
-import qualified Data.ByteString.Char8 as B
+import           Control.Applicative
+import           Control.Category       (Category (..))
+import           Control.Lens
+import           Control.Monad          (liftM, liftM2, liftM3, liftM4, liftM5, replicateM, unless)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.ByteString.Char8  (ByteString)
+import qualified Data.ByteString.Char8  as B
+import           Data.ByteString.Lens   (unpackedChars)
+import           Data.Digest.CRC32
+import           Data.Int
+import           Data.Serialize.Get
+import           Data.Serialize.Put
+import           GHC.Exts               (IsString (..))
 import qualified Network
+import           Numeric.Lens
+import           Prelude                hiding (id, (.))
+import           System.IO
 
 data ReqResp a where
   MetadataRR       :: MonadIO m => MetadataRequest         -> ReqResp (m MetadataResponse)
@@ -271,7 +271,7 @@ requestBytes x = runPut $ do
 apiVersion :: RequestMessage -> ApiVersion
 apiVersion OffsetFetchRequest{}  = 1 -- have to be V1 to use kafka storage to allow metadata
 apiVersion OffsetCommitRequest{} = 2 -- use V2 commit to not deal with Timestamps, and get stored in Kafka
-apiVersion _ = ApiVersion 0 -- everything else is at version 0 right now
+apiVersion _                     = ApiVersion 0 -- everything else is at version 0 right now
 
 apiKey :: RequestMessage -> ApiKey
 apiKey ProduceRequest{}          = ApiKey 0
@@ -283,12 +283,12 @@ apiKey OffsetFetchRequest{}      = ApiKey 9
 apiKey GroupCoordinatorRequest{} = ApiKey 10
 
 instance Serializable RequestMessage where
-  serialize (ProduceRequest r) = serialize r
-  serialize (FetchRequest r) = serialize r
-  serialize (OffsetRequest r) = serialize r
-  serialize (MetadataRequest r) = serialize r
-  serialize (OffsetCommitRequest r) = serialize r
-  serialize (OffsetFetchRequest r) = serialize r
+  serialize (ProduceRequest r)          = serialize r
+  serialize (FetchRequest r)            = serialize r
+  serialize (OffsetRequest r)           = serialize r
+  serialize (MetadataRequest r)         = serialize r
+  serialize (OffsetCommitRequest r)     = serialize r
+  serialize (OffsetFetchRequest r)      = serialize r
   serialize (GroupCoordinatorRequest r) = serialize r
 
 instance Serializable Int64 where serialize = putWord64be . fromIntegral

@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE ForeignFunctionInterface   #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -22,29 +22,29 @@ module Blockchain.DB.AddressStateDB (
   addressStateExists,
   getAddressFromHash,
   getStorageKeyFromHash
-) where 
+) where
 
-import Blockchain.Data.Address
+import           Blockchain.Data.Address
 
-import Blockchain.ExtWord
-import Blockchain.Data.AddressStateDB
-import Blockchain.Data.RLP
-import Blockchain.DB.HashDB
-import Blockchain.DB.StateDB
-import Blockchain.Util
-import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.Data.AddressStateDB
+import           Blockchain.Data.RLP
+import qualified Blockchain.Database.MerklePatricia          as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.StateDB
+import           Blockchain.ExtWord
+import           Blockchain.Util
 
-import Data.Binary
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
-import Data.Maybe
+import           Data.Binary
+import qualified Data.ByteString.Base16                      as B16
+import qualified Data.ByteString.Char8                       as BC
+import qualified Data.ByteString.Lazy                        as BL
+import           Data.Maybe
 
-import Control.Monad.State as ST
-import Control.Monad.Trans.Resource
-       
-import qualified Data.NibbleString as N
+import           Control.Monad.State                         as ST
+import           Control.Monad.Trans.Resource
+
+import qualified Data.NibbleString                           as N
 
 getAddressState::(HasStateDB m, HasHashDB m)=>Address->m AddressState
 getAddressState address = do
@@ -59,7 +59,7 @@ getAddressState address = do
         return b
         where b = blankAddressState
       Just s -> return $ (rlpDecode . rlpDeserialize . rlpDecode) s
-        
+
 getAllAddressStates::(HasHashDB m, HasStateDB m, MonadResource m)=>m [(Address, AddressState)]
 getAllAddressStates = do
   sdb <- getStateDB
@@ -76,7 +76,7 @@ getAddressFromHash =
 
 getStorageKeyFromHash::(HasHashDB m, MonadResource m)=>N.NibbleString -> m (Maybe Word256)
 getStorageKeyFromHash  =
-  liftM (fmap (decode . BL.fromStrict . nibbleString2ByteString) ) . hashDBGet  
+  liftM (fmap (decode . BL.fromStrict . nibbleString2ByteString) ) . hashDBGet
 
 putAddressState::(HasStateDB m, HasHashDB m)=>Address->AddressState->m ()
 putAddressState address newState = do

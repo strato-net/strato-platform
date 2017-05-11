@@ -1,6 +1,6 @@
-{-# LANGUAGE FlexibleContexts        #-}
-{-# LANGUAGE OverloadedStrings       #-}
-{-# LANGUAGE TemplateHaskell         #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS -fno-warn-unused-imports #-} -- #justHFlagsThingz
 
 import           Control.Monad.Logger

@@ -1,19 +1,19 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module Main where
 
-import Control.Monad.Trans.Resource
-import qualified Database.LevelDB as LD
-import Test.HUnit
-import qualified Data.NibbleString as N
-import Blockchain.Data.RLP
-import Blockchain.Util
-import Blockchain.Database.MerklePatricia.MPDB
-import Blockchain.Database.MerklePatriciaMem
-import Blockchain.Database.MerklePatricia
-import Blockchain.Database.MerklePatricia.Internal
-import Blockchain.Database.MerklePatricia.InternalMem
+import           Blockchain.Data.RLP
+import           Blockchain.Database.MerklePatricia
+import           Blockchain.Database.MerklePatricia.Internal
+import           Blockchain.Database.MerklePatricia.InternalMem
+import           Blockchain.Database.MerklePatricia.MPDB
+import           Blockchain.Database.MerklePatriciaMem
+import           Blockchain.Util
+import           Control.Monad.Trans.Resource
+import qualified Data.NibbleString                              as N
+import qualified Database.LevelDB                               as LD
+import           Test.HUnit
 
 bigTest :: [(Key,String)]
 bigTest=
@@ -46,27 +46,27 @@ addAllKVsMem mpdb (x:rest) = do
 blank :: MPMem
 blank = initializeBlankMem {mpStateRoot=emptyTriePtr}
 
-testGetPut :: Test 
-testGetPut = TestCase $ do 
+testGetPut :: Test
+testGetPut = TestCase $ do
   db <- putSingleKV key val
   res <- getSingleKV db key
 
   assertEqual "get . put = id" res [(key,val)]
 
 testGetPutRepeated :: Test
-testGetPutRepeated = TestCase $ do 
+testGetPutRepeated = TestCase $ do
   db <- putSingleKV key val
-  db2 <- unsafePutKeyValMem db key2 val2 
+  db2 <- unsafePutKeyValMem db key2 val2
 
   res <- getSingleKV db2 key2
 
   assertEqual "get . put . put = id" res [(key2,val2)]
 
 testGetPutRepeatedII :: Test
-testGetPutRepeatedII = TestCase $ do 
+testGetPutRepeatedII = TestCase $ do
   db <- addAllKVsMem blank bigTest
 
-  res <- getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"   
+  res <- getSingleKV db "00000000000000000000000000000002ffffffffffffffff0000000000000003"
 
   assertEqual "get . putn = id" res [("00000000000000000000000000000002ffffffffffffffff0000000000000003",rlpEncode $ rlpSerialize $ rlpEncode ("84548123a8" :: String))]
 
@@ -76,10 +76,10 @@ testSingleInsert = TestCase $ do
       db <- LD.open "/tmp/testDB" LD.defaultOptions{LD.createIfMissing=True}
 
       let ldb' = MPDB {ldb=db,stateRoot=emptyTriePtr}
-  
+
       initializeBlank ldb'
 
-      addAllKVs ldb' [head bigTest]                      
+      addAllKVs ldb' [head bigTest]
 
   sr2 <- addAllKVsMem blank [head bigTest]
 
@@ -92,7 +92,7 @@ testMultipleInserts = TestCase $ do
       db <- LD.open "/tmp/testDB2" LD.defaultOptions{LD.createIfMissing=True}
 
       let ldb' = MPDB {ldb=db,stateRoot=emptyTriePtr}
-  
+
       initializeBlank ldb'
 
       addAllKVs ldb' bigTest
@@ -103,7 +103,7 @@ testMultipleInserts = TestCase $ do
 
 
 key :: N.NibbleString
-key = (byteString2NibbleString "anyString") 
+key = (byteString2NibbleString "anyString")
 
 val :: RLPObject
 val = (RLPString "anotherString")

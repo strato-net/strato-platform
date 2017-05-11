@@ -1,4 +1,6 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.Discovery.UDPServer (
       runEthUDPServer,
@@ -6,38 +8,38 @@ module Blockchain.Strato.Discovery.UDPServer (
       udpHandshakeServer
      ) where
 
-import Network.Socket
-import qualified Network.Socket.ByteString as NB
-import System.Timeout
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
-import qualified Crypto.Types.PubKey.ECC as ECC
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Base16 as B16
+import qualified Crypto.Types.PubKey.ECC                 as ECC
+import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Base16                  as B16
+import qualified Data.ByteString.Char8                   as BC
 import           Data.Monoid
+import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
-import qualified Data.Text as T
+import           Network.Socket
+import qualified Network.Socket.ByteString               as NB
+import           System.Timeout
 
-import System.Entropy
-import System.Random
+import           System.Entropy
+import           System.Random
 
-import Blockchain.Data.PubKey
-import qualified Blockchain.Colors as CL
+import qualified Blockchain.Colors                       as CL
+import           Blockchain.Data.PubKey
+import           Blockchain.DB.SQLDB
 import           Blockchain.EthConf
 import           Blockchain.Format
-import           Blockchain.DB.SQLDB
 import           Blockchain.SHA
-import           Blockchain.Strato.Discovery.UDP
-import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.ContextLite
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.P2PUtil
 import           Blockchain.Strato.Discovery.PeerDB
+import           Blockchain.Strato.Discovery.UDP
 
-import qualified Network.Haskoin.Internals as H
+import qualified Network.Haskoin.Internals               as H
 
 runEthUDPServer::(MonadIO m, MonadCatch m, MonadThrow m, MonadBaseControl IO m, MonadLogger m)=>
                  ContextLite->H.PrvKey->Int->Socket->m ()
@@ -207,6 +209,6 @@ handleValidPacket prv sock addr portNum packet otherPubKey =
                               return ()
 
 getAddrPort::SockAddr-> Either DiscoverException PortNumber
-getAddrPort (SockAddrInet portNumber _) = Right portNumber
+getAddrPort (SockAddrInet portNumber _)      = Right portNumber
 getAddrPort (SockAddrInet6 portNumber _ _ _) = Right portNumber
-getAddrPort s = Left $ MissingPortException $ "No port number: " ++ show s
+getAddrPort s                                = Left $ MissingPortException $ "No port number: " ++ show s

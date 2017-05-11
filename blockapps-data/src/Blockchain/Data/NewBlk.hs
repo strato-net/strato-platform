@@ -1,14 +1,14 @@
-{-# LANGUAGE OverloadedStrings, ForeignFunctionInterface #-}
 {-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE ForeignFunctionInterface   #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 
@@ -18,20 +18,20 @@ module Blockchain.Data.NewBlk (
   putNewBlk,
   blockToNewBlk,
   newBlkToBlock
-) where 
+) where
 
-import Control.Exception.Lifted
+import           Control.Exception.Lifted
 
-import Database.Persist hiding (get)
-import qualified Database.Persist.Postgresql as SQL
+import           Database.Persist             hiding (get)
+import qualified Database.Persist.Postgresql  as SQL
 
-import Blockchain.DB.SQLDB
+import           Blockchain.DB.SQLDB
 
-import Blockchain.Data.BlockDB
-import Blockchain.SHA
-import Blockchain.Data.DataDefs
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs
+import           Blockchain.SHA
 
-import Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Resource
 
 --import Debug.Trace
 

@@ -1,20 +1,22 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -fno-warn-orphans                                   #-}
 module Executable.EVMCheckpoint where
 
-import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base16   as B16
 
-import Blockchain.SHA
-import Blockchain.Data.RLP
+import qualified Blockchain.Colors        as CL
+import           Blockchain.Data.BlockDB  (blockHeaderHash)
 import qualified Blockchain.Data.DataDefs as DD
-import Blockchain.Data.BlockDB (blockHeaderHash) -- for `instance RLPSerializable DD.BlockData` and blockHeaderHash
-import Blockchain.Format
-import qualified Blockchain.Colors as CL
+import           Blockchain.Data.RLP
+import           Blockchain.Format
+import           Blockchain.SHA
 
-import qualified Network.Kafka.Protocol as KP
-import Blockchain.VMContext (ContextBestBlockInfo(..))
+import           Blockchain.VMContext     (ContextBestBlockInfo (..))
+import qualified Network.Kafka.Protocol   as KP
 
-import Control.Arrow ((>>>))
+import           Control.Arrow            ((>>>))
 
 data EVMCheckpoint = EVMCheckpoint {
     checkpointSHA    :: SHA,

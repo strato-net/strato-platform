@@ -1,59 +1,58 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Main where
 
+import qualified Blockchain.VM.TestDescriptions as TD
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Data.Aeson
+import qualified Data.ByteString.Lazy           as BL
+import           Data.Either
+import qualified Data.Map                       as M
+import           HFlags
 import           System.Directory
 import           Test.HUnit
-import           Data.Aeson
-import           Data.Either
-import           HFlags
-import qualified Blockchain.VM.TestDescriptions as TD
-import qualified Data.Map as M
-import qualified Data.ByteString.Lazy as BL
 
-import           Blockchain.VMOptions()
-import           Blockchain.VMContext
 import           Blockchain.VM.TestEthereum
 import           Blockchain.VM.TestFiles
+import           Blockchain.VMContext
+import           Blockchain.VMOptions           ()
 
 doTests :: [(String, TD.Test)] -> IO ()
 doTests tests = do
   results <- flip runLoggingT noLog $ runContextM $ forM tests $ \(n, t) -> do
-    result <- runTest t 
+    result <- runTest t
     return $ (n, result)
   let a = fst results :: [(String, Either String String)]
-  _ <- liftIO $ runTestTT $ TestList $ map f a 
+  _ <- liftIO $ runTestTT $ TestList $ map f a
   return ()
     where
-  f :: (String, Either a b) -> Test.HUnit.Test 
+  f :: (String, Either a b) -> Test.HUnit.Test
   f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
 
 doTests' :: [(String, TD.Test)] -> ContextM Counts
 doTests' tests = do
   results <- forM tests $ \(n, t) -> do
-    result <- runTest t 
+    result <- runTest t
     return $ (n, result)
   let a = results :: [(String, Either String String)]
-  liftIO $ runTestTT $ TestList $ map f a 
+  liftIO $ runTestTT $ TestList $ map f a
     where
-  f :: (String, Either a b) -> Test.HUnit.Test 
+  f :: (String, Either a b) -> Test.HUnit.Test
   f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
 
-doTests'' :: [(String, TD.Test)] -> ContextM Test.HUnit.Test 
+doTests'' :: [(String, TD.Test)] -> ContextM Test.HUnit.Test
 doTests'' tests = do
   results <- forM tests $ \(n, t) -> do
     result <- runTest t
     return $ (n, result)
   let a = results :: [(String, Either String String)]
-  return $ TestList $ map f a 
+  return $ TestList $ map f a
     where
-  f :: (String, Either a b) -> Test.HUnit.Test 
+  f :: (String, Either a b) -> Test.HUnit.Test
   f (n, r) = TestLabel n (TestCase $ assertBool n (isRight $ r))
 
 main::IO ()
@@ -71,17 +70,17 @@ main = do
         Right val ->
           case val of
             Success tests -> TestLabel theFileName <$> (doTests'' (M.toList tests))
-            _ -> error $ "hit Failure for " ++ show theFileName 
+            _             -> error $ "hit Failure for " ++ show theFileName
         Left _ -> error "hit Left"
 
   let g f mas = (fmap f) <$> sequence mas -- :: (Monad m, Traversable t) => (a -> b) -> t (m a) -> m (t b)
   let b = g id tests
-  
-  r <- do 
+
+  r <- do
     flip runLoggingT noLog $ runContextM $ b
 
   let rr = fst r :: [Test.HUnit.Test]
   void $ runTestTT $ TestList $ rr
-  
+
   return ()
 

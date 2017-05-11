@@ -19,30 +19,30 @@ module Blockchain.Data.BlockDB (
   createBlockFromHeaderAndBody
 ) where
 
-import qualified Database.Esqueleto           as E
-import           Database.Persist             hiding (get)
-import qualified Database.Persist.Postgresql  as SQL
+import qualified Database.Esqueleto                 as E
+import           Database.Persist                   hiding (get)
+import qualified Database.Persist.Postgresql        as SQL
 
 import           Data.Bits
-import qualified Data.ByteString              as B
+import qualified Data.ByteString                    as B
 
 import           Data.List
-import qualified Data.Map                     as M
+import qualified Data.Map                           as M
 import           Data.Maybe
-import qualified Data.Set                     as S
+import qualified Data.Set                           as S
 
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 
 import           Numeric
-import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
-import qualified Blockchain.Colors            as CL
+import qualified Blockchain.Colors                  as CL
 import           Blockchain.Constants
 import           Blockchain.Data.BlockHeader
 
+import           Blockchain.Database.MerklePatricia (StateRoot (..), unboxStateRoot)
 import           Blockchain.DB.SQLDB
-import           Blockchain.Database.MerklePatricia (StateRoot(..), unboxStateRoot)
 
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.RLP
@@ -198,7 +198,7 @@ putBlocks difficultyBase blocks makeHashOne = do
           ret <- SQL.getBy (UniqueTXHash txHash)
           key <-
             case ret of
-             Just x -> return $ entityKey x
+             Just x  -> return $ entityKey x
              Nothing -> error "error in putBlocks: no transaction exists in the DB, even though I just inserted it"
           SQL.update key [RawTransactionBlockNumber SQL.=. fromIntegral (blockDataNumber (blockBlockData b))]
           return key

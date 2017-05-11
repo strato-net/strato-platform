@@ -1,10 +1,10 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes    #-}
+{-# LANGUAGE EmptyDataDecls         #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE AllowAmbiguousTypes #-} -- todo: can a fundep solve this? its for line 33
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
 
 module Blockchain.Database.KeyVal (
     PointedKeyValDB(..),
@@ -12,13 +12,13 @@ module Blockchain.Database.KeyVal (
     KeyValMPMap
   ) where
 
-import Control.Monad.Trans
-import Control.Monad.Trans.Resource
-import Control.Monad.Trans.State
-import Blockchain.Database.MerklePatricia
-import Blockchain.Database.MerklePatriciaMem
+import           Blockchain.Database.MerklePatricia
+import           Blockchain.Database.MerklePatriciaMem
+import           Control.Monad.Trans
+import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.State
 
-{- 
+{-
   A general interface for a key value "database" with a distinguished element
   representing a "snapshot" or "summary" of the database. The "snapshot" can also
   include the database handle or connection string.
@@ -27,8 +27,8 @@ import Blockchain.Database.MerklePatriciaMem
   "snapshot".
 
   The unfortunate parameter t represents in some cases a file path for the on disk
-  db. 
--} 
+  db.
+-}
 
 class (Monad m) => PointedKeyValDB m a b c t | c -> t where
     getKV :: Monad m => a-> m (Maybe b)
@@ -42,15 +42,15 @@ type KeyValMPMap m = StateT MPMem m
 data Void
 
 instance (
-           Monad m, 
-           MonadBaseControl IO m, 
-           MonadThrow m, 
+           Monad m,
+           MonadBaseControl IO m,
+           MonadThrow m,
            MonadIO m
-         ) 
+         )
         => PointedKeyValDB (KeyValMPLevelDB m) Key Val MPDB String where
 
     getKV key = do
-        db <- get     
+        db <- get
         runResourceT $ getKeyVal db key
 
     putKV kvPair = do
@@ -58,18 +58,18 @@ instance (
         runResourceT $ putKeyVal db (fst kvPair) (snd kvPair)
 
     deleteKV key = do
-        db <- get 
-        runResourceT $ deleteKey db key 
+        db <- get
+        runResourceT $ deleteKey db key
 
     emptyKV path = liftIO $ runResourceT $ openMPDB path  -- fix
 
 instance (
            Monad m
-         ) 
+         )
         => PointedKeyValDB (KeyValMPMap m) Key Val MPMem Void where
 
     getKV key = do
-        db <- get     
+        db <- get
         getKeyValMem db key
 
     putKV kvPair = do
@@ -77,7 +77,7 @@ instance (
         putKeyValMem db (fst kvPair) (snd kvPair)
 
     deleteKV key = do
-        db <- get 
-        deleteKeyMem db key 
+        db <- get
+        deleteKeyMem db key
 
     emptyKV _ = return initializeBlankMem             -- fix

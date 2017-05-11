@@ -8,23 +8,23 @@ module Blockchain.DB.BlockSummaryDB (
   ) where
 
 
-import Control.Monad.Trans.Resource
-import Data.Binary
-import qualified Data.ByteString.Lazy as BL
-import Data.Maybe
-import qualified Database.LevelDB as LDB
+import           Control.Monad.Trans.Resource
+import           Data.Binary
+import qualified Data.ByteString.Lazy         as BL
+import           Data.Maybe
+import qualified Database.LevelDB             as LDB
 
-import Blockchain.Data.BlockSummary
-import Blockchain.Data.RLP
-import Blockchain.Format
-import Blockchain.SHA
+import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.RLP
+import           Blockchain.Format
+import           Blockchain.SHA
 
 type BlockSummaryDB = LDB.DB
 
 class MonadResource m => HasBlockSummaryDB m where
   getBlockSummaryDB :: m BlockSummaryDB
 
-        
+
 getBSum::(MonadResource m, HasBlockSummaryDB m)=>SHA->m BlockSummary
 getBSum blockHash = do
   db <- getBlockSummaryDB

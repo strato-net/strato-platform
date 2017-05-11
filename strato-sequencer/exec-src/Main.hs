@@ -1,19 +1,20 @@
-{-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Main where
 
-import Control.Monad.Logger
-import HFlags
+import           Control.Monad.Logger
+import           HFlags
 
-import Blockchain.Output
-import Blockchain.Sequencer
-import Blockchain.Sequencer.Monad
+import           Blockchain.Output
+import           Blockchain.Sequencer
+import           Blockchain.Sequencer.Monad
 
-import Blockchain.EthConf
+import           Blockchain.EthConf
 
-import Flags
+import           Flags
 
-import qualified Data.ByteString.Char8  as C8
-import qualified Network.Kafka.Protocol as KP
+import qualified Data.ByteString.Char8      as C8
+import qualified Network.Kafka.Protocol     as KP
 
 main :: IO ()
 main = do

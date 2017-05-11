@@ -5,13 +5,13 @@ module Blockchain.Database.MerklePatriciaMem (
   MPMem(..)
   ) where
 
-import qualified Crypto.Hash.SHA3 as SHA3
-import Data.Maybe (isJust)
-import qualified Data.Map as Map
+import qualified Crypto.Hash.SHA3                               as SHA3
+import qualified Data.Map                                       as Map
+import           Data.Maybe                                     (isJust)
 
-import Blockchain.Data.RLP
-import Blockchain.Database.MerklePatricia.InternalMem
-import Blockchain.Database.MerklePatricia.StateRoot
+import           Blockchain.Data.RLP
+import           Blockchain.Database.MerklePatricia.InternalMem
+import           Blockchain.Database.MerklePatricia.StateRoot
 
 putKeyValMem::Monad m=>MPMem
            ->Key
@@ -48,8 +48,8 @@ initializeBlankMem =
     let theRLP = rlpEncode (0::Integer)
         bytes = rlpSerialize theRLP
     in
-      MPMem { 
-        mpMap = Map.insert (SHA3.hash 256 bytes) bytes Map.empty, 
+      MPMem {
+        mpMap = Map.insert (SHA3.hash 256 bytes) bytes Map.empty,
         mpStateRoot = StateRoot bytes
       }
 

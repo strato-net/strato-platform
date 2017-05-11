@@ -2,17 +2,17 @@
 module Blockchain.Strato.Discovery.ExtendedECDSA (
   ExtendedSignature(..),
   extSignMsg,
-  getPubKeyFromSignature 
+  getPubKeyFromSignature
   ) where
 
-import Control.Monad
-import qualified Control.Monad.State as S
-import Control.Monad.Trans (lift)
-import Data.Bits
+import           Control.Monad
+import qualified Control.Monad.State       as S
+import           Control.Monad.Trans       (lift)
+import           Data.Bits
 
-import Network.Haskoin.Constants
-import Network.Haskoin.Crypto
-import Network.Haskoin.Internals
+import           Network.Haskoin.Constants
+import           Network.Haskoin.Crypto
+import           Network.Haskoin.Internals
 
 --import Debug.Trace
 
@@ -35,7 +35,7 @@ nextSecret = do
 
 genKeyPair :: Monad m => SecretT m (FieldN, Point)
 genKeyPair = do
-    -- 3.2.1.1 
+    -- 3.2.1.1
     d <- nextSecret
     -- 3.2.1.2
     let q = mulPoint d curveG
@@ -81,7 +81,7 @@ extSignMsg h d = do
 -------------------
 
 getPubKeyFromSignature::ExtendedSignature->Word256->Maybe PubKey
-getPubKeyFromSignature (ExtendedSignature sig yIsOdd) msgHash = 
+getPubKeyFromSignature (ExtendedSignature sig yIsOdd) msgHash =
   case ys of
     (firstY:secondY:_) ->
       let

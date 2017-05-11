@@ -1,13 +1,14 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
 module Blockchain.Strato.RedisBlockDB.Models where
 
-import qualified Data.ByteString.Char8                as S8
-import qualified Data.ByteString.Base16               as SB16
+import qualified Data.ByteString.Base16        as SB16
+import qualified Data.ByteString.Char8         as S8
 
-import qualified Blockchain.Data.BlockHeader          as BHD
+import qualified Blockchain.Data.BlockHeader   as BHD
 import           Blockchain.Data.RLP
-import qualified Blockchain.Data.Transaction          as TXD
+import qualified Blockchain.Data.Transaction   as TXD
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 
@@ -56,8 +57,8 @@ newtype RedisHeader    = RedisHeader   BHD.BlockHeader deriving (Eq, Read, Show,
 newtype RedisTx        = RedisTx       TXD.Transaction deriving (Eq, Read, Show, RLPSerializable, TransactionLike)
 newtype RedisTxs       = RedisTxs      [RedisTx]       deriving (Eq, Read, Show, RedisDBValuable)
 newtype RedisUncles    = RedisUncles   [RedisHeader]   deriving (Eq, Read, Show, RedisDBValuable)
-data RedisBestBlock = RedisBestBlock { bestBlockHash :: SHA
-                                     , bestBlockNumber :: Integer          -- todo: BlockNumber
+data RedisBestBlock = RedisBestBlock { bestBlockHash            :: SHA
+                                     , bestBlockNumber          :: Integer          -- todo: BlockNumber
                                      , bestBlockTotalDifficulty :: Integer -- todo: TotalDifficulty
                                      } deriving (Eq, Read, Show)
 
@@ -66,4 +67,4 @@ instance RedisDBValuable RedisBestBlock where
         where wrap (RedisBestBlock sha num total) = RLPArray [rlpEncode sha, rlpEncode num, rlpEncode total]
     fromValue = unwrap . rlpDeserialize
         where unwrap (RLPArray [sha, num, total]) = RedisBestBlock (rlpDecode sha) (rlpDecode num) (rlpDecode total)
-              unwrap _ = error "we are clearly incapable of humane exception handling"
+              unwrap _                            = error "we are clearly incapable of humane exception handling"

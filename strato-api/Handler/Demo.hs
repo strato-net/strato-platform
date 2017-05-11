@@ -1,6 +1,6 @@
 module Handler.Demo where
 
-import Import
+import           Import
 
 getDemoR :: Handler Html
 getDemoR = defaultLayout $ do

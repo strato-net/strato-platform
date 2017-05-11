@@ -1,9 +1,9 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.ContextLite (
@@ -17,22 +17,22 @@ module Blockchain.ContextLite (
   ) where
 
 
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.State
-import Control.Monad.Trans.Resource
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
 
-import Blockchain.Context
-import Blockchain.DBM
-import Blockchain.DB.SQLDB
-import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.EthConf (lookupRedisBlockDBConfig, mkConfiguredKafkaState)
+import           Blockchain.Context
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EthConf                    (lookupRedisBlockDBConfig, mkConfiguredKafkaState)
+import           Blockchain.Strato.Discovery.Data.Peer
 
-import qualified Database.Persist.Postgresql as SQL
-import qualified Database.PostgreSQL.Simple as PS
-import qualified Data.Text as T
+import qualified Data.Text                             as T
+import qualified Database.Persist.Postgresql           as SQL
+import qualified Database.PostgreSQL.Simple            as PS
 
-import qualified Database.Redis as Redis
+import qualified Database.Redis                        as Redis
 
 instance Show PS.Connection where
   show _ = "Postgres Simple Connection"

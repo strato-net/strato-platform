@@ -1,46 +1,45 @@
-{-# LANGUAGE DeriveDataTypeable
-           , EmptyDataDecls
-           , FlexibleContexts
-           , FlexibleInstances
-           , FunctionalDependencies
-           , MultiParamTypeClasses
-           , TypeFamilies
-           , UndecidableInstances
-           , GADTs
-           , OverloadedStrings
- #-}
+{-# LANGUAGE DeriveDataTypeable     #-}
+{-# LANGUAGE EmptyDataDecls         #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs                  #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE UndecidableInstances   #-}
 
 module Handler.BlockInfo where
 
 
-import Import
-import Handler.Common 
-import Handler.Filters
+import           Handler.Common
+import           Handler.Filters
+import           Import
 
 import qualified Database.Esqueleto as E
-       
-import Data.List
-import qualified Data.Map as Map
 
-import qualified Prelude as P
-import qualified Data.Text as T
+import           Data.List
+import qualified Data.Map           as Map
+
+import qualified Data.Text          as T
+import qualified Prelude            as P
 
 blockIdRef :: (E.Esqueleto query expr backend) =>(expr (Entity BlockDataRef), expr (Entity Block))-> expr (E.Value Bool)
 blockIdRef (a, t) = (a E.^. BlockDataRefBlockId E.==. t E.^. BlockId)
-                    
+
 getBlockInfoR :: Handler Value
 getBlockInfoR = do
               getParameters <- reqGetParams <$> getRequest
 
               appNameMaybe <- lookupGetParam "appname"
               case appNameMaybe of
-                (Just t) -> liftIO $ putStrLn $ t
+                (Just t)  -> liftIO $ putStrLn $ t
                 (Nothing) -> liftIO $ putStrLn "anon"
 
               limit <- liftIO $ myFetchLimit
 
               sortParam <- lookupGetParam "sortby"
-               
+
               let index'  = (fromIntegral $ (maybe 0 id $ extractPage "index" getParameters)  :: Integer)
               let raw    = (fromIntegral $ (maybe 0 id $ extractPage "raw" getParameters) :: Integer) > 0
               let paramMap = Map.fromList getParameters
@@ -57,7 +56,7 @@ getBlockInfoR = do
                     E.on ( btx E.^. BlockTransactionBlockId E.==. blk E.^. BlockId )
                     E.on ( blk E.^. BlockId E.==. bdRef E.^. BlockDataRefBlockId )
 
-                    let criteria = P.map (getBlkFilter (bdRef, accStateRef, rawTX, blk)) $ getParameters 
+                    let criteria = P.map (getBlkFilter (bdRef, accStateRef, rawTX, blk)) $ getParameters
                     let allCriteria = ((bdRef E.^. BlockDataRefNumber) E.>=. E.val index') : criteria
 
                     E.where_ (P.foldl1 (E.&&.) allCriteria)
@@ -78,7 +77,7 @@ getBlockInfoR = do
               toRet raw modBlocks (next addedParam) -- consider removing nub - it takes time n^{2}
             where
               toRet :: Bool -> [Block] -> String -> Handler Value
-              toRet raw bs gp = case if' raw bs (P.map bToBPrime (P.zip (P.repeat gp) bs)) of 
-                      Left a -> returnJson a
+              toRet raw bs gp = case if' raw bs (P.map bToBPrime (P.zip (P.repeat gp) bs)) of
+                      Left a  -> returnJson a
                       Right b -> returnJson b
-                   
+

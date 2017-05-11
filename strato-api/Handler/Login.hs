@@ -2,35 +2,35 @@
 
 module Handler.Login where
 
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Text            as T
+import qualified Data.Text.Encoding   as T
 
 
-import Network.Wai
-import Import
-import Handler.Filters
-import Handler.Common
+import           Handler.Common
+import           Handler.Filters
+import           Import
+import           Network.Wai
 
-import Crypto.BCrypt
-import qualified Database.Esqueleto as E
+import           Crypto.BCrypt
+import qualified Database.Esqueleto   as E
 import qualified Database.Persist.Sql as SQL
 
-import qualified Prelude as P
+import qualified Prelude              as P
 
 postLoginR :: Handler Value
 postLoginR = do
   addHeader "Access-Control-Allow-Origin" "*"
-  
+
   maybeEmail <- lookupPostParam "email"
   maybeAppName <- lookupPostParam "app"
   maybeAddress <- lookupPostParam "address"
-  maybeLoginPass <- lookupPostParam "loginpass"  
+  maybeLoginPass <- lookupPostParam "loginpass"
 
-  emailDB <- case maybeEmail of 
+  emailDB <- case maybeEmail of
     (Just email) -> return $ email
-    Nothing -> invalidArgs ["Missing 'email'"]
+    Nothing      -> invalidArgs ["Missing 'email'"]
 
-  (_,appId) <- case maybeAppName of 
+  (_,appId) <- case maybeAppName of
     (Just app) -> do appLookup <- runDB $ E.select $
                                         E.from $ \(a) -> do
                                         E.where_ (  a E.^. BlockAppName E.==. (E.val $ T.unpack app) E.&&.
@@ -39,14 +39,14 @@ postLoginR = do
                                         return a
                      case appLookup of
                             [] -> permissionDenied $ "app: " ++ app ++ " not registered"
-                            x -> return (app,E.entityKey $ P.head x)
+                            x  -> return (app,E.entityKey $ P.head x)
     Nothing -> invalidArgs ["Missing 'app'"]
 
-  addressDB <- case maybeAddress of 
+  addressDB <- case maybeAddress of
     (Just address) -> return $ address
-    Nothing -> invalidArgs ["Missing 'address'"]
+    Nothing        -> invalidArgs ["Missing 'address'"]
 
-  userWallet <- case maybeLoginPass of 
+  userWallet <- case maybeLoginPass of
     Nothing -> invalidArgs ["missing 'loginpass'"]
     (Just loginPass) -> do emailLookup <- runDB $ E.select $
                                         E.from $ \(u `E.LeftOuterJoin` ud) -> do
@@ -59,21 +59,21 @@ postLoginR = do
                                         return u
 
                            case emailLookup of
-                             [] -> do permissionDenied $ "invalid email or password or address" 
+                             [] -> do permissionDenied $ "invalid email or password or address"
                              x -> do now <- liftIO $ getCurrentTime --- todo, add last attempted login
                                      let userEnt = P.head x
                                          user = E.entityVal $ userEnt
                                          userKey = E.entityKey $ userEnt
                                          numLogins = userNNumLogins $ user
-                                         passHash = userNLoginPassHash $ user 
+                                         passHash = userNLoginPassHash $ user
                                          valid = validatePassword passHash (T.encodeUtf8 loginPass)
 
-                                     case valid of 
+                                     case valid of
                                        False -> permissionDenied $ "invalid email or password or address"
                                        True  -> do _ <- runDB $ SQL.update userKey [ UserNLastLogin SQL.=. now,
                                                                                          UserNNumLogins SQL.=. (numLogins+1) ]
                                                    ip <- fmap (show . remoteHost . reqWaiRequest) getRequest
-                                                   _ <- runDB $ E.insert $ BlockAppLogin { 
+                                                   _ <- runDB $ E.insert $ BlockAppLogin {
                                                                         blockAppLoginUserId = userKey,
                                                                         blockAppLoginBlockAppId = appId,
                                                                         blockAppLoginTimestamp = now,
@@ -84,13 +84,13 @@ postLoginR = do
                                                                      E.where_ ((u E.^. UserNEmail E.==. (E.val $ T.unpack emailDB)) E.&&.
                                                                                (u E.^. UserNVerified E.==. (E.val $ True)) E.&&.
                                                                                (ud E.^. UserDataAddress E.==. (E.val $ toAddr addressDB)))
-                                                                   
+
                                                                      E.limit $ (1 :: Int64)
                                                                      E.orderBy [E.desc (u E.^. UserNNumLogins)]
                                                                      return ud
-                       
+
                                                    return  userLookup
-   
+
 --  sendResponse $ addressDB1
   returnJson . E.entityVal . P.head  $ userWallet
 

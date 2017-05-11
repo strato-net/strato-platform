@@ -18,41 +18,41 @@ module Blockchain.Strato.Discovery.UDP (
   getHostAddress
   ) where
 
-import Network.Socket
-import qualified Network.Socket.ByteString as NB
+import           Network.Socket
+import qualified Network.Socket.ByteString             as NB
 
-import Control.Error (note, fmapL)
-import Control.Exception
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import qualified Crypto.Hash.SHA3 as SHA3
-import Crypto.Types.PubKey.ECC
-import Data.Binary
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import Data.List.Split
-import Data.Maybe
-import qualified Data.Text as T
-import Data.Time.Clock.POSIX
-import qualified Network.Haskoin.Internals as H
-import qualified Network.URI as URI
-import Numeric
-import System.Endian
-import System.Timeout
+import           Control.Error                         (fmapL, note)
+import           Control.Exception
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import qualified Crypto.Hash.SHA3                      as SHA3
+import           Crypto.Types.PubKey.ECC
+import           Data.Binary
+import           Data.Bits
+import qualified Data.ByteString                       as B
+import qualified Data.ByteString.Base16                as B16
+import qualified Data.ByteString.Char8                 as BC
+import           Data.List.Split
+import           Data.Maybe
+import qualified Data.Text                             as T
+import           Data.Time.Clock.POSIX
+import qualified Network.Haskoin.Internals             as H
+import qualified Network.URI                           as URI
+import           Numeric
+import           System.Endian
+import           System.Timeout
 
-import qualified Blockchain.Colors as CL
-import Blockchain.Data.RLP
-import Blockchain.ExtendedECDSA
-import Blockchain.ExtWord
-import Blockchain.Format
-import Blockchain.SHA
-import Blockchain.Util
-import Blockchain.Strato.Discovery.P2PUtil (hPubKeyToPubKey, DiscoverException(..))
+import qualified Blockchain.Colors                     as CL
+import           Blockchain.Data.RLP
+import           Blockchain.ExtendedECDSA
+import           Blockchain.ExtWord
+import           Blockchain.Format
+import           Blockchain.SHA
+import           Blockchain.Strato.Discovery.P2PUtil   (DiscoverException (..), hPubKeyToPubKey)
+import           Blockchain.Util
 
-import Blockchain.Strato.Discovery.Data.Peer
+import           Blockchain.Strato.Discovery.Data.Peer
 
 encrypt :: H.PrvKey -> Word256 -> H.SecretT IO ExtendedSignature
 encrypt = flip extSignMsg
@@ -67,10 +67,10 @@ data NodeDiscoveryPacket =
   Neighbors [Neighbor] Integer deriving (Show,Read,Eq)
 
 instance Format NodeDiscoveryPacket where
-  format (Ping _ from to _) = CL.blue "Ping" ++ " " ++ format from ++ " to: " ++ format to
-  format (Pong to _ _) = CL.blue "Pong" ++ " to: " ++ format to
+  format (Ping _ from to _)       = CL.blue "Ping" ++ " " ++ format from ++ " to: " ++ format to
+  format (Pong to _ _)            = CL.blue "Pong" ++ " to: " ++ format to
   format (FindNeighbors nodeID _) = CL.blue "FindNeighbors " ++ format nodeID
-  format (Neighbors neighbors _) = CL.blue "Neighbors" ++ ": \n" ++ unlines (map (("    " ++) . format) neighbors)
+  format (Neighbors neighbors _)  = CL.blue "Neighbors" ++ ": \n" ++ unlines (map (("    " ++) . format) neighbors)
 
 data IAddr = HostName String
            | IPV4Addr HostAddress
@@ -101,16 +101,16 @@ stringToIAddr :: String -> IAddr
 stringToIAddr x
     | URI.isIPv4address x = case map read $ splitOn "." x of
         [a,b,c,d] -> IPV4Addr $ a + (b `shift` 8) + (c `shift` 16) + (d `shift` 24)
-        _ -> error $ "Invalid IPV4: " ++ x
+        _         -> error $ "Invalid IPV4: " ++ x
     | URI.isIPv6address x = case map (read . ("0x" ++)) $ splitOn ":" x of
         [a,b,c,d,e,f,g,h] -> IPV6Addr $ tupleToHostAddress6 (a,b,c,d,e,f,g,h)
-        _ -> error $ "Invalid IPV6: " ++ x
+        _                 -> error $ "Invalid IPV6: " ++ x
     | otherwise = HostName x
 
 instance RLPSerializable IAddr where
-  rlpEncode (IPV4Addr x) = rlpEncode $ fromBE32 x
+  rlpEncode (IPV4Addr x)   = rlpEncode $ fromBE32 x
   rlpEncode x@(IPV6Addr _) = error $ "case not yet covered for rlpEncode for IPV6: " ++ format x
-  rlpEncode (HostName s) = rlpEncode $ (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
+  rlpEncode (HostName s)   = rlpEncode $ (B.pack [255, 255, 255, 255] `B.append` BC.pack s)
   rlpDecode o@(RLPString s)
       | B.length s == 4 = IPV4Addr $ fromBE32 $ rlpDecode o
       --TODO- verify the order of this
@@ -154,7 +154,7 @@ peerToNeighbor p = do
 
 getHostAddress :: SockAddr -> Either DiscoverException IAddr
 getHostAddress (SockAddrInet _ x) = Right $ IPV4Addr x
-getHostAddress x = Left $ IPFormatException $ "Unsupported case in sockAddrToHostAddr: " ++ show x
+getHostAddress x                  = Left $ IPFormatException $ "Unsupported case in sockAddrToHostAddr: " ++ show x
 
 ndPacketToRLP :: NodeDiscoveryPacket -> (Word8, RLPObject)
 ndPacketToRLP (Ping ver (Endpoint ipFrom udpPortFrom tcpPortFrom) (Endpoint ipTo udpPortTo tcpPortTo) expiration) =
@@ -264,13 +264,13 @@ nodeIDToPoint (NodeID nodeID) = Point x y
       y = byteString2Integer $ B.drop 32 nodeID
 
 pointToNodeID::Point->NodeID
-pointToNodeID PointO = error "called pointToNodeID with PointO, we can't handle that yet"
+pointToNodeID PointO      = error "called pointToNodeID with PointO, we can't handle that yet"
 pointToNodeID (Point x y) = NodeID $ B.pack $ word256ToBytes (fromInteger x) ++ word256ToBytes (fromInteger y)
 
 instance RLPSerializable NodeID where
   rlpEncode (NodeID x) = RLPString x
   rlpDecode (RLPString x) = NodeID x
-  rlpDecode x = error $ "unsupported rlp in rlpDecode for NodeID: " ++ show x
+  rlpDecode x             = error $ "unsupported rlp in rlpDecode for NodeID: " ++ show x
 
 instance Format NodeID where
   format (NodeID x) = BC.unpack (B16.encode $ B.take 10 x) ++ "...."
@@ -317,8 +317,8 @@ getServerPubKey myPriv domain port =
       pubKey <- try (timeout 5000000 (NB.recv socket' 2000 >>= processDataStream' . B.unpack)) :: IO (Either SomeException (Maybe H.PubKey))
 
       case pubKey of
-        Right Nothing -> return $ Left $ SomeException UDPTimeout
-        Left x -> return $ Left x
+        Right Nothing  -> return $ Left $ SomeException UDPTimeout
+        Left x         -> return $ Left x
         Right (Just x) -> return $ fmapL SomeException $ hPubKeyToPubKey x
 
 findNeighbors::H.PrvKey -> String -> PortNumber -> IO ()

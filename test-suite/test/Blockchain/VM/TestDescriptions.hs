@@ -1,4 +1,6 @@
-{-# LANGUAGE DeriveGeneric, OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.VM.TestDescriptions (
@@ -13,68 +15,68 @@ module Blockchain.VM.TestDescriptions (
   ) where
 
 import           Data.Aeson
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.HashMap.Lazy as H
-import qualified Data.Map as M
+import qualified Data.ByteString           as B
+import qualified Data.ByteString.Base16    as B16
+import qualified Data.ByteString.Char8     as BC
+import qualified Data.HashMap.Lazy         as H
+import qualified Data.Map                  as M
 import           Data.Maybe
-import qualified Data.Text as T
+import qualified Data.Text                 as T
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
-import           GHC.Generics hiding (to)
+import           GHC.Generics              hiding (to)
 import qualified Network.Haskoin.Internals as Haskoin
 import           Numeric
 
-import Blockchain.Data.Address
-import Blockchain.Data.Code
-import Blockchain.Data.Log
-import Blockchain.SHA
-import Blockchain.Util
-import Blockchain.VM.VMState
+import           Blockchain.Data.Address
+import           Blockchain.Data.Code
+import           Blockchain.Data.Log
+import           Blockchain.SHA
+import           Blockchain.Util
+import           Blockchain.VM.VMState
 
 data Env =
   Env {
-    currentCoinbase::Address,
-    currentDifficulty::String,
-    currentGasLimit::Integer,
-    currentNumber::String,
-    --currentTimestamp::String,
-    currentTimestamp::UTCTime,
-    previousHash::SHA
+    currentCoinbase   ::  Address,
+    currentDifficulty ::  String,
+    currentGasLimit   ::  Integer,
+    currentNumber     ::  String,
+    --currentTimestamp  ::  String,
+    currentTimestamp  ::  UTCTime,
+    previousHash      ::  SHA
     } deriving (Generic, Show)
 
 data AddressState' =
   AddressState' {
-    nonce'::Integer,
-    balance'::Integer,
-    storage'::M.Map Integer Integer,
-    contractCode'::Code
+    nonce'        ::  Integer,
+    balance'      ::  Integer,
+    storage'      ::  M.Map Integer Integer,
+    contractCode' ::  Code
     } deriving (Generic, Show, Eq)
 
-newtype RawData = RawData { theData::B.ByteString } deriving (Show, Eq)
+newtype RawData = RawData { theData  ::  B.ByteString } deriving (Show, Eq)
 
 data Exec =
   Exec {
-    address'::Address,
-    caller::Address,
-    code::Code,
-    data'::RawData,
-    gas'::String,
-    gasPrice'::String,
-    origin::Address,
-    value'::String
+    address'  ::  Address,
+    caller    ::  Address,
+    code      ::  Code,
+    data'     ::  RawData,
+    gas'      ::  String,
+    gasPrice' ::  String,
+    origin    ::  Address,
+    value'    ::  String
     } deriving (Generic, Show)
 
 data Transaction' =
   Transaction' {
-    tData'::RawData,
-    tGasLimit'::String,
-    tGasPrice'::String,
-    tNonce'::String,
-    tSecretKey'::Haskoin.PrvKey,
-    tTo'::Maybe Address,
-    tValue'::String
+    tData'      ::  RawData,
+    tGasLimit'  ::  String,
+    tGasPrice'  ::  String,
+    tNonce'     ::  String,
+    tSecretKey' ::  Haskoin.PrvKey,
+    tTo'        ::  Maybe Address,
+    tValue'     ::  String
     } deriving (Show)
 
 data InputWrapper = IExec Exec | ITransaction Transaction' deriving (Show)
@@ -82,45 +84,45 @@ data InputWrapper = IExec Exec | ITransaction Transaction' deriving (Show)
 {-
 data CallCreate =
   CallCreate {
-    ccData::String,
-    ccDestination::String,
-    ccGasLimit::String,
-    ccValue::String
+    ccData  ::  String,
+    ccDestination  ::  String,
+    ccGasLimit  ::  String,
+    ccValue  ::  String
     } deriving (Show, Eq)
 -}
 
 {-
 data Log =
   Log {
-    logAddress::String,
-    logBloom'::String,
-    logData::String,
-    logTopics::[String]
+    logAddress  ::  String,
+    logBloom'  ::  String,
+    logData  ::  String,
+    logTopics  ::  [String]
     } deriving (Show, Eq)
 -}
 
 data Test =
   Test {
-    callcreates::Maybe [DebugCallCreate],
-    env::Env,
-    theInput::InputWrapper,
+    callcreates  ::  Maybe [DebugCallCreate],
+    env          ::  Env,
+    theInput     ::  InputWrapper,
     {-
-    exec::Maybe Exec,
-    transaction::Maybe Transaction,
+    exec  ::  Maybe Exec,
+    transaction  ::  Maybe Transaction,
     -}
-    remainingGas::Maybe Integer,
-    logs'::[Log],
-    out::RawData,
-    pre::M.Map Address AddressState',
-    post::M.Map Address AddressState'
+    remainingGas ::  Maybe Integer,
+    logs'        ::  [Log],
+    out          ::  RawData,
+    pre          ::  M.Map Address AddressState',
+    post         ::  M.Map Address AddressState'
     } deriving (Generic, Show)
 
 type Tests = M.Map String Test
 
-convertAddressAndAddressInfo::M.Map String AddressState'->M.Map Address AddressState'
+convertAddressAndAddressInfo  ::  M.Map String AddressState'->M.Map Address AddressState'
 convertAddressAndAddressInfo = M.fromList . map convertPre' . M.toList
     where
-      convertPre'::(String, AddressState')->(Address, AddressState')
+      convertPre'  ::  (String, AddressState')->(Address, AddressState')
       convertPre' (addressString, addressState) = (Address $ fromInteger $ byteString2Integer $ fst $ B16.decode $ BC.pack addressString, addressState)
 
 
@@ -159,13 +161,13 @@ instance FromJSON Test where
 --Same as an Integer, but can be pulled from json files as either a json number or string (like "2")
 newtype SloppyInteger = SloppyInteger Integer
 
-sloppyInteger2Integer::SloppyInteger->Integer
+sloppyInteger2Integer  ::  SloppyInteger->Integer
 sloppyInteger2Integer (SloppyInteger x) = x
 
 instance FromJSON SloppyInteger where
   parseJSON (Number x) = return $ SloppyInteger $ floor x
-  parseJSON (String x) = return $ SloppyInteger $ floor $ (read $ T.unpack x::Double)
-  parseJSON x = error $ "Wrong format when trying to parse SloppyInteger from JSON: " ++ show x
+  parseJSON (String x) = return $ SloppyInteger $ floor $ (read $ T.unpack x  ::  Double)
+  parseJSON x          = error $ "Wrong format when trying to parse SloppyInteger from JSON: " ++ show x
 
 instance FromJSON Exec where
   parseJSON (Object v) =
@@ -185,26 +187,26 @@ instance FromJSON Exec where
 --   parseJSON (String v) = fmap Just $ parseJSON (String v)
 --   parseJSON x = error $ "Wrong format when trying to parse 'Maybe Address' from JSON: " ++ show x
 
-sloppyParseHexNumber::T.Text->Integer
+sloppyParseHexNumber  ::  T.Text->Integer
 sloppyParseHexNumber x =
   case readHex x' of
    [(val, "")] -> val
-   _ -> error $ "bad value passed to sloppyParseHexNumber: " ++ show x
+   _           -> error $ "bad value passed to sloppyParseHexNumber: " ++ show x
   where
     x' = removeOptional0x $ T.unpack x
     removeOptional0x ('0':'x':rest) = rest
-    removeOptional0x x'' = x''                                  
+    removeOptional0x x''            = x''
 
-sloppyParseHexByteString::T.Text->B.ByteString
+sloppyParseHexByteString  ::  T.Text->B.ByteString
 sloppyParseHexByteString x =
   case B16.decode $ BC.pack x' of
    (val, "") -> val
-   _ -> error $ "bad value passed to sloppyParseHexNumber: " ++ show x
+   _         -> error $ "bad value passed to sloppyParseHexNumber: " ++ show x
   where
     x' = removeOptional0x $ T.unpack x
     removeOptional0x ('0':'x':rest) = rest
-    removeOptional0x x'' = x''                                  
-         
+    removeOptional0x x''            = x''
+
 instance FromJSON Transaction' where
   parseJSON (Object v) =
     transaction' <$>
@@ -248,7 +250,7 @@ instance FromJSON AddressState where
     v .: "storage" <*>
     v .: "code"
     where
-      addressState::String->String->Object->SHA->AddressState
+      addressState  ::  String->String->Object->SHA->AddressState
       addressState w x y z = AddressState (read w) (read x) emptyTriePtr z
   parseJSON x = error $ "Wrong format when trying to parse AddressState from JSON: " ++ show x
 -}
@@ -261,7 +263,7 @@ instance FromJSON AddressState' where
     v .: "storage" <*>
     v .: "code"
     where
-      addressState'::String->String->M.Map String String->Code->AddressState'
+      addressState'  ::  String->String->M.Map String String->Code->AddressState'
       addressState' w x y z = AddressState' (hexOrDecString2Integer w) (hexOrDecString2Integer x) (readMap y) z
       readMap = (M.map hexOrDecString2Integer) . (M.mapKeys hexOrDecString2Integer)
       hexOrDecString2Integer "0x" = 0
@@ -293,11 +295,11 @@ instance FromJSON Log where
       log' v1 v2 d v4 = Log v1 (fromIntegral $ byteString2Integer $ fst $ B16.decode v2) (sloppyParseHexByteString d) v4
   parseJSON x = error $ "Wrong format when trying to parse Log from JSON: " ++ show x
 
-b16_decode_optional0x::B.ByteString->(B.ByteString, B.ByteString)
-b16_decode_optional0x x = 
+b16_decode_optional0x  ::  B.ByteString->(B.ByteString, B.ByteString)
+b16_decode_optional0x x =
   case BC.unpack x of
     ('0':'x':rest) -> B16.decode $ BC.pack rest
-    _ -> B16.decode x
+    _              -> B16.decode x
 
 
 {- DOIT Readd
@@ -313,7 +315,7 @@ instance FromJSON B.ByteString where
     withText "Address" $
     pure . string2ByteString . T.unpack
     where
-      string2ByteString::String->B.ByteString
+      string2ByteString  ::  String->B.ByteString
       string2ByteString ('0':'x':rest) = fst . B16.decode . BC.pack $ rest
       string2ByteString x = fst . B16.decode . BC.pack $ x
 -}
@@ -323,9 +325,9 @@ instance FromJSON Code where
     withText "SHA" $
     pure . string2Code . T.unpack
     where
-      string2Code::String->Code
+      string2Code  ::  String->Code
       string2Code ('0':'x':rest) = Code . fst . B16.decode . BC.pack $ rest
-      string2Code x = error $ "string2Code called with input of wrong format: " ++ x
+      string2Code x              = error $ "string2Code called with input of wrong format: " ++ x
 
 instance FromJSON Haskoin.PrvKey where
   parseJSON =
@@ -337,7 +339,7 @@ instance FromJSON RawData where
     withText "RawData" $
     pure . string2RawData . T.unpack
     where
-      string2RawData::String->RawData
+      string2RawData  ::  String->RawData
       string2RawData x = RawData . fst . b16_decode_optional0x . BC.pack $ x
 
 {- DOIT Readd
@@ -346,7 +348,7 @@ instance FromJSON SHA where
     withText "SHA" $
     pure . string2SHA . T.unpack
     where
-      string2SHA::String->SHA
+      string2SHA  ::  String->SHA
       string2SHA ('0':'x':rest) = SHA . fromIntegral . byteString2Integer . fst . B16.decode . BC.pack $ rest
       string2SHA x = SHA . fromIntegral . byteString2Integer . fst . B16.decode . BC.pack $ x
 -}

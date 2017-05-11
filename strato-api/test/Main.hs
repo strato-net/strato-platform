@@ -1,11 +1,11 @@
 module Main where
 
 
-import Test.Hspec.Runner
-import Hspec.Formatters.Blaze (blazeFormatter)
-import System.IO
-import Data.Maybe
-import Control.Monad
+import           Control.Monad
+import           Data.Maybe
+import           Hspec.Formatters.Blaze (blazeFormatter)
+import           System.IO
+import           Test.Hspec.Runner
 
 import qualified Spec
 

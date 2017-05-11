@@ -34,8 +34,7 @@ import           System.Directory
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>), (</>))
 
 
-import           Blockchain.Bagger.BaggerState      (BaggerState,
-                                                     defaultBaggerState)
+import           Blockchain.Bagger.BaggerState      (BaggerState, defaultBaggerState)
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB

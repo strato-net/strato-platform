@@ -33,7 +33,7 @@ wei = 1
 -- minimumDifficulty = minBlockDifficulty $ blockConfig $ ethConf
 
 minimumDifficulty = 12000
-difficultyDurationLimit = 8 
+difficultyDurationLimit = 8
 difficultyAdjustment=11::Int
 difficultyExpDiffPeriod=100000
 

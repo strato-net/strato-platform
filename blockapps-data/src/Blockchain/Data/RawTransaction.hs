@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE EmptyDataDecls             #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -9,8 +9,7 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE DeriveGeneric              #-}
-    
+
 module Blockchain.Data.RawTransaction (
   RawTransaction(..),
   insertRawTX,
@@ -20,16 +19,16 @@ module Blockchain.Data.RawTransaction (
   ) where
 
 
-import Control.Exception.Lifted
-import Control.Monad.IO.Class
-import Control.Monad
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Resource
-import qualified Database.Persist.Postgresql as SQL
+import           Control.Exception.Lifted
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import qualified Database.Persist.Postgresql  as SQL
 
-import Blockchain.Data.DataDefs
-import Blockchain.DB.SQLDB
-import Blockchain.DBM
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
 
 
 insertRawTXIfNew::HasSQLDB m=>[RawTransaction]->m ()
@@ -37,7 +36,7 @@ insertRawTXIfNew = insertRawTX Fail
 
 insertRawTXIfNew'::(MonadBaseControl IO m, MonadIO m)=>
                    [RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
-insertRawTXIfNew' = insertRawTX' Fail 
+insertRawTXIfNew' = insertRawTX' Fail
 
 insertRawTX :: HasSQLDB m=>DebugMode->[RawTransaction]->m ()
 insertRawTX m rawTXs= do
@@ -149,7 +148,7 @@ instance RLPSerializable RawTransaction where
         rlpEncode r,
         rlpEncode s
         ]
-      
+
   rlpEncode RawTransaction{rawTransactionNonce=n,
                            rawTransactionGasPrice=gp,
                            rawTransactionGasLimit=gl,
@@ -170,4 +169,4 @@ instance RLPSerializable RawTransaction where
         rlpEncode r,
         rlpEncode s
         ]
-  -}  
+  -}

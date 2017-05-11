@@ -2,23 +2,23 @@
 
 module Handler.Faucet where
 
-import qualified Data.Text as T
-import qualified Network.Haskoin.Crypto as H
-import qualified Data.Binary as BN
-import qualified Prelude as P
-import qualified Database.Esqueleto as E
+import qualified Data.Binary                 as BN
+import qualified Data.Text                   as T
+import qualified Database.Esqueleto          as E
+import qualified Network.Haskoin.Crypto      as H
+import qualified Prelude                     as P
 
-import           Import
-import           Handler.Filters
-import           Handler.Common
-import           Blockchain.Data.Address
 import           Blockchain.Constants
-import           Blockchain.Data.TXOrigin
+import           Blockchain.Data.Address
 import           Blockchain.Data.Transaction
-import           Blockchain.Sequencer.Event (IngestTx(..), IngestEvent(IETx))
-import           Blockchain.Sequencer.Kafka (writeUnseqEvents)
-import           Blockchain.EthConf (runKafkaConfigured)
-import           Blockchain.Util (getCurrentMicrotime)
+import           Blockchain.Data.TXOrigin
+import           Blockchain.EthConf          (runKafkaConfigured)
+import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
+import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
+import           Blockchain.Util             (getCurrentMicrotime)
+import           Handler.Common
+import           Handler.Filters
+import           Import
 
 retrievePrvKey :: FilePath -> IO (Maybe H.PrvKey)
 retrievePrvKey path = do
@@ -29,12 +29,12 @@ retrievePrvKey path = do
 
 lookupNonce :: (YesodPersist site, YesodPersistBackend site ~ SqlBackend) => Address -> HandlerT site IO Integer
 lookupNonce addr' = do
-  addrSt <- runDB $ E.select $ 
+  addrSt <- runDB $ E.select $
                       E.from $ \(accStateRef) -> do
                       E.where_ (accStateRef E.^. AddressStateRefAddress E.==. (E.val addr'))
                       return accStateRef
-  case addrSt of 
-    [] -> return 0
+  case addrSt of
+    []      -> return 0
     addrSt' -> return $ addressStateRefNonce $ E.entityVal $ P.head $ addrSt'
 
 emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
@@ -52,7 +52,7 @@ postFaucetR = do
   addHeader "Access-Control-Allow-Origin" "*"
 
   key <- liftIO $ retrievePrvKey $ "config" </> "priv"
-  key' <- maybe (invalidArgs ["No faucet account is defined"]) return key 
+  key' <- maybe (invalidArgs ["No faucet account is defined"]) return key
   liftIO $ putStrLn $ T.pack $ show key'
 
   nonce <- lookupNonce $ prvKey2Address key'
@@ -60,7 +60,7 @@ postFaucetR = do
   maybeVal <- lookupPostParam "address"
   liftIO $ putStrLn $ T.pack $ show maybeVal
   case maybeVal of
-    Just val -> putTX key' val nonce 
+    Just val -> putTX key' val nonce
     Nothing -> do
       maybeAddrs <- lookupPostParam "addresses"
       liftIO $ putStrLn $ T.pack $ show maybeAddrs
@@ -76,7 +76,7 @@ postFaucetR = do
       tx <- liftIO $ H.withSource H.devURandom (createMessageTX n (50000000000) (100000) a (1000*ether) "" k)
       liftIO $ putStrLn $ T.pack $ "tx for faucet: " ++ (show tx)
       return tx
-    putTX k v n = do 
+    putTX k v n = do
       tx <- makeTX k (toAddr v) n
       _ <- insertTXIfNew API Nothing [tx]
       emitKafkaTransactions [tx]

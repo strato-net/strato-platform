@@ -1,7 +1,7 @@
 {-|
 
-Module      : Blockchain.Strato.Model.Block  
-Description : Block Data Model 
+Module      : Blockchain.Strato.Model.Block
+Description : Block Data Model
 Copyright   : (c) BlockApps Inc., 2017
 Stability   : experimental
 Portability : POSIX
@@ -28,15 +28,15 @@ import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.BlockHeaderModel
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Constants
-import           Blockchain.Strato.Model.BlockHeaderModel
 import           Blockchain.Strato.Model.TransactionModel
 
 type Difficulty = Integer
 
 {-
-data BlockData = 
+data BlockData =
   BlockData {
     parentHash :: SHA,
     unclesHash :: SHA,
@@ -45,21 +45,21 @@ data BlockData =
     transactionsRoot :: StateRoot,
     receiptsRoot :: StateRoot,
     logBloom :: B.ByteString,
-    difficulty :: Integer, 
-    number :: Integer, 
-    gasLimit :: Integer, 
-    gasUsed :: Integer, 
+    difficulty :: Integer,
+    number :: Integer,
+    gasLimit :: Integer,
+    gasUsed :: Integer,
     timestamp :: UTCTime,
-    extraData :: Integer, 
+    extraData :: Integer,
     nonce :: Word64,
     mixHash :: SHA
   } deriving (Show, Read, Eq)
 -}
 data Block =
-  Block { 
-    blockData :: BlockHeader,
+  Block {
+    blockData           :: BlockHeader,
     receiptTransactions :: [Transaction],
-    blockUncles :: [BlockHeader] 
+    blockUncles         :: [BlockHeader]
   } deriving (Show, Read, Eq)
 
 nextDifficulty::Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
@@ -153,11 +153,11 @@ instance RLPSerializable BlockData where
 instance BlockLike BlockHeader Transaction Block where
     blockHeader       = blockHeader
     blockTransactions = receiptTransactions
-    blockUncleHeaders = blockUncles 
+    blockUncleHeaders = blockUncles
 
     buildBlock = Block
 
 createBlockFromHeaderAndBody::BlockHeader->([Transaction], [BlockHeader])->Block
 createBlockFromHeaderAndBody header (transactions, uncles) =
   Block header transactions uncles
- 
+

@@ -3,7 +3,7 @@ module Blockchain.EthEncryptionException (
   EthEncryptionException(..)
   ) where
 
-import Control.Exception.Lifted
+import           Control.Exception.Lifted
 
 data EthEncryptionException =
   HandshakeException String

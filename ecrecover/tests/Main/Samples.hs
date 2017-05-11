@@ -1,7 +1,7 @@
 module Main.Samples where
 
-import Data.ByteString hiding (List)
-import Data.Int
+import           Data.ByteString hiding (List)
+import           Data.Int
 
 type List = []
 

@@ -5,33 +5,33 @@ module Blockchain.RLPx (
   ethCryptAccept
   ) where
 
-import Control.Exception
-import Control.Monad
-import Control.Monad.IO.Class
-import Crypto.Cipher.AES
-import qualified Crypto.Hash.SHA3 as SHA3
-import Crypto.PubKey.ECC.DH
-import Crypto.Random
-import Crypto.Types.PubKey.ECC
-import Data.Binary
-import Data.Bits
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import Data.Conduit
-import qualified Data.Conduit.Binary as CB
-import Data.Maybe
-import qualified Network.Haskoin.Internals as H
+import           Control.Exception
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Crypto.Cipher.AES
+import qualified Crypto.Hash.SHA3                  as SHA3
+import           Crypto.PubKey.ECC.DH
+import           Crypto.Random
+import           Crypto.Types.PubKey.ECC
+import           Data.Binary
+import           Data.Bits
+import qualified Data.ByteString                   as B
+import qualified Data.ByteString.Lazy              as BL
+import           Data.Conduit
+import qualified Data.Conduit.Binary               as CB
+import           Data.Maybe
+import qualified Network.Haskoin.Internals         as H
 
-import qualified Blockchain.AESCTR as AES
-import Blockchain.Data.PubKey
-import Blockchain.Data.RLP
-import qualified Blockchain.ECIES as ECIES
-import Blockchain.Error
-import Blockchain.EthEncryptionException
-import Blockchain.ExtendedECDSA
-import Blockchain.ExtWord
-import Blockchain.Frame
-import Blockchain.Handshake
+import qualified Blockchain.AESCTR                 as AES
+import           Blockchain.Data.PubKey
+import           Blockchain.Data.RLP
+import qualified Blockchain.ECIES                  as ECIES
+import           Blockchain.Error
+import           Blockchain.EthEncryptionException
+import           Blockchain.ExtendedECDSA
+import           Blockchain.ExtWord
+import           Blockchain.Frame
+import           Blockchain.Handshake
 
 
 
@@ -53,24 +53,24 @@ ethCryptConnect myPriv otherPubKey = do
   --h <- liftIO $ connectTo ipAddress (PortNumber thePort)
 
 --  liftIO $ putStrLn $ "connected over tcp"
-  
+
   let myNonce = B.pack $ word256ToBytes 20 --TODO- Important!  Don't hardcode this
 
   handshakeInitBytes <- liftIO $ getHandshakeBytes myPriv otherPubKey myNonce
-      
+
   yield handshakeInitBytes
 
   handshakeReplyBytes <- CB.take 210
 
   when (BL.length handshakeReplyBytes /= 210) $ liftIO $ throwIO $ HandshakeException "handshake reply didn't contain enough bytes"
-  
+
   let ackMsg = bytesToAckMsg $ B.unpack $ either (error . ("error in ethCryptConnect"++)) id $ ECIES.decrypt myPriv handshakeReplyBytes B.empty
 
 --  liftIO $ putStrLn $ "ackMsg: " ++ show ackMsg
 ------------------------------
 
   let m_originated=False -- hardcoded for now, I can only connect as client
-      
+
       otherNonce=B.pack $ word256ToBytes $ ackNonce ackMsg
 
       SharedKey shared' = getShared theCurve myPriv (ackEphemeralPubKey ackMsg)
@@ -84,7 +84,7 @@ ethCryptConnect myPriv otherPubKey = do
 
   -- liftIO $ putStrLn $ "myNonce `add` otherNonce: " ++ show (myNonce `add` otherNonce)
   -- liftIO $ putStrLn $ "myNonce `add` otherNonce `add` shared: " ++ show (myNonce `add` otherNonce `add` shared)
-  
+
   -- liftIO $ putStrLn $ "otherNonce: " ++ show otherNonce
 
   -- liftIO $ putStrLn $ "frameDecKey: " ++ show frameDecKey
@@ -112,7 +112,7 @@ ethCryptConnect myPriv otherPubKey = do
 
 add::B.ByteString->B.ByteString->B.ByteString
 add acc val | B.length acc ==32 && B.length val == 32 = SHA3.hash 256 $ val `B.append` acc
-add _ _ = error "add called with ByteString of length not 32"
+add _ _     = error "add called with ByteString of length not 32"
 
 hPubKeyToPubKey::H.PubKey->Point
 hPubKeyToPubKey pubKey =
@@ -130,7 +130,7 @@ ethCryptAccept myPriv otherPoint = do
 
   maybeResult <-
     case ECIES.decrypt myPriv hsBytes B.empty of
-     Left _ -> return Nothing
+     Left _  -> return Nothing
      Right x -> ethCryptAcceptOld myPriv otherPoint hsBytes x
 
   case maybeResult of
@@ -156,16 +156,16 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
       pubKey = rlpDecode pubKeyRLP::B.ByteString
       signatureBytes = rlpDecode signatureRLP
       version = rlpDecode versionRLP::Integer
-                                                                           
+
   --liftIO $ putStrLn $ "signature: " ++ show signatureBytes
   --liftIO $ putStrLn $ "pubKey: " ++ show pubKey
   --liftIO $ putStrLn $ "otherNonce: " ++ show otherNonce
   --liftIO $ putStrLn $ "version: " ++ show version
 
   let otherPoint = bytesToPoint $ B.unpack pubKey
-             
+
   when (version /= 4) $ error "wrong version in packet sent to ethCryptAcceptEIP8"
-       
+
   let SharedKey sharedKey = getShared theCurve myPriv otherPoint
       msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
       r = bytesToWord256 $ B.unpack $ B.take 32 $ signatureBytes
@@ -184,7 +184,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
       myEphemeral = calculatePublic theCurve myPriv'
       myNonce = 25 :: Word256
       ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
-        
+
   eciesMsgOBytes <- liftIO $ fmap BL.toStrict $ ECIES.encrypt myPriv' otherPoint (BL.toStrict $ encode $ ackMsg) B.empty
 
   yield $ eciesMsgOBytes
@@ -240,7 +240,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
         myEphemeral = calculatePublic theCurve myPriv'
         myNonce = 25 :: Word256
         ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
-        
+
     eciesMsgOBytes <- liftIO $ fmap BL.toStrict $ ECIES.encrypt myPriv' otherPoint (BL.toStrict $ encode $ ackMsg) B.empty
 
     yield $ eciesMsgOBytes

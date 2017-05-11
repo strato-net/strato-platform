@@ -4,8 +4,7 @@ module RawMP (doit) where
 
 import           Control.Monad.IO.Class
 import qualified Database.LevelDB                            as DB
-import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>),
-                                                              (</>))
+import           Text.PrettyPrint.ANSI.Leijen                hiding ((<$>), (</>))
 
 import           Blockchain.Data.RLP
 import qualified Data.NibbleString                           as N

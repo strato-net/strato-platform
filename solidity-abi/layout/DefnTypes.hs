@@ -4,15 +4,15 @@
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
 module DefnTypes where
 
-import Data.Function
-import qualified Data.List as List
-import qualified Data.Map as Map
-import Data.Map (Map)
-import Data.Monoid
-import Data.Maybe
+import           Data.Function
+import qualified Data.List     as List
+import           Data.Map      (Map)
+import qualified Data.Map      as Map
+import           Data.Maybe
+import           Data.Monoid
 
-import Imports
-import ParserTypes
+import           Imports
+import           ParserTypes
 
 -- | A shorthand, and not a well-named one.
 type IdentT a = Map Identifier a
@@ -21,7 +21,7 @@ type IdentT a = Map Identifier a
 -- removed.  It represents the state of a contract post-inheritance.
 data SolidityContractDef =
   ContractDef {
-    objsDef :: SolidityObjsDef,
+    objsDef  :: SolidityObjsDef,
     typesDef :: SolidityTypesDef,
     inherits :: [(ContractName, SolidityContractDef)]
     } deriving (Show)
@@ -55,7 +55,7 @@ makeFilesDef files = do
 -- beginning of 'makeFilesDef'.
 makeContractsDef :: Map FileName (Either ImportError SolidityContractsDef) ->
                     FileName ->
-                    SolidityFile -> 
+                    SolidityFile ->
                     Either ImportError (SolidityContractsDef, SolidityContractsDef)
 makeContractsDef fileDefEs fileName (SolidityFile contracts imports) = do
   importDefs <- getImportDefs fileName fileDefEs imports
@@ -68,9 +68,9 @@ makeContractsDef fileDefEs fileName (SolidityFile contracts imports) = do
 
     contractTypes' =
       makeTypesDef $ map (\(name, _) -> TypeDef name ContractT) $ Map.toList allDefs
-    finalize (ContractDef objsD typesD bases) = 
+    finalize (ContractDef objsD typesD bases) =
       ContractDef objsD (typesD `Map.union` contractTypes') bases
-  
+
     result = Map.map finalize $ c3Linearized contractDefs importDefs
   return (result, result `Map.union` importDefs)
 
@@ -109,17 +109,17 @@ c3Merge contracts = c3Head <> c3Merge c3Tail
       if headName == name
         then return $ do
         (n', c') <- head' cPurge
-        return (n', c'{inherits = tail' cPurge})        
+        return (n', c'{inherits = tail' cPurge})
         else return $ Just (name, contract{inherits = cPurge})
     c3Index = fromMaybe (error "Contract inheritance cannot be linearized") $
               List.findIndex isC3Head contracts
     isC3Head (name, _) =
       all (name `notElem`) $
       map (map fst . tail' . inherits . snd) contracts
-    
+
     tail' [] = []
-    tail' l = tail l
+    tail' l  = tail l
     head' [] = Nothing
-    head' l = Just (head l)
+    head' l  = Just (head l)
 
 

@@ -5,15 +5,15 @@
 module Blockchain.Strato.RedisBlockDB.Chain where
 
 import           Control.Monad
-import           Test.QuickCheck
+import           Data.Foldable
+import           Data.Maybe
+import           Data.Tree
 import           Lens.Family2
 import           Lens.Family2.TH
-import           Data.Foldable
-import           Data.Tree
-import           Data.Maybe
+import           Test.QuickCheck
 
+import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.ArbitraryInstances()
 import           Blockchain.Strato.Model.SHA
 
 ------------------------------------------------------------------------------
@@ -32,7 +32,7 @@ makeGenesisBlock = do
 --                   . (over _blockDataReceiptTransactions (const []))
 --                   . (over _blockDataUncles              (const []))
                    ) <$> generate arbitrary
-    return $ startBlock 
+    return $ startBlock
 
 buildChain :: BlockData -> Int -> Int -> IO [BlockData]
 buildChain seed depth maxSiblings = do
@@ -44,13 +44,13 @@ buildChain seed depth maxSiblings = do
 --  o-o-o-o-o-o-o--o
 --                \o
 buildY :: BlockData -> Int -> Int -> IO (Tree BlockData)
-buildY seed 0     _           = pure (Node seed []) 
+buildY seed 0     _           = pure (Node seed [])
 buildY _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
 buildY seed depth maxSiblings = do
     let spread = if depth == 1 then maxSiblings else 1
-    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) 
+    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
     nextNumber      <- return $ (blockDataNumber seed) + 1
-    siblings        <- generate $ vectorOf spread arbitrary :: IO [BlockData] 
+    siblings        <- generate $ vectorOf spread arbitrary :: IO [BlockData]
     withUpdates     <- return $ ( (over _blockDataParentHash      (const . blockHeaderHash $ seed))
                                 . (over _blockDataDifficulty      (const nextDifficulty'))
                                 . (over _blockDataNumber          (const nextNumber))
@@ -59,16 +59,16 @@ buildY seed depth maxSiblings = do
     expanded        <- forM withUpdates $ \sibling -> do
                            grandchildren <- buildY sibling (depth - 1) maxSiblings
                            return $ grandchildren
-    return $ Node seed expanded 
+    return $ Node seed expanded
 
 buildTree :: BlockData -> Int -> Int -> IO (Tree BlockData)
-buildTree seed 0     _           = pure (Node seed []) 
+buildTree seed 0     _           = pure (Node seed [])
 buildTree _    _     n | n < 2   = error "fewer than 2 siblings make no sense"
 buildTree seed depth maxSiblings = do
-    siblingCount    <- generate $ invDist maxSiblings 
-    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000)) 
+    siblingCount    <- generate $ invDist maxSiblings
+    nextDifficulty' <- ((blockDataDifficulty seed) +) <$> (generate $ choose (1, 1000))
     nextNumber      <- return $ (blockDataNumber seed) + 1
-    siblings        <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData] 
+    siblings        <- generate $ vectorOf siblingCount arbitrary :: IO [BlockData]
     withUpdates     <- return $ ( (over _blockDataParentHash      (const . blockHeaderHash $ seed))
                                 . (over _blockDataDifficulty      (const nextDifficulty'))
                                 . (over _blockDataNumber          (const nextNumber))
@@ -114,12 +114,12 @@ bushY g n m = do
 
 leaves :: Tree a -> [a]
 leaves (Node n []) = [n]
-leaves (Node _ f) = concat $ map leaves f
+leaves (Node _ f)  = concat $ map leaves f
 
 stem :: (Eq a) => a -> Tree a -> [a]
-stem l (Node n [])     = if n == l then [n] else [] 
-stem l (Node _ [t])    = (rootLabel t):(stem l t) -- if rootLabel t == l then [rootLabel t] else stem l t 
-stem l (Node _ f)      = concat $ map (stem l) f 
+stem l (Node n [])  = if n == l then [n] else []
+stem l (Node _ [t]) = (rootLabel t):(stem l t) -- if rootLabel t == l then [rootLabel t] else stem l t
+stem l (Node _ f)   = concat $ map (stem l) f
 
 stem' :: BlockData -> [BlockData] -> [BlockData]
 stem' _ []                  = error "stem' called with empty list"
@@ -127,7 +127,7 @@ stem' l (c:cs) | l == c     = [l]
                | otherwise  = l:(stem' parent (c:cs))
     where
         hash = blockDataParentHash l
-        parent = fromMaybe l (find (\b -> blockHeaderHash b == hash) (c:cs)) 
+        parent = fromMaybe l (find (\b -> blockHeaderHash b == hash) (c:cs))
 
 showTree :: (Show a) => Tree a -> String
 showTree = drawTree . prettyTree
@@ -139,4 +139,4 @@ prettyTree' :: Tree BlockData -> Tree String
 prettyTree' tree = prettyTree $ (\x -> (blockDataNumber x, showHash . blockHeaderHash $ x)) <$> tree
 
 showHash :: SHA -> String
-showHash = take 8 . shaToHex 
+showHash = take 8 . shaToHex

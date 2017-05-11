@@ -1,9 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Flags where
 
-import HFlags
-import Blockchain.Constants
-import Blockchain.Sequencer.Constants
+import           Blockchain.Constants
+import           Blockchain.Sequencer.Constants
+import           HFlags
 
 -- core flags
 defineFlag "q:txdedupwindow" (2000 :: Int) "Transaction window to deduplicate any given Tx (i.e., after N transactions have passed, a previously seen Tx can be reemitted)"

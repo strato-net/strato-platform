@@ -6,19 +6,19 @@ module Blockchain.Verification (
   receiptsVerificationValue
   ) where
 
-import Prelude.Unicode
+import           Prelude.Unicode
 
 
-import Blockchain.Data.BlockDB
-import Blockchain.Data.RLP
-import Blockchain.Data.Transaction
-import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.SHA
-import Blockchain.Database.MerklePatricia.InternalMem
-import Blockchain.Database.MerklePatriciaMem
-import Blockchain.Util
+import           Blockchain.Data.BlockDB
+import           Blockchain.Data.RLP
+import           Blockchain.Data.Transaction
+import qualified Blockchain.Database.MerklePatricia             as MP
+import           Blockchain.Database.MerklePatricia.InternalMem
+import           Blockchain.Database.MerklePatriciaMem
+import           Blockchain.SHA
+import           Blockchain.Util
 
-import Data.Functor.Identity
+import           Data.Functor.Identity
 
 {-
 transactionsVerificationValue::[Transaction]->MP.StateRoot
@@ -41,7 +41,7 @@ transactionsVerificationValue theList = runIdentity $ do
     return (mpStateRoot mp)
 
 ommersVerificationValue::[BlockData]->SHA
-ommersVerificationValue = listToRLPVerificationValue 
+ommersVerificationValue = listToRLPVerificationValue
 
 receiptsVerificationValue::()->MP.StateRoot
 receiptsVerificationValue _ = MP.emptyTriePtr

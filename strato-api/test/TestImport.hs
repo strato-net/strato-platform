@@ -3,14 +3,15 @@ module TestImport
     , module XX
     ) where
 
-import Application           (makeFoundation)
-import ClassyPrelude         as XX hiding (delete, deleteBy)
-import Database.Persist      as XX hiding (get)
-import Database.Persist.Sql  (SqlPersistM, SqlBackend, runSqlPersistMPool, rawExecute, rawSql, unSingle, connEscapeName)
-import Foundation            as XX hiding (Handler)
-import Test.Hspec            as XX
-import Yesod.Default.Config2 (ignoreEnv, loadYamlSettings)
-import Yesod.Test            as XX
+import           Application           (makeFoundation)
+import           ClassyPrelude         as XX hiding (delete, deleteBy)
+import           Database.Persist      as XX hiding (get)
+import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute, rawSql, runSqlPersistMPool,
+                                        unSingle)
+import           Foundation            as XX hiding (Handler)
+import           Test.Hspec            as XX
+import           Yesod.Default.Config2 (ignoreEnv, loadYamlSettings)
+import           Yesod.Test            as XX
 
 runDB :: SqlPersistM a -> YesodExample App a
 runDB query = do

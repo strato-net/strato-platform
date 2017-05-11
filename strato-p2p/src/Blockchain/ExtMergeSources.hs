@@ -1,21 +1,23 @@
-{-# LANGUAGE FlexibleContexts, KindSignatures, RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE KindSignatures   #-}
+{-# LANGUAGE RankNTypes       #-}
 
 module Blockchain.ExtMergeSources (
   mergeSourcesCloseForAny
   ) where
 
 
-import Control.Concurrent
-import Control.Concurrent.STM
-import Control.Exception.Lifted
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Resource
-import qualified Data.Conduit.List as CL
-import Data.Conduit.TMChan hiding (mergeSources)
+import           Control.Concurrent
+import           Control.Concurrent.STM
+import           Control.Exception.Lifted
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Resource
+import qualified Data.Conduit.List            as CL
+import           Data.Conduit.TMChan          hiding (mergeSources)
 
-import Data.Conduit
+import           Data.Conduit
 
 liftSTM :: forall (m :: * -> *) a. MonadIO m => STM a -> m a
 liftSTM = liftIO . atomically
@@ -27,7 +29,7 @@ chanSink
     -> Sink a m ()
 chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
 {-# INLINE chanSink #-}
-    
+
 mergeSourcesCloseForAny :: (MonadResource mi, MonadIO mo, MonadBaseControl IO mi)
              => [Source mi a] -- ^ The sources to merge.
              -> Int -- ^ The bound of the intermediate channel.
@@ -46,5 +48,5 @@ mergeSourcesCloseForAny sx bound = do
             myTh <- liftIO myThreadId
             _ <- liftIO $ forM (filter (/= myTh) threadIds) killThread
             case x of
-                Left e -> throw (e::SomeException)
+                Left e  -> throw (e::SomeException)
                 Right _ -> liftIO $ putStrLn "Closing conduit"

@@ -1,4 +1,9 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Context
     ( Context(..)
@@ -14,17 +19,17 @@ module Blockchain.Context
     ) where
 
 
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource
-import Control.Monad.State
-import Data.Time.Clock
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import           Data.Time.Clock
 
-import Blockchain.Data.BlockHeader
-import Blockchain.DB.SQLDB
+import           Blockchain.Data.BlockHeader
+import           Blockchain.DB.SQLDB
 
-import qualified Network.Kafka as K
-import qualified Database.Redis as Redis
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import qualified Database.Redis                 as Redis
+import qualified Network.Kafka                  as K
 
 data Context =
     Context {

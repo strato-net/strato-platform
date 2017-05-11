@@ -1,6 +1,6 @@
 module Test.ErrorMessages where
 
-import Test.Combinators
+import           Test.Combinators
 
 fileError :: String -> String
 fileError fileName = "File" ## quoted fileName

@@ -5,14 +5,14 @@ module Server (
   ) where
 
 --import Control.Monad.IO.Class
-import Network.Wai
-import Network.Wai.Handler.Warp
-import Network.HTTP.Types (status200)
-import Blaze.ByteString.Builder (copyByteString)
-import qualified Data.ByteString.Lazy as BL
+import           Blaze.ByteString.Builder (copyByteString)
+import qualified Data.ByteString.Lazy     as BL
+import           Network.HTTP.Types       (status200)
+import           Network.Wai
+import           Network.Wai.Handler.Warp
 --import Data.Monoid
 
-import RPC
+import           RPC
 
 startServer::IO ()
 startServer = do
@@ -27,6 +27,6 @@ app req respond = do
 
   response <- doRPC $ BL.fromStrict theRequest
 
-  respond $ 
+  respond $
     responseBuilder status200 [ ("Content-Type", "text/plain") ] $ copyByteString $ BL.toStrict response
 

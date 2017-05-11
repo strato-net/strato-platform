@@ -5,7 +5,7 @@ module Blockchain.DB.StateDB (
   getStateRoot
   ) where
 
-import Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Resource
 
 import qualified Blockchain.Database.MerklePatricia as MP
 

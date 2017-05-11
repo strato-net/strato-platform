@@ -1,13 +1,13 @@
 module Parser.Common where
 
-import Data.Bifunctor
-import Data.List
-import Data.Maybe
+import           Data.Bifunctor
+import           Data.List
+import           Data.Maybe
 
-import Blockchain.Ethereum.Solidity.Parse
-import Test.Combinators
-import Test.Common
-import Test.ErrorMessages
+import           Blockchain.Ethereum.Solidity.Parse
+import           Test.Combinators
+import           Test.Common
+import           Test.ErrorMessages
 
 type FileVerifier = SolidityFile -> Assertion
 type ParserTestInput = (String, SourceCode, FileVerifier)
@@ -23,7 +23,7 @@ fileHasContract fileName solFile cName =
   cName `elem` map contractName (fileContracts solFile)
   |! fileError fileName ## theError
 
-  where theError = isMissingError $ contractError cName 
+  where theError = isMissingError $ contractError cName
 
 contractHasVar :: FileName -> SolidityFile -> ContractName -> Identifier -> Assertion
 contractHasVar fileName solFile cName vName =
@@ -36,7 +36,7 @@ contractHasVar fileName solFile cName vName =
     c = fromJust $ find (\d -> contractName d == cName) $ fileContracts solFile
     cVars = map objName $ filter isVar $ contractObjs c
     isVar ObjDef{objArgType = NoValue, objValueType = (SingleValue _)} = True
-    isVar _ = False
+    isVar _                                                            = False
 
 varTypeIs :: FileName -> SolidityFile -> ContractName -> Identifier -> SolidityBasicType ->
              Assertion
@@ -88,10 +88,10 @@ contractHasFunction fileName solFile cName fName =
     c = fromJust $ find (\d -> contractName d == cName) $ fileContracts solFile
     cFuncs = map objName $ filter isFunc $ contractObjs c
     isFunc ObjDef{objArgType = TupleValue _, objValueType = TupleValue _} = True
-    isFunc _ = False
+    isFunc _                                                              = False
 
 functionSignatureIs :: FileName -> SolidityFile -> ContractName -> Identifier ->
-                       [Identifier] -> [SolidityBasicType] -> 
+                       [Identifier] -> [SolidityBasicType] ->
                        [Identifier] -> [SolidityBasicType] -> Assertion
 functionSignatureIs fileName solFile cName fName argNames argTypes valNames valTypes =
   contractHasFunction fileName solFile cName fName >>
@@ -105,14 +105,14 @@ functionSignatureIs fileName solFile cName fName argNames argTypes valNames valT
     theError = wrongThingError
       ("args" ## show (zip argTypes argNames) ##
        "and values" ## show (zip valTypes valNames))
-      (show (tupleBoth $ objArgType theObj) ## 
+      (show (tupleBoth $ objArgType theObj) ##
        "and" ## show (tupleBoth $ objValueType theObj))
     c = fromJust $ find (\d -> contractName d == cName) $ fileContracts solFile
     theObj = fromJust $ find (\obj -> objName obj == fName) $ contractObjs c
     getTuple (TupleValue l) = l
-    getTuple _ = []
+    getTuple _              = []
     tupleNames = map objName . getTuple
     tupleTypes = map getType . getTuple
     tupleBoth x = zip (tupleTypes x) (tupleNames x)
     getType ObjDef{objValueType = SingleValue t} = t
-    getType _ = undefined
+    getType _                                    = undefined

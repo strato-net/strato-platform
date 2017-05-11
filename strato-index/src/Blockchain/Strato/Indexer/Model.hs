@@ -3,10 +3,10 @@ module Blockchain.Strato.Indexer.Model
     ( IndexEvent(..)
     ) where
 
-import Data.Binary
+import           Data.Binary
 
-import Blockchain.Sequencer.Event
-import Blockchain.Strato.Model.SHA
+import           Blockchain.Sequencer.Event
+import           Blockchain.Strato.Model.SHA
 
 data IndexEvent = RanBlock OutputBlock
                 | NewBestBlock (SHA, Integer, Integer)

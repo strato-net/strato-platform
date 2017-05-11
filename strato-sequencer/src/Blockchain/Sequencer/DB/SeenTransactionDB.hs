@@ -1,14 +1,15 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Blockchain.Sequencer.DB.SeenTransactionDB where
 
-import Control.Monad.Trans.Resource
-import Blockchain.SHA
+import           Blockchain.SHA
+import           Control.Monad.Trans.Resource
 
-import qualified Data.Set      as S
-import qualified Data.Sequence as Q
+import qualified Data.Sequence                as Q
+import qualified Data.Set                     as S
 
 data SeenTransactionDB =
-     SeenTransactionDB { size :: Int
+     SeenTransactionDB { size       :: Int
                        , operations :: Int -- track number of pushes to start popping after `size`
                        , clearQueue :: Q.Seq SHA
                        , seen       :: S.Set SHA

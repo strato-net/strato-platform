@@ -1,31 +1,32 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Foundation where
 
-import Import.NoFoundation
-import Database.Persist.Sql (ConnectionPool, runSqlPool)
-import Text.Hamlet          (hamletFile)
-import Text.Jasmine         (minifym)
+import           Database.Persist.Sql     (ConnectionPool, runSqlPool)
+import           Import.NoFoundation
+import           Text.Hamlet              (hamletFile)
+import           Text.Jasmine             (minifym)
 -- import Yesod.Auth.BrowserId (authBrowserId)
-import Yesod.Default.Util   (addStaticContentExternal)
-import Yesod.Core.Types     (Logger)
-import Yesod.Raml.Routes
-import qualified Yesod.Core.Unsafe as Unsafe
-import qualified Network.Wai as W
-import qualified Data.ByteString.Char8 as BC
-import Data.Time
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import           Blockchain.SHA
+import qualified Data.ByteString.Char8    as BC
+import qualified Data.Text                as T
+import qualified Data.Text.Encoding       as T
 import qualified Data.Text.Encoding.Error as T
-import qualified Prelude as P
-import Blockchain.SHA
+import           Data.Time
+import qualified Network.Wai              as W
+import qualified Prelude                  as P
+import           Yesod.Core.Types         (Logger)
+import qualified Yesod.Core.Unsafe        as Unsafe
+import           Yesod.Default.Util       (addStaticContentExternal)
+import           Yesod.Raml.Routes
 
-import Blockchain.DB.SQLDB
+import           Blockchain.DB.SQLDB
 
 debug :: c -> String -> c
 debug = flip trace
-  
+
 timeFormat :: String
 timeFormat = "%Y-%m-%dT%T.%q"
 
@@ -76,7 +77,7 @@ instance Yesod App where
                      r <- waiRequest
                      let path' = T.decodeUtf8With T.lenientDecode $ W.rawPathInfo r
                      return $ toTypedContent $ "Invalid path: " `T.append` path' `T.append` "\n"
-    errorHandler (InternalError msg) = 
+    errorHandler (InternalError msg) =
         return $ toTypedContent $ "Internal Error:\n" `T.append` msg `T.append` "\n"
     errorHandler (InvalidArgs ia) = do
         return $ toTypedContent $ "Invalid Arguments\n" `T.append` T.intercalate "\n  -" ia `T.append` "\n"
@@ -96,11 +97,11 @@ instance Yesod App where
     makeSessionBackend _ = fmap Just $ defaultClientSessionBackend
         120    -- timeout in minutes
         "config/client_session_key.aes"
-    
+
 --    yesodMiddleware = (sslOnlyMiddleware 120) . defaultYesodMiddleware
 
 --    makeSessionBackend _ = return Nothing
-    
+
     defaultLayout widget = do
         master <- getYesod
         mmsg <- getMessage
@@ -110,7 +111,7 @@ instance Yesod App where
         -- default-layout-wrapper is the entire page. Since the final
         -- value passed to hamletToRepHtml cannot be a widget, this allows
         -- you to use normal widget features in default-layout.
-          
+
         pc <- widgetToPageContent $ do
             addStylesheet $ StaticR css_bootstrap_css
             $(widgetFile "default-layout")
@@ -148,7 +149,7 @@ instance Yesod App where
     -- What messages should be logged. The following includes all messages when
     -- in development, and warnings and errors in production.
 
-    --maximumContentLength _ (Just (getAccountInfoR _)) = 2 * 1024 * 1024 -- 2 megabytes 
+    --maximumContentLength _ (Just (getAccountInfoR _)) = 2 * 1024 * 1024 -- 2 megabytes
     maximumContentLength _ _ = Just (fromIntegral $ 2 * 1024 * 1024 :: Word64) -- 2M
 
     shouldLog app _source level =
@@ -161,7 +162,7 @@ instance Yesod App where
 -- How to run database actions.
 instance HasSQLDB Foundation.Handler where
     getSQLDB = appConnPool <$> getYesod
-    
+
 instance YesodPersist App where
     type YesodPersistBackend App = SqlBackend
     runDB action = do
