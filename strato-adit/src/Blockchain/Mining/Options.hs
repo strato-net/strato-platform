@@ -12,7 +12,8 @@ defineFlag "threads" (1 :: Int) "Number of mining threads"
 
 defineFlag "blocktime" (10000 :: Int) "Blocktime in milliseconds for Normal miner"
 defineFlag "variance" (1000 :: Int) "Blocktime variance in milliseconds for Normal miner"
-
+defineFlag "minQuorumSize" (1 :: Int) "Minimum quorum size for mining"
+defineFlag "useSyncMode" False "Whether or not to wait for P2P to meet minQuorumSize before mining blocks"
 defineFlag "pgPoolSize" (5 :: Int) "Size of postgres pool"
 
 -- -- You can also do simple range checks with this.

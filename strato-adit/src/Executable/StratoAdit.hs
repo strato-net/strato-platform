@@ -1,64 +1,43 @@
-{-# LANGUAGE FlexibleContexts,FlexibleInstances, OverloadedStrings, TemplateHaskell, ScopedTypeVariables, BangPatterns, LambdaCase #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Executable.StratoAdit (
   stratoAdit
 ) where
 
-import           Prelude hiding (lookup) 
-import           Control.Concurrent.Lifted hiding (yield)
+import           Control.Concurrent.Lifted      hiding (yield)
 import           Control.Concurrent.STM
 import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.State
-import           Control.Exception
-import qualified Data.Aeson as AE
-import           Data.Maybe
-import           Data.ByteString hiding (zip, length, take)
-import qualified Data.ByteString.Lazy as BL
-import           Data.Conduit
-import           Data.Conduit.Network
-import qualified Data.Text as T
-import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
-import           System.CPUTime
+import qualified Data.Text                      as T
 import           Network.Kafka
 import           Network.Kafka.Protocol
+import           Prelude                        hiding (lookup)
+import           System.CPUTime
+import           Text.PrettyPrint.ANSI.Leijen   hiding ((<$>))
 
-import           Blockchain.Mining
-import           Blockchain.Mining.SHA
-import           Blockchain.Mining.Normal
-import           Blockchain.Mining.Instant
-import           Blockchain.Stream.UnminedBlock
-import           Blockchain.Format
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs()
+import           Blockchain.Data.DataDefs       ()
+import qualified Blockchain.Data.TXOrigin       as TO
+import           Blockchain.Format
 import           Blockchain.KafkaTopics
-import           Blockchain.Stream.Raw (setDefaultKafkaState)
+import           Blockchain.Mining
+import           Blockchain.Mining.Instant
+import           Blockchain.Mining.Normal
 import           Blockchain.Mining.Options
+import           Blockchain.Mining.SHA
+import           Blockchain.P2PRPC
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
-import qualified Blockchain.Data.TXOrigin as TO
-
+import           Blockchain.Stream.Raw          (setDefaultKafkaState)
+import           Blockchain.Stream.UnminedBlock
 import           Executable.AditM
-
-getPeers :: Int -> IO (Maybe Int)
-getPeers port = do
-  runTCPClient (clientSettings port "127.0.0.1") $ \appData -> do
-    appSource appData $$ getPeersRPC `fuseUpstream` appSink appData
-
-getPeersRPC :: ConduitM ByteString ByteString IO (Maybe Int) 
-getPeersRPC = do
-  yield "{\"jsonrpc\": \"2.0\", \"method\": \"getNumPeers\", \"id\": 1}"
-  response <- await
-  -- toLog $ "getNumPeers: " ++ BL.unpack response
-  return $ AE.decode $ BL.fromStrict $ fromJust response
-
-getNumConn :: IO Int
-getNumConn = do
-  clientResponse <- try $ liftIO $ getPeers 14001 :: IO (Either SomeException (Maybe Int))
-  return $ case clientResponse of
-        Left _         -> -2
-        Right Nothing  -> -1
-        Right (Just v) -> v
 
 lookupMiner :: MinerType -> Miner
 lookupMiner = \case
@@ -83,7 +62,7 @@ doBlock minerNumber n newNonce = do
         theMinedBlock = n{blockBlockData = theblockData}
         coinbase = format . blockDataCoinbase . blockBlockData $ n
         theHash = blockHash theMinedBlock
-    toLog "doBlock" minerNumber $ "Coinbase " ++ coinbase ++ " success for " ++ format (blockHash n) ++ " -> " ++ show newNonce 
+    toLog "doBlock" minerNumber $ "Coinbase " ++ coinbase ++ " success for " ++ format (blockHash n) ++ " -> " ++ show newNonce
     toLog "doBlock" minerNumber $ "New block hash is " ++ format theHash ++ "!"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
@@ -112,12 +91,19 @@ doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
-    numPeers <- liftIO getNumConn
+    numPeers <- liftIO $ getNumPeersIO "localhost" clientCommPort
     forM_ blocks $ \b -> do
-        $logInfoS "numPeers: " . T.pack $ show numPeers
-        liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
-        $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #" ++ (show . blockDataNumber $ blockBlockData b)
+        if flags_useSyncMode
+          then case numPeers of
+            Left err -> $logInfoS "doConsume" . T.pack $ "Not mining because couldn't get # of client peers: " ++ show err
+            Right count -> if count < flags_minQuorumSize
+                             then $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ (show count) ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
+                             else doMineThingy b
+          else doMineThingy b
     doConsume (offset + fromIntegral (length blocks)) c
+    where doMineThingy b = do
+            liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
+            $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #" ++ (show . blockDataNumber $ blockBlockData b)
 
 stratoAdit :: LoggingT IO ()
 stratoAdit = runAditT $ do

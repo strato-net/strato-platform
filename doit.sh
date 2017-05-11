@@ -15,7 +15,7 @@ function newnode {
   if $mineBlocks
   then echo "Starting strato-adit"
       export miningThreads=${miningThreads:-1}
-      runForever strato-adit --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
+      runForever strato-adit --useSyncMode=$useSyncMode --minQuorumSize=$minQuorumSize --threads=${miningThreads:-1} --aMiner=$miningAlgorithm >> logs/strato-adit 2>&1
   fi
 
   if $serveBlocks
@@ -141,6 +141,7 @@ setEnv receiveBlocks true
 setEnv addBootnodes false
 setEnv noMinPeers false
 setEnv useSyncMode false
+setEnv minQuorumSize 1
 setEnv difficultyBomb false
 
 setEnv backupLocation /var/lib/strato/backup_strato_block

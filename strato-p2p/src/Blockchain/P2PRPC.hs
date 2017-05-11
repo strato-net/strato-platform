@@ -13,6 +13,9 @@ module Blockchain.P2PRPC
   , serverCommPort
   , getPeersSignature
   , getNumPeersSignature
+  , getPeersIO
+  , getNumPeersIO
+  , mkConn
   ) where
 
 import           Control.Monad.Trans.Except (runExceptT)

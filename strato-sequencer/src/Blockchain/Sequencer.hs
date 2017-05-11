@@ -97,13 +97,12 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                       then do
                         $logDebugS "transformEvents/emitTxs" . T.pack $ "Already witnessed " ++ prettyTx inTx
                         tick ctr_sequencer_txs_witnessed
+                        return []
                       else do
                         $logDebugS "transformEvents/emitTxs" . T.pack $ "Haven't witnessed " ++ prettyTx inTx
                         witnessTransactionHash witnessHash
                         tick ctr_sequencer_txs_unwitnessed
-
-                    -- we have a mempool now, now need for tx dedup. todo: remove SeenTxDB completely
-                    return [(Nothing, OETx inTs tx)]
+                        return [(Nothing, OETx inTs tx)]
 
           emitBlocks bk b' = case b' of
             Nothing -> do
@@ -127,9 +126,12 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
             where blockNonce = show . BDB.blockDataNumber $ bd
                   blockHash  = format . BDB.blockHeaderHash $ bd
 
-          prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ format o
+          prettyTx IngestTx{itOrigin=o, itTransaction=t} = prefix t ++ " via " ++ shortOrigin o
                 where prefix TD.MessageTX{}          = "MessageTx [" ++ (format . TX.partialTransactionHash $ t) ++ "]"
                       prefix TD.ContractCreationTX{} = "CreationTx[" ++ (format . TX.partialTransactionHash $ t) ++ "]"
+
+                      shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
+                      shortOrigin x = format x
 
 assertTopicCreation' :: SequencerM ()
 assertTopicCreation' = void $ K.withKafkaViolently assertTopicCreation
