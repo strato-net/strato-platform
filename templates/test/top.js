@@ -13,7 +13,7 @@ describe("top", function () {
       var apiURI = config.apiURL;
       profile = ["strato-dev", apiURI];
     } catch (e){
-      profile = ["strato-dev", "http://strato-dev4.blockapps.net"]
+      profile = ["strato-dev", "http://localhost/strato-api"]
     }
 
     common.blockapps.setProfile(profile[0], profile[1]);
