@@ -11,6 +11,7 @@ module BlockApps.SolidityVarReader (
   valueToSolidityValue
   ) where
 
+import           Control.Monad.Except
 import qualified Data.Bimap                       as Bimap
 import           Data.Binary
 import           Data.Bits
@@ -426,10 +427,23 @@ decodeMapValue
   -> Either String Value
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
-decodeMapValue _ Struct{..} _ mappingName _ = do
-  _ <- Map.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
+decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
+  (position, maybeMappingType) <- Map.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
 
-  return $ SimpleValue $ ValueBool True
+  (fromType, toType) <-
+    case maybeMappingType of
+     TypeMapping fromType toType -> return (fromType, toType)
+     x -> throwError $ Text.unpack mappingName ++ " is not a map, it is of type " ++ show x
+
+
+
+  let getValPosition::SimpleType->Text->Storage.Position->Storage.Position
+      getValPosition _ _ _ = Storage.positionAt 0 --TODO fill in this dummy stub
+      valPosition = getValPosition fromType keyName position
+
+  let val = decodeValue' typeDefs' storage valPosition toType
+
+  return val
 
   
 
