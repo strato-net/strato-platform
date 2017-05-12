@@ -140,6 +140,14 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
       storage k = fromMaybe 0 $ Map.lookup k storageMap
       ret = fmap valueToSolidityValue $ decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
+  logWith logNotice $ Text.unlines
+    [ "Storage:"
+    , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    , "End of storage"
+    ]
+
+
+  
   case ret of
    Left err -> throwError $ UserError $ Text.pack err
    Right val -> return $ Map.fromList $ [(mappingName, Map.fromList [(keyName, val)])]
