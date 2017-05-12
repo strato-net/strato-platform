@@ -1,23 +1,31 @@
+{-# OPTIONS_GHC -fno-warn-orphans       #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE OverloadedLists            #-}
 
 module BlockApps.Bloc20.API.Users where
 
-import           Control.Lens                     (mapped, (&), (?~))
+import           Control.Lens                     hiding ((.=), elements)
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy             as ByteString.Lazy
 import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
+import           Data.LargeWord
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
+import           Data.Monoid                      ((<>))
+import           Data.Proxy                       (Proxy(..))
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
+import           Data.Swagger
 import           Generic.Random.Generic
 import           GHC.Generics
 import qualified Network.HTTP.Media               as M
@@ -512,22 +520,159 @@ instance ToSchema PostMethodListRequest where
         , methodcallContractName = "HorroscopeApp"
         }
 
-newtype PostMethodListResponse = PostMethodListResponse
-  { postmethodlistresponseReturnValue :: Text
-  } deriving (Eq,Show,Generic)
+newtype PostMethodListResponse =
+    PostMethodListResponse { returnValue :: PostMethodListResponseReturnValue }
 
 instance ToJSON PostMethodListResponse where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON pmlr = object  [ "returnValue" .= returnValue pmlr ]
+
+  toEncoding pmlr = pairs (  "returnValue" .= returnValue pmlr)
 
 instance FromJSON PostMethodListResponse where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = withObject "PostMethodListResponse" $ \v -> PostMethodListResponse
+        <$> v .: "PostMethodListResponse"
 
 instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
 
-instance Arbitrary PostMethodListResponse where arbitrary = genericArbitrary uniform
+instance Arbitrary PostMethodListResponse where
+  arbitrary = do
+    retVal <- arbitrary
+    return PostMethodListResponse {returnValue = retVal}
 
-instance ToSchema PostMethodListResponse
+
+instance ToSchema PostMethodListResponse where
+  declareNamedSchema _ = do
+    pmlrRef<- declareSchemaRef (Proxy :: Proxy PostMethodListResponseReturnValue)
+    return $ NamedSchema (Just "PostMethodListResponse") (mempty
+      & type_ .~ SwaggerObject
+      & description .~ Just "Response for PostMethodList. returnValue will\
+                            \ be text unless the function returns a single Enum.\
+                            \ It will return EnumResponse in this single case."
+      & properties .~ [("returnValue",pmlrRef)]
+      & example .~ (Just $ toJSON ex)
+      )
+    where
+      ex = PostMethodListResponse
+            { returnValue = PostMethodListResponseReturnValueAsText "1"}
+
+data PostMethodListResponseReturnValue =
+    PostMethodListResponseReturnValueAsText Text
+  | PostMethodListResponseeAsEnum EnumResponse
+
+instance Arbitrary PostMethodListResponseReturnValue where
+  arbitrary = elements
+    [ PostMethodListResponseReturnValueAsText "1"
+    , PostMethodListResponseReturnValueAsText "2"
+    , PostMethodListResponseReturnValueAsText "3"
+    , PostMethodListResponseReturnValueAsText "4"
+    , PostMethodListResponseeAsEnum EnumResponse
+                                      { key = "Dog"
+                                      , value = 1
+                                      , enumType = "Pets"
+                                      }
+    , PostMethodListResponseeAsEnum EnumResponse
+                                      { key = "Charmander"
+                                      , value = 4
+                                      , enumType = "Pokemon"
+                                      }
+    , PostMethodListResponseeAsEnum EnumResponse
+                                      { key = "Fili"
+                                      , value = 6
+                                      , enumType = "Dwarves"
+                                      }
+    ]
+instance ToSchema PostMethodListResponseReturnValue where
+  declareNamedSchema _ =  do
+    enumRef<- declareSchemaRef (Proxy :: Proxy EnumResponse)
+    return $ NamedSchema (Just "PostMethodListResponseReturnValue") (mempty
+      & type_ .~ SwaggerObject
+      & description .~ Just "Return Value to PostMethodListResponse.\
+                            \ Will either be text or EnumResponse. Only\
+                            \ EnumResponse when the function returns a\
+                            \ single enum."
+      & additionalProperties .~ Just enumRef
+
+      )
+instance ToJSON PostMethodListResponseReturnValue where
+  toJSON (PostMethodListResponseReturnValueAsText txt) = toJSON txt
+  toJSON (PostMethodListResponseeAsEnum enr) = toJSON enr
+
+  toEncoding (PostMethodListResponseReturnValueAsText txt) = toEncoding txt
+  toEncoding (PostMethodListResponseeAsEnum enr) = toEncoding enr
+instance FromJSON PostMethodListResponseReturnValue where
+  parseJSON val =
+    case val of
+      Object o -> do
+        er <- parseJSON (Object o)
+        return $ PostMethodListResponseeAsEnum er
+      String txt -> return $ PostMethodListResponseReturnValueAsText txt
+      _ -> fail "Incorrect type to parseJSON for PostMethodListResponseReturnValue"
+
+data EnumResponse =
+  EnumResponse
+    { key :: Text
+    , value :: Word256
+    , enumType :: Text
+    }
+instance Arbitrary EnumResponse where
+  arbitrary = do
+    k <- arbitrary
+    v <- arbitrary
+    e <- arbitrary
+    return EnumResponse
+      { key = k
+      , value = v
+      , enumType = e
+      }
+instance ToSchema EnumResponse where
+  declareNamedSchema _ = do
+    word256Ref<- declareSchemaRef (Proxy :: Proxy Word256)
+    textRef<- declareSchemaRef (Proxy :: Proxy Text)
+    return $ NamedSchema (Just "EnumResponse") (mempty
+      & type_ .~ SwaggerObject
+      & properties .~ [ ("key", textRef)
+                      , ("value", word256Ref)
+                      , ("enumType", textRef)
+                      ]
+      & description .~ Just "Enum Response Type. Contains the Enum name, the key, and the value"
+      )
+instance ToJSON EnumResponse where
+  toJSON er =
+    object [ "key" .= key er
+           , "value" .= ((fromIntegral . value $ er) :: Int)
+           , "enumType" .= enumType er
+           ]
+  toEncoding er =
+    pairs (  "key" .= key er
+          <> "value" .= ((fromIntegral . value $ er) :: Int)
+          <> "enumType" .= enumType er
+          )
+
+instance FromJSON EnumResponse where
+  parseJSON = withObject "EnumResponse" $ \v -> EnumResponse
+      <$> v .: "key"
+      <*> v .: "value"
+      <*> v .: "enumType"
+
+instance Arbitrary Word256 where arbitrary = fromInteger <$> arbitrary
+instance ToJSON Word256 where
+  toJSON x = toJSON (fromIntegral x :: Int)
+  toEncoding x = toEncoding (fromIntegral x :: Int)
+instance FromJSON Word256 where
+  parseJSON val =
+    case val of
+      Number v -> return . round . toRational $ v
+      _ -> fail "Incorrect type to parseJSON for Word256"
+
+instance ToSchema Word256 where
+  declareNamedSchema _ = return $
+    NamedSchema
+      (Just "Word256")
+      (paramSchemaToSchema (Proxy :: Proxy Word256))
+
+instance ToParamSchema Word256 where
+  toParamSchema _ = toParamSchemaBoundedIntegral (Proxy :: Proxy Word256)
 
 data MethodCall = MethodCall
   { methodcallContractName    :: Text

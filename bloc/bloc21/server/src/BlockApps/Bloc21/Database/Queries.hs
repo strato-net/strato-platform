@@ -1348,7 +1348,10 @@ getContractXabiByMetadataId metadataId = do
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+  -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+  metadataId <- case contractId of
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
   funcs <- getXabiFunctionsQuery metadataId
   constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
   constr <- case constrIdMaybe of
