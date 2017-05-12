@@ -23,12 +23,6 @@ import qualified Blockchain.ECIES          as ECIES
 import           Blockchain.ExtendedECDSA
 import           Blockchain.ExtWord
 
-
--- import Debug.Trace
-
-theCurve::Curve
-theCurve = getCurveByName SEC_p256k1
-
 sigToBytes::ExtendedSignature->[Word8]
 sigToBytes (ExtendedSignature signature yIsOdd) =
   word256ToBytes (fromIntegral $ H.sigR signature) ++
@@ -86,8 +80,8 @@ bytesToAckMsg _ = error "wrong number of bytes in call to bytesToECIESMsg"
 getHandshakeBytes::PrivateNumber->PublicPoint->B.ByteString->IO B.ByteString
 getHandshakeBytes myPriv otherPubKey myNonce = do
   let
-    myPublic = calculatePublic theCurve myPriv
-    SharedKey sharedKey = getShared theCurve myPriv otherPubKey
+    myPublic = calculatePublic ECIES.theCurve myPriv
+    SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPubKey
 
     msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack myNonce)
 

@@ -33,14 +33,6 @@ import           Blockchain.ExtWord
 import           Blockchain.Frame
 import           Blockchain.Handshake
 
-
-
-
---import Debug.Trace
-
-theCurve::Curve
-theCurve = getCurveByName SEC_p256k1
-
 intToBytes::Integer->[Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
@@ -73,7 +65,7 @@ ethCryptConnect myPriv otherPubKey = do
 
       otherNonce=B.pack $ word256ToBytes $ ackNonce ackMsg
 
-      SharedKey shared' = getShared theCurve myPriv (ackEphemeralPubKey ackMsg)
+      SharedKey shared' = getShared ECIES.theCurve myPriv (ackEphemeralPubKey ackMsg)
       shared = B.pack $ intToBytes shared'
 
       frameDecKey = myNonce `add` otherNonce `add` shared `add` shared
@@ -166,7 +158,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
 
   when (version /= 4) $ error "wrong version in packet sent to ethCryptAcceptEIP8"
 
-  let SharedKey sharedKey = getShared theCurve myPriv otherPoint
+  let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
       msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
       r = bytesToWord256 $ B.unpack $ B.take 32 $ signatureBytes
       s = bytesToWord256 $ B.unpack $ B.take 32 $ B.drop 32 $ signatureBytes
@@ -181,7 +173,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
   entropyPool <- liftIO createEntropyPool
   let g = cprgCreate entropyPool :: SystemRNG
       (myPriv', _) = generatePrivate g $ getCurveByName SEC_p256k1
-      myEphemeral = calculatePublic theCurve myPriv'
+      myEphemeral = calculatePublic ECIES.theCurve myPriv'
       myNonce = 25 :: Word256
       ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
 
@@ -189,7 +181,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
 
   yield $ eciesMsgOBytes
 
-  let SharedKey ephemeralSharedSecret = getShared theCurve myPriv' otherEphemeral
+  let SharedKey ephemeralSharedSecret = getShared ECIES.theCurve myPriv' otherEphemeral
       ephemeralSharedSecretBytes = intToBytes ephemeralSharedSecret
 
       myNonceBS = B.pack $ word256ToBytes myNonce
@@ -221,7 +213,7 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
 ethCryptAcceptOld::MonadIO m=>PrivateNumber->Point->BL.ByteString->B.ByteString->ConduitM B.ByteString B.ByteString m (Maybe (EthCryptState, EthCryptState))
 ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
 
-    let SharedKey sharedKey = getShared theCurve myPriv otherPoint
+    let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
         otherNonce = B.take 32 $ B.drop 161 $ eciesMsgIBytes
         msg = fromIntegral sharedKey `xor` (bytesToWord256 $ B.unpack otherNonce)
         r = bytesToWord256 $ B.unpack $ B.take 32 $ eciesMsgIBytes
@@ -237,7 +229,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
     entropyPool <- liftIO createEntropyPool
     let g = cprgCreate entropyPool :: SystemRNG
         (myPriv', _) = generatePrivate g $ getCurveByName SEC_p256k1
-        myEphemeral = calculatePublic theCurve myPriv'
+        myEphemeral = calculatePublic ECIES.theCurve myPriv'
         myNonce = 25 :: Word256
         ackMsg = AckMessage { ackEphemeralPubKey=myEphemeral, ackNonce=myNonce, ackKnownPeer=False }
 
@@ -245,7 +237,7 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
 
     yield $ eciesMsgOBytes
 
-    let SharedKey ephemeralSharedSecret = getShared theCurve myPriv' otherEphemeral
+    let SharedKey ephemeralSharedSecret = getShared ECIES.theCurve myPriv' otherEphemeral
         ephemeralSharedSecretBytes = intToBytes ephemeralSharedSecret
 
         myNonceBS = B.pack $ word256ToBytes myNonce

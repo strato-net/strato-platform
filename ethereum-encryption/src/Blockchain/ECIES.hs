@@ -2,7 +2,8 @@
 
 module Blockchain.ECIES (
   decrypt,
-  encrypt
+  encrypt,
+  theCurve
   ) where
 
 import           Codec.Utils
@@ -16,14 +17,14 @@ import           Data.Binary.Get
 import           Data.Binary.Put
 import           Data.Bits
 import qualified Data.ByteString         as B
---import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy    as BL
 import           Data.HMAC
 import           System.Entropy
 
 import           Blockchain.ExtWord
 
---import Debug.Trace
+theCurve :: Curve
+theCurve = getCurveByName SEC_p256k1
 
 encrypt  ::  PrivateNumber->Point->B.ByteString->B.ByteString->IO BL.ByteString
 encrypt myPrvKey otherPubKey bytes prefix = do
@@ -51,9 +52,6 @@ decrypt prvKey bytes prefix = do
   return msg
 
 -----------------
-
-theCurve  ::  Curve
-theCurve = getCurveByName SEC_p256k1
 
 intToBytes  ::  Integer->[Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]

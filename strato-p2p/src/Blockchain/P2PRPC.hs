@@ -31,7 +31,6 @@ import qualified Data.ByteString.Lazy.Char8            as BLC
 import           Data.Conduit
 import           Data.Conduit.Network
 import qualified Data.Set                              as S
-import           Data.Text                             (Text)
 import qualified Data.Text                             as Text
 
 import           Network.JsonRpc.Client

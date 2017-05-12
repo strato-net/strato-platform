@@ -23,6 +23,7 @@ executable strato-p2p-client
                    base >= 4 && < 5
                  , blockapps-util
                  , hflags
+                 , ethereum-discovery
                  , monad-logger
                  , strato-p2p
     main-is: StratoP2PClientMain.hs
@@ -68,6 +69,7 @@ library
                  , ethereum-rlp
                  , blockapps-haskoin
                  , hflags
+                 , iproute
                  , json-rpc-server
                  , json-rpc-client
                  , lifted-base
@@ -86,6 +88,7 @@ library
                  , SafeSemaphore
                  , stm
                  , stm-conduit
+                 , streaming-commons
                  , strato-conf
                  , text
                  , time

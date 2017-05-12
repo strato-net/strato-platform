@@ -43,7 +43,7 @@ data Context =
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
 
-instance (MonadState Context m) => K.HasKafkaState m where
+instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
     getKafkaState = contextKafkaState <$> get
     putKafkaState s = do
       ctx <- get
@@ -52,7 +52,7 @@ instance (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadBaseControl IO m)=>HasSQLDB (StateT Context m) where
+instance (MonadResource m, MonadBaseControl IO m, MonadState Context m) => HasSQLDB m where
   getSQLDB = contextSQLDB <$> get
 
 getDebugMsg :: MonadState Context m => m String
