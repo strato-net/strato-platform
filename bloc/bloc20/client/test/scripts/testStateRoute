@@ -58,4 +58,6 @@ echo "##############################################"
 echo "# getting some values from the mapping route #"
 echo "##############################################"
 
-customHttp $blocUrl/contracts/$contractName/Latest/state/flipMapping/0 | jq .
+#customHttp $blocUrl/contracts/$contractName/Latest/state/flipMapping/0 | jq .
+customHttp $blocUrl/contracts/$contractName/Latest/state/intToStringMapping/0 | jq .
+customHttp $blocUrl/contracts/$contractName/Latest/state/intToStringMapping/1 | jq .
