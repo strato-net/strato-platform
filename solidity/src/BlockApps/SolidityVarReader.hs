@@ -28,6 +28,7 @@ import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
 import           Text.Printf
+import           Text.Read
 
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
@@ -435,10 +436,18 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
      TypeMapping fromType toType -> return (fromType, toType)
      x -> throwError $ Text.unpack mappingName ++ " is not a map, it is of type " ++ show x
 
+  -- 78338746147236970124700731725183845421594913511827187288591969170390706184117:1
+     
+  keyByteString <-
+    case fromType of
+     TypeInt256 -> do
+       keyAsInteger <- readMaybe (Text.unpack keyName) `orFail` ("Can not parse key as an Integer: " ++ Text.unpack keyName)
+       return $ word256ToByteString $ fromInteger keyAsInteger
+     x -> throwError $ "Sorry, This route doesn't support maps with keys of type: " ++ show x
 
-
-  let getValPosition::SimpleType->Text->Storage.Position->Storage.Position
-      getValPosition _ _ _ = Storage.positionAt 0 --TODO fill in this dummy stub
+  let valPositionInt=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ keyByteString `ByteString.append` word256ToByteString (Storage.offset position)
+      getValPosition::SimpleType->Text->Storage.Position->Storage.Position
+      getValPosition _ _ _ = Storage.positionAt valPositionInt  --TODO fill in this dummy stub
       valPosition = getValPosition fromType keyName position
 
   let val = decodeValue' typeDefs' storage valPosition toType
