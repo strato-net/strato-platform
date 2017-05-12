@@ -31,7 +31,6 @@ import           Blockchain.Colors
 import           Blockchain.Context
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockHeader
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.NewBlk
 import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
@@ -119,7 +118,7 @@ handleEvents mode peer = awaitForever $ \case
         return ()
 
     MsgEvt (NewBlock block' tdiff) -> do
-        $logInfoS "handleEvents/NewBlock" $ "newBlock with tdiff " ++ show tdiff
+        $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock with tdiff " ++ show tdiff
         lift $ putNewBlk $ blockToNewBlk block' -- todo delete this?
         let sha         = blockHash block'
         let header      = blockHeader block'
@@ -132,7 +131,8 @@ handleEvents mode peer = awaitForever $ \case
                 bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
                 let fetchNumber = numFromRedis bestBlock - 1
                 $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-                $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing" >> syncFetch Forward fetchNumber
+                $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
+                syncFetch Forward fetchNumber
             Just _  -> do
                 void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                 lift . void $ setTitleAndProduceBlocks [block']
@@ -189,7 +189,8 @@ handleEvents mode peer = awaitForever $ \case
                  let lastParent = case length existingParents of
                                       0 -> fetchNumber
                                       _ -> head . sort $ blockHeaderBlockNumber . snd <$> existingParents
-                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents) >> syncFetch Reverse lastParent
+                 $logInfoS "handleEvents/BlockHeaders" $ T.pack $ "missing blocks: " ++ (unlines $ format <$> missingParents)
+                 syncFetch Reverse lastParent
 
             -- todo: try with (&&&)
             headersInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ headerHash <$> headers

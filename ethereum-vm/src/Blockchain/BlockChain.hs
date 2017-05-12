@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
+{-# OPTIONS -fno-warn-unused-top-binds #-}
 
 module Blockchain.BlockChain
     ( addBlock
@@ -98,11 +99,11 @@ data TransactionFailureCause = TFInsufficientFunds Integer Integer OutputTx -- t
 txRejectionToAPIFailureCause :: Bagger.TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (Bagger.NonceTooLow    stage queue needed tx) =
     Failure (show stage) (Just $ show queue) IncorrectNonce (Just needed) (Just . transactionNonce $ otBaseTx tx) Nothing
-txRejectionToAPIFailureCause (Bagger.BalanceTooLow  stage queue needed actual tx) =
+txRejectionToAPIFailureCause (Bagger.BalanceTooLow  stage queue needed actual _) =
     Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InsufficientFunds (Just needed) (Just actual) Nothing
 txRejectionToAPIFailureCause (Bagger.GasLimitTooLow stage queue needed tx) =
     Failure (show stage) (Just $ show queue) IntrinsicGasExceedsLimit (Just needed) (Just . transactionGasLimit $ otBaseTx tx) Nothing
-txRejectionToAPIFailureCause (Bagger.LessLucrative  stage queue newTx oldTx) =
+txRejectionToAPIFailureCause (Bagger.LessLucrative  stage queue newTx _) =
     Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatSHAWithoutColor (otHash newTx))
 
 tfToBaggerTxRejection :: TransactionFailureCause -> Bagger.TxRejection
@@ -471,7 +472,7 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 --outputTransactionMessage::IO ()
 outputTransactionResult::BlockData->OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->
                          M.Map Address AddressStateModification->M.Map Address AddressStateModification->ContextM ()
-outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=tAddr} result deltaT beforeMap afterMap = do
+outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap = do
   let
     (txrStatus, message, gasRemaining) =
       case result of

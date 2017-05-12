@@ -250,7 +250,12 @@ runPeerInList connectedPeers thePeer otherServiceHost otherServicePort = do
 stratoP2PClient :: LoggingT IO ()
 stratoP2PClient = do
   connectedPeers <- newTVar S.empty
+
+  $logInfoS "stratoP2PClient" $ T.pack $ "clientCommPort: " ++ show clientCommPort
+  $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
+
   _ <- liftIO . forkIO $ runStratoP2PComm clientCommPort connectedPeers
+
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
     peers' <- liftIO getAvailablePeers
