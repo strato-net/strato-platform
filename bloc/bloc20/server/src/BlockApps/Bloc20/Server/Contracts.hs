@@ -113,8 +113,36 @@ getContractsSymbols (ContractName contractName) contractId = blocTransaction $ d
   vars <- blocQuery $ getXabiVariableNamesQuery metadataId
   return $ map SymbolName vars
 
+
 getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> Bloc GetContractsStateMappingResponse -- state-translation
-getContractsStateMapping _ _ _ _ = throwError $ Unimplemented "getContractsStateMapping"
+getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName = do
+  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+
+  contract' <-
+    either (throwError . UserError . Text.pack) return eitherErrorOrContract
+
+  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+
+  address <- case contractId of
+    Unnamed addr -> return addr
+    Named "Latest" -> blocQuery1 $ proc () -> do
+      (_,cmId,addr,_) <-
+        (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+          (queryTable contractsInstanceTable) -< ()
+      restrict -< cmId .== constant (metadataId::Int32)
+      returnA -< addr
+    Named somethingElse -> blocError $ UserError $
+      "Expected address or \"Latest\": saw " <> somethingElse
+
+  storage' <- blocStrato $ getStorage $ Just address
+
+  let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+      storage k = fromMaybe 0 $ Map.lookup k storageMap
+      ret = fmap valueToSolidityValue $ decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
+
+  case ret of
+   Nothing -> throwError $ UserError "unknown user error" --TODO put in real error message
+   Just val -> return $ Map.fromList $ [(mappingName, Map.fromList [(keyName, val)])]
 
 getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwError $ Unimplemented "getContractsStates"

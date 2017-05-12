@@ -5,6 +5,7 @@
 module BlockApps.SolidityVarReader (
   decodeValue,
   decodeValues,
+  decodeMapValue,
   word256ToByteString,
   byteStringToWord256,
   valueToSolidityValue
@@ -415,6 +416,17 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
 
 --  x -> error $ "Missing case in decodeValue': " ++ show x
 
+
+decodeMapValue
+  :: TypeDefs
+  -> Struct
+  -> Storage
+  -> Text
+  -> Text
+  -> Maybe Value
+--decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
+--  undefined typeDefs' storage mappingName keyName
+decodeMapValue _ _ _ _ _ = return $ SimpleValue $ ValueBool True
 
 
 
