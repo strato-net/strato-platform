@@ -1,6 +1,12 @@
 
 contract Mapping {
 
+  string x;
+  
+  mapping(int=>int) simpleMapping;
+
+  int y;
+
   mapping(int=>string) intToStringMapping;
   mapping(string=>int) stringToIntMapping;
 
