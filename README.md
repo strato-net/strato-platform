@@ -1,7 +1,7 @@
 
 ![logo](http://blockapps.net/wp-content/uploads/2016/12/blockapps-logo-horizontal-blue-for-web-transparent.png)
 
-#monstrato Build Guide
+# monstrato Build Guide
 
 Note: If you are running through this guide and find something doesn't work, please update it.
 
