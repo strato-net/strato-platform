@@ -2,7 +2,7 @@
 var units = require('blockapps-js').ethbase.Units;
 var ethValue = require('blockapps-js').ethbase.Units.ethValue;
 
-var scaffoldApp = { 
+var scaffoldApp = {
   properties: {
     appName: {
       message: "Enter the name of your app",
@@ -20,12 +20,13 @@ var scaffoldApp = {
     },
 
     apiURL: {
-      message: "Enter the BlockApps API URL you are using or ENTER for default",
-      required: false,
+      description: `Enter the BlockApps API URL you are using`,
+      required: true,
       pattern: '[^,\/]$',
-      default: 'http://strato-dev4.blockapps.net'
+      message: 'make sure to leave off the trailing slash',
+      default: 'http://MACHINE_IP/strato-api'
     },
-   
+
     profile: {
       message: "Enter the blockchain profile you wish to use.  Options: strato-dev, ethereum",
       required: false,
@@ -36,7 +37,7 @@ var scaffoldApp = {
 };
 
 
-var createPassword = { 
+var createPassword = {
   properties: {
     password: {
       message: "Enter a high entropy password. You will need this to sign transactions.",
@@ -46,7 +47,7 @@ var createPassword = {
   }
 };
 
-var registerPassword = { 
+var registerPassword = {
   properties: {
     password: {
       message: "Enter password for app store",
@@ -56,7 +57,7 @@ var registerPassword = {
   }
 };
 
-var requestPassword = { 
+var requestPassword = {
   properties: {
     password: {
       message: "Enter password to retrieve private key",
@@ -66,14 +67,14 @@ var requestPassword = {
   }
 };
 
-var transfer = { 
+var transfer = {
   properties: {
     password: {
       message: "Enter password to retrieve private key and sign transaction",
       hidden: true,
       required: true
     },
-   
+
     to: {
       message: "Enter the address to which to transfer the Ether",
       required: true
@@ -94,7 +95,7 @@ var transfer = {
       message: "Enter the gas limit for your transaction",
       required: true,
       default: 22000
-    },      
+    },
 
     gasPrice: {
       message: "Enter the gas price for your transaction",
@@ -106,9 +107,9 @@ var transfer = {
 
 var confirmTransfer = function(promptObj) {
 
-  console.log("preparing to send " 
-                         + ethValue(parseInt(promptObj.value)).in(promptObj.unit) 
-                         + " wei to " + promptObj.to 
+  console.log("preparing to send "
+                         + ethValue(parseInt(promptObj.value)).in(promptObj.unit)
+                         + " wei to " + promptObj.to
                          + " plus a maximal gas fee of " + units.convertEth(promptObj.gasLimit * promptObj.gasPrice).from("wei").to("ether") + " ether");
   return {
     properties : {
@@ -118,7 +119,7 @@ var confirmTransfer = function(promptObj) {
         required : true,
         conform: function (pass) {
           return (promptObj.password === pass);
-        } 
+        }
       }
     }
   };
