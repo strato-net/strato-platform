@@ -141,8 +141,8 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
       ret = fmap valueToSolidityValue $ decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
   case ret of
-   Nothing -> throwError $ UserError "unknown user error" --TODO put in real error message
-   Just val -> return $ Map.fromList $ [(mappingName, Map.fromList [(keyName, val)])]
+   Left err -> throwError $ UserError $ Text.pack err
+   Right val -> return $ Map.fromList $ [(mappingName, Map.fromList [(keyName, val)])]
 
 getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwError $ Unimplemented "getContractsStates"

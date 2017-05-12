@@ -24,7 +24,7 @@ import           Data.List
 import qualified Data.Map                         as Map
 import           Data.Maybe
 import           Data.Text                        (Text)
-import qualified Data.Text                        as T
+import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
 import           Text.Printf
 
@@ -41,126 +41,126 @@ import qualified BlockApps.Storage                as Storage
 valueToSolidityValue::Value->SolidityValue
 valueToSolidityValue (SimpleValue (ValueBool x)) = SolidityBool x
 
-valueToSolidityValue (SimpleValue (ValueInt8 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt16 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt24 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt32 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt40 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt48 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt56 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt64 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt8 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt16 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt24 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt32 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt40 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt48 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt56 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt64 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueInt72 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt80 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt88 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt96 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt104 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt112 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt120 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt128 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt72 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt80 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt88 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt96 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt104 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt112 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt120 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt128 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueInt136 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt144 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt152 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt160 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt168 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt176 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt184 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt192 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt136 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt144 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt152 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt160 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt168 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt176 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt184 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt192 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueInt200 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt208 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt216 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt224 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt232 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt240 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt248 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueInt256 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt200 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt208 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt216 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt224 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt232 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt240 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt248 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt256 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueUInt8 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt16 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt24 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt32 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt40 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt48 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt56 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt64 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt8 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt16 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt24 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt32 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt40 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt48 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt56 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt64 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueUInt72 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt80 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt88 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt96 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt104 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt112 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt120 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt128 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt72 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt80 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt88 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt96 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt104 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt112 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt120 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt128 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueUInt136 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt144 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt152 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt160 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt168 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt176 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt184 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt192 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt136 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt144 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt152 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt160 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt168 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt176 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt184 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt192 v)) = SolidityValueAsString $ Text.pack $ show v
 
-valueToSolidityValue (SimpleValue (ValueUInt200 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt208 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt216 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt224 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt232 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt240 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt248 v)) = SolidityValueAsString $ T.pack $ show v
-valueToSolidityValue (SimpleValue (ValueUInt256 v)) = SolidityValueAsString $ T.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt200 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt208 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt216 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt224 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt232 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt240 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt248 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt256 v)) = SolidityValueAsString $ Text.pack $ show v
 
 
 
 
 valueToSolidityValue (SimpleValue (ValueString s)) = SolidityValueAsString s
 valueToSolidityValue (SimpleValue (ValueAddress (Address addr))) =
-  SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
+  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueContract (Address addr)) =
-  SolidityValueAsString $ T.pack $ printf "%040x" (fromIntegral addr::Integer)
+  SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr::Integer)
 valueToSolidityValue (ValueArrayFixed _ values) = SolidityArray $ map valueToSolidityValue values
 valueToSolidityValue (ValueArrayDynamic values) = SolidityArray $ map valueToSolidityValue values
-valueToSolidityValue (SimpleValue (ValueBytes bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes1 byte)) = SolidityValueAsString $ T.pack $ BC.unpack $ ByteString.pack [byte]
-valueToSolidityValue (SimpleValue (ValueBytes2 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes3 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes4 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes5 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes6 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes7 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes8 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes9 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes10 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes11 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes12 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes13 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes14 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes15 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes16 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes17 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes18 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes19 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes20 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes21 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes22 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes23 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes24 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes25 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes26 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes27 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes28 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes29 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes30 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes31 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (SimpleValue (ValueBytes32 bytes)) = SolidityValueAsString $ T.pack $ BC.unpack bytes
-valueToSolidityValue (ValueEnum name value) = SolidityValueAsString $ name `T.append` "." `T.append` value
+valueToSolidityValue (SimpleValue (ValueBytes bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes1 byte)) = SolidityValueAsString $ Text.pack $ BC.unpack $ ByteString.pack [byte]
+valueToSolidityValue (SimpleValue (ValueBytes2 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes3 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes4 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes5 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes6 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes7 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes8 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes9 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes10 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes11 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes12 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes13 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes14 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes15 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes16 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes17 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes18 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes19 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes20 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes21 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes22 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes23 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes24 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes25 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes26 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes27 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes28 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes29 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes30 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes31 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (SimpleValue (ValueBytes32 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
+valueToSolidityValue (ValueEnum name value) = SolidityValueAsString $ name `Text.append` "." `Text.append` value
 valueToSolidityValue (ValueStruct namedItems) =
   SolidityObject $ map (fmap valueToSolidityValue) namedItems
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
-  SolidityValueAsString $ T.pack $ "function ("
+  SolidityValueAsString $ Text.pack $ "function ("
                           ++ intercalate "," (map (formatType . snd) paramTypes)
                           ++ ") returns ("
                           ++ intercalate "," (map (formatType . snd) returnTypes)
@@ -392,7 +392,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
       theList = (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [0..fromIntegral (storage offset-1)::Int]
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
-  TypeMapping tyk tyv -> SimpleValue $ ValueString $ T.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
+  TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
 
   TypeEnum name ->
     case Map.lookup name enumDefs of
@@ -423,11 +423,20 @@ decodeMapValue
   -> Storage
   -> Text
   -> Text
-  -> Maybe Value
+  -> Either String Value
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
-decodeMapValue _ _ _ _ _ = return $ SimpleValue $ ValueBool True
+decodeMapValue _ Struct{..} _ mappingName _ = do
+  _ <- Map.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
 
+  return $ SimpleValue $ ValueBool True
+
+  
+
+
+orFail::Maybe a->String->Either String a
+orFail Nothing msg = Left msg
+orFail (Just x) _ = Right x
 
 
 decodeByteString::Storage->Word256->Int->Int->Value

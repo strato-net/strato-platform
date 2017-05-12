@@ -54,8 +54,8 @@ echo "$request" | customHttp POST $blocUrl/users/fred/$address/contract "Accept:
 
 echo ""
 
-echo "##################################"
-echo "# querying state in new contract #"
-echo "##################################"
+echo "##############################################"
+echo "# getting some values from the mapping route #"
+echo "##############################################"
 
-customHttp $blocUrl/contracts/$contractName/Latest/state/mapping/qqqq | jq .
+customHttp $blocUrl/contracts/$contractName/Latest/state/flipMapping/qqqq | jq .
