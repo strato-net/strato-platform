@@ -18,6 +18,7 @@ library
     BlockApps.Bloc20.API
     BlockApps.Bloc20.Crypto
     BlockApps.Bloc20.API.Addresses
+    BlockApps.Bloc20.API.Git
     BlockApps.Bloc20.API.SwaggerSchema
     BlockApps.Bloc20.API.Contracts
     BlockApps.Bloc20.API.Search
@@ -35,6 +36,7 @@ library
                , cryptonite
                , bytestring
                , generic-random
+               , gitrev
                , http-api-data
                , http-media
                , insert-ordered-containers

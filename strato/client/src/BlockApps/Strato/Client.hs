@@ -25,7 +25,6 @@ module BlockApps.Strato.Client
   , postFaucets
   , postSolc
   , postExtabi
-  , stratoDev
   ) where
 
 import           Data.Proxy
@@ -174,6 +173,3 @@ getTxsFilter
     uncurryAccountsFilterParams f AccountsFilterParams{..} = f
       qaAddress qaBalance qaMinBalance qaMaxBalance
       qaNonce qaMinNonce qaMaxNonce
-
-stratoDev :: BaseUrl
-stratoDev = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"

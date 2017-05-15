@@ -18,6 +18,7 @@ library
     BlockApps.Bloc21.API
     BlockApps.Bloc21.Crypto
     BlockApps.Bloc21.API.Addresses
+    BlockApps.Bloc21.API.Git
     BlockApps.Bloc21.API.SwaggerSchema
     BlockApps.Bloc21.API.Contracts
     BlockApps.Bloc21.API.Search
@@ -35,6 +36,7 @@ library
                , cryptonite
                , bytestring
                , generic-random
+               , gitrev
                , http-api-data
                , http-media
                , lens
