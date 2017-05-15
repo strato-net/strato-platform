@@ -147,19 +147,10 @@ spec = do
       responses `shouldSatisfy` all ((== "0") . unwrapPostMethodListResponseToText)
 
   describe "PostMethodListResponseReturnValue" $ do
-    it "has inverse To/FromJSON instances for PostMethodListResponseReturnValueAsText" $ \ _ ->
+    it "has inverse To/FromJSON instances " $ \ _ ->
       property $
-        (\x -> (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue))
-        (PostMethodListResponseReturnValueAsText "For Gondor!!")
-    it "has inverse To/FromJSON instances for PostMethodListResponseeAsEnum" $ \ _ ->
-      property $
-        (\x -> (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue))
-        ( PostMethodListResponseeAsEnum EnumResponse
-                                          { key = "Jade"
-                                          , value = 1
-                                          , enumType = "3Keys"
-                                          }
-        )
+        (\x -> (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue)) <$>
+        arbitrary
 
 unwrapPostMethodListResponseToText :: PostMethodListResponse -> Text.Text
 unwrapPostMethodListResponseToText pmlr = case returnValue pmlr of

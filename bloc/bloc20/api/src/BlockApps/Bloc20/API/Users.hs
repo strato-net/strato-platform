@@ -561,26 +561,9 @@ data PostMethodListResponseReturnValue =
   deriving (Show, Eq)
 
 instance Arbitrary PostMethodListResponseReturnValue where
-  arbitrary = elements
-    [ PostMethodListResponseReturnValueAsText "1"
-    , PostMethodListResponseReturnValueAsText "2"
-    , PostMethodListResponseReturnValueAsText "3"
-    , PostMethodListResponseReturnValueAsText "4"
-    , PostMethodListResponseeAsEnum EnumResponse
-                                      { key = "Dog"
-                                      , value = 1
-                                      , enumType = "Pets"
-                                      }
-    , PostMethodListResponseeAsEnum EnumResponse
-                                      { key = "Charmander"
-                                      , value = 4
-                                      , enumType = "Pokemon"
-                                      }
-    , PostMethodListResponseeAsEnum EnumResponse
-                                      { key = "Fili"
-                                      , value = 6
-                                      , enumType = "Dwarves"
-                                      }
+  arbitrary = oneof 
+    [ PostMethodListResponseReturnValueAsText <$> arbitrary
+    , PostMethodListResponseeAsEnum <$> arbitrary
     ]
 instance ToSchema PostMethodListResponseReturnValue where
   declareNamedSchema _ =  do
