@@ -17,7 +17,7 @@ import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Code
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
-import           Blockchain.Database.MerklePatricia
+import           Blockchain.Database.MerklePatricia hiding (stateRoot)
 import           Blockchain.SHA
 import           Blockchain.Util
 
