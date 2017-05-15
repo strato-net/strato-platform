@@ -6,6 +6,7 @@
 
 module BlockApps.Bloc21.Server.Contracts where
 
+import           Control.Applicative
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -67,20 +68,20 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
-  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+  eitherErrorOrContract' <- xAbiToContract <$> getContractXabi contract contractId
 
   contract' <-
-    either (throwError . UserError . Text.pack) return eitherErrorOrContract
+    either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> blocQuery1 $ proc () -> do
-      (_,cmId,addr,_) <-
+      (_,cmId',addr,_) <-
         (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
           (queryTable contractsInstanceTable) -< ()
-      restrict -< cmId .== constant (metadataId::Int32)
+      restrict -< cmId' .== constant (metadataId::Int32)
       returnA -< addr
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
@@ -137,7 +138,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
 
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
-      ret = fmap valueToSolidityValue $ decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
+      ret = valueToSolidityValue <$> decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
   logWith logNotice $ Text.unlines
     [ "Storage:"
@@ -147,7 +148,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
 
   case ret of
    Left err -> throwError $ UserError $ Text.pack err
-   Right val -> return $ Map.fromList $ [(mappingName, Map.fromList [(keyName, val)])]
+   Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
 
 
 
