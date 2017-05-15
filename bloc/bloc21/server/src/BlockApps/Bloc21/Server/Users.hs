@@ -3,6 +3,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE LambdaCase          #-}
 
 module BlockApps.Bloc21.Server.Users where
 
@@ -253,7 +254,10 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
                               either (throwError . UserError . Text.pack) return $
                                 xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
       let txResp = transactionresultResponse txResult
-      let mFormattedResponse = convertResultResToVals txResp orderedResultTypes
+
+      -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+      -- workaround for enums
+      let mFormattedResponse = convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
       methodReturn <-
         blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
       return $ MethodResolved methodReturn
@@ -312,12 +316,22 @@ postUsersContractMethod
 
     let
       txResp = transactionresultResponse txResult
+
+      -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+      -- workaround for enums
       mFormattedResponse =
-        convertResultResToVals txResp orderedResultTypes
+        convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
 
     formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
 
     return $ PostUsersContractMethodResponse formattedResponse
+
+convertEnumTypeToInt :: Type -> Type
+convertEnumTypeToInt = \case
+  TypeEnum _ -> SimpleType TypeUInt256
+  TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
+  TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
+  ty -> ty
 
 convertResultResToVals :: Text -> [Type] -> Maybe [SolidityValue]
 convertResultResToVals txResp responseTypes =
