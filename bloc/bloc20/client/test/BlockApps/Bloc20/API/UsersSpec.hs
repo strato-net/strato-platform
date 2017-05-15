@@ -146,7 +146,7 @@ spec = do
       let Right responses = eResponses
       responses `shouldSatisfy` all ((== "0") . unwrapPostMethodListResponseToText)
 
-  describe "PostMethodListResponseReturnValue" $ do
+  describe "PostMethodListResponseReturnValue" $
     it "has inverse To/FromJSON instances " $ \ _ ->
       property $
         (\x -> (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue)) <$>
