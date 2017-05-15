@@ -6,7 +6,6 @@
 
 module BlockApps.Bloc21.Server.Contracts where
 
-import           Control.Applicative
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
