@@ -3,13 +3,16 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE LambdaCase          #-}
 
 module BlockApps.Bloc20.Server.Users where
+
 
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
 import           Crypto.Secp256k1
+import qualified Data.Bimap                      as Bimap
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as ByteString
 import qualified Data.ByteString.Base16          as Base16
@@ -41,6 +44,7 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
+import           BlockApps.Solidity.TypeDefs
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
@@ -206,10 +210,11 @@ postUsersContractMethodList
   -> PostMethodListRequest
   -> Bloc [PostMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-  txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
+  txsFuncIdsAndXabi <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
     functionId <- getFunctionId cmId methodcallMethodName
 
+    xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
     eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
 
     contract' <-
@@ -235,8 +240,8 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       (sel <> argsBin)
       nonceIncr
     -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-    return (tx,functionId)
-  let (txs,funcIds) = unzip txsFuncIds
+    return (tx,functionId,xabi)
+  let (txs,funcIds,xabis) = unzip3 txsFuncIdsAndXabi
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
   map PostMethodListResponse <$> if postmethodlistrequestResolve
@@ -246,17 +251,47 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
     let zipped = resultJoiner <$> zip funcIds hashes
         resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
 
-    for zipped $ \(funcId,txResult) -> do
+    for (zip zipped xabis) $ \((funcId,txResult), xabi) -> do
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
       let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
       orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
                               either (throwError . UserError . Text.pack) return $
-                                xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
+                                xabiTypeToType xabi indexedTypeType
       let txResp = transactionresultResponse txResult
-      let mFormattedResponse = Text.concat <$> convertResultResToTexts txResp orderedResultTypes
-      formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-      return $ if Text.null formattedResponse then "null" else formattedResponse
-  else return $ map (Text.pack . keccak256String) hashes
+
+      case orderedResultTypes of
+        [TypeEnum str] -> do
+          let eitherErrorOrContract = xAbiToContract xabi
+          contract' <-
+            either (throwError . UserError . Text.pack) return eitherErrorOrContract
+          let enumSet = getEnumSetFromContract str contract'
+              byteResp = fst (Base16.decode (Text.encodeUtf8 txResp))
+              mValInt = bytesToValue byteResp (SimpleType TypeUInt256)
+          case mValInt of
+            Just (SimpleValue (ValueUInt256 v)) ->
+              let k = fromIntegral v
+                  enumRes  = EnumResponse
+                              { key = enumSet Bimap.! k
+                              , value = v
+                              , enumType = str
+                              }
+              in return $ PostMethodListResponseeAsEnum enumRes
+            _ -> throwError (AnError $ Text.append "Failed building single enum response.\
+                                          \Failed converting to UInt256: " txResp)
+
+        _ -> do
+          let mFormattedResponse = Text.intercalate "," <$>
+                convertResultResToTexts txResp (map convertEnumTypeToInt orderedResultTypes)
+          formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+          return $ PostMethodListResponseReturnValueAsText
+                    ( if Text.null formattedResponse
+                        then  "null"
+                        else formattedResponse
+                    )
+  else return $
+          map (PostMethodListResponseReturnValueAsText . Text.pack . keccak256String) hashes
+
+
 
 postUsersContractMethod
   :: UserName
@@ -273,7 +308,6 @@ postUsersContractMethod
   (PostUsersContractMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
-
     eitherErrorOrContract <- xAbiToContract <$> getContractXabiByMetadataId cmId
 
     contract' <-
@@ -309,15 +343,26 @@ postUsersContractMethod
 
     txResult <- pollTxResult hash
 
+
     let
       txResp = transactionresultResponse txResult
       mFormattedResponse = Text.intercalate "," <$>
-        convertResultResToTexts txResp orderedResultTypes
+        convertResultResToTexts txResp (map convertEnumTypeToInt orderedResultTypes)
 
     formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
     let ret = if Text.null formattedResponse then "null" else formattedResponse
 
     return $ PostUsersContractMethodResponse $ "transaction returned: " <> ret
+
+getEnumSetFromContract :: Text -> Contract -> EnumSet
+getEnumSetFromContract eTy contr = (Map.!) (enumDefs . typeDefs $ contr) eTy
+
+convertEnumTypeToInt :: Type -> Type
+convertEnumTypeToInt = \case
+  TypeEnum _ -> SimpleType TypeUInt256
+  TypeArrayFixed n ty -> TypeArrayFixed n (convertEnumTypeToInt ty)
+  TypeArrayDynamic ty -> TypeArrayDynamic (convertEnumTypeToInt ty)
+  ty -> ty
 
 convertResultResToTexts :: Text -> [Type] -> Maybe [Text]
 convertResultResToTexts txResp responseTypes =

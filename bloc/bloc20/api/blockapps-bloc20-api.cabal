@@ -39,6 +39,8 @@ library
                , gitrev
                , http-api-data
                , http-media
+               , insert-ordered-containers
+               , largeword
                , lens
                , QuickCheck
                , quickcheck-instances

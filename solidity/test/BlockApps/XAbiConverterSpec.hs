@@ -1,7 +1,5 @@
-{-# LANGUAGE
-      OverloadedStrings
-    , QuasiQuotes
-#-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 
 module BlockApps.XAbiConverterSpec where
@@ -20,7 +18,7 @@ import Text.RawString.QQ
 
 spec :: Spec
 spec =
-  describe "Xabi" $ 
+  describe "Xabi" $
     it "should convert a first pass xabi to a contract, then to a second pass xabi" $ do
       let firstPass = fromMaybe undefined $ decode firstPassString
           secondPass = fromMaybe undefined $ decode secondPassString::Xabi
@@ -28,101 +26,101 @@ spec =
       contractToXabi (either undefined id $ xAbiToContract firstPass) `shouldBe` secondPass{xabiConstr=Map.empty}
 
 secondPassString::ByteString.ByteString
-secondPassString = 
+secondPassString =
   [r|
 
-   {  
-      "funcs":{  
-         "isReader":{  
-            "args":{  
-               "reader":{  
+   {
+      "funcs":{
+         "isReader":{
+            "args":{
+               "reader":{
                   "type":"Address",
                   "index":0
                }
             },
             "selector":"69a7ddf7",
-            "vals":{  
-               "#0":{  
+            "vals":{
+               "#0":{
                   "type":"Bool",
                   "index":0
                }
             }
          },
-         "addReader":{  
-            "args":{  
-               "reader":{  
+         "addReader":{
+            "args":{
+               "reader":{
                   "type":"Address",
                   "index":0
                }
             },
             "selector":"afd8b1d1",
-            "vals":{  
+            "vals":{
 
             }
          },
-         "getContents":{  
-            "args":{  
+         "getContents":{
+            "args":{
 
             },
             "selector":"23677ae2",
-            "vals":{  
-               "#0":{  
+            "vals":{
+               "#0":{
                   "dynamic":true,
                   "type":"String",
                   "index":0
                }
             }
          },
-         "transfer":{  
-            "args":{  
-               "_owner":{  
+         "transfer":{
+            "args":{
+               "_owner":{
                   "type":"Address",
                   "index":0
                }
             },
             "selector":"1a695230",
-            "vals":{  
+            "vals":{
 
             }
          },
-         "isOwner":{  
-            "args":{  
-               "addr":{  
+         "isOwner":{
+            "args":{
+               "addr":{
                   "type":"Address",
                   "index":0
                }
             },
             "selector":"2f54bf6e",
-            "vals":{  
-               "#0":{  
+            "vals":{
+               "#0":{
                   "type":"Bool",
                   "index":0
                }
             }
          }
       },
-      "constr":{  
-         "_author":{  
+      "constr":{
+         "_author":{
             "type":"Address",
             "index":1
          },
-         "_userOwner":{  
+         "_userOwner":{
             "type":"Address",
             "index":0
          },
-         "_hash":{  
+         "_hash":{
             "type":"Bytes",
             "index":2,
             "bytes":32
          },
-         "_contents":{  
+         "_contents":{
             "dynamic":true,
             "type":"String",
             "index":4
          },
-         "_tags":{  
+         "_tags":{
             "dynamic":true,
-            "entry":{  
+            "entry":{
                "type":"Bytes",
                "bytes":32
             },
@@ -130,50 +128,50 @@ secondPassString =
             "index":3
          }
       },
-      "vars":{  
-         "hash":{  
+      "vars":{
+         "hash":{
             "atBytes":160,
             "type":"Bytes",
             "bytes":32,
             "public":true
          },
-         "contents":{  
+         "contents":{
             "atBytes":192,
             "dynamic":true,
             "type":"String",
             "public":true
          },
-         "readers":{  
+         "readers":{
             "atBytes":32,
             "dynamic":true,
-            "value":{  
+            "value":{
                "type":"Bool"
             },
-            "key":{  
+            "key":{
                "type":"Address"
             },
             "type":"Mapping",
             "public":true
          },
-         "owner":{  
+         "owner":{
             "atBytes":0,
             "type":"Address",
             "public":true
          },
-         "author":{  
+         "author":{
             "atBytes":96,
             "type":"Address",
             "public":true
          },
-         "userOwner":{  
+         "userOwner":{
             "atBytes":64,
             "type":"Address",
             "public":true
          },
-         "tags":{  
+         "tags":{
             "atBytes":128,
             "dynamic":true,
-            "entry":{  
+            "entry":{
                "type":"Bytes",
                "bytes":32
             },
@@ -187,121 +185,121 @@ secondPassString =
 
 
 firstPassString::ByteString.ByteString
-firstPassString = 
+firstPassString =
   [r|
 
 
-   {  
-      "funcs":{  
-         "isReader":{  
-            "args":{  
-               "reader":{  
+   {
+      "funcs":{
+         "isReader":{
+            "args":{
+               "reader":{
                   "type":"Address",
                   "index":0
                }
             },
-            "vals":{  
-               "#0":{  
+            "vals":{
+               "#0":{
                   "type":"Bool",
                   "index":0
                }
             }
          },
-         "addReader":{  
-            "args":{  
-               "reader":{  
+         "addReader":{
+            "args":{
+               "reader":{
                   "type":"Address",
                   "index":0
                }
             },
-            "vals":{  
+            "vals":{
             }
          },
-         "getContents":{  
-            "args":{  
+         "getContents":{
+            "args":{
             },
-            "vals":{  
-               "#0":{  
+            "vals":{
+               "#0":{
                   "dynamic":true,
                   "type":"String",
                   "index":0
                }
             }
          },
-         "transfer":{  
-            "args":{  
-               "_owner":{  
+         "transfer":{
+            "args":{
+               "_owner":{
                   "type":"Address",
                   "index":0
                }
             },
-            "vals":{  
+            "vals":{
             }
          },
-         "isOwner":{  
-            "args":{  
-               "addr":{  
+         "isOwner":{
+            "args":{
+               "addr":{
                   "type":"Address",
                   "index":0
                }
             },
-            "vals":{  
-               "#0":{  
+            "vals":{
+               "#0":{
                   "type":"Bool",
                   "index":0
                }
             }
          }
       },
-      "types":{  
-         "Owned":{  
+      "types":{
+         "Owned":{
             "type":"Contract",
             "bytes":0
          },
-         "StorageBlob":{  
+         "StorageBlob":{
             "type":"Contract",
             "bytes":0
          },
-         "ReadPermissioned":{  
+         "ReadPermissioned":{
             "type":"Contract",
             "bytes":0
          },
-         "IdentityAccessManager":{  
+         "IdentityAccessManager":{
             "type":"Contract",
             "bytes":0
          },
-         "BasicUserStorage":{  
+         "BasicUserStorage":{
             "type":"Contract",
             "bytes":0
          },
-         "Login":{  
+         "Login":{
             "type":"Contract",
             "bytes":0
          }
       },
-      "constr":{  
-         "_author":{  
+      "constr":{
+         "_author":{
             "type":"Address",
             "index":1
          },
-         "_userOwner":{  
+         "_userOwner":{
             "type":"Address",
             "index":0
          },
-         "_hash":{  
+         "_hash":{
             "dynamic":false,
             "type":"Bytes",
             "index":2,
             "bytes":32
          },
-         "_contents":{  
+         "_contents":{
             "dynamic":true,
             "type":"String",
             "index":4
          },
-         "_tags":{  
+         "_tags":{
             "dynamic":true,
-            "entry":{  
+            "entry":{
                "dynamic":false,
                "type":"Bytes",
                "bytes":32
@@ -310,51 +308,51 @@ firstPassString =
             "index":3
          }
       },
-      "vars":{  
-         "hash":{  
+      "vars":{
+         "hash":{
             "atBytes":96,
             "dynamic":false,
             "type":"Bytes",
             "bytes":32,
             "public":false
          },
-         "contents":{  
+         "contents":{
             "atBytes":128,
             "dynamic":true,
             "type":"String",
             "public":false
          },
-         "readers":{  
+         "readers":{
             "atBytes":0,
             "dynamic":true,
-            "value":{  
+            "value":{
                "type":"Bool"
             },
-            "key":{  
+            "key":{
                "type":"Address"
             },
             "type":"Mapping",
             "public":false
          },
-         "owner":{  
+         "owner":{
             "atBytes":0,
             "type":"Address",
             "public":false
          },
-         "author":{  
+         "author":{
             "atBytes":32,
             "type":"Address",
             "public":false
          },
-         "userOwner":{  
+         "userOwner":{
             "atBytes":0,
             "type":"Address",
             "public":false
          },
-         "tags":{  
+         "tags":{
             "atBytes":64,
             "dynamic":true,
-            "entry":{  
+            "entry":{
                "dynamic":false,
                "type":"Bytes",
                "bytes":32
@@ -366,6 +364,3 @@ firstPassString =
    }
 
 |]
-
-
-
