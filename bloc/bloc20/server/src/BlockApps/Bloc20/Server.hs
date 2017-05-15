@@ -18,11 +18,13 @@ import           BlockApps.Bloc20.API
 import           BlockApps.Bloc20.Monad
 import           BlockApps.Bloc20.Server.Addresses
 import           BlockApps.Bloc20.Server.Contracts
+import           BlockApps.Bloc20.Server.Git
 import           BlockApps.Bloc20.Server.Search
 import           BlockApps.Bloc20.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = getHomepage
+  :<|> getGitInfo
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser

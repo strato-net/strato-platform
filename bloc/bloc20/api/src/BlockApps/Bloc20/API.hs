@@ -7,6 +7,7 @@ module BlockApps.Bloc20.API
   , layoutBloc
   , mockBloc
   , blocApi
+  , module BlockApps.Bloc20.API.Git
   , module BlockApps.Bloc20.API.Users
   , module BlockApps.Bloc20.API.Addresses
   , module BlockApps.Bloc20.API.Contracts
@@ -23,6 +24,7 @@ import           Servant.Mock
 
 import           BlockApps.Bloc20.API.Addresses
 import           BlockApps.Bloc20.API.Contracts
+import           BlockApps.Bloc20.API.Git
 import           BlockApps.Bloc20.API.Search
 import           BlockApps.Bloc20.API.Users
 import           BlockApps.Bloc20.API.Utils
@@ -31,6 +33,8 @@ import           BlockApps.Bloc20.Crypto
 type BlocAPI =
   -- / endpoint, for smoke test
   GetHomepage
+  -- /git, to check github hash, branch, etc.
+  :<|> GetGitInfo
   -- /users endpoints
   :<|> GetUsers
   :<|> PostUsersUser

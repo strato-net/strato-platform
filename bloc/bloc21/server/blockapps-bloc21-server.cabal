@@ -22,6 +22,7 @@ library
     BlockApps.Bloc21.Server
     BlockApps.Bloc21.Server.Addresses
     BlockApps.Bloc21.Server.Contracts
+    BlockApps.Bloc21.Server.Git
     BlockApps.Bloc21.Server.Search
     BlockApps.Bloc21.Server.Users
     BlockApps.Bloc21.Server.Utils
