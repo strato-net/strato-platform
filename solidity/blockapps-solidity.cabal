@@ -57,6 +57,7 @@ library
                , lens
                , logging-effect
                , memory
+               , mtl
                , parsec
                , QuickCheck
                , quickcheck-instances

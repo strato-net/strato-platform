@@ -67,20 +67,20 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
-  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+  eitherErrorOrContract' <- xAbiToContract <$> getContractXabi contract contractId
 
   contract' <-
-    either (throwError . UserError . Text.pack) return eitherErrorOrContract
+    either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
 
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> blocQuery1 $ proc () -> do
-      (_,cmId,addr,_) <-
+      (_,cmId',addr,_) <-
         (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
           (queryTable contractsInstanceTable) -< ()
-      restrict -< cmId .== constant (metadataId::Int32)
+      restrict -< cmId' .== constant (metadataId::Int32)
       returnA -< addr
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
@@ -114,7 +114,47 @@ getContractsSymbols (ContractName contractName) contractId = blocTransaction $ d
   return $ map SymbolName vars
 
 getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> Bloc GetContractsStateMappingResponse -- state-translation
-getContractsStateMapping _ _ _ _ = throwError $ Unimplemented "getContractsStateMapping"
+getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName = do
+  eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
+
+  contract' <-
+    either (throwError . UserError . Text.pack) return eitherErrorOrContract
+
+  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+
+  address <- case contractId of
+              Unnamed addr -> return addr
+              Named "Latest" -> blocQuery1 $ proc () -> do
+                (_,cmId,addr,_) <-
+                  (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+                    (queryTable contractsInstanceTable) -< ()
+                restrict -< cmId .== constant (metadataId::Int32)
+                returnA -< addr
+              Named somethingElse -> blocError $ UserError $
+                                     "Expected address or \"Latest\": saw " <> somethingElse
+
+  storage' <- blocStrato $ getStorage $ Just address
+
+  let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+      storage k = fromMaybe 0 $ Map.lookup k storageMap
+      ret = valueToSolidityValue <$> decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
+
+  logWith logNotice $ Text.unlines
+    [ "Storage:"
+    , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    , "End of storage"
+    ]
+
+  case ret of
+   Left err -> throwError $ UserError $ Text.pack err
+   Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
+
+
+
+
+
+
+
 
 getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwError $ Unimplemented "getContractsStates"

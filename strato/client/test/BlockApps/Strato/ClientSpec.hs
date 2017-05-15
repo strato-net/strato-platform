@@ -15,6 +15,8 @@ import           Test.QuickCheck
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
+stratoDev = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+
 spec :: Spec
 spec
   = modifyMaxSuccess (const 10)
