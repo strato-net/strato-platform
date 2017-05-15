@@ -5,11 +5,13 @@
 module BlockApps.Bloc20.API.UsersSpec where
 
 import           Control.Concurrent
+import           Data.Aeson
 import           Data.Either
 import qualified Data.Map.Strict              as Map
 import qualified Data.Text                    as Text
 import           Servant.Client
 import           Test.Hspec
+import           Test.QuickCheck
 
 import           BlockApps.Bloc20.API
 import           BlockApps.Bloc20.API.SpecUtils
@@ -143,6 +145,21 @@ spec = do
       eResponses `shouldSatisfy` isRight
       let Right responses = eResponses
       responses `shouldSatisfy` all ((== "0") . unwrapPostMethodListResponseToText)
+
+  describe "PostMethodListResponseReturnValue" $ do
+    it "has inverse To/FromJSON instances for PostMethodListResponseReturnValueAsText" $ \ _ ->
+      property $
+        (\x -> (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue))
+        (PostMethodListResponseReturnValueAsText "For Gondor!!")
+    it "has inverse To/FromJSON instances for PostMethodListResponseeAsEnum" $ \ _ ->
+      property $
+        (\x -> (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue))
+        ( PostMethodListResponseeAsEnum EnumResponse
+                                          { key = "Jade"
+                                          , value = 1
+                                          , enumType = "3Keys"
+                                          }
+        )
 
 unwrapPostMethodListResponseToText :: PostMethodListResponse -> Text.Text
 unwrapPostMethodListResponseToText pmlr = case returnValue pmlr of

@@ -1,39 +1,39 @@
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE OverloadedLists            #-}
 
 module BlockApps.Bloc20.API.Users where
 
-import           Control.Lens                     hiding ((.=), elements)
+import           Control.Lens                       hiding (elements, (.=))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy             as ByteString.Lazy
-import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
+import qualified Data.ByteString.Lazy               as ByteString.Lazy
+import qualified Data.ByteString.Lazy.Char8         as Lazy.Char8
 import           Data.LargeWord
-import           Data.Map                         (Map)
-import qualified Data.Map                         as Map
-import           Data.Monoid                      ((<>))
-import           Data.Proxy                       (Proxy(..))
-import           Data.Text                        (Text)
-import qualified Data.Text                        as Text
-import qualified Data.Text.Encoding               as Text
+import           Data.Map                           (Map)
+import qualified Data.Map                           as Map
+import           Data.Monoid                        ((<>))
+import           Data.Proxy                         (Proxy (..))
 import           Data.Swagger
+import           Data.Text                          (Text)
+import qualified Data.Text                          as Text
+import qualified Data.Text.Encoding                 as Text
 import           Generic.Random.Generic
 import           GHC.Generics
-import qualified Network.HTTP.Media               as M
+import qualified Network.HTTP.Media                 as M
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
-import           Test.QuickCheck.Instances        ()
+import           Test.QuickCheck.Instances          ()
 import           Web.FormUrlEncoded
 
 import           BlockApps.Bloc20.API.SwaggerSchema
@@ -60,7 +60,7 @@ type PostUsersUser = "users"
   :> Post '[HTMLifiedAddress, JSON] Address
 
 data PostUsersUserRequest = PostUsersUserRequest
-  { userFaucet :: Text
+  { userFaucet   :: Text
   , userPassword :: Password
   } deriving (Eq, Show, Generic)
 
@@ -150,7 +150,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestContract :: Maybe Text
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
   , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue :: Maybe (Strung Natural)
+  , postuserscontractrequestValue    :: Maybe (Strung Natural)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
@@ -522,7 +522,7 @@ instance ToSchema PostMethodListRequest where
 
 newtype PostMethodListResponse =
     PostMethodListResponse { returnValue :: PostMethodListResponseReturnValue }
-    deriving (Show)
+    deriving (Show, Eq)
 
 instance ToJSON PostMethodListResponse where
   toJSON pmlr = object  [ "returnValue" .= returnValue pmlr ]
@@ -537,9 +537,7 @@ instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
 
 instance Arbitrary PostMethodListResponse where
-  arbitrary = do
-    retVal <- arbitrary
-    return PostMethodListResponse {returnValue = retVal}
+  arbitrary = PostMethodListResponse <$> arbitrary
 
 
 instance ToSchema PostMethodListResponse where
@@ -560,7 +558,7 @@ instance ToSchema PostMethodListResponse where
 data PostMethodListResponseReturnValue =
     PostMethodListResponseReturnValueAsText Text
   | PostMethodListResponseeAsEnum EnumResponse
-  deriving (Show)
+  deriving (Show, Eq)
 
 instance Arbitrary PostMethodListResponseReturnValue where
   arbitrary = elements
@@ -598,10 +596,10 @@ instance ToSchema PostMethodListResponseReturnValue where
       )
 instance ToJSON PostMethodListResponseReturnValue where
   toJSON (PostMethodListResponseReturnValueAsText txt) = toJSON txt
-  toJSON (PostMethodListResponseeAsEnum enr) = toJSON enr
+  toJSON (PostMethodListResponseeAsEnum enr)           = toJSON enr
 
   toEncoding (PostMethodListResponseReturnValueAsText txt) = toEncoding txt
-  toEncoding (PostMethodListResponseeAsEnum enr) = toEncoding enr
+  toEncoding (PostMethodListResponseeAsEnum enr)           = toEncoding enr
 instance FromJSON PostMethodListResponseReturnValue where
   parseJSON val =
     case val of
@@ -613,11 +611,11 @@ instance FromJSON PostMethodListResponseReturnValue where
 
 data EnumResponse =
   EnumResponse
-    { key :: Text
-    , value :: Word256
+    { key      :: Text
+    , value    :: Word256
     , enumType :: Text
     }
-    deriving (Show)
+    deriving (Show, Eq)
 instance Arbitrary EnumResponse where
   arbitrary = do
     k <- arbitrary
@@ -666,7 +664,7 @@ instance FromJSON Word256 where
   parseJSON val =
     case val of
       Number v -> return . round . toRational $ v
-      _ -> fail "Incorrect type to parseJSON for Word256"
+      _        -> fail "Incorrect type to parseJSON for Word256"
 
 instance ToSchema Word256 where
   declareNamedSchema _ = return $
