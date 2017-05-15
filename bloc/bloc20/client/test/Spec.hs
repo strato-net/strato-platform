@@ -67,9 +67,9 @@ setup = do
           in 6 * second
       }
 
-    postCompileRequest1 = PostCompileRequest [] (simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
-    postCompileRequest2 = PostCompileRequest [] (testContractName testConfig) (testSrc testConfig)
-    postCompileRequest3 = PostCompileRequest [] (simpleMappingContractName testConfig) (simpleMappingSrc testConfig)
+    postCompileRequest1 = PostCompileRequest (Just []) (Just (simpleStorageContractName testConfig)) (simpleStorageSrc testConfig)
+    postCompileRequest2 = PostCompileRequest (Just []) (Just (testContractName testConfig)) (testSrc testConfig)
+    postCompileRequest3 = PostCompileRequest (Just []) (Just (simpleMappingContractName testConfig)) (simpleMappingSrc testConfig)
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig

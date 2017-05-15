@@ -298,8 +298,8 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
         postCompileRequest = PostCompileRequest
-          [simpleStorageBytes32ArrayContractName]
-          simpleStorageBytes32ArrayContractName
+          (Just [simpleStorageBytes32ArrayContractName])
+          (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = simpleStorageBytes32ArraySrc

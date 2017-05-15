@@ -522,6 +522,7 @@ instance ToSchema PostMethodListRequest where
 
 newtype PostMethodListResponse =
     PostMethodListResponse { returnValue :: PostMethodListResponseReturnValue }
+    deriving (Show)
 
 instance ToJSON PostMethodListResponse where
   toJSON pmlr = object  [ "returnValue" .= returnValue pmlr ]
@@ -530,7 +531,7 @@ instance ToJSON PostMethodListResponse where
 
 instance FromJSON PostMethodListResponse where
   parseJSON = withObject "PostMethodListResponse" $ \v -> PostMethodListResponse
-        <$> v .: "PostMethodListResponse"
+        <$> v .: "returnValue"
 
 instance ToSample PostMethodListResponse where
   toSamples _ = noSamples
@@ -559,6 +560,7 @@ instance ToSchema PostMethodListResponse where
 data PostMethodListResponseReturnValue =
     PostMethodListResponseReturnValueAsText Text
   | PostMethodListResponseeAsEnum EnumResponse
+  deriving (Show)
 
 instance Arbitrary PostMethodListResponseReturnValue where
   arbitrary = elements
@@ -615,6 +617,7 @@ data EnumResponse =
     , value :: Word256
     , enumType :: Text
     }
+    deriving (Show)
 instance Arbitrary EnumResponse where
   arbitrary = do
     k <- arbitrary

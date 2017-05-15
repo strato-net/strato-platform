@@ -136,7 +136,15 @@ spec = do
               , methodcallTxParams = txParams
               }
           }
-      Right responses <- runClientM
+
+      eResponses <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      responses `shouldSatisfy` all ((== "0") . postmethodlistresponseReturnValue)
+      eResponses `shouldSatisfy` isRight
+      let Right responses = eResponses
+      responses `shouldSatisfy` all ((== "0") . unwrapPostMethodListResponseToText)
+
+unwrapPostMethodListResponseToText :: PostMethodListResponse -> Text.Text
+unwrapPostMethodListResponseToText pmlr = case returnValue pmlr of
+  PostMethodListResponseReturnValueAsText txtVal -> txtVal
+  _ -> "Wrong...beeep boop. I is wrong computer."
