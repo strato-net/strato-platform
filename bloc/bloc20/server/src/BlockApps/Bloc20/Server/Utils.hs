@@ -18,15 +18,6 @@ import           BlockApps.Ethereum
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
-tester7 :: BaseUrl
-tester7 = BaseUrl Http "tester7.centralus.cloudapp.azure.com" 80 "/bloc"
-
-bayar4a :: BaseUrl
-bayar4a = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/bloc"
-
-strato :: BaseUrl
-strato = BaseUrl Http "bayar4a.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
-
 waitNewBlock :: ClientM ()
 waitNewBlock = do
   blockNum <- lastBlockNum

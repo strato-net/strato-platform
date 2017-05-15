@@ -21,7 +21,6 @@ data TestConfig = TestConfig
   { mgr                          :: Manager
   , blocUrl                      :: BaseUrl
   , stratoUrl                    :: BaseUrl
-  -- , url :: BaseUrl
   , userName                     :: UserName
   , userAddress                  :: Address
   , toUserName                   :: UserName

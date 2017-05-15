@@ -5,11 +5,13 @@
 module BlockApps.Bloc20.API.UsersSpec where
 
 import           Control.Concurrent
+import           Data.Aeson
 import           Data.Either
 import qualified Data.Map.Strict              as Map
 import qualified Data.Text                    as Text
 import           Servant.Client
 import           Test.Hspec
+import           Test.QuickCheck
 
 import           BlockApps.Bloc20.API
 import           BlockApps.Bloc20.API.SpecUtils
@@ -136,7 +138,20 @@ spec = do
               , methodcallTxParams = txParams
               }
           }
-      Right responses <- runClientM
+
+      eResponses <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      responses `shouldSatisfy` all ((== "0") . postmethodlistresponseReturnValue)
+      eResponses `shouldSatisfy` isRight
+      let Right responses = eResponses
+      responses `shouldSatisfy` all ((== "0") . unwrapPostMethodListResponseToText)
+
+  describe "PostMethodListResponseReturnValue" $
+    it "has inverse To/FromJSON instances " $ \ _ ->
+      property $ \ x ->
+        (eitherDecode . encode) x == Right (x :: PostMethodListResponseReturnValue)
+
+unwrapPostMethodListResponseToText :: PostMethodListResponse -> Text.Text
+unwrapPostMethodListResponseToText pmlr = case returnValue pmlr of
+  PostMethodListResponseReturnValueAsText txtVal -> txtVal
+  _ -> "Wrong...beeep boop. I is wrong computer."

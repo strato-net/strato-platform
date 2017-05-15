@@ -432,83 +432,7 @@ spec =
       postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
       postUsersContractEither `shouldSatisfy` isRight
 
-      let
-        Right contractAddr = postUsersContractEither
 
-      -- get contract state
-
-      contractStateEither <- runClientM
-        (getContractsState
-          (ContractName simpleStorageBytes32ArrayContractName)
-          (Unnamed contractAddr)
-        )
-        (ClientEnv mgr blocUrl)
-      contractStateEither `shouldSatisfy` isRight
-      let
-        Right contractStateMap = contractStateEither
-        mStoredData = Map.lookup "storedData" contractStateMap
-      mStoredData `shouldSatisfy` isJust
-      let
-        Just storedData = mStoredData
-      storedData `shouldBe` SolidityArray []
-
-      -- call contract store value
-      let
-        arg1 = Text.decodeUtf8 (Base16.encode (Char8.replicate 32 'a'))
-        arg2 = Text.decodeUtf8 (Base16.encode (Char8.replicate 32 'b'))
-        contractName = ContractName simpleStorageBytes32ArrayContractName
-        postUsersContractMethodRequestSet = PostUsersContractMethodRequest
-          { postuserscontractmethodPassword = pw
-          , postuserscontractmethodMethod = "set"
-          , postuserscontractmethodArgs = Map.singleton "x" (ArgArray [ArgString arg1, ArgString arg2])
-          , postuserscontractmethodValue = Just $ Strung 0
-          , postuserscontractmethodTxParams = txParams
-          }
-      postUsersContractMethodEitherSet <- runClientM
-        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestSet)
-        (ClientEnv mgr blocUrl)
-      postUsersContractMethodEitherSet `shouldSatisfy` isRight
-
-      -- call get value and verify
-
-      let
-        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
-          { postuserscontractmethodPassword = pw
-          , postuserscontractmethodMethod = "get"
-          , postuserscontractmethodArgs = Map.empty
-          , postuserscontractmethodValue = Just $ Strung 0
-          , postuserscontractmethodTxParams = txParams
-          }
-      postUsersContractMethodEitherGet <- runClientM
-        (postUsersContractMethod userName1 addr1 contractName contractAddr postUsersContractMethodRequestGet)
-        (ClientEnv mgr blocUrl)
-      postUsersContractMethodEitherGet `shouldSatisfy` isRight
-      let
-        Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
-      values `shouldBe`
-        [ SolidityArray
-          [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-          ]
-        ]
-
-      -- get state and verify
-
-      contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr))
-        (ClientEnv mgr blocUrl)
-      contractStateEither' `shouldSatisfy` isRight
-
-      let
-        Right contractStateMap' = contractStateEither'
-        mStoredData' = Map.lookup "storedData" contractStateMap'
-      mStoredData' `shouldSatisfy` isJust
-      let
-        Just storedData' = mStoredData'
-      storedData' `shouldBe` SolidityArray
-        [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        ]
 
     it "should disambiguate contracts with the same name using latest and address" $ \ TestConfig {..} -> do
       sameName1Src <- readSolFile "SameName1.sol"
@@ -643,7 +567,7 @@ spec =
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
-          , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList (map ArgInt [1,2,3,4,5,6,7,8])))
+          , postuserscontractrequestArgs = Just $ Map.singleton "x" (ArgArray (Vector.fromList (fmap ArgInt [1,2,3,4,5,6,7,8])))
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
           }
@@ -673,7 +597,7 @@ spec =
           { postuserscontractrequestSrc = simpleConstructorSrc
           , postuserscontractrequestPassword = pw
           , postuserscontractrequestContract = Just testArrayStatName
-          , postuserscontractrequestArgs = Just $ Map.singleton "x" $ ArgString "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
+          , postuserscontractrequestArgs = Just . Map.singleton "x" $ ArgString "416c6c207468617420697320676f6c6420646f6573206e6f7420676c69747465722c204e6f7420616c6c2074686f73652077686f2077616e64657220617265206c6f73743b20546865206f6c642074686174206973207374726f6e6720646f6573206e6f74207769746865722c204465657020726f6f747320617265206e6f742072656163686564206279207468652066726f73742e2046726f6d2074686520617368657320612066697265207368616c6c20626520776f6b656e2c2041206c696768742066726f6d2074686520736861646f7773207368616c6c20737072696e673b2052656e65776564207368616c6c2062652074686520626c6164652074686174207761732062726f6b656e2c205468652063726f776e6c65737320616761696e207368616c6c206265206b696e672e"
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
           }
@@ -1067,7 +991,7 @@ spec =
       threadDelay 4000000
       let
         Right bobAddr = postBobEither
-        args = Map.singleton "userKey" $ ArgString . Text.pack . addressString $ bobAddr
+        args = Map.singleton "userKey" . ArgString . Text.pack . addressString $ bobAddr
         contrMethodReq = PostUsersContractMethodRequest pw "createIdentityAgent" args (Just $ Strung 0) Nothing
       identityAgentEither <- runClientM
         (postUsersContractMethod iamUsername iamUserAddr (ContractName "IdentityAccessManager") iamAddr contrMethodReq)

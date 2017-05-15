@@ -4,6 +4,7 @@
 
 module BlockApps.Bloc20.Client
   ( getHomepage
+  , getGitInfo
   , getAddresses
   , getContracts
   , getContractsData
@@ -41,6 +42,9 @@ import           BlockApps.Strato.Types
 
 getHomepage :: ClientM Homepage
 getHomepage = client (Proxy @ GetHomepage)
+
+getGitInfo :: ClientM GitInfo
+getGitInfo = client (Proxy @ GetGitInfo)
 
 getAddresses :: ClientM [Address]
 getAddresses = client (Proxy @ GetAddresses)

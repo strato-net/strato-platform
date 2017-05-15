@@ -11,6 +11,7 @@
 
 module BlockApps.Bloc20.Database.Queries where
 
+
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Except
@@ -311,6 +312,7 @@ getContractsMetaDataId contractName = \case
   Named name -> if contractName == name
     then getContractsMetaDataIdBySameNameQuery contractName
     else getContractsMetaDataIdByNameQuery contractName name
+
 
 getContractsMetaDataIdExhaustive :: Text -> Address -> Bloc Int32
 getContractsMetaDataIdExhaustive contractName contractAddr = do
@@ -1347,7 +1349,10 @@ getContractXabiByMetadataId metadataId = do
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi
 getContractXabi (ContractName contractName) contractId = do
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+  metadataId <- case contractId of
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+
   funcs <- getXabiFunctionsQuery metadataId
   constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
   constr <- case constrIdMaybe of
