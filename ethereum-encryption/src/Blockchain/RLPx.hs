@@ -33,18 +33,20 @@ import           Blockchain.ExtWord
 import           Blockchain.Frame
 import           Blockchain.Handshake
 
-intToBytes::Integer->[Word8]
+intToBytes :: Integer -> [Word8]
 intToBytes x = map (fromIntegral . (x `shiftR`)) [256-8, 256-16..0]
 
-bXor::B.ByteString->B.ByteString->B.ByteString
+bXor :: B.ByteString
+     -> B.ByteString
+     -> B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
 bXor _ _ = error' "bXor called with two ByteStrings of different length"
 
-ethCryptConnect::MonadIO m=>PrivateNumber->PublicPoint->ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
+ethCryptConnect :: MonadIO m
+                => PrivateNumber
+                -> PublicPoint
+                -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptConnect myPriv otherPubKey = do
-  --h <- liftIO $ connectTo ipAddress (PortNumber thePort)
-
---  liftIO $ putStrLn $ "connected over tcp"
 
   let myNonce = B.pack $ word256ToBytes 20 --TODO- Important!  Don't hardcode this
 
@@ -56,38 +58,15 @@ ethCryptConnect myPriv otherPubKey = do
 
   when (BL.length handshakeReplyBytes /= 210) $ liftIO $ throwIO $ HandshakeException "handshake reply didn't contain enough bytes"
 
-  let ackMsg = bytesToAckMsg $ B.unpack $ either (error . ("error in ethCryptConnect"++)) id $ ECIES.decrypt myPriv handshakeReplyBytes B.empty
-
---  liftIO $ putStrLn $ "ackMsg: " ++ show ackMsg
-------------------------------
-
-  let m_originated=False -- hardcoded for now, I can only connect as client
-
-      otherNonce=B.pack $ word256ToBytes $ ackNonce ackMsg
-
+  let ackMsg            = bytesToAckMsg $ B.unpack $ either (error . ("error in ethCryptConnect"++)) id $ ECIES.decrypt myPriv handshakeReplyBytes B.empty
+      m_originated      = False -- hardcoded for now, I can only connect as client
+      otherNonce        = B.pack $ word256ToBytes $ ackNonce ackMsg
       SharedKey shared' = getShared ECIES.theCurve myPriv (ackEphemeralPubKey ackMsg)
-      shared = B.pack $ intToBytes shared'
-
-      frameDecKey = myNonce `add` otherNonce `add` shared `add` shared
-      macEncKey = frameDecKey `add` shared
-
-      ingressCipher = if m_originated then handshakeInitBytes else BL.toStrict handshakeReplyBytes
-      egressCipher = if m_originated then BL.toStrict handshakeReplyBytes else handshakeInitBytes
-
-  -- liftIO $ putStrLn $ "myNonce `add` otherNonce: " ++ show (myNonce `add` otherNonce)
-  -- liftIO $ putStrLn $ "myNonce `add` otherNonce `add` shared: " ++ show (myNonce `add` otherNonce `add` shared)
-
-  -- liftIO $ putStrLn $ "otherNonce: " ++ show otherNonce
-
-  -- liftIO $ putStrLn $ "frameDecKey: " ++ show frameDecKey
-
-  -- liftIO $ putStrLn $ "shared: " ++ show shared'
-
-  -- liftIO $ putStrLn $ "ingressCipher: " ++ show ingressCipher
-  -- liftIO $ putStrLn $ "egressCipher: " ++ show egressCipher
-
-  -- liftIO $ putStrLn $ "macEncKey: " ++ show macEncKey
-
+      shared            = B.pack $ intToBytes shared'
+      frameDecKey       = myNonce `add` otherNonce `add` shared `add` shared
+      macEncKey         = frameDecKey `add` shared
+      ingressCipher     = if m_originated then handshakeInitBytes else BL.toStrict handshakeReplyBytes
+      egressCipher      = if m_originated then BL.toStrict handshakeReplyBytes else handshakeInitBytes
 
   return (
           EthCryptState { --encrypt
@@ -102,11 +81,13 @@ ethCryptConnect myPriv otherPubKey = do
           }
          )
 
-add::B.ByteString->B.ByteString->B.ByteString
+add :: B.ByteString
+    -> B.ByteString
+    -> B.ByteString
 add acc val | B.length acc ==32 && B.length val == 32 = SHA3.hash 256 $ val `B.append` acc
 add _ _     = error "add called with ByteString of length not 32"
 
-hPubKeyToPubKey::H.PubKey->Point
+hPubKeyToPubKey :: H.PubKey -> Point
 hPubKeyToPubKey pubKey =
   Point (fromIntegral x) (fromIntegral y)
   where
@@ -114,9 +95,10 @@ hPubKeyToPubKey pubKey =
     y = fromMaybe (error "getY failed in prvKey2Address") $ H.getY hPoint
     hPoint = H.pubKeyPoint pubKey
 
-
-
-ethCryptAccept::MonadIO m=>PrivateNumber->Point->ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
+ethCryptAccept :: MonadIO m
+               => PrivateNumber
+               -> Point
+               -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptAccept myPriv otherPoint = do
   hsBytes <- CB.take 307
 
@@ -138,9 +120,12 @@ ethCryptAccept myPriv otherPoint = do
      ethCryptAcceptEIP8 myPriv otherPoint (hsBytes `BL.append` remainingBytes) eciesMsgIBytes
 
 
-
-ethCryptAcceptEIP8::MonadIO m=>
-                    PrivateNumber->Point->BL.ByteString->B.ByteString->ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
+ethCryptAcceptEIP8 :: MonadIO m
+                   => PrivateNumber
+                   -> Point
+                   -> BL.ByteString
+                   -> B.ByteString
+                   -> ConduitM B.ByteString B.ByteString m (EthCryptState, EthCryptState)
 ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
 
   let (RLPArray [signatureRLP, pubKeyRLP, otherNonceRLP, versionRLP], _) = rlpSplit eciesMsgIBytes
@@ -148,11 +133,6 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
       pubKey = rlpDecode pubKeyRLP::B.ByteString
       signatureBytes = rlpDecode signatureRLP
       version = rlpDecode versionRLP::Integer
-
-  --liftIO $ putStrLn $ "signature: " ++ show signatureBytes
-  --liftIO $ putStrLn $ "pubKey: " ++ show pubKey
-  --liftIO $ putStrLn $ "otherNonce: " ++ show otherNonce
-  --liftIO $ putStrLn $ "version: " ++ show version
 
   let otherPoint = bytesToPoint $ B.unpack pubKey
 
@@ -204,13 +184,12 @@ ethCryptAcceptEIP8 myPriv _ hsBytes eciesMsgIBytes = do
         }
       )
 
-
-
-
-
-
-
-ethCryptAcceptOld::MonadIO m=>PrivateNumber->Point->BL.ByteString->B.ByteString->ConduitM B.ByteString B.ByteString m (Maybe (EthCryptState, EthCryptState))
+ethCryptAcceptOld :: MonadIO m
+                  => PrivateNumber
+                  -> Point
+                  -> BL.ByteString
+                  -> B.ByteString
+                  -> ConduitM B.ByteString B.ByteString m (Maybe (EthCryptState, EthCryptState))
 ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
 
     let SharedKey sharedKey = getShared ECIES.theCurve myPriv otherPoint
@@ -259,7 +238,3 @@ ethCryptAcceptOld myPriv otherPoint hsBytes eciesMsgIBytes = do
         key=macEncKey
         }
       )
-
-
-
-

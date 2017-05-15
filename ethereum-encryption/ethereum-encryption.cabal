@@ -25,12 +25,14 @@ library
                      , entropy
                      , ethereum-rlp
                      , blockapps-haskoin
+                     , monad-logger
                      , lifted-base
                      , mtl
                      , network
                      , resourcet
                      , spoon
                      , time
+                     , text
                      , transformers
                      , ansi-wl-pprint
   hs-source-dirs:      src

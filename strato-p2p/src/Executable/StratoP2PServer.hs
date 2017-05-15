@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE LambdaCase          #-}
@@ -5,12 +6,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
-module Executable.StratoP2PServer (
-  stratoP2PServer
+module Executable.StratoP2PServer
+  ( stratoP2PServer
   ) where
 
 import           Blockchain.CommunicationConduit
-import           Blockchain.ContextLite
+import           Blockchain.Context
 import           Blockchain.RLPx
 import           Conduit
 import           Control.Concurrent                    hiding (yield)
@@ -20,11 +21,10 @@ import           Control.Monad
 import           Control.Monad.Logger
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
-import           Data.Maybe
 import qualified Data.Set                              as S
+import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
-import           Prelude
 
 import           Blockchain.ECIES
 import           Blockchain.EthConf
@@ -32,7 +32,6 @@ import           Blockchain.P2PRPC
 import           Blockchain.P2PUtil
 import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Data.Streaming.Network                (appCloseConnection)
 
 runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
              => TVar (S.Set ConnectedPeer)
@@ -40,9 +39,9 @@ runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger 
              -> Int
              -> m ()
 runEthServer connectedPeers myPriv listenPort = do
-  ctx <- initContextLite
+  ctx <- initContext
   let myPubkey = calculatePublic theCurve myPriv
-  void . runEthCryptMLite ctx . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
+  void . runContextM ctx . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
     let theSockAddr = sockAddrToIP (appSockAddr app)
     getPeerByIP theSockAddr >>= \case
       Nothing -> do
@@ -58,13 +57,17 @@ runEthServer connectedPeers myPriv listenPort = do
           Just otherPubKey -> do
             void $ modifyTVar connectedPeers (S.insert cp)
             (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
-            eventSource <- mkEthP2PEventSource app inCtx
-            (_ :: Either SomeException ()) <- try $ eventSource
-                           =$= handleMsgServerConduit myPubkey unwrappedPeer
-                           =$= mkEthP2PEventConduit app outCtx
-                            $$ appSink app
+            !eventSource <- mkEthP2PEventSource app inCtx []
+            let !eventSink = mkEthP2PEventConduit app outCtx
+            (attempt :: Either SomeException ()) <- try $ eventSource
+                         =$= handleMsgServerConduit myPubkey unwrappedPeer
+                         =$= eventSink
+                          $$ appSink app
 
             void $ modifyTVar connectedPeers (S.delete cp)
+            case attempt of
+              Right () -> $logInfoS "runEthServer" "Peer ran successfully!"
+              Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
 
 stratoP2PServer :: LoggingT IO ()
 stratoP2PServer = do

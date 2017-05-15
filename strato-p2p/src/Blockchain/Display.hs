@@ -20,17 +20,14 @@ import           Blockchain.Data.Wire
 import           Blockchain.Format
 
 prefix :: Bool -> String -> String
-prefix True ""        = CL.green "msg >>>>>: "
-prefix False ""       = CL.cyan "msg <<<<<: "
-prefix True peerName  = CL.green $ peerName ++ " >>>>>: "
-prefix False peerName = CL.cyan $ peerName ++ " <<<<<: "
+prefix True ""        = CL.green "msg send: "
+prefix False ""       = CL.cyan  "msg recv: "
+prefix True peerName  = CL.green $ peerName ++ " send: "
+prefix False peerName = CL.cyan  $ peerName ++ " recv: "
 
 --This must exist somewhere already
 tap :: MonadIO m => (a -> m ()) -> Conduit a m a
-tap f = do
-  awaitForever $ \x -> do
-      lift $ f x
-      yield x
+tap f = awaitForever $ \x -> lift (f x) >> yield x
 
 displayMessage :: MonadLogger m => Bool -> String -> Message -> m ()
 displayMessage _ _ Ping = return ()

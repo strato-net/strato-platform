@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -34,7 +35,7 @@ import           System.Random
 
 import qualified Blockchain.Colors                     as C
 import           Blockchain.CommunicationConduit
-import           Blockchain.ContextLite
+import           Blockchain.Context
 import           Blockchain.ECIES
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
@@ -47,6 +48,7 @@ import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout
+import           Blockchain.TimerSource
 
 runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
         => TVar (S.Set ConnectedPeer)
@@ -56,17 +58,16 @@ runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
         -> CommPort      -- otherServiceCommPort
         -> m ()
 runPeer connectedPeers peer myPriv _ _ = runResourceT $ do
-  ctx <- initContextLite
-  runEthCryptMLite ctx $ do
-    let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
+  ctx <- initContext
+  runContextM ctx $ do
+    let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
         myPublic    = calculatePublic theCurve myPriv
 
-    $logInfoS "runPeer" $ T.pack $ C.blue "Welcome to strato-p2p-client"
-    $logInfoS "runPeer" $ T.pack $ C.blue "============================"
-    $logInfoS "runPeer" $ T.pack $ C.blue "now on steroids too "
-    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
-    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
-    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+    $logInfoS "runPeer" . T.pack . C.blue  $ "Welcome to strato-p2p-client"
+    $logInfoS "runPeer" . T.pack . C.blue  $ "============================"
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
 
     let peerPort    = pPeerTcpPort peer
         peerAddress = BC.pack . T.unpack $ pPeerIp peer
@@ -77,12 +78,17 @@ runPeer connectedPeers peer myPriv _ _ = runResourceT $ do
 
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
-        eventSource <- mkEthP2PEventSource app inCtx
-        (_ :: Either SomeException ()) <- try $ eventSource
+        !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
+        let !eventSink = mkEthP2PEventConduit app outCtx
+        (attempt :: Either SomeException ()) <- try $ eventSource
                        =$= handleMsgClientConduit myPublic peer
-                       =$= mkEthP2PEventConduit app outCtx
-                        $$ appSink app
+                       =$= eventSink
+                        $$ transPipe liftIO (appSink app)
+
         void $ modifyTVar connectedPeers (S.delete cp)
+        case attempt of
+          Right () -> $logInfoS "runPeer" "Peer ran successfully!"
+          Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
 getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
                  => TVar (S.Set ConnectedPeer)

@@ -1,12 +1,20 @@
-
-module Blockchain.Frame (
-  EthCryptState(..),
-  ethEncrypt,
-  ethDecrypt
+{-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE TemplateHaskell   #-}
+module Blockchain.Frame
+  ( EthCryptState(..)
+  , ethEncrypt
+  , ethDecrypt
+  , cbSafeTake
   ) where
 
+import qualified Blockchain.AESCTR                 as AES
+import           Blockchain.Error
+import           Blockchain.EthEncryptionException
 import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.Logger
 import           Crypto.Cipher.AES
 import qualified Crypto.Hash.SHA3                  as SHA3
 import           Data.Bits
@@ -15,77 +23,91 @@ import qualified Data.ByteString.Lazy              as BL
 import           Data.Conduit
 import qualified Data.Conduit.Binary               as CB
 import           Data.Maybe
+import qualified Data.Text                         as T
 
-import qualified Blockchain.AESCTR                 as AES
-import           Blockchain.Error
-import           Blockchain.EthEncryptionException
-
-bXor  ::  B.ByteString->B.ByteString->B.ByteString
+bXor :: B.ByteString->B.ByteString->B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
 bXor x y = error' $
            "bXor called with two ByteStrings of different length: length string1 = " ++
            show (B.length x) ++ ", length string2 = " ++ show (B.length y)
 
-data EthCryptState =
-  EthCryptState {
-    aesState ::  AES.AESCTRState,
-    mac      ::  SHA3.Ctx,
-    key      ::  B.ByteString
-    }
+data EthCryptState = EthCryptState { aesState :: AES.AESCTRState
+                                   , mac      :: SHA3.Ctx
+                                   , key      :: B.ByteString
+                                   }
 
-rawUpdateMac  ::  SHA3.Ctx->B.ByteString->(SHA3.Ctx, B.ByteString)
+instance Show EthCryptState where
+  show = show . key
+
+rawUpdateMac :: SHA3.Ctx
+             -> B.ByteString
+             -> (SHA3.Ctx, B.ByteString)
 rawUpdateMac theMac value =
   let mac' = SHA3.update theMac value
   in (mac', B.take 16 $ SHA3.finalize mac')
 
-updateMac  ::  SHA3.Ctx->B.ByteString->B.ByteString->(SHA3.Ctx, B.ByteString)
+updateMac :: SHA3.Ctx
+          -> B.ByteString
+          -> B.ByteString
+          -> (SHA3.Ctx, B.ByteString)
 updateMac theMac theKey value =
   rawUpdateMac theMac $
     value `bXor` (encryptECB (initAES theKey) (B.take 16 $ SHA3.finalize theMac))
 
-ethEncrypt  ::  Monad m=>EthCryptState->Conduit B.ByteString m B.ByteString
+ethEncrypt :: (MonadLogger m, Monad m)
+           => EthCryptState
+           -> Conduit B.ByteString m B.ByteString
 ethEncrypt ethCryptState = do
-  bytes <- fmap (fromMaybe (throw PeerHungUp)) await
-  let frameSize = B.length bytes
-      frameBuffSize = (16 - frameSize `mod` 16) `mod` 16
-      header =
-        B.pack [fromIntegral $ frameSize `shiftR` 16,
-                fromIntegral $ frameSize `shiftR` 8,
-                fromIntegral $ frameSize,
-                0xc2,
-                0x80,
-                0x80,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  $logInfoS "ethEncrypt" . T.pack $ "reading ethCryptState: " ++ show ethCryptState
+  await >>= \case
+    Nothing -> do
+      $logInfoS "ethEncrypt" "got Nothing from await. Did we get closed?"
+      error' "K THX BAI"
+    Just bytes -> do
+      $logInfoS "ethEncrypt" "ARIIIIIIIIIIIIIIIIIIIIIIIIZE!!!!!!!!!!!!!!!!!!!!"
+      let frameSize = B.length bytes
+          frameBuffSize = (16 - frameSize `mod` 16) `mod` 16
+          header =
+            B.pack [fromIntegral $ frameSize `shiftR` 16,
+                    fromIntegral $ frameSize `shiftR` 8,
+                    fromIntegral $ frameSize,
+                    0xc2,
+                    0x80,
+                    0x80,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-  let (aesState', headCipher) = AES.encrypt (aesState ethCryptState) header
-      (mac', headMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
+      let (aesState', headCipher) = AES.encrypt (aesState ethCryptState) header
+          (mac', headMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
 
---  liftIO $ putStrLn $ "headCipher: " ++ (show headCipher)
---  liftIO $ putStrLn $ "headMAC:    " ++ (show headMAC)
+      yield headCipher
+      yield headMAC
 
-  yield headCipher
-  yield headMAC
+      let (aesState'', frameCipher) = AES.encrypt aesState' (bytes `B.append` B.replicate frameBuffSize 0)
+          (mac'', mid) = rawUpdateMac mac' frameCipher
+          (mac''', frameMAC) = updateMac mac'' (key ethCryptState) mid
 
-  let (aesState'', frameCipher) = AES.encrypt aesState' (bytes `B.append` B.replicate frameBuffSize 0)
-      (mac'', mid) = rawUpdateMac mac' frameCipher
-      (mac''', frameMAC) = updateMac mac'' (key ethCryptState) mid
+      yield frameCipher
+      yield frameMAC
 
-  yield frameCipher
-  yield frameMAC
+      ethEncrypt ethCryptState{aesState=aesState'', mac=mac'''}
 
-  ethEncrypt ethCryptState{aesState=aesState'', mac=mac'''}
-
-cbSafeTake  ::  Monad m=>Int->ConduitM B.ByteString B.ByteString m (Maybe BL.ByteString)
+cbSafeTake :: forall o m. Monad m
+           => Int
+           -> ConduitM B.ByteString o m (Maybe B.ByteString)
 cbSafeTake i = do
     ret <- CB.take i
     if BL.length ret /= fromIntegral i
        then return Nothing
-       else return $ Just ret
+       else return . Just $ BL.toStrict ret
 
-ethDecrypt  ::  Monad m=>EthCryptState->Conduit B.ByteString m B.ByteString
+ethDecrypt :: (MonadLogger m, Monad m)
+           => EthCryptState
+           -> Conduit B.ByteString m B.ByteString
 ethDecrypt ethCryptState = do
-  headCipher <- fmap (BL.toStrict . fromMaybe (throw PeerHungUp)) $ cbSafeTake 16
-  headMAC <- fmap (BL.toStrict . fromMaybe (throw PeerHungUp)) $ cbSafeTake 16
+  $logInfoS "ethDecrypt" . T.pack $ "reading ethCryptState: " ++ show ethCryptState
+
+  headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
+  headMAC    <- fromMaybe (throw HeadMACTooShort)    <$> cbSafeTake 16
 
   let (mac', expectedHeadMAC) = updateMac (mac ethCryptState) (key ethCryptState) headCipher
   when (expectedHeadMAC /= headMAC) $ throw HeadMacIncorrect
@@ -98,8 +120,9 @@ ethDecrypt ethCryptState = do
         fromIntegral (header `B.index` 2)
       frameBufferSize = (16 - (frameSize `mod` 16)) `mod` 16
 
-  frameCipher <- fmap (BL.toStrict . fromMaybe (throw PeerHungUp)) $ cbSafeTake (frameSize + frameBufferSize)
-  frameMAC <- fmap (BL.toStrict . fromMaybe (throw PeerHungUp)) $ cbSafeTake 16
+  $logInfoS "ethDecrypt" . T.pack $ "reading frame"
+  frameCipher <- fromMaybe (throw FrameCipherTooShort) <$> cbSafeTake (frameSize + frameBufferSize)
+  frameMAC    <- fromMaybe (throw FrameMACTooShort)    <$> cbSafeTake 16
 
   let (mac'', mid) = rawUpdateMac mac' frameCipher
       (mac''', expectedFrameMAC) = updateMac mac'' (key ethCryptState) mid

@@ -7,6 +7,7 @@ module Blockchain.Output (
     rightPad  -- todo: not enough NPM
 ) where
 
+import           Control.Concurrent    (ThreadId, myThreadId)
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text             as Text
@@ -45,9 +46,9 @@ formatLogLevel = leftPad 5 ' ' . helper
 formatLogStr :: LogStr -> String
 formatLogStr = BC.unpack . fromLogStr
 
-formatLogOutput :: Bool -> Bool -> String -> Loc -> LogSource -> LogLevel -> LogStr -> BC.ByteString
-formatLogOutput showLoc showTS timestamp loc logSource level msg = BC.pack $
-    printf "%s%s%s | %s | %s" tsAndDivider locAndDivider (formatLogLevel level) (formatLogSource logSource) (formatLogStr msg)
+formatLogOutput :: Bool -> Bool -> String -> ThreadId -> Loc -> LogSource -> LogLevel -> LogStr -> BC.ByteString
+formatLogOutput showLoc showTS timestamp tid loc logSource level msg = BC.pack $
+    printf "%s%s%s | %s | %s | %s" tsAndDivider locAndDivider (formatLogLevel level) (show tid) (formatLogSource logSource) (formatLogStr msg)
     where locAndDivider = if showLoc then formatLoc loc ++ " | " else ""
           tsAndDivider = if showTS then '[':(timestamp ++ "] ") else ""
 
@@ -56,8 +57,9 @@ printLogMsg = printLogMsg' False True
 
 printLogMsg' :: Bool -> Bool -> Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 printLogMsg' showLoc showTimestamp loc logSource level msg = do
+  myTID <- myThreadId
   timestamp <- if showTimestamp then rightPad 30 ' ' . show <$> getCurrentTime else return ""
-  lock $ putStrLn $ BC.unpack $ formatLogOutput showLoc showTimestamp timestamp loc logSource level msg
+  lock $ putStrLn $ BC.unpack $ formatLogOutput showLoc showTimestamp timestamp myTID loc logSource level msg
   hFlush stdout
 
 printToFile :: FilePath -> Loc -> LogSource -> LogLevel -> LogStr -> IO ()

@@ -93,6 +93,7 @@ library
                  , text
                  , time
                  , transformers
+                 , transformers-base
                  , ansi-wl-pprint
                  , strato-conf
                  , strato-sequencer
@@ -119,7 +120,6 @@ library
     other-modules:
                    Blockchain.TimerSource
                    Blockchain.CommunicationConduit
-                   Blockchain.ContextLite
                    Blockchain.BlockSynchronizerSql
                    Blockchain.P2PUtil
     ghc-options: -Wall -O2
