@@ -58,8 +58,8 @@ runEthServer connectedPeers myPriv listenPort = do
             void $ modifyTVar connectedPeers (S.insert cp)
             (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
             !eventSource <- mkEthP2PEventSource app inCtx []
-            let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
-            (attempt :: Either SomeException ()) <- try $ 
+            let !eventSink = mkEthP2PEventServerConduit (show $ appSockAddr app) outCtx
+            (attempt :: Either SomeException ()) <- try $
                         eventSource
                           =$= handleMsgServerConduit myPubkey unwrappedPeer
                           =$= eventSink

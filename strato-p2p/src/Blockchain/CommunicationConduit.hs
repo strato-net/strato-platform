@@ -8,12 +8,14 @@ module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
     , awaitMsg
-    , mkEthP2PEventConduit
+    , mkEthP2PEventServerConduit
+    , mkEthP2PEventClientConduit
     , mkEthP2PEventSource
     ) where
 
 import           Control.Exception.Lifted              (throwIO)
 import           Control.Monad.Base                    (MonadBase)
+import           Control.Monad.Fix
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -65,7 +67,7 @@ mkEthP2PEventSource :: ( Monad m
                     -> EthCryptState
                     -> [Source m Event]
                     -> m (Source m Event)
-mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny ( 
+mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
     [ appSource app
         =$= ethDecrypt inCtx
         =$= bytesToMessages
@@ -74,18 +76,24 @@ mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
     , seqEventNotifictationSource =$= CL.map NewSeqEvent
     ] ++ extra) (2 + length extra)
 
-mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
+mkEthP2PEventClientConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventConduit str outCtx = tap (displayMessage True str) =$= messagesToBytes =$= ethEncrypt outCtx
+mkEthP2PEventClientConduit str outCtx = tap (displayMessage True str) =$= messageToBytes =$= ethEncrypt outCtx
+
+
+mkEthP2PEventServerConduit :: (Monad m, MonadResource m, MonadLogger m)
+                     => String
+                     -> EthCryptState
+                     -> Conduit Message m BC.ByteString
+mkEthP2PEventServerConduit str outCtx = tap (displayMessage True str) =$= (fix . const $ messageToBytes) =$= ethEncrypt outCtx
 
 awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
     Just (MsgEvt msg) -> return $ Just msg
     Nothing           -> return Nothing
     _                 -> awaitMsg
-
 
 handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
@@ -198,12 +206,14 @@ bytesToMessages = forever $ do
     objBytes <- getRLPData
     yield $ obj2WireMessage word $ rlpDeserialize objBytes
 
-messagesToBytes :: Monad m => Conduit Message m B.ByteString
-messagesToBytes = do
+messageToBytes :: Monad m => Conduit Message m B.ByteString
+messageToBytes = do
     maybeMsg <- await
     case maybeMsg of
      Nothing -> return ()
      Just msg -> do
         let (theWord, o) = wireMessage2Obj msg
         yield $ theWord `B.cons` rlpSerialize o
-        messagesToBytes
+
+messagesToBytes :: Monad m => Conduit Message m B.ByteString
+messagesToBytes = fix . const $ messageToBytes
