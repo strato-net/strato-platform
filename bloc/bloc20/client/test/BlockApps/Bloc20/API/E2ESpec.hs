@@ -929,14 +929,16 @@ spec =
     it "should create ReturnTuple contract, call methods " $ \ TestConfig {..} -> do
       let
           userName1 = UserName "blockapps2"
-      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
+          postUsersUserRequest1 = PostUsersUserRequest "1" pw
+      postUsersEither1 <- runClientM (postUsersUser userName1 postUsersUserRequest1) (ClientEnv mgr blocUrl)
       postUsersEither1 `shouldSatisfy` isRight
       returnTupleSrc <- readSolFile "ReturnTuple.sol"
       let
         Right addr1 = postUsersEither1
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "ReturnTuple"
-        arghash = ArgString $ Text.decodeUtf8 $ Base16.encode $ traceShowId $ keccak256ByteString $ keccak256 "foo"
+        hash = keccak256ByteString $ keccak256 "foo"
+        arghash = ArgString $ Text.decodeUtf8 $ Base16.encode $ hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = returnTupleSrc
@@ -975,7 +977,11 @@ spec =
       postUsersContractMethodEitherGet `shouldSatisfy` isRight
       let
         Right (PostUsersContractMethodResponse returnValues) = postUsersContractMethodEitherGet
-      returnValues `shouldBe`
-        [ SolidityValueAsString "foo"
-        , SolidityValueAsString "foo"
+      returnValues `shouldBe` mconcat
+        [ "transaction returned: "
+        , "\""
+        , Text.decodeUtf8 (Base16.encode hash)
+        , "\""
+        , ","
+        , "foo"
         ]
