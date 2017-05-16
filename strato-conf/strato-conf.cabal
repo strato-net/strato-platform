@@ -30,6 +30,8 @@ library
                      , postgresql-simple
                      , containers
                      , blockapps-milena
+                     , blockapps-util
+                     , ethereum-encryption
                      , file-embed
                      , crypto-random
                      , crypto-pubkey-types

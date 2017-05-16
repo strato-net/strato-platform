@@ -1061,11 +1061,11 @@ call' noValueTransfer = do
 
   vmState <- lift get
 
-  when flags_debug $ liftIO $ do
-      let result = fromMaybe B.empty $ returnVal vmState
-      --putStrLn $ "Result: " ++ format result
-      putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
-      --putStrLn $ show (pretty address) ++ ": " ++ format result
+  --when flags_debug $ liftIO $ do
+  --    let result = fromMaybe B.empty $ returnVal vmState
+  --    --putStrLn $ "Result: " ++ format result
+  --    putStrLn $ "Gas remaining: " ++ show (vmGasRemaining vmState) ++ ", needed: " ++ show (5*toInteger (B.length result))
+  --    --putStrLn $ show (pretty address) ++ ": " ++ format result
 
   return (fromMaybe B.empty $ returnVal vmState)
 

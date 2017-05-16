@@ -14,13 +14,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Blockchain.PrivateKeyConf where
 
+import           Blockchain.ECIES
 import           Crypto.PubKey.ECC.DH
 import           Crypto.Random
-import           Crypto.Types.PubKey.ECC
 import           Data.Bifunctor
 import           Data.Yaml
 import           GHC.Generics
-
 import           Numeric
 
 newtype PrivKey = PrivKey { unPrivKey :: PrivateNumber } deriving (Eq, Generic)
@@ -36,9 +35,6 @@ instance ToJSON PrivKey where
 
 instance FromJSON PrivKey where
   parseJSON v = read <$> parseJSON v
-
-theCurve :: Curve
-theCurve = getCurveByName SEC_p256k1
 
 generatePrivKey :: IO PrivKey
 generatePrivKey = do

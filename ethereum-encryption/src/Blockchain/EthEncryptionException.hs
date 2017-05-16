@@ -9,6 +9,11 @@ data EthEncryptionException =
   HandshakeException String
   | HeadMacIncorrect
   | FrameMacIncorrect
-  | PeerHungUp deriving (Show)
+  | PeerHungUp
+  | HeadCipherTooShort
+  | HeadMACTooShort
+  | FrameCipherTooShort
+  | FrameMACTooShort
+  deriving (Eq, Read, Show)
 
 instance Exception EthEncryptionException where

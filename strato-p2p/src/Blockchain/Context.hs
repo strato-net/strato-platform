@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -8,6 +9,8 @@
 module Blockchain.Context
     ( Context(..)
     , ContextM
+    , initContext
+    , runContextM
     , getDebugMsg
     , addDebugMsg
     , getBlockHeaders
@@ -16,20 +19,28 @@ module Blockchain.Context
     , stampActionTimestamp
     , getActionTimestamp
     , clearActionTimestamp
+    , addPeer
+    , getPeerByIP
     ) where
 
 
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
+import qualified Data.Text                             as T
 import           Data.Time.Clock
 
 import           Blockchain.Data.BlockHeader
 import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EthConf
+import           Blockchain.Strato.Discovery.Data.Peer
 
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import qualified Database.Redis                 as Redis
-import qualified Network.Kafka                  as K
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import qualified Database.Persist.Postgresql           as SQL
+import qualified Database.PostgreSQL.Simple            as PS
+import qualified Database.Redis                        as Redis
+import qualified Network.Kafka                         as K
 
 data Context =
     Context {
@@ -43,7 +54,7 @@ data Context =
 
 type ContextM = StateT Context (ResourceT (LoggingT IO))
 
-instance (MonadState Context m) => K.HasKafkaState m where
+instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
     getKafkaState = contextKafkaState <$> get
     putKafkaState s = do
       ctx <- get
@@ -52,7 +63,7 @@ instance (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadBaseControl IO m)=>HasSQLDB (StateT Context m) where
+instance (MonadResource m, MonadBaseControl IO m, MonadState Context m) => HasSQLDB m where
   getSQLDB = contextSQLDB <$> get
 
 getDebugMsg :: MonadState Context m => m String
@@ -89,3 +100,52 @@ clearActionTimestamp :: MonadState Context m => m ()
 clearActionTimestamp = do
     cxt <- get
     put cxt{actionTimestamp=Nothing}
+
+instance Show PS.Connection where
+  show _ = "Postgres Simple Connection"
+
+type ContextMLite = StateT Context (ResourceT (LoggingT IO))
+
+runContextM :: (MonadBaseControl IO m )
+            => s
+            -> StateT s (ResourceT m) a
+            -> m ()
+runContextM s f = void . runResourceT $ runStateT f s
+
+initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
+            => m Context
+initContext = do
+  dbs <- openDBs
+  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  return Context { actionTimestamp = Nothing
+                 , contextRedisBlockDB = redisBDBPool
+                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
+                 , contextSQLDB = sqlDB' dbs
+                 , blockHeaders=[]
+                 , vmTrace=[]
+                 }
+
+addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
+        => PPeer
+        -> m (SQL.Key PPeer)
+addPeer peer = do
+  db <- getSQLDB
+  maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
+  SQL.runSqlPool (actions maybePeer) db
+  where actions = \case
+            Nothing    -> SQL.insert peer
+            Just peer' -> do
+              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
+              return (SQL.entityKey peer')
+
+getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
+            => String
+            -> m (Maybe (SQL.Entity PPeer))
+getPeerByIP ip = do
+    db <- getSQLDB
+    (SQL.runSqlPool actions db) >>= \case
+        [] -> return Nothing
+        lst -> return . Just $ head lst
+
+    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+

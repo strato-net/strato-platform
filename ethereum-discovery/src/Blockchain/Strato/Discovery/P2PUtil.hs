@@ -1,6 +1,5 @@
 
 module Blockchain.Strato.Discovery.P2PUtil (
-  theCurve,
   hPubKeyToPubKey,
   ecdsaSign,
   intToBytes,
@@ -21,8 +20,7 @@ import           Blockchain.ExtendedECDSA  (ExtendedSignature, extSignMsg)
 
 
 import qualified Crypto.Hash.SHA3          as SHA3
-import           Crypto.PubKey.ECC.DH
-import           Crypto.Types.PubKey.ECC   (CurveName (SEC_p256k1), Point (..), getCurveByName)
+import           Crypto.Types.PubKey.ECC   (Point (..))
 import           Network.Haskoin.Crypto    (Word256)
 import qualified Network.Haskoin.Internals as H
 import qualified Network.Socket            as S
@@ -45,9 +43,6 @@ add acc val
   | B.length acc == 32 && B.length val == 32 = Right $ SHA3.hash 256 $ val `B.append` acc
   | otherwise = Left $ ByteStringLengthException $ "Expected length 32 summands, got " ++
       show (B.length acc, B.length val)
-
-theCurve :: Curve
-theCurve = getCurveByName SEC_p256k1
 
 --I need to use two definitions of PubKey (internally they represent the same thing)
 --The one in the Haskoin package allows me to recover signatures.

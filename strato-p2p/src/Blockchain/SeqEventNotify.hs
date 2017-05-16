@@ -21,14 +21,14 @@ seqEventNotifictationSource :: ( MonadIO m
                                , MonadBaseControl IO m
                                , MonadResource m
                                , MonadLogger m
-                               , K.HasKafkaState (ConduitM () OutputEvent m)
+                               , K.HasKafkaState m
                                )
                             => Source m OutputEvent
 seqEventNotifictationSource = do
-    ofs' <- K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqEventsTopicName
+    ofs' <- lift $ K.withKafkaViolently $ K.getLastOffset K.LatestTime 0 seqEventsTopicName
     loop ofs'
     where loop nextOffset = do
-              events <- K.withKafkaViolently $ readSeqEvents nextOffset
+              events <- lift $ K.withKafkaViolently $ readSeqEvents nextOffset
               $logInfoS "seqEventNotify" . T.pack $ "read kafka seqevents @ " ++ show nextOffset
               forM_ events $ \e -> do
                   yield $ e

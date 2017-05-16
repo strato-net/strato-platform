@@ -36,7 +36,7 @@ import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (b
 import           Blockchain.Strato.StateDiff.Database
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
-import           Blockchain.Output                    (printLogMsg')
+import           Blockchain.Output                    (printLogMsg)
 import           Blockchain.Sequencer                 (bootstrap)
 import qualified Blockchain.Sequencer.Constants       as SeqConstants
 import           Blockchain.Sequencer.Event           (OutputBlock)
@@ -192,4 +192,4 @@ bootstrapSequencer gb = do
                                             , syncWrites            = False
                                             , bootstrapDoEmit       = True
                                             }
-    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) (printLogMsg' True True)
+    runLoggingT (runSequencerM dummySequencerCfg (bootstrap gb)) printLogMsg

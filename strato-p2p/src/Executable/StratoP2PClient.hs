@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -9,6 +10,8 @@
 
 module Executable.StratoP2PClient (stratoP2PClient) where
 
+import           Blockchain.PrivateKeyConf
+import           Blockchain.RLPx
 import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
@@ -20,206 +23,78 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 import           Crypto.PubKey.ECC.DH
-import           Crypto.Types.PubKey.ECC
-import           Data.ByteString                       (ByteString)
-import qualified Data.ByteString                       as B
 import qualified Data.ByteString.Char8                 as BC
-import qualified Data.ByteString.Lazy                  as BL
 import           Data.Conduit
-import qualified Data.Conduit.Binary                   as CB
-import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Network
-import           Data.Semigroup
+import           Data.Maybe
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
-import qualified Database.Persist.Postgresql           as SQL
 import qualified Network.Haskoin.Internals             as H
 import           System.Random
 
-import           Blockchain.Frame
-import           Blockchain.RLPx
-
 import qualified Blockchain.Colors                     as C
-import           Blockchain.Constants
+import           Blockchain.CommunicationConduit
 import           Blockchain.Context
-import           Blockchain.Data.BlockDB
-import           Blockchain.Data.Extra
-import           Blockchain.Data.RLP
-import           Blockchain.Data.Wire
-import           Blockchain.DB.DetailsDB
-import           Blockchain.DB.SQLDB
-import           Blockchain.DBM
-import           Blockchain.DeLoopNotify
-import           Blockchain.Display
+import           Blockchain.ECIES
 import           Blockchain.EthConf                    hiding (genesisHash, port)
 import           Blockchain.EthEncryptionException
-import           Blockchain.Event
 import           Blockchain.EventException
-import           Blockchain.ExtMergeSources
 import           Blockchain.Format
 import           Blockchain.Options
-import           Blockchain.Output                     (printLogMsg')
+import           Blockchain.Output                     (printLogMsg)
 import           Blockchain.P2PRPC
 import           Blockchain.P2PUtil
-import           Blockchain.SeqEventNotify
-import           Blockchain.Stream.VMEvent
-import           Blockchain.TCPClientWithTimeout
-import           Blockchain.TimerSource
-import           Blockchain.Util
-
-import           Data.Maybe
-
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models
-import qualified Database.Redis                        as Redis
-
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
-
-awaitMsg :: MonadIO m
-         => ConduitM Event Message m (Maybe Message)
-awaitMsg = await >>= \case
-     Just (MsgEvt msg) -> return $ Just msg
-     Nothing           -> return Nothing
-     _                 -> awaitMsg
-
-handleMsg :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
-          => Point
-          -> PPeer
-          -> Conduit Event m Message
-handleMsg myId peer = do
-          yield Hello { version = 4
-                      , clientId = stratoVersionString
-                      , capability = [ETH ethVersion]
-                      , port = 0
-                      , nodeId = myId
-                      }
-          awaitMsg >>= \case
-              Just Hello{} ->
-                  RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
-                      Nothing -> error "we don't have a local BestBlock"
-                      Just (RedisBestBlock hash _ tdiff) -> do
-                          genHash <- lift getGenesisBlockHash
-                          yield Status {
-                              protocolVersion = fromIntegral ethVersion,
-                              networkID       = ourNetworkID,
-                              totalDifficulty = fromIntegral tdiff,
-                              latestHash      = hash,
-                              genesisHash     = genHash
-                          }
-              other -> assertHandshake other
-
-          awaitMsg >>= \case
-              Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
-                      genHash <- lift getGenesisHash
-                      when (peerGH /= genHash) $ throwIO WrongGenesisBlock
-                      void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
-                      lastBlockNumber <- liftIO getBestKafkaBlockNumber
-                      Just (ChainBlock firstBlock:_) <- liftIO $ fetchVMEventsIO 0
-                      yield $ GetBlockHeaders (BlockNumber (max (lastBlockNumber - flags_syncBacktrackNumber) (blockDataNumber $ blockBlockData firstBlock))) maxReturnedHeaders 0 Forward
-                      stampActionTimestamp
-              other -> assertHandshake other
-
-          handleEvents (if flags_debugFail then Fail else Log) peer
-
-    where assertHandshake m = do
-              $logInfoS "handleMsg/assertHandshake" $ T.pack $ "asserHandshake: " ++ show m
-              throwIO . maybe PeerDisconnected EventBeforeHandshake $ m
-          ourNetworkID    = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
-
-cbSafeTake :: Monad m => Int -> ConduitM BC.ByteString o m BC.ByteString
-cbSafeTake i = do
-    ret <- BL.toStrict <$> CB.take i
-    if B.length ret /= i
-       then error "safeTake: not enough data"
-       else return ret
-
-getRLPData :: Monad m => Consumer B.ByteString m B.ByteString
-getRLPData = do
-    first <- fmap (fromMaybe $ error "no rlp data") CB.head
-    case first of
-        x | x < 128 -> return $ B.singleton x
-        x | x >= 192 && x <= 192+55 ->
-                   B.cons x <$> cbSafeTake (fromIntegral x - 192)
-        x | x >= 0xF8 && x <= 0xFF -> do
-                   length' <- cbSafeTake $ fromIntegral x-0xF7
-                   rest <- cbSafeTake $ fromIntegral $ bytes2Integer $ B.unpack length'
-                   return $ x `B.cons` length' `B.append` rest
-        x -> error $ "missing case in getRLPData: " ++ show x
-
-bytesToMessages :: Monad m => Conduit B.ByteString m Message
-bytesToMessages = forever $ do
-    msgTypeData <- cbSafeTake 1
-    let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData::Integer)
-    objBytes <- getRLPData
-    yield $ obj2WireMessage word $ rlpDeserialize objBytes
-
-messagesToBytes :: Monad m => Conduit Message m B.ByteString
-messagesToBytes = forever $ await >>= \case
-    Nothing -> return ()
-    Just msg -> do
-        let (theWord, o) = wireMessage2Obj msg
-        yield $ theWord `B.cons` rlpSerialize o
-
-theCurve :: Curve
-theCurve = getCurveByName SEC_p256k1
+import           Blockchain.TCPClientWithTimeout
+import           Blockchain.TimerSource
 
 runPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
         => TVar (S.Set ConnectedPeer)
         -> PPeer
         -> PrivateNumber
-        -> ByteString
-        -> CommPort
+        -> BC.ByteString -- otherServiceCommHost
+        -> CommPort      -- otherServiceCommPort
         -> m ()
-runPeer connectedPeers peer myPriv otherServiceCommHost otherServiceCommPort = do
-    let otherPubKey = fromMaybe (error "programmer error- runPeer was called without a pubkey") $ pPeerPubkey peer
-    let myPublic = calculatePublic theCurve myPriv
+runPeer connectedPeers peer myPriv _ _ = runResourceT $ do
+  ctx <- initContext
+  runContextM ctx $ do
+    let otherPubKey = fromMaybe (error "programmer error: runPeer was called without a pubkey") $ pPeerPubkey peer
+        myPublic    = calculatePublic theCurve myPriv
 
-    $logInfoS "runPeer" $ T.pack $ C.blue "Welcome to strato-p2p-client"
-    $logInfoS "runPeer" $ T.pack $ C.blue "============================"
-    $logInfoS "runPeer" $ T.pack $ C.blue "now on steroids too "
-    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
-    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "my pubkey is: " ++ format myPublic
-    $logInfoS "runPeer" $ T.pack $ C.green " * " ++ "server pubkey is : " ++ format otherPubKey
+    $logInfoS "runPeer" . T.pack . C.blue  $ "Welcome to strato-p2p-client"
+    $logInfoS "runPeer" . T.pack . C.blue  $ "============================"
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (T.unpack (pPeerIp peer) ++ ":" ++ show (pPeerTcpPort peer))
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "my pubkey is: " ++ format myPublic
+    $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "server pubkey is: " ++ format otherPubKey
 
-    redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
-    runTCPClientWithConnectTimeout (clientSettings (pPeerTcpPort peer) $ BC.pack $ T.unpack $ pPeerIp peer) 5 $ \server ->
-        runResourceT $ do
-            let connectedPeer = ConnectedPeer peer
-            void $ modifyTVar connectedPeers $ S.insert connectedPeer
-            pool <- runNoLoggingT $ SQL.createPostgresqlPool connStr 20
+    let peerPort    = pPeerTcpPort peer
+        peerAddress = BC.pack . T.unpack $ pPeerIp peer
 
-            let kafkaState = mkConfiguredKafkaState "strato-p2p-client"
+    runTCPClientWithConnectTimeout (clientSettings peerPort peerAddress) 5 $ \app -> do
+        let cp = ConnectedPeer peer
+        void $ modifyTVar connectedPeers $ S.insert cp
 
-            void $ flip runStateT (Context pool redisBDBPool kafkaState [] [] Nothing) $ do
-                (_, (outCxt, inCxt)) <- liftIO $
-                    appSource server $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink server
+        (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
-                eventSource <- mergeSourcesCloseForAny [
-                    appSource server
-                      =$= ethDecrypt inCxt
-                      =$= bytesToMessages
-                      =$= tap (displayMessage False (pPeerString peer))
-                      =$= CL.map MsgEvt
-                  , seqEventNotifictationSource =$= CL.map NewSeqEvent
-                  , timerSource
-                  , deLoopSource otherServiceCommHost otherServiceCommPort (T.unpack $ pPeerIp peer)
-                  ] 2
+        !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
+        let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+        (attempt :: Either SomeException ()) <- try $
+                    eventSource
+                       =$= handleMsgClientConduit myPublic peer
+                       =$= eventSink
+                        $$ appSink app
 
-                _ <- eventSource
-                      =$= handleMsg myPublic peer
-                      =$= transPipe lift (tap (displayMessage True (pPeerString peer)))
-                      =$= messagesToBytes
-                      =$= ethEncrypt outCxt
-                       $$ transPipe liftIO (appSink server)
-
-                void $ modifyTVar connectedPeers $ S.delete connectedPeer
+        void $ modifyTVar connectedPeers (S.delete cp)
+        case attempt of
+          Right () -> $logDebugS "runPeer" "Peer ran successfully!"
+          Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
 getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
                  => TVar (S.Set ConnectedPeer)
                  -> PPeer
-                 -> ByteString
+                 -> BC.ByteString
                  -> CommPort
                  -> m ()
 getPubKeyRunPeer connectedPeers peer otherServiceCommHost otherServiceCommPort = do
@@ -240,11 +115,11 @@ getPubKeyRunPeer connectedPeers peer otherServiceCommHost otherServiceCommPort =
 runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
               => TVar (S.Set ConnectedPeer)
               -> PPeer
-              -> ByteString
+              -> BC.ByteString
               -> CommPort
               -> m ()
 runPeerInList connectedPeers thePeer otherServiceHost otherServicePort = do
-  liftIO $ disablePeerForSeconds thePeer 60 --don't connect to a peer more than once per minute, out of politeness
+  liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
   getPubKeyRunPeer connectedPeers thePeer otherServiceHost otherServicePort
 
 stratoP2PClient :: LoggingT IO ()
@@ -258,65 +133,47 @@ stratoP2PClient = do
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
-    peers' <- liftIO getAvailablePeers
-    serverPeers' <- liftIO (getPeersIO "localhost" serverCommPort)
-    let serverPeers = either (const []) id serverPeers'
-    peers <- filterM (notAlreadyConnectedToServer serverPeers) peers'
-    case flags_mode of
-      SingleThreaded -> singleThreadedClient connectedPeers peers
-      MultiThreaded  -> do
-        multiThreadedClient connectedPeers peers activePeersSem
-        $logInfoS "stratoP2PClient" "Waiting 15 seconds before looping over peers again"
-        liftIO $ threadDelay 50000000
+    $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
+    peers <- filterM notAlreadyConnected =<< liftIO getAvailablePeers
+    multiThreadedClient connectedPeers peers activePeersSem
+    $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
+    liftIO $ threadDelay 5000000
+    where
+      multiThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> SSem -> LoggingT IO ()
+      multiThreadedClient _ [] _ = do
+        $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
+        liftIO $ threadDelay 10000000
+      multiThreadedClient connectedPeers peers sem = liftIO . void . for peers $ \p -> do
+        isRunning <- ((ConnectedPeer p) `S.member`) <$> readTVarIO connectedPeers
+        unless isRunning $ do
+          (liftIO (SSem.tryWait sem)) >>= \case
+            Nothing -> return ()
+            Just _  -> void . forkIO . flip runLoggingT printLogMsg $ do
+              result <- try $ runPeerInList connectedPeers p osch oscp
+              liftIO (SSem.signal sem)
+              handleRunPeerResult p result
 
-  where singleThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> LoggingT IO ()
-        singleThreadedClient _  [] = do
-          $logInfoS "stratoP2PClient/singleThreadedClient" "No available peers, will try again in 10 seconds"
-          liftIO $ threadDelay 10000000
-        singleThreadedClient connectedPeers peers = do
-          peerNumber <- liftIO $ randomRIO (0, length peers - 1)
-          let thePeer = peers !! peerNumber
-          try (runPeerInList connectedPeers thePeer osch oscp) >>= handleRunPeerResult thePeer
+      disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
+      disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
 
-        multiThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> SSem -> LoggingT IO ()
-        multiThreadedClient connectedPeers peers sem = liftIO . void . for peers $ \p -> do
-          isRunning <- ((ConnectedPeer p) `S.member`) <$> readTVarIO connectedPeers
-          unless isRunning $ do
-            (liftIO (SSem.tryWait sem)) >>= \case
-              Nothing -> return ()
-              Just _  -> void . forkIO . flip runLoggingT (printLogMsg' True True) $ do
-                result <- try $ runPeerInList connectedPeers p osch oscp
-                liftIO (SSem.signal sem)
-                handleRunPeerResult p result
+      handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
+      handleRunPeerResult thePeer = \case
+        Left e | Just (ErrorCall x) <- fromException e -> error x
+        Left e -> do
+          $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
+          case e of
+           e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
+           e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
+           e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
+           _  -> return ()
+        Right _ -> return ()
 
-        disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
-        disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
+      osch = "localhost"
+      oscp = serverCommPort
 
-        handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
-        handleRunPeerResult thePeer = \case
-          Left e | Just (ErrorCall x) <- fromException e -> error x
-          Left e -> do
-            $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
-            case e of
-             e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
-             e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
-             e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
-             _  -> return ()
-          Right _ -> return ()
-
-        notAlreadyConnectedToServer :: (MonadLogger m, MonadIO m) => [RPCPeer] -> PPeer -> m Bool
-        notAlreadyConnectedToServer serverPeers PPeer{..} = do
-            let stringyIP = T.unpack pPeerIp
-            resolveIPOrHost stringyIP >>= \case
-              Left err -> do
-                $logInfoS "checkConnectedToServer" . T.pack $ "Failed to resolve " ++ show stringyIP ++ ": " ++ err
-                return True -- pretend the connection already exists, for safety's sake
-              Right asIPs -> do
-                let found = any (`elem` serverPeerIPs) asIPs
-                    serverPeerIPs = rpcPeerIP <$> serverPeers
-                $logInfoS "checkConnectedToServer" . T.pack $ T.unpack pPeerIp <> " -> " <> show asIPs <> " / " <> show serverPeerIPs <> " -> " <> show found
-                return (not found)
-
-        -- otherServiceCommHost / otherServiceCommPort
-        osch = "localhost"
-        oscp = serverCommPort
+      notAlreadyConnected :: (MonadLogger m, MonadIO m) => PPeer -> m Bool
+      notAlreadyConnected PPeer{..} = isAlreadyConnected osch oscp (T.unpack pPeerIp) >>= \case
+          Left err -> do
+            $logInfoS "notAlreadyConnected" . T.pack $ "Failed to check if peer is already connected, pretending it is: " ++ show err
+            return False
+          Right theTruth -> return (not theTruth)

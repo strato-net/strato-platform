@@ -1,7 +1,7 @@
 name:              strato-api
 version:           0.0.0
 cabal-version:     >= 1.8
-build-type:        Custom
+build-type:        Simple
 
 Flag dev
     Description:   Turn on development settings, like auto-reload templates.

@@ -9,11 +9,8 @@ import           Crypto.PubKey.ECC.DH
 import           Crypto.Random
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString           as B
---import qualified Data.ByteString.Base16 as B16
---import qualified Data.ByteString.Char8 as BC
 import           Data.Maybe
 import qualified Network.Haskoin.Internals as H
---import Numeric
 
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire
@@ -24,10 +21,7 @@ import           Blockchain.Frame
 import           Blockchain.RLPx
 import           Blockchain.UDP
 
---import Debug.Trace
-
-theCurve::Curve
-theCurve = getCurveByName SEC_p256k1
+import           Blockchain.PrivateKeyConf
 
 sendMsg::Message->EthCryptM ()
 sendMsg msg = do

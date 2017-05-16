@@ -16,8 +16,7 @@ normalMiner = Miner mineNormal verifyNormal
 
 mineNormal :: Block -> IO (Maybe Integer)
 mineNormal _ = do
-            r <- liftIO $ randomDelay (fromIntegral . (1000 *) . blockTime $ blockConfig ethConf) flags_variance
-            putStrLn $ "Sleeping for " ++ (show r) ++ " milliseconds"
+            _ <- liftIO $ randomDelay (fromIntegral . (1000 *) . blockTime $ blockConfig ethConf) flags_variance
             return $ Just 6
 
 verifyNormal :: Block -> Bool
