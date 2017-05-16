@@ -33,6 +33,7 @@ deployments:
       environment:
         ssl: "${ssl}"
         stratoHost: "${stratoHost}"
+        stratourl: "${stratourl}"
         cirrusurl: "${cirrusurl}"
         pguser: "${pguser}"
         pgpasswd: "${pgpasswd}"
