@@ -12,27 +12,24 @@ var Promise = require('bluebird'),
  delayPromise = util.delayPromise,
  Consumer = kafka.Consumer;
 
-const stratoHost    = (process.env.STRATO    || 'strato:3000') ;
-const postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
-const zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
+const stratoRoot    = (process.env["stratourl"] || "http://strato:3000");
+const postgrestRoot = (process.env["postgresturl"] || "http://postgrest:3001"); 
+const zookeeperConn = (process.env["zookeeper_conn"] || "zookeeper:2181/");
 
 const delay         = (process.env.DELAY || 200);
 const totalAttempts = (process.env.ATTEMPTS || 5);
 const startOffset   = (process.env.OFFSET || 0);
 const fetchMaxMegabytes = (process.env.FETCHMAX_MB || 15); // unit megabytes
 
-
-
-
 var count =  0;
 
 function start() {
   return function(scope) {
     return new Promise((resolve, reject) => {
-      console.log("Connections are:\n\tstrato: " + stratoHost + "\n\tpostgrest: " + postgrestHost + "\n\tzookeeper: " + zookeeperHost);
-      bajs.setProfile('strato-dev', 'http://' + stratoHost)
+      console.log("Connections are:\n\tstrato: " + stratoRoot + "\n\tpostgrest: " + postgrestRoot + "\n\tzookeeper: " + zookeeperConn);
+      bajs.setProfile('strato-dev', stratoRoot);
 
-      var client = new kafka.Client(zookeeperHost);
+      var client = new kafka.Client(zookeeperConn);
       const payloads = [{
         topic: scope.kafkaTopic,
         offset: startOffset,
@@ -120,7 +117,7 @@ function consumeMessage(m) {
           .then(x => {
             x.address = a;
             var options = { method: 'POST',
-              url: 'http://' + postgrestHost + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
+              url: postgrestRoot + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
               headers:
                { 'cache-control': 'no-cache',
                  'content-type': 'application/json' },
@@ -142,7 +139,7 @@ function consumeMessage(m) {
           .then(x => {
             x.address = a;
             var options = { method: 'PATCH',
-              url: 'http://' + postgrestHost + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
+              url: postgrestRoot + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
               headers:
                { 'cache-control': 'no-cache',
                  'content-type': 'application/json' },
@@ -323,7 +320,7 @@ function consume(scope) {
     if(httpMethod === 'POST') {
       options = states.map(state => {
         const codeHash = state.codeHash;
-        const url = 'http://' + postgrestHost + '/'
+        const url = postgrestRoot + '/'
                     + global.contractMap[codeHash].name;
         delete state.codeHash;
         return buildOption(state,httpMethod, url);
@@ -331,7 +328,7 @@ function consume(scope) {
     } else if (httpMethod === 'PATCH') {
       options = states.map(state => {
         const codeHash = state.codeHash;
-        const url = 'http://' + postgrestHost + '/'
+        const url = postgrestRoot + '/'
                     + global.contractMap[codeHash].name
                     + '?address=eq.' + state.address;
         delete state.codeHash;
@@ -340,7 +337,7 @@ function consume(scope) {
     } else if (httpMethod === 'DELETE') {
       options = states.map(state => {
         const codeHash = state.codeHash;
-        const url = 'http://' + postgrestHost + '/'
+        const url = postgrestRoot + '/'
                     + global.contractMap[codeHash].name
                     + '?address=eq.' + state.address;
         delete state.codeHash;

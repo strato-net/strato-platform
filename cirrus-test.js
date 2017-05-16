@@ -12,8 +12,8 @@ var chain = "deeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeed5";
 var stateDiff_chain = "stateDiff_" + chain;
 var contractNew_chain = "contractNew_" + chain;
 
-var zookeeperHost = (process.env.ZOOKEEPER || 'zookeeper:2181');
-var client = new kafka.Client(zookeeperHost);
+var zookeeperConn = (process.env["zookeeper_conn"] || 'zookeeper:2181/');
+var client = new kafka.Client(zookeeperConn);
 var producer = new kafka.HighLevelProducer(client, {partitionerType: 0}); 
 var offsetter = new kafka.Offset(client); 
 

@@ -10,11 +10,11 @@ function initCirrus(scope) {
   scope.pool = {};
 
   var pgConfig = {
-    host: (process.env.POSTGRES || 'postgres'),
-    user: 'postgres',
-    //password: 'api',
-    database: 'cirrus',
-    port: 5432
+    host: (process.env["postgres_host"] || 'postgres'),
+    user: (process.env["postgres_user"] || 'postgres'),
+    password: (process.env["postgres_password"]),
+    database: (process.env["postgres_db"] || 'cirrus'),
+    port: parseInt(process.env["postgres_port"] || "5432")
   };
   return getPostgres(pgConfig)(scope)
     .then(createContractABITable())
@@ -45,11 +45,11 @@ function getPostgres(pgConfig) {
 function fetchABIs() {
   return function(scope) {
     console.log('fetching abi data');
-    var postgrestHost = (process.env.POSTGREST || 'postgrest:3001');
+    var postgrestRoot = (process.env["postgrestRoot"] || "http://postgrest:3001")
+    
     var options = {
       method: 'GET',
-      url: 'http://' + postgrestHost + '/contract',
-      // url: 'http://' + postgrestHost ,
+      url: postgrestRoot + '/contract',
       json: true,
     };
 
@@ -113,21 +113,27 @@ function generateContractTables() {
 function getKafkaTopic() {
   return function(scope) {
     console.log('made it!');
-    var stratoHost    = (process.env.STRATO    || 'strato:3000') ;
+    var stratoRoot = (process.env["stratourl"] || 'http://strato:3000');
     var options = {
       method: 'GET',
-      url: 'http://' + stratoHost + '/' + '/eth/v1.2/uuid',
+      url: stratoRoot + '/eth/v1.2/uuid',
       json: true
     };
-    return rp(options)
-      .then(function(r) {
-        scope.kafkaTopic = 'statediff_' + r.peerId;
-        return scope;
-      })
-      .catch(function(err) {
-        console.log('Got an error querying strato for kafka topic: ', err.message);
-        throw new Error('Got an error querying strato for kafka topic: ', err.message);
-      })
+    if(process.env["stateDiffTopic"]){
+      var sd = process.env["stateDiffTopic"]);
+      scope.kafkaTopic = sd;
+      return Promise.resolve(sd);
+    } else {
+      return rp(options)
+        .then(function(r) {
+          scope.kafkaTopic = 'statediff_' + r.peerId;
+          return scope;
+        })
+        .catch(function(err) {
+          console.log('Got an error querying strato for kafka topic: ', err.message);
+          throw new Error('Got an error querying strato for kafka topic: ', err.message);
+        })
+    }
   }
 }
 module.exports = initCirrus;
