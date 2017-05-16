@@ -62,9 +62,8 @@ ethEncrypt ethCryptState = do
   await >>= \case
     Nothing -> do
       $logInfoS "ethEncrypt" "got Nothing from await. Did we get closed?"
-      error' "K THX BAI"
+      error "K THX BAI"
     Just bytes -> do
-      $logInfoS "ethEncrypt" "ARIIIIIIIIIIIIIIIIIIIIIIIIZE!!!!!!!!!!!!!!!!!!!!"
       let frameSize = B.length bytes
           frameBuffSize = (16 - frameSize `mod` 16) `mod` 16
           header =

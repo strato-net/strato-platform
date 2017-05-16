@@ -79,11 +79,12 @@ runPeer connectedPeers peer myPriv _ _ = runResourceT $ do
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
         !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
-        let !eventSink = mkEthP2PEventConduit app outCtx
-        (attempt :: Either SomeException ()) <- try $ eventSource
+        let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
+        (attempt :: Either SomeException ()) <- try $ 
+                    eventSource
                        =$= handleMsgClientConduit myPublic peer
                        =$= eventSink
-                        $$ transPipe liftIO (appSink app)
+                        $$ appSink app
 
         void $ modifyTVar connectedPeers (S.delete cp)
         case attempt of
@@ -118,7 +119,7 @@ runPeerInList :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
               -> CommPort
               -> m ()
 runPeerInList connectedPeers thePeer otherServiceHost otherServicePort = do
-  liftIO $ disablePeerForSeconds thePeer 60 --don't connect to a peer more than once per minute, out of politeness
+  liftIO $ disablePeerForSeconds thePeer 10 --don't connect to a peer more than once per minute, out of politeness
   getPubKeyRunPeer connectedPeers thePeer otherServiceHost otherServicePort
 
 stratoP2PClient :: LoggingT IO ()

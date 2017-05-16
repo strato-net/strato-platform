@@ -65,24 +65,22 @@ mkEthP2PEventSource :: ( Monad m
                     -> EthCryptState
                     -> [Source m Event]
                     -> m (Source m Event)
-mkEthP2PEventSource app inCtx extra = do
-    mergeSourcesCloseForAny ( [ appSource app
-                                  =$= ethDecrypt inCtx
-                                  =$= bytesToMessages
-                                  =$= tap (displayMessage False (show $ appSockAddr app))
-                                  =$= CL.map MsgEvt
-                              , seqEventNotifictationSource =$= CL.map NewSeqEvent
-                              ] ++ extra) (2 + length extra)
+mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny ( 
+    [ appSource app
+        =$= ethDecrypt inCtx
+        =$= bytesToMessages
+        =$= tap (displayMessage False (show $ appSockAddr app))
+        =$= CL.map MsgEvt
+    , seqEventNotifictationSource =$= CL.map NewSeqEvent
+    ] ++ extra) (2 + length extra)
 
 mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
-                     => AppData
+                     => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventConduit app outCtx = tap (displayMessage True (show $ appSockAddr app))
-                                   =$= messagesToBytes
-                                   =$= ethEncrypt outCtx
+mkEthP2PEventConduit str outCtx = tap (displayMessage True str) =$= messagesToBytes =$= ethEncrypt outCtx
 
-awaitMsg :: (Monad m, MonadIO m) => ConduitM Event Message m (Maybe Message)
+awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
     Just (MsgEvt msg) -> return $ Just msg
     Nothing           -> return Nothing
@@ -130,14 +128,6 @@ handleMsgClientConduit myId peer = do
 
       where ourNetworkID = if flags_cNetworkID == -1 then (if flags_cTestnet then 0 else 1) else flags_cNetworkID
 
-assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
-                => Maybe Message
-                -> m ()
-assertHandshake mmsg = do
-    let theFail = maybe PeerDisconnected EventBeforeHandshake mmsg
-    $logErrorS "assertHandshake" . T.pack $ "assertHandshake called: " ++ show theFail
-    throwIO theFail
-
 handleMsgServerConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadState Context m, MonadLogger m)
                  => Point
                  -> PPeer
@@ -175,6 +165,14 @@ handleMsgServerConduit myPubkey peer = do
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
 
+assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
+                => Maybe Message
+                -> m ()
+assertHandshake mmsg = do
+    let theFail = maybe PeerDisconnected EventBeforeHandshake mmsg
+    $logErrorS "assertHandshake" . T.pack $ "assertHandshake called: " ++ show theFail
+    throwIO theFail
+
 cbSafeTake' :: forall o m. Monad m
             => Int
             -> ConduitM BC.ByteString o m BC.ByteString
@@ -193,7 +191,7 @@ getRLPData = (fromMaybe $ error "no rlp data") <$> CB.head >>= \case
    x                             -> error $ "missing case in getRLPData: " ++ show x
 
 
-bytesToMessages :: MonadIO m => Conduit B.ByteString m Message
+bytesToMessages :: Monad m => Conduit B.ByteString m Message
 bytesToMessages = forever $ do
     msgTypeData <- cbSafeTake' 1
     let word = fromInteger (rlpDecode $ rlpDeserialize msgTypeData :: Integer)
@@ -208,3 +206,4 @@ messagesToBytes = do
      Just msg -> do
         let (theWord, o) = wireMessage2Obj msg
         yield $ theWord `B.cons` rlpSerialize o
+        messagesToBytes
