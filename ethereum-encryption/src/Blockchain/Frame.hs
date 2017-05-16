@@ -23,7 +23,6 @@ import qualified Data.ByteString.Lazy              as BL
 import           Data.Conduit
 import qualified Data.Conduit.Binary               as CB
 import           Data.Maybe
-import qualified Data.Text                         as T
 
 bXor :: B.ByteString->B.ByteString->B.ByteString
 bXor x y | B.length x == B.length y = B.pack $ B.zipWith xor x y
@@ -58,11 +57,8 @@ ethEncrypt :: (MonadLogger m, Monad m)
            => EthCryptState
            -> Conduit B.ByteString m B.ByteString
 ethEncrypt ethCryptState = do
-  $logInfoS "ethEncrypt" . T.pack $ "reading ethCryptState: " ++ show ethCryptState
   await >>= \case
-    Nothing -> do
-      $logInfoS "ethEncrypt" "got Nothing from await. Did we get closed?"
-      error "K THX BAI"
+    Nothing -> return ()
     Just bytes -> do
       let frameSize = B.length bytes
           frameBuffSize = (16 - frameSize `mod` 16) `mod` 16
@@ -103,8 +99,6 @@ ethDecrypt :: (MonadLogger m, Monad m)
            => EthCryptState
            -> Conduit B.ByteString m B.ByteString
 ethDecrypt ethCryptState = do
-  $logInfoS "ethDecrypt" . T.pack $ "reading ethCryptState: " ++ show ethCryptState
-
   headCipher <- fromMaybe (throw HeadCipherTooShort) <$> cbSafeTake 16
   headMAC    <- fromMaybe (throw HeadMACTooShort)    <$> cbSafeTake 16
 
@@ -112,14 +106,12 @@ ethDecrypt ethCryptState = do
   when (expectedHeadMAC /= headMAC) $ throw HeadMacIncorrect
 
   let (aesState', header) = AES.decrypt (aesState ethCryptState) headCipher
-
-  let frameSize =
+      frameSize =
         (fromIntegral (header `B.index` 0) `shiftL` 16) +
         (fromIntegral (header `B.index` 1) `shiftL` 8) +
         fromIntegral (header `B.index` 2)
       frameBufferSize = (16 - (frameSize `mod` 16)) `mod` 16
 
-  $logInfoS "ethDecrypt" . T.pack $ "reading frame"
   frameCipher <- fromMaybe (throw FrameCipherTooShort) <$> cbSafeTake (frameSize + frameBufferSize)
   frameMAC    <- fromMaybe (throw FrameMACTooShort)    <$> cbSafeTake 16
 
@@ -127,9 +119,6 @@ ethDecrypt ethCryptState = do
       (mac''', expectedFrameMAC) = updateMac mac'' (key ethCryptState) mid
 
   when (expectedFrameMAC /= frameMAC) $ throw FrameMacIncorrect
-
   let (aesState'', fullFrame) = AES.decrypt aesState' frameCipher
-
   yield $ B.take frameSize fullFrame
-
   ethDecrypt ethCryptState{aesState=aesState'', mac=mac'''}

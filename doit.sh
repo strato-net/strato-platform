@@ -27,7 +27,7 @@ function newnode {
 
   if $receiveBlocks
   then echo "Starting strato-p2p-client"
-       runForever strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --mode=$p2pMode --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
+       runForever strato-p2p-client --cNetworkID=$networkID --maxConn=$maxConn --sqlPeers=true --debugFail=${debugFail:-true} >> logs/strato-p2p-client 2>&1
   fi
 
   echo "Starting strato-sequencer"
@@ -143,7 +143,6 @@ setEnv noMinPeers false
 setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 20
-setEnv p2pMode MultiThreaded
 setEnv difficultyBomb false
 
 setEnv backupLocation /var/lib/strato/backup_strato_block

@@ -133,55 +133,47 @@ stratoP2PClient = do
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
+    $logInfoS "stratoP2PClient" "about to fetch available peers and loop over them"
     peers <- filterM notAlreadyConnected =<< liftIO getAvailablePeers
-    case flags_mode of
-      SingleThreaded -> singleThreadedClient connectedPeers peers
-      MultiThreaded  -> do
-        multiThreadedClient connectedPeers peers activePeersSem
-        $logInfoS "stratoP2PClient" "Waiting 15 seconds before looping over peers again"
-        liftIO $ threadDelay 50000000
+    multiThreadedClient connectedPeers peers activePeersSem
+    $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
+    liftIO $ threadDelay 5000000
+    where
+      multiThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> SSem -> LoggingT IO ()
+      multiThreadedClient _ [] _ = do
+        $logInfoS "stratoP2PClient/multiThreadedClient" "No available peers, will try again in 10 seconds"
+        liftIO $ threadDelay 10000000
+      multiThreadedClient connectedPeers peers sem = liftIO . void . for peers $ \p -> do
+        isRunning <- ((ConnectedPeer p) `S.member`) <$> readTVarIO connectedPeers
+        unless isRunning $ do
+          (liftIO (SSem.tryWait sem)) >>= \case
+            Nothing -> return ()
+            Just _  -> void . forkIO . flip runLoggingT (printLogMsg' True True) $ do
+              result <- try $ runPeerInList connectedPeers p osch oscp
+              liftIO (SSem.signal sem)
+              handleRunPeerResult p result
 
-  where singleThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> LoggingT IO ()
-        singleThreadedClient _  [] = do
-          $logInfoS "stratoP2PClient/singleThreadedClient" "No available peers, will try again in 10 seconds"
-          liftIO $ threadDelay 10000000
-        singleThreadedClient connectedPeers peers = do
-          peerNumber <- liftIO $ randomRIO (0, length peers - 1)
-          let thePeer = peers !! peerNumber
-          try (runPeerInList connectedPeers thePeer osch oscp) >>= handleRunPeerResult thePeer
+      disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
+      disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
 
-        multiThreadedClient :: TVar (S.Set ConnectedPeer) -> [PPeer] -> SSem -> LoggingT IO ()
-        multiThreadedClient connectedPeers peers sem = liftIO . void . for peers $ \p -> do
-          isRunning <- ((ConnectedPeer p) `S.member`) <$> readTVarIO connectedPeers
-          unless isRunning $ do
-            (liftIO (SSem.tryWait sem)) >>= \case
-              Nothing -> return ()
-              Just _  -> void . forkIO . flip runLoggingT (printLogMsg' True True) $ do
-                result <- try $ runPeerInList connectedPeers p osch oscp
-                liftIO (SSem.signal sem)
-                handleRunPeerResult p result
+      handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
+      handleRunPeerResult thePeer = \case
+        Left e | Just (ErrorCall x) <- fromException e -> error x
+        Left e -> do
+          $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
+          case e of
+           e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
+           e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
+           e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
+           _  -> return ()
+        Right _ -> return ()
 
-        disablePeerForHours :: MonadIO m => PPeer -> Int -> m ()
-        disablePeerForHours thePeer = liftIO . disablePeerForSeconds thePeer . (60*60*)
+      osch = "localhost"
+      oscp = serverCommPort
 
-        handleRunPeerResult :: (MonadLogger m, MonadIO m) => PPeer -> Either SomeException a -> m ()
-        handleRunPeerResult thePeer = \case
-          Left e | Just (ErrorCall x) <- fromException e -> error x
-          Left e -> do
-            $logInfoS "stratoP2PClient/handleRunPeerResult" $ T.pack $ "Connection ended: " ++ show (e :: SomeException)
-            case e of
-             e' | Just TimeoutException  <- fromException e' -> disablePeerForHours thePeer 4
-             e' | Just WrongGenesisBlock <- fromException e' -> disablePeerForHours thePeer (24*7)
-             e' | Just HeadMacIncorrect  <- fromException e' -> disablePeerForHours thePeer 24
-             _  -> return ()
-          Right _ -> return ()
-
-        osch = "localhost"
-        oscp = serverCommPort
-
-        notAlreadyConnected :: (MonadLogger m, MonadIO m) => PPeer -> m Bool
-        notAlreadyConnected PPeer{..} = isAlreadyConnected osch oscp (T.unpack pPeerIp) >>= \case
-            Left err -> do
-              $logInfoS "notAlreadyConnected" . T.pack $ "Failed to check if peer is already connected, pretending it is: " ++ show err
-              return False
-            Right theTruth -> return (not theTruth)
+      notAlreadyConnected :: (MonadLogger m, MonadIO m) => PPeer -> m Bool
+      notAlreadyConnected PPeer{..} = isAlreadyConnected osch oscp (T.unpack pPeerIp) >>= \case
+          Left err -> do
+            $logInfoS "notAlreadyConnected" . T.pack $ "Failed to check if peer is already connected, pretending it is: " ++ show err
+            return False
+          Right theTruth -> return (not theTruth)

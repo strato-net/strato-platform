@@ -14,7 +14,6 @@ module Blockchain.CommunicationConduit
 
 import           Control.Exception.Lifted              (throwIO)
 import           Control.Monad.Base                    (MonadBase)
-import           Control.Monad.Fix
 import           Control.Monad.Logger
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
@@ -116,7 +115,7 @@ handleMsgClientConduit myId peer = do
         other -> assertHandshake other
     awaitMsg >>= \case
         Just Status{totalDifficulty=peerTD, genesisHash=peerGH, latestHash=peerBestHash} -> do
-                genHash <- fromMaybe (error "we disgust ourselves and are miserable excuses for human beings") <$> lift (RBDB.withRedisBlockDB RBDB.getGenesisHash)
+                genHash <- lift getGenesisBlockHash -- fromMaybe (error "we disgust ourselves and are miserable excuses for human beings") <$> lift (RBDB.withRedisBlockDB RBDB.getGenesisHash)
                 when (peerGH /= genHash) $ throwIO WrongGenesisBlock
                 void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo peerBestHash 0 peerTD) -- we set to 0 cause we dont necessarily know the number yet
                 lastBlockNumber <- liftIO getBestKafkaBlockNumber

@@ -16,6 +16,5 @@ import           Blockchain.Event
 timerSource :: (MonadLogger m, MonadIO m)
             => Source m Event
 timerSource = forever $ do
-  $logInfoS "timerSource" "waiting another 10 seconds"
   liftIO $ threadDelay 1000000
   yield TimerEvt
