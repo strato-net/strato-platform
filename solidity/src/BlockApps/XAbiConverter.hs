@@ -258,7 +258,10 @@ typeToXabiType typeDefs (TypeArrayDynamic theType) = Xabi.Array (Just True) Noth
 typeToXabiType typeDefs (TypeArrayFixed size theType) = Xabi.Array (Just False) (Just size) (typeToXabiType typeDefs theType)
 typeToXabiType typeDefs (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType typeDefs to)
 typeToXabiType _ (TypeStruct structName) = Xabi.Struct Nothing structName
-typeToXabiType _ (TypeEnum enumName) = Xabi.Enum (Just 1) enumName Nothing
+typeToXabiType typeDefs (TypeEnum enumName) =
+  case Map.lookup enumName $ enumDefs typeDefs of
+   Nothing -> error $ "undefined enum: " ++ Text.unpack enumName
+   Just x -> Xabi.Enum (Just 1) enumName $ Just $ map snd $ sortOn fst $ Bimap.toList x
 typeToXabiType _ (TypeContract contractName) = Xabi.Contract contractName
 typeToXabiType _ TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
 
