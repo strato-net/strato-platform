@@ -258,7 +258,7 @@ typeToXabiType (TypeArrayDynamic theType) = Xabi.Array (Just True) Nothing (type
 typeToXabiType (TypeArrayFixed size theType) = Xabi.Array (Just False) (Just size) (typeToXabiType theType)
 typeToXabiType (TypeMapping from to) = Xabi.Mapping (Just True) (simpleTypeToXabiType from) (typeToXabiType to)
 typeToXabiType (TypeStruct structName) = Xabi.Struct Nothing structName
-typeToXabiType (TypeEnum enumName) = Xabi.Enum (Just 1) enumName
+typeToXabiType (TypeEnum enumName) = Xabi.Enum (Just 1) enumName Nothing
 typeToXabiType (TypeContract contractName) = Xabi.Contract contractName
 typeToXabiType TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
 
