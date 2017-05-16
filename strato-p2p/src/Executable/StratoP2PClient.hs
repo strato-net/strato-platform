@@ -79,7 +79,7 @@ runPeer connectedPeers peer myPriv _ _ = runResourceT $ do
         (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptConnect myPriv otherPubKey `fuseUpstream` appSink app
 
         !eventSource <- mkEthP2PEventSource app inCtx [timerSource]
-        let !eventSink = mkEthP2PEventClientConduit (show $ appSockAddr app) outCtx
+        let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
         (attempt :: Either SomeException ()) <- try $
                     eventSource
                        =$= handleMsgClientConduit myPublic peer

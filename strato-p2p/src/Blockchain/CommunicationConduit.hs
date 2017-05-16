@@ -8,9 +8,8 @@ module Blockchain.CommunicationConduit
     ( handleMsgServerConduit
     , handleMsgClientConduit
     , awaitMsg
-    , mkEthP2PEventServerConduit
-    , mkEthP2PEventClientConduit
     , mkEthP2PEventSource
+    , mkEthP2PEventConduit
     ) where
 
 import           Control.Exception.Lifted              (throwIO)
@@ -76,18 +75,11 @@ mkEthP2PEventSource app inCtx extra = mergeSourcesCloseForAny (
     , seqEventNotifictationSource =$= CL.map NewSeqEvent
     ] ++ extra) (2 + length extra)
 
-mkEthP2PEventClientConduit :: (Monad m, MonadResource m, MonadLogger m)
+mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      => String
                      -> EthCryptState
                      -> Conduit Message m BC.ByteString
-mkEthP2PEventClientConduit str outCtx = tap (displayMessage True str) =$= messageToBytes =$= ethEncrypt outCtx
-
-
-mkEthP2PEventServerConduit :: (Monad m, MonadResource m, MonadLogger m)
-                     => String
-                     -> EthCryptState
-                     -> Conduit Message m BC.ByteString
-mkEthP2PEventServerConduit str outCtx = tap (displayMessage True str) =$= (fix . const $ messageToBytes) =$= ethEncrypt outCtx
+mkEthP2PEventConduit str outCtx = tap (displayMessage True str) =$= messageToBytes =$= ethEncrypt outCtx
 
 awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
 awaitMsg = await >>= \case
@@ -214,6 +206,4 @@ messageToBytes = do
      Just msg -> do
         let (theWord, o) = wireMessage2Obj msg
         yield $ theWord `B.cons` rlpSerialize o
-
-messagesToBytes :: Monad m => Conduit Message m B.ByteString
-messagesToBytes = fix . const $ messageToBytes
+        messageToBytes
