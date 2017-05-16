@@ -938,7 +938,7 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         testContractName' = "ReturnTuple"
         hash = keccak256ByteString $ keccak256 "foo"
-        arghash = ArgString $ Text.decodeUtf8 $ Base16.encode $ hash
+        arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
         argcontents = ArgString "foo"
         postUsersContractRequest = PostUsersContractRequest
           { postuserscontractrequestSrc = returnTupleSrc
