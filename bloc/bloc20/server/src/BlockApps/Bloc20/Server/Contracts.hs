@@ -72,7 +72,10 @@ getContractsState contract@(ContractName contractName) contractId = do
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
-  metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+
+  metadataId <- case contractId of
+    Unnamed contractAddress -> getContractsMetaDataIdExhaustive contractName contractAddress
+    _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
 
   address <- case contractId of
     Unnamed addr -> return addr
@@ -147,7 +150,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
     ]
 
 
-  
+
   case ret of
    Left err -> throwError $ UserError $ Text.pack err
    Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
