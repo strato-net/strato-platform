@@ -42,7 +42,7 @@ import           Blockchain.EthEncryptionException
 import           Blockchain.EventException
 import           Blockchain.Format
 import           Blockchain.Options
-import           Blockchain.Output                     (printLogMsg')
+import           Blockchain.Output                     (printLogMsg)
 import           Blockchain.P2PRPC
 import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -88,7 +88,7 @@ runPeer connectedPeers peer myPriv _ _ = runResourceT $ do
 
         void $ modifyTVar connectedPeers (S.delete cp)
         case attempt of
-          Right () -> $logInfoS "runPeer" "Peer ran successfully!"
+          Right () -> $logDebugS "runPeer" "Peer ran successfully!"
           Left err -> $logErrorS "runPeer" . T.pack $ "Peer did not run successfully: " ++ show err
 
 getPubKeyRunPeer :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadThrow m)
@@ -133,7 +133,7 @@ stratoP2PClient = do
 
   activePeersSem <- liftIO (SSem.new flags_maxConn)
   forever $ do
-    $logInfoS "stratoP2PClient" "about to fetch available peers and loop over them"
+    $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     peers <- filterM notAlreadyConnected =<< liftIO getAvailablePeers
     multiThreadedClient connectedPeers peers activePeersSem
     $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
@@ -148,7 +148,7 @@ stratoP2PClient = do
         unless isRunning $ do
           (liftIO (SSem.tryWait sem)) >>= \case
             Nothing -> return ()
-            Just _  -> void . forkIO . flip runLoggingT (printLogMsg' True True) $ do
+            Just _  -> void . forkIO . flip runLoggingT printLogMsg $ do
               result <- try $ runPeerInList connectedPeers p osch oscp
               liftIO (SSem.signal sem)
               handleRunPeerResult p result

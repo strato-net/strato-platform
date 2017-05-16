@@ -556,7 +556,7 @@ oneTimeSetup genesisBlockName = do
      {- CONFIG: define tables and indices -}
      {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
 
-      flip runLoggingT (printLogMsg' True True)$ withPostgresqlConn connStr $ runReaderT $ do
+      flip runLoggingT printLogMsg $ withPostgresqlConn connStr $ runReaderT $ do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 

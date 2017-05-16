@@ -3,10 +3,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
-module Blockchain.Strato.Discovery.UDPServer (
-      runEthUDPServer,
-      connectMe,
-      udpHandshakeServer
+module Blockchain.Strato.Discovery.UDPServer
+     ( runEthUDPServer
+     , connectMe
+     , udpHandshakeServer
      ) where
 
 import           Control.Monad.Catch
@@ -42,14 +42,23 @@ import           Blockchain.Strato.Discovery.UDP
 
 import qualified Network.Haskoin.Internals               as H
 
-runEthUDPServer::(MonadIO m, MonadCatch m, MonadThrow m, MonadBaseControl IO m, MonadLogger m)=>
-                 ContextLite->H.PrvKey->Int->Socket->m ()
-runEthUDPServer cxt myPriv portNum sock = do
-  _ <- runResourceT $ flip runStateT cxt $ udpHandshakeServer myPriv sock portNum
-  return ()
+runEthUDPServer :: ( MonadIO m
+                   , MonadCatch m
+                   , MonadThrow m
+                   , MonadBaseControl IO m
+                   , MonadLogger m
+                   )
+                => ContextLite
+                -> H.PrvKey
+                -> Int
+                -> Socket
+                -> m ()
+runEthUDPServer ctx myPriv portNum sock =
+  void . runResourceT $ runStateT (udpHandshakeServer myPriv sock portNum) ctx
 
-connectMe::(MonadIO m, MonadLogger m)=>
-           Int->m Socket
+connectMe :: (MonadIO m, MonadLogger m)
+          => Int
+          -> m Socket
 connectMe port' = do
   (serveraddr:_) <- liftIO $ getAddrInfo
                                   (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
@@ -59,12 +68,15 @@ connectMe port' = do
 
   return sock
 
-addPeersIfNeeded::(MonadIO m, MonadLogger m)=>
-                  H.PrvKey->Socket->m ()
+addPeersIfNeeded :: (MonadIO m, MonadLogger m)
+                 => H.PrvKey
+                 -> Socket
+                 -> m ()
 addPeersIfNeeded prv sock= do
   numAvailablePeers <- liftIO getNumAvailablePeers
-  $logInfoS "addPeersIfNeeded" $ T.pack $ "Number of available peers: " ++ show numAvailablePeers
-  when (numAvailablePeers < minAvailablePeers (discoveryConfig ethConf)) $ do
+  let minPeers = minAvailablePeers (discoveryConfig ethConf)
+  $logInfoS "addPeersIfNeeded" $ T.pack $ "Number of available peers: " ++ show numAvailablePeers ++ " / " ++ show minPeers
+  when (numAvailablePeers < minPeers) $ do
     bondedPeers <- liftIO getBondedPeersForUDP
     if length bondedPeers /= 0
       then do
@@ -108,12 +120,13 @@ attemptBond prv sock portNum = do
                    (time+50)
           liftIO $ setPeerBondingState (T.unpack $ pPeerIp p) (pPeerUdpPort p) 1
 
-udpHandshakeServer :: (HasSQLDB m,
-                       MonadResource m,
-                       MonadBaseControl IO m,
-                       MonadCatch m,
-                       MonadThrow m,
-                       MonadLogger m)
+udpHandshakeServer :: ( HasSQLDB m
+                      , MonadResource m
+                      , MonadBaseControl IO m
+                      , MonadCatch m
+                      , MonadThrow m
+                      , MonadLogger m
+                      )
                    => H.PrvKey
                    -> Socket
                    -> Int
@@ -141,12 +154,13 @@ udpHandshakeServer prv sock portNum = do
       otherPort <- getAddrPort addr
       return (packet, validOtherPubKey, otherPort)
 
-handleValidPacket :: (HasSQLDB m,
-                      MonadResource m,
-                      MonadBaseControl IO m,
-                      MonadCatch m,
-                      MonadThrow m,
-                      MonadLogger m)
+handleValidPacket :: ( HasSQLDB m
+                     , MonadResource m
+                     , MonadBaseControl IO m
+                     , MonadCatch m
+                     , MonadThrow m
+                     , MonadLogger m
+                     )
                   => H.PrvKey
                   -> Socket
                   -> SockAddr
@@ -154,62 +168,54 @@ handleValidPacket :: (HasSQLDB m,
                   -> NodeDiscoveryPacket
                   -> ECC.Point
                   -> m ()
-handleValidPacket prv sock addr portNum packet otherPubKey =
-  case packet of
+handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
     Ping{} -> do
-               let ip = sockAddrToIP addr
-               curTime <- liftIO getCurrentTime
-               let peer = PPeer {
-                     pPeerPubkey = Just otherPubKey,
-                     pPeerIp = T.pack ip,
-                     pPeerUdpPort = fromIntegral portNum,
-                     pPeerTcpPort = fromIntegral portNum, --TODO- put correct TCP port in here
-                     pPeerNumSessions = 0,
-                     pPeerLastTotalDifficulty = 0,
-                     pPeerLastMsg  = T.pack "msg",
-                     pPeerLastMsgTime = curTime,
-                     pPeerEnableTime = curTime,
-                     pPeerUdpEnableTime = curTime,
-                     pPeerLastBestBlockHash = SHA 0,
-                     pPeerBondState = 0,
-                     pPeerVersion = T.pack "61" -- fix
-                     }
-               _ <- addPeer peer
+        curTime <- liftIO getCurrentTime
+        let ip   = sockAddrToIP addr
+            peer = PPeer { pPeerPubkey = Just otherPubKey
+                         , pPeerIp = T.pack ip
+                         , pPeerUdpPort = fromIntegral portNum
+                         , pPeerTcpPort = fromIntegral portNum --TODO- put correct TCP port in here
+                         ,  pPeerNumSessions = 0
+                         ,  pPeerLastTotalDifficulty = 0
+                         ,  pPeerLastMsg  = T.pack "msg"
+                         ,  pPeerLastMsgTime = curTime
+                         ,  pPeerEnableTime = curTime
+                         ,  pPeerUdpEnableTime = curTime
+                         ,  pPeerLastBestBlockHash = SHA 0
+                         ,  pPeerBondState = 0
+                         ,  pPeerVersion = T.pack "61" -- fix
+                         }
+        void $ addPeer peer
+        time <- liftIO $ round `fmap` getPOSIXTime
+        peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1" -- todo: WHAT THE FUCK?!???!?!
+        sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
 
-               time <- liftIO $ round `fmap` getPOSIXTime
-               peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1"
-               sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
-
-    Pong{} ->
-      liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
+    Pong{} -> liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
 
     FindNeighbors{} -> do
-               time <- liftIO $ round `fmap` getPOSIXTime
-               sendPacket sock prv addr $ Neighbors [] (time + 50)
+        time <- liftIO $ round `fmap` getPOSIXTime
+        sendPacket sock prv addr $ Neighbors [] (time + 50)
 
-    Neighbors neighbors _ ->
-               forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
-                              curTime <- liftIO getCurrentTime
-                              let peer = PPeer {
-                                    pPeerPubkey = Just $ nodeIDToPoint nodeID,
-                                    pPeerIp = T.pack $ format addr',
-                                    pPeerUdpPort = fromIntegral udpPort,
-                                    pPeerTcpPort = fromIntegral tcpPort,
-                                    pPeerNumSessions = 0,
-                                    pPeerLastTotalDifficulty = 0,
-                                    pPeerLastMsg  = T.pack "msg",
-                                    pPeerLastMsgTime = curTime,
-                                    pPeerEnableTime = curTime,
-                                    pPeerUdpEnableTime = curTime,
-                                    pPeerLastBestBlockHash = SHA 0,
-                                    pPeerBondState = 0,
-                                    pPeerVersion = T.pack "61" -- fix
-                                    }
-                              _ <- addPeer peer
+    Neighbors neighbors _ -> forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
+        curTime <- liftIO getCurrentTime
+        let peer = PPeer { pPeerPubkey = Just $ nodeIDToPoint nodeID
+                         , pPeerIp = T.pack $ format addr'
+                         , pPeerUdpPort = fromIntegral udpPort
+                         , pPeerTcpPort = fromIntegral tcpPort
+                         , pPeerNumSessions = 0
+                         , pPeerLastTotalDifficulty = 0
+                         , pPeerLastMsg  = T.pack "msg"
+                         , pPeerLastMsgTime = curTime
+                         , pPeerEnableTime = curTime
+                         , pPeerUdpEnableTime = curTime
+                         , pPeerLastBestBlockHash = SHA 0
+                         , pPeerBondState = 0
+                         , pPeerVersion = T.pack "61" -- fix
+                         }
+        void $ addPeer peer
 
-                              return ()
-
-getAddrPort::SockAddr-> Either DiscoverException PortNumber
+getAddrPort :: SockAddr -> Either DiscoverException PortNumber
 getAddrPort (SockAddrInet portNumber _)      = Right portNumber
 getAddrPort (SockAddrInet6 portNumber _ _ _) = Right portNumber
-getAddrPort s                                = Left $ MissingPortException $ "No port number: " ++ show s
+getAddrPort s                                = Left . MissingPortException $ "No port number: " ++ show s

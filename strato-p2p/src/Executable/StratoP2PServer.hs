@@ -67,7 +67,7 @@ runEthServer connectedPeers myPriv listenPort = do
 
             void $ modifyTVar connectedPeers (S.delete cp)
             case attempt of
-              Right () -> $logInfoS "runEthServer" "Peer ran successfully!"
+              Right () -> $logDebugS "runEthServer" "Peer ran successfully!"
               Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
 
 stratoP2PServer :: LoggingT IO ()

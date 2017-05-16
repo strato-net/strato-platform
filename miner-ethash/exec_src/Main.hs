@@ -16,14 +16,14 @@ import           Blockchain.Strato.Mining.Ethash.Constants
 import           Blockchain.Strato.Mining.Ethash.Hashimoto
 import           Blockchain.Strato.Mining.Ethash.TimeIt
 
-encodeWord8::Word8->String
+encodeWord8 :: Word8 -> String
 encodeWord8 c | c < 0x20 || c > 0x7e = "\\x" ++ showHex c ""
 encodeWord8 c = [w2c c]
 
-encodeByteString::B.ByteString->String
+encodeByteString :: B.ByteString -> String
 encodeByteString = (encodeWord8 =<<) . B.unpack
 
-word32Unpack::B.ByteString->[Word32]
+word32Unpack :: B.ByteString -> [Word32]
 word32Unpack s | B.null s = []
 word32Unpack s | B.length s >= 4 = decode (BL.fromStrict $ B.take 4 s) : word32Unpack (B.drop 4 s)
 word32Unpack _ = error "word32Unpack called for ByteString of length not a multiple of 4"
@@ -33,7 +33,6 @@ main :: IO ()
 main = do
 --  cache <- mkCache (fromIntegral $ cacheSize 0) $ B.replicate 32 0
 --  let dataset = calcDataset (fullSize 0) cache
-
 
   let fullSize' = fromIntegral $ fullSize 0
       --getItem = calcDatasetItem cache . fromIntegral

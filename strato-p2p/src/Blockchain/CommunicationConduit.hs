@@ -80,25 +80,19 @@ mkEthP2PEventConduit :: (Monad m, MonadResource m, MonadLogger m)
                      -> Conduit Message m BC.ByteString
 mkEthP2PEventConduit str outCtx = tap (displayMessage True str) =$= messageToBytes =$= ethEncrypt outCtx
 
-awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
-awaitMsg = await >>= \case
-    Just (MsgEvt msg) -> return $ Just msg
-    Nothing           -> return Nothing
-    _                 -> awaitMsg
-
 handleMsgClientConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, MonadState Context m, HasSQLDB m, MonadLogger m)
                        => Point
                        -> PPeer
                        -> Conduit Event m Message
 handleMsgClientConduit myId peer = do
-    $logInfoS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
+    $logDebugS "handleMsgClientConduit" $ T.pack $ "<waving hand emoji>"
     yield Hello { version = 4
                 , clientId = stratoVersionString
                 , capability = [ETH . fromIntegral $ ethVersion]
                 , port = 0
                 , nodeId = myId
                 }
-    $logInfoS "handleMsgClientConduit" $ T.pack $ "about to parse message"
+    $logDebugS "handleMsgClientConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just Hello{} ->
             RBDB.withRedisBlockDB RBDB.getBestBlockInfo >>= \case
@@ -132,7 +126,7 @@ handleMsgServerConduit :: (MonadIO m, RBDB.HasRedisBlockDB m, HasSQLDB m, MonadS
                  -> PPeer
                  -> Conduit Event m Message
 handleMsgServerConduit myPubkey peer = do
-    $logInfoS "handleMsgServerConduit" $ T.pack $ "about to parse message"
+    $logDebugS "handleMsgServerConduit" $ T.pack $ "about to parse message"
     awaitMsg >>= \case
         Just Hello{} -> do
             $logInfoS "handshake/Hello{}" "received hello"
@@ -163,6 +157,12 @@ handleMsgServerConduit myPubkey peer = do
                     }
         other -> assertHandshake other
     handleEvents (if flags_debugFail then Fail else Log) peer
+
+awaitMsg :: (Monad m) => ConduitM Event Message m (Maybe Message)
+awaitMsg = await >>= \case
+    Just (MsgEvt msg) -> return $ Just msg
+    Nothing           -> return Nothing
+    _                 -> awaitMsg
 
 assertHandshake :: (MonadLogger m, MonadIO m, MonadBase IO m)
                 => Maybe Message

@@ -1,6 +1,8 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE KindSignatures   #-}
-{-# LANGUAGE RankNTypes       #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Blockchain.ExtMergeSources (
   mergeSourcesCloseForAny
@@ -12,6 +14,7 @@ import           Control.Concurrent.STM
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Resource
 import qualified Data.Conduit.List            as CL
@@ -30,7 +33,7 @@ chanSink
 chanSink ch writer = CL.mapM_ $ liftIO . atomically . writer ch
 {-# INLINE chanSink #-}
 
-mergeSourcesCloseForAny :: (MonadResource mi, MonadIO mo, MonadBaseControl IO mi)
+mergeSourcesCloseForAny :: (MonadLogger mi, MonadResource mi, MonadIO mo, MonadBaseControl IO mi)
              => [Source mi a] -- ^ The sources to merge.
              -> Int -- ^ The bound of the intermediate channel.
              -> mi (Source mo a)
@@ -49,4 +52,4 @@ mergeSourcesCloseForAny sx bound = do
             _ <- liftIO $ forM (filter (/= myTh) threadIds) killThread
             case x of
                 Left e  -> throw (e::SomeException)
-                Right _ -> liftIO $ putStrLn "Closing conduit"
+                Right _ -> $logInfoS "mergeSourcesCloseForAny" "Closing conduit"
