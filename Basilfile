@@ -67,6 +67,15 @@ deployments:
       links:
         - strato:strato
         - postgres-cirrus:postgres
+      environment:
+        stratourl: "${stratourl}"
+        zookeeper_conn: "${cirrus_zookeeper_conn}"
+        stateDiffTopic: "${stateDiffTopic}"
+        postgres_db: "${cirrus_pg_db:-cirrus}"
+        postgres_user: "${cirrus_pg_user:-postgres}"
+        postgres_password: "${cirrus_pg_password}"
+        postgres_host: "${cirrus_pg_host:-postgres}"
+        postgres_port: "${cirrus_pg_port:-5432}"
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
