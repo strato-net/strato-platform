@@ -27,6 +27,14 @@ pipeline {
         sh 'eval "$(cat run_unit_tests.sh)"'
       }
     }
+    
+    stage('Integration Tests') {
+      steps {
+        echo "TODO: Run Integration Tests for client 2.0 and 2.1"
+        // sh 'stack test blockapps-bloc21-client'
+        // sh 'stack test blockapps-bloc20-client'
+      }
+    }
 
     stage ('HLint') {
       steps {
