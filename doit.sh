@@ -85,10 +85,16 @@ function doInit {
 }
 
 function doRegister {
-   echo "Not registering with the blockchain explorer"
-#  echo "Registering with the blockchain explorer"
-#  fqdn=${stratoHost:-$(curl -s ident.me)}
-#  until [[ $(curl -s -d "url=http://$fqdn/" http://$explorerHost:9000/api/nodes) == "SUCCESS" ]] ; do : ; done
+  if [[ -z ${explorerAdvertise} ]]; then
+    echo "explorerAdvertise is empty or not set, not registering with the blockchain explorer"
+  else
+    if [[ -z ${explorerHost} ]]; then
+      echo "explorerHost not set, don't know how to register with the blockchain explorer"
+    else
+      echo "Registering with the blockchain explorer"
+      until [[ $(curl -s -d "url=$explorerAdvertise" $explorerHost/api/nodes) == "SUCCESS" ]] ; do : ; done
+    fi
+  fi
 }
 
 function runForever {
