@@ -120,7 +120,7 @@ function getKafkaTopic() {
       json: true
     };
     if(process.env["stateDiffTopic"]){
-      var sd = process.env["stateDiffTopic"]);
+      var sd = process.env["stateDiffTopic"];
       scope.kafkaTopic = sd;
       return Promise.resolve(sd);
     } else {
