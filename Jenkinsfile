@@ -36,7 +36,7 @@ pipeline {
         sh '''#!/bin/bash -le
           cd silo
           basil compose > docker-compose.yml
-          genesisBlock=$(< gb.json) && stratoHost=nginx && ssl=false && docker-compose up -d
+          genesisBlock=$(< gb.json) explorerHost=http://explorer:9000 explorerAdvertise=http://localhost stratoHost=nginx ssl=false docker-compose up -d
           docker ps
         '''
       }

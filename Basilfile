@@ -107,6 +107,8 @@ deployments:
         statsFlush: "${statsFlush}"
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
+        explorerHost: "${explorerHost}"
+        explorerAdvertise: "${explorerAdvertise}"
       links:
         - zookeeper
         - kafka
