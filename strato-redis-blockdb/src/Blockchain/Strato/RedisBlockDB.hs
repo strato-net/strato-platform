@@ -1,8 +1,12 @@
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# OPTIONS -fno-warn-orphans #-}
+
 module Blockchain.Strato.RedisBlockDB
     ( getSHAsByNumber
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
@@ -21,6 +25,7 @@ module Blockchain.Strato.RedisBlockDB
     , acquireRedlock, releaseRedlock, defaultRedlockTTL
     ) where
 
+import           Blockchain.Output
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
@@ -28,10 +33,12 @@ import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Arrow                         (second)
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
+import           Control.Monad.Logger
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import           Data.Maybe                            (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import qualified Data.Set                              as Set
+import qualified Data.Text                             as T
 import           Database.Redis
 import           System.Random                         (randomIO)
 
@@ -41,6 +48,9 @@ zipMapM :: (Traversable t, Monad m)
         -> t a
         -> m (t (a, b))
 zipMapM f = mapM (\x -> (,) x <$> f x)
+
+liftLog :: LoggingT m a -> m a
+liftLog = flip runLoggingT printLogMsg
 
 class (Monad m) => HasRedisBlockDB m where
     getRedisBlockDB :: m Connection
@@ -463,26 +473,26 @@ updateWorldBestBlockInfo sha num tdiff = do
     maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
     case maybeLockID of
         Left err -> do
-            liftIO . putStrLn $ "Could not acquire redlock, will retry; " ++ show err
+            liftLog $ $logWarnS "updateWorldBestBlockInfo" . T.pack $ "Could not acquire redlock, will retry; " ++ show err
             liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
             updateWorldBestBlockInfo sha num tdiff
         Right lockID -> do
-            liftIO (putStrLn "Acquired ")
+            liftLog $ $logDebugS "updateWorldBestBlockInfo" "Acquired lock"
             maybeExistingWBBI <- getWorldBestBlockInfo
             case maybeExistingWBBI of
                 Nothing -> do
-                    liftIO $ putStrLn "No WorldBestBlock in Redis, will force"
+                    liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
                     void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
                     releaseAndFinalize lockID True
                 Just (RedisBestBlock _ _ oldTDiff) -> do
-                    liftIO . putStr $ "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff
+                    liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ( "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
                     let willUpdate = oldTDiff <= tdiff
                     if willUpdate
                         then do
-                            liftIO (putStrLn " updating")
+                            liftLog $ $logDebugS "updateWorldBestBlockInfo" "Updating best block"
                             void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
                         else
-                            liftIO (putStrLn " not updating")
+                            liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
                     releaseAndFinalize lockID willUpdate
     where releaseAndFinalize lockID didUpdate = do
               didRelease <- releaseWorldBestBlockRedlock lockID

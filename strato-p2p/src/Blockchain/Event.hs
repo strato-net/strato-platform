@@ -265,7 +265,8 @@ handleEvents mode peer = awaitForever $ \case
                 $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
             OETx ts tx -> do
-                $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ format tx ++ " at " ++ show ts
+                $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ show (otHash tx) ++ " at " ++ show ts
+                $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
                 when (shouldSend peer tx) . yield $ Transactions [tx'] where
                     tx' = otBaseTx $ tx
             _          -> return () -- shouldn't happen but our types don't prohibit us

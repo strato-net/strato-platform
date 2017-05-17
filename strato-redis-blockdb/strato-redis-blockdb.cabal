@@ -20,6 +20,9 @@ library
                      , hedis
                      , base16-bytestring
                      , random
+                     , monad-logger
+                     , text
+                     , blockapps-util
                      -- solely for REPL
                      , strato-conf
                      , blockapps-data

@@ -1,21 +1,22 @@
 {-# LANGUAGE QuasiQuotes     #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Blockchain.Output (
-    printLogMsg,
-    printToFile,
-    leftPad,  -- todo: not enough NPM
-    rightPad  -- todo: not enough NPM
-) where
+module Blockchain.Output
+    ( printLogMsg
+    , printToFile
+    , leftPad  -- todo: not enough NPM
+    , rightPad  -- todo: not enough NPM
+    ) where
 
-import           Control.Concurrent    (ThreadId, myThreadId)
+import           Control.Concurrent     (ThreadId, myThreadId)
 import           Control.Monad
+import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import qualified Data.ByteString.Char8 as BC
-import qualified Data.Text             as Text
+import qualified Data.ByteString.Char8  as BC
+import qualified Data.Text              as Text
 import           System.GlobalLock
 import           System.IO
-import           System.Log.FastLogger (fromLogStr)
+import           System.Log.FastLogger  (fromLogStr)
 
 import           Text.Printf
 
@@ -54,16 +55,32 @@ formatLogStr = BC.unpack . fromLogStr
 formatThreadId :: ThreadId -> String
 formatThreadId = rightPad 14 ' ' . show
 
-formatLogOutput :: Bool -> String -> ThreadId -> Loc -> LogSource -> LogLevel -> LogStr -> BC.ByteString
+formatLogOutput :: Bool
+                -> String
+                -> ThreadId
+                -> Loc
+                -> LogSource
+                -> LogLevel
+                -> LogStr
+                -> BC.ByteString
 formatLogOutput showTS timestamp tid loc logSource level msg = BC.pack $
     printf "%s%s%s | %s | %s | %s" tsAndDivider locAndDivider (formatLogLevel level) (formatThreadId tid) (formatLogSource logSource) (formatLogStr msg)
     where locAndDivider = if (level == LevelDebug || level == LevelWarn) then formatLoc loc ++ " | " else ""
           tsAndDivider = if showTS then '[':(timestamp ++ "] ") else ""
 
-printLogMsg :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+printLogMsg :: Loc
+            -> LogSource
+            -> LogLevel
+            -> LogStr
+            -> IO ()
 printLogMsg = printLogMsg' True
 
-printLogMsg' :: Bool -> Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+printLogMsg' :: Bool
+             -> Loc
+             -> LogSource
+             -> LogLevel
+             -> LogStr
+             -> IO ()
 printLogMsg' showTimestamp loc logSource level msg = do
   myTID <- myThreadId
   timestamp <- if showTimestamp then rightPad 30 ' ' . show <$> getCurrentTime else return ""

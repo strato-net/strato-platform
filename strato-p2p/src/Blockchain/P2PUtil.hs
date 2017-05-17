@@ -84,16 +84,16 @@ isAlreadyConnected :: (MonadLogger m, MonadIO m)
                    -> m (Either DeloopException Bool)
 isAlreadyConnected otherHost otherPort peerAddress = resolveIPOrHost peerAddress >>= \case
   Left err -> do
-    $logInfoS "isAlreadyConnected" . T.pack $ "Failed to resolve " ++ show peerAddress ++ ": " ++ err
+    $logWarnS "isAlreadyConnected" . T.pack $ "Failed to resolve " ++ show peerAddress ++ ": " ++ err
     return . Left . FailedToResolvePeer $ show err -- pretend the connection already exists, for safety's sake
   Right asIPs -> do
     liftIO (getPeersIO otherHost otherPort) >>= \case
       Left err -> do
-        $logInfoS "isAlreadyConnected" . T.pack $ "Failed to call RPC at " ++ BC.unpack otherHost ++ ": " ++ show err
+        $logWarnS "isAlreadyConnected" . T.pack $ "Failed to call RPC at " ++ BC.unpack otherHost ++ ": " ++ show err
         return . Left . FailedToCallRPC $ show err
       Right serverPeers -> do
         let found = any (`elem` serverPeerIPs) asIPs
             serverPeerIPs = rpcPeerIP <$> serverPeers
-        $logInfoS "isAlreadyConnected" . T.pack $ peerAddress <> " -> " <> show asIPs <> " / " <> show serverPeerIPs <> " -> " <> show found
+        $logDebugS "isAlreadyConnected" . T.pack $ peerAddress <> " -> " <> show asIPs <> " / " <> show serverPeerIPs <> " -> " <> show found
         return (Right found)
 
