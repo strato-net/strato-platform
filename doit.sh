@@ -92,7 +92,7 @@ function doRegister {
       echo "explorerHost not set, don't know how to register with the blockchain explorer"
     else
       echo "Registering with the blockchain explorer"
-      until [[ $(curl -s -d "url=$explorerAdvertise" $explorerHost/api/nodes) == "SUCCESS" ]] ; do : ; done
+      until [[ $(curl -s -d "url=$explorerAdvertise/" $explorerHost/api/nodes) == "SUCCESS" ]] ; do : ; done
     fi
   fi
 }
