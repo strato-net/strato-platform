@@ -2,6 +2,7 @@ FROM ubuntu:16.04
 MAINTAINER Ilya Ostrovskiy <ilya@blockapps.net>
 ENV POSTGREST_SOURCE=http://github.com/begriffs/postgrest/releases/download
 ENV POSTGREST_VERSION=0.3.2.0
+ENV POSTGREST_LISTEN_PORT 3001
 ENV POSTGREST_FILE=postgrest-$POSTGREST_VERSION-ubuntu.tar.xz
 ENV POSTGREST_SCHEMA=public
 ENV POSTGREST_ANONYMOUS=postgres
