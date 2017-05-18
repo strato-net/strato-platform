@@ -11,3 +11,4 @@ nodes:
     explorerUrl: 'https://0.0.0.0/explorer'
     stratoUrl: 'https://0.0.0.0/strato-api'
     blocUrl: 'https://0.0.0.0/bloc'
+    searchUrl: 'https://0.0.0.0/cirrus'
