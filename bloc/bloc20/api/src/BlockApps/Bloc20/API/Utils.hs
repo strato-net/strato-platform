@@ -5,7 +5,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TypeApplications           #-}
 
 module BlockApps.Bloc20.API.Utils where
 
