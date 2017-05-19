@@ -33,8 +33,6 @@ import           BlockApps.Bloc21.Crypto
 type BlocAPI =
   -- / endpoint, for smoke test
   GetHomepage
-  -- /git, to check github hash, branch, etc.
-  :<|> GetGitInfo
   -- /users endpoints
   :<|> GetUsers
   :<|> PostUsersUser

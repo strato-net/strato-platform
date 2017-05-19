@@ -22,7 +22,6 @@ import           BlockApps.Bloc21.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = getHomepage
-  :<|> getGitInfo
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
@@ -64,6 +63,7 @@ type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
 serveBlocAndDocs
   :: BlocEnv
-  -> Server (BlocAPI :<|> BlocDocsAPI)
+  -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
 serveBlocAndDocs blocEnv = serveBloc blocEnv
+  :<|> getGitInfo
   :<|> return blocSwagger

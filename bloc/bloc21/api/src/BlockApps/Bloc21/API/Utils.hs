@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeApplications           #-}
 
@@ -105,10 +106,11 @@ instance Arbitrary UserName where arbitrary = genericArbitrary uniform
 instance ToParamSchema UserName
 
 instance ToSchema UserName where
-  declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
-    & mapped.schema.paramSchema.type_ .~ SwaggerString
-    & mapped.schema.example ?~ toJSON (UserName "Martin")
-
+  declareNamedSchema _ = return $ NamedSchema (Just "User Name")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ toJSON (UserName "Martin")
+        & description ?~ "User Name" )
 
 --------------------------------------------------------------------------------
 
@@ -127,8 +129,18 @@ instance FromJSON TxParams where
   parseJSON = genericParseJSON (aesonPrefix camelCase){omitNothingFields = True}
 
 instance ToSchema TxParams where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Transaction Parameters"
-    & mapped.schema.paramSchema.type_ .~ SwaggerObject
-    & mapped.schema.example ?~ toJSON (TxParams (Just $ Gas 123) (Just $ Wei 345)
-                                 (Just $ Nonce 9876))
+  declareNamedSchema _ = do
+    wordSchema <- declareSchemaRef (Proxy :: Proxy Word)
+    return $ NamedSchema (Just "Transaction Parameters")
+      ( mempty
+        & type_ .~ SwaggerObject
+        & example ?~ toJSON
+          (TxParams (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876)))
+        & description ?~ "Transaction Parameters"
+        & properties .~
+            [ ("gasLimit", wordSchema)
+            , ("gasPrice", wordSchema)
+            , ("nonce", wordSchema)
+            ]
+        & required .~ []
+      )

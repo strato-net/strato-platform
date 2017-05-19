@@ -5,7 +5,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TypeApplications           #-}
 
 module BlockApps.Bloc20.API.Utils where
 
@@ -14,7 +13,7 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy.Char8       as Lazy.Char8
-import           Data.Proxy
+-- import           Data.Proxy
 import           Data.String
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
@@ -40,7 +39,8 @@ instance ToSample Homepage where
 instance Arbitrary Homepage where -- seriously, lmfao
     arbitrary = return whoWouldveThoughtThisIsActuallyTheHomepage
 instance ToSchema Homepage where
-    declareNamedSchema _ = declareNamedSchema $ Proxy @ Text
+    declareNamedSchema _ =
+      return $ NamedSchema (Just "Homepage") mempty
 instance ToJSON Homepage
 instance FromJSON Homepage
 
