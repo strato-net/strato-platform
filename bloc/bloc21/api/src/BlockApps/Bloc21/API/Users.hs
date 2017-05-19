@@ -319,19 +319,35 @@ instance ToSample PostUsersContractMethodResponse where
     PostUsersContractMethodResponse [SolidityValueAsString "return"]
 
 instance ToSchema PostUsersContractMethodRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.name ?~ "Post Users Contract Method Request"
-    & mapped.schema.description ?~ "Everything you need to make a method request"
-    & mapped.schema.example ?~ toJSON ex
-    where
-      ex :: PostUsersContractMethodRequest
-      ex = PostUsersContractMethodRequest
-       { postuserscontractmethodPassword = "MySecretPassword"
-       , postuserscontractmethodMethod = "fireMissiles"
-       , postuserscontractmethodArgs = Map.fromList [("arg1", ArgString "accessCodes"), ("arg2", ArgString "target")]
-       , postuserscontractmethodValue = Just $ Strung 0
-       , postuserscontractmethodTxParams = Nothing
-       }
+  declareNamedSchema _ = do
+    textSchema <- declareSchemaRef (Proxy :: Proxy Text)
+    pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
+    argsSchema <- declareSchemaRef (Proxy :: Proxy (Map Text ArgValue))
+    txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
+    return $ NamedSchema (Just "Post Users Contract Request")
+      ( mempty
+        & type_ .~ SwaggerObject
+        & properties .~
+            [ ("password", pwSchema)
+            , ("method", textSchema & mapped.description ?~ "Method name")
+            , ("args", argsSchema)
+            , ("value", textSchema & mapped.description ?~ "Method value in Eth")
+            , ("txParams", txParamsSchema)
+            ]
+        & required .~ [ "password", "method", "args" ]
+        & description ?~ "Post Users Contract Method Request"
+        & example ?~ toJSON PostUsersContractRequest
+            { postuserscontractrequestSrc =
+              "contract SimpleStorage { uint storedData; function set(uint x) \
+              \{ storedData = x; } function get() returns (uint retVal) \
+              \{ return storedData; } }"
+            , postuserscontractrequestPassword = "securePassword"
+            , postuserscontractrequestContract = Just "SimpleStorage"
+            , postuserscontractrequestArgs = Nothing
+            , postuserscontractrequestTxParams = Nothing
+            , postuserscontractrequestValue = Just $ Strung 1000000
+            }
+      )
 
 instance ToSchema PostUsersContractMethodResponse where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
