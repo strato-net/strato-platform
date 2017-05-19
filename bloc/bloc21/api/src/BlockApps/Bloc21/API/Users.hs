@@ -4,18 +4,21 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeOperators              #-}
 
 module BlockApps.Bloc21.API.Users where
 
-import           Control.Lens                     (mapped, (&), (?~))
+import           Control.Lens                     (mapped)
+import           Control.Lens.Operators           hiding ((.=))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy             as ByteString.Lazy
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
+-- import           Data.Proxy
 import           Data.Text                        (Text)
 import qualified Data.Text.Encoding               as Text
 import           Generic.Random.Generic
@@ -313,8 +316,19 @@ instance ToSchema PostUsersContractMethodRequest where
        }
 
 instance ToSchema PostUsersContractMethodResponse where
-    declareNamedSchema = const . pure . named "Post contract response" $
-      sketchSchema (PostUsersContractMethodResponse [SolidityValueAsString "I am a contract response"])
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Users Contract Method Response"
+    & mapped.schema.description ?~ "Post Users Contract Method Response"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostUsersContractMethodResponse
+      ex = PostUsersContractMethodResponse
+        { postusercontractmethodresponseReturns =
+          [ SolidityValueAsString "tomahawk"
+          , SolidityValueAsString "2"
+          , SolidityBool True
+          ]
+        }
 
 --------------------------------------------------------------------------------
 
@@ -395,8 +409,15 @@ instance Arbitrary PostSendListResponse where
 
 
 instance ToSchema PostSendListResponse where
-  declareNamedSchema = const . pure . named "Post Send List response" $
-    sketchSchema (PostSendListResponse "I am a send listresponse")
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Post Users Send List Response"
+    & mapped.schema.description ?~ "Post Users Send List Response"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: PostSendListResponse
+      ex = PostSendListResponse
+        { postsendlistresponseSenderBalance = "1000"
+        }
 
 instance ToSchema SendTransaction where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -436,12 +457,25 @@ instance FromJSON PostUsersContractMethodListResponse
 instance ToSample PostUsersContractMethodListResponse where
   toSamples _ = samples
     [ MethodHash (keccak256 "foo")
-    , MethodResolved [SolidityValueAsString "result"]
+    , MethodResolved
+       [ SolidityValueAsString "1"
+       , SolidityValueAsString "two"
+       , SolidityValueAsString "buckleMyShoe"
+       ]
     ]
 
 instance ToSchema PostUsersContractMethodListResponse where
- declareNamedSchema = const . pure . named "Post contract response" $
-   sketchSchema (MethodResolved [SolidityValueAsString "I am a contract response"])
+ declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+     & mapped.name ?~ "Post Users Contract Method List Response"
+     & mapped.schema.description ?~ "Post Users Contract Method List Response"
+     & mapped.schema.example ?~ toJSON ex
+     where
+       ex :: PostUsersContractMethodListResponse
+       ex = MethodResolved
+         [ SolidityValueAsString "1"
+         , SolidityValueAsString "two"
+         , SolidityValueAsString "buckleMyShoe"
+         ]
 
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password

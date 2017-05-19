@@ -7,7 +7,7 @@
 module BlockApps.Solidity.Xabi where
 
 import           Control.Applicative
-import           Control.Lens                 (mapped, (&), (?~))
+import           Control.Lens                 (mapped, (&), (?~), (.~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (camelCase, dropFPrefix)
@@ -15,7 +15,6 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as Map
 import           Data.Proxy
 import           Data.Swagger
-import           Data.Swagger.Internal.Schema (named)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Generic.Random.Generic
@@ -201,7 +200,11 @@ instance ToParamSchema (MaybeNamed Address) where
   toParamSchema _ = toParamSchema (Proxy :: Proxy Address)
 
 instance ToSchema (MaybeNamed Address) where
-  declareNamedSchema = pure . named "MaybeNamed Address" . paramSchemaToSchema
+  declareNamedSchema _ = return $ NamedSchema (Just "Contract Name, \"Latest\", Or Address")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ toJSON (Unnamed (Address 0xdeadbeef))
+        & description ?~ "Contract Name, \"Latest\", Or Address" )
 
 soliditySchemaOptions :: SchemaOptions
 soliditySchemaOptions = SchemaOptions

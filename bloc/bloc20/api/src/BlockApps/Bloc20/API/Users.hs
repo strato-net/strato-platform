@@ -183,22 +183,39 @@ instance ToSample PostUsersContractRequest where
     }
 
 instance ToSchema PostUsersContractRequest where
-  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Post User Contract Request"
-    & mapped.schema.example ?~ toJSON req
-    where
-      req = PostUsersContractRequest
-        { postuserscontractrequestSrc =
-          "contract SimpleStorage { uint storedData; function set(uint x) \
-          \{ storedData = x; } function get() returns (uint retVal) \
-          \{ return storedData; } }"
-        , postuserscontractrequestPassword = "securePassword"
-        , postuserscontractrequestContract = Just "SimpleStorage"
-        , postuserscontractrequestArgs = Nothing
-        , postuserscontractrequestTxParams = Nothing
-        , postuserscontractrequestValue = Just $ Strung 1000000
-        }
-
+  declareNamedSchema _ = do
+    textSchema <- declareSchemaRef (Proxy :: Proxy Text)
+    pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
+    contractNameSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Text))
+    argsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe (Map Text ArgValue)))
+    txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
+    return $ NamedSchema (Just "Post Users Contract Request")
+      ( mempty
+        & type_ .~ SwaggerObject
+        & properties .~
+            [ ("src", textSchema & mapped.description ?~ "Solidity source code")
+            , ("password", pwSchema)
+            , ("contract", contractNameSchema & mapped.description ?~ "Contract name")
+            , ("args", argsSchema)
+            , ("txParams", txParamsSchema)
+            , ("value", textSchema & mapped.description ?~ "Contract value in Eth")
+            ]
+        & required .~ [ "src"
+                      , "password"
+                      ]
+        & description ?~ "Post Users Contract Request"
+        & example ?~ toJSON PostUsersContractRequest
+            { postuserscontractrequestSrc =
+              "contract SimpleStorage { uint storedData; function set(uint x) \
+              \{ storedData = x; } function get() returns (uint retVal) \
+              \{ return storedData; } }"
+            , postuserscontractrequestPassword = "securePassword"
+            , postuserscontractrequestContract = Just "SimpleStorage"
+            , postuserscontractrequestArgs = Nothing
+            , postuserscontractrequestTxParams = Nothing
+            , postuserscontractrequestValue = Just $ Strung 1000000
+            }
+      )
 --------------------------------------------------------------------------------
 
 type PostUsersUploadList = "users"
@@ -561,7 +578,7 @@ data PostMethodListResponseReturnValue =
   deriving (Show, Eq)
 
 instance Arbitrary PostMethodListResponseReturnValue where
-  arbitrary = oneof 
+  arbitrary = oneof
     [ PostMethodListResponseReturnValueAsText <$> arbitrary
     , PostMethodListResponseeAsEnum <$> arbitrary
     ]

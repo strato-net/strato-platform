@@ -45,7 +45,7 @@ module BlockApps.Ethereum
   , BloomFilter (..)
   ) where
 
-import           Control.Lens                 (mapped, (&), (.~), (?~))
+import           Control.Lens.Operators
 import           Crypto.Hash
 import           Crypto.Random.Entropy
 import           Crypto.Secp256k1
@@ -65,7 +65,6 @@ import           Data.Monoid
 import           Data.Proxy
 import           Data.RLP
 import           Data.Swagger
-import           Data.Swagger.Internal.Schema (named, plain)
 import qualified Data.Text                    as Text
 import           Data.Time
 import           Data.Word
@@ -148,9 +147,12 @@ instance ToParamSchema Address where
     & format ?~ "hex string"
 
 instance ToSchema Address where
-  declareNamedSchema proxy = (plain . paramSchemaToSchema $ proxy)
-    & mapped.name ?~ "Address"
-    & mapped.schema.example ?~ toJSON (Address 0xdeadbeef)
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Address")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ toJSON (Address 0xdeadbeef)
+        & description ?~ "Ethereum Address, 20 byte hex encoded string" )
 
 deriveAddress :: PubKey -> Address
 deriveAddress = keccak256Address . ByteString.drop 1 . exportPubKey False
@@ -226,7 +228,12 @@ instance ToSample Keccak256 where
     samples [keccak256lazy (Binary.encode @ Integer n) | n <- [1..10]]
 
 instance ToSchema Keccak256 where
-  declareNamedSchema = const . pure $ named "Keccak256" byteSchema
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Keccak256 hash, 32 byte hex encoded string")
+      ( mempty
+        & type_ .~ SwaggerString
+        & example ?~ toJSON (keccak256lazy (Binary.encode @ Integer 1))
+        & description ?~ "Keccak256 hash, 32 byte hex encoded string" )
 
 keccak256Address :: ByteString -> Address
 keccak256Address
@@ -421,7 +428,12 @@ instance ToParamSchema Nonce where
   toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
 
 instance ToSchema Nonce where
-  declareNamedSchema = pure . named "Nonce" . paramSchemaToSchema
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Nonce")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (Nonce 1)
+        & description ?~ "Numeric Nonce" )
 
 instance Arbitrary Nonce where arbitrary = Nonce . fromInteger <$> arbitrary
 
@@ -444,7 +456,12 @@ instance ToParamSchema Wei where
   toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
 
 instance ToSchema Wei where
-  declareNamedSchema = pure . named "Wei" . paramSchemaToSchema
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Wei")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (Wei 1000000)
+        & description ?~ "Number of Wei currency units" )
 
 instance ToJSON Wei where
   toJSON (Wei g) = toJSON $ toInteger g
@@ -470,7 +487,12 @@ instance ToParamSchema Gas where
   toParamSchema _ = toParamSchemaBoundedIntegral $ Proxy @ Word256
 
 instance ToSchema Gas where
-  declareNamedSchema = pure . named "Gas" . paramSchemaToSchema
+  declareNamedSchema _ = return $
+    NamedSchema (Just "Gas")
+      ( mempty
+        & type_ .~ SwaggerInteger
+        & example ?~ toJSON (Gas 1000)
+        & description ?~ "Number of Gas units" )
 
 instance RLPEncodable Gas where
   rlpEncode (Gas n) = rlpEncode $ toInteger n

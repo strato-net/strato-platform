@@ -6,6 +6,7 @@ module Main where
 import           BlockApps.Bloc21.API       (blocApi)
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Swagger
+import           Data.String
 import           Network.Wai.Handler.Warp
 import           Servant
 import           Servant.Swagger
@@ -16,18 +17,31 @@ type SwaggerizedAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
 swaggerizedAPI :: Proxy SwaggerizedAPI
 swaggerizedAPI = Proxy
 
-iamSwagger :: Swagger
-iamSwagger = toSwagger blocApi
+blocHost :: IsString string => string
+blocHost = "localhost"
+
+blocPort :: Num x => x
+blocPort = 8000
+
+blocPath :: FilePath
+blocPath = "/bloc/v2.1"
+
+docPort :: Num x => x
+docPort = 8080
+
+blocSwagger :: Swagger
+blocSwagger = toSwagger blocApi
     & info.title   .~ "Bloc API"
-    & info.version .~ "0.1"
+    & info.version .~ "2.1"
     & info.description ?~ "This is the API for the BlocH"
-    & host ?~ Host "localhost" (Just 8000)
+    & host ?~ Host blocHost (Just blocPort)
+    & basePath .~ Just blocPath
 
-server :: Server SwaggerizedAPI
-server = swaggerSchemaUIServer iamSwagger
+docServer :: Server SwaggerizedAPI
+docServer = swaggerSchemaUIServer blocSwagger
 
-app :: Application
-app = serve swaggerizedAPI server
+docApp :: Application
+docApp = serve swaggerizedAPI docServer
 
 main :: IO ()
-main = run 8080 app
+main = run docPort docApp
