@@ -39,7 +39,7 @@ formatLoc Loc{ loc_filename = file
              } = leftPad 50 ' ' $ printf "%s:%d" file line
 
 formatLogSource :: LogSource -> String
-formatLogSource = leftPad 35 ' ' . Text.unpack
+formatLogSource = rightPad 35 ' ' . Text.unpack
 
 formatLogLevel :: LogLevel -> String
 formatLogLevel = leftPad 5 ' ' . helper
