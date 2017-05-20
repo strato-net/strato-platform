@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
@@ -145,7 +146,7 @@ udpHandshakeServer prv sock portNum = do
     handler msg addr = case argValidator msg addr of
       Left msgErr -> $logInfoS "udpHandshakeServer/handler" $ T.pack $ "Invalid message: " ++ show msgErr ++ " -- " ++ show msg
       Right (packet, otherPubKey, otherPort) -> do
-        _ <- $logInfoS "udpHandshakeServer/handler" $ T.pack $ CL.cyan "<<<<" ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
+        _ <- $logInfoS "udpHandshakeServer/handler" $ T.pack $ CL.cyan "receiving " ++ " (" ++ show addr ++ " " ++ BC.unpack (B.take 10 $ B16.encode $ B.pack $ pointToBytes otherPubKey) ++ "....) " ++ format packet
         handleValidPacket prv sock addr otherPort packet otherPubKey
     argValidator :: B.ByteString -> SockAddr -> Either DiscoverException (NodeDiscoveryPacket, ECC.Point, PortNumber)
     argValidator msg addr = do
@@ -193,11 +194,16 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
 
     Pong{} -> liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
 
-    FindNeighbors{} -> do
+    (FindNeighbors targetPubkey _) -> do
         time <- liftIO $ round `fmap` getPOSIXTime
-        sendPacket sock prv addr $ Neighbors [] (time + 50)
+        let nextTime = time + 50
+            ip = T.pack (sockAddrToIP addr)
+        peers <- getPeersClosestTo targetPubkey ip otherPubKey
+        let theNeighbors = (\PPeer{..} -> Neighbor (pPeerIp pPeerUdpPort pPeerTcpPort) (fromJust pPeerPubkey)) <$> peers
+        sendPacket sock prv addr $ Neighbors theNeighbors nextTime
 
     Neighbors neighbors _ -> forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
+        $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
         curTime <- liftIO getCurrentTime
         let peer = PPeer { pPeerPubkey = Just $ nodeIDToPoint nodeID
                          , pPeerIp = T.pack $ format addr'

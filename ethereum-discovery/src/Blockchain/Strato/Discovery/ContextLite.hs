@@ -7,18 +7,18 @@ module Blockchain.Strato.Discovery.ContextLite (
   ContextLite, -- (..),
   initContextLite,
   addPeer,
+  getPeersClosestTo
   ) where
 
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Resource
-
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
+import           Blockchain.Strato.Discovery.Data.Peer
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import qualified Crypto.Types.PubKey.ECC               as ECC
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
-
-import           Blockchain.Strato.Discovery.Data.Peer
 
 data ContextLite =
   ContextLite { liteSQLDB::SQLDB }
@@ -53,6 +53,5 @@ getPeerByIP ip = do
     lst -> return $ Just . head $ lst
 
   where actions = SQL.selectList [ PPeerIp SQL.==. (T.pack ip) ] []
-
 
 
