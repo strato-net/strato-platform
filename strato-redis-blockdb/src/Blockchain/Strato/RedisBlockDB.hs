@@ -412,7 +412,9 @@ getBestBlockInfo = getBestBlockInfo' bestBlockInfoKey
 
 getBestBlockInfo' :: S8.ByteString -> Redis (Maybe RedisBestBlock)
 getBestBlockInfo' key = get key >>= \case
-    Left _  -> return Nothing
+    Left x  -> do
+        liftLog $ $logErrorS "getBestBlockInfo'" . T.pack $ "got Left " ++ show x
+        return Nothing
     Right r -> case r of
         Nothing -> return Nothing -- return . Left $ SingleLine "No BestBlock data set in RedisBlockDB"
         Just bs -> return . Just $ RedisBestBlock sha num tdiff
@@ -469,34 +471,37 @@ getWorldBestBlockInfo :: Redis (Maybe RedisBestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
 updateWorldBestBlockInfo :: SHA -> Integer -> Integer -> Redis (Either Reply Bool)
-updateWorldBestBlockInfo sha num tdiff = do
-    maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
-    case maybeLockID of
-        Left err -> do
-            liftLog $ $logWarnS "updateWorldBestBlockInfo" . T.pack $ "Could not acquire redlock, will retry; " ++ show err
-            liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
-            updateWorldBestBlockInfo sha num tdiff
-        Right lockID -> do
-            liftLog $ $logDebugS "updateWorldBestBlockInfo" "Acquired lock"
-            maybeExistingWBBI <- getWorldBestBlockInfo
-            case maybeExistingWBBI of
-                Nothing -> do
-                    liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-                    void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
-                    releaseAndFinalize lockID True
-                Just (RedisBestBlock _ _ oldTDiff) -> do
-                    liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ( "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
-                    let willUpdate = oldTDiff <= tdiff
-                    if willUpdate
-                        then do
-                            liftLog $ $logDebugS "updateWorldBestBlockInfo" "Updating best block"
-                            void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
-                        else
-                            liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
-                    releaseAndFinalize lockID willUpdate
-    where releaseAndFinalize lockID didUpdate = do
-              didRelease <- releaseWorldBestBlockRedlock lockID
-              return $ case didRelease of
-                  Right True  -> Right didUpdate
-                  Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
-                  err         -> err
+updateWorldBestBlockInfo sha num tdiff = withRetryCount 0
+    where withRetryCount :: Int -> Redis (Either Reply Bool)
+          withRetryCount theRetryCount = do
+              maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
+              case maybeLockID of
+                  Left err -> do
+                      when (theRetryCount /= 0 && (theRetryCount `mod` 5) == 0) $ do
+                          liftLog $ $logWarnS "updateWorldBestBlockInfo" . T.pack $ "Could not acquire redlock after " ++ show theRetryCount ++ " attempts, will retry; " ++ show err
+                          liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
+                      withRetryCount $ theRetryCount + 1
+                  Right lockID -> do
+                      liftLog $ $logDebugS "updateWorldBestBlockInfo" "Acquired lock"
+                      maybeExistingWBBI <- getWorldBestBlockInfo
+                      case maybeExistingWBBI of
+                          Nothing -> do
+                              liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
+                              void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                              releaseAndFinalize lockID True
+                          Just (RedisBestBlock _ _ oldTDiff) -> do
+                              liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ( "oldTDiff = " ++ show oldTDiff ++ "; newTDiff = " ++ show tdiff)
+                              let willUpdate = oldTDiff <= tdiff
+                              if willUpdate
+                                  then do
+                                      liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
+                                      void $ forceBestBlockInfo' worldBestBlockKey (RedisBestBlock sha num tdiff)
+                                  else
+                                      liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
+                              releaseAndFinalize lockID willUpdate
+              where releaseAndFinalize lockID didUpdate = do
+                        didRelease <- releaseWorldBestBlockRedlock lockID
+                        return $ case didRelease of
+                            Right True  -> Right didUpdate
+                            Right False -> Left $ SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
+                            err         -> err

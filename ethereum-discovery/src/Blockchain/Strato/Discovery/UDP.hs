@@ -208,7 +208,7 @@ sendPacket :: (MonadIO m, MonadLogger m)
            -> NodeDiscoveryPacket
            -> m ()
 sendPacket sock prv addr packet = do
-  $logInfoS "sendPacket" $ T.pack $ CL.green ">>>>" ++ " (" ++ show addr ++ ") " ++ format packet
+  $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
   let (theType', theRLP) = ndPacketToRLP packet
       theData = B.unpack $ rlpSerialize theRLP
       SHA theMsgHash = hash $ B.pack $ theType' : theData
@@ -348,7 +348,3 @@ findNeighbors myPriv domain port =
 
       _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
       return ()
-
-
-
-

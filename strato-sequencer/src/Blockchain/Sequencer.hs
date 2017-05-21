@@ -112,9 +112,11 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                 readyToEmit <- enqueueIfParentNotEmitted b
                 case readyToEmit of
                     (ReadyToEmit totalPastDifficulty) -> do
-                        $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit! Emitting it and chain of dependents."
                         chain <- buildEmissionChain b totalPastDifficulty
                         tickBy (length chain) ctr_sequencer_blocks_released
+                        if (chain /= [])
+                          then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit! Emitting it and chain of dependents."
+                          else $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit, but its emission chain is empty. It was likely already emitted."
                         return chain
                     NotReadyToEmit                    -> do
                         $logWarnS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is not yet ready to emit."
