@@ -3,11 +3,10 @@
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# OPTIONS -fno-warn-redundant-constraints #-}
-module Blockchain.Strato.Discovery.ContextLite (
-  ContextLite, -- (..),
-  initContextLite,
-  addPeer,
-  getPeersClosestTo
+module Blockchain.Strato.Discovery.ContextLite
+  ( ContextLite -- (..)
+  , initContextLite
+  , addPeer
   ) where
 
 
@@ -16,7 +15,6 @@ import           Blockchain.DBM
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Control.Monad.State
 import           Control.Monad.Trans.Resource
-import qualified Crypto.Types.PubKey.ECC               as ECC
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
 

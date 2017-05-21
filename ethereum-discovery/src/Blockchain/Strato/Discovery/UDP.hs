@@ -38,7 +38,6 @@ import           Data.List.Split
 import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Time.Clock.POSIX
-import qualified Database.Persist.Postgresql           as SQL
 import qualified Network.Haskoin.Internals             as H
 import qualified Network.URI                           as URI
 import           Numeric
@@ -47,7 +46,6 @@ import           System.Timeout
 
 import qualified Blockchain.Colors                     as CL
 import           Blockchain.Data.RLP
-import           Blockchain.DB.SQLDB
 import           Blockchain.ExtendedECDSA
 import           Blockchain.ExtWord
 import           Blockchain.Format
@@ -350,13 +348,3 @@ findNeighbors myPriv domain port =
 
       _ <- NB.recv socket' 10 >>= print -- processDataStream' . B.unpack
       return ()
-
-
--- todo: respect the requester's target
-getPeersClosestTo :: (HasSQLDB m) => NodeID -> T.Text -> Point -> m [PPeer]
-getPeersClosestTo _ requesterIP _ = do
-   peerEnts <- (getSQLDB >>= (runResourceT . SQL.runSqlPool action))
-   let rets = (\(SQL.Entity _ ent) -> ent) <$> peerEnts
-   return $ take 20 rets
-
-   where action = SQL.selectList [ PPeerIp SQL.!=. requesterIP]

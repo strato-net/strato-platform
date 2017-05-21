@@ -19,6 +19,7 @@ import qualified Crypto.Types.PubKey.ECC                 as ECC
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import           Data.Maybe                              (fromJust)
 import           Data.Monoid
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
@@ -197,10 +198,14 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
     (FindNeighbors targetPubkey _) -> do
         time <- liftIO $ round `fmap` getPOSIXTime
         let nextTime = time + 50
-            ip = T.pack (sockAddrToIP addr)
-        peers <- getPeersClosestTo targetPubkey ip otherPubKey
-        let theNeighbors = (\PPeer{..} -> Neighbor (pPeerIp pPeerUdpPort pPeerTcpPort) (fromJust pPeerPubkey)) <$> peers
+            ip = sockAddrToIP addr
+        peers <- getPeersClosestTo targetPubkey (T.pack ip) otherPubKey
+        let theNeighbors = (\p -> Neighbor (mkEndpoint p) (mkNodeId p)) <$> peers
         sendPacket sock prv addr $ Neighbors theNeighbors nextTime
+
+          where mkEndpoint PPeer{..} = Endpoint (stringToIAddr $ T.unpack pPeerIp) (fromIntegral pPeerUdpPort) (fromIntegral pPeerTcpPort)
+                mkNodeId             = pointToNodeID . fromJust . pPeerPubkey
+
 
     Neighbors neighbors _ -> forM_ neighbors $ \(Neighbor (Endpoint addr' udpPort tcpPort) nodeID) -> do
         $logDebugS "handleValidPacket/Neighbors" . T.pack $ "Got new neighbors: " ++ show neighbors
