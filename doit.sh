@@ -13,11 +13,16 @@ setEnv pgpasswd api
 setEnv pghost postgres
 setEnv stratoHost nginx
 setEnv stratourl http://$stratoHost/strato-api/eth/v1.2
-setEnv cirrusurl http://localhost/cirrus 
+setEnv cirrusurl http://localhost/cirrus
+setEnv blochost  http://localhost
+setEnv blocport 8000
+setEnv blocpath '.'
 
 blocserver="/usr/bin/blockapps-bloc"
 locale-gen "en_US.UTF-8"
 export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 
-$blocserver --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" --stratourl="$stratourl" --cirrusurl="$cirrusurl" 2>&1
+$blocserver --blochost="$blochost" --blocport="$blocport" --blocpath="$blocpath" \
+            --pghost="$pghost" --pguser="$pguser" --password="$pgpasswd" \
+            --stratourl="$stratourl" --cirrusurl="$cirrusurl" 2>&1
