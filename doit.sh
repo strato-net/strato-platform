@@ -14,9 +14,6 @@ setEnv pghost postgres
 setEnv stratoHost nginx
 setEnv stratourl http://$stratoHost/strato-api/eth/v1.2
 setEnv cirrusurl http://localhost/cirrus
-#setEnv blochost http://localhost
-#seEnv blocport 8000
-#setEnv blocpath '/.'
 
 blocserver="/usr/bin/blockapps-bloc"
 locale-gen "en_US.UTF-8"
