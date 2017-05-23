@@ -16,7 +16,7 @@ setEnv stratourl http://$stratoHost/strato-api/eth/v1.2
 setEnv cirrusurl http://localhost/cirrus
 setEnv blochost  http://localhost
 setEnv blocport 8000
-setEnv blocpath '.'
+setEnv blocpath '/.'
 
 blocserver="/usr/bin/blockapps-bloc"
 locale-gen "en_US.UTF-8"
