@@ -59,7 +59,6 @@ library
                , monad-control
                , monad-loops
                , mtl
-               , network
                , opaleye
                , postgresql-simple
                , product-profunctors

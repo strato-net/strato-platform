@@ -23,7 +23,6 @@ executable blockapps-bloc
                , blockapps-strato-api
                , blockapps-strato-client
                , logging-effect
-               , network
                , hflags
                , http-client
                , postgresql-simple

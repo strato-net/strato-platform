@@ -9,7 +9,6 @@ module BlockApps.Bloc21.Server where
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Proxy
 import           Data.Swagger
-import           Network
 import           Servant
 import           Servant.Swagger
 
@@ -52,22 +51,17 @@ getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
 
-blocSwagger :: HostName -> PortNumber -> FilePath -> Swagger
-blocSwagger hst prt pth = toSwagger (Proxy @BlocAPI)
+blocSwagger :: Swagger
+blocSwagger = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
     & info.version .~ "2.1"
     & info.description ?~ "This is the V2.1 API for the BlocH"
-    & host ?~ Host hst (Just prt) -- this should not be hard coded
-    & basePath ?~ (pth ++ "/bloc/v2.1")
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
 serveBlocAndDocs
   :: BlocEnv
-  -> HostName
-  -> PortNumber
-  -> FilePath
   -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
-serveBlocAndDocs blocEnv hst prt pth = serveBloc blocEnv
+serveBlocAndDocs blocEnv = serveBloc blocEnv
   :<|> getGitInfo
-  :<|> return (blocSwagger hst prt pth)
+  :<|> return blocSwagger
