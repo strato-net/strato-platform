@@ -7,7 +7,6 @@ module Executable.EVMCheckpoint where
 import qualified Data.ByteString.Base16   as B16
 
 import qualified Blockchain.Colors        as CL
-import           Blockchain.Data.BlockDB  (blockHeaderHash)
 import qualified Blockchain.Data.DataDefs as DD
 import           Blockchain.Data.RLP
 import           Blockchain.Format
@@ -28,8 +27,8 @@ data EVMCheckpoint = EVMCheckpoint {
 instance RLPSerializable EVMCheckpoint where
     rlpDecode (RLPArray [sha, header, RLPArray txShas, bbi]) =
         EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode <$> txShas) (rlpDecode bbi)
-    rlpEncode (EVMCheckpoint sha head txShas bbi) =
-        RLPArray [rlpEncode sha, rlpEncode head, RLPArray (rlpEncode <$> txShas), rlpEncode bbi]
+    rlpEncode (EVMCheckpoint sha header txShas bbi) =
+        RLPArray [rlpEncode sha, rlpEncode header, RLPArray (rlpEncode <$> txShas), rlpEncode bbi]
 
 instance RLPSerializable ContextBestBlockInfo where
     rlpDecode (RLPArray [tag, body]) = case rlpDecode tag :: Integer of
@@ -57,7 +56,7 @@ instance RLPSerializable ContextBestBlockInfo where
 
 
 instance Format EVMCheckpoint where -- todo add format instance for ContextBestBlockInfo and show it here as well.
-    format (EVMCheckpoint sha head txhs _) =
+    format (EVMCheckpoint sha _ txhs _) =
         "EVMCheckpoint " ++ CL.red (short sha) ++ (' ':count)
             where short = take 16 . formatSHAWithoutColor
                   count = CL.green $ show (length txhs)
