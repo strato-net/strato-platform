@@ -15,5 +15,4 @@ defineFlag "cirrusurl" ("http://tester11.eastus.cloudapp.azure.com/cirrus"::Stri
 defineFlag "loglevel" (4::Int) "The log level for output messages"
 defineFlag "blochost" ("localhost" :: HostName) "the host name for Bloc for the documentation"
 defineFlag "blocport" (8000 :: Integer) "the port number for Bloc for the documentation"
-defineFlag "bloc20path" ("/bloc/v2.0" :: FilePath) "the API path for Bloc v2.0 for the documentation"
-defineFlag "bloc21path" ("/bloc/v2.1" :: FilePath) "the API path for Bloc v2.1 for the documentation"
+defineFlag "blocpath" ("" :: FilePath) "the API path for Bloc for the documentation"

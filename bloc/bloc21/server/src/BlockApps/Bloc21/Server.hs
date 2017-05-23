@@ -58,7 +58,7 @@ blocSwagger hst prt pth = toSwagger (Proxy @BlocAPI)
     & info.version .~ "2.1"
     & info.description ?~ "This is the V2.1 API for the BlocH"
     & host ?~ Host hst (Just prt) -- this should not be hard coded
-    & basePath ?~ pth
+    & basePath ?~ (pth ++ "/bloc/v2.1")
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
