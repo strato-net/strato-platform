@@ -38,6 +38,7 @@ deployments:
         pguser: "${pguser}"
         pgpasswd: "${pgpasswd}"
         pghost: "${pghost}"
+        blocpath: "${blocpath}"
 
   - name: redis
     compose:
@@ -198,7 +199,7 @@ deployments:
       image: swaggerapi/swagger-ui
       restart: always
       environment:
-        API_URL: "http://bloch:8000/bloc/v2.1/swagger.json"
+        API_URL: "/bloc/v2.1/swagger.json"
       ports:
         - "8080:8080"
         
@@ -207,7 +208,7 @@ deployments:
       image: swaggerapi/swagger-ui
       restart: always
       environment:
-        API_URL: "http://bloch:8000/bloc/v2.0/swagger.json"
+        API_URL: "/bloc/v2.0/swagger.json"
       ports:
         - "8081:8080"
 
