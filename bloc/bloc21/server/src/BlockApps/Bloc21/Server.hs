@@ -51,17 +51,19 @@ getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
 serveBloc :: BlocEnv -> Server BlocAPI
 serveBloc env = enter (NT (enterBloc env)) bloc
 
-blocSwagger :: Swagger
-blocSwagger = toSwagger (Proxy @BlocAPI)
+blocSwagger :: FilePath -> Swagger
+blocSwagger path = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
     & info.version .~ "2.1"
     & info.description ?~ "This is the V2.1 API for the BlocH"
+    & basePath .~ if null path then Nothing else Just path
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
 serveBlocAndDocs
   :: BlocEnv
+  -> FilePath
   -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
-serveBlocAndDocs blocEnv = serveBloc blocEnv
+serveBlocAndDocs blocEnv path = serveBloc blocEnv
   :<|> getGitInfo
-  :<|> return blocSwagger
+  :<|> return (blocSwagger path)

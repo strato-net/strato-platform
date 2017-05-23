@@ -108,8 +108,8 @@ appBloc env21 env20 =
               "bloc" :> "v2.0" :> Bloc20.BlocDocsAPI
               ))
   $ Bloc21.serveBloc env21
-     :<|> return (Bloc21.blocSwagger)
+     :<|> return (Bloc21.blocSwagger flags_blocpath)
      :<|> Bloc20.serveBloc env20
-     :<|> return (Bloc20.blocSwagger)
+     :<|> return (Bloc20.blocSwagger flags_blocpath)
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
