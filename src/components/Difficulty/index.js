@@ -6,13 +6,13 @@ import { withRouter } from 'react-router-dom';
 class Difficulty extends Component {
 
   componentDidMount() {
-    this.props.getDifficulty();
+    this.props.fetchDifficulty();
   }
 
   render() {
     return (
-      <div>
-        <h1>{this.props.difficulty}</h1>
+      <div className="App">
+        <h1>Difficulty: {this.props.difficulty.difficulty}</h1>
       </div>
     );
   }

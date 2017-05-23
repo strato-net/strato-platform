@@ -5,7 +5,7 @@ import {
 } from './difficulty.actions';
 
 const initialState = {
-  difficulty: -1,
+  difficulty: '',
   error: null,
 };
 

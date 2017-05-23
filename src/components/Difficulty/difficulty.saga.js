@@ -1,5 +1,5 @@
 import {
-  takeLatest,
+  takeEvery,
   put,
   call
 } from 'redux-saga/effects';
@@ -10,7 +10,7 @@ import {
 } from './difficulty.actions';
 
 const url = "http://strato-int.centralus.cloudapp.azure.com/strato-api/eth/v1.2/block/last/0"
-
+//FIXME hard coded api url
 
 function getDifficulty() {
   return fetch(
@@ -22,7 +22,10 @@ function getDifficulty() {
     },
   })
     .then(function(response) {
-      return response.json();
+      return response.json()
+    })
+    .then(function(res) {
+      return res[0].blockData.difficulty;
     })
     .catch(function(error) {
       throw error;
@@ -32,7 +35,7 @@ function getDifficulty() {
 function* fetchDifficulty(action) {
   try {
     let response = yield call(getDifficulty);
-    yield put(fetchDifficultySuccess(response.data));
+    yield put(fetchDifficultySuccess(response));
   }
   catch (err) {
     yield put(fetchDifficultyFailure(err));
@@ -40,5 +43,5 @@ function* fetchDifficulty(action) {
 }
 
 export default function* watchFetchDifficulty() {
-  yield takeLatest(FETCH_DIFFICULTY, fetchDifficulty);
+  yield takeEvery(FETCH_DIFFICULTY, fetchDifficulty);
 }

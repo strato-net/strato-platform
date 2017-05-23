@@ -8,10 +8,10 @@ export const fetchDifficulty = function () {
   }
 };
 
-export const fetchDifficultySuccess = function (response) {
+export const fetchDifficultySuccess = function (difficulty) {
   return {
     type: FETCH_DIFFICULTY_SUCCESS,
-    response: response
+    difficulty: difficulty
   }
 };
 
