@@ -2,21 +2,18 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { fetchDifficulty } from './difficulty.actions';
 import { withRouter } from 'react-router-dom';
-
+import NumberCard from '../NumberCard';
 import './Difficulty.scss'
 
 class Difficulty extends Component {
 
-  componentDidMount() {
+  componentDidMount() { //FIXME Put fetchDifficulty on a timer? 
     this.props.fetchDifficulty();
   }
 
   render() {
     return (
-      <div className="container pt-card pt-elevation-3">
-        <span className="difficulty"><h1>{this.props.difficulty.difficulty}</h1></span>
-        <span className="desc"><h5>Difficulty</h5></span>
-      </div>
+      <NumberCard number={this.props.difficulty.difficulty} description="Difficulty"/>
     );
   }
 }
