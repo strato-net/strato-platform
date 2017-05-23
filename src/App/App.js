@@ -1,6 +1,10 @@
 import React, { Component } from 'react';
 import './App.css';
 
+// Blueprint css
+import 'normalize.css/normalize.css';
+import '@blueprintjs/core/dist/blueprint.css';
+
 class App extends Component {
   render() {
     return (
