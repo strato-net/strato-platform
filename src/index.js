@@ -11,20 +11,27 @@ import {
   applyMiddleware,
   combineReducers
 } from 'redux';
+import { fork } from 'redux-saga/effects';
 import createSagaMiddleware from 'redux-saga';
 
 import { routerReducer } from 'react-router-redux';
 import { reducer as formReducer } from 'redux-form';
 
+import difficultyReducer from './components/Difficulty/difficulty.reducer'
+
+import difficultySaga from './components/Difficulty/difficulty.saga'
+
 const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
+  difficulty: difficultyReducer,
 });
 
 const rootSaga = function* startForeman() {
   yield [
     // YOUR SAGAS HERE
+    fork(difficultySaga),
   ]
 };
 
@@ -34,11 +41,11 @@ const sagaMiddleware = createSagaMiddleware();
 const store = createStore(
   rootReducer,
   applyMiddleware(sagaMiddleware),
-  window.devToolsExtension ? window.devToolsExtension() : f => f,
+  //window.devToolsExtension ? window.devToolsExtension() : f => f,
 );
 
 // then run the saga
-sagaMiddleware.run(rootSaga);
+sagaMiddleware.run(rootSaga)
 
 ReactDOM.render(
   <Provider store={store}>
