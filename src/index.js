@@ -18,20 +18,24 @@ import { routerReducer } from 'react-router-redux';
 import { reducer as formReducer } from 'redux-form';
 
 import difficultyReducer from './components/Difficulty/difficulty.reducer'
+import transactionsReducer from './components/Transactions/transactions.reducer'
 
-import difficultySaga from './components/Difficulty/difficulty.saga'
+import watchFetchDifficulty from './components/Difficulty/difficulty.saga'
+import watchFetchTx from './components/Transactions/transactions.saga'
 
 const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
   difficulty: difficultyReducer,
+  transactions: transactionsReducer,
 });
 
 const rootSaga = function* startForeman() {
   yield [
     // YOUR SAGAS HERE
-    fork(difficultySaga),
+    fork(watchFetchDifficulty),
+    fork(watchFetchTx),
   ]
 };
 

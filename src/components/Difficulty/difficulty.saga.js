@@ -10,6 +10,7 @@ import {
 } from './difficulty.actions';
 
 const url = "http://strato-int.centralus.cloudapp.azure.com/strato-api/eth/v1.2/block/last/0" //FIXME hard coded api url
+/*const url = APIURL + "/strato-api/eth/v1.2/block/last/0" */ 
 
 function getDifficulty() {
   return fetch(
