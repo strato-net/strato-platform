@@ -1,10 +1,17 @@
 import React from 'react';
-import { Route } from 'react-router-dom';
-import App from './App/App.js';
+import { Route, Switch } from 'react-router-dom';
+import Dashboard from './components/Dashboard';
+import Test from './components/Test';
 
+export const routes = (
+  <Switch>
+    <Route exact path="/" component={Dashboard}/>
+  </Switch>
+);
 
-export default (
-  <Route exact path="/" component={ App }>
-
-  </Route>
+export const navLinksData = (
+  [
+    {path: '/', label: 'Dashboard', id: 'dashboard'},
+    {path: '/test', label: 'Test', id: 'test'}
+  ]
 );
