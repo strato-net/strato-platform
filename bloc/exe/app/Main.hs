@@ -108,8 +108,8 @@ appBloc env21 env20 =
               "bloc" :> "v2.0" :> Bloc20.BlocDocsAPI
               ))
   $ Bloc21.serveBloc env21
-     :<|> return (Bloc21.blocSwagger flags_bloc21host (fromInteger flags_bloc21port) flags_bloc21path)
+     :<|> return (Bloc21.blocSwagger flags_blochost (fromInteger flags_blocport) flags_bloc21path)
      :<|> Bloc20.serveBloc env20
-     :<|> return (Bloc20.blocSwagger flags_bloc20host (fromInteger flags_bloc20port) flags_bloc20path)
+     :<|> return (Bloc20.blocSwagger flags_blochost (fromInteger flags_blocport) flags_bloc20path)
   where
     policy = simpleCorsResourcePolicy{corsRequestHeaders=["Content-Type"]}
