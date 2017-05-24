@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
-module Blockchain.VM (
-  runCodeFromStart,
-  call,
-  create
-  ) where
+module Blockchain.VM
+    ( runCodeFromStart
+    , call
+    , create
+    ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
 import qualified Prelude                            as Ordering (Ordering (..))

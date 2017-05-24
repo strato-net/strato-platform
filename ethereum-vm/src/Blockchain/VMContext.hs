@@ -5,19 +5,19 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
 
-module Blockchain.VMContext (
-  Context(..),
-  ContextBestBlockInfo(..),
-  ContextM,
-  runContextM,
-  evalContextM,
-  execContextM,
-  incrementNonce,
-  getNewAddress,
-  purgeStorageMap,
-  getContextBestBlockInfo,
-  putContextBestBlockInfo
-  ) where
+module Blockchain.VMContext
+    ( Context(..)
+    , ContextBestBlockInfo(..)
+    , ContextM
+    , runContextM
+    , evalContextM
+    , execContextM
+    , incrementNonce
+    , getNewAddress
+    , purgeStorageMap
+    , getContextBestBlockInfo
+    , putContextBestBlockInfo
+    ) where
 
 
 import           Control.Monad.IO.Class
@@ -39,6 +39,9 @@ import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
+import           Blockchain.Data.LogDB
+import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.DB.CodeDB
@@ -49,25 +52,28 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
+import qualified Blockchain.Strato.Indexer.Kafka    as IK
+import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.VMOptions
 
 import           Executable.EVMFlags
 
-data Context = Context {
-    contextStateDB           :: MP.MPDB,
-    contextHashDB            :: HashDB,
-    contextCodeDB            :: CodeDB,
-    contextBlockSummaryDB    :: BlockSummaryDB,
-    contextSQLDB             :: SQLDB,
-    contextAddressStateDBMap :: M.Map Address AddressStateModification,
-    contextStorageMap        :: M.Map (Address, Word256) Word256,
-    contextBaggerState       :: !BaggerState,
-    contextKafkaState        :: K.KafkaState,
-    contextBestBlockInfo     :: ContextBestBlockInfo,
-    contextRedisPool         :: Redis.Connection
-}
+data Context = Context { contextStateDB           :: MP.MPDB
+                       , contextHashDB            :: HashDB
+                       , contextCodeDB            :: CodeDB
+                       , contextBlockSummaryDB    :: BlockSummaryDB
+                       , contextSQLDB             :: SQLDB
+                       , contextAddressStateDBMap :: M.Map Address AddressStateModification
+                       , contextStorageMap        :: M.Map (Address, Word256) Word256
+                       , contextBaggerState       :: !BaggerState
+                       , contextKafkaState        :: K.KafkaState
+                       , contextBestBlockInfo     :: ContextBestBlockInfo
+                       , contextRedisPool         :: Redis.Connection
+                       , contextTxResultQueue     :: [TransactionResult]
+                       , contextLogDBQueue        :: [LogDB]
+                       }
 
 type ContextM = StateT Context (StatsT (ResourceT (LoggingT IO)))
 
@@ -76,6 +82,30 @@ instance (MonadResource m) => MonadResource (StatsT m) where
 
 instance (MonadLogger m) => MonadLogger (StatsT m) where
     monadLoggerLog a b c d = lift $ monadLoggerLog a b c d
+
+instance HasMemTXResultDB ContextM where
+  enqueueTransactionResults txrs = do
+    ctx <- get
+    let q = contextTxResultQueue ctx
+    put $ ctx { contextTxResultQueue = (q ++ txrs) }
+
+  flushTransactionResults = do
+    ctx <- get
+    let toWrite = contextTxResultQueue ctx
+    K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
+    put $ ctx { contextTxResultQueue = [] }
+
+instance HasMemLogDB ContextM where
+  enqueueLogEntries ls = do
+    ctx <- get
+    let q = contextLogDBQueue ctx
+    put $ ctx { contextLogDBQueue = (q ++ ls) }
+
+  flushLogEntries = do
+    ctx <- get
+    let toWrite = contextLogDBQueue ctx
+    K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
+    put $ ctx { contextLogDBQueue = [] }
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
     deriving (Eq, Read, Show)
@@ -150,7 +180,8 @@ runContextM f = do
                         defaultBaggerState
                         initialKafkaState
                         Unspecified
-                        redisPool)
+                        redisPool
+                        [] [])
 
 
 evalContextM :: (MonadIO m, MonadBaseControl IO m, MonadThrow m) => StateT Context (StatsT (ResourceT m)) a -> m a

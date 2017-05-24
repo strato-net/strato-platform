@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# OPTIONS -fno-warn-orphans      #-}
@@ -418,7 +419,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             lift . $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
             return ExecResults { erRemainingBlockGas=remainingBlockGas
                                , erReturnVal=Nothing
-                               , erTrace=error "theTrace not set" -- todo: seriously?
+                               , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
                                , erNewContractAddress=Nothing
                                }
@@ -470,8 +471,13 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
       txCost _  = if isHomestead then gCREATETX else gTX
 
 --outputTransactionMessage::IO ()
-outputTransactionResult::BlockData->OutputTx->Either TransactionFailureCause ExecResults->NominalDiffTime->
-                         M.Map Address AddressStateModification->M.Map Address AddressStateModification->ContextM ()
+outputTransactionResult :: BlockData
+                        -> OutputTx
+                        -> Either TransactionFailureCause ExecResults
+                        -> NominalDiffTime
+                        -> M.Map Address AddressStateModification
+                        -> M.Map Address AddressStateModification
+                        -> ContextM ()
 outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap = do
   let
     (txrStatus, message, gasRemaining) =
@@ -506,11 +512,11 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
               Left _ -> return []
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
-      forM_ theLogs $ \log' ->
-        putLogDB $ LogDB theHash (address log') (topics log' `indexMaybe` 0) (topics log' `indexMaybe` 1) (topics log' `indexMaybe` 2) (topics log' `indexMaybe` 3) (logData log') (bloom log')
-
-      void $ putTransactionResult
-             TransactionResult { transactionResultBlockHash        = blockHeaderHash b
+      let ranBlockHash = blockHeaderHash b
+          mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+      enqueueLogEntries $ mkLogEntry <$> theLogs
+      enqueueTransactionResult $
+             TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash
                                , transactionResultMessage          = message
                                , transactionResultResponse         = response

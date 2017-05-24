@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Blockchain.Data.TransactionResult (
-     putTransactionResult
+module Blockchain.Data.TransactionResult
+    ( HasMemTXResultDB(..)
+    , putTransactionResult
+    , putTransactionResults
     ) where
 
 import           Database.Persist             hiding (get)
@@ -13,8 +15,20 @@ import           Control.Monad.Trans.Resource
 import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 
-putTransactionResult::(HasSQLDB m, MonadIO m, MonadBaseControl IO m)=>
-                      TransactionResult->m (Key TransactionResult)
-putTransactionResult tr = do
-  pool <- getSQLDB
-  runResourceT $ SQL.runSqlPool (SQL.insert tr) pool
+class (Monad m) => HasMemTXResultDB m where
+  enqueueTransactionResults :: [TransactionResult] -> m ()
+  flushTransactionResults   :: m ()
+
+  enqueueTransactionResult :: TransactionResult -> m ()
+  enqueueTransactionResult = enqueueTransactionResults . pure
+
+
+putTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+                     => TransactionResult
+                     -> m (Key TransactionResult)
+putTransactionResult = fmap head . putTransactionResults . pure
+
+putTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+                      => [TransactionResult]
+                      -> m [Key TransactionResult]
+putTransactionResults trs = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany trs)

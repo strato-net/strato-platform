@@ -2,7 +2,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-
 module Blockchain.Strato.Indexer.ApiIndexer
     ( apiIndexer
     , kafkaClientIds

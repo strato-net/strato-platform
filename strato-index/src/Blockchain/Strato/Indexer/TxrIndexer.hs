@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-module Blockchain.Strato.Indexer.P2PIndexer where
+module Blockchain.Strato.Indexer.TxrIndexer where
 
 import           Control.Monad
 import           Control.Monad.Logger
@@ -11,7 +11,9 @@ import           Network.Kafka
 import           Network.Kafka.Consumer
 import           Network.Kafka.Protocol
 
-import           Blockchain.Data.BlockDB
+import           Blockchain.Data.DataDefs           (LogDB (..), TransactionResult (..))
+import qualified Blockchain.Data.LogDB              as LogDB
+import qualified Blockchain.Data.TransactionResult  as TxrDB
 import           Blockchain.EthConf                 (lookupConsumerGroup)
 import           Blockchain.Format
 
@@ -19,28 +21,27 @@ import           Blockchain.Strato.Indexer.IContext
 import           Blockchain.Strato.Indexer.Kafka
 import           Blockchain.Strato.Indexer.Model
 
-import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 
-p2pIndexer :: LoggingT IO ()
-p2pIndexer = runIContextM "strato-p2p-indexer" . forever $ do
-    $logInfoS "p2pIndexer" "About to fetch IndexEvents"
+txrIndexer :: LoggingT IO ()
+txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
+    $logInfoS "txrIndexer" "About to fetch IndexEvents"
     (offset, idxEvents) <- getUnprocessedIndexEvents
-    $logInfoS "p2pIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+    $logInfoS "txrIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
     let zipIdxEvents = zip [offset+1..] idxEvents
-    forM_ zipIdxEvents $ \(nextIdx, e) -> do
+    forM_ zipIdxEvents $ \(nextIdx, e) -> do -- todo: don't insert one-by-one?
         case e of
-            RanBlock b -> do
-                $logInfoS "p2pIndexer" . T.pack $ "Inserting Redis block with sha: " ++ format (blockHash b)
-                void $ RBDB.withRedisBlockDB (RBDB.putBlock b)
-            NewBestBlock (sha, num, tdiff) -> do
-                $logInfoS "p2pIndexer" . T.pack $
-                    "Updating RedisBestBlock as (" ++ format sha ++ ", " ++ show num ++ ", " ++ show tdiff ++ ")"
-                void $ RBDB.withRedisBlockDB (RBDB.putBestBlockInfo sha num tdiff)
+            LogDBEntry l -> do
+                $logInfoS "txrIndexer" . T.pack $ "Inserting LogDB entry for tx: " ++ format (logDBTransactionHash l) ++ " at block " ++ format (logDBBlockHash l)
+                void $ LogDB.putLogDB l
+            TxResult r -> do
+                $logInfoS "txrIndexer" . T.pack $
+                    "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
+                void $ TxrDB.putTransactionResult r
             _ -> return ()
         setKafkaCheckpoint nextIdx
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
-kafkaClientIds = ("strato-p2p-indexer", lookupConsumerGroup "strato-p2p-indexer")
+kafkaClientIds = ("strato-txr-indexer", lookupConsumerGroup "strato-txr-indexer")
 
 getKafkaCheckpoint :: IContextM Offset
 getKafkaCheckpoint = withKafkaViolently (fetchSingleOffset (snd kafkaClientIds) targetTopicName 0) >>= \case

@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# OPTIONS -fno-warn-unused-imports #-} -- #justHFlagsThingz
 
+import           Control.Monad
 import           Control.Monad.Logger
 import           HFlags
 
@@ -13,5 +14,5 @@ import           Executable.EVMFlags
 
 main :: IO ()
 main = do
-  s <- $initHFlags "Ethereum VM"
+  void $ $initHFlags "Ethereum VM"
   runLoggingT ethereumVM printLogMsg

@@ -17,6 +17,8 @@ import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
 import           Blockchain.Data.BlockSummary
+import           Blockchain.Data.LogDB
+import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.EthConf
 import           Blockchain.Format                     (format)
@@ -75,6 +77,10 @@ ethereumVM = void . execContextM $ do
         forM_ blocks $ \b ->
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks False blocks
+
+        -- todo: is this the best place to put this?
+        flushLogEntries
+        flushTransactionResults
 
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
