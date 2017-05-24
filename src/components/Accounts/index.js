@@ -69,11 +69,9 @@ class Accounts extends Component {
                     <div>
                         <table className="pt-table accounts-table">
                             <thead>
-                                <tr>
-                                    <td className="col-sm-4"><h4>Account</h4></td>
-                                    <td className="col-sm-4"><h4>Username</h4></td>
-                                    <td className="col-sm-4"><h4>Balance</h4></td>
-                                </tr>
+                                    <th className="col-sm-4"><h4>Account</h4></th>
+                                    <th className="col-sm-4"><h4>Username</h4></th>
+                                    <th className="col-sm-4"><h4>Balance</h4></th>
                             </thead>
 
                             <tbody>
