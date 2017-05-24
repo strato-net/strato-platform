@@ -39,6 +39,9 @@ function newnode {
   echo "Starting strato-p2p-indexer"
   runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
+  echo "Starting strato-txr-indexer"
+  runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
+
   echo "Starting ethereum-vm"
   runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
                          --diffPublish=true --createTransactionResults=true \

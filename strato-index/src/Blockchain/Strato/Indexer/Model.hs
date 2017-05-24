@@ -1,9 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
+{-# OPTIONS -fno-warn-orphans #-}
 module Blockchain.Strato.Indexer.Model
     ( IndexEvent(..)
     ) where
 
-import           Blockchain.Data.DataDefs    (LogDB, TransactionResult)
+import           Blockchain.Data.DataDefs                (LogDB, TransactionResult)
+import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA
 import           Data.Binary
@@ -13,6 +15,11 @@ data IndexEvent = RanBlock OutputBlock
                 | LogDBEntry LogDB
                 | TxResult TransactionResult
                 deriving (Eq, Read, Show)
+
+instance Binary LogDB
+instance Binary TransactionResult
+instance Binary TransactionFailureType
+instance Binary TransactionResultStatus
 
 instance Binary IndexEvent where
     get = do

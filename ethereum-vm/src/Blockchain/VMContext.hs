@@ -39,7 +39,7 @@ import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
-import           Blockchain.Data.DataDefs           (TransactionResult, LogDB)
+import           Blockchain.Data.DataDefs           (LogDB, TransactionResult)
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -52,6 +52,8 @@ import           Blockchain.DB.StateDB
 import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.ExtWord
+import qualified Blockchain.Strato.Indexer.Kafka    as IK
+import qualified Blockchain.Strato.Indexer.Model    as IM
 import           Blockchain.Strato.Model.SHA
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
 import           Blockchain.VMOptions
@@ -90,7 +92,7 @@ instance HasMemTXResultDB ContextM where
   flushTransactionResults = do
     ctx <- get
     let toWrite = contextTxResultQueue ctx
-    void $ putTransactionResults toWrite
+    K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
     put $ ctx { contextTxResultQueue = [] }
 
 instance HasMemLogDB ContextM where
@@ -101,8 +103,8 @@ instance HasMemLogDB ContextM where
 
   flushLogEntries = do
     ctx <- get
-    let toWrite = contextTxResultQueue ctx
-    void $ putTransactionResults toWrite
+    let toWrite = contextLogDBQueue ctx
+    K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
     put $ ctx { contextLogDBQueue = [] }
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)

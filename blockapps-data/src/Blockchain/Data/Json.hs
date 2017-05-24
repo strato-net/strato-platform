@@ -339,7 +339,7 @@ showHexSimple :: (Show a, Integral a) => a -> String
 showHexSimple t = showHex t ""
 
 instance ToJSON LogDB where
-    toJSON (LogDB h
+    toJSON (LogDB bh th
                   (Address x)
                   maybeTopic1
                   maybeTopic2
@@ -347,7 +347,8 @@ instance ToJSON LogDB where
                   maybeTopic4
                   dataBS
                   bloomW512) =
-        object ["hash" .= h,
+        object ["hash" .= th,
+                "blockHash" .= bh,
                 "address" .= (showHex x ""),
                 "topic1" .= (maybe "" showHexSimple maybeTopic1 :: String),
                 "topic2" .= (maybe "" showHexSimple maybeTopic2 :: String),

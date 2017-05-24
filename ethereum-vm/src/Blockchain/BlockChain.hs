@@ -512,10 +512,11 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
               Left _ -> return []
               Right erResult -> filterM (fmap not . NoCache.addressStateExists) $ moveToFront $ erNewContractAddress erResult
 
-      let mkLogEntry Log{..} = LogDB theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
+      let ranBlockHash = blockHeaderHash b
+          mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
       enqueueTransactionResult $
-             TransactionResult { transactionResultBlockHash        = blockHeaderHash b
+             TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash
                                , transactionResultMessage          = message
                                , transactionResultResponse         = response

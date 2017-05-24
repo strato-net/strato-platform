@@ -36,7 +36,6 @@ import           Data.Word
 import           Data.Aeson
 import           GHC.Generics
 
-
 entityDefs :: [EntityDef]
 entityDefs = $(persistFileWith lowerCaseSettings "src/Blockchain/Data/DataDefs.txt")
 
