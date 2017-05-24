@@ -37,7 +37,7 @@ const sagaMiddleware = createSagaMiddleware();
 const store = createStore(
   rootReducer,
   applyMiddleware(sagaMiddleware),
-  window.devToolsExtension ? window.devToolsExtension() : f => f,
+  //window.devToolsExtension ? window.devToolsExtension() : f => f,
 );
 
 // then run the saga
