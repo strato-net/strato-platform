@@ -1,9 +1,7 @@
 import React, { Component } from 'react';
 import {decorator as reduxBurgerMenu} from 'redux-burger-menu';
-import { push as Menu } from 'react-burger-menu';
-import 'normalize.css/normalize.css';
-import '@blueprintjs/core/dist/blueprint.css';
-import './menubar.css';
+import { push as Menu } from 'react-burger-menu'
+import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 
 class MenuBar extends Component {
@@ -43,4 +41,4 @@ class MenuBar extends Component {
   }
 }
 
-export default reduxBurgerMenu(MenuBar);
+export default reduxBurgerMenu(Menubar);
