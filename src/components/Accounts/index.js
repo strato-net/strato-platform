@@ -3,49 +3,48 @@ import {Button, ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 
 class Accounts extends Component {
+  dataMock = [
+  {
+    "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
+    "username": "Alice",
+    "balance": "1234",
+  }, {
+    "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
+    "username": "Bob",
+    "balance": "2345",
+  }, {
+    "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
+    "username": "Charlie",
+    "balance": "3456",
+  }, {
+    "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
+    "username": "Desiree",
+    "balance": "4567",
+  }, {
+    "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
+    "username": "Edward",
+    "balance": "5689",
+  }];
+
+  //1000000000000000000 wei per ether
+  tableRows = this.dataMock.map(function (val, i) {
+    return <tr>
+      <td className="col-sm-3">
+        {val.account}
+      </td>
+      <td className="col-sm-3">
+        {val.username}
+      </td>
+      <td className="col-sm-3">
+        {val.balance} wei
+      </td>
+      <td className="col-sm-3">
+        <ProgressBar className="pt-intent-primary" value={Math.random()}/>
+      </td>
+    </tr>
+  });
 
   render() {
-    let data = [
-      {
-        "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
-        "username": "Alice",
-        "balance": "1234",
-      }, {
-        "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-        "username": "Bob",
-        "balance": "2345",
-      }, {
-        "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
-        "username": "Charlie",
-        "balance": "3456",
-      }, {
-        "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-        "username": "Desiree",
-        "balance": "4567",
-      }, {
-        "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-        "username": "Edward",
-        "balance": "5689",
-      }];
-
-    //1000000000000000000 wei per ether
-    let tableRows = data.map(function (val, i) {
-      return <tr>
-        <td className="col-sm-3">
-          {val.account}
-        </td>
-        <td className="col-sm-3">
-          {val.username}
-        </td>
-        <td className="col-sm-3">
-          {val.balance} wei
-        </td>
-        <td className="col-sm-3">
-          <ProgressBar className="pt-intent-primary" value={Math.random()}/>
-        </td>
-      </tr>
-    });
-
     return (
       <div>
         <div className="row smd-content-row">
@@ -84,7 +83,7 @@ class Accounts extends Component {
                 </thead>
 
                 <tbody>
-                {tableRows}
+                {this.tableRows}
                 </tbody>
               </table>
             </div>
