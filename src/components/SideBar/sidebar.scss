@@ -1,3 +1,5 @@
+@import "~@blueprintjs/core/dist/blueprint.css";
+@import "../../../node_modules/@blueprintjs/core/dist/variables.scss";
 ///* Position and sizing of burger button */
 .bm-burger-button {
   display: none;
@@ -10,7 +12,7 @@
 
 /* Color/shape of burger icon bars */
 .bm-burger-bars {
-  background: #373a47;
+  zbackground: #373a47;
 }
 
 /* Position and sizing of clickable cross button */
@@ -21,24 +23,35 @@
 
 /* Color/shape of close button cross */
 .bm-cross {
-  background: #bdc3c7;
+  background: $pt-dark-text-color;
+}
+
+a {
+  color: $pt-dark-text-color;
+  font-size: $pt-font-size-large;
+}
+
+a:hover {
+  font-family: $pt-font-family;
+  min-font-size: $pt-font-size;
+  color: $pt-dark-code-text-color
 }
 
 /* General sidebar styles */
 .bm-menu {
-  background: #373a47;
+  background: $pt-dark-app-background-color;
   padding: 2.5em 1.5em 0;
   font-size: 1.15em;
 }
 
 /* Morph shape necessary with bubble or elastic */
 .bm-morph-shape {
-  fill: #373a47;
+  fill: $pt-dark-app-background-color;
 }
 
 /* Wrapper for item list */
 .bm-item-list {
-  color: #b8b7ad;
+  color: $pt-dark-text-color;
   padding: 0.8em;
 }
 

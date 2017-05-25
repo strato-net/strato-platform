@@ -5,6 +5,10 @@ import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 import {decorator as reduxBurgerMenu} from 'redux-burger-menu';
 import {action as toggleMenu} from 'redux-burger-menu';
+import { Colors} from '@blueprintjs/core';
+
+import 'normalize.css/normalize.css';
+import '@blueprintjs/core/dist/blueprint.css';
 
 
 const Menu = reduxBurgerMenu(preReduxMenu);
