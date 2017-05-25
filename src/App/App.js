@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import Difficulty from '../components/Difficulty';
 import './App.css';
 
 import 'normalize.css/normalize.css';
