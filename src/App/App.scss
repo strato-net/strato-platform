@@ -1,8 +1,7 @@
-.grid {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  padding: 5px;
+.smd-content-row {
+  margin: 23px 2%;
+}
+
+.smd-full-width {
+  width: 100%;
 }

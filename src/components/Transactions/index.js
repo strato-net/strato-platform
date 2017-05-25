@@ -10,12 +10,11 @@ class Transactions extends Component {
   }
 
   render() {
-    console.log(this.props);
     const txs = this.props.tx.map(
       (tx, i) => {
         return <li>tx #{i} of type {tx.transactionType}</li>
       }
-    )
+    );
     return (
       <div>tx
         <ul>
@@ -26,7 +25,7 @@ class Transactions extends Component {
   }
 }
 
-function mapStateToProps(state, ownProps) {
+function mapStateToProps(state) {
   return {
     tx: state.transactions.tx
   };
