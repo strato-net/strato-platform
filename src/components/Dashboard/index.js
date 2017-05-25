@@ -15,6 +15,11 @@ class Dashboard extends Component {
     return (
       <div>
         <div className="row smd-content-row">
+          <div className="col-sm-9 text-left">
+            <h2 style={{margin: 0}}>Dashboard</h2>
+          </div>
+        </div>
+        <div className="row smd-content-row">
           <div className="col-sm-3">
             <NumberCard number={this.props.difficulty} description="Difficulty" />
           </div>
@@ -24,7 +29,6 @@ class Dashboard extends Component {
             <TxList />
           </div>
         </div>
-
       </div>
     );
   }

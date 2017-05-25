@@ -50,7 +50,7 @@ class Accounts extends Component {
       <div>
         <div className="row smd-content-row">
           <div className="col-sm-9 text-left">
-            <h2 style={{"margin": "0px"}}>Accounts Tab</h2>
+            <h2 style={{margin: 0}}>Accounts</h2>
           </div>
           <div className="col-sm-3 text-right">
             {/* //FIXME Align the button to the Accounts Tab h2
