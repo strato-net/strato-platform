@@ -4,7 +4,7 @@ import { push as Menu } from 'react-burger-menu'
 import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 
-class Sidebar extends Component {
+class Menubar extends Component {
 
   navLinksData = this.props.navLinksData;
 
@@ -22,4 +22,4 @@ class Sidebar extends Component {
   }
 }
 
-export default reduxBurgerMenu(Sidebar);
+export default reduxBurgerMenu(Menubar);
