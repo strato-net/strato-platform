@@ -4,7 +4,8 @@ import registerServiceWorker from './registerServiceWorker';
 import './index.css';
 
 import { Provider } from 'react-redux';
-import routes from './routes';
+
+import App from './App/App'
 import { BrowserRouter as Router } from 'react-router-dom'
 import {
   createStore,
@@ -16,6 +17,8 @@ import createSagaMiddleware from 'redux-saga';
 
 import { routerReducer } from 'react-router-redux';
 import { reducer as formReducer } from 'redux-form';
+import {reducer as burgerMenu} from 'redux-burger-menu';
+
 
 import difficultyReducer from './components/Difficulty/difficulty.reducer'
 import transactionsReducer from './components/Transactions/transactions.reducer'
@@ -27,6 +30,7 @@ const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
+  burgerMenu,
   difficulty: difficultyReducer,
   transactions: transactionsReducer,
 });
@@ -53,7 +57,9 @@ sagaMiddleware.run(rootSaga)
 
 ReactDOM.render(
   <Provider store={store}>
-    <Router>{routes}</Router>
+    <Router>
+      <App />
+    </Router>
   </Provider>,
   document.getElementById('root')
 );
