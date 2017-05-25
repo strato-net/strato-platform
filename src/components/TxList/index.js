@@ -1,14 +1,8 @@
 import React, {Component} from 'react';
 
-import 'normalize.css/normalize.css';
-import '@blueprintjs/core/dist/blueprint.css';
-import 'bootstrap/dist/css/bootstrap.css';
-import './TxList.css';
-
 class TxList extends Component {
-
-  render() {
-    const tx = [{
+  txMock = [
+    {
       "transactionType": "Contract",
       "origin": "API",
       "next": "",
@@ -92,46 +86,44 @@ class TxList extends Component {
       "timestamp": "2017-05-24 14:28:53.652253 UTC",
       "v": "1b",
       "nonce": 2
-    }]
+    }
+  ];
 
-    const txRows = tx.map(function (tx) {
-      const date = new Date(tx.timestamp);
-      var hours = date.getHours()
-      var ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      var dateStr = hours.toString()
-        + ":" + date.getMinutes().toString()
-        + " " + ampm
-        + " " + date.getMonth().toString()
-        + "/" + date.getDate().toString()
-        + "/" + date.getFullYear().toString();
-      return <tr className="tx-row">
-        <td className="col-sm">{tx.transactionType}</td>
-        <td className="col-sm">{tx.value}</td>
-        <td className="col-sm">{tx.from}</td>
-        <td className="col-sm">{tx.to === undefined ? "No recipient" : tx.to}</td>
-        <td className="col-sm">{dateStr}</td>
-      </tr>
-    })
+  txRows = this.txMock.map(function (tx) {
+    const date = new Date(tx.timestamp);
+    let hours = date.getHours();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 ? hours : 12;
+    const dateStr = hours.toString()
+      + ":" + date.getMinutes().toString()
+      + " " + ampm
+      + " " + date.getMonth().toString()
+      + "/" + date.getDate().toString()
+      + "/" + date.getFullYear().toString();
+    return <tr className="tx-row">
+      <td className="col-sm">{tx.transactionType}</td>
+      <td className="col-sm">{tx.value}</td>
+      <td className="col-sm">{tx.from}</td>
+      <td className="col-sm">{tx.to === undefined ? "No recipient" : tx.to}</td>
+      <td className="col-sm">{dateStr}</td>
+    </tr>
+  });
 
+  render() {
     return (
-      <div className="row accounts-row">
-        <div>
-          <table className="pt-table pt-interactive accounts-table">
-            <thead>
-            <th className="col-sm"><h4>Transaction Type</h4></th>
-            <th className="col-sm"><h4>Value</h4></th>
-            <th className="col-sm"><h4>Sender</h4></th>
-            <th className="col-sm"><h4>Recipient</h4></th>
-            <th className="col-sm"><h4>Timestamp</h4></th>
-            </thead>
-
-            <tbody>
-            {txRows}
-            </tbody>
-          </table>
-        </div>
+      <div className="pt-card pt-elevation-2">
+        <table className="pt-table pt-interactive smd-full-width">
+          <thead>
+          <th className="col-sm"><h4>Transaction Type</h4></th>
+          <th className="col-sm"><h4>Value</h4></th>
+          <th className="col-sm"><h4>Sender</h4></th>
+          <th className="col-sm"><h4>Recipient</h4></th>
+          <th className="col-sm"><h4>Timestamp</h4></th>
+          </thead>
+          <tbody>
+          {this.txRows}
+          </tbody>
+        </table>
       </div>
     );
   }
