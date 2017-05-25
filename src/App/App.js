@@ -13,7 +13,7 @@ class App extends Component {
   render() {
     return (
       <div className="App" id="outer-container">
-        <SideBar navLinksData={navLinksData} isOpen={ true } />
+        <SideBar navLinksData={navLinksData} />
         <main id="page-wrap">
           <MenuBar />
           {scenes}
