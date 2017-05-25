@@ -5,16 +5,18 @@ import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import 'bootstrap/dist/css/bootstrap.css'
 
-import Sidebar from '../components/Sidebar'
-import {routes, navLinksData} from '../routes';
+import MenuBar from '../components/MenuBar'
+import SideBar from '../components/SideBar'
+import {routes as scenes, navLinksData} from '../routes';
 
 class App extends Component {
   render() {
     return (
       <div className="App" id="outer-container">
-        <Sidebar navLinksData={navLinksData} />
+        <SideBar navLinksData={navLinksData} isOpen={ true } />
         <main id="page-wrap">
-          {routes}
+          <MenuBar />
+          {scenes}
         </main>
       </div>
     );

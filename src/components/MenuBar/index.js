@@ -1,44 +1,41 @@
-import React, { Component } from 'react';
-import {decorator as reduxBurgerMenu} from 'redux-burger-menu';
-import { push as Menu } from 'react-burger-menu'
-import './menubar.css';
-import { NavLink } from 'react-router-dom';
+import React, {Component} from 'react';
+import { connect } from 'react-redux';
+
+import {action as toggleMenu} from 'redux-burger-menu';
 
 class MenuBar extends Component {
 
-  navLinksData = this.props.navLinksData;
+  openSidebar(e) {
+    e.stopPropagation();
+    this.props.dispatch(toggleMenu(true));
+  }
 
   render() {
     return (
-        <nav className="pt-navbar pt-dark">
-            <div className="pt-navbar-group pt-align-left">
-                {/* //FIXME Fix sandwich menu needs to go into nav bar*/}
-                <div id="outer-container">
-                    <span className="pt-icon-standard pt-icon-menu"/>
-                    {/*<Menu pageWrapId={ "page-wrap" } outerContainerId={ "outer-container" }>*/}
-                        {/*{*/}
-                            {/*this.navLinksData.map(*/}
-                                {/*data =>*/}
-                                    {/*<NavLink key={data.id} id={data.id} className="menu-item" to={data.path}>{data.label}</NavLink>*/}
-                            {/*)*/}
-                        {/*}*/}
-                    {/*</Menu>*/}
-                </div>
-            </div>
-            <div className="pt-navbar-group pt-align-left">
-                <div className="pt-navbar-heading">Strato Management Dashboard</div>
-            </div>
-            <div className="pt-navbar-group pt-align-right">
-                <a href="/" className="pt-button pt-minimal pt-icon-home">Home</a>
-                <a href="/accounts" className="pt-button pt-minimal pt-icon-document">Accounts</a>
-                <span className="pt-navbar-divider" />
-                <a className="pt-button pt-minimal pt-icon-user" />
-                <a className="pt-button pt-minimal pt-icon-notifications" />
-                <a className="pt-button pt-minimal pt-icon-cog" />
-            </div>
-        </nav>
+      <nav className="pt-navbar pt-dark">
+        <div className="pt-navbar-group pt-align-left">
+          <div id="outer-container">
+            <span className="pt-icon-standard pt-icon-menu" onClick={(e) => this.openSidebar(e)} />
+          </div>
+        </div>
+        <div className="pt-navbar-group pt-align-left">
+          <div className="pt-navbar-heading">Strato Management Dashboard</div>
+        </div>
+        <div className="pt-navbar-group pt-align-right">
+          <span className="pt-navbar-divider"/>
+          <a className="pt-button pt-minimal pt-icon-user"/>
+          <a className="pt-button pt-minimal pt-icon-notifications"/>
+          <a className="pt-button pt-minimal pt-icon-cog"/>
+        </div>
+      </nav>
     );
   }
 }
 
-export default reduxBurgerMenu(MenuBar);
+function mapStateToProps(state) {
+  return {
+    sidebarIsOpen: state.burgerMenu.isOpen,
+  };
+}
+
+export default connect(mapStateToProps)(MenuBar);
