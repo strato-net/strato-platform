@@ -1,9 +1,12 @@
 import React, { Component } from 'react';
+import TxList from "../TxList/index";
 
 class Dashboard extends Component {
   render() {
     return (
-      <div>Dashboard layout and content here</div>
+      <div className="container">
+        <TxList/>
+      </div>
     );
   }
 }
