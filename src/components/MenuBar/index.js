@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import {decorator as reduxBurgerMenu} from 'redux-burger-menu';
 import { push as Menu } from 'react-burger-menu'
-import './sidebar.css';
+import './menubar.css';
 import { NavLink } from 'react-router-dom';
 
 class MenuBar extends Component {
@@ -41,4 +41,4 @@ class MenuBar extends Component {
   }
 }
 
-export default reduxBurgerMenu(Menubar);
+export default reduxBurgerMenu(MenuBar);
