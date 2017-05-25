@@ -82,10 +82,10 @@ class Accounts extends Component {
                     <div>
                         <table className="pt-table pt-interactive accounts-table">
                             <thead>
-                            <th className="col-sm-4"><h4>Account</h4></th>
-                            <th className="col-sm-4"><h4>Username</h4></th>
-                            <th className="col-sm-4"><h4>Balance</h4></th>
-                            <th className="col-sm-4"><h4>User Activity</h4></th>
+                            <th className="col-sm-3"><h4>Account</h4></th>
+                            <th className="col-sm-3"><h4>Username</h4></th>
+                            <th className="col-sm-3"><h4>Balance</h4></th>
+                            <th className="col-sm-3"><h4>User Activity</h4></th>
                             </thead>
 
                             <tbody>
