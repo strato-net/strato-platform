@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import { connect } from 'react-redux';
-
 import {action as toggleMenu} from 'redux-burger-menu';
+import './menubar.css';
 
 class MenuBar extends Component {
 
@@ -15,11 +15,11 @@ class MenuBar extends Component {
       <nav className="pt-navbar pt-dark">
         <div className="pt-navbar-group pt-align-left">
           <div id="outer-container">
-            <span className="pt-icon-standard pt-icon-menu" onClick={(e) => this.openSidebar(e)} />
+            <span className="pt-icon-large pt-icon-menu smd-sidebar-button" onClick={(e) => this.openSidebar(e)} />
           </div>
         </div>
         <div className="pt-navbar-group pt-align-left">
-          <div className="pt-navbar-heading">Strato Management Dashboard</div>
+          <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
           <span className="pt-navbar-divider"/>
