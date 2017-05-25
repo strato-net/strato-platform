@@ -89,36 +89,42 @@ class TxList extends Component {
     }
   ];
 
-  txRows = this.txMock.map(function (tx) {
-    const date = new Date(tx.timestamp);
-    let hours = date.getHours();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 ? hours : 12;
-    const dateStr = hours.toString()
-      + ":" + date.getMinutes().toString()
-      + " " + ampm
-      + " " + date.getMonth().toString()
-      + "/" + date.getDate().toString()
-      + "/" + date.getFullYear().toString();
-    return <tr className="tx-row">
-      <td className="col-sm">{tx.transactionType}</td>
-      <td className="col-sm">{tx.value}</td>
-      <td className="col-sm">{tx.from}</td>
-      <td className="col-sm">{tx.to === undefined ? "No recipient" : tx.to}</td>
-      <td className="col-sm">{dateStr}</td>
-    </tr>
-  });
+  txRows = this.txMock.map(
+    function (tx, i) {
+      const date = new Date(tx.timestamp);
+      let hours = date.getHours();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 ? hours : 12;
+      const dateStr = hours.toString()
+        + ":" + date.getMinutes().toString()
+        + " " + ampm
+        + " " + date.getMonth().toString()
+        + "/" + date.getDate().toString()
+        + "/" + date.getFullYear().toString();
+      return (
+        <tr className="tx-row" key={i}>
+          <td className="col-sm">{tx.transactionType}</td>
+          <td className="col-sm">{tx.value}</td>
+          <td className="col-sm">{tx.from}</td>
+          <td className="col-sm">{tx.to === undefined ? "No recipient" : tx.to}</td>
+          <td className="col-sm">{dateStr}</td>
+        </tr>
+      )
+    }
+  );
 
   render() {
     return (
       <div className="pt-card pt-elevation-2">
         <table className="pt-table pt-interactive smd-full-width">
           <thead>
-          <th className="col-sm"><h4>Transaction Type</h4></th>
-          <th className="col-sm"><h4>Value</h4></th>
-          <th className="col-sm"><h4>Sender</h4></th>
-          <th className="col-sm"><h4>Recipient</h4></th>
-          <th className="col-sm"><h4>Timestamp</h4></th>
+            <tr>
+              <th className="col-sm"><h4>Transaction Type</h4></th>
+              <th className="col-sm"><h4>Value</h4></th>
+              <th className="col-sm"><h4>Sender</h4></th>
+              <th className="col-sm"><h4>Recipient</h4></th>
+              <th className="col-sm"><h4>Timestamp</h4></th>
+            </tr>
           </thead>
           <tbody>
           {this.txRows}

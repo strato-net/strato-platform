@@ -18,10 +18,10 @@ import {reducer as burgerMenu} from 'redux-burger-menu';
 import App from "./App/App.js";
 
 
-import difficultyReducer from './components/Difficulty/difficulty.reducer'
+import blockDataReducer from './components/BlockData/block-data.reducer'
 import transactionsReducer from './components/Transactions/transactions.reducer'
 
-import watchFetchDifficulty from './components/Difficulty/difficulty.saga'
+import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/Transactions/transactions.saga'
 
 const rootReducer = combineReducers({
@@ -29,14 +29,14 @@ const rootReducer = combineReducers({
   routing: routerReducer,
   // YOUR REDUCERS HERE
   burgerMenu,
-  difficulty: difficultyReducer,
+  blockData: blockDataReducer,
   transactions: transactionsReducer,
 });
 
 const rootSaga = function* startForeman() {
     yield [
         // YOUR SAGAS HERE
-        fork(watchFetchDifficulty),
+        fork(watchFetchBlockData),
         fork(watchFetchTx),
     ]
 };
@@ -51,7 +51,7 @@ const store = createStore(
 );
 
 // then run the saga
-sagaMiddleware.run(rootSaga)
+sagaMiddleware.run(rootSaga);
 
 ReactDOM.render(
     <Provider store={store}>

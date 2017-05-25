@@ -1,29 +1,29 @@
 import {
-  FETCH_DIFFICULTY,
-  FETCH_DIFFICULTY_SUCCESS,
-  FETCH_DIFFICULTY_FAILURE,
-} from './difficulty.actions';
+  FETCH_BLOCK_DATA,
+  FETCH_BLOCK_DATA_SUCCESS,
+  FETCH_BLOCK_DATA_FAILURE,
+} from './block-data.actions';
 
 const initialState = {
-  difficulty: '',
+  blockData: '',
   error: null,
 };
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_DIFFICULTY:
+    case FETCH_BLOCK_DATA:
       return {
-        difficulty: state.difficulty,
+        blockData: state.blockData,
         error: null,
       };
-    case FETCH_DIFFICULTY_SUCCESS:
+    case FETCH_BLOCK_DATA_SUCCESS:
       return {
-        difficulty: action.difficulty,
+        blockData: action.blockData,
         error: null,
       };
-    case FETCH_DIFFICULTY_FAILURE:
+    case FETCH_BLOCK_DATA_FAILURE:
       return {
-        difficulty: state.difficulty,
+        blockData: state.blockData,
         error: action.error
       };
     default:

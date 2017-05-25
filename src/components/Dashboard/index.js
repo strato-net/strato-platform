@@ -2,13 +2,13 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import TxList from "../TxList/index";
-import { fetchDifficulty } from '../Difficulty/difficulty.actions';
+import { fetchBlockData } from '../BlockData/block-data.actions';
 import NumberCard from '../NumberCard';
 
 class Dashboard extends Component {
 
   componentDidMount() { //FIXME Put fetchDifficulty on a timer?
-    this.props.fetchDifficulty();
+    this.props.fetchBlockData();
   }
 
   render() {
@@ -21,7 +21,16 @@ class Dashboard extends Component {
         </div>
         <div className="row smd-content-row">
           <div className="col-sm-3">
-            <NumberCard number={this.props.difficulty} description="Difficulty" />
+            <NumberCard number={this.props.blockData['difficulty']} description="Difficulty" />
+          </div>
+          <div className="col-sm-3">
+            <NumberCard number={this.props.blockData['number']} description="Current block #" />
+          </div>
+          <div className="col-sm-3">
+            <NumberCard number={this.props.blockData['nonce']} description="Nonce" />
+          </div>
+          <div className="col-sm-3">
+            <NumberCard number={this.props.blockData['gasLimit']} description="Gas Limit" longNumber />
           </div>
         </div>
         <div className="row smd-content-row">
@@ -36,8 +45,8 @@ class Dashboard extends Component {
 
 function mapStateToProps(state) {
   return {
-    difficulty: state.difficulty.difficulty,
+    blockData: state.blockData.blockData,
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchDifficulty })(Dashboard))
+export default withRouter(connect(mapStateToProps, { fetchBlockData })(Dashboard))
