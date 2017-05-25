@@ -26,12 +26,12 @@ import watchFetchDifficulty from './components/Difficulty/difficulty.saga'
 import watchFetchTx from './components/Transactions/transactions.saga'
 
 const rootReducer = combineReducers({
-    form: formReducer,
-    routing: routerReducer,
-    // YOUR REDUCERS HERE
-    difficulty: difficultyReducer,
-    transactions: transactionsReducer,
-    burgerMenu
+  form: formReducer,
+  routing: routerReducer,
+  // YOUR REDUCERS HERE
+  burgerMenu,
+  difficulty: difficultyReducer,
+  transactions: transactionsReducer,
 });
 
 const rootSaga = function* startForeman() {
