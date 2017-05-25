@@ -308,8 +308,8 @@ postUsersContractMethod
   (PostUsersContractMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabiByMetadataId cmId
-
+    xabi <- getContractXabiByMetadataId cmId
+    let eitherErrorOrContract = xAbiToContract xabi
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
@@ -337,9 +337,7 @@ postUsersContractMethod
     orderedResultTypes <-
       for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
         either (throwError . UserError . Text.pack) return $
-          xabiTypeToType
-              (error "missing typedefs in postUsersContractMethod")
-              indexedTypeType
+          xabiTypeToType xabi indexedTypeType
 
     txResult <- pollTxResult hash
 
