@@ -207,11 +207,11 @@ postUsersContractMethodList
   -> PostMethodListRequest
   -> Bloc [PostUsersContractMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-  txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
+  txsFuncIdsXabis <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
     functionId <- getFunctionId cmId methodcallMethodName
-
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+    xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+    let eitherErrorOrContract = xAbiToContract xabi
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
@@ -236,8 +236,8 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       (sel <> argsBin)
       nonceIncr
     -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-    return (tx,functionId)
-  let (txs,funcIds) = unzip txsFuncIds
+    return (tx,functionId,xabi)
+  let (txs,funcIds,xabis) = unzip3 txsFuncIdsXabis
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
   if postmethodlistrequestResolve
@@ -247,12 +247,12 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
     let zipped = resultJoiner <$> zip funcIds hashes
         resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
 
-    for zipped $ \(funcId,txResult) -> do
+    for (zip zipped xabis) $ \((funcId,txResult),xabi) -> do
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
       let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
       orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
                               either (throwError . UserError . Text.pack) return $
-                                xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
+                                xabiTypeToType xabi indexedTypeType
       let txResp = transactionresultResponse txResult
 
       -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
@@ -279,7 +279,8 @@ postUsersContractMethod
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
 
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabiByMetadataId cmId
+    xabi <- getContractXabiByMetadataId cmId
+    let eitherErrorOrContract = xAbiToContract xabi
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
@@ -308,9 +309,7 @@ postUsersContractMethod
     orderedResultTypes <-
       for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
         either (throwError . UserError . Text.pack) return $
-          xabiTypeToType
-              (error "missing typedefs in postUsersContractMethod")
-              indexedTypeType
+          xabiTypeToType xabi indexedTypeType
 
     txResult <- pollTxResult hash
 
