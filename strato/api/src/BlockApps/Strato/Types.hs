@@ -7,6 +7,8 @@
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeApplications      #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module BlockApps.Strato.Types
   ( Hex (..)
   , Strung (..)
@@ -36,7 +38,7 @@ module BlockApps.Strato.Types
   ) where
 
 import           Control.Applicative
-import           Control.Lens                 (mapped, (&), (?~))
+import           Control.Lens                 (mapped, (&), (?~), (.~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -53,6 +55,7 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Data.Time
 import           Data.Word
+import           Data.Proxy
 import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric
@@ -95,6 +98,9 @@ instance (Integral n, Show n) => ToHttpApiData (Hex n) where
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
+instance ToSchema (Hex Word160) where
+  declareNamedSchema = const . pure $ named "hex word160" binarySchema
+
 instance ToSchema (Hex Word256) where
   declareNamedSchema = const . pure $ named "hex word256" binarySchema
 
@@ -114,8 +120,46 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
       Nothing -> fail $ "cannot decode Strung: " ++ string
       Just y  -> return $ Strung y
 
-instance ToSchema (Strung Natural) where
-  declareNamedSchema = const . pure $ named "Strung Natural"  $ sketchSchema (Strung (8 :: Natural))
+instance ToSchema x => ToSchema (WithNext x)
+instance ToSchema x => ToSchema (Strung x)
+instance ToSchema x => ToSchema (NonEmpty x)
+--instance ToSchema x => ToSchema (Generic x)
+
+instance ToSchema Transaction
+instance ToSchema TransactionType
+instance ToSchema Block
+instance ToSchema BlockData
+instance ToSchema Account
+instance ToSchema Difficulty
+instance ToSchema TxCount
+instance ToSchema Storage
+instance ToSchema Addresses
+instance ToSchema Word160 where
+  declareNamedSchema = const . pure $ named "Word160" $ binarySchema 
+-- add min max
+instance ToSchema Src where
+  declareNamedSchema _ = do
+             _ <- declareSchemaRef (Proxy :: Proxy Text)
+             return $ NamedSchema (Just "Post Users Contract Request")
+                ( mempty
+                & type_ .~ SwaggerString
+                )
+
+instance ToSchema SolcResponse
+instance ToSchema AbiBin
+instance ToSchema ExtabiResponse
+
+instance ToParamSchema Keccak256 where
+  toParamSchema _ = mempty & type_ .~ SwaggerString
+
+instance ToSchema Natural where
+  declareNamedSchema = const . pure $ named "Natural" $ sketchSchema (8 :: Natural)
+
+instance ToParamSchema Natural where
+  toParamSchema _ = mempty & type_ .~ SwaggerInteger
+
+-- instance ToSchema (Strung Natural) where
+--   declareNamedSchema = const . pure $ named "Strung Natural"  $ sketchSchema (Strung (8 :: Natural))
 
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
@@ -304,7 +348,6 @@ instance FromJSON Account where
 
 instance ToJSON Account where
   toJSON = genericToJSON (aesonPrefix camelCase)
-
 
 newtype Difficulty = Difficulty { unDifficulty :: Integer }
   deriving (Eq, Show, Generic)

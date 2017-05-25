@@ -1,7 +1,10 @@
 {-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
-module BlockApps.Strato.API where
+module BlockApps.Strato.API 
+   ( API 
+   )
+where
 
 import           Data.Text              (Text)
 import           Numeric.Natural
