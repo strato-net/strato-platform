@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {Button, Table, Cell, Column} from '@blueprintjs/core';
+import { Button, ProgressBar } from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
@@ -11,37 +11,41 @@ class Accounts extends Component {
     render() {
         let data = [
             {
-                "account": "0xC1f16c418B66A5aE47A5820e1fdb947A77f29531",
+                "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
                 "username": "Alice",
-                "balance": "12",
+                "balance": "1234",
             }, {
-                "account": "0xC1f16c418B66A5aE47A5820e1fdb947A77f29531",
+                "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
                 "username": "Bob",
-                "balance": "23",
+                "balance": "2345",
             }, {
-                "account": "0xC1f16c418B66A5aE47A5820e1fdb947A77f29531",
+                "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
                 "username": "Charlie",
-                "balance": "34",
+                "balance": "3456",
             }, {
-                "account": "0xC1f16c418B66A5aE47A5820e1fdb947A77f29531",
+                "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
                 "username": "Desiree",
-                "balance": "45",
+                "balance": "4567",
             }, {
-                "account": "0xC1f16c418B66A5aE47A5820e1fdb947A77f29531",
+                "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
                 "username": "Edward",
-                "balance": "56",
+                "balance": "5689",
             }];
 
+        //1000000000000000000 wei per ether
         let tableRows = data.map(function (val, i) {
             return <tr>
-                <td className="col-sm-4">
+                <td className="col-sm-3">
                     {val.account}
                 </td>
-                <td className="col-sm-4">
+                <td className="col-sm-3">
                     {val.username}
                 </td>
-                <td className="col-sm-4">
-                    {val.balance}
+                <td className="col-sm-3">
+                    {val.balance} wei
+                </td>
+                <td className="col-sm-3">
+                    <ProgressBar className="pt-intent-primary" value={Math.random()}/>
                 </td>
             </tr>
         });
@@ -50,9 +54,14 @@ class Accounts extends Component {
 
         return (
             <div className="container account-container pt-card pt-elevation-1">
-                <div className="row accounts-row justify-content-left">
-                    <div className="col-sm">
-                        <h2>Accounts Tab</h2>
+                <div className="row accounts-row">
+                    <div className="col-sm-9 text-left">
+                        <h2 style={{"margin":"0px"}}>Accounts Tab</h2>
+                    </div>
+                    <div className="col-sm-3 text-right">
+                        {/* //FIXME Align the button to the Accounts Tab h2
+                        * align it to the right edge as well*/}
+                        <Button style={{"margin":"1.5px"}} className="pt-intent-primary pt-icon-add">Create User</Button>
                     </div>
                 </div>
                 <div className="row accounts-row">
@@ -70,18 +79,13 @@ class Accounts extends Component {
                     </div>
                 </div>
                 <div className="row accounts-row">
-                    <div className="col-sm-9"></div>
-                    <div className="col-sm-3 center-block text-center">
-                        <Button className="pt-intent-primary pt-large pt-icon-add">Create User</Button>
-                    </div>
-                </div>
-                <div className="row accounts-row">
                     <div>
-                        <table className="pt-table accounts-table">
+                        <table className="pt-table pt-interactive accounts-table">
                             <thead>
                             <th className="col-sm-4"><h4>Account</h4></th>
                             <th className="col-sm-4"><h4>Username</h4></th>
                             <th className="col-sm-4"><h4>Balance</h4></th>
+                            <th className="col-sm-4"><h4>User Activity</h4></th>
                             </thead>
 
                             <tbody>
