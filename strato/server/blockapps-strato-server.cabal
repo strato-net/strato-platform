@@ -20,6 +20,7 @@ executable blockapps-strato-server
                 , lens
                 , servant-server
                 , servant-swagger
+                , wai-cors
                 , warp
   build-depends: base
     , blockapps-ethereum

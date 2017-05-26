@@ -123,9 +123,12 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
 instance ToSchema x => ToSchema (WithNext x)
 instance ToSchema x => ToSchema (Strung x)
 instance ToSchema x => ToSchema (NonEmpty x)
---instance ToSchema x => ToSchema (Generic x)
 
-instance ToSchema Transaction
+instance ToSchema Transaction where
+  declareNamedSchema _ = do
+             _ <- declareSchemaRef (Proxy :: Proxy Transaction)
+             return $ NamedSchema (Just "Get transactions") mempty 
+
 instance ToSchema TransactionType
 instance ToSchema Block
 instance ToSchema BlockData
@@ -141,9 +144,9 @@ instance ToSchema Src where
   declareNamedSchema _ = do
              _ <- declareSchemaRef (Proxy :: Proxy Text)
              return $ NamedSchema (Just "Post Users Contract Request")
-                ( mempty
-                & type_ .~ SwaggerString
-                )
+                 ( mempty
+                 & type_ .~ SwaggerString
+                 )
 
 instance ToSchema SolcResponse
 instance ToSchema AbiBin
@@ -157,9 +160,6 @@ instance ToSchema Natural where
 
 instance ToParamSchema Natural where
   toParamSchema _ = mempty & type_ .~ SwaggerInteger
-
--- instance ToSchema (Strung Natural) where
---   declareNamedSchema = const . pure $ named "Strung Natural"  $ sketchSchema (Strung (8 :: Natural))
 
 instance Show x => ToJSON (Strung x) where
   toJSON = toJSON . show . unStrung
@@ -189,7 +189,7 @@ instance FromJSON x => FromJSON (WithNext x) where
 instance ToJSON x => ToJSON (WithNext x) where
   toJSON (WithNext x next) = case toJSON x of
     Object obj -> Object (HashMap.insert "next" (toJSON next) obj)
-    val        -> object [ "next" .= next, "without_next" .= val ]
+    val        -> val -- object [ "next" .= next, "without_next" .= val ]
 
 data TransactionType
   = Contract

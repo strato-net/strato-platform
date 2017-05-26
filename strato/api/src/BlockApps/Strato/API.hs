@@ -43,7 +43,7 @@ type API =
     :> Get '[JSON] [TransactionResult]
   :<|> "transactionResult"
     :> "batch"
-    :> ReqBody '[JSON] [Keccak256]
+    :> ReqBody '[PlainText] [Keccak256]
     :> Post '[JSON] BatchTransactionResult
   :<|> "block"
     :> QueryParam "number" Natural
