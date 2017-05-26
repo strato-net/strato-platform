@@ -1,15 +1,14 @@
 {-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
-module BlockApps.Strato.API 
-   ( API 
+module BlockApps.Strato.API
+   ( API
    )
 where
 
+import           BlockApps.Strato.Types
 import           Numeric.Natural
 import           Servant.API
-
-import           BlockApps.Strato.Types
 
 type API =
   "transaction"
@@ -86,7 +85,7 @@ type API =
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
-    :> Post '[PlainText] FaucetResponse 
+    :> Post '[PlainText] FaucetResponse
   :<|> "solc"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] SolcResponse

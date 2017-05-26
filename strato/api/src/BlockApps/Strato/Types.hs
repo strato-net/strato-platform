@@ -5,8 +5,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -39,7 +39,7 @@ module BlockApps.Strato.Types
   ) where
 
 import           Control.Applicative
-import           Control.Lens                 (mapped, (&), (?~), (.~))
+import           Control.Lens                 (mapped, (&), (.~), (?~))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
@@ -49,13 +49,13 @@ import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
 import           Data.Map.Strict              (Map)
 import           Data.Maybe
+import           Data.Proxy
 import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
 import           Data.Time
 import           Data.Word
-import           Data.Proxy
 import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric
@@ -68,13 +68,12 @@ import           Text.Read
 import           Text.Read.Lex
 import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
 
-import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
-                                               addressString, keccak256,
-                                               keccak256lazy, stringAddress)
+import           BlockApps.Ethereum           (Address (..), Keccak256 (..), addressString, keccak256, keccak256lazy,
+                                               stringAddress)
 
 import           BlockApps.Solidity.Xabi
 
-newtype FaucetResponse = FaucetResponse String deriving (Eq, Generic)
+newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic)
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 
@@ -141,12 +140,12 @@ instance ToSchema Transaction where
     where
       ex :: Transaction
       ex  = Transaction
-          { transactionTransactionType = Transfer 
+          { transactionTransactionType = Transfer
           , transactionHash            = keccak256 "989ad6524e83e1a38b485bb898d27abbac65fc33905c3d3a2fd41c5bb91c3fc8"
           , transactionGasLimit        = Strung 90000000
           , transactionCodeOrData      = Just ""
           , transactionNonce           = Strung 123
-          , transactionGasPrice        = Strung 50000000000 
+          , transactionGasPrice        = Strung 50000000000
           , transactionTo              = Just (Address 0xdeadbeef)
           , transactionFrom            = Address 0xabba
           , transactionValue           = Strung 154
@@ -156,7 +155,7 @@ instance ToSchema Transaction where
           , transactionS               = Hex 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
           , transactionV               = Hex 0x1c
           , transactionTimestamp       = Just (Strung (UTCTime (fromGregorian 2017 5 26) (secondsToDiffTime 123455)))
-          , transactionOrigin          = "API" 
+          , transactionOrigin          = "API"
           }
 
 instance ToSchema TransactionType
@@ -169,21 +168,21 @@ instance ToSchema Account where
     where
       ex :: Account
       ex  = Account
-          { accountAddress        = Address 0xdeadbeef 
+          { accountAddress        = Address 0xdeadbeef
           , accountNonce          = Strung 42
           , accountBalance        = Strung 123
-          , accountContractRoot   = keccak256 "123" 
+          , accountContractRoot   = keccak256 "123"
           , accountKind           = "AddressStateRef"
           , accountCode           = "60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056"
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
           , accountLatestBlockNum = 23
           }
- 
+
 instance ToSchema Difficulty
 instance ToSchema TxCount
 instance ToSchema Storage
 instance ToSchema Word160 where
-  declareNamedSchema = const . pure $ named "Word160" $ binarySchema 
+  declareNamedSchema = const . pure $ named "Word160" $ binarySchema
 -- add min max
 instance ToSchema Src where
   declareNamedSchema _ = do
@@ -374,7 +373,7 @@ instance ToJSON Block where
 
 data Account = Account
   { accountAddress        :: Address
-  , accountNonce          :: Strung Natural 
+  , accountNonce          :: Strung Natural
   , accountKind           :: Text
   , accountBalance        :: Strung Natural
   , accountContractRoot   :: Keccak256
