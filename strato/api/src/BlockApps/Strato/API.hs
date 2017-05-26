@@ -6,7 +6,6 @@ module BlockApps.Strato.API
    )
 where
 
-import           Data.Text              (Text)
 import           Numeric.Natural
 import           Servant.API
 
@@ -87,10 +86,7 @@ type API =
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
-    :> Post '[PlainText] Text
-  :<|> "faucet"
-    :> ReqBody '[FormUrlEncoded] Addresses
-    :> Post '[PlainText] Text
+    :> Post '[PlainText] FaucetResponse 
   :<|> "solc"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] SolcResponse

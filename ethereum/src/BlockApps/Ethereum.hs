@@ -151,7 +151,7 @@ instance ToSchema Address where
     NamedSchema (Just "Address")
       ( mempty
         & type_ .~ SwaggerString
-        & example ?~ toJSON (Address 0xdeadbeef)
+        & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
         & description ?~ "Ethereum Address, 20 byte hex encoded string" )
 
 deriveAddress :: PubKey -> Address

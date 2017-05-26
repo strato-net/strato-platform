@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -15,9 +16,9 @@ module BlockApps.Strato.Types
   , Address (..)
   , addressString
   , stringAddress
-  , Addresses (..)
   , Keccak256 (..)
   , WithNext (..)
+  , FaucetResponse(..)
   , TransactionType (..)
   , Transaction (..)
   , TransactionResult (..)
@@ -43,7 +44,6 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
-import           Data.Foldable
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
@@ -69,9 +69,12 @@ import           Text.Read.Lex
 import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
 
 import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
-                                               Nonce, addressString, keccak256,
+                                               addressString, keccak256,
                                                keccak256lazy, stringAddress)
+
 import           BlockApps.Solidity.Xabi
+
+newtype FaucetResponse = FaucetResponse String deriving (Eq, Generic)
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 
@@ -120,23 +123,65 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
       Nothing -> fail $ "cannot decode Strung: " ++ string
       Just y  -> return $ Strung y
 
-instance ToSchema x => ToSchema (WithNext x)
+instance ToSchema x => ToSchema (WithNext x) where
+  declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
+
 instance ToSchema x => ToSchema (Strung x)
 instance ToSchema x => ToSchema (NonEmpty x)
 
+instance ToSchema FaucetResponse where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "A faucet response url"
+    & mapped.schema.example     ?~ "/account?address=00000000000000000000000000000000deadbeef"
+
 instance ToSchema Transaction where
-  declareNamedSchema _ = do
-             _ <- declareSchemaRef (Proxy :: Proxy Transaction)
-             return $ NamedSchema (Just "Get transactions") mempty 
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "A transaction"
+    & mapped.schema.example     ?~ toJSON ex
+    where
+      ex :: Transaction
+      ex  = Transaction
+          { transactionTransactionType = Transfer 
+          , transactionHash            = keccak256 "989ad6524e83e1a38b485bb898d27abbac65fc33905c3d3a2fd41c5bb91c3fc8"
+          , transactionGasLimit        = Strung 90000000
+          , transactionCodeOrData      = Just ""
+          , transactionNonce           = Strung 123
+          , transactionGasPrice        = Strung 50000000000 
+          , transactionTo              = Just (Address 0xdeadbeef)
+          , transactionFrom            = Address 0xabba
+          , transactionValue           = Strung 154
+          , transactionFromBlock       = Just . Strung $ True
+          , transactionBlockNumber     = Just 342
+          , transactionR               = Hex 0xa90ee66c8faf6ce19a5e0496fc809cc1d6984d8636afc9c8a8b2ac381cabc014
+          , transactionS               = Hex 0x5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+          , transactionV               = Hex 0x1c
+          , transactionTimestamp       = Just (Strung (UTCTime (fromGregorian 2017 5 26) (secondsToDiffTime 123455)))
+          , transactionOrigin          = "API" 
+          }
 
 instance ToSchema TransactionType
 instance ToSchema Block
 instance ToSchema BlockData
-instance ToSchema Account
+instance ToSchema Account where
+  declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
+    & mapped.schema.description ?~ "An account"
+    & mapped.schema.example     ?~ toJSON ex
+    where
+      ex :: Account
+      ex  = Account
+          { accountAddress        = Address 0xdeadbeef 
+          , accountNonce          = Strung 42
+          , accountBalance        = Strung 123
+          , accountContractRoot   = keccak256 "123" 
+          , accountKind           = "AddressStateRef"
+          , accountCode           = "60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056"
+          , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
+          , accountLatestBlockNum = 23
+          }
+ 
 instance ToSchema Difficulty
 instance ToSchema TxCount
 instance ToSchema Storage
-instance ToSchema Addresses
 instance ToSchema Word160 where
   declareNamedSchema = const . pure $ named "Word160" $ binarySchema 
 -- add min max
@@ -167,17 +212,10 @@ instance Show x => ToJSON (Strung x) where
 instance Arbitrary x => Arbitrary (Strung x) where
   arbitrary = genericArbitrary uniform
 
-newtype Addresses = Addresses { unAddresses :: NonEmpty (Hex Word160) }
-  deriving (Eq, Show, Generic)
-
-instance ToForm Addresses where
-  toForm (Addresses hexes) = Form $ HashMap.singleton "addresses"
-    [Text.pack . show . map (\(Hex n) -> showHex n "") $ toList hexes]
-
 data WithNext x = WithNext
   { withoutNext :: x
   , next        :: Text
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Show)
 
 instance FromJSON x => FromJSON (WithNext x) where
   parseJSON (value@(Object obj)) = do
@@ -213,6 +251,7 @@ data Transaction = Transaction
   , transactionV               :: Hex Word8
   , transactionTimestamp       :: Maybe (Strung UTCTime)
   , transactionNonce           :: Strung Natural
+  , transactionOrigin          :: Text
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Transaction where
@@ -335,7 +374,8 @@ instance ToJSON Block where
 
 data Account = Account
   { accountAddress        :: Address
-  , accountNonce          :: Nonce
+  , accountNonce          :: Strung Natural 
+  , accountKind           :: Text
   , accountBalance        :: Strung Natural
   , accountContractRoot   :: Keccak256
   , accountCode           :: Text
@@ -387,7 +427,7 @@ instance ToForm Src where
   toForm (Src src) = Form $ HashMap.singleton "src" [src]
 
 newtype ExtabiResponse = ExtabiResponse { extabiresponseSrc :: Map Text Xabi }
-  deriving (Eq,Show,Generic)
+  deriving (Eq, Show, Generic)
 
 instance FromJSON ExtabiResponse where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
