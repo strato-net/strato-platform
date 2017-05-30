@@ -1,0 +1,23 @@
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+}
+
+.smd-full-width {
+  width: 100%;
+}
+
+.smd-pad-4 {
+  padding: 4px;
+}
+
+.smd-pad-8 {
+  padding: 8px;
+}
+
+.smd-pad-16 {
+  padding: 16px;
+}

@@ -1,7 +1,5 @@
-.smd-content-row {
-  margin: 23px 2%;
-}
+@import "../../node_modules/@blueprintjs/core/dist/variables.scss";
 
-.smd-full-width {
-  width: 100%;
+body {
+  background: $pt-dark-app-background-color !important;
 }

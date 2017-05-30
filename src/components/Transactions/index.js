@@ -23,7 +23,7 @@ class Transactions extends Component {
           + " " + date.getMonth().toString()
           + "/" + date.getDate().toString()
           + "/" + date.getFullYear().toString();
-        let txLink = "/transaction/" + tx.hash;
+
         return (
             <tr className="tx-row" key={i}>
               <td className="col-sm">{tx.transactionType}</td>
@@ -37,10 +37,10 @@ class Transactions extends Component {
     );
 
     return (
-        <div className="row smd-content-row">
+        <div className="row ">
           <div className="col-lg-12">
-            <div className="pt-card pt-elevation-2">
-              <table className="pt-table pt-interactive smd-full-width">
+            <div className="pt-card pt-dark pt-elevation-2">
+              <table className="pt-table pt-interactive ">
                 <thead>
                 <th className="col-sm"><h4>Transaction Type</h4></th>
                 <th className="col-sm"><h4>Value</h4></th>

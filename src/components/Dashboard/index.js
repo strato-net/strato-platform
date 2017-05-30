@@ -13,13 +13,14 @@ class Dashboard extends Component {
 
   render() {
     return (
-      <div>
-        <div className="row smd-content-row">
-          <div className="col-sm-9 text-left">
-            <h2 style={{margin: 0}}>Dashboard</h2>
+      <div className="container pt-dark">
+        <div className="row">
+          <div className="col-sm-12 text-left">
+            <h2>Dashboard</h2>
+            <hr />
           </div>
         </div>
-        <div className="row smd-content-row">
+        <div className="row ">
           <div className="col-sm-3">
             <NumberCard number={this.props.blockData['difficulty']} description="Difficulty" />
           </div>
@@ -33,8 +34,9 @@ class Dashboard extends Component {
             <NumberCard number={this.props.blockData['gasLimit']} description="Gas Limit" longNumber />
           </div>
         </div>
-        <div className="row smd-content-row">
+        <div className="row">
           <div className="col-lg-12">
+            <hr />
             <Transactions />
           </div>
         </div>
