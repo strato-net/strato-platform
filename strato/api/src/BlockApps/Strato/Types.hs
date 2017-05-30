@@ -214,7 +214,7 @@ instance Arbitrary x => Arbitrary (Strung x) where
 data WithNext x = WithNext
   { withoutNext :: x
   , next        :: Text
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
 
 instance FromJSON x => FromJSON (WithNext x) where
   parseJSON (value@(Object obj)) = do
