@@ -182,7 +182,7 @@ instance ToSchema Difficulty
 instance ToSchema TxCount
 instance ToSchema Storage
 instance ToSchema Word160 where
-  declareNamedSchema = const . pure $ named "Word160" $ binarySchema
+  declareNamedSchema = const . pure $ named "Word160" binarySchema
 -- add min max
 instance ToSchema Src where
   declareNamedSchema _ = do
