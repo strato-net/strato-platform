@@ -39,7 +39,8 @@ class SideBar extends Component {
               onClick={(e) => this.closeSidebar(e)}
               className="menu-item"
             >
-              {data.label}
+              <span className={data.icon+ " pt-icon-large"}> </span>
+              <span className="menu-item"> {data.label}</span>
             </NavLink>
           )
         }

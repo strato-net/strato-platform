@@ -12,7 +12,7 @@ export const routes = (
 
 export const navLinksData = (
   [
-    {path: '/', label: 'Dashboard', id: 'dashboard'},
-    {path: '/accounts', label: 'Accounts', id: 'accounts'},
+    {path: '/', label: 'Dashboard', id: 'dashboard', icon: "pt-icon-dashboard"},
+    {path: '/accounts', label: 'Accounts', id: 'accounts', icon: "pt-icon-people"},
   ]
 );
