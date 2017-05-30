@@ -27,29 +27,16 @@ class CreateContract extends Component {
                   Contract Name
                 </label>
                 <div className="pt-form-content">
-                  <input id="input" className="pt-input" style={{"width": "300px;"}} placeholder="Contract Name" type="text" dir="auto" />
+                  <input id="input" className="pt-input" style={{"width": "100%;"}} placeholder="Contract Name" type="text" dir="auto" />
                   <div className="pt-form-helper-text">Pick a name for your contract</div>
                 </div>
               </div>
 
               <div className="input">
-                <label className="pt-label" for="input">
-                  Contract Input
+                <label style={{"margin": "0.5%"}} className="pt-file-upload">
+                  <input type="file"/>
+                  <span className="pt-file-upload-input">Upload Smart Contract</span>
                 </label>
-                <div className="pt-form-content">
-                  <input id="input" className="pt-input" style={{"width": "300px;"}} placeholder="Contract Input" type="text" dir="auto" />
-                  <div className="pt-form-helper-text">Pick a blank</div>
-                </div>
-              </div>
-
-              <div className="input">
-                <label className="pt-label" for="input">
-                  Contract Input
-                </label>
-                <div className="pt-form-content">
-                  <input id="input" className="pt-input" style={{"width": "300px;"}} placeholder="Contract Input" type="text" dir="auto" />
-                  <div className="pt-form-helper-text">Pick a blank</div>
-                </div>
               </div>
             </div>
           </div>

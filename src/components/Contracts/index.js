@@ -29,13 +29,6 @@ class Contracts extends Component {
             </div>
           </div>
 
-          <div className="col-sm-6">
-            <label style={{"margin": "0.5%"}} className="pt-file-upload pt-fill">
-              <input type="file"/>
-              <span className="pt-file-upload-input">Upload Smart Contract</span>
-            </label>
-          </div>
-
         </div>
 
         <div className="row smd-content-row">
