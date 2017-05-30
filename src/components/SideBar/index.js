@@ -5,6 +5,10 @@ import './sidebar.css';
 import { NavLink } from 'react-router-dom';
 import {decorator as reduxBurgerMenu} from 'redux-burger-menu';
 import {action as toggleMenu} from 'redux-burger-menu';
+import { Colors} from '@blueprintjs/core';
+
+import 'normalize.css/normalize.css';
+import '@blueprintjs/core/dist/blueprint.css';
 
 
 const Menu = reduxBurgerMenu(preReduxMenu);
@@ -35,7 +39,8 @@ class SideBar extends Component {
               onClick={(e) => this.closeSidebar(e)}
               className="menu-item"
             >
-              {data.label}
+              <span className={data.icon+ " pt-icon-large"}> </span>
+              <span className="menu-item"> {data.label}</span>
             </NavLink>
           )
         }
