@@ -2,7 +2,7 @@ import React, {Component} from 'react';
 import {fetchAccounts} from './accounts.actions'
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
-import {Button, ProgressBar} from '@blueprintjs/core';
+import {ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import BigNumber from 'bignumber.js'
@@ -14,6 +14,9 @@ class Accounts extends Component {
   }
 
   getSum = (total, num) => {
+    if (num === undefined) {
+      return total;
+    }
     return total + new Number(num.balance);
   }
 
@@ -41,13 +44,22 @@ class Accounts extends Component {
   // }];
 
   render() {
-    const maxBlockNum = Math.max(...this.props.accounts.map(value => {return value.latestBlockNum}));
-    const rows = this.props.accounts.map(function(value, i) {
-      return (<tr key={i}>
-        <td className="col-sm-4">{value.address}</td>
-        <td className="col-sm-4">{new BigNumber(value.balance).div(1000000000000000000).toString()}</td>
-        <td className="col-sm-4"><ProgressBar className="pt-intent-primary" value={value.latestBlockNum/maxBlockNum}/></td>
-      </tr>)
+    const maxBlockNum = Math.max(...this.props.accounts.map(value => {
+      return value === undefined ? 1 : value.latestBlockNum
+    }));
+
+    var undef = 0;
+
+    const rows = this.props.accounts.map(function (value, i) {
+      if (value !== undefined) {
+        return (<tr key={i}>
+          <td className="col-sm-4">{value.address}</td>
+          <td className="col-sm-4">{new BigNumber(value.balance).div(1000000000000000000).toString()}</td>
+          <td className="col-sm-4"><ProgressBar className="pt-intent-primary"
+                                                value={value.latestBlockNum / maxBlockNum}/></td>
+        </tr>)
+      }
+      else {undef++;}
     });
 
     const totalEther = new BigNumber(this.props.accounts.reduce(this.getSum, 0)).div(1000000000000000000).toString();
@@ -70,7 +82,7 @@ class Accounts extends Component {
             <NumberCard number={234241} description="TX Volume"/>
           </div>
           <div className="col-sm-3">
-            <NumberCard number={this.props.accounts.length} description="Users"/>
+            <NumberCard number={this.props.accounts.length-undef} description="Users"/>
           </div>
           <div className="col-sm-3">
             <NumberCard number={123456} description="Arbitrary User Metric"/>
@@ -88,7 +100,7 @@ class Accounts extends Component {
                 </thead>
 
                 <tbody>
-                  {rows}
+                {rows}
                 </tbody>
               </table>
             </div>

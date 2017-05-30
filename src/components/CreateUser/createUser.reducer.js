@@ -1,6 +1,9 @@
 import {
   OPEN_OVERLAY,
-  CLOSE_OVERLAY
+  CLOSE_OVERLAY,
+  CREATE_USER,
+  CREATE_USER_FAILURE,
+  CREATE_USER_SUCCESS,
 } from './createUser.actions';
 
 const initialState = {
@@ -17,9 +20,26 @@ const reducer = function (state = initialState, action) {
       return {
         isOpen: false
       };
-    default:
-      return state;
-  }
+    case CREATE_USER:
+      return {
+        isOpen: true,
+        spinning: true
+      };
+    case CREATE_USER_FAILURE:
+      return {
+        isOpen: false,
+        spinning: false,
+        error: action.error
+      };
+    case CREATE_USER_SUCCESS:
+      return {
+        isOpen: false,
+        spinning: false,
+        key: action.key
+      };
+  default:
+  return state;
+}
 };
 
 export default reducer;
