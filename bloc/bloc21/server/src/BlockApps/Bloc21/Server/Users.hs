@@ -1,9 +1,9 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE LambdaCase          #-}
 
 module BlockApps.Bloc21.Server.Users where
 
@@ -11,23 +11,23 @@ import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
 import           Crypto.Secp256k1
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as ByteString
-import qualified Data.ByteString.Base16          as Base16
+import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString                   as ByteString
+import qualified Data.ByteString.Base16            as Base16
 import           Data.Foldable
-import           Data.Int                        (Int32)
-import           Data.List                       (sortOn)
-import           Data.Map.Strict                 (Map)
-import qualified Data.Map.Strict                 as Map
+import           Data.Int                          (Int32)
+import           Data.List                         (sortOn)
+import           Data.Map.Strict                   (Map)
+import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.RLP
-import           Data.Set                        (isSubsetOf)
-import           Data.Text                       (Text)
-import qualified Data.Text                       as Text
-import qualified Data.Text.Encoding              as Text
+import           Data.Set                          (isSubsetOf)
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
+import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
-import           Opaleye hiding (not)
+import           Opaleye                           hiding (not)
 
 import           BlockApps.Bloc21.API.Users
 import           BlockApps.Bloc21.API.Utils
@@ -45,10 +45,10 @@ import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
-import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types          hiding (Transaction (..))
+import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 
 getUsers :: Bloc [UserName]
@@ -117,7 +117,7 @@ postUsersContract userName addr
     case addressMaybe of
       Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-        stratoMsg -> throwError $ UserError stratoMsg
+        stratoMsg  -> throwError $ UserError stratoMsg
       Just addr' -> do
         void . blocModify $ \conn -> runInsert conn contractsInstanceTable
           ( Nothing
@@ -157,7 +157,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     case addressMaybe of
       Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-        stratoMsg -> throwError $ UserError stratoMsg
+        stratoMsg  -> throwError $ UserError stratoMsg
       Just addr' -> do
         void . blocModify $ \conn -> runInsert conn contractsInstanceTable
           ( Nothing
@@ -437,7 +437,7 @@ prepareTx userName password addr toAddr TxParams{..} value code nonceIncr = do
       accts <- blocStrato $ getAccountsFilter
         accountsFilterParams{qaAddress = Just addr}
       Nonce nonce <- case listToMaybe accts of
-        Nothing -> throwError . UserError $ "strato error: failed to find account"
+        Nothing   -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
       let newNonce = Nonce (nonce + fromIntegral nonceIncr)
       return $ prepareSignedTx sk addr UnsignedTransaction

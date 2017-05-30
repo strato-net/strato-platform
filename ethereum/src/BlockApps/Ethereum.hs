@@ -215,6 +215,12 @@ instance MimeUnrender PlainText Keccak256 where
 instance MimeRender PlainText Keccak256 where
   mimeRender _ = Lazy.fromStrict . Char8.pack . keccak256String
 
+instance MimeRender PlainText [Keccak256] where
+  mimeRender _ = encode
+
+instance MimeUnrender PlainText [Keccak256] where
+  mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
+
 instance Arbitrary Keccak256 where
   arbitrary = keccak256lazy . Binary.encode @ Integer <$> arbitrary
 

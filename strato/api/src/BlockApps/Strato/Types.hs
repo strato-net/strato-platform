@@ -68,8 +68,8 @@ import           Text.Read
 import           Text.Read.Lex
 import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
 
-import           BlockApps.Ethereum           (Address (..), Keccak256 (..), addressString, keccak256, keccak256lazy,
-                                               stringAddress)
+import           BlockApps.Ethereum           (Address (..), Keccak256 (..), Nonce (..), addressString, keccak256,
+                                               keccak256lazy, stringAddress)
 
 import           BlockApps.Solidity.Xabi
 
@@ -169,7 +169,7 @@ instance ToSchema Account where
       ex :: Account
       ex  = Account
           { accountAddress        = Address 0xdeadbeef
-          , accountNonce          = Strung 42
+          , accountNonce          = Nonce 42
           , accountBalance        = Strung 123
           , accountContractRoot   = keccak256 "123"
           , accountKind           = "AddressStateRef"
@@ -373,7 +373,7 @@ instance ToJSON Block where
 
 data Account = Account
   { accountAddress        :: Address
-  , accountNonce          :: Strung Natural
+  , accountNonce          :: Nonce --Strung Natural
   , accountKind           :: Text
   , accountBalance        :: Strung Natural
   , accountContractRoot   :: Keccak256
@@ -437,7 +437,16 @@ instance ToJSON ExtabiResponse where
 instance MimeUnrender PlainText ExtabiResponse where
   mimeUnrender _ = eitherDecode
 
+instance FromJSON FaucetResponse
+instance ToJSON FaucetResponse
+
 instance MimeRender PlainText ExtabiResponse where
+  mimeRender _ = encode
+
+instance MimeUnrender PlainText FaucetResponse where
+  mimeUnrender _ = eitherDecode
+
+instance MimeRender PlainText FaucetResponse where
   mimeRender _ = encode
 
 newtype SolcResponse = SolcResponse { solcresponseSrc :: Map Text AbiBin }
