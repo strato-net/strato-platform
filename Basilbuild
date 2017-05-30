@@ -26,37 +26,37 @@ BUILD_HASKELL=stack setup $(STACKFLAGS) && stack install $(STACKFLAGS) --local-b
 all: build_docker
 
 prebuild:
-	mkdir -p $(BASILWORK)
-	mkdir -p $(STACKWORK)
-	mkdir -p $(FAKEROOT)/usr/bin
-	mkdir -p $(BLOCHOME)
-	mkdir -p $(BUILDER_HOME)
-	mkdir -p /tmp/docker-dummy
+        mkdir -p $(BASILWORK)
+        mkdir -p $(STACKWORK)
+        mkdir -p $(FAKEROOT)/usr/bin
+        mkdir -p $(BLOCHOME)
+        mkdir -p $(BUILDER_HOME)
+        mkdir -p /tmp/docker-dummy
 
 build_haskell: build_buildbase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
-	$(BUILD_HASKELL)
+        $(BUILD_HASKELL)
 else
-	$(DOCKER_SHELL) "$(BUILD_HASKELL)"
+        $(DOCKER_SHELL) "$(BUILD_HASKELL)"
 endif
 
 build_deploybase: prebuild
-	cp -f Dockerfile.deploybase /tmp/docker-dummy
-	docker build -t $(DEPLOYBASE_NAME):latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
-	rm -f /tmp/docker-dummy/Dockerfile.deploybase
+        cp -f Dockerfile.deploybase /tmp/docker-dummy
+        docker build -t $(DEPLOYBASE_NAME):latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
+        rm -f /tmp/docker-dummy/Dockerfile.deploybase
 
 build_buildbase: build_deploybase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
-	echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
+        echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
 else
-	cp -f Dockerfile.buildbase /tmp/docker-dummy
-	docker build -t $(BUILDBASE_NAME):latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
-	rm -f /tmp/docker-dummy/Dockerfile.buildbase
+        cp -f Dockerfile.buildbase /tmp/docker-dummy
+        docker build -t $(BUILDBASE_NAME):latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+        rm -f /tmp/docker-dummy/Dockerfile.buildbase
 endif
 
 build_docker: build_deploybase build_haskell
-	cp -f Dockerfile $(FAKEROOT)
-	cp -f $(EXTRADEPS) $(BLOCHOME)
+        cp -f Dockerfile $(FAKEROOT)
+        cp -f $(EXTRADEPS) $(BLOCHOME)
         cp -f $(FAKEROOT)/usr/bin/blockapps-strato-server $(BLOCKHOME)
-	cp -f $(FAKEROOT)/usr/bin/blockapps-bloc $(BLOCHOME)
-	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
+        cp -f $(FAKEROOT)/usr/bin/blockapps-bloc $(BLOCHOME)
+        docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)
