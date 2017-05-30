@@ -21,6 +21,7 @@ import App from "./App/App.js";
 import blockDataReducer from './components/BlockData/block-data.reducer'
 import transactionsReducer from './components/Transactions/transactions.reducer'
 import createUserReducer from './components/CreateUser/createUser.reducer'
+import createContractReducer from './components/CreateContract/createContract.reducer'
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/Transactions/transactions.saga'
@@ -33,6 +34,7 @@ const rootReducer = combineReducers({
   blockData: blockDataReducer,
   transactions: transactionsReducer,
   createUser: createUserReducer,
+  createContract: createContractReducer,
 });
 
 const rootSaga = function* startForeman() {
