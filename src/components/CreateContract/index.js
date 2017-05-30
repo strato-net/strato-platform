@@ -28,7 +28,7 @@ class CreateContract extends Component {
                 </label>
                 <div className="pt-form-content">
                   <input id="input" className="pt-input" style={{"width": "300px;"}} placeholder="Contract Name" type="text" dir="auto" />
-                  <div className="pt-form-helper-text">Pick a username</div>
+                  <div className="pt-form-helper-text">Pick a name for your contract</div>
                 </div>
               </div>
 
@@ -38,7 +38,7 @@ class CreateContract extends Component {
                 </label>
                 <div className="pt-form-content">
                   <input id="input" className="pt-input" style={{"width": "300px;"}} placeholder="Contract Input" type="text" dir="auto" />
-                  <div className="pt-form-helper-text">Pick a password</div>
+                  <div className="pt-form-helper-text">Pick a blank</div>
                 </div>
               </div>
 
@@ -48,7 +48,7 @@ class CreateContract extends Component {
                 </label>
                 <div className="pt-form-content">
                   <input id="input" className="pt-input" style={{"width": "300px;"}} placeholder="Contract Input" type="text" dir="auto" />
-                  <div className="pt-form-helper-text">Confirm your password</div>
+                  <div className="pt-form-helper-text">Pick a blank</div>
                 </div>
               </div>
             </div>

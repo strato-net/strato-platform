@@ -45,8 +45,8 @@ class Contracts extends Component {
                 <thead>
                 <th className="col-sm-3"><h4>Contract Address</h4></th>
                 <th className="col-sm-3"><h4>Balance</h4></th>
-                <th className="col-sm-3"><h4>Balance</h4></th>
-                <th className="col-sm-3"><h4>User Activity</h4></th>
+                <th className="col-sm-3"><h4>Metric</h4></th>
+                <th className="col-sm-3"><h4>Contract Activity</h4></th>
                 </thead>
 
                 <tbody>
