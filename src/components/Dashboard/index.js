@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import TxList from "../TxList/index";
+import Transactions from "../Transactions";
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import NumberCard from '../NumberCard';
 
@@ -35,7 +35,7 @@ class Dashboard extends Component {
         </div>
         <div className="row smd-content-row">
           <div className="col-lg-12">
-            <TxList />
+            <Transactions />
           </div>
         </div>
       </div>

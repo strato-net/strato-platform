@@ -1,7 +1,8 @@
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import { fetchTx } from './transactions.actions';
-import { withRouter } from 'react-router-dom';
+import React, {Component} from 'react';
+import {connect} from 'react-redux';
+import {fetchTx} from './transactions.actions';
+import {withRouter} from 'react-router-dom';
+import './Transactions.css'
 
 class Transactions extends Component {
 
@@ -10,17 +11,51 @@ class Transactions extends Component {
   }
 
   render() {
-    const txs = this.props.tx.map(
-      (tx, i) => {
-        return <li>tx #{i} of type {tx.transactionType}</li>
+    let txRows = this.props.tx.map(
+      function (tx, i) {
+        const date = new Date(tx.timestamp);
+        let hours = date.getHours();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 ? hours : 12;
+        const dateStr = hours.toString()
+          + ":" + date.getMinutes().toString()
+          + " " + ampm
+          + " " + date.getMonth().toString()
+          + "/" + date.getDate().toString()
+          + "/" + date.getFullYear().toString();
+        let txLink = "/transaction/" + tx.hash;
+        return (
+            <tr className="tx-row" key={i}>
+              <td className="col-sm">{tx.transactionType}</td>
+              <td className="col-sm">{tx.value}</td>
+              <td className="col-sm">{tx.from}</td>
+              <td className="col-sm">{tx.to === undefined ? "No recipient" : tx.to}</td>
+              <td className="col-sm">{dateStr}</td>
+            </tr>
+        )
       }
     );
+
     return (
-      <div>tx
-        <ul>
-          {txs}
-        </ul>
-      </div>
+        <div className="row smd-content-row">
+          <div className="col-lg-12">
+            <div className="pt-card pt-elevation-2">
+              <table className="pt-table pt-interactive smd-full-width">
+                <thead>
+                <th className="col-sm"><h4>Transaction Type</h4></th>
+                <th className="col-sm"><h4>Value</h4></th>
+                <th className="col-sm"><h4>Sender</h4></th>
+                <th className="col-sm"><h4>Recipient</h4></th>
+                <th className="col-sm"><h4>Timestamp</h4></th>
+                </thead>
+
+                <tbody>
+                {txRows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
     );
   }
 }
@@ -31,4 +66,4 @@ function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchTx })(Transactions));
+export default withRouter(connect(mapStateToProps, {fetchTx})(Transactions));

@@ -20,6 +20,7 @@ import App from "./App/App.js";
 
 import blockDataReducer from './components/BlockData/block-data.reducer'
 import transactionsReducer from './components/Transactions/transactions.reducer'
+import createUserReducer from './components/CreateUser/createUser.reducer'
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/Transactions/transactions.saga'
@@ -31,6 +32,7 @@ const rootReducer = combineReducers({
   burgerMenu,
   blockData: blockDataReducer,
   transactions: transactionsReducer,
+  createUser: createUserReducer,
 });
 
 const rootSaga = function* startForeman() {

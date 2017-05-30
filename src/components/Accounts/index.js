@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import {Button, ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
+import CreateUser from '../CreateUser';
 
 class Accounts extends Component {
   dataMock = [
@@ -54,7 +55,8 @@ class Accounts extends Component {
           <div className="col-sm-3 text-right">
             {/* //FIXME Align the button to the Accounts Tab h2
              * align it to the right edge as well*/}
-            <Button style={{"margin": "1.5px"}} className="pt-intent-primary pt-icon-add">Create User</Button>
+            {/*<Button style={{"margin": "1.5px"}} className="pt-intent-primary pt-icon-add">Create User</Button>*/}
+            <CreateUser/>
           </div>
         </div>
         <div className="row smd-content-row">
