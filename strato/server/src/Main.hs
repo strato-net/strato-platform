@@ -23,7 +23,7 @@ stratoSwagger = toSwagger (Proxy @Strato.API)
   & info.version .~ "1.2"
   & info.description ?~ "This is the strato api"
   & info.license ?~ ("MIT" & url ?~ URL "http://mit.com")
-  & host ?~ "strato-int.centralus.cloudapp.azure.com" -- remove this
+-- & host ?~ "strato-int.centralus.cloudapp.azure.com" -- remove this
   & basePath ?~ "/strato-api/eth/v1.2/"
 
 server :: Server SwaggerAPI
