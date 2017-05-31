@@ -53,7 +53,7 @@ class CreateUser extends Component {
                     Password
                   </label>
                   <div className="pt-form-content">
-                    <InputGroup id="input-b" className="form-width" placeholder="Username"
+                    <InputGroup id="input-b" className="form-width" placeholder="Password"
                                 onChange={this.handlePasswordChange}
                                 type="text" dir="auto"/>
                     <div className="pt-form-helper-text">Pick a password</div>

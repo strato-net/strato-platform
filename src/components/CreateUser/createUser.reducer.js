@@ -8,6 +8,7 @@ import {
 
 const initialState = {
   isOpen: false,
+  spinning: false,
 };
 
 const reducer = function (state = initialState, action) {
@@ -23,7 +24,7 @@ const reducer = function (state = initialState, action) {
     case CREATE_USER:
       return {
         isOpen: true,
-        spinning: true
+        spinning: true,
       };
     case CREATE_USER_FAILURE:
       return {
@@ -35,7 +36,7 @@ const reducer = function (state = initialState, action) {
       return {
         isOpen: false,
         spinning: false,
-        key: action.key
+        response: action.response,
       };
   default:
   return state;
