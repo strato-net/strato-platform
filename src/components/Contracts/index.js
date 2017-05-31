@@ -1,9 +1,35 @@
 import React, {Component} from 'react';
-import CreateContract from '../CreateContract'
+import { fetchContracts } from './contracts.actions';
+import {connect} from 'react-redux';
+import {withRouter} from 'react-router-dom';
+import CreateContract from '../CreateContract';
 
 class Contracts extends Component {
 
+  componentDidMount(){
+    this.props.fetchContracts();
+  }
+
   render() {
+    var tableRows = this.props.contracts.SimpleStorage === undefined ? (<tr><td>No Data</td><td>No Data</td></tr>) :
+      this.props.contracts.SimpleStorage.map(function(val, i) {
+          const date = new Date(val.createdAt);
+          let hours = date.getHours();
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12 ? hours : 12;
+          const dateStr = hours.toString()
+            + ":" + date.getMinutes().toString()
+            + " " + ampm
+            + " " + date.getMonth().toString()
+            + "/" + date.getDate().toString()
+            + "/" + date.getFullYear().toString();
+      return (
+        <tr key={i}>
+          <td className="col-sm-6">{val.address}</td>
+          <td className="col-sm-6">{dateStr}</td>
+        </tr>
+      )
+    })
     return (
       <div>
         <div className="row smd-content-row">
@@ -37,18 +63,11 @@ class Contracts extends Component {
               <table className="pt-table pt-interactive smd-full-width">
                 <thead>
                 <th className="col-sm-3"><h4>Contract Address</h4></th>
-                <th className="col-sm-3"><h4>Balance</h4></th>
-                <th className="col-sm-3"><h4>Metric</h4></th>
-                <th className="col-sm-3"><h4>Contract Activity</h4></th>
+                <th className="col-sm-3"><h4>Created At</h4></th>
                 </thead>
 
                 <tbody>
-                <tr>
-                  <td>No Data</td>
-                  <td>No Data</td>
-                  <td>No Data</td>
-                  <td>No Data</td>
-                </tr>
+                {tableRows}
                 </tbody>
               </table>
             </div>
@@ -59,4 +78,10 @@ class Contracts extends Component {
   }
 }
 
-export default Contracts
+function mapStateToProps(state) {
+  return {
+    contracts: state.contracts.contracts
+  };
+}
+
+export default withRouter(connect(mapStateToProps, {fetchContracts})(Contracts));
