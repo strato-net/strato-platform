@@ -22,6 +22,7 @@ library
     , blockapps-ethereum
     , blockapps-solidity
     , binary
+    , bytestring
     , aeson
     , aeson-casing
     , containers

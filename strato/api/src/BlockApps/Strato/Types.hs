@@ -44,6 +44,7 @@ import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Casing.Internal   (dropFPrefix)
 import qualified Data.Binary                  as Binary
+import qualified Data.ByteString.Lazy         as Lazy
 import qualified Data.HashMap.Strict          as HashMap
 import           Data.LargeWord
 import           Data.List.NonEmpty           (NonEmpty)
@@ -54,6 +55,7 @@ import           Data.Swagger
 import           Data.Swagger.Internal.Schema (named, sketchSchema)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
+import qualified Data.Text.Encoding           as Text
 import           Data.Time
 import           Data.Word
 import           Generic.Random.Generic
@@ -437,17 +439,21 @@ instance ToJSON ExtabiResponse where
 instance MimeUnrender PlainText ExtabiResponse where
   mimeUnrender _ = eitherDecode
 
-instance FromJSON FaucetResponse
-instance ToJSON FaucetResponse
+instance FromJSON FaucetResponse where
+  parseJSON = fmap FaucetResponse . parseJSON
+instance ToJSON FaucetResponse where
+  toJSON (FaucetResponse x) = toJSON x
 
 instance MimeRender PlainText ExtabiResponse where
   mimeRender _ = encode
 
 instance MimeUnrender PlainText FaucetResponse where
-  mimeUnrender _ = eitherDecode
+  mimeUnrender _ =
+    return . FaucetResponse . Text.decodeUtf8 . Lazy.toStrict
 
 instance MimeRender PlainText FaucetResponse where
-  mimeRender _ = encode
+  mimeRender _ (FaucetResponse x) =
+    Lazy.fromStrict $ Text.encodeUtf8 x
 
 newtype SolcResponse = SolcResponse { solcresponseSrc :: Map Text AbiBin }
                      deriving (Eq,Show,Generic)
