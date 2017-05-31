@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLists       #-}
@@ -49,23 +50,23 @@ import           Control.Lens.Operators
 import           Crypto.Hash
 import           Crypto.Random.Entropy
 import           Crypto.Secp256k1
-import           Data.Aeson                   hiding (Array, String)
-import qualified Data.Aeson                   as Aeson
-import qualified Data.Aeson.Encoding          as AesonEnc
-import qualified Data.Binary                  as Binary
-import qualified Data.ByteArray               as ByteArray
-import           Data.ByteString              (ByteString)
-import qualified Data.ByteString              as ByteString
-import qualified Data.ByteString.Base16       as Base16
-import qualified Data.ByteString.Char8        as Char8
-import qualified Data.ByteString.Lazy         as Lazy
+import           Data.Aeson             hiding (Array, String)
+import qualified Data.Aeson             as Aeson
+import qualified Data.Aeson.Encoding    as AesonEnc
+import qualified Data.Binary            as Binary
+import qualified Data.ByteArray         as ByteArray
+import           Data.ByteString        (ByteString)
+import qualified Data.ByteString        as ByteString
+import qualified Data.ByteString.Base16 as Base16
+import qualified Data.ByteString.Char8  as Char8
+import qualified Data.ByteString.Lazy   as Lazy
 import           Data.LargeWord
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Proxy
 import           Data.RLP
 import           Data.Swagger
-import qualified Data.Text                    as Text
+import qualified Data.Text              as Text
 import           Data.Time
 import           Data.Word
 import           GHC.Generics
@@ -74,8 +75,8 @@ import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
-import           Text.Read                    hiding (String)
-import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
+import           Text.Read              hiding (String)
+import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
 newtype Address = Address { unAddress :: Word160 }
   deriving (Eq, Ord, Generic, Bounded)
@@ -151,7 +152,7 @@ instance ToSchema Address where
     NamedSchema (Just "Address")
       ( mempty
         & type_ .~ SwaggerString
-        & example ?~ toJSON (Address 0xdeadbeef)
+        & example ?~ "address=deadbeef" --toJSON (Address 0xdeadbeef) -- FIXME if causing troubles outside /faucet
         & description ?~ "Ethereum Address, 20 byte hex encoded string" )
 
 deriveAddress :: PubKey -> Address
@@ -213,6 +214,12 @@ instance MimeUnrender PlainText Keccak256 where
   mimeUnrender _ = maybe (Left "Couldn't read Keccak") Right . stringKeccak256 . Char8.unpack . Lazy.toStrict
 instance MimeRender PlainText Keccak256 where
   mimeRender _ = Lazy.fromStrict . Char8.pack . keccak256String
+
+instance MimeRender PlainText [Keccak256] where
+  mimeRender _ = encode
+
+instance MimeUnrender PlainText [Keccak256] where
+  mimeUnrender _ = maybe (Left "Couldn't decode [Keccak256]") Right . decode
 
 instance Arbitrary Keccak256 where
   arbitrary = keccak256lazy . Binary.encode @ Integer <$> arbitrary

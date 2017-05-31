@@ -22,7 +22,6 @@ module BlockApps.Strato.Client
   , getTotalTx
   , getStorage
   , postFaucet
-  , postFaucets
   , postSolc
   , postExtabi
   ) where
@@ -108,8 +107,7 @@ getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: Maybe Address -> ClientM [Storage]
-postFaucet :: Address -> ClientM Text
-postFaucets :: Addresses -> ClientM Text
+postFaucet :: Address -> ClientM FaucetResponse
 postSolc :: Src -> ClientM SolcResponse
 postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
@@ -125,7 +123,6 @@ getTxsFilter
   :<|> getTotalTx
   :<|> getStorage
   :<|> postFaucet
-  :<|> postFaucets
   :<|> postSolc
   :<|> postExtabi =
     uncurryTxsFilterParams getTxsFilter'
@@ -141,7 +138,6 @@ getTxsFilter
     :<|> getTotalTx'
     :<|> getStorage'
     :<|> postFaucet'
-    :<|> postFaucets'
     :<|> postSolc'
     :<|> postExtabi'
   where
@@ -158,7 +154,6 @@ getTxsFilter
       :<|> getTotalTx'
       :<|> getStorage'
       :<|> postFaucet'
-      :<|> postFaucets'
       :<|> postSolc'
       :<|> postExtabi' =
         client (Proxy @ API)

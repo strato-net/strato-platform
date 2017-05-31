@@ -1,0 +1,50 @@
+name: blockapps-strato-server
+version: 0.1.0.0
+synopsis: Strato microservice
+description: Strato microservice API definitions
+homepage: https://github.com/blockapps/blockapps-haskell/strato/api
+license-file: LICENSE
+author: Kristoffer Josefsson
+maintainer: kristoffer@blockapps.net
+copyright: 2017 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+executable blockapps-strato-server
+  ghc-options:      -Wall
+  hs-source-dirs: src/
+  main-is: Main.hs
+  build-depends:  base
+                , blockapps-strato-api
+                , lens
+                , servant-server
+                , servant-swagger
+                , wai-cors
+                , warp
+  build-depends: base
+    , blockapps-ethereum
+    , blockapps-solidity
+    , binary
+    , aeson
+    , aeson-casing
+    , containers
+    , generic-random
+    , http-api-data
+    , http-client
+    , largeword
+    , lens
+    , QuickCheck
+    , quickcheck-instances
+    , servant
+    , servant-client
+    , servant-docs
+    , swagger2
+    , text
+    , time
+    , unordered-containers
+  default-language: Haskell2010
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/strato/server

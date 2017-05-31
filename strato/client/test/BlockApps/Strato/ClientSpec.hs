@@ -97,11 +97,6 @@ spec
       forAll arbitrary $ \ addr -> do
         resp <- runClientM (postFaucet addr) (ClientEnv mgr stratoDev)
         resp `shouldSatisfy` isRight
-  describe "postFaucets" $
-    it "works" $ \ mgr ->
-      forAll arbitrary $ \ addrs -> do
-        resp <- runClientM (postFaucets addrs) (ClientEnv mgr stratoDev)
-        resp `shouldSatisfy` isRight
   let src = Src "contract f {uint global; function f() {global=7;}}"
   describe "postSolc" $
     it "works" $ \ mgr -> do
