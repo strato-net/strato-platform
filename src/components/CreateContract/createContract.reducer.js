@@ -9,6 +9,7 @@ import {
 const initialState = {
   isOpen: false,
   spinning: false,
+  response: "Status: Upload Contract"
 };
 
 const reducer = function (state = initialState, action) {
@@ -24,19 +25,21 @@ const reducer = function (state = initialState, action) {
     case CREATE_CONTRACT:
       return {
         isOpen: true,
-        spinning: true
+        spinning: true,
+        response: "Uploading Contract..."
       };
     case CREATE_CONTRACT_FAILURE:
       return {
-        isOpen: false,
+        isOpen: true,
         spinning: false,
+        response: "Error Uploading Contract...: " + action.error,
         error: action.error
       };
     case CREATE_CONTRACT_SUCCESS:
       return {
-        isOpen: false,
+        isOpen: true,
         spinning: false,
-        key: action.key
+        response: "Upload Success: " + action.response,
       };
     default:
       return state;

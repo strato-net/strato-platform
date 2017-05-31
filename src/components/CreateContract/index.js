@@ -34,6 +34,8 @@ class CreateContract extends Component {
 
   handleSubmit = () => {
     this.props.createContract(payload);
+    this.props.closeOverlay();
+    payload = { username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)" }
   };
 
   render() {
@@ -83,7 +85,7 @@ class CreateContract extends Component {
 
             <div>
               <div className="col-sm-3"></div>
-              <div className="col-sm-3">{this.props.spinning ? <Spinner className="text-center"/> : ''}</div>
+              <div className="col-sm-6">{this.props.spinning ? <Spinner className="text-center"/> : ''}</div>
               <div className="col-sm-3"></div>
             </div>
           </div>
@@ -108,6 +110,7 @@ function mapStateToProps(state) {
   return {
     isOpen: state.createContract.isOpen,
     spinning: state.createContract.spinning,
+    response: state.createContract.response,
   };
 }
 

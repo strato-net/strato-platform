@@ -17,37 +17,45 @@ function getAddress(username) {
   return fetch(
     getAddressUrl,
     {
-      method: 'POST',
+      method: 'GET',
       headers: {
         'Accept' : 'text/html',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
     })
     .then(function(response) {
-      return response;
+      return response.json();
     })
     .catch(function(error) {
       throw error;
     });
 }
 
-function createContractApiCall(src, username, password) {
-  return fetch(
-    url.replace(":user", username).replace(":address", getAddress(username)),
-    {
-      method: 'POST',
-      headers: {
-        'Accept' : 'text/html',
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: "src="+src+"&password="+password
-    })
-    .then(function(response) {
-      return response;
-    })
-    .catch(function(error) {
-      throw error;
-    });
+function createContractApiCall(source, username, password) {
+  getAddress(username).then(function(res) {
+    let addr = res[0];
+    let src = source.replace(/\s+/g, " ");
+    let args = { "_greeting" : "hello"};
+    return fetch(
+      url.replace(":user", username).replace(":address", addr),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({password, src, args})
+      })
+      .then(function(response) {
+        return response;
+      })
+      .then(function(res) {
+        console.log(res, res.text());
+        return res;
+      })
+      .catch(function(error) {
+        throw error;
+      });
+  })
 }
 
 function* createContract(action) {

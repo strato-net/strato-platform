@@ -32,7 +32,7 @@ export const createContractSuccess = function(response) {
     type: CREATE_CONTRACT_SUCCESS,
     response: response,
     spinning: false,
-    isOpen: false,
+    isOpen: true,
   }
 }
 
