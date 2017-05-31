@@ -166,7 +166,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: master
+    ref: strato-swagger 
     compose:
       restart: always
       volumes:
@@ -192,24 +192,36 @@ deployments:
         ZOO_MY_ID: "1"
       ports:
         - "2181:2181"
-
-  - name: bloch-docs-21 
+  
+  - name: blockapps-docs
+    repo: https://github.com/blockapps/blockapps-swagger.git
+    ref: master
     compose:
-      image: swaggerapi/swagger-ui
       restart: always
       environment:
-        API_URL: "/bloc/v2.1/swagger.json"
+        API_URL: "/strato-api/eth/v1.2/swagger.json"
       ports:
         - "8080:8080"
-        
-  - name: bloch-docs-20 
-    compose:
-      image: swaggerapi/swagger-ui
-      restart: always
-      environment:
-        API_URL: "/bloc/v2.0/swagger.json"
-      ports:
-        - "8081:8080"
+
+#  - name: bloch-docs-21 
+#    repo: https://github.com/blockapps/blockapps-swagger.git
+#    ref: master
+#    compose:
+#      restart: always
+#      environment:
+#        API_URL: "/bloc/v2.1/swagger.json"
+#      ports:
+#        - "8080:8080"
+#        
+#  - name: bloch-docs-20 
+#    repo: https://github.com/blockapps/blockapps-swagger.git
+#    ref: master
+#    compose:
+#      restart: always
+#      environment:
+#        API_URL: "/bloc/v2.0/swagger.json"
+#      ports:
+#        - "8081:8080"
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
