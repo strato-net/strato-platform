@@ -1,0 +1,1 @@
+export const APIURL = "http://bayar6.eastus.cloudapp.azure.com/";

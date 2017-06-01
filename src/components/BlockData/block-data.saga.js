@@ -8,9 +8,9 @@ import {
   fetchBlockDataSuccess,
   fetchBlockDataFailure
 } from './block-data.actions';
+import { APIURL } from '../../env';
 
-const url = "http://strato-int.centralus.cloudapp.azure.com/strato-api/eth/v1.2/block/last/0"; //FIXME hard coded api url
-/*const url = APIURL + "/strato-api/eth/v1.2/block/last/0" */ 
+const url = APIURL + "/strato-api/eth/v1.2/block/last/15"
 
 function getBlockData() {
   return fetch(
@@ -25,7 +25,7 @@ function getBlockData() {
       return response.json()
     })
     .then(function(res) {
-      return res[0].blockData;
+      return res;
     })
     .catch(function(error) {
       throw error;

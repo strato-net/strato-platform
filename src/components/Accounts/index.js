@@ -9,9 +9,23 @@ import BigNumber from 'bignumber.js'
 
 class Accounts extends Component {
 
-  componentDidMount() { //FIXME Put fetchTx on a timer?
+  componentDidMount() {
     this.props.fetchAccounts();
+    this.startPoll();
   }
+
+  componentWillUnmount() {
+    clearTimeout(this.timeout)
+  }
+
+  startPoll() {
+    //console.log('startPoll', this.props);
+    const fetchAccounts = this.props.fetchAccounts;
+    this.timeout = setInterval(function () {
+      fetchAccounts();
+    }, 5000);
+  }
+
 
   getSum = (total, num) => {
     if (num === undefined) {
@@ -62,7 +76,7 @@ class Accounts extends Component {
       else {undef++;}
     });
 
-    const totalEther = new BigNumber(this.props.accounts.reduce(this.getSum, 0)).div(1000000000000000000).toString();
+    const totalEther = "123456"
 
     return (
       <div>

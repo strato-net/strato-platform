@@ -2,16 +2,17 @@ import React, { Component } from 'react';
 import * as Plottable from 'plottable';
 
 class PieChart extends Component {
-  componentDidMount() {
 
+  componentDidMount() {
     const scale = new Plottable.Scales.Linear();
     const colorScale = new Plottable.Scales.InterpolatedColor();
     colorScale.range(["#FA9B4E", "#5279C7"]);
     const data = [{ val: 1 }, { val: 2 }, { val: 3 }];
 
     // eslint-disable-next-line
+    console.log(this.props.data);
     const plot = new Plottable.Plots.Pie()
-      .addDataset(new Plottable.Dataset(data))
+      .addDataset(new Plottable.Dataset(this.props.data))
       .sectorValue(function(d) { return d.val; }, scale)
       .attr("fill", function(d) { return d.val; }, colorScale)
       .renderTo("div#pc");
