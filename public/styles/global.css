@@ -4,6 +4,7 @@ html {
 
 body {
   min-height: 100%;
+  font-family: 'Roboto', sans-serif !important;
 }
 
 .smd-full-width {
