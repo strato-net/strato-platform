@@ -76,7 +76,7 @@ class Accounts extends Component {
       else {undef++;}
     });
 
-    const totalEther = new BigNumber(this.props.accounts.reduce(this.getSum, 0)).div(1000000000000000000).toString();
+    const totalEther = "123456"
 
     return (
       <div>
