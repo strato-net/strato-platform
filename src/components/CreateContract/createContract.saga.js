@@ -8,8 +8,8 @@ import {
   createContractSuccess,
   createContractFailure,
 } from './createContract.actions';
+import { APIURL } from '../../env';
 
-const APIURL = "http://strato-int.centralus.cloudapp.azure.com/" //FIXME hard coded api url
 const url = APIURL + "bloc/users/:user/:address/contract"
 
 function getAddress(username) {
