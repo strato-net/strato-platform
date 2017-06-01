@@ -25,7 +25,7 @@ function getBlockData() {
       return response.json()
     })
     .then(function(res) {
-      return res[0].blockData;
+      return res;
     })
     .catch(function(error) {
       throw error;
