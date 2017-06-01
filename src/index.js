@@ -13,9 +13,8 @@ import createSagaMiddleware from 'redux-saga';
 import { fork } from 'redux-saga/effects';
 import {routerReducer} from 'react-router-redux';
 import {reducer as formReducer} from 'redux-form';
-import {reducer as burgerMenu} from 'redux-burger-menu';
 
-import App from "./App/App.js";
+import App from "./App/";
 
 
 import blockDataReducer from './components/BlockData/block-data.reducer'
@@ -36,7 +35,6 @@ const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
-  burgerMenu,
   blockData: blockDataReducer,
   transactions: transactionsReducer,
   createUser: createUserReducer,

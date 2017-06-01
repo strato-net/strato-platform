@@ -9,7 +9,7 @@ import {
   fetchTxFailure
 } from './transactions.actions';
 
-const url = "http://strato-int.centralus.cloudapp.azure.com/strato-api/eth/v1.2/transaction/last/5" //FIXME hard coded api url
+const url = "http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2/transaction/last/5" //FIXME hard coded api url
 /*const url = APIURL + "/strato-api/eth/v1.2/transaction/last/5" */
 
 function getTx() {

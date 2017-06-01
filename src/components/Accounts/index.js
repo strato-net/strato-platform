@@ -17,7 +17,7 @@ class Accounts extends Component {
     if (num === undefined) {
       return total;
     }
-    return total + new Number(num.balance);
+    return total + num.balance;
   }
 
   // dataMock = [
@@ -48,18 +48,20 @@ class Accounts extends Component {
       return value === undefined ? 1 : value.latestBlockNum
     }));
 
-    var undef = 0;
+    let undef = 0;
 
-    const rows = this.props.accounts.map(function (value, i) {
-      if (value !== undefined) {
+    const rows = this.props.accounts
+      .filter(function(value){
+        return value !== undefined;
+      })
+      .map(function (value, i) {
         return (<tr key={i}>
           <td className="col-sm-4">{value.address}</td>
           <td className="col-sm-4">{new BigNumber(value.balance).div(1000000000000000000).toString()}</td>
           <td className="col-sm-4"><ProgressBar className="pt-intent-primary"
                                                 value={value.latestBlockNum / maxBlockNum}/></td>
-        </tr>)
-      }
-      else {undef++;}
+        </tr>);
+
     });
 
     const totalEther = new BigNumber(this.props.accounts.reduce(this.getSum, 0)).div(1000000000000000000).toString();

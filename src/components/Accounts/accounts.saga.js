@@ -9,7 +9,7 @@ import {
   fetchAccountsFailure
 } from './accounts.actions';
 
-const APIURL = "http://strato-int.centralus.cloudapp.azure.com/" //FIXME hard coded api url
+const APIURL = "http://bayar6.eastus.cloudapp.azure.com/" //FIXME hard coded api url
 const addressUrl = APIURL + "bloc/addresses"
 
 function getAccounts() {

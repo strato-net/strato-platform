@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import * as Plottable from 'plottable';
-import { Textfit } from 'react-textfit';
 import './bar-graph.css';
 
 class BarGraph extends Component {
@@ -36,9 +35,7 @@ class BarGraph extends Component {
         <div className="row">
           <div className="col-sm-12 text-center">
             <h1>
-              <Textfit className="text-fit" mode="single" max={36}>
                 {this.props.data[this.props.data.length-1].y}
-              </Textfit>
             </h1>
           </div>
         </div>

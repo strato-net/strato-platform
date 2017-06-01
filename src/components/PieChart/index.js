@@ -7,7 +7,7 @@ class PieChart extends Component {
     const scale = new Plottable.Scales.Linear();
     const colorScale = new Plottable.Scales.InterpolatedColor();
     colorScale.range(["#FA9B4E", "#5279C7"]);
-    const data = [{ val: 1 }, { val: 2 }, { val: 3 }];
+    const data = [{ val: 4 }, { val: 2 }, { val: 10 }];
 
     // eslint-disable-next-line
     const plot = new Plottable.Plots.Pie()

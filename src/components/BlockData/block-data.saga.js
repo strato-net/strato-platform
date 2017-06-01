@@ -9,7 +9,7 @@ import {
   fetchBlockDataFailure
 } from './block-data.actions';
 
-const url = "http://strato-int.centralus.cloudapp.azure.com/strato-api/eth/v1.2/block/last/0"; //FIXME hard coded api url
+const url = "http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2/block/last/0"; //FIXME hard coded api url
 /*const url = APIURL + "/strato-api/eth/v1.2/block/last/0" */ 
 
 function getBlockData() {

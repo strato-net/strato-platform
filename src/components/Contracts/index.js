@@ -3,6 +3,7 @@ import {fetchContracts} from './contracts.actions';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import CreateContract from '../CreateContract';
+import * as moment from 'moment';
 
 class Contracts extends Component {
 
@@ -11,25 +12,17 @@ class Contracts extends Component {
   }
 
   render() {
-    var contracts = this.props.contracts;
-    var rows = []
-    Object.getOwnPropertyNames(this.props.contracts).map(function(contractName, i) {
-      Object.values(contracts[contractName]).map(function(contract, j) {
-        const date = new Date(contract.createdAt);
-        let hours = date.getHours();
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 ? hours : 12;
-        const dateStr = hours.toString()
-          + ":" + date.getMinutes().toString()
-          + " " + ampm
-          + " " + date.getMonth().toString()
-          + "/" + date.getDate().toString()
-          + "/" + date.getFullYear().toString();
+    const contracts = this.props.contracts;
+    const rows = []
+    Object.getOwnPropertyNames(this.props.contracts).forEach(function(contractName, i) {
+      Object.values(contracts[contractName]).forEach(function(contract, j) {
         rows.push(
           <tr key={Math.random()}>
             <td className="col-sm-4">{contractName}</td>
             <td className="col-sm-4">{contract.address}</td>
-            <td className="col-sm-4">{dateStr}</td>
+            <td className="col-sm-4">
+              {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
+            </td>
           </tr>
         )
       });

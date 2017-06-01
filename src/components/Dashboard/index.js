@@ -3,7 +3,6 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import Transactions from "../Transactions";
 import { fetchBlockData } from '../BlockData/block-data.actions';
-import NumberCard from '../NumberCard';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import { Text } from '@blueprintjs/core';
@@ -33,10 +32,10 @@ class Dashboard extends Component {
             { x: 13, y: 1496545 }, { x: 14, y: 149650345 }, { x: 15, y: 1496345 }];
 
     return (
-      <div className="container pt-dark">
+      <div className="container-fluid pt-dark">
         <div className="row">
           <div className="col-sm-9 text-left">
-            <h2>Dashboard</h2>
+            <h3>Dashboard</h3>
           </div>
           <div className="col-sm-3 text-right">
             <p className="network-status">NETWORK IN SYNC</p>
