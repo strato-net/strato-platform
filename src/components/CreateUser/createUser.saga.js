@@ -13,7 +13,6 @@ import { APIURL } from '../../env';
 const url = APIURL + "bloc/users/:user"
 
 function createUserApiCall(username, password) {
-  let faucet = "1";
   return fetch(
     url.replace(":user", username),
     {

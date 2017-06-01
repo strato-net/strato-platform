@@ -31,7 +31,7 @@ class Accounts extends Component {
       return value === undefined ? 1 : value.accountData.latestBlockNum
     }));
 
-    var undef = 0;
+    let undef = 0;
 
     var rows = this.props.accounts.map(function (value, i) {
       if (value !== undefined) {
@@ -102,7 +102,6 @@ class Accounts extends Component {
 }
 
 function mapStateToProps(state) {
-  console.log("STATE ", state.accounts.accounts);
   return {
     accounts: state.accounts.accounts
   };

@@ -10,6 +10,7 @@ import {
 } from './block-data.actions';
 import { APIURL } from '../../env';
 
+
 const url = APIURL + "/strato-api/eth/v1.2/block/last/15"
 
 function getBlockData() {

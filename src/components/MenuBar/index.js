@@ -1,21 +1,15 @@
 import React, {Component} from 'react';
 import { connect } from 'react-redux';
-import {action as toggleMenu} from 'redux-burger-menu';
 import './menubar.css';
 
 class MenuBar extends Component {
 
-  openSidebar(e) {
-    e.stopPropagation();
-    this.props.dispatch(toggleMenu(true));
-  }
-
   render() {
     return (
-      <nav className="pt-navbar pt-dark">
+      <nav className="pt-navbar pt-dark" style={{position: 'fixed', width: '100%'}}>
         <div className="pt-navbar-group pt-align-left">
-          <div id="outer-container">
-            <span className="pt-icon-large pt-icon-menu smd-sidebar-button" onClick={(e) => this.openSidebar(e)} />
+          <div>
+            <span className="pt-icon-large pt-icon-menu smd-sidebar-button" />
           </div>
         </div>
         <div className="pt-navbar-group pt-align-left">
@@ -23,9 +17,9 @@ class MenuBar extends Component {
         </div>
         <div className="pt-navbar-group pt-align-right">
           <span className="pt-navbar-divider"/>
-          <a className="pt-button pt-minimal pt-icon-user"/>
-          <a className="pt-button pt-minimal pt-icon-notifications"/>
-          <a className="pt-button pt-minimal pt-icon-cog"/>
+          <span className="pt-button pt-minimal pt-icon-user"/>
+          <span className="pt-button pt-minimal pt-icon-notifications"/>
+          <span className="pt-button pt-minimal pt-icon-cog"/>
         </div>
       </nav>
     );
@@ -34,7 +28,6 @@ class MenuBar extends Component {
 
 function mapStateToProps(state) {
   return {
-    sidebarIsOpen: state.burgerMenu.isOpen,
   };
 }
 

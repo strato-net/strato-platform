@@ -3,20 +3,31 @@ import * as Plottable from 'plottable';
 
 class PieChart extends Component {
 
+  constructor(props) {
+    super(props);
+    this.state = {
+      plot: null,
+      dataset: null
+    }
+  }
+
   componentDidMount() {
     const scale = new Plottable.Scales.Linear();
     const colorScale = new Plottable.Scales.InterpolatedColor();
     colorScale.range(["#FA9B4E", "#5279C7"]);
-    const data = [{ val: 1 }, { val: 2 }, { val: 3 }];
+    const data = [{ val: 4 }, { val: 2 }, { val: 10 }];
 
-    // eslint-disable-next-line
-    console.log(this.props.data);
-    const plot = new Plottable.Plots.Pie()
-      .addDataset(new Plottable.Dataset(this.props.data))
+    this.state.dataset = new Plottable.Dataset(this.props.data);
+    this.state.plot = new Plottable.Plots.Pie()
+      .addDataset(this.state.dataset)
       .sectorValue(function(d) { return d.val; }, scale)
       .attr("fill", function(d) { return d.val; }, colorScale)
       .renderTo("div#pc");
 
+  }
+
+  componentDidUpdate() {
+    this.state.dataset.data(this.props.data);
   }
 
   render() {

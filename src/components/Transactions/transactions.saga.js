@@ -10,8 +10,7 @@ import {
 } from './transactions.actions';
 import { APIURL } from '../../env';
 
-const url = APIURL+ "strato-api/eth/v1.2/transaction/last/5" //FIXME hard coded api url
-/*const url = APIURL + "/strato-api/eth/v1.2/transaction/last/5" */
+const url = APIURL+ "strato-api/eth/v1.2/transaction/last/5" 
 
 function getTx() {
   return fetch(

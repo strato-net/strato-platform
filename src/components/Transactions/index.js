@@ -4,6 +4,7 @@ import {fetchTx} from './transactions.actions';
 import {withRouter} from 'react-router-dom';
 import './Transactions.css'
 import {Text} from '@blueprintjs/core';
+import * as moment from 'moment';
 
 class Transactions extends Component {
 
@@ -29,9 +30,16 @@ class Transactions extends Component {
       function (tx, i) {
         return (
             <tr key={i}>
-              <td width="50%"><Text ellipsize={true}><small>{tx.hash}</small></Text></td>
-              <td width="30%" className="text-right"><small>{tx.value}</small></td>
-              <td width="20%"><small>{tx.transactionType}</small></td>
+              <td width="40%"><Text ellipsize={true}><small>{tx.hash}</small></Text></td>
+              <td width="23%" className="text-right"><small>{tx.value}</small></td>
+              <td width="22%">
+                <small>
+                  <Text ellipsize={true}>
+                    {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
+                  </Text>
+                </small>
+              </td>
+              <td width="15%"><small>{tx.transactionType}</small></td>
             </tr>
         )
       }
@@ -39,11 +47,14 @@ class Transactions extends Component {
 
     return (
       <div className="pt-card pt-dark pt-elevation-2">
-        <table className="pt-table pt-interactive pt-condensed pt-striped">
+        <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout:'fixed'}}>
           <thead>
-          <th width="50%"><h5>Hash</h5></th>
-          <th className="text-right" width="30%"><h5>Value</h5></th>
-          <th width="20%"><h5>Type</h5></th>
+          <tr>
+            <th width="40%"><h5>Hash</h5></th>
+            <th className="text-right" width="23%"><h5>Value</h5></th>
+            <th width="22%"><h5>Timestamp</h5></th>
+            <th width="15%"><h5>Type</h5></th>
+          </tr>
           </thead>
 
           <tbody>
