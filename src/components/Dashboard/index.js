@@ -84,7 +84,6 @@ class Dashboard extends Component {
     const txCount = this.txCount(receiptTransactions);
     const blockPropData = this.blockPropogation(blockData);
     const txTypeData = this.txType(receiptTransactions);
-    console.log(txTypeData);
 
     return (
       <div className="container-fluid pt-dark">

@@ -4,6 +4,14 @@ import './bar-graph.css';
 
 class BarGraph extends Component {
 
+  constructor(props) {
+    super(props);
+    this.state = {
+      plot: null,
+      dataset: null
+    }
+  }
+
   maxY() {
     var max = 0;
     var y = 0;
@@ -39,16 +47,22 @@ class BarGraph extends Component {
     const yScale = new Plottable.Scales.Linear().domain([scaleMin, scaleMax]);
 
     // eslint-disable-next-line
-    const plot = new Plottable.Plots.Bar()
-      .addDataset(new Plottable.Dataset(this.props.data))
+    this.state.dataset = new Plottable.Dataset(this.props.data);
+    this.state.plot = new Plottable.Plots.Bar()
+      .addDataset(this.state.dataset)
       .x(function (d) {
         return d.x;
       }, xScale)
       .y(function (d) {
         return d.y;
       }, yScale)
-      .animated(true)
+      //.animator(Plottable.Plots.Animator.MAIN, new Plottable.Animators.Easing().easingMode('quad'))
+      .animated(false)
       .renderTo("div#bg" + this.props.identifier);
+  }
+
+  componentDidUpdate() {
+    this.state.dataset.data(this.props.data);
   }
 
   render() {
