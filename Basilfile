@@ -166,7 +166,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: strato-swagger 
+    ref: master 
     compose:
       restart: always
       volumes:
