@@ -26,57 +26,33 @@ class Accounts extends Component {
     }, 5000);
   }
 
-
-  getSum = (total, num) => {
-    if (num === undefined) {
-      return total;
-    }
-    return total + new Number(num.balance);
-  }
-
-  // dataMock = [
-  // {
-  //   "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
-  //   "username": "Alice",
-  //   "balance": "1234",
-  // }, {
-  //   "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-  //   "username": "Bob",
-  //   "balance": "2345",
-  // }, {
-  //   "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
-  //   "username": "Charlie",
-  //   "balance": "3456",
-  // }, {
-  //   "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-  //   "username": "Desiree",
-  //   "balance": "4567",
-  // }, {
-  //   "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-  //   "username": "Edward",
-  //   "balance": "5689",
-  // }];
-
   render() {
     const maxBlockNum = Math.max(...this.props.accounts.map(value => {
-      return value === undefined ? 1 : value.latestBlockNum
+      return value === undefined ? 1 : value.accountData.latestBlockNum
     }));
 
     var undef = 0;
 
-    const rows = this.props.accounts.map(function (value, i) {
+    var rows = this.props.accounts.map(function (value, i) {
       if (value !== undefined) {
-        return (<tr key={i}>
-          <td className="col-sm-4">{value.address}</td>
-          <td className="col-sm-4">{new BigNumber(value.balance).div(1000000000000000000).toString()}</td>
-          <td className="col-sm-4"><ProgressBar className="pt-intent-primary"
-                                                value={value.latestBlockNum / maxBlockNum}/></td>
-        </tr>)
+        return value.address.map(addr => {
+          return (<tr key={i}>
+            <td className="col-sm-3">{value.name}</td>
+            <td className="col-sm-3">{addr}</td>
+            <td className="col-sm-3">{value.accountData.balance}</td>
+            <td className="col-sm-3"><ProgressBar className="pt-intent-primary"
+                                                  value={value.accountData.latestBlockNum / maxBlockNum}/></td>
+          </tr>)
+        })
       }
-      else {undef++;}
+      else {
+        undef++;
+      }
     });
-
-    const totalEther = "123456"
+    rows = rows.reduce(function (a, b) {
+      return a.concat(b);
+    }, []);
+    const totalEther = "123456";
 
     return (
       <div>
@@ -96,7 +72,7 @@ class Accounts extends Component {
             <NumberCard number={234241} description="TX Volume"/>
           </div>
           <div className="col-sm-3">
-            <NumberCard number={this.props.accounts.length-undef} description="Users"/>
+            <NumberCard number={this.props.accounts.length - undef} description="Users"/>
           </div>
           <div className="col-sm-3">
             <NumberCard number={123456} description="Arbitrary User Metric"/>
@@ -107,10 +83,10 @@ class Accounts extends Component {
             <div className="pt-card pt-dark pt-elevation-2">
               <table className="pt-table pt-interactive ">
                 <thead>
-                <th className="col-sm-4"><h4>Account</h4></th>
-                {/*<th className="col-sm-3"><h4>Username</h4></th>*/}
-                <th className="col-sm-4"><h4>Balance</h4></th>
-                <th className="col-sm-4"><h4>User Activity</h4></th>
+                <th className="col-sm-3"><h4>Account</h4></th>
+                <th className="col-sm-3"><h4>Username</h4></th>
+                <th className="col-sm-3"><h4>Balance</h4></th>
+                <th className="col-sm-3"><h4>User Activity</h4></th>
                 </thead>
 
                 <tbody>
@@ -126,6 +102,7 @@ class Accounts extends Component {
 }
 
 function mapStateToProps(state) {
+  console.log("STATE ", state.accounts.accounts);
   return {
     accounts: state.accounts.accounts
   };
