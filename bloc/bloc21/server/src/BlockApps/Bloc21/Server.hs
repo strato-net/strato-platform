@@ -22,7 +22,6 @@ import           BlockApps.Bloc21.Server.Users
 
 bloc :: ServerT BlocAPI Bloc
 bloc = getHomepage
-  :<|> getGitInfo
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
@@ -57,13 +56,13 @@ blocSwagger = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
     & info.version .~ "2.1"
     & info.description ?~ "This is the V2.1 API for the BlocH"
-    & host ?~ Host "localhost" (Just 8000) -- this should not be hard coded
     & basePath ?~ "/bloc/v2.1"
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
 
 serveBlocAndDocs
   :: BlocEnv
-  -> Server (BlocAPI :<|> BlocDocsAPI)
+  -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
 serveBlocAndDocs blocEnv = serveBloc blocEnv
+  :<|> getGitInfo
   :<|> return blocSwagger

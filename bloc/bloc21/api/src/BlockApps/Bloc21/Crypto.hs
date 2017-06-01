@@ -4,6 +4,7 @@
 
 module BlockApps.Bloc21.Crypto where
 
+import           Control.Lens.Operators
 import           Control.Monad.IO.Class
 import qualified Crypto.KDF.BCrypt                 as BCrypt
 import qualified Crypto.KDF.Scrypt                 as Scrypt
@@ -38,7 +39,11 @@ instance ToParamSchema Password where
   toParamSchema = const passwordParamSchema
 
 instance ToSchema Password where
-  declareNamedSchema =  const . pure . named "Password" $ passwordSchema
+  declareNamedSchema _ = return $ NamedSchema (Just "Password")
+    ( mempty
+      & type_ .~ SwaggerString
+      & example ?~ toJSON (Password "password")
+      & description ?~ "Password" )
 
 instance ToJSON Password where
   toJSON (Password pw) = toJSON $ Text.decodeUtf8 pw

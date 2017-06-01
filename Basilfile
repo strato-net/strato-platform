@@ -12,7 +12,7 @@ metadata:
 deployments:
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: master
+    ref: master 
     compose:
       restart: always
       environment:

@@ -1,13 +1,14 @@
 {-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
-module BlockApps.Strato.API where
-
-import           Data.Text              (Text)
-import           Numeric.Natural
-import           Servant.API
+module BlockApps.Strato.API
+   ( API
+   )
+where
 
 import           BlockApps.Strato.Types
+import           Numeric.Natural
+import           Servant.API
 
 type API =
   "transaction"
@@ -40,7 +41,7 @@ type API =
     :> Get '[JSON] [TransactionResult]
   :<|> "transactionResult"
     :> "batch"
-    :> ReqBody '[JSON] [Keccak256]
+    :> ReqBody '[PlainText] [Keccak256]
     :> Post '[JSON] BatchTransactionResult
   :<|> "block"
     :> QueryParam "number" Natural
@@ -84,10 +85,7 @@ type API =
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
-    :> Post '[PlainText] Text
-  :<|> "faucet"
-    :> ReqBody '[FormUrlEncoded] Addresses
-    :> Post '[PlainText] Text
+    :> Post '[PlainText] FaucetResponse
   :<|> "solc"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] SolcResponse

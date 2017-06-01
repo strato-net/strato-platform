@@ -57,7 +57,7 @@ instance ToSchema AddressCreatedAt where
     where
       ex :: AddressCreatedAt
       ex = AddressCreatedAt
-        { createdAt = 1976
+        { createdAt = 1494448021000
         , address = Unnamed $ Address 0xdeadbeef
         }
 

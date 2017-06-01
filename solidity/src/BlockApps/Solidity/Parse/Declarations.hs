@@ -219,6 +219,7 @@ functionDeclaration = do
 --        _ | null functionName || not functionVisible -> NoValue
 --        _ | functionName == contractName' -> SingleValue $ Typedef contractName'
 --        _ -> functionRet
+  let nameUnnamed (name,ty) i = if Text.null name then (Text.pack ('#' : show i),ty) else (name,ty)
 
   return
     (
@@ -226,10 +227,10 @@ functionDeclaration = do
       FuncDeclaration Xabi.Func{
         Xabi.funcArgs =
            Map.fromList $
-           zipWith (\x i -> fmap (Xabitype.IndexedType i) x) functionArgs [0..]
+           zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) functionArgs [0..]
       , Xabi.funcVals =
            Map.fromList $
-           zipWith (\v i -> fmap (Xabitype.IndexedType i) v) functionRet [0..]
+           zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
 
 
 --    objName = functionName,

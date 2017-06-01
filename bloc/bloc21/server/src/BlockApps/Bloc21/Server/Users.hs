@@ -1,9 +1,9 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
-{-# LANGUAGE LambdaCase          #-}
 
 module BlockApps.Bloc21.Server.Users where
 
@@ -11,23 +11,23 @@ import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
 import           Crypto.Secp256k1
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as ByteString
-import qualified Data.ByteString.Base16          as Base16
+import           Data.ByteString                   (ByteString)
+import qualified Data.ByteString                   as ByteString
+import qualified Data.ByteString.Base16            as Base16
 import           Data.Foldable
-import           Data.Int                        (Int32)
-import           Data.List                       (sortOn)
-import           Data.Map.Strict                 (Map)
-import qualified Data.Map.Strict                 as Map
+import           Data.Int                          (Int32)
+import           Data.List                         (sortOn)
+import           Data.Map.Strict                   (Map)
+import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.RLP
-import           Data.Set                        (isSubsetOf)
-import           Data.Text                       (Text)
-import qualified Data.Text                       as Text
-import qualified Data.Text.Encoding              as Text
+import           Data.Set                          (isSubsetOf)
+import           Data.Text                         (Text)
+import qualified Data.Text                         as Text
+import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
-import           Opaleye hiding (not)
+import           Opaleye                           hiding (not)
 
 import           BlockApps.Bloc21.API.Users
 import           BlockApps.Bloc21.API.Utils
@@ -45,10 +45,10 @@ import           BlockApps.Solidity.Struct
 import           BlockApps.Solidity.Type
 import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
-import qualified BlockApps.Solidity.Xabi.Type    as Xabi
+import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types          hiding (Transaction (..))
+import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 
 getUsers :: Bloc [UserName]
@@ -117,7 +117,7 @@ postUsersContract userName addr
     case addressMaybe of
       Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-        stratoMsg -> throwError $ UserError stratoMsg
+        stratoMsg  -> throwError $ UserError stratoMsg
       Just addr' -> do
         void . blocModify $ \conn -> runInsert conn contractsInstanceTable
           ( Nothing
@@ -157,7 +157,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     case addressMaybe of
       Nothing -> case transactionresultMessage txResult of
         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-        stratoMsg -> throwError $ UserError stratoMsg
+        stratoMsg  -> throwError $ UserError stratoMsg
       Just addr' -> do
         void . blocModify $ \conn -> runInsert conn contractsInstanceTable
           ( Nothing
@@ -207,11 +207,11 @@ postUsersContractMethodList
   -> PostMethodListRequest
   -> Bloc [PostUsersContractMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-  txsFuncIds <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
+  txsFuncIdsXabis <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
     cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
     functionId <- getFunctionId cmId methodcallMethodName
-
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+    xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+    let eitherErrorOrContract = xAbiToContract xabi
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
@@ -236,8 +236,8 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       (sel <> argsBin)
       nonceIncr
     -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-    return (tx,functionId)
-  let (txs,funcIds) = unzip txsFuncIds
+    return (tx,functionId,xabi)
+  let (txs,funcIds,xabis) = unzip3 txsFuncIdsXabis
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
   if postmethodlistrequestResolve
@@ -247,12 +247,12 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
     let zipped = resultJoiner <$> zip funcIds hashes
         resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
 
-    for zipped $ \(funcId,txResult) -> do
+    for (zip zipped xabis) $ \((funcId,txResult),xabi) -> do
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
       let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
       orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
                               either (throwError . UserError . Text.pack) return $
-                                xabiTypeToType (error "missing typedefs in postUsersContractMethod") indexedTypeType
+                                xabiTypeToType xabi indexedTypeType
       let txResp = transactionresultResponse txResult
 
       -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
@@ -279,7 +279,8 @@ postUsersContractMethod
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
 
-    eitherErrorOrContract <- xAbiToContract <$> getContractXabiByMetadataId cmId
+    xabi <- getContractXabiByMetadataId cmId
+    let eitherErrorOrContract = xAbiToContract xabi
 
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
@@ -308,9 +309,7 @@ postUsersContractMethod
     orderedResultTypes <-
       for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
         either (throwError . UserError . Text.pack) return $
-          xabiTypeToType
-              (error "missing typedefs in postUsersContractMethod")
-              indexedTypeType
+          xabiTypeToType xabi indexedTypeType
 
     txResult <- pollTxResult hash
 
@@ -438,7 +437,7 @@ prepareTx userName password addr toAddr TxParams{..} value code nonceIncr = do
       accts <- blocStrato $ getAccountsFilter
         accountsFilterParams{qaAddress = Just addr}
       Nonce nonce <- case listToMaybe accts of
-        Nothing -> throwError . UserError $ "strato error: failed to find account"
+        Nothing   -> throwError . UserError $ "strato error: failed to find account"
         Just acct -> return $ accountNonce acct
       let newNonce = Nonce (nonce + fromIntegral nonceIncr)
       return $ prepareSignedTx sk addr UnsignedTransaction

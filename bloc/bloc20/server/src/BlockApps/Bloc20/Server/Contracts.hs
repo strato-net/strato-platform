@@ -72,10 +72,9 @@ getContractsState contract@(ContractName contractName) contractId = do
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
-
   metadataId <- case contractId of
-    Unnamed contractAddress -> getContractsMetaDataIdExhaustive contractName contractAddress
-    _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
 
   address <- case contractId of
     Unnamed addr -> return addr

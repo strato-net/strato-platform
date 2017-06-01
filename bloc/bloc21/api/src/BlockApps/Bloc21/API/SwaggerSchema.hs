@@ -34,6 +34,3 @@ instance ToParamSchema Natural where
   toParamSchema _ =  mempty
     & type_ .~ SwaggerInteger
     & minimum_ ?~ 0
-
-instance ToSchema Natural where
-  declareNamedSchema = pure . named "Natural" . paramSchemaToSchema

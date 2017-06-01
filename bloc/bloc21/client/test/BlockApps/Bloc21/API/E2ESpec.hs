@@ -1018,3 +1018,58 @@ spec =
         (postUsersContractMethod iamUsername iamUserAddr cName (fromJust . stringAddress . Text.unpack $ storeAddr)  storeMethodReq)
         (ClientEnv mgr blocUrl)
       storeEither `shouldSatisfy` isRight
+
+    it "should create ReturnTuple contract, call methods " $ \ TestConfig {..} -> do
+      let
+          userName1 = UserName "blockapps2"
+      postUsersEither1 <- runClientM (postUsersUser userName1 True pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      returnTupleSrc <- readSolFile "ReturnTuple.sol"
+      let
+        Right addr1 = postUsersEither1
+        params1 = accountsFilterParams {qaAddress = Just addr1}
+        testContractName' = "ReturnTuple"
+        hash = keccak256ByteString $ keccak256 "foo"
+        arghash = ArgString $ Text.decodeUtf8 $ Base16.encode hash
+        argcontents = ArgString "foo"
+        postUsersContractRequest = PostUsersContractRequest
+          { postuserscontractrequestSrc = returnTupleSrc
+          , postuserscontractrequestPassword = pw
+          , postuserscontractrequestContract = Just testContractName'
+          , postuserscontractrequestArgs = Just $ Map.fromList
+              [("_hash",arghash),("_contents",argcontents)]
+          , postuserscontractrequestTxParams = txParams
+          , postuserscontractrequestValue = Just $ Strung 0
+          }
+      eAccts1 <- runClientM (getAccountsFilter params1) (ClientEnv mgr stratoUrl)
+      eAccts1 `shouldSatisfy` isRight
+      let
+        Right accts1 = eAccts1
+      length accts1 `shouldBe` 1
+      postUsersContractEither <- runClientM (postUsersContract userName1 addr1 postUsersContractRequest) (ClientEnv mgr blocUrl)
+      postUsersContractEither `shouldSatisfy` isRight
+
+      let
+        Right contractAddr = postUsersContractEither
+
+      -- call get value and verify
+
+      let
+        contractNameDeployer = ContractName testContractName'
+        postUsersContractMethodRequestGet = PostUsersContractMethodRequest
+          { postuserscontractmethodPassword = pw
+          , postuserscontractmethodMethod = "getBlobData"
+          , postuserscontractmethodArgs = Map.empty
+          , postuserscontractmethodValue = Just $ Strung 0
+          , postuserscontractmethodTxParams = txParams
+          }
+      postUsersContractMethodEitherGet <- runClientM
+        (postUsersContractMethod userName1 addr1 contractNameDeployer contractAddr postUsersContractMethodRequestGet)
+        (ClientEnv mgr blocUrl)
+      postUsersContractMethodEitherGet `shouldSatisfy` isRight
+      let
+        Right (PostUsersContractMethodResponse returnValues) = postUsersContractMethodEitherGet
+      returnValues `shouldBe`
+        [ SolidityValueAsString (Text.pack (Char8.unpack hash))
+        , SolidityValueAsString "foo"
+        ]

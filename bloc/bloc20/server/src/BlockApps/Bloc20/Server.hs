@@ -9,8 +9,6 @@ module BlockApps.Bloc20.Server where
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Proxy
 import           Data.Swagger
---import           Network.Wai.Middleware.Cors
---import           Network.Wai.Middleware.RequestLogger
 import           Servant
 import           Servant.Swagger
 
@@ -59,7 +57,6 @@ blocSwagger = toSwagger (Proxy @BlocAPI)
     & info.title   .~ "Bloc API"
     & info.version .~ "2.0"
     & info.description ?~ "This is the V2.0 API for the BlocH"
-    & host ?~ Host "localhost" (Just 8000) -- this should not be hard coded
     & basePath ?~ "/bloc/v2.0"
 
 type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
@@ -69,10 +66,3 @@ serveBlocAndDocs
   -> Server (BlocAPI :<|> BlocDocsAPI)
 serveBlocAndDocs blocEnv = serveBloc blocEnv
   :<|> return blocSwagger
-
---appBloc :: BlocEnv -> Application
---appBloc
---  = simpleCors
---  . logStdoutDev
---  . serve (Proxy @ (BlocAPI :<|> BlocDocsAPI))
---  . serveBlocAndDocs
