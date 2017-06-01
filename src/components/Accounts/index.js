@@ -1,51 +1,69 @@
 import React, {Component} from 'react';
+import {fetchAccounts} from './accounts.actions'
+import {connect} from 'react-redux';
+import {withRouter} from 'react-router-dom';
 import {ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
+import BigNumber from 'bignumber.js'
 
 class Accounts extends Component {
-  dataMock = [
-  {
-    "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
-    "username": "Alice",
-    "balance": "1234",
-  }, {
-    "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-    "username": "Bob",
-    "balance": "2345",
-  }, {
-    "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
-    "username": "Charlie",
-    "balance": "3456",
-  }, {
-    "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-    "username": "Desiree",
-    "balance": "4567",
-  }, {
-    "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
-    "username": "Edward",
-    "balance": "5689",
-  }];
 
-  //1000000000000000000 wei per ether
-  tableRows = this.dataMock.map(function (val, i) {
-    return <tr>
-      <td className="col-sm-3">
-        {val.account}
-      </td>
-      <td className="col-sm-3">
-        {val.username}
-      </td>
-      <td className="col-sm-3">
-        {val.balance} wei
-      </td>
-      <td className="col-sm-3">
-        <ProgressBar className="pt-intent-primary" value={Math.random()}/>
-      </td>
-    </tr>
-  });
+  componentDidMount() { //FIXME Put fetchTx on a timer?
+    this.props.fetchAccounts();
+  }
+
+  getSum = (total, num) => {
+    if (num === undefined) {
+      return total;
+    }
+    return total + new Number(num.balance);
+  }
+
+  // dataMock = [
+  // {
+  //   "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
+  //   "username": "Alice",
+  //   "balance": "1234",
+  // }, {
+  //   "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
+  //   "username": "Bob",
+  //   "balance": "2345",
+  // }, {
+  //   "account": "47424dbce71e182d2836045b76a7e1ce459d6e08",
+  //   "username": "Charlie",
+  //   "balance": "3456",
+  // }, {
+  //   "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
+  //   "username": "Desiree",
+  //   "balance": "4567",
+  // }, {
+  //   "account": "6ad318ce7b79c37b262fbda8a603365bbdbd41be",
+  //   "username": "Edward",
+  //   "balance": "5689",
+  // }];
 
   render() {
+    const maxBlockNum = Math.max(...this.props.accounts.map(value => {
+      return value === undefined ? 1 : value.latestBlockNum
+    }));
+
+    var undef = 0;
+
+    const rows = this.props.accounts.map(function (value, i) {
+      if (value !== undefined) {
+        return (<tr key={i}>
+          <td className="col-sm-4">{value.address}</td>
+          <td className="col-sm-4">{new BigNumber(value.balance).div(1000000000000000000).toString()}</td>
+          <td className="col-sm-4"><ProgressBar className="pt-intent-primary"
+                                                value={value.latestBlockNum / maxBlockNum}/></td>
+        </tr>)
+      }
+      else {undef++;}
+    });
+
+    const totalEther = new BigNumber(this.props.accounts.reduce(this.getSum, 0)).div(1000000000000000000).toString();
+
     return (
       <div>
         <div className="row">
@@ -53,39 +71,36 @@ class Accounts extends Component {
             <h2 style={{margin: 0}}>Accounts</h2>
           </div>
           <div className="col-sm-3 text-right">
-            {/* //FIXME Align the button to the Accounts Tab h2
-             * align it to the right edge as well*/}
-            {/*<Button style={{"margin": "1.5px"}} className="pt-intent-primary pt-icon-add">Create User</Button>*/}
             <CreateUser/>
           </div>
         </div>
         <div className="row ">
           <div className="col-sm-3">
-            <NumberCard number={1230498} description="Ether"/>
+            <NumberCard number={totalEther} description="Ether"/>
           </div>
           <div className="col-sm-3">
             <NumberCard number={234241} description="TX Volume"/>
           </div>
           <div className="col-sm-3">
-            <NumberCard number={245} description="Users"/>
+            <NumberCard number={this.props.accounts.length-undef} description="Users"/>
           </div>
           <div className="col-sm-3">
             <NumberCard number={123456} description="Arbitrary User Metric"/>
           </div>
         </div>
-        <div className="row ">
+        <div className="row">
           <div className="col-lg-12">
             <div className="pt-card pt-dark pt-elevation-2">
               <table className="pt-table pt-interactive ">
                 <thead>
-                <th className="col-sm-3"><h4>Account</h4></th>
-                <th className="col-sm-3"><h4>Username</h4></th>
-                <th className="col-sm-3"><h4>Balance</h4></th>
-                <th className="col-sm-3"><h4>User Activity</h4></th>
+                <th className="col-sm-4"><h4>Account</h4></th>
+                {/*<th className="col-sm-3"><h4>Username</h4></th>*/}
+                <th className="col-sm-4"><h4>Balance</h4></th>
+                <th className="col-sm-4"><h4>User Activity</h4></th>
                 </thead>
 
                 <tbody>
-                {this.tableRows}
+                {rows}
                 </tbody>
               </table>
             </div>
@@ -96,4 +111,10 @@ class Accounts extends Component {
   }
 }
 
-export default Accounts
+function mapStateToProps(state) {
+  return {
+    accounts: state.accounts.accounts
+  };
+}
+
+export default withRouter(connect(mapStateToProps, {fetchAccounts})(Accounts));
