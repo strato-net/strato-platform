@@ -8,9 +8,9 @@ import {
   fetchAccountsSuccess,
   fetchAccountsFailure
 } from './accounts.actions';
+import { APIURL } from '../../env';
 
-const APIURL = "http://bayar6.eastus.cloudapp.azure.com/" //FIXME hard coded api url
-const addressUrl = APIURL + "bloc/addresses"
+const addressUrl = APIURL + "bloc/addresses";
 
 function getAccounts() {
   return fetch(

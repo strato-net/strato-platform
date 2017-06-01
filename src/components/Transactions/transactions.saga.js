@@ -8,9 +8,9 @@ import {
   fetchTxSuccess,
   fetchTxFailure
 } from './transactions.actions';
+import { APIURL } from '../../env';
 
-const url = "http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2/transaction/last/5" //FIXME hard coded api url
-/*const url = APIURL + "/strato-api/eth/v1.2/transaction/last/5" */
+const url = APIURL+ "strato-api/eth/v1.2/transaction/last/5" 
 
 function getTx() {
   return fetch(

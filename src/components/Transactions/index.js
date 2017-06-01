@@ -8,8 +8,21 @@ import * as moment from 'moment';
 
 class Transactions extends Component {
 
-  componentDidMount() { //FIXME Put fetchTx on a timer?
+  componentDidMount() {
     this.props.fetchTx();
+    this.startPoll();
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.timeout)
+  }
+
+  startPoll() {
+    //console.log('startPoll', this.props);
+    const fetchTx = this.props.fetchTx;
+    this.timeout = setInterval(function () {
+      fetchTx();
+    }, 5000);
   }
 
   render() {

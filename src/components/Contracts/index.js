@@ -9,6 +9,19 @@ class Contracts extends Component {
 
   componentDidMount() {
     this.props.fetchContracts();
+    this.startPoll();
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.timeout)
+  }
+
+  startPoll() {
+    //console.log('startPoll', this.props);
+    const fetchContracts = this.props.fetchContracts;
+    this.timeout = setInterval(function () {
+      fetchContracts();
+    }, 5000);
   }
 
   render() {

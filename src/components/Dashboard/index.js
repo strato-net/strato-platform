@@ -1,35 +1,90 @@
-import React, { Component } from 'react';
-import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import React, {Component} from 'react';
+import {connect} from 'react-redux';
+import {withRouter} from 'react-router-dom';
 import Transactions from "../Transactions";
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
-import { Text } from '@blueprintjs/core';
+import {Text} from '@blueprintjs/core';
 import './dashboard.css';
 
 class Dashboard extends Component {
 
-  componentDidMount() { //FIXME Put fetchDifficulty on a timer?
+  componentDidMount() {
     this.props.fetchBlockData();
+    this.startPoll();
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.timeout)
+  }
+
+  startPoll() {
+    //console.log('startPoll', this.props);
+    const dashboardFetchStatus = this.props.fetchBlockData;
+    this.timeout = setInterval(function () {
+      dashboardFetchStatus();
+    }, 5000);
+  }
+
+  difficulty(blockData) {
+    return Object.values(blockData).map(function (val, i) {
+      return {x: i, y: val.difficulty};
+    })
+  }
+
+  blockPropogation(blockData) {
+    let timeData = [];
+    let times = Object.values(blockData).map(function (val) {
+      return val.timestamp
+    });
+
+    var i= 0;
+    for (; i < times.length-1; i++) {
+      let obj = {x: i, y: Math.abs((new Date(times[i+1]).getSeconds()) - (new Date(times[i]).getSeconds()))};
+      timeData.push(obj);
+    }
+    return timeData;
+  }
+
+
+  txCount(blockData) {
+    return blockData.map(val => {
+      return val.length
+    }).reduce((x, y) => {
+      return x + y
+    }, 0);
+  }
+
+  txFreq(blockData) {
+    return blockData.map(function (val, i) {
+      return {x: i, y: val.length};
+    })
+  }
+
+  txType(blockData) {
+    let types = {"FunctionCall" : 0, "Transfer": 0, "Contract": 0};
+    blockData.map(function (val) {
+      val.map(v => { types[v.transactionType]++ });
+    })
+    return [ {val: types["FunctionCall"]}, {val: types["Transfer"]}, {val: types["Contract"]} ];
   }
 
   render() {
-    const difficultyData = [{ x: 1, y: 134392 }, { x: 2, y: 126456 }, { x: 3, y: 131392 },
-            { x: 4, y: 131348 }, { x: 5, y: 132264 }, { x: 6, y: 111200 },
-            { x: 7, y: 141200 }, { x: 8, y: 151136 }, { x: 9, y: 91072 },
-            { x: 10, y: 130000 }, { x: 11, y: 135264 }, { x: 12, y: 131272 },
-            { x: 13, y: 100000 }, { x: 14, y: 121136 }, { x: 15, y: 141072 }];
-    const txCountData = [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 1 },
-            { x: 4, y: 1 }, { x: 5, y: 1 }, { x: 6, y: 3 },
-            { x: 7, y: 2 }, { x: 8, y: 2 }, { x: 9, y: 1 },
-            { x: 10, y: 1 }, { x: 11, y: 4 }, { x: 12, y: 2 },
-            { x: 13, y: 3 }, { x: 14, y: 1 }, { x: 15, y: 2 }];
-    const blockPropData = [{ x: 1, y: 119650345 }, { x: 2, y: 145 }, { x: 3, y: 145 },
-            { x: 4, y: 14945 }, { x: 5, y: 14960345 }, { x: 6, y: 140345 },
-            { x: 7, y: 1490345 }, { x: 8, y: 1490345 }, { x: 9, y: 14965035 },
-            { x: 10, y: 1496345 }, { x: 11, y: 14950345 }, { x: 12, y: 14965230345 },
-            { x: 13, y: 1496545 }, { x: 14, y: 149650345 }, { x: 15, y: 1496345 }];
+    const blockData = Object.values(this.props.blockData).map(val => {
+      return val.blockData
+    });
+
+    const receiptTransactions = Object.values(this.props.blockData).map(val => {
+      return val.receiptTransactions
+    });
+
+    const difficultyData = this.difficulty(blockData);
+    const txFreqData = this.txFreq(receiptTransactions);
+    const txCount = this.txCount(receiptTransactions);
+    const blockPropData = this.blockPropogation(blockData);
+    const txTypeData = this.txType(receiptTransactions);
+    console.log(txTypeData);
 
     return (
       <div className="container-fluid pt-dark">
@@ -43,16 +98,16 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
+            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"}/>
           </div>
           <div className="col-sm-3">
-            <BarGraph data={txCountData} label={"Transaction Count"} identifier={"TxCount"}/>
+            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"}/>
           </div>
           <div className="col-sm-3">
-            <BarGraph data={blockPropData} label={"Block Propagation"} identifier={"BlockProp"}/>
+            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"}/>
           </div>
           <div className="col-sm-3">
-            <PieChart />
+            <PieChart data={txTypeData}/>
           </div>
         </div>
         <div className="row">
@@ -70,7 +125,9 @@ class Dashboard extends Component {
                   <small>Coinbase</small>
                 </div>
                 <div className="col-xs-9">
-                  <Text ellipsize={true}><small> e062bc64387256babbe59456b8daadeb32eae5a4</small></Text>
+                  <Text ellipsize={true}>
+                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
+                  </Text>
                 </div>
               </div>
               <div className="row pt-text-muted">
@@ -97,7 +154,9 @@ class Dashboard extends Component {
                   <small>Coinbase</small>
                 </div>
                 <div className="col-xs-9">
-                  <Text ellipsize={true}><small> e062bc64387256babbe59456b8daadeb32eae5a4</small></Text>
+                  <Text ellipsize={true}>
+                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
+                  </Text>
                 </div>
               </div>
               <div className="row pt-text-muted">
@@ -124,7 +183,9 @@ class Dashboard extends Component {
                   <small>Coinbase</small>
                 </div>
                 <div className="col-xs-9">
-                  <Text ellipsize={true}><small> e062bc64387256babbe59456b8daadeb32eae5a4</small></Text>
+                  <Text ellipsize={true}>
+                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
+                  </Text>
                 </div>
               </div>
               <div className="row pt-text-muted">
@@ -151,7 +212,9 @@ class Dashboard extends Component {
                   <small>Coinbase</small>
                 </div>
                 <div className="col-xs-9">
-                  <Text ellipsize={true}><small> e062bc64387256babbe59456b8daadeb32eae5a4</small></Text>
+                  <Text ellipsize={true}>
+                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
+                  </Text>
                 </div>
               </div>
               <div className="row pt-text-muted">
@@ -188,4 +251,4 @@ function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchBlockData })(Dashboard))
+export default withRouter(connect(mapStateToProps, {fetchBlockData})(Dashboard))

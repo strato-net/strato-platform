@@ -8,8 +8,8 @@ import {
   createUserSuccess,
   createUserFailure,
 } from './createUser.actions';
+import { APIURL } from '../../env';
 
-const APIURL = "http://bayar6.eastus.cloudapp.azure.com/" //FIXME hard coded api url
 const url = APIURL + "bloc/users/:user"
 
 function createUserApiCall(username, password) {
