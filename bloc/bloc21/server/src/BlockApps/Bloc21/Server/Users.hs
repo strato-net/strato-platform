@@ -358,7 +358,7 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
               textToArgType "Address" False ""
             Xabi.Struct _ _ ->
               textToArgType "Struct" False ""
-            Xabi.Enum _ _ ->
+            Xabi.Enum{} ->
               textToArgType "Enum" False ""
             Xabi.Array dy len ety ->
               let

@@ -27,7 +27,6 @@ module BlockApps.Strato.Client
   ) where
 
 import           Data.Proxy
-import           Data.Text              (Text)
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API

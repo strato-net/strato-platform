@@ -53,8 +53,8 @@ solidityContract = do
            , xabiConstr = maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
            , xabiVars =
                 Map.fromList $
-                zipWith (\v i -> fmap (Xabitype.VarType i Nothing) v)
-                [ (Text.pack n, v) | (n, VariableDeclaration v) <- declarations]
+                zipWith (\(v, isPublic) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing)) v)
+                [ ((Text.pack n, v), isPublic) | (n, VariableDeclaration v isPublic) <- declarations]
                 [0, 32..]
            , xabiTypes =
              Map.fromList $
@@ -80,7 +80,7 @@ data Declaration =
   | EnumDeclaration Xabi.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
-  | VariableDeclaration Xabitype.Type
+  | VariableDeclaration Xabitype.Type Bool
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
@@ -102,7 +102,7 @@ structDeclaration = do
   reserved "struct"
   structName <- identifier
   structFields <- braces $ many1 $ do
-    (fieldName, VariableDeclaration decl) <- simpleVariableDeclaration
+    (fieldName, VariableDeclaration decl _) <- simpleVariableDeclaration
     semi
     return (fieldName, decl)
   return
@@ -175,7 +175,7 @@ simpleVariableDeclaration = do
   -- generate accessor functions
   --TODO - deal with the variableVisible flag
 --  (variableVisible, variableIsPublic) <- option (True, False) $
-  (_, _) <- option (True, False) $
+  (_, variableIsPublic) <- option (True, False) $
                      (reserved "constant" >> return (False, False)) <|>
                      (reserved "storage" >> return (True, False)) <|>
                      (reserved "memory" >> return (False, False)) <|>
@@ -188,7 +188,7 @@ simpleVariableDeclaration = do
 --        then SingleValue variableType
 --        else NoValue
 
-  return (variableName, VariableDeclaration variableType)
+  return (variableName, VariableDeclaration variableType variableIsPublic)
 
 --  ObjDef{
 --    objName = variableName,

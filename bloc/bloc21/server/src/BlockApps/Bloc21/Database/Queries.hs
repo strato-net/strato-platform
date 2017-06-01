@@ -1112,7 +1112,7 @@ insertXabiType = \case
     --       )
     --     | (name,(atby,tyid)) <- Map.toList fieldsWithIds]
     -- return parentTypeId
-  Xabi.Enum bytes typedef ->
+  Xabi.Enum bytes typedef _ ->
     blocModify1 $ \conn ->
       runInsertReturning conn xabiTypesTable
         ( Nothing
@@ -1225,7 +1225,7 @@ getXabiType typeId = do
       return $ Xabi.Struct xtby xttd'
     "Enum" -> do
       xttd' <- blocMaybe "Missing typedef in type Enum" xttd
-      return $ Xabi.Enum xtby xttd'
+      return $ Xabi.Enum xtby xttd' Nothing
     "Array" -> do
       xtetid' <- blocMaybe "Missing entry type id in type Array" xtetid
       xtet <- getXabiType xtetid'
