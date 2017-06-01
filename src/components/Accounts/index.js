@@ -66,7 +66,7 @@ class Accounts extends Component {
 
     return (
       <div>
-        <div className="row smd-content-row">
+        <div className="row">
           <div className="col-sm-9 text-left">
             <h2 style={{margin: 0}}>Accounts</h2>
           </div>
@@ -74,7 +74,7 @@ class Accounts extends Component {
             <CreateUser/>
           </div>
         </div>
-        <div className="row smd-content-row">
+        <div className="row ">
           <div className="col-sm-3">
             <NumberCard number={totalEther} description="Ether"/>
           </div>
@@ -88,10 +88,10 @@ class Accounts extends Component {
             <NumberCard number={123456} description="Arbitrary User Metric"/>
           </div>
         </div>
-        <div className="row smd-content-row">
+        <div className="row">
           <div className="col-lg-12">
-            <div className="pt-card pt-elevation-2">
-              <table className="pt-table pt-interactive smd-full-width">
+            <div className="pt-card pt-dark pt-elevation-2">
+              <table className="pt-table pt-interactive ">
                 <thead>
                 <th className="col-sm-4"><h4>Account</h4></th>
                 {/*<th className="col-sm-3"><h4>Username</h4></th>*/}

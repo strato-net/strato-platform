@@ -29,7 +29,7 @@ class CreateUser extends Component {
           isOpen={this.props.isOpen}
           onClose={this.props.closeOverlay}
           title="Create New User"
-          className=""
+          className="pt-dark"
         >
           <form>
             {/*FIXME Text input divs are not positioned sensibly */}

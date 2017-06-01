@@ -8,7 +8,7 @@ import { Textfit } from 'react-textfit';
 class NumberCard extends Component {
   render() {
     return (
-      <div className="col-sm pt-card pt-elevation-2">
+      <div className="col-sm pt-card pt-dark pt-elevation-2">
         <div className="text-right number">
             <h1>
               <Textfit className="text-fit" mode="single" max={36}>
