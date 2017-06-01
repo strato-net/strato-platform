@@ -6,7 +6,7 @@ class MenuBar extends Component {
 
   render() {
     return (
-      <nav className="pt-navbar pt-dark">
+      <nav className="pt-navbar pt-dark" style={{position: 'fixed', width: '100%'}}>
         <div className="pt-navbar-group pt-align-left">
           <div>
             <span className="pt-icon-large pt-icon-menu smd-sidebar-button" />

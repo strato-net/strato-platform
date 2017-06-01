@@ -46,7 +46,7 @@ class BarGraph extends Component {
     const xScale = new Plottable.Scales.Linear().domain([0, 16]);
     const yScale = new Plottable.Scales.Linear().domain([scaleMin, scaleMax]);
 
-    // eslint-disable-next-line
+
     this.state.dataset = new Plottable.Dataset(this.props.data);
     this.state.plot = new Plottable.Plots.Bar()
       .addDataset(this.state.dataset)
