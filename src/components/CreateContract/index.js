@@ -47,6 +47,7 @@ class CreateContract extends Component {
           isOpen={this.props.isOpen}
           onClose={this.props.closeOverlay}
           title="Create New Contract"
+          className="pt-dark"
         >
           
           <div className="pt-dialog-body">
