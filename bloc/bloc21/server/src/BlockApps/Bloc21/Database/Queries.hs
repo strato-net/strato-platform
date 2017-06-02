@@ -1395,7 +1395,7 @@ getFunctionId cmId funcName = blocQuery1 $ proc () -> do
 
 getEnumValues :: Int32 -> Text -> Bloc [(Text,Int)]
 getEnumValues cmId enumName = blocQuery $
-  orderBy (asc (\ (_,ix) -> ix)) $ proc () -> do
+  orderBy (asc snd) $ proc () -> do
     (name,enumValue,enumIndex,contractMetaDataId,ty) <- joinTable -< ()
     restrict -< contractMetaDataId .== constant cmId
       .&& name .== constant enumName
@@ -1407,9 +1407,3 @@ getEnumValues cmId enumName = blocQuery $
       (\ (tdId,_,_,_,_) (_,_,_,typedefId) -> tdId .== typedefId)
       (queryTable xabiTypeDefsTable)
       (queryTable xabiEnumNamesTable)
-
-  -- limit 1 . orderBy (desc id) $ proc () -> do
-  --   (_,_,_,_,name1,name2,cm2Id) <- linkedContractsJoinTable -< ()
-  --   restrict -< name1 .== constant contractName1
-  --   restrict -< name2 .== constant contractName2
-  --   returnA -< cm2Id
