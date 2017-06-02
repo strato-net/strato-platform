@@ -58,9 +58,9 @@ echo "Running vm tests..."
 echo "Running e2e tests..."
 if [[ "$enableSsl" == true ]]
 then
-  node_modules/mocha/bin/mocha --config $rootDir/test-https.config.yaml $suite
+  node_modules/mocha/bin/mocha -b --config $rootDir/test-https.config.yaml $suite
 else
-  node_modules/mocha/bin/mocha --config $rootDir/test.config.yaml $suite
+  node_modules/mocha/bin/mocha -b --config $rootDir/test.config.yaml $suite
 fi
 
 cd $rootDir
