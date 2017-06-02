@@ -37,9 +37,9 @@ aside {
 
 .active-menu-item {
   border: 1px solid $pt-dark-divider-black;
-  color: $pt-dark-code-text-color;
+  color: $pt-dark-code-text-color !important;
   background-color: $pt-dark-code-background-color;
-  text-decoration: none;
+  text-decoration: none !important;
 }
 
 .smd-sidebar-logo {
