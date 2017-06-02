@@ -115,6 +115,14 @@ getContractsSymbols (ContractName contractName) contractId = blocTransaction $ d
   vars <- blocQuery $ getXabiVariableNamesQuery metadataId
   return $ map SymbolName vars
 
+getContractsEnum :: ContractName -> MaybeNamed Address -> EnumName -> Bloc [EnumValue]
+getContractsEnum (ContractName contractName) contractId (EnumName enumName) =
+  blocTransaction $ do
+    metadataId <- case contractId of
+      Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+      Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+    map (EnumValue . fst) <$> getEnumValues metadataId enumName
+
 getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> Bloc GetContractsStateMappingResponse -- state-translation
 getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName = do
   eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
