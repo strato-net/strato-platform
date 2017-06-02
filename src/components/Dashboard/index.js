@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
-import Transactions from "../Transactions";
+import TransactionList from "../TransactionList";
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
@@ -20,7 +20,6 @@ class Dashboard extends Component {
   }
 
   startPoll() {
-    //console.log('startPoll', this.props);
     const dashboardFetchStatus = this.props.fetchBlockData;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
@@ -64,8 +63,8 @@ class Dashboard extends Component {
 
   txType(blockData) {
     let types = {"FunctionCall" : 0, "Transfer": 0, "Contract": 0};
-    blockData.map(function (val) {
-      val.map(v => { types[v.transactionType]++ });
+    blockData.forEach(function (val) {
+      val.forEach(v => { types[v.transactionType]++ });
     })
     return [ {val: types["FunctionCall"]}, {val: types["Transfer"]}, {val: types["Contract"]} ];
   }
@@ -236,7 +235,7 @@ class Dashboard extends Component {
           </div>
           <div className="col-sm-9">
             <h4>Recent Transactions</h4>
-            <Transactions />
+            <TransactionList />
           </div>
         </div>
       </div>

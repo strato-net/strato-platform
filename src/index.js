@@ -18,14 +18,14 @@ import App from "./App/";
 
 
 import blockDataReducer from './components/BlockData/block-data.reducer'
-import transactionsReducer from './components/Transactions/transactions.reducer'
+import transactionsReducer from './components/TransactionList/transactionList.reducer'
 import createUserReducer from './components/CreateUser/createUser.reducer'
 import createContractReducer from './components/CreateContract/createContract.reducer'
 import accountsReducer from './components/Accounts/accounts.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
-import watchFetchTx from './components/Transactions/transactions.saga'
+import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';

@@ -8,7 +8,8 @@ class BarGraph extends Component {
     super(props);
     this.state = {
       plot: null,
-      dataset: null
+      dataset: null,
+      firstRender: true
     }
   }
 
@@ -32,13 +33,13 @@ class BarGraph extends Component {
 
   averageY() {
     var y = 0;
-    this.props.data.map(val => {
+    this.props.data.forEach(val => {
       y += val.y;
     })
     return Math.round(y / this.props.data.length); //rounded or keep decimal?
   }
 
-  componentDidMount() {
+  renderGraph() {
     let min = this.minY();
     let max = this.maxY();
     let scaleMax = max + ((max - min) / 50 + 1);
@@ -46,7 +47,7 @@ class BarGraph extends Component {
     const xScale = new Plottable.Scales.Linear().domain([0, 16]);
     const yScale = new Plottable.Scales.Linear().domain([scaleMin, scaleMax]);
 
-
+    // TODO: fix this. Do not mutate state directly. Use redux.
     this.state.dataset = new Plottable.Dataset(this.props.data);
     this.state.plot = new Plottable.Plots.Bar()
       .addDataset(this.state.dataset)
@@ -57,12 +58,33 @@ class BarGraph extends Component {
         return d.y;
       }, yScale)
       //.animator(Plottable.Plots.Animator.MAIN, new Plottable.Animators.Easing().easingMode('quad'))
-      .animated(false)
+      .animated(true)
       .renderTo("div#bg" + this.props.identifier);
   }
 
+  componentDidMount() {
+    this.renderGraph();
+  }
+
   componentDidUpdate() {
-    this.state.dataset.data(this.props.data);
+    let min = this.minY();
+    let max = this.maxY();
+    let scaleMax = max + ((max - min) / 50 + 1);
+    let scaleMin = min - ((max - min) / 50 + 1) < 0 ? 0 : min - ((max - min) / 50 + 1);
+    const xScale = new Plottable.Scales.Linear().domain([0, 16]);
+    const yScale = new Plottable.Scales.Linear().domain([scaleMin, scaleMax]);
+
+    this.state.plot
+      .x(function (d) {
+        return d.x;
+      }, xScale)
+      .y(function (d) {
+        return d.y;
+      }, yScale)
+      .animated(this.state.firstRender);
+    this.state.dataset
+      .data(this.props.data);
+    this.state.firstRender = false;
   }
 
   render() {

@@ -14,7 +14,7 @@ aside {
 }
 
 .menu {
-  padding: 20px;
+  padding: 0px 20px;
 }
 
 .menu-item{
@@ -40,4 +40,12 @@ aside {
   color: $pt-dark-code-text-color;
   background-color: $pt-dark-code-background-color;
   text-decoration: none;
+}
+
+.smd-sidebar-logo {
+  position: absolute;
+  left: 0px;
+  bottom: 60px;
+  width: 100%;
+  text-align: center;
 }

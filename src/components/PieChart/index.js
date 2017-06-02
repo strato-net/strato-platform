@@ -15,7 +15,6 @@ class PieChart extends Component {
     const scale = new Plottable.Scales.Linear();
     const colorScale = new Plottable.Scales.InterpolatedColor();
     colorScale.range(["#FA9B4E", "#5279C7"]);
-    const data = [{ val: 4 }, { val: 2 }, { val: 10 }];
 
     this.state.dataset = new Plottable.Dataset(this.props.data);
     this.state.plot = new Plottable.Plots.Pie()
@@ -27,6 +26,15 @@ class PieChart extends Component {
   }
 
   componentDidUpdate() {
+    const scale = new Plottable.Scales.Linear();
+    const colorScale = new Plottable.Scales.InterpolatedColor();
+    colorScale.range(["#FA9B4E", "#5279C7"]);
+
+
+    this.state.plot
+      .sectorValue(function(d) { return d.val; }, scale)
+      .attr("fill", function(d) { return d.val; }, colorScale);
+      
     this.state.dataset.data(this.props.data);
   }
 

@@ -21,7 +21,6 @@ class CreateContract extends Component {
     };
 
     reader.readAsText(file);
-    console.log(payload.filename);
   }
 
   handleUsernameChange = (e) => {

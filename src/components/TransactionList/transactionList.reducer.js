@@ -2,7 +2,7 @@ import {
   FETCH_TX,
   FETCH_TX_SUCCESS,
   FETCH_TX_FAILURE,
-} from './transactions.actions';
+} from './transactionList.actions';
 
 const initialState = {
   tx: [],

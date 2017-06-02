@@ -87,7 +87,6 @@ function getAccountData(users) {
 function* fetchAccounts(action) {
   try {
     let response = yield call(getAccounts);
-    console.log(response);
     yield put(fetchAccountsSuccess(response));
   }
   catch (err) {

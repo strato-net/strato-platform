@@ -5,7 +5,6 @@ import {withRouter} from 'react-router-dom';
 import {ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
-import BigNumber from 'bignumber.js'
 
 class Accounts extends Component {
 
@@ -19,7 +18,6 @@ class Accounts extends Component {
   }
 
   startPoll() {
-    //console.log('startPoll', this.props);
     const fetchAccounts = this.props.fetchAccounts;
     this.timeout = setInterval(function () {
       fetchAccounts();
@@ -27,21 +25,16 @@ class Accounts extends Component {
   }
 
   render() {
-    const maxBlockNum = Math.max(...this.props.accounts.map(value => {
-      return value === undefined ? 1 : value.accountData.latestBlockNum
-    }));
-
     let undef = 0;
-
     var rows = this.props.accounts.map(function (value, i) {
       if (value !== undefined) {
-        return value.address.map((addr,j) => {
-          return (<tr key={value.address+i+j}>
+        return value.address.map((addr, j) => {
+          return (<tr key={value.address + i + j}>
             <td className="col-sm-4">{value.name}</td>
             <td className="col-sm-4">{addr}</td>
             <td className="col-sm-4">{value.accountData.balance}</td>
             {/*<td className="col-sm-3"><ProgressBar className="pt-intent-primary"*/}
-                                                  {/*value={value.accountData.latestBlockNum / maxBlockNum}/></td>*/}
+            {/*value={value.accountData.latestBlockNum / maxBlockNum}/></td>*/}
           </tr>)
         })
       }
@@ -49,9 +42,6 @@ class Accounts extends Component {
         undef++;
       }
     });
-    rows = rows.reduce(function (a, b) {
-      return a.concat(b);
-    }, []);
 
     return (
       <div className="container-fluid pt-dark">
@@ -67,38 +57,30 @@ class Accounts extends Component {
           <div className="col-sm-3">
             <NumberCard number={this.props.accounts.length - undef} description="Users"/>
           </div>
-            <div className="col-sm-9">
-              <div className="pt-card pt-elevation-2">
-                <div className="pt-input-group pt-dark pt-large">
-                  <span className="pt-icon pt-icon-search"></span>
-                  <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
-                </div>
-                <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout:'fixed'}}>
-                  <thead>
-                  <th className="col-sm-4"><h4>Username</h4></th>
-                  <th className="col-sm-4"><h4>Account</h4></th>
-                  <th className="col-sm-4"><h4>Balance</h4></th>
-                  {/*<th className="col-sm-3"><h4>User Activity</h4></th>*/}
-                  </thead>
-
-                  <tbody>
-                  {rows}
-                  </tbody>
-                </table>
+          <div className="col-sm-9">
+            <div className="pt-card pt-elevation-2">
+              <div className="pt-input-group pt-dark pt-large">
+                <span className="pt-icon pt-icon-search"></span>
+                <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
               </div>
-            </div>
-        </div>
+              <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
+                <thead>
+                <th className="col-sm-4"><h4>Username</h4></th>
+                <th className="col-sm-4"><h4>Account</h4></th>
+                <th className="col-sm-4"><h4>Balance</h4></th>
+                {/*<th className="col-sm-3"><h4>User Activity</h4></th>*/}
+                </thead>
 
+                <tbody>
+                {rows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
         <div className="row">
           <div className="col-sm-12">
             <br/>
-          </div>
-        </div>
-
-        <div className="row">
-          <div className="col-lg-3"></div>
-          <div className="col-lg-9">
-
           </div>
         </div>
       </div>
