@@ -4,8 +4,13 @@
   "private": true,
   "dependencies": {
     "@blueprintjs/core": "^1.17.1",
+    "bignumber.js": "^4.0.2",
+    "bootstrap": "^3.3.7",
+    "moment": "^2.18.1",
+    "plottable": "^3.1.1",
     "react": "^15.5.4",
     "react-addons-css-transition-group": "^15.5.2",
+    "react-burger-menu": "^2.0.2",
     "react-dom": "^15.5.4",
     "react-redux": "^5.0.5",
     "react-router-dom": "^4.1.1",

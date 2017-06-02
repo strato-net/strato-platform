@@ -1,0 +1,12 @@
+@import "../../node_modules/@blueprintjs/core/dist/variables.scss";
+@import "../../node_modules/plottable/plottable.css";
+
+body {
+  background: $pt-dark-app-background-color !important;
+}
+
+#outer-container {
+  margin-left: 320px;
+  padding: 0px 12px;
+  padding-top: 48px;
+}
