@@ -35,8 +35,8 @@ class Accounts extends Component {
 
     var rows = this.props.accounts.map(function (value, i) {
       if (value !== undefined) {
-        return value.address.map(addr => {
-          return (<tr key={i}>
+        return value.address.map((addr,j) => {
+          return (<tr key={value.address+i+j}>
             <td className="col-sm-4">{value.name}</td>
             <td className="col-sm-4">{addr}</td>
             <td className="col-sm-4">{value.accountData.balance}</td>
@@ -52,7 +52,6 @@ class Accounts extends Component {
     rows = rows.reduce(function (a, b) {
       return a.concat(b);
     }, []);
-    const totalEther = "123456";
 
     return (
       <div className="container-fluid pt-dark">
