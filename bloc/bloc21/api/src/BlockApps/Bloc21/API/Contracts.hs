@@ -161,7 +161,38 @@ type GetContractsSymbols = "contracts"
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "symbols"
   :> Get '[JSON] [SymbolName]
+--------------------------------------------------------------------------------
 
+-- GET /contracts/:contractName/:contractAddress/enum/:enumName
+type GetContractsEnum = "contracts"
+  :> Capture "contractName" ContractName
+  :> Capture "contractAddress" (MaybeNamed Address)
+  :> "enum"
+  :> Capture "enumName" EnumName
+  :> Get '[JSON] [EnumValue]
+
+newtype EnumName = EnumName {getEnumName :: Text} deriving (Eq,Show,Generic)
+newtype EnumValue = EnumValue {getEnumValue :: Text} deriving (Eq,Show,Generic)
+instance ToCapture (Capture "enumName" EnumName) where
+  toCapture _ = DocCapture "enumName" "the name of a user defined enum type"
+instance ToSample EnumName where
+  toSamples _ = singleSample (EnumName "TrafficLight")
+instance ToSample EnumValue where
+  toSamples _ = samples (EnumValue <$> ["Red","Yellow","Green"])
+instance ToHttpApiData EnumName where
+  toUrlPiece = getEnumName
+instance FromHttpApiData EnumName where
+  parseUrlPiece = Right . EnumName
+instance Arbitrary EnumValue where
+  arbitrary = elements (EnumValue <$> ["Red","Yellow","Green"])
+instance FromJSON EnumValue where parseJSON = fmap EnumValue . parseJSON
+instance ToJSON EnumValue where toJSON = toJSON . getEnumValue
+instance ToSchema EnumValue where
+-- instance ToSchema FunctionName where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.name ?~ "Enum Value"
+    & mapped.schema.example ?~ toJSON (EnumValue "Red")
+instance ToParamSchema EnumName
 --------------------------------------------------------------------------------
 -- GET /contracts/:contractName/:contractAddress/state/:mapping/:key
 type GetContractsStateMapping = "contracts"

@@ -54,6 +54,7 @@ type BlocAPI =
   :<|> GetContractsSymbols
   :<|> GetContractsStateMapping
   :<|> GetContractsStates
+  :<|> GetContractsEnum
   :<|> PostContractsCompile
   -- /search endpoints
   :<|> GetSearchContract

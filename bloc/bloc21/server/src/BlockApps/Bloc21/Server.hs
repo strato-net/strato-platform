@@ -40,6 +40,7 @@ bloc = getHomepage
   :<|> getContractsSymbols
   :<|> getContractsStateMapping
   :<|> getContractsStates
+  :<|> getContractsEnum
   :<|> postContractsCompile
   :<|> getSearchContract
   :<|> getSearchContractState

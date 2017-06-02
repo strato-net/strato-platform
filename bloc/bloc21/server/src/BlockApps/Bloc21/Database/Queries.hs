@@ -1392,3 +1392,18 @@ getFunctionId cmId funcName = blocQuery1 $ proc () -> do
     .&& name .== constant funcName
     .&& Opaleye.not isConstr
   returnA -< xfId
+
+getEnumValues :: Int32 -> Text -> Bloc [(Text,Int)]
+getEnumValues cmId enumName = blocQuery $
+  orderBy (asc snd) $ proc () -> do
+    (name,enumValue,enumIndex,contractMetaDataId,ty) <- joinTable -< ()
+    restrict -< contractMetaDataId .== constant cmId
+      .&& name .== constant enumName
+      .&& ty .== constant ("Enum" :: Text)
+    returnA -< (enumValue,enumIndex)
+  where
+    joinTable = joinF
+      (\ (_,name,contractMetaDataId,ty,_) (_,enumValue,enumIndex,_) -> (name,enumValue,enumIndex,contractMetaDataId,ty))
+      (\ (tdId,_,_,_,_) (_,_,_,typedefId) -> tdId .== typedefId)
+      (queryTable xabiTypeDefsTable)
+      (queryTable xabiEnumNamesTable)
