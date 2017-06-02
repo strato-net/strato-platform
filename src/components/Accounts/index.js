@@ -37,11 +37,11 @@ class Accounts extends Component {
       if (value !== undefined) {
         return value.address.map(addr => {
           return (<tr key={i}>
-            <td className="col-sm-3">{value.name}</td>
-            <td className="col-sm-3">{addr}</td>
-            <td className="col-sm-3">{value.accountData.balance}</td>
-            <td className="col-sm-3"><ProgressBar className="pt-intent-primary"
-                                                  value={value.accountData.latestBlockNum / maxBlockNum}/></td>
+            <td className="col-sm-4">{value.name}</td>
+            <td className="col-sm-4">{addr}</td>
+            <td className="col-sm-4">{value.accountData.balance}</td>
+            {/*<td className="col-sm-3"><ProgressBar className="pt-intent-primary"*/}
+                                                  {/*value={value.accountData.latestBlockNum / maxBlockNum}/></td>*/}
           </tr>)
         })
       }
@@ -55,45 +55,51 @@ class Accounts extends Component {
     const totalEther = "123456";
 
     return (
-      <div>
+      <div className="container-fluid pt-dark">
         <div className="row">
           <div className="col-sm-9 text-left">
-            <h2 style={{margin: 0}}>Accounts</h2>
+            <h3>Accounts</h3>
           </div>
           <div className="col-sm-3 text-right">
             <CreateUser/>
           </div>
         </div>
-        <div className="row ">
-          <div className="col-sm-3">
-            <NumberCard number={totalEther} description="Ether"/>
-          </div>
-          <div className="col-sm-3">
-            <NumberCard number={234241} description="TX Volume"/>
-          </div>
+        <div className="row">
           <div className="col-sm-3">
             <NumberCard number={this.props.accounts.length - undef} description="Users"/>
           </div>
-          <div className="col-sm-3">
-            <NumberCard number={123456} description="Arbitrary User Metric"/>
+            <div className="col-sm-9">
+              <div className="pt-card pt-elevation-2">
+                <div className="pt-input-group pt-dark pt-large">
+                  <span className="pt-icon pt-icon-search"></span>
+                  <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
+                </div>
+                <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout:'fixed'}}>
+                  <thead>
+                  <th className="col-sm-4"><h4>Username</h4></th>
+                  <th className="col-sm-4"><h4>Account</h4></th>
+                  <th className="col-sm-4"><h4>Balance</h4></th>
+                  {/*<th className="col-sm-3"><h4>User Activity</h4></th>*/}
+                  </thead>
+
+                  <tbody>
+                  {rows}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+        </div>
+
+        <div className="row">
+          <div className="col-sm-12">
+            <br/>
           </div>
         </div>
-        <div className="row">
-          <div className="col-lg-12">
-            <div className="pt-card pt-dark pt-elevation-2">
-              <table className="pt-table pt-interactive ">
-                <thead>
-                <th className="col-sm-3"><h4>Account</h4></th>
-                <th className="col-sm-3"><h4>Username</h4></th>
-                <th className="col-sm-3"><h4>Balance</h4></th>
-                <th className="col-sm-3"><h4>User Activity</h4></th>
-                </thead>
 
-                <tbody>
-                {rows}
-                </tbody>
-              </table>
-            </div>
+        <div className="row">
+          <div className="col-lg-3"></div>
+          <div className="col-lg-9">
+
           </div>
         </div>
       </div>
