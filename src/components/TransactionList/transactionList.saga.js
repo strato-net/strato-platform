@@ -7,10 +7,10 @@ import {
   FETCH_TX,
   fetchTxSuccess,
   fetchTxFailure
-} from './transactions.actions';
+} from './transactionList.actions';
 import { APIURL } from '../../env';
 
-const url = APIURL+ "strato-api/eth/v1.2/transaction/last/5" 
+const url = APIURL+ "strato-api/eth/v1.2/transaction/last/5"
 
 function getTx() {
   return fetch(
