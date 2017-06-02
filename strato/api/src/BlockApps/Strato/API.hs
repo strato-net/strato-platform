@@ -11,7 +11,7 @@ import           Numeric.Natural
 import           Servant.API
 
 type API =
-  "transaction"
+  "eth":> "v1.2" :> "transaction"
     :> QueryParam "from" Address
     :> QueryParam "to" Address
     :> QueryParam "address" Address
@@ -26,24 +26,24 @@ type API =
     :> QueryParam "mingaslimit" Natural
     :> QueryParam "blocknumber" Natural
     :> Get '[JSON] [WithNext Transaction]
-  :<|> "transaction"
+  :<|> "eth":> "v1.2" :> "transaction"
     :> "last"
     :> Capture "integer" Natural
     :> Get '[JSON] [WithNext Transaction]
-  :<|> "transaction"
+  :<|> "eth":> "v1.2" :> "transaction"
     :> ReqBody '[JSON] PostTransaction
     :> Post '[PlainText] Keccak256
-  :<|> "transactionList"
+  :<|> "eth":> "v1.2" :> "transactionList"
       :> ReqBody '[JSON] [PostTransaction]
       :> Post '[JSON] [Keccak256]
-  :<|> "transactionResult"
+  :<|> "eth":> "v1.2" :> "transactionResult"
     :> Capture "hash" Keccak256
     :> Get '[JSON] [TransactionResult]
-  :<|> "transactionResult"
+  :<|> "eth":> "v1.2" :> "transactionResult"
     :> "batch"
     :> ReqBody '[PlainText] [Keccak256]
     :> Post '[JSON] BatchTransactionResult
-  :<|> "block"
+  :<|> "eth":> "v1.2" :> "block"
     :> QueryParam "number" Natural
     :> QueryParam "minnumber" Natural
     :> QueryParam "maxnumber" Natural
@@ -61,11 +61,11 @@ type API =
     :> QueryParam "coinbase" Address
     :> QueryParam "hash" Keccak256
     :> Get '[JSON] [WithNext Block]
-  :<|> "block"
+  :<|> "eth":> "v1.2" :> "block"
     :> "last"
     :> Capture "integer" Natural
     :> Get '[JSON] [WithNext Block]
-  :<|> "account"
+  :<|> "eth":> "v1.2" :> "account"
     :> QueryParam "address" Address
     :> QueryParam "balance" Natural
     :> QueryParam "minbalance" Natural
@@ -74,21 +74,21 @@ type API =
     :> QueryParam "minnonce" Natural
     :> QueryParam "maxnonce" Natural
     :> Get '[JSON] [Account]
-  :<|> "stats"
+  :<|> "eth":> "v1.2" :> "stats"
     :> "difficulty"
     :> Get '[JSON] Difficulty
-  :<|> "stats"
+  :<|> "eth":> "v1.2" :> "stats"
     :> "totaltx"
     :> Get '[JSON] TxCount
-  :<|> "storage"
+  :<|> "eth":> "v1.2" :> "storage"
     :> QueryParam "address" Address
     :> Get '[JSON] [Storage]
-  :<|> "faucet"
+  :<|> "eth":> "v1.2" :> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
     :> Post '[PlainText] FaucetResponse
-  :<|> "solc"
+  :<|> "eth":> "v1.2" :> "solc"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] SolcResponse
-  :<|> "extabi"
+  :<|> "eth":> "v1.2" :> "extabi"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] ExtabiResponse
