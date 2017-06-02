@@ -23,12 +23,12 @@ class Contracts extends Component {
       contractRows.push({name: contractName, rows: []});
       Object.values(contracts[contractName]).forEach(function (contract, j) {
         contractRows[i].rows.push(<tr key={Math.random()}>
-          <td className="col-sm-3">{contract.address}</td>
-          <td className="col-sm-3">
+          <td className="col-md-3">{contract.address}</td>
+          <td className="col-md-3">
             {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
           </td>
-          <td className="col-sm-2">
-            <Button type="button" onClick={this.queryCard} className="pt-intent-primary">Query Contract</Button>
+          <td className="col-md-2">
+            <Button type="button" className="pt-intent-primary">Query Contract</Button>
           </td>
         </tr>);
       });
@@ -37,14 +37,14 @@ class Contracts extends Component {
     const cards = contractRows.map((value) => {
       return (
         <div className="row smd-pad-16">
-          <div className="col-lg-6">
+          <div className="col-md-6">
             <div className="pt-card pt-dark pt-elevation-2">
               <h3>{value.name}</h3>
               <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
                 <thead>
-                <th className="col-sm-2"><h4>Contract Address</h4></th>
-                <th className="col-sm-2"><h4>Created At</h4></th>
-                <th className="col-sm-2"><h4>Cirrus</h4></th>
+                <th className="col-md-2"><h4>Contract Address</h4></th>
+                <th className="col-md-2"><h4>Created At</h4></th>
+                <th className="col-md-2"><h4>Cirrus</h4></th>
                 </thead>
 
                 <tbody>
@@ -53,34 +53,31 @@ class Contracts extends Component {
               </table>
             </div>
           </div>
+
+          <div className="col-md-6">
+            <div className="pt-card pt-dark pt-elevation-2">
+            </div>
+          </div>
         </div>);
     });
 
     return (
       <div>
         <div className="row pt-dark">
-          <div className="col-sm-3 text-left">
+          <div className="col-md-3 text-left">
             <h3>Contracts</h3>
           </div>
-          <div className="col-sm-6 smd-pad-16">
+          <div className="col-md-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
               <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
             </div>
           </div>
-          <div className="col-sm-3 text-right">
+          <div className="col-md-3 text-right">
             <CreateContract/>
           </div>
         </div>
-
-        <div className="row">
-          {cards}
-          <div className="col-lg-6">
-            <div className="pt-card pt-dark pt-elevation-2">
-
-            </div>
-          </div>
-        </div>
+        {cards}
       </div>
     );
   }
