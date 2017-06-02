@@ -18,7 +18,6 @@ class TransactionList extends Component {
   }
 
   startPoll() {
-    //console.log('startPoll', this.props);
     const fetchTx = this.props.fetchTx;
     this.timeout = setInterval(function () {
       fetchTx();

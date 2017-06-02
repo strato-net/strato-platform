@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import {fetchContracts} from './contracts.actions';
 import {connect} from 'react-redux';
+import {Button} from '@blueprintjs/core';
 import {withRouter} from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import * as moment from 'moment';
@@ -9,80 +10,74 @@ class Contracts extends Component {
 
   componentDidMount() {
     this.props.fetchContracts();
-    this.startPoll();
   }
 
-  componentWillUnmount() {
-    clearTimeout(this.timeout)
-  }
+  queryCard() {
 
-  startPoll() {
-    //console.log('startPoll', this.props);
-    const fetchContracts = this.props.fetchContracts;
-    this.timeout = setInterval(function () {
-      fetchContracts();
-    }, 5000);
   }
 
   render() {
     const contracts = this.props.contracts;
-    const rows = []
-    Object.getOwnPropertyNames(this.props.contracts).forEach(function(contractName, i) {
-      Object.values(contracts[contractName]).forEach(function(contract, j) {
-        rows.push(
-          <tr key={Math.random()}>
-            <td className="col-sm-4">{contractName}</td>
-            <td className="col-sm-4">{contract.address}</td>
-            <td className="col-sm-4">
-              {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
-            </td>
-          </tr>
-        )
+    const contractRows = [];
+    Object.getOwnPropertyNames(this.props.contracts).forEach(function (contractName, i) {
+      contractRows.push({name: contractName, rows: []});
+      Object.values(contracts[contractName]).forEach(function (contract, j) {
+        contractRows[i].rows.push(<tr key={Math.random()}>
+          <td className="col-md-3">{contract.address}</td>
+          <td className="col-md-3">
+            {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
+          </td>
+          <td className="col-md-2">
+            <Button type="button" className="pt-intent-primary">Query Contract</Button>
+          </td>
+        </tr>);
       });
     });
+
+    const cards = contractRows.map((value) => {
+      return (
+        <div className="row smd-pad-16">
+          <div className="col-md-6">
+            <div className="pt-card pt-dark pt-elevation-2">
+              <h3>{value.name}</h3>
+              <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
+                <thead>
+                <th className="col-md-2"><h4>Contract Address</h4></th>
+                <th className="col-md-2"><h4>Created At</h4></th>
+                <th className="col-md-2"><h4>Cirrus</h4></th>
+                </thead>
+
+                <tbody>
+                {value.rows}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="col-md-6">
+            <div className="pt-card pt-dark pt-elevation-2">
+            </div>
+          </div>
+        </div>);
+    });
+
     return (
       <div>
-        <div className="row ">
-
-          <div className="col-sm-9 text-left">
-            <h2 style={{margin: 0}}>Contracts</h2>
+        <div className="row pt-dark">
+          <div className="col-md-3 text-left">
+            <h3>Contracts</h3>
           </div>
-
-          <div className="col-sm-3 text-right">
-            {/* //FIXME Align the button to the Accounts Tab h2
-             * align it to the right edge as well*/}
-            {/*<Button style={{"margin": "1.5px"}} className="pt-intent-primary pt-icon-add">Create User</Button>*/}
-            <CreateContract/>
-          </div>
-
-        </div>
-        <div className="row ">
-
-          <div className="col-sm-6">
+          <div className="col-md-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
               <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
             </div>
           </div>
-        </div>
-
-        <div className="row ">
-          <div className="col-lg-12">
-            <div className="pt-card pt-dark pt-elevation-2">
-              <table className="pt-table pt-interactive ">
-                <thead>
-                <th className="col-sm-4"><h4>Contract Name</h4></th>
-                <th className="col-sm-4"><h4>Contract Address</h4></th>
-                <th className="col-sm-4"><h4>Created At</h4></th>
-                </thead>
-
-                <tbody>
-                {rows}
-                </tbody>
-              </table>
-            </div>
+          <div className="col-md-3 text-right">
+            <CreateContract/>
           </div>
         </div>
+        {cards}
       </div>
     );
   }

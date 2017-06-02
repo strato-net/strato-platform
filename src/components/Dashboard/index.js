@@ -20,7 +20,6 @@ class Dashboard extends Component {
   }
 
   startPoll() {
-    //console.log('startPoll', this.props);
     const dashboardFetchStatus = this.props.fetchBlockData;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();

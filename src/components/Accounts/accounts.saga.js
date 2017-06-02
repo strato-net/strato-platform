@@ -30,7 +30,7 @@ function getAccounts() {
       return Promise.all(userAdresses(res));
     })
     .then(res => {
-      return Promise.all(getAccountData(res));
+      return getAccountData(res);
     })
     .catch(function (error) {
       throw error;
@@ -53,39 +53,35 @@ function userAdresses(usernames) {
         name: val,
         address: res
       };
-      return user
+      return user;
     }).catch(function (error) {
-      throw error;
-    })
+        throw error;
+      })
   });
 }
 
 function getAccountData(users) {
-  var rtn = users.map(function (user) {
-    return user.address.map(val => {
-      return fetch(
-        accountDataUrl.replace(":address", val),
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          },
-        })
-        .then(function (response) {
-          return response.json();
-        })
-        .then(function (res) {
-          user.accountData = res[0];
-          return user;
-        })
-        .catch(function (error) {
-          throw error;
-        });
-    });
-  });
-  return rtn.reduce(function (a, b) {
-    return a.concat(b);
-  }, []);
+  var rtn = Promise.all(users.map(function (user) {
+    return fetch(
+      accountDataUrl.replace(":address", user.address[0]),
+      {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        },
+      })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (res) {
+        user.accountData = res[0];
+        return user;
+      })
+      .catch(function (error) {
+        throw error;
+      });
+  }));
+  return rtn;
 }
 
 function* fetchAccounts(action) {

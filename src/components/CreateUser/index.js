@@ -21,8 +21,9 @@ class CreateUser extends Component {
   }
 
   render() {
-    return (<div>
-        <Button onClick={this.props.openOverlay} style={{"margin": "1.5px"}} className="pt-intent-primary pt-icon-add"
+    return (
+      <div className="smd-pad-16">
+        <Button onClick={this.props.openOverlay} className="pt-intent-primary pt-icon-add"
                 text="Create User"/>
         <Dialog
           iconName="inbox"

@@ -18,7 +18,6 @@ class Accounts extends Component {
   }
 
   startPoll() {
-    //console.log('startPoll', this.props);
     const fetchAccounts = this.props.fetchAccounts;
     this.timeout = setInterval(function () {
       fetchAccounts();
@@ -26,76 +25,50 @@ class Accounts extends Component {
   }
 
   render() {
-    const maxBlockNum = Math.max(...this.props.accounts.map(value => {
-      return value === undefined ? 1 : value.accountData.latestBlockNum
-    }));
-
     let undef = 0;
-    let rows = [];
-    this.props.accounts
-      .forEach(function (value, i) {
-        if (value !== undefined) {
-          rows.push(value.address.map(addr => {
-            return (
-              <tr key={i}>
-                <td className="col-sm-3">{value.name}</td>
-                <td className="col-sm-3">{addr}</td>
-                <td className="col-sm-3">{value.accountData.balance}</td>
-                <td className="col-sm-3">
-                  <ProgressBar
-                    className="pt-intent-primary"
-                    value={value.accountData.latestBlockNum / maxBlockNum}
-                  />
-                </td>
-              </tr>)
-            })
-          );
-        }
-        else {
-          undef++;
-        }
-      });
-
-    rows = rows.reduce(function (a, b) {
-      return a.concat(b);
-    }, []);
-    const totalEther = "123456";
+    var rows = this.props.accounts.map(function (value, i) {
+      if (value !== undefined) {
+        return value.address.map((addr, j) => {
+          return (<tr key={value.address + i + j}>
+            <td className="col-sm-4">{value.name}</td>
+            <td className="col-sm-4">{addr}</td>
+            <td className="col-sm-4">{value.accountData.balance}</td>
+            {/*<td className="col-sm-3"><ProgressBar className="pt-intent-primary"*/}
+            {/*value={value.accountData.latestBlockNum / maxBlockNum}/></td>*/}
+          </tr>)
+        })
+      }
+      else {
+        undef++;
+      }
+    });
 
     return (
-      <div>
+      <div className="container-fluid pt-dark">
         <div className="row">
           <div className="col-sm-9 text-left">
-            <h2 style={{margin: 0}}>Accounts</h2>
+            <h3>Accounts</h3>
           </div>
           <div className="col-sm-3 text-right">
             <CreateUser/>
           </div>
         </div>
-        <div className="row ">
-          <div className="col-sm-3">
-            <NumberCard number={totalEther} description="Ether"/>
-          </div>
-          <div className="col-sm-3">
-            <NumberCard number={234241} description="TX Volume"/>
-          </div>
+        <div className="row">
           <div className="col-sm-3">
             <NumberCard number={this.props.accounts.length - undef} description="Users"/>
           </div>
-          <div className="col-sm-3">
-            <NumberCard number={123456} description="Arbitrary User Metric"/>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-lg-12">
-            <div className="pt-card pt-dark pt-elevation-2">
-              <table className="pt-table pt-interactive ">
+          <div className="col-sm-9">
+            <div className="pt-card pt-elevation-2">
+              <div className="pt-input-group pt-dark pt-large">
+                <span className="pt-icon pt-icon-search"></span>
+                <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
+              </div>
+              <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
                 <thead>
-                  <tr>
-                    <th className="col-sm-3"><h4>Account</h4></th>
-                    <th className="col-sm-3"><h4>Username</h4></th>
-                    <th className="col-sm-3"><h4>Balance</h4></th>
-                    <th className="col-sm-3"><h4>User Activity</h4></th>
-                  </tr>
+                <th className="col-sm-4"><h4>Username</h4></th>
+                <th className="col-sm-4"><h4>Account</h4></th>
+                <th className="col-sm-4"><h4>Balance</h4></th>
+                {/*<th className="col-sm-3"><h4>User Activity</h4></th>*/}
                 </thead>
 
                 <tbody>
@@ -103,6 +76,11 @@ class Accounts extends Component {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-sm-12">
+            <br/>
           </div>
         </div>
       </div>
