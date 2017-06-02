@@ -6,6 +6,7 @@ module Main where
 import qualified Data.Map.Strict                  as Map
 import           Network.HTTP.Client              hiding (Proxy)
 import           Servant.Client
+import           System.Environment
 import           Test.Hspec
 
 import qualified BlockApps.Bloc20.API.AddressesSpec as Addresses
@@ -37,15 +38,18 @@ main = hspec $ do
 
 setup :: IO TestConfig
 setup = do
+  strato <- maybe (return defaultStrato) parseBaseUrl =<< lookupEnv "STRATO"
+  bloc <- maybe (return defaultBloc) parseBaseUrl =<< lookupEnv "BLOC"
   mgr' <- newManager defaultManagerSettings
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"
   putStrLn $ "Using Strato URL: " ++ showBaseUrl strato
+  putStrLn $ "Using Bloc URL: " ++ showBaseUrl bloc
   let
     testConfig = TestConfig
       { mgr = mgr'
-      , blocUrl = localhost
+      , blocUrl = bloc
       , stratoUrl = strato
       , userName = "testUser1"
       , userAddress = Address 0x0
@@ -114,13 +118,13 @@ setup = do
           , simpleMappingContractAddress = smcAddr
           }
       return config
-  cfgEither <- runClientM  clients (ClientEnv mgr' localhost)
+  cfgEither <- runClientM clients (ClientEnv mgr' bloc)
   case cfgEither of
     Left err  -> fail $ "Failed to bootstrap tests: " ++ show err
     Right cfg -> return cfg
 
-localhost :: BaseUrl
-localhost = BaseUrl Http "localhost" 8000 "/bloc/v2.0"
+defaultBloc :: BaseUrl
+defaultBloc = BaseUrl Http "localhost" 8000 "/bloc/v2.0"
 
-strato :: BaseUrl
-strato = BaseUrl Http "tester13.eastus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+defaultStrato :: BaseUrl
+defaultStrato = BaseUrl Http "strato-int.centralus.cloudapp.azure.com" 80 "/strato-api"
