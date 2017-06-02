@@ -9,7 +9,14 @@ class MenuBar extends Component {
       <nav className="pt-navbar pt-dark" style={{position: 'fixed', width: '100%'}}>
         <div className="pt-navbar-group pt-align-left">
           <div>
-            <span className="pt-icon-large pt-icon-menu smd-sidebar-button" />
+            <a href="http://blockapps.net" target="_blank" rel="noopener noreferrer">
+              <img
+                src="images/blockapps-cube-color-430x500.png"
+                alt="Blockapps Logo"
+                height="32"
+                className="smd-menu-logo"
+              />
+            </a>
           </div>
         </div>
         <div className="pt-navbar-group pt-align-left">

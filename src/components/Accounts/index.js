@@ -5,7 +5,6 @@ import {withRouter} from 'react-router-dom';
 import {ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
-import BigNumber from 'bignumber.js'
 
 class Accounts extends Component {
 
@@ -32,23 +31,31 @@ class Accounts extends Component {
     }));
 
     let undef = 0;
+    let rows = [];
+    this.props.accounts
+      .forEach(function (value, i) {
+        if (value !== undefined) {
+          rows.push(value.address.map(addr => {
+            return (
+              <tr key={i}>
+                <td className="col-sm-3">{value.name}</td>
+                <td className="col-sm-3">{addr}</td>
+                <td className="col-sm-3">{value.accountData.balance}</td>
+                <td className="col-sm-3">
+                  <ProgressBar
+                    className="pt-intent-primary"
+                    value={value.accountData.latestBlockNum / maxBlockNum}
+                  />
+                </td>
+              </tr>)
+            })
+          );
+        }
+        else {
+          undef++;
+        }
+      });
 
-    var rows = this.props.accounts.map(function (value, i) {
-      if (value !== undefined) {
-        return value.address.map(addr => {
-          return (<tr key={i}>
-            <td className="col-sm-3">{value.name}</td>
-            <td className="col-sm-3">{addr}</td>
-            <td className="col-sm-3">{value.accountData.balance}</td>
-            <td className="col-sm-3"><ProgressBar className="pt-intent-primary"
-                                                  value={value.accountData.latestBlockNum / maxBlockNum}/></td>
-          </tr>)
-        })
-      }
-      else {
-        undef++;
-      }
-    });
     rows = rows.reduce(function (a, b) {
       return a.concat(b);
     }, []);
@@ -83,10 +90,12 @@ class Accounts extends Component {
             <div className="pt-card pt-dark pt-elevation-2">
               <table className="pt-table pt-interactive ">
                 <thead>
-                <th className="col-sm-3"><h4>Account</h4></th>
-                <th className="col-sm-3"><h4>Username</h4></th>
-                <th className="col-sm-3"><h4>Balance</h4></th>
-                <th className="col-sm-3"><h4>User Activity</h4></th>
+                  <tr>
+                    <th className="col-sm-3"><h4>Account</h4></th>
+                    <th className="col-sm-3"><h4>Username</h4></th>
+                    <th className="col-sm-3"><h4>Balance</h4></th>
+                    <th className="col-sm-3"><h4>User Activity</h4></th>
+                  </tr>
                 </thead>
 
                 <tbody>

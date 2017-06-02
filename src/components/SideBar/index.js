@@ -23,7 +23,7 @@ class SideBar extends Component {
     );
 
     return (
-      <aside className="sidebar">
+      <aside>
         <div className="menu">
           {
             navLinksData.map(data =>
@@ -41,6 +41,17 @@ class SideBar extends Component {
           }
         </div>
         <hr />
+        <div>
+        </div>
+        <div className="smd-sidebar-logo">
+          <a href="http://blockapps.net" target="_blank" rel="noopener noreferrer">
+            <img
+              src="images/blockapps-logo-horizontal-white.png"
+              width="120"
+              alt="Blockapps Logo"
+            />
+          </a>
+        </div>
       </aside>
     );
   }
