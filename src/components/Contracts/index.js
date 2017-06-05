@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {fetchContracts} from './contracts.actions';
+import {fetchContracts, changeContractFilter} from './contracts.actions';
 import {connect} from 'react-redux';
 import {Button} from '@blueprintjs/core';
 import {withRouter} from 'react-router-dom';
@@ -12,14 +12,24 @@ class Contracts extends Component {
     this.props.fetchContracts();
   }
 
-  queryCard() {
-
+  updateFilter(filter) {
+    console.log("UPDATE FILTER");
+    this.props.changeContractFilter(filter);
   }
 
   render() {
     const contracts = this.props.contracts;
+    const filter = this.props.filter;
+    const contractNames = Object.getOwnPropertyNames(this.props.contracts);
     const contractRows = [];
-    Object.getOwnPropertyNames(this.props.contracts).forEach(function (contractName, i) {
+
+    contractNames
+      .filter(function(contract){
+                if(!filter) {
+                    return true;
+                  }
+               return contract.toLowerCase().indexOf(filter) > -1 })
+      .forEach(function (contractName, i) {
       contractRows.push({name: contractName, rows: []});
       Object.values(contracts[contractName]).forEach(function (contract, j) {
         contractRows[i].rows.push(<tr key={Math.random()}>
@@ -70,7 +80,12 @@ class Contracts extends Component {
           <div className="col-md-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
-              <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
+              <input
+                className="pt-input"
+                type="search"
+                placeholder="Search input"
+                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                dir="auto"/>
             </div>
           </div>
           <div className="col-md-3 text-right">
@@ -85,8 +100,9 @@ class Contracts extends Component {
 
 function mapStateToProps(state) {
   return {
-    contracts: state.contracts.contracts
+    contracts: state.contracts.contracts,
+    filter: state.contracts.filter
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchContracts})(Contracts));
+export default withRouter(connect(mapStateToProps, {fetchContracts, changeContractFilter})(Contracts));
