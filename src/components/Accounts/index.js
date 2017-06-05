@@ -1,8 +1,7 @@
 import React, {Component} from 'react';
-import {fetchAccounts} from './accounts.actions'
+import { fetchAccounts, changeAccountFilter } from './accounts.actions'
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
-import {ProgressBar} from '@blueprintjs/core';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 
@@ -10,38 +9,44 @@ class Accounts extends Component {
 
   componentDidMount() {
     this.props.fetchAccounts();
-    this.startPoll();
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
   }
 
-  startPoll() {
-    const fetchAccounts = this.props.fetchAccounts;
-    this.timeout = setInterval(function () {
-      fetchAccounts();
-    }, 5000);
-  }
+  updateFilter(filter) {
+    this.props.changeAccountFilter(filter);
+  };
 
   render() {
-    let undef = 0;
-    var rows = this.props.accounts.map(function (value, i) {
-      if (value !== undefined) {
-        return value.address.map((addr, j) => {
-          return (<tr key={value.address + i + j}>
-            <td className="col-sm-4">{value.name}</td>
-            <td className="col-sm-4">{addr}</td>
-            <td className="col-sm-4">{value.accountData.balance}</td>
-            {/*<td className="col-sm-3"><ProgressBar className="pt-intent-primary"*/}
-            {/*value={value.accountData.latestBlockNum / maxBlockNum}/></td>*/}
-          </tr>)
+    const accounts = this.props.accounts;
+    const filter = this.props.filter;
+    const users = Object.getOwnPropertyNames(accounts);
+    const rows = [];
+    users.forEach(function(user){
+      const addresses = Object.getOwnPropertyNames(accounts[user]);
+      addresses
+        .filter(function(address){
+          if(!filter) {
+            return true;
+          }
+          return user.toLowerCase().indexOf(filter) > -1
+            || address.toLowerCase().indexOf(filter) > -1;
         })
-      }
-      else {
-        undef++;
-      }
+        .forEach(function(address){
+          if(address === 'error') {
+            return;
+          }
+          rows.push(
+            <tr key={address}>
+              <td className="col-sm-4">{user}</td>
+              <td className="col-sm-4">{address}</td>
+              <td className="col-sm-4">{accounts[user][address].balance}</td>
+            </tr>
+          );
+        });
     });
+
 
     return (
       <div className="container-fluid pt-dark">
@@ -55,20 +60,26 @@ class Accounts extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <NumberCard number={this.props.accounts.length - undef} description="Users"/>
+            <NumberCard number={users.length} description="Users"/>
           </div>
           <div className="col-sm-9">
             <div className="pt-card pt-elevation-2">
               <div className="pt-input-group pt-dark pt-large">
                 <span className="pt-icon pt-icon-search"></span>
-                <input className="pt-input" type="search" placeholder="Search input" dir="auto"/>
+                <input
+                  className="pt-input"
+                  type="search"
+                  placeholder="Search accounts"
+                  onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                  dir="auto"/>
               </div>
               <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
                 <thead>
-                <th className="col-sm-4"><h4>Username</h4></th>
-                <th className="col-sm-4"><h4>Account</h4></th>
-                <th className="col-sm-4"><h4>Balance</h4></th>
-                {/*<th className="col-sm-3"><h4>User Activity</h4></th>*/}
+                  <tr>
+                    <th className="col-sm-4"><h4>Username</h4></th>
+                    <th className="col-sm-4"><h4>Account</h4></th>
+                    <th className="col-sm-4"><h4>Balance</h4></th>
+                  </tr>
                 </thead>
 
                 <tbody>
@@ -90,8 +101,14 @@ class Accounts extends Component {
 
 function mapStateToProps(state) {
   return {
-    accounts: state.accounts.accounts
+    accounts: state.accounts.accounts,
+    filter: state.accounts.filter
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchAccounts})(Accounts));
+export default withRouter(
+  connect(
+    mapStateToProps,
+    { fetchAccounts, changeAccountFilter }
+  )(Accounts)
+);
