@@ -79,11 +79,7 @@ function getAccountDetailApi(address) {
 function* getAccounts(action) {
   try {
     const response = yield call(getAccountsApi);
-    const accounts = response.reduce(function(result, item){
-      result[item] = {};
-      return result;
-    }, {});
-    yield put(fetchAccountsSuccess(accounts));
+    yield put(fetchAccountsSuccess(response));
     // dispatch the action
     yield response.map(account => put(fetchUserAddresses(account)));
   }
@@ -106,7 +102,7 @@ function* getUserAddresses(action) {
 function* getAccountDetail(action) {
   try {
     const response = yield call(getAccountDetailApi, action.address);
-    // don't ask about response['0']. 
+    // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
   }
   catch(err) {
