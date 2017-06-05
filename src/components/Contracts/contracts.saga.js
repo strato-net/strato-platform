@@ -1,5 +1,5 @@
 import {
-  takeEvery,
+  takeLatest,
   put,
   call
 } from 'redux-saga/effects';
@@ -40,5 +40,5 @@ function* fetchContracts(action) {
 }
 
 export default function* watchFetchContracts() {
-  yield takeEvery(FETCH_CONTRACTS, fetchContracts);
+  yield takeLatest(FETCH_CONTRACTS, fetchContracts);
 }

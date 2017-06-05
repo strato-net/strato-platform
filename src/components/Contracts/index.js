@@ -13,7 +13,6 @@ class Contracts extends Component {
   }
 
   updateFilter(filter) {
-    console.log("UPDATE FILTER");
     this.props.changeContractFilter(filter);
   }
 
@@ -28,7 +27,7 @@ class Contracts extends Component {
                 if(!filter) {
                     return true;
                   }
-               return contract.toLowerCase().indexOf(filter) > -1 })
+               return contract.toLowerCase().indexOf(filter) > -1; })
       .forEach(function (contractName, i) {
       contractRows.push({name: contractName, rows: []});
       Object.values(contracts[contractName]).forEach(function (contract, j) {
