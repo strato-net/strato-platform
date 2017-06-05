@@ -4,12 +4,12 @@ MAINTAINER Ilya Ostrovskiy <ilya@blockapps.net>
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y nginx && \
+    apt-get install -y nginx apache2-utils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /etc/nginx
 
-COPY nginx-nossl.conf nginx-ssl.conf /etc/nginx/
+COPY nginx-nossl.conf nginx-ssl.conf auth.htpasswd /etc/nginx/
 COPY run.sh /
 RUN chmod a+x /run.sh
 
