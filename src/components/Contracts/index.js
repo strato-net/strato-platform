@@ -36,9 +36,6 @@ class Contracts extends Component {
           <td className="col-md-3">
             {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
           </td>
-          <td className="col-md-2">
-            <Button type="button" className="pt-intent-primary">Query Contract</Button>
-          </td>
         </tr>);
       });
     });
@@ -48,12 +45,12 @@ class Contracts extends Component {
         <div className="row smd-pad-16">
           <div className="col-md-6">
             <div className="pt-card pt-dark pt-elevation-2">
-              <h3>{value.name}</h3>
+              <div className="col-sm-8"> <h3>{value.name}</h3> </div>
+              <div className="col-sm-4 smd-pad-16"><Button type="button" className="pt-intent-primary">Query Contract</Button></div>
               <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
                 <thead>
-                <th className="col-md-2"><h4>Contract Address</h4></th>
-                <th className="col-md-2"><h4>Created At</h4></th>
-                <th className="col-md-2"><h4>Cirrus</h4></th>
+                <th className="col-md-3"><h4>Contract Address</h4></th>
+                <th className="col-md-3"><h4>Created At</h4></th>
                 </thead>
 
                 <tbody>
