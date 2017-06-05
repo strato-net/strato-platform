@@ -52,10 +52,8 @@ class CreateContract extends Component {
       </div> :
       (
       Object.values(src).map(val => {
-        console.log("VAL", val);
           if (val.constr !== undefined) {
             return Object.getOwnPropertyNames(val.constr).map(arg => {
-              console.log("PROPERTY", arg);
               return (<div className="input">
                 <label className="pt-label">
                   {arg}
