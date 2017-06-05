@@ -24,8 +24,12 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case FETCH_ACCOUNTS_SUCCESS:
+      const accounts = action.accounts.reduce(function(result, item){
+        result[item] = {};
+        return result;
+      }, {});
       return {
-        accounts: action.accounts,
+        accounts: accounts,
         filter: state.filter,
         error: null,
       };
