@@ -183,6 +183,7 @@ deployments:
         - explorer
       environment:
         ssl: "${ssl}"
+        uiPassword: "${uiPassword}"
 
   - name: zookeeper
     compose:
