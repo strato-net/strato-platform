@@ -28,6 +28,7 @@ import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
+import {watchCompileContract} from './components/CreateContract/createContract.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
 
@@ -52,6 +53,7 @@ const rootSaga = function* startForeman() {
         fork(watchFetchAccounts),
         fork(watchCreateContract),
         fork(watchFetchContracts),
+        fork(watchCompileContract),
     ]
 };
 
