@@ -54,17 +54,18 @@ class CreateContract extends Component {
       Object.values(src).map(val => {
           if (val.constr !== undefined) {
             return Object.getOwnPropertyNames(val.constr).map(arg => {
+              console.log(arg);
               return (<div className="input">
                 <label className="pt-label">
-                  {arg}
+                  {arg + " (" + val.constr[arg].type + ")"}
                 </label>
                 <div className="pt-form-content">
-                  <InputGroup id="input-b" className="form-width" placeholder={arg}
+                  <InputGroup id="input-b" className="form-width" placeholder={arg+" ("+val.constr[arg].type+")"}
                               onChange={(e) => {
                                 inputs[arg] = e.target.value;
                               }}
                               type="text" dir="auto"/>
-                  <div className="pt-form-helper-text">Enter an argument</div>
+                  <div className="pt-form-helper-text">Enter a {val.constr[arg].type}</div>
                 </div>
               </div>);
             });
