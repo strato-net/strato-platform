@@ -25,7 +25,7 @@ class Account extends Component {
         <div className="row">
           <div className="col-sm-12">
             <div className="pt-card">
-              <table className="pt-table pt-striped">
+              <table className="pt-table pt-str">
                 <thead>
                   <tr>
                     <th>Field</th>

@@ -5,7 +5,7 @@ import {
 } from './block-data.actions';
 
 const initialState = {
-  blockData: '',
+  blockData: [],
   error: null,
 };
 
