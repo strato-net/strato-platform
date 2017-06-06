@@ -8,9 +8,9 @@ import {
   fetchTxSuccess,
   fetchTxFailure
 } from './transactionList.actions';
-import { APIURL } from '../../env';
+import { NODES } from '../../env';
 
-const url = APIURL+ "strato-api/eth/v1.2/transaction/last/5"
+const url = NODES[0].url + "strato-api/eth/v1.2/transaction/last/5"
 
 function getTx() {
   return fetch(

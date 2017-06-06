@@ -1,0 +1,58 @@
+import {
+  FETCH_NODE_DETAIL_SUCCESS,
+  FETCH_NODE_PEERS_SUCCESS,
+  FETCH_NODE_COINBASE_SUCCESS,
+} from './nodeCard.actions';
+import { NODES } from '../../env';
+
+const initialState = {
+  nodes: NODES
+};
+
+const reducer = function (state = initialState, action) {
+  switch(action.type) {
+    case FETCH_NODE_DETAIL_SUCCESS:
+      return {
+        nodes: state.nodes.map((node,index) => {
+          if(index != action.nodeIndex) {
+            return node;
+          }
+
+          return {
+            ...state.nodes[action.nodeIndex],
+            detail: action.detail
+          }
+        })
+      }
+    case FETCH_NODE_PEERS_SUCCESS:
+      return {
+        nodes: state.nodes.map((node,index) => {
+          if(index != action.nodeIndex) {
+            return node;
+          }
+
+          return {
+            ...state.nodes[action.nodeIndex],
+            peers: action.peers
+          }
+        })
+      }
+    case FETCH_NODE_COINBASE_SUCCESS:
+      return {
+        nodes: state.nodes.map((node,index) => {
+          if(index != action.nodeIndex) {
+            return node;
+          }
+
+          return {
+            ...state.nodes[action.nodeIndex],
+            coinbase: action.coinbase
+          }
+        })
+      }
+    default:
+      return state;
+  }
+}
+
+export default reducer;

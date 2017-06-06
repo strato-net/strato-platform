@@ -8,9 +8,9 @@ import {
   createUserSuccess,
   createUserFailure,
 } from './createUser.actions';
-import { APIURL } from '../../env';
+import { NODES } from '../../env';
 
-const url = APIURL + "bloc/users/:user"
+const url = NODES[0].url + "bloc/users/:user"
 
 function createUserApiCall(username, password) {
   return fetch(

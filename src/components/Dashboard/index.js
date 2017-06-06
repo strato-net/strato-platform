@@ -1,11 +1,11 @@
-import React, {Component} from 'react';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
+import NodeCard from '../NodeCard';
 import TransactionList from "../TransactionList";
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
-import {Text} from '@blueprintjs/core';
 import './dashboard.css';
 
 class Dashboard extends Component {
@@ -84,6 +84,8 @@ class Dashboard extends Component {
     const blockPropData = this.blockPropogation(blockData);
     const txTypeData = this.txType(receiptTransactions);
 
+    const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
+
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
@@ -116,122 +118,7 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-3">
             <h4>Nodes</h4>
-            <div className="pt-card pt-elevation-2 node-success">
-              <h5>Node 0</h5>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Coinbase</small>
-                </div>
-                <div className="col-xs-9">
-                  <Text ellipsize={true}>
-                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
-                  </Text>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Block</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>17</small>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Peers</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>2</small>
-                </div>
-              </div>
-            </div>
-            <div className="pt-card pt-elevation-2 node-warning">
-              <h5>Node 1</h5>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Coinbase</small>
-                </div>
-                <div className="col-xs-9">
-                  <Text ellipsize={true}>
-                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
-                  </Text>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Block</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>17</small>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Peers</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>2</small>
-                </div>
-              </div>
-            </div>
-            <div className="pt-card pt-elevation-2 node-success">
-              <h5>Node 2</h5>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Coinbase</small>
-                </div>
-                <div className="col-xs-9">
-                  <Text ellipsize={true}>
-                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
-                  </Text>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Block</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>17</small>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Peers</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>2</small>
-                </div>
-              </div>
-            </div>
-            <div className="pt-card pt-elevation-2 node-danger">
-              <h5>Node 3</h5>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Coinbase</small>
-                </div>
-                <div className="col-xs-9">
-                  <Text ellipsize={true}>
-                    <small> e062bc64387256babbe59456b8daadeb32eae5a4</small>
-                  </Text>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Block</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>17</small>
-                </div>
-              </div>
-              <div className="row pt-text-muted">
-                <div className="col-xs-3">
-                  <small>Peers</small>
-                </div>
-                <div className="col-xs-9">
-                  <small>2</small>
-                </div>
-              </div>
-            </div>
+            {nodes}
           </div>
           <div className="col-sm-9">
             <h4>Recent Transactions</h4>
@@ -246,6 +133,7 @@ class Dashboard extends Component {
 function mapStateToProps(state) {
   return {
     blockData: state.blockData.blockData,
+    nodes: state.nodes.nodes
   };
 }
 

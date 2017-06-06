@@ -17,11 +17,11 @@ import {
   fetchAccountDetailSuccess,
   fetchAccountDetailFailure
 } from './accounts.actions';
-import {APIURL} from '../../env';
+import {NODES} from '../../env';
 
-const accountDataUrl = APIURL + "strato-api/eth/v1.2/account?address=:address";
-const addressUrl = APIURL + 'bloc/users/:user';
-const usernameUrl = APIURL + "bloc/users";
+const accountDataUrl = NODES[0].url + "strato-api/eth/v1.2/account?address=:address";
+const addressUrl = NODES[0].url + 'bloc/users/:user';
+const usernameUrl = NODES[0].url + "bloc/users";
 
 function getAccountsApi() {
   return fetch(
