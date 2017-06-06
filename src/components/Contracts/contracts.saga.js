@@ -8,8 +8,8 @@ import {
   fetchContractsSuccess,
   fetchContractsFailure
 } from './contracts.actions';
+import {APIURL} from '../../env.js'
 
-const APIURL = "http://bayar6.eastus.cloudapp.azure.com/" //FIXME hard coded api url
 const contractsUrl = APIURL + "bloc/contracts"
 
 function getContracts() {

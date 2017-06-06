@@ -6,7 +6,7 @@ import {
 } from './contracts.actions';
 
 const initialState = {
-  contracts: [],
+  contracts: {},
   filter: '',
   error: null,
 };
@@ -20,8 +20,12 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case FETCH_CONTRACTS_SUCCESS:
+      let received_contracts = Object.getOwnPropertyNames(action.contracts).reduce(function(result, contractName) {
+        result[contractName] = {subcontracts: action.contracts[contractName], isOpen: true};
+        return result;
+      }, {});
       return {
-        contracts: action.contracts,
+        contracts: received_contracts,
         filter: state.filter,
         error: null,
       };

@@ -2,6 +2,7 @@ export const FETCH_CONTRACTS = 'FETCH_CONTRACTS';
 export const FETCH_CONTRACTS_SUCCESS = 'FETCH_CONTRACTS_SUCCESS';
 export const FETCH_CONTRACTS_FAILURE = 'FETCH_CONTRACTS_FAILURE';
 export const CHANGE_CONTRACT_FILTER = 'CHANGE_CONTRACT_FILTER';
+export const TOGGLE_COLLAPSE_TABLE = 'TOGGLE_COLLAPSE_TABLE';
 
 export const fetchContracts = function () {
   return {
@@ -28,4 +29,4 @@ export const changeContractFilter = function (filter) {
     type: CHANGE_CONTRACT_FILTER,
     filter: filter,
   }
-}
+};

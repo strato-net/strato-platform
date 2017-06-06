@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {openOverlay, closeOverlay, createContract, compileContract} from './createContract.actions';
-import {Button, Dialog, Intent, Spinner, InputGroup} from '@blueprintjs/core';
+import {Button, Dialog, Intent, InputGroup} from '@blueprintjs/core';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 
@@ -51,6 +51,7 @@ class CreateContract extends Component {
         </label>
       </div> :
       (
+        // eslint-disable-next-line
       Object.values(src).map(val => {
           if (val.constr !== undefined) {
             return Object.getOwnPropertyNames(val.constr).map(arg => {
