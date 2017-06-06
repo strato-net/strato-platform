@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import './sidebar.css';
 import { NavLink } from 'react-router-dom';
+import logo from './blockapps-logo-horizontal-white.png';
 
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
@@ -46,7 +47,7 @@ class SideBar extends Component {
         <div className="smd-sidebar-logo">
           <a href="http://blockapps.net" target="_blank" rel="noopener noreferrer">
             <img
-              src="images/blockapps-logo-horizontal-white.png"
+              src={logo}
               width="120"
               alt="Blockapps Logo"
             />
