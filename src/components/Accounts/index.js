@@ -18,13 +18,21 @@ class Accounts extends Component {
     this.props.changeAccountFilter(filter);
   };
 
+
   render() {
     const accounts = this.props.accounts;
     const filter = this.props.filter;
+    const history = this.props.history;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
+
+    function handleClick(user,address) {
+      history.push('/accounts/' + user + '/' + address);
+    }
+
     users.forEach(function(user){
       const addresses = Object.getOwnPropertyNames(accounts[user]);
+
       addresses
         .filter(function(address){
           if(!filter) {
@@ -38,7 +46,7 @@ class Accounts extends Component {
             return;
           }
           rows.push(
-            <tr key={address}>
+            <tr key={address} onClick={(e) => handleClick(user,address)}>
               <td className="col-sm-4">{user}</td>
               <td className="col-sm-4">{address}</td>
               <td className="col-sm-4">{accounts[user][address].balance}</td>
