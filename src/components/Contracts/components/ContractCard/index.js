@@ -25,10 +25,10 @@ class ContractCard extends Component {
             onClick={() => {self.setState({selectedAddress:contract.address});}}
             key={contract.address}
           >
-            <td >
+            <td>
               {contract.address}
             </td>
-            <td>
+            <td style={{border: 'none'}}>
               {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
             </td>
           </tr>
