@@ -2,8 +2,11 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import NodeCard from '../NodeCard';
-import TransactionList from "../TransactionList";
+import TransactionList from '../TransactionList';
+import NumberCard from '../NumberCard';
 import { fetchBlockData } from '../BlockData/block-data.actions';
+import { fetchAccounts } from '../Accounts/accounts.actions';
+import { fetchContracts } from '../Contracts/contracts.actions';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
@@ -12,6 +15,8 @@ class Dashboard extends Component {
 
   componentDidMount() {
     this.props.fetchBlockData();
+    this.props.fetchAccounts();
+    this.props.fetchContracts();
     this.startPoll();
   }
 
@@ -21,8 +26,12 @@ class Dashboard extends Component {
 
   startPoll() {
     const dashboardFetchStatus = this.props.fetchBlockData;
+    const fetchAccounts = this.props.fetchAccounts;
+    const fetchContracts = this.props.fetchContracts;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
+      fetchAccounts();
+      fetchContracts();
     }, 5000);
   }
 
@@ -85,15 +94,50 @@ class Dashboard extends Component {
     const txTypeData = this.txType(receiptTransactions);
 
     const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
-
+    const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
+    const userCount = Object.getOwnPropertyNames(this.props.accounts).length;
+    const contractCount = Object.getOwnPropertyNames(this.props.contracts).length;
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
           </div>
-          <div className="col-sm-3 text-right">
-            <p className="network-status">NETWORK IN SYNC</p>
+        </div>
+        <div className="row">
+          <div className="col-sm-3">
+            <NumberCard
+              number="HEALTH"
+              description="Network"
+              mode={ apiError ? 'warning' : 'success' }
+              iconClass={ apiError ? 'fa-exclamation-circle' : 'fa-check-circle' }
+            />
+          </div>
+          <div className="col-sm-3">
+            <NumberCard
+              number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
+              description="Last Block"
+              iconClass="fa-link"
+            />
+          </div>
+          <div className="col-sm-3">
+            <NumberCard
+              number={userCount}
+              description="Users"
+              iconClass="fa-users"
+            />
+          </div>
+          <div className="col-sm-3">
+            <NumberCard
+              number={ contractCount }
+              description="Contracts"
+              iconClass="fa-gavel"
+            />
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-sm-12">
+            <br/>
           </div>
         </div>
         <div className="row">
@@ -111,17 +155,12 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
-            <br/>
-          </div>
-        </div>
-        <div className="row">
           <div className="col-sm-3">
-            <h4>Nodes</h4>
+            <h3>Nodes</h3>
             {nodes}
           </div>
           <div className="col-sm-9">
-            <h4>Recent Transactions</h4>
+            <h3>Recent Transactions</h3>
             <TransactionList />
           </div>
         </div>
@@ -133,8 +172,19 @@ class Dashboard extends Component {
 function mapStateToProps(state) {
   return {
     blockData: state.blockData.blockData,
-    nodes: state.nodes.nodes
+    nodes: state.nodes.nodes,
+    accounts: state.accounts.accounts,
+    contracts: state.contracts.contracts
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchBlockData})(Dashboard))
+export default withRouter(
+  connect(
+    mapStateToProps,
+    {
+      fetchBlockData,
+      fetchAccounts,
+      fetchContracts
+    }
+  )(Dashboard)
+);

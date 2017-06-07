@@ -7,6 +7,7 @@ import {
   fetchNodePeers,
   fetchNodeCoinbase
 } from './nodeCard.actions';
+import './nodeCard.css';
 
 class NodeCard extends Component {
 
@@ -40,8 +41,11 @@ class NodeCard extends Component {
       this.props.blockData[0].blockData.number.toString()
       : 'unknown';
 
+    let className = 'pt-card pt-elevation-2 ';
+    className += node.apiFailure ? 'node-warning' : 'node-success';
+
     return (
-      <div className="pt-card pt-elevation-2 node-success">
+      <div className={className}>
         <h5>{node.name}</h5>
         <div className="row pt-text-muted">
           <div className="col-xs-3">

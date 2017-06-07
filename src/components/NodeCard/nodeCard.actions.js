@@ -49,7 +49,7 @@ export const fetchNodePeersSuccess = function(nodeIndex, peers) {
 
 export const fetchNodePeersFailure = function(nodeIndex, error) {
   return {
-    type: FETCH_NODE_PEERS_SUCCESS,
+    type: FETCH_NODE_PEERS_FAILURE,
     nodeIndex: nodeIndex,
     error: error
   }

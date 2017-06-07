@@ -14,12 +14,12 @@ class SideBar extends Component {
   render() {
     const navLinksData = (
       [
-        {path: '/dashboard', label: 'Dashboard', id: 'dashboard', icon: "pt-icon-dashboard"},
+        {path: '/dashboard', label: 'Dashboard', id: 'dashboard', icon: "fa-dashboard"},
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
-        {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "pt-icon-link"},
-        {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "pt-icon-exchange"},
-        {path: '/accounts', label: 'Accounts', id: 'accounts', icon: "pt-icon-people"},
-        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "pt-icon-projects"},
+        {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link"},
+        {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange"},
+        {path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users"},
+        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel"},
       ]
     );
 
@@ -35,7 +35,7 @@ class SideBar extends Component {
                 className="menu-item"
                 activeClassName="active-menu-item"
               >
-                <span className={data.icon+ " pt-icon"}> </span>
+                <i className={ 'fa ' + data.icon }> </i>
                 <span className="menu-text"> {data.label}</span>
               </NavLink>
             )
