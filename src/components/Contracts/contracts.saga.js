@@ -1,5 +1,5 @@
 import {
-  takeEvery,
+  takeLatest,
   put,
   call
 } from 'redux-saga/effects';
@@ -11,7 +11,7 @@ import {
 import {NODES} from '../../env';
 
 
-const contractsUrl = NODES[0].url + "bloc/contracts"
+const contractsUrl = NODES[0].url + "bloc/contracts";
 
 function getContracts() {
   return fetch(
@@ -41,5 +41,5 @@ function* fetchContracts(action) {
 }
 
 export default function* watchFetchContracts() {
-  yield takeEvery(FETCH_CONTRACTS, fetchContracts);
+  yield takeLatest(FETCH_CONTRACTS, fetchContracts);
 }

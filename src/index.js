@@ -23,14 +23,17 @@ import createUserReducer from './components/CreateUser/createUser.reducer'
 import createContractReducer from './components/CreateContract/createContract.reducer'
 import accountsReducer from './components/Accounts/accounts.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
+import contractStateReducer from './components/Contracts/components/ContractState/contractState.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer.js';
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
+import {watchCompileContract} from './components/CreateContract/createContract.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
+import watchFetchState from './components/Contracts/components/ContractState/contractState.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
 
 const rootReducer = combineReducers({
@@ -43,6 +46,7 @@ const rootReducer = combineReducers({
   createContract: createContractReducer,
   accounts: accountsReducer,
   contracts: contractsReducer,
+  contractState: contractStateReducer,
   nodes: nodeCardReducer
 });
 
@@ -55,6 +59,8 @@ const rootSaga = function* startForeman() {
         fork(watchFetchAccounts),
         fork(watchCreateContract),
         fork(watchFetchContracts),
+        fork(watchCompileContract),
+        fork(watchFetchState),
         fork(watchFetchNodeData),
     ]
 };
