@@ -1,6 +1,7 @@
 import {
   FETCH_NODE_DETAIL_SUCCESS,
   FETCH_NODE_PEERS_SUCCESS,
+  FETCH_NODE_PEERS_FAILURE,
   FETCH_NODE_COINBASE_SUCCESS,
 } from './nodeCard.actions';
 import { NODES } from '../../env';
@@ -14,7 +15,7 @@ const reducer = function (state = initialState, action) {
     case FETCH_NODE_DETAIL_SUCCESS:
       return {
         nodes: state.nodes.map((node,index) => {
-          if(index != action.nodeIndex) {
+          if(index !== action.nodeIndex) {
             return node;
           }
 
@@ -27,20 +28,34 @@ const reducer = function (state = initialState, action) {
     case FETCH_NODE_PEERS_SUCCESS:
       return {
         nodes: state.nodes.map((node,index) => {
-          if(index != action.nodeIndex) {
+          if(index !== action.nodeIndex) {
             return node;
           }
 
           return {
             ...state.nodes[action.nodeIndex],
-            peers: action.peers
+            peers: action.peers,
+            apiFailure: false
+          }
+        })
+      }
+    case FETCH_NODE_PEERS_FAILURE:
+      return {
+        nodes: state.nodes.map((node,index) => {
+          if(index !== action.nodeIndex) {
+            return node;
+          }
+
+          return {
+            ...state.nodes[action.nodeIndex],
+            apiFailure: true
           }
         })
       }
     case FETCH_NODE_COINBASE_SUCCESS:
       return {
         nodes: state.nodes.map((node,index) => {
-          if(index != action.nodeIndex) {
+          if(index !== action.nodeIndex) {
             return node;
           }
 
