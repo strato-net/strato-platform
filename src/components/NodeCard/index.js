@@ -42,7 +42,7 @@ class NodeCard extends Component {
       : 'unknown';
 
     let className = 'pt-card pt-elevation-2 ';
-    className += node.apiFailure ? 'node-danger' : 'node-success';
+    className += node.apiFailure ? 'node-warning' : 'node-success';
 
     return (
       <div className={className}>

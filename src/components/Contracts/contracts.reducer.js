@@ -5,7 +5,7 @@ import {
 } from './contracts.actions';
 
 const initialState = {
-  contracts: [],
+  contracts: {},
   error: null,
 };
 
