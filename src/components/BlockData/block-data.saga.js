@@ -8,10 +8,10 @@ import {
   fetchBlockDataSuccess,
   fetchBlockDataFailure
 } from './block-data.actions';
-import { APIURL } from '../../env';
+import { NODES } from '../../env';
 
 
-const url = APIURL + "/strato-api/eth/v1.2/block/last/15"
+const url = NODES[0].url + "/strato-api/eth/v1.2/block/last/15"
 
 function getBlockData() {
   return fetch(

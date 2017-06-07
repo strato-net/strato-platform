@@ -11,13 +11,13 @@ import {
   compileContractSuccess,
   compileContractFailure
 } from './createContract.actions';
-import { APIURL } from '../../env';
+import { NODES } from '../../env';
 
-const url = APIURL + "bloc/users/:user/:address/contract"
-const compileUrl = APIURL + "/strato-api/eth/v1.2/extabi";
+const url = NODES[0].url + "bloc/users/:user/:address/contract"
+const compileUrl = NODES[0].url + "/strato-api/eth/v1.2/extabi";
 
 function getAddress(username) {
-  let getAddressUrl = APIURL+ "bloc/users/" + username
+  const getAddressUrl = NODES[0].url + "bloc/users/" + username
   return fetch(
     getAddressUrl,
     {

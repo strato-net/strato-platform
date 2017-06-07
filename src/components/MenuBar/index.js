@@ -1,6 +1,8 @@
 import React, {Component} from 'react';
+import { Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import './menubar.css';
+import logo from './blockapps-cube-color-430x500.png';
 
 class MenuBar extends Component {
 
@@ -9,14 +11,14 @@ class MenuBar extends Component {
       <nav className="pt-navbar pt-dark" style={{position: 'fixed', width: '100%'}}>
         <div className="pt-navbar-group pt-align-left">
           <div>
-            <a href="http://blockapps.net" target="_blank" rel="noopener noreferrer">
+            <Link to="/dashboard">
               <img
-                src="images/blockapps-cube-color-430x500.png"
+                src={logo}
                 alt="Blockapps Logo"
                 height="32"
                 className="smd-menu-logo"
               />
-            </a>
+            </Link>
           </div>
         </div>
         <div className="pt-navbar-group pt-align-left">

@@ -8,9 +8,10 @@ import {
   fetchContractsSuccess,
   fetchContractsFailure
 } from './contracts.actions';
-import {APIURL} from '../../env.js'
+import {NODES} from '../../env';
 
-const contractsUrl = APIURL + "bloc/contracts"
+
+const contractsUrl = NODES[0].url + "bloc/contracts";
 
 function getContracts() {
   return fetch(
