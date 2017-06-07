@@ -68,7 +68,11 @@ class Accounts extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <NumberCard number={users.length} description="Users"/>
+            <NumberCard
+              number={users.length}
+              description="Users" 
+              iconClass="fa-users"
+            />
           </div>
           <div className="col-sm-9">
             <div className="pt-card pt-elevation-2">

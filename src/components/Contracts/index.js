@@ -8,6 +8,7 @@ import ContractCard from './components/ContractCard';
 class Contracts extends Component {
 
   componentDidMount() {
+    this.props.changeContractFilter('');
     this.props.fetchContracts();
   }
 
@@ -31,6 +32,7 @@ class Contracts extends Component {
           <div className="row pt-dark">
             <div className="col-sm-12">
               <ContractCard contract={{name: value, contract: contracts[value]}} key={'ContractCard'+contracts[value].address}/>
+              <br />
             </div>
           </div>
         );
@@ -38,25 +40,25 @@ class Contracts extends Component {
 
     return (
       <div className="container-fluid">
-          <div className="row pt-dark">
-            <div className="col-md-3 text-left">
-              <h3>Contracts</h3>
-            </div>
-            <div className="col-md-6 smd-pad-16">
-              <div className="pt-input-group pt-dark pt-large">
-                <span className="pt-icon pt-icon-search"></span>
-                <input
-                  className="pt-input"
-                  type="search"
-                  placeholder="Search input"
-                  onChange={e => this.updateFilter(e.target.value.toLowerCase())}
-                  dir="auto"/>
-              </div>
-            </div>
-            <div className="col-md-3 text-right">
-              <CreateContract/>
+        <div className="row pt-dark">
+          <div className="col-md-3 text-left">
+            <h3>Contracts</h3>
+          </div>
+          <div className="col-md-6 smd-pad-16">
+            <div className="pt-input-group pt-dark pt-large">
+              <span className="pt-icon pt-icon-search"></span>
+              <input
+                className="pt-input"
+                type="search"
+                placeholder="Search contracts"
+                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                dir="auto"/>
             </div>
           </div>
+          <div className="col-md-3 text-right">
+            <CreateContract/>
+          </div>
+        </div>
 
         {cards}
       </div>

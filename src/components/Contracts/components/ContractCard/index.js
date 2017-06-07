@@ -30,18 +30,21 @@ class ContractCard extends Component {
     cardData = cardData.length === 0 ? [<tr key={1}>
       <td colSpan="2" className="text-center">No Instances</td>
     </tr>] : cardData;
-    
+
     return (
       <div className="row">
         <div className="pt-card pt-dark pt-elevation-2 col-md-6">
           <div className="col-sm-6"><h4>{this.props.contract.name}</h4></div>
-          <div className="col-sm-6 smd-pad-16 text-right"><Button type="button"
-                                                             className="pt-dark pt-icon-double-caret-vertical btn-sm"
-                                                             onClick={() => {
-                                                               this.setState({isOpen: !this.state.isOpen})
-                                                             }}>
-            {this.state.isOpen ? "Hide" : "Show"} Contracts
-          </Button></div>
+          <div className="col-sm-6 text-right">
+            <Button type="button"
+               className="pt-dark pt-icon-double-caret-vertical btn-sm"
+               onClick={() => {
+               this.setState({isOpen: !this.state.isOpen})
+               }}
+            >
+              {this.state.isOpen ? "Hide" : "Show"} Contracts
+            </Button>
+          </div>
           <Collapse isOpen={this.state.isOpen} component="table" className="col-sm-12" transitionDuration={100}>
             <table className="pt-table pt-interactive pt-condensed pt-striped">
               <thead>
