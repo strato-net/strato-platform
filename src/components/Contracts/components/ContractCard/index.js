@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import {Button, Collapse} from '@blueprintjs/core';
 import * as moment from 'moment';
 import ContractState from '../ContractState';
+import './contractCard.css';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -18,8 +19,15 @@ class ContractCard extends Component {
     subcontracts
       .filter((contract) => {return re.test(contract.address)})
       .forEach(function (contract) {
-        cardData.push(<tr onClick={() => {self.setState({selectedAddress:contract.address});}} key={contract.address}>
-            <td>{contract.address}</td>
+        cardData.push(
+          <tr
+            className={self.state.selectedAddress === contract.address ? 'selected' : ''}
+            onClick={() => {self.setState({selectedAddress:contract.address});}}
+            key={contract.address}
+          >
+            <td >
+              {contract.address}
+            </td>
             <td>
               {moment(contract.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
             </td>
