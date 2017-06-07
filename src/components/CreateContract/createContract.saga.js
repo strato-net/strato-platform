@@ -52,7 +52,6 @@ function createContractApiCall(source, username, password, args) {
         return response;
       })
       .then(function(res) {
-        console.log(res, res.text());
         return res;
       })
       .catch(function(error) {
@@ -75,7 +74,6 @@ function compileContractApiCall(src) {
         return response.json();
       })
       .then(function(res) {
-        console.log(res);
         return res;
       })
       .catch(function(error) {

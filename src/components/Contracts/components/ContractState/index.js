@@ -11,34 +11,41 @@ class ContractState extends Component {
 
   render() {
     const state = this.props.states[this.props.contractAddress] === undefined ? {} : this.props.states[this.props.contractAddress];
-    const variableData = []
-    Object.getOwnPropertyNames(state).forEach((variable, i) => {
-      variableData.push(<tr key={variable + ' ' + i}>
-        <td>{variable}</td>
-        <td>{state[variable]}</td>
-      </tr>);
-    })
-    
-    return (
-    <div className="pt-card pt-dark pt-elevation-2">
-      <div className="row">
-        <div className="col-sm-12"><h4>State</h4></div>
-      </div>
-      <div className="row">
-        <div className="col-sm-12">
-          <table className="pt-table pt-condensed pt-striped">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>State</th>
-              </tr>
-            </thead>
-            <tbody>{variableData}</tbody>
-          </table>
+    const symbols = Object.getOwnPropertyNames(state);
+
+    const symbolTable = [];
+    if(symbols.length > 0) {
+      symbolTable.push(
+        <tr key={'header' + this.props.contractAddress}>
+          <th>Symbol</th>
+          <th>State</th>
+        </tr>
+      );
+
+      symbols.forEach((symbol, i) => {
+        symbolTable.push(<tr key={symbol + ' ' + i}>
+          <td>{symbol}</td>
+          <td>{state[symbol]}</td>
+        </tr>)
+      })
+    }
+
+    if(symbols.length > 0) {
+      return (
+        <div className="pt-card pt-dark pt-elevation-2">
+          <div className="row">
+            <div className="col-sm-12">
+              <table className="pt-table pt-condensed pt-striped">
+                {symbolTable}
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    );
+      );
+    }
+    else {
+      return null;
+    }
   }
 }
 

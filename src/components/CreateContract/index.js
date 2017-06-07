@@ -32,7 +32,6 @@ class CreateContract extends Component {
 
   handleSubmit = () => {
     payload["arguments"] = inputs;
-    console.log(inputs);
     this.props.createContract(payload);
     payload = {username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)"};
     inputs = {};
@@ -55,7 +54,6 @@ class CreateContract extends Component {
       Object.values(src).map(val => {
           if (val.constr !== undefined) {
             return Object.getOwnPropertyNames(val.constr).map(arg => {
-              console.log(arg);
               return (<div className="input">
                 <label className="pt-label">
                   {arg + " (" + val.constr[arg].type + ")"}

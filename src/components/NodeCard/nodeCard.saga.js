@@ -75,7 +75,6 @@ function getNodeCoinbaseApi(nodeIndex) {
 function* getNodeDetail(action) {
   try {
     const response = yield call(getNodeDetailApi, action.nodeIndex);
-    console.log(response);
     yield put(fetchNodeDetailSuccess(action.nodeIndex, response));
   }
   catch(err) {
