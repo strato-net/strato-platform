@@ -5,18 +5,23 @@ import './NumberCard.css'
 
 class NumberCard extends Component {
   render() {
-    return (
-      <div className="col-sm pt-card pt-dark pt-elevation-2">
-        <div className="text-right number">
-            <h1>
-              {this.props.number}
-            </h1>
+    let classes = 'pt-card pt-dark pt-elevation-2 ';
+    classes += this.props.mode ? this.props.mode : 'neutral';
 
-        </div>
-        <div className="text-right desc">
-          <h5>
-            {this.props.description}
-          </h5>
+    return (
+      <div className={classes}>
+        <div className="row">
+          <div className="col-xs-4 text-center">
+            <i className={'fa ' + this.props.iconClass + ' fa-5x smd-pad-8'} aria-hidden="true"></i>
+          </div>
+          <div className="col-xs-8">
+            <div className="h2 text-right">
+              <strong>{this.props.number}</strong>
+            </div>
+            <div className="h4 text-right desc">
+              {this.props.description}
+            </div>
+          </div>
         </div>
       </div>
     );

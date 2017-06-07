@@ -1,0 +1,19 @@
+@import "../../../node_modules/@blueprintjs/core/dist/variables.scss";
+
+.node-danger {
+  border-left: solid $vermilion5 8px;
+  padding: 4px 8px;
+  margin-bottom: 2px;
+}
+
+.node-success {
+  border-left: solid $forest5 8px;
+  padding: 4px 8px;
+  margin-bottom: 2px;
+}
+
+.node-warning {
+  border-left: solid $gold5 8px;
+  margin-bottom: 2px;
+  padding: 4px 8px;
+}

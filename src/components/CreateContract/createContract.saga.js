@@ -8,12 +8,12 @@ import {
   createContractSuccess,
   createContractFailure,
 } from './createContract.actions';
-import { APIURL } from '../../env';
+import { NODES } from '../../env';
 
-const url = APIURL + "bloc/users/:user/:address/contract"
+const url = NODES[0].url + "bloc/users/:user/:address/contract"
 
 function getAddress(username) {
-  let getAddressUrl = APIURL+ "bloc/users/" + username
+  const getAddressUrl = NODES[0].url + "bloc/users/" + username
   return fetch(
     getAddressUrl,
     {

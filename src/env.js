@@ -1,1 +1,6 @@
-export const APIURL = "http://bayar6.eastus.cloudapp.azure.com/";
+export const NODES = [
+  {
+    name: 'BAYAR6',
+    url: 'http://bayar6.eastus.cloudapp.azure.com/'
+  }
+]
