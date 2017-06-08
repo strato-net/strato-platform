@@ -25,28 +25,34 @@ class TransactionList extends Component {
   }
 
   render() {
-    let txRows = this.props.tx.map(
+    let txRows = this.props.tx.slice(0, 5).map(
       function (tx, i) {
         return (
-            <tr key={i}>
-              <td width="40%"><Text ellipsize={true}><small>{tx.hash}</small></Text></td>
-              <td width="23%" className="text-right"><small>{tx.value}</small></td>
-              <td width="22%">
-                <small>
-                  <Text ellipsize={true}>
-                    {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
-                  </Text>
-                </small>
-              </td>
-              <td width="15%"><small>{tx.transactionType}</small></td>
-            </tr>
+          <tr key={i}>
+            <td width="40%"><Text ellipsize={true}>
+              <small>{tx.hash}</small>
+            </Text></td>
+            <td width="23%" className="text-right">
+              <small>{tx.value}</small>
+            </td>
+            <td width="22%">
+              <small>
+                <Text ellipsize={true}>
+                  {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
+                </Text>
+              </small>
+            </td>
+            <td width="15%">
+              <small>{tx.transactionType}</small>
+            </td>
+          </tr>
         )
       }
     );
 
     return (
       <div className="pt-card pt-dark pt-elevation-2">
-        <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout:'fixed'}}>
+        <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
           <thead>
           <tr>
             <th width="40%"><h5>Hash</h5></th>
