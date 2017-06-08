@@ -118,7 +118,7 @@ class BlockView extends Component {
 }
 
 function mapStateToProps(state, ownProps) {
-  const blockNumber = ownProps.match.params.block;
+  const blockNumber = Number(ownProps.match.params.block);
   return {
     block: state.blockData.blockData.filter((val) => {
       return val.blockData.number === blockNumber

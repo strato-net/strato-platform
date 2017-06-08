@@ -17,7 +17,6 @@ class Contracts extends Component {
   }
 
   render() {
-    console.log('render contracts')
     const contracts = this.props.contracts;
     const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
