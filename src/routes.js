@@ -9,6 +9,7 @@ import Account from './components/Account';
 import Contracts from './components/Contracts';
 import SideBar from './components/SideBar';
 import TransactionView from './components/Transactions/components/TransactionView';
+import BlockView from './components/Blocks/components/BlockView';
 
 export const routes = (
   <Switch>
@@ -18,6 +19,7 @@ export const routes = (
     <Route exact path="/dashboard" component={Dashboard}/>
     <Route exact path="/nodes" component={Nodes} />
     <Route exact path="/blocks" component={Blocks} />
+    <Route exact path="/blocks/:block" component={BlockView} />
     <Route exact path="/transactions" component={Transactions} />
     <Route exact path="/transactions/:hash" component={TransactionView} />
     <Route exact path="/accounts" component={Accounts}/>

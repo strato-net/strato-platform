@@ -1,4 +1,5 @@
 import React, {Component} from 'react';
+import BlockTable from './components/BlockTable';
 
 class Blocks extends Component {
   render() {
@@ -9,6 +10,7 @@ class Blocks extends Component {
             <h3>Blocks</h3>
           </div>
         </div>
+        <BlockTable/>
       </div>
     );
   }
