@@ -25,39 +25,46 @@ class TransactionTable extends Component {
 
   render() {
     const history = this.props.history;
+
     function handleClick(hash) {
-      history.push('/transactions/'+hash);
+      history.push('/transactions/' + hash);
     }
 
     let txRows = this.props.tx.map(
       function (tx, i) {
         return (
-          <tr key={i} onClick={() => {handleClick(tx.hash)}}>
-            <td>
-                <Tooltip tooltipClassName="smd-padding-8" content={tx.hash} position={Position.TOP}>
-                  <Text ellipsize={true}>
-                    <small>{tx.hash}</small>
-                  </Text>
+          <tr key={i} onClick={() => {
+            handleClick(tx.hash)
+          }}>
+            <td width="40%">
+              <Text ellipsize={true}>
+                <Tooltip tooltipClassName="smd-padding-8" content={tx.hash} position={Position.TOP_LEFT}>
+                  <small>{tx.hash}</small>
                 </Tooltip>
+              </Text>
             </td>
-            <td>
-              <small>{tx.value}</small>
+            <td width="10%">
+              <Text ellipsize={true}>
+                <Tooltip tooltipClassName="smd-padding-8" content={tx.value + ' wei'} position={Position.TOP_LEFT}>
+                  <small>{tx.value} wei</small>
+                </Tooltip>
+              </Text>
             </td>
-            <td>
-              <small>
-                <Text ellipsize={true}>
+            <td width="10%">
+              <Text ellipsize={true}>
+                <small>
                   {tx.blockNumber}
-                </Text>
-              </small>
+                </small>
+              </Text>
             </td>
-            <td>
-              <small>
-                <Text ellipsize={true}>
+            <td width="20%">
+              <Text ellipsize={true}>
+                <small>
                   {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
-                </Text>
-              </small>
+                </small>
+              </Text>
             </td>
-            <td>
+            <td width="20%">
               <small>{tx.transactionType}</small>
             </td>
           </tr>
@@ -69,14 +76,15 @@ class TransactionTable extends Component {
       <div className="pt-card pt-dark pt-elevation-2">
         <div className="row">
           <div className="col-sm-12">
-            <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
+            <table className="pt-table pt-interactive pt-condensed pt-striped"
+                   style={{tableLayout: 'fixed', width: "100%"}}>
               <thead>
               <tr>
-                <th><h5>Hash</h5></th>
-                <th className="text-right"><h5>Value</h5></th>
-                <th><h5>Block Number</h5></th>
-                <th><h5>Timestamp</h5></th>
-                <th><h5>Type</h5></th>
+                <th width="40%"><h5>Hash</h5></th>
+                <th width="10%" className="text-right"><h5>Value</h5></th>
+                <th width="10%"><h5>Block Number</h5></th>
+                <th width="20%"><h5>Timestamp</h5></th>
+                <th width="20%"><h5>Type</h5></th>
               </tr>
               </thead>
 

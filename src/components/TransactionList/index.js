@@ -3,7 +3,7 @@ import {connect} from 'react-redux';
 import {fetchTx} from './transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
-import {Text} from '@blueprintjs/core';
+import {Text, Tooltip, Position} from '@blueprintjs/core';
 import * as moment from 'moment';
 
 class TransactionList extends Component {
@@ -29,18 +29,22 @@ class TransactionList extends Component {
       function (tx, i) {
         return (
           <tr key={i}>
-            <td width="40%"><Text ellipsize={true}>
-              <small>{tx.hash}</small>
-            </Text></td>
+            <td width="40%">
+              <Text ellipsize={true}>
+                <Tooltip tooltipClassName="smd-padding-8" content={tx.hash} position={Position.TOP_LEFT}>
+                  <small>{tx.hash}</small>
+                </Tooltip>
+              </Text>
+            </td>
             <td width="23%" className="text-right">
               <small>{tx.value}</small>
             </td>
             <td width="22%">
-              <small>
-                <Text ellipsize={true}>
+              <Text ellipsize={true}>
+                <small>
                   {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
-                </Text>
-              </small>
+                </small>
+              </Text>
             </td>
             <td width="15%">
               <small>{tx.transactionType}</small>
@@ -52,7 +56,7 @@ class TransactionList extends Component {
 
     return (
       <div className="pt-card pt-dark pt-elevation-2">
-        <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed'}}>
+        <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed', width: '100%'}}>
           <thead>
           <tr>
             <th width="40%"><h5>Hash</h5></th>
