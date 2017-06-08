@@ -18,7 +18,6 @@ const initialState = {
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case FETCH_CONTRACTS:
-      console.log(FETCH_CONTRACTS);
       return {
         contracts: state.contracts,
         filter: state.filter,
