@@ -36,31 +36,31 @@ class BlockTable extends Component {
           <tr key={block.blockData.number} onClick={() => {
             handleClick(block.blockData.number)
           }}>
-            <td width="16.66%">
+            <td width="10%">
               <small>{block.blockData.number}</small>
             </td>
-            <td width="16.66%">
+            <td width="22.5%">
               <Text ellipsize={true}>
                 <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.parentHash} position={Position.TOP_LEFT}>
                   <small>{block.blockData.parentHash}</small>
                 </Tooltip>
               </Text>
             </td>
-            <td width="16.66%">
+            <td width="15%">
               <Text ellipsize={true}>
                 <small>
                   {block.blockData.difficulty}
                 </small>
               </Text>
             </td>
-            <td width="16.66%">
+            <td width="10%">
               <Text ellipsize={true}>
                 <small>
                   {block.blockData.nonce}
                 </small>
               </Text>
             </td>
-            <td width="16.66%">
+            <td width="22.5%">
               <Text ellipsize={true}>
                 <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.coinbase} position={Position.TOP_LEFT}>
                   <small>
@@ -69,7 +69,7 @@ class BlockTable extends Component {
                 </Tooltip>
               </Text>
             </td>
-            <td width="16.66%">
+            <td width="20%">
               <Text ellipsize={true}>
                 <small>
                   {moment(block.blockData.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
@@ -89,12 +89,12 @@ class BlockTable extends Component {
                    style={{tableLayout: 'fixed', width: '100%'}}>
               <thead>
               <tr>
-                <th width="16.66%"><h5>Block Number</h5></th>
-                <th width="16.66%"><h5>Parent Hash</h5></th>
-                <th width="16.66%"><h5>Difficulty</h5></th>
-                <th width="16.66%"><h5>Nonce</h5></th>
-                <th width="16.66%"><h5>Coinbase</h5></th>
-                <th width="16.66%"><h5>Timestamp</h5></th>
+                <th width="10%"><h5>Block Number</h5></th>
+                <th width="22.5%"><h5>Parent Hash</h5></th>
+                <th width="15%"><h5>Difficulty</h5></th>
+                <th width="10%"><h5>Nonce</h5></th>
+                <th width="22.5%"><h5>Coinbase</h5></th>
+                <th width="20%"><h5>Timestamp</h5></th>
               </tr>
               </thead>
 
