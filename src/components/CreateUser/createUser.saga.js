@@ -8,6 +8,11 @@ import {
   createUserSuccess,
   createUserFailure,
 } from './createUser.actions';
+
+import {
+  fetchAccounts
+} from '../Accounts/accounts.actions';
+
 import { NODES } from '../../env';
 
 const url = NODES[0].url + "bloc/users/:user"
@@ -35,6 +40,7 @@ function* createUser(action) {
   try {
     let response = yield call(createUserApiCall, action.username, action.password);
     yield put(createUserSuccess(response));
+    yield put(fetchAccounts());
   }
   catch (err) {
     yield put(createUserFailure(err));

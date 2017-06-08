@@ -7,7 +7,7 @@ import {
   FETCH_STATE,
   fetchStateSuccess,
   fetchStateFailure
-} from './contractState.actions';
+} from './contractCard.actions';
 import {NODES} from '../../../../env.js'
 
 const contractsUrl = NODES[0].url + "bloc/contracts/:contractName/:contractAddress/state";
@@ -32,7 +32,7 @@ function getState(contractName, contractAddress) {
 function* fetchState(action) {
   try {
     let response = yield call(getState, action.name, action.address);
-    yield put(fetchStateSuccess(action.address, response));
+    yield put(fetchStateSuccess(action.name, action.address, response));
   }
   catch (err) {
     yield put(fetchStateFailure(err));

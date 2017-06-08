@@ -7,7 +7,7 @@ import ContractCard from './components/ContractCard';
 
 class Contracts extends Component {
 
-  componentDidMount() {
+  componentWillMount() {
     this.props.changeContractFilter('');
     this.props.fetchContracts();
   }
@@ -17,21 +17,22 @@ class Contracts extends Component {
   }
 
   render() {
+    console.log('render contracts')
     const contracts = this.props.contracts;
     const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
-
     const cards = contractNames
       .filter(function(contract){
-                if(!filter) {
-                    return true;
-                  }
-               return contract.toLowerCase().indexOf(filter) > -1; })
-      .map((value) => {
+        if(!filter) {
+          return true;
+        }
+        return contract.toLowerCase().indexOf(filter) > -1;
+      })
+      .map((value,i) => {
         return (
-          <div className="row pt-dark">
+          <div className="row pt-dark" key={'contract-card-'+i}>
             <div className="col-sm-12">
-              <ContractCard contract={{name: value, contract: contracts[value]}} key={'ContractCard'+contracts[value].address}/>
+              <ContractCard contract={{name: value, contract: contracts[value]}} />
               <br />
             </div>
           </div>
@@ -55,7 +56,7 @@ class Contracts extends Component {
                 dir="auto"/>
             </div>
           </div>
-          <div className="col-md-3 text-right">
+          <div className="col-md-3 text-right smd-pad-8">
             <CreateContract/>
           </div>
         </div>

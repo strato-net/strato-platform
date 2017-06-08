@@ -28,7 +28,7 @@ class BlockView extends Component {
               {block === undefined ?
                 <table>
                   <tbody>
-                  <tr colSpan="2">No data</tr>
+                  <tr colSpan={2}>No data</tr>
                   </tbody>
                 </table> :
                 <table className="pt-table pt-str">
@@ -121,7 +121,7 @@ function mapStateToProps(state, ownProps) {
   const blockNumber = ownProps.match.params.block;
   return {
     block: state.blockData.blockData.filter((val) => {
-      return val.blockData.number == blockNumber
+      return val.blockData.number === blockNumber
     })[0],
   };
 }

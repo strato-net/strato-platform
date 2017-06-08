@@ -11,6 +11,10 @@ import {
   compileContractSuccess,
   compileContractFailure
 } from './createContract.actions';
+import {
+  fetchContracts
+} from '../Contracts/contracts.actions';
+
 import { NODES } from '../../env';
 
 const url = NODES[0].url + "bloc/users/:user/:address/contract"
@@ -85,6 +89,7 @@ function* createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.fileText,
       action.payload.username, action.payload.password, action.payload.arguments);
+    yield put(fetchContracts());
     yield put(createContractSuccess(response));
   }
   catch (err) {

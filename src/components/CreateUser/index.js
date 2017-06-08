@@ -38,7 +38,7 @@ class CreateUser extends Component {
               <div className="pt-form-group">
 
                 <div className="input">
-                  <label className="pt-label" for="input-a">
+                  <label className="pt-label" htmlFor="input-a">
                     Username
                   </label>
                   <div className="pt-form-content">
@@ -50,7 +50,7 @@ class CreateUser extends Component {
                 </div>
 
                 <div className="input">
-                  <label className="pt-label" for="input-b">
+                  <label className="pt-label" htmlFor="input-b">
                     Password
                   </label>
                   <div className="pt-form-content">
