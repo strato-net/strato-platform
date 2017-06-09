@@ -1,18 +1,16 @@
-FROM node:6.3.1
+FROM node:boron-slim
 
-# Create app directory
 RUN mkdir -p /usr/src/app
+
 WORKDIR /usr/src/app
 
-# Install app dependencies
-COPY package.json /usr/src/app
-RUN npm install
-
-# Bundle app source
 COPY . /usr/src/app
 
-# Build Static Production application
-RUN npm run build && npm install -g serve
+RUN npm install && \
+    npm install -g serve && \
+    npm run build && \
+    rm -rf node_modules public src
 
 EXPOSE 3000
+
 CMD [ "sh", "/usr/src/app/docker-run.sh" ]
