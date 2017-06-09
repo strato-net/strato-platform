@@ -38,7 +38,7 @@ class CreateUser extends Component {
               <div className="pt-form-group">
 
                 <div className="input">
-                  <label className="pt-label" for="input-a">
+                  <label className="pt-label" htmlFor="input-a">
                     Username
                   </label>
                   <div className="pt-form-content">
@@ -50,7 +50,7 @@ class CreateUser extends Component {
                 </div>
 
                 <div className="input">
-                  <label className="pt-label" for="input-b">
+                  <label className="pt-label" htmlFor="input-b">
                     Password
                   </label>
                   <div className="pt-form-content">
@@ -75,7 +75,7 @@ class CreateUser extends Component {
 
               <div>
                 <div className="col-sm-3"></div>
-                <div className="col-sm-3">{this.props.spinning ? <Spinner className="text-center"/> : <span></span>}</div>
+                <div className="col-sm-3">{this.props.compileSuccess ? <Spinner className="text-center"/> : <span></span>}</div>
                 <div className="col-sm-3"></div>
               </div>
             </div>
@@ -100,7 +100,7 @@ class CreateUser extends Component {
 function mapStateToProps(state) {
   return {
     isOpen: state.createUser.isOpen,
-    spinning: state.createUser.spinning
+    spinning: state.createUser.compileSuccess
   };
 }
 

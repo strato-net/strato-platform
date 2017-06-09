@@ -2,14 +2,17 @@
 
 UI for Strato Management Dashboard
 
+
 ## Pre-requisite setup:
 
-  -- install node.js npm
+```
+install node.js npm
+```
 
 ## Dependencies
 
 SMD needs a running STRATO platform, options:
-  
+
   -- Run STRATO platform (Private Ethereum Blockchain node) on your machine or a VM:
 
      https://github.com/blockapps/strato-getting-started

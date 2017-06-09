@@ -10,7 +10,7 @@ import {
 } from './accounts.actions';
 
 const initialState = {
-  accounts: [],
+  accounts: {},
   filter: '',
   error: null,
 };

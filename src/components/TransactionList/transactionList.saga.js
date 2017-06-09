@@ -8,33 +8,34 @@ import {
   fetchTxSuccess,
   fetchTxFailure
 } from './transactionList.actions';
-import { NODES } from '../../env';
+import {NODES} from '../../env';
 
-const url = NODES[0].url + "strato-api/eth/v1.2/transaction/last/5"
+const url = NODES[0].url + "strato-api/eth/v1.2/transaction/last/";
 
-function getTx() {
+function getTx(last) {
+  if (last === undefined) last = 15;
   return fetch(
-    url,
+    url + last.toString(),
     {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
-    },
-  })
-    .then(function(response) {
+      },
+    })
+    .then(function (response) {
       return response.json()
     })
-    .then(function(res) {
+    .then(function (res) {
       return res;
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
 function* fetchTx(action) {
   try {
-    let response = yield call(getTx);
+    let response = yield call(getTx, action.last);
     yield put(fetchTxSuccess(response));
   }
   catch (err) {

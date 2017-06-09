@@ -1,23 +1,22 @@
 import React, {Component} from 'react';
-import {openOverlay, closeOverlay, createContract} from './createContract.actions';
-import {Button, Dialog, Intent, Spinner, InputGroup} from '@blueprintjs/core';
+import {openOverlay, closeOverlay, createContract, compileContract} from './createContract.actions';
+import {Button, Dialog, Intent, InputGroup} from '@blueprintjs/core';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 
 import './CreateContract.css';
 
-var payload = { username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)"}
-
+var payload = {username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)"};
+var inputs = {}
 class CreateContract extends Component {
 
   handleFileUpload(e) {
     var file = e.target.files[0];
     var reader = new FileReader();
     payload.filename = file.name;
-    reader.onload = function(event) {
-      // The file's text will be printed here
+    reader.onload = function (event) {
       payload.fileText = event.target.result;
-      payload.fileText = payload.fileText.replace(/\r?\n|\r/, " ");
+      payload.fileText = payload.fileText.replace(/\r?\n|\r/g, " ");
     };
 
     reader.readAsText(file);
@@ -32,12 +31,48 @@ class CreateContract extends Component {
   };
 
   handleSubmit = () => {
+    payload["arguments"] = inputs;
     this.props.createContract(payload);
-    this.props.closeOverlay();
-    payload = { username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)" }
+    payload = {username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)"};
+    inputs = {};
   };
 
+  handleCompile = () => {
+    this.props.compileContract(payload);
+  }
+
   render() {
+    let src = this.props.abi === undefined ? undefined : this.props.abi.src;
+    let args = src === undefined ?
+      <div className="input">
+        <label className="pt-label">
+          Waiting for Compliation...
+        </label>
+      </div> :
+      (
+        // eslint-disable-next-line
+      Object.values(src).map(val => {
+          if (val.constr !== undefined) {
+            return Object.getOwnPropertyNames(val.constr).map(arg => {
+              return (<div className="input">
+                <label className="pt-label">
+                  {arg + " (" + val.constr[arg].type + ")"}
+                </label>
+                <div className="pt-form-content">
+                  <InputGroup id="input-b" className="form-width" placeholder={arg+" ("+val.constr[arg].type+")"}
+                              onChange={(e) => {
+                                inputs[arg] = e.target.value;
+                              }}
+                              type="text" dir="auto"/>
+                  <div className="pt-form-helper-text">Enter a {val.constr[arg].type}</div>
+                </div>
+              </div>);
+            });
+          }
+        }
+      )
+    );
+
     return (<div className="smd-pad-16">
         <Button onClick={this.props.openOverlay} className="pt-intent-primary pt-icon-add"
                 text="Create Contract"/>
@@ -48,7 +83,6 @@ class CreateContract extends Component {
           title="Create New Contract"
           className="pt-dark"
         >
-          
           <div className="pt-dialog-body">
             <div className="pt-form-group">
               <div className="input">
@@ -81,18 +115,20 @@ class CreateContract extends Component {
                   <span className="pt-file-upload-input">{payload.filename}</span>
                 </label>
               </div>
-            </div>
 
-            <div>
-              <div className="col-sm-3"></div>
-              <div className="col-sm-6">{this.props.spinning ? <Spinner className="text-center"/> : ''}</div>
-              <div className="col-sm-3"></div>
+              {args}
             </div>
           </div>
 
           <div className="pt-dialog-footer">
             <div className="pt-dialog-footer-actions">
-              <Button text="Cancel" onClick={this.props.closeOverlay} />
+              <Button text="Cancel" onClick={this.props.closeOverlay}/>
+              <Button
+                className="pt-icon-code"
+                intent={Intent.WARNING}
+                onClick={this.handleCompile}
+                text="Compile Contract"
+              />
               <Button
                 intent={Intent.PRIMARY}
                 onClick={this.handleSubmit}
@@ -109,9 +145,15 @@ class CreateContract extends Component {
 function mapStateToProps(state) {
   return {
     isOpen: state.createContract.isOpen,
-    spinning: state.createContract.spinning,
+    spinning: state.createContract.compileSuccess,
     response: state.createContract.response,
+    abi: state.createContract.abi,
   };
 }
 
-export default withRouter(connect(mapStateToProps, {openOverlay, closeOverlay, createContract})(CreateContract));
+export default withRouter(connect(mapStateToProps, {
+  openOverlay,
+  closeOverlay,
+  createContract,
+  compileContract
+})(CreateContract));
