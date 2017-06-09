@@ -1,10 +1,18 @@
 FROM node:6.3.1
 
-WORKDIR /src
+# Create app directory
+RUN mkdir -p /usr/src/app
+WORKDIR /usr/src/app
 
-COPY . /src
-
+# Install app dependencies
+COPY package.json /usr/src/app
 RUN npm install
-RUN npm install -g serve
 
-CMD /bin/bash ./run.sh
+# Bundle app source
+COPY . /usr/src/app
+
+# Build Static Production application
+RUN npm run build && npm install -g serve
+
+EXPOSE 3000
+CMD [ "sh", "/usr/src/app/docker-run.sh" ]

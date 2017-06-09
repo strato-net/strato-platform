@@ -1,19 +1,21 @@
 pipeline {
-  agent any
+  agent {
+    label "cd9"
+  }
   stages {
-    stage('Test') {
-      steps {
-        sh 'npm run test'
-      }
-    }
     stage('Build') {
       steps {
-        sh 'npm run build'
+        sh '''#!/bin/bash -le
+          docker build -t blockapps/smd-ui .
+        '''
       }
     }
-    stage('Dockerize') {
+    stage('Run') {
       steps {
-        sh 'npm run start'
+        sh '''#!/bin/bash -le
+          docker rm -f smd-ui
+          docker run -d --name smd-ui -p 3035:3000 -e NODE_NAME=BAYAR6 -e NODE_URL=http://bayar6.eastus.cloudapp.azure.com/ blockapps/smd-ui
+        '''
       }
     }
   }
