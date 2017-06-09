@@ -5,6 +5,8 @@ import {Button, Text} from '@blueprintjs/core';
 import * as moment from 'moment';
 
 class BlockView extends Component {
+
+
   render() {
     const blockNumber = this.props.match.params.block;
     const block = this.props.block;
@@ -22,96 +24,105 @@ class BlockView extends Component {
             />
           </div>
         </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <div className="pt-card">
-              {block === undefined ?
-                <table>
-                  <tbody>
-                  <tr colSpan={2}>No data</tr>
-                  </tbody>
-                </table> :
-                <table className="pt-table pt-str">
-                  <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Value</th>
-                  </tr>
-                  </thead>
-                  <tbody>
-                  <tr>
-                    <td>Parent Hash</td>
-                    <td>
-                      <Text ellipsize={true}>
-                        <small>{block.blockData.parentHash}</small>
-                      </Text>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Difficulty</td>
-                    <td>
-                      <small>
-                        <Text ellipsize={true}>
-                          {block.blockData.difficulty}
-                        </Text>
-                      </small>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Nonce</td>
-                    <td>
-                      <small>
-                        <Text ellipsize={true}>
-                          {block.blockData.nonce}
-                        </Text>
-                      </small>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Coinbase</td>
-                    <td>
-                      <small>
-                        <Text ellipsize={true}>
-                          {block.blockData.coinbase}
-                        </Text>
-                      </small>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>State Root</td>
-                    <td>
-                      <small>
-                        <Text ellipsize={true}>
-                          {block.blockData.stateRoot}
-                        </Text>
-                      </small>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Transactions Root</td>
-                    <td>
-                      <small>
-                        <Text ellipsize={true}>
-                          {block.blockData.transactionsRoot}
-                        </Text>
-                      </small>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Timestamp</td>
-                    <td>
-                      <small>
-                        <Text ellipsize={true}>
-                          {moment(block.blockData.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
-                        </Text>
-                      </small>
-                    </td>
-                  </tr>
-                  </tbody>
-                </table>}
+        {block === undefined ?
+          <div className="row">
+            <div className="col-sm-12">
+              <div className="pt-card">
+                  <table>
+                    <tbody>
+                    <tr colSpan={2}>No data</tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+            :
+            <div className="row">
+              <div className="col-sm-12">
+                <div className="pt-card">
+                  <table className="pt-table pt-str">
+                    <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                      <td>Parent Hash</td>
+                      <td>
+                        <Text ellipsize={true}>
+                          <small>{block.blockData.parentHash}</small>
+                        </Text>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Difficulty</td>
+                      <td>
+                        <small>
+                          <Text ellipsize={true}>
+                            {block.blockData.difficulty}
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Nonce</td>
+                      <td>
+                        <small>
+                          <Text ellipsize={true}>
+                            {block.blockData.nonce}
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Coinbase</td>
+                      <td>
+                        <small>
+                          <Text ellipsize={true}>
+                            {block.blockData.coinbase}
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>State Root</td>
+                      <td>
+                        <small>
+                          <Text ellipsize={true}>
+                            {block.blockData.stateRoot}
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Transactions Root</td>
+                      <td>
+                        <small>
+                          <Text ellipsize={true}>
+                            {block.blockData.transactionsRoot}
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Timestamp</td>
+                      <td>
+                        <small>
+                          <Text ellipsize={true}>
+                            {moment(block.blockData.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          }
+
       </div>
     );
   }

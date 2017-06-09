@@ -1,45 +1,51 @@
 import React, {Component} from 'react';
-import {openOverlay, closeOverlay, createContract, compileContract} from './createContract.actions';
-import {Button, Dialog, Intent, InputGroup} from '@blueprintjs/core';
+import {openOverlay, closeOverlay, createContract, compileContract, usernameFormChange, passwordFormChange, contractFormChange} from './createContract.actions';
+import {fetchContracts} from '../Contracts/contracts.actions';
+import {Button, Dialog} from '@blueprintjs/core';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 
 import './CreateContract.css';
 
-var payload = {username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)"};
 var inputs = {}
 class CreateContract extends Component {
 
-  handleFileUpload(e) {
-    var file = e.target.files[0];
-    var reader = new FileReader();
-    payload.filename = file.name;
+  handleFileUpload = (e) => {
+    let contract = e.target.files[0];
+    let reader = new FileReader();
+    const self = this;
     reader.onload = function (event) {
-      payload.fileText = event.target.result;
-      payload.fileText = payload.fileText.replace(/\r?\n|\r/g, " ");
-    };
-
-    reader.readAsText(file);
+      contract = event.target.result.replace(/\r?\n|\r/g, " ");
+      self.props.contractFormChange(contract.name, contract);
+      self.props.compileContract(contract);
+    }
+    reader.readAsText(contract);
   }
 
   handleUsernameChange = (e) => {
-    payload.username = e.target.value;
+    this.props.usernameFormChange(e.target.value);
   };
 
   handlePasswordChange = (e) => {
-    payload.password = e.target.value;
+    this.props.passwordFormChange(e.target.value);
   };
 
   handleSubmit = () => {
-    payload["arguments"] = inputs;
-    this.props.createContract(payload);
-    payload = {username: '', password: '', fileText: '', filename: "Upload Smart Contract(.sol)"};
-    inputs = {};
+    if (!this.props.createDisabled) {
+      const payload = {
+        username: this.props.username,
+        password: this.props.password,
+        fileText: this.props.contract,
+        arguments: inputs,
+      }
+      this.props.createContract(payload);
+    }
+    this.props.fetchContracts();
   };
 
-  handleCompile = () => {
-    this.props.compileContract(payload);
-  }
+  // handleCompile = () => {
+  //   this.props.compileContract();
+  // }
 
   render() {
     let src = this.props.abi === undefined ? undefined : this.props.abi.src;
@@ -54,12 +60,13 @@ class CreateContract extends Component {
       Object.values(src).map(val => {
           if (val.constr !== undefined) {
             return Object.getOwnPropertyNames(val.constr).map(arg => {
+              inputs[arg]= '';
               return (<div className="input">
                 <label className="pt-label">
                   {arg + " (" + val.constr[arg].type + ")"}
                 </label>
                 <div className="pt-form-content">
-                  <InputGroup id="input-b" className="form-width" placeholder={arg+" ("+val.constr[arg].type+")"}
+                  <input id="input-b" className="form-width pt-input" placeholder={arg+" ("+val.constr[arg].type+")"}
                               onChange={(e) => {
                                 inputs[arg] = e.target.value;
                               }}
@@ -90,7 +97,7 @@ class CreateContract extends Component {
                   Username
                 </label>
                 <div className="pt-form-content">
-                  <InputGroup id="input-a" className="form-width" placeholder="Username"
+                  <input id="input-a" className={this.props.username === undefined ? "form-width pt-input pt-intent-danger" : "form-width pt-input"} placeholder="Username"
                               onChange={this.handleUsernameChange}
                               type="text" dir="auto"/>
                   <div className="pt-form-helper-text">Enter your username</div>
@@ -102,7 +109,7 @@ class CreateContract extends Component {
                   Password
                 </label>
                 <div className="pt-form-content">
-                  <InputGroup id="input-b" className="form-width" placeholder="Password"
+                  <input id="input-b" className={this.props.password === undefined ? "form-width pt-input pt-intent-danger" : "form-width pt-input"} placeholder="Password"
                               onChange={this.handlePasswordChange}
                               type="text" dir="auto"/>
                   <div className="pt-form-helper-text">Enter your password</div>
@@ -111,8 +118,8 @@ class CreateContract extends Component {
 
               <div className="input">
                 <label style={{"margin": "0.5%"}} className="pt-file-upload">
-                  <InputGroup type="file" onChange={this.handleFileUpload}/>
-                  <span className="pt-file-upload-input">{payload.filename}</span>
+                  <input type="file" onChange={this.handleFileUpload} className={this.props.filename === undefined ? "pt-intent-danger" : ""}/>
+                  <span className="pt-file-upload-input form-width">{this.props.filename === undefined ? 'Upload Contract(.sol)' : this.props.filename}</span>
                 </label>
               </div>
 
@@ -124,13 +131,7 @@ class CreateContract extends Component {
             <div className="pt-dialog-footer-actions">
               <Button text="Cancel" onClick={this.props.closeOverlay}/>
               <Button
-                className="pt-icon-code"
-                intent={Intent.WARNING}
-                onClick={this.handleCompile}
-                text="Compile Contract"
-              />
-              <Button
-                intent={Intent.PRIMARY}
+                className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                 onClick={this.handleSubmit}
                 text="Create Contract"
               />
@@ -148,6 +149,11 @@ function mapStateToProps(state) {
     spinning: state.createContract.compileSuccess,
     response: state.createContract.response,
     abi: state.createContract.abi,
+    createDisabled: state.createContract.createDisabled,
+    filename: state.createContract.filename,
+    username: state.createContract.username,
+    password: state.createContract.password,
+    contract: state.createContract.contract,
   };
 }
 
@@ -155,5 +161,9 @@ export default withRouter(connect(mapStateToProps, {
   openOverlay,
   closeOverlay,
   createContract,
-  compileContract
+  compileContract,
+  usernameFormChange,
+  passwordFormChange,
+  contractFormChange,
+  fetchContracts,
 })(CreateContract));

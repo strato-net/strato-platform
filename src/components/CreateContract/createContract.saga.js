@@ -99,7 +99,7 @@ function* createContract(action) {
 
 function* compileContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.payload.fileText);
+    let response = yield call(compileContractApiCall, action.contract);
     yield put(compileContractSuccess(response));
   }
   catch (err) {
