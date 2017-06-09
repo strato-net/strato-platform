@@ -8,7 +8,7 @@ class MenuBar extends Component {
 
   render() {
     return (
-      <nav className="pt-navbar pt-dark" style={{position: 'fixed', width: '100%'}}>
+      <nav className="pt-navbar pt-dark smd-menu-bar" >
         <div className="pt-navbar-group pt-align-left">
           <div>
             <Link to="/dashboard">
@@ -26,9 +26,9 @@ class MenuBar extends Component {
         </div>
         <div className="pt-navbar-group pt-align-right">
           <span className="pt-navbar-divider"/>
-          <span className="pt-button pt-minimal pt-icon-user"/>
-          <span className="pt-button pt-minimal pt-icon-notifications"/>
-          <span className="pt-button pt-minimal pt-icon-cog"/>
+          <Link to="http://developers.blockapps.net/dashboard" target="_blank">
+            <button className="pt-button pt-minimal pt-small" >DOCS</button>
+          </Link>
         </div>
       </nav>
     );

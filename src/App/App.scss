@@ -1,12 +1,33 @@
 @import "../../node_modules/@blueprintjs/core/dist/variables.scss";
 @import "../../node_modules/plottable/plottable.css";
 
+html {
+  height: 100%;
+}
+
 body {
   background: $pt-dark-app-background-color !important;
+  min-height: 100%;
+  font-family: 'Roboto', sans-serif !important;
 }
 
 #outer-container {
   margin-left: 320px;
   padding: 0px 12px;
-  padding-top: 48px;
+}
+
+.smd-full-width {
+  width: 100%;
+}
+
+.smd-pad-4 {
+  padding: 4px;
+}
+
+.smd-pad-8 {
+  padding: 8px;
+}
+
+.smd-pad-16 {
+  padding: 16px;
 }

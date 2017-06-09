@@ -25,13 +25,17 @@ class TransactionList extends Component {
   }
 
   render() {
+    const self = this;
     let txRows = this.props.tx.slice(0, 5).map(
       function (tx, i) {
         return (
-          <tr key={i}>
+          <tr
+            key={i}
+            onClick={e => {self.props.history.push('/transactions/' + tx.hash)}}
+          >
             <td width="40%">
               <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={tx.hash} position={Position.TOP_LEFT}>
+                <Tooltip content={tx.hash} position={Position.TOP_LEFT}>
                   <small>{tx.hash}</small>
                 </Tooltip>
               </Text>
@@ -42,7 +46,7 @@ class TransactionList extends Component {
             <td width="22%">
               <Text ellipsize={true}>
                 <small>
-                  {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
+                  {moment(new Date(tx.timestamp)).format('YYYY-MM-DD hh:mm:ss A')}
                 </small>
               </Text>
             </td>
