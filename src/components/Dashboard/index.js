@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import { withRouter, Link } from 'react-router-dom';
 import NodeCard from '../NodeCard';
 import TransactionList from '../TransactionList';
 import NumberCard from '../NumberCard';
@@ -121,18 +121,24 @@ class Dashboard extends Component {
             />
           </div>
           <div className="col-sm-3">
-            <NumberCard
-              number={userCount}
-              description="Users"
-              iconClass="fa-users"
-            />
+            <Link to="/accounts">
+              <NumberCard
+                number={userCount}
+                description="Users"
+                iconClass="fa-users"
+                className="smd-pointer"
+              />
+            </Link>
           </div>
           <div className="col-sm-3">
-            <NumberCard
-              number={ contractCount }
-              description="Contracts"
-              iconClass="fa-gavel"
-            />
+            <Link to="/contracts">
+              <NumberCard
+                number={ contractCount }
+                description="Contracts"
+                iconClass="fa-gavel"
+                className="smd-pointer"
+              />
+            </Link>
           </div>
         </div>
         <div className="row">

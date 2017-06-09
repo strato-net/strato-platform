@@ -20,7 +20,8 @@ class Contracts extends Component {
     const contracts = this.props.contracts;
     const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
-    const cards = contractNames
+
+    const cards = contractNames.length === 0 ? null : contractNames
       .filter(function(contract){
         if(!filter) {
           return true;
