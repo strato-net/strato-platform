@@ -1,6 +1,6 @@
-export const NODES = window._NODES_ || [
+export const NODES = window._NODES_.name !== '__NODE_NAME__' ? [
   {
-    name: 'BAYAR6',
-    url: 'http://bayar6.eastus.cloudapp.azure.com/'
+    name: 'TESTER14',
+    url: 'http://tester14.eastus.cloudapp.azure.com/'
   }
-]
+] : window._NODES_;
