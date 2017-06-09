@@ -1,10 +1,16 @@
-FROM node:6.3.1
+FROM node:boron-slim
 
-WORKDIR /src
+RUN mkdir -p /usr/src/app
 
-COPY . /src
+WORKDIR /usr/src/app
 
-RUN npm install
-RUN npm install -g serve
+COPY . /usr/src/app
 
-CMD /bin/bash ./run.sh
+RUN npm install && \
+    npm install -g serve && \
+    npm run build && \
+    rm -rf node_modules public src
+
+EXPOSE 3000
+
+CMD [ "sh", "/usr/src/app/docker-run.sh" ]
