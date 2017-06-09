@@ -32,7 +32,7 @@ class ContractCard extends Component {
             }}
             key={'card-data-' + instance.address}
           >
-            <td>
+            <td style={{border: 'none'}}>
               {instance.address}
             </td>
             <td style={{border: 'none'}}>
