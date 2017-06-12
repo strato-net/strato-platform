@@ -14,7 +14,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           docker rm -f smd-ui || true
-          docker run -d --name smd-ui -p 3035:3000 -e NODE_NAME=BAYAR6 -e NODE_URL=http://bayar6.eastus.cloudapp.azure.com/ blockapps/smd-ui
+          docker run -d --name smd-ui -p 3035:3002 -e NODE_NAME=BAYAR6 -e NODE_URL=http://bayar6.eastus.cloudapp.azure.com/ blockapps/smd-ui
           sleep 10
           curl localhost:3035
         '''

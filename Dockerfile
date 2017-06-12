@@ -11,6 +11,6 @@ RUN npm install && \
     npm run build && \
     rm -rf node_modules public src
 
-EXPOSE 3000
+EXPOSE 3002
 
 CMD [ "sh", "/usr/src/app/docker-run.sh" ]
