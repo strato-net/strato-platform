@@ -10,15 +10,19 @@ metadata:
     init: "#include basil_extensions.js"
 
 deployments:
-  - name: bloc
-    repo: https://github.com/blockapps/bloc.git
+  - name: smd-ui 
+    repo: https://github.com/blockapps/smd-ui.git
     ref: master
     compose:
       restart: always
+      depends_on:
+        - strato
+        - bloch 
+      ports:
+        - "3002:3002"
       environment:
-        ssl: "${ssl}"
-        stratoHost: "${stratoHost}"
-        apiUrlOverride: "${apiUrlOverride}"
+        NODE_NAME: "${NODE_NAME}"
+        NODE_URL: "${NODE_URL}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
@@ -162,7 +166,6 @@ deployments:
         peers: "${peers}"
       links:
         - strato:strato
-        - bloc:bloc
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
@@ -177,10 +180,10 @@ deployments:
         - "80:80"
       depends_on:
         - strato
-        - bloc
+        - smd-ui 
+        - bloch
         - cirrus
         - postgrest
-        - explorer
       environment:
         ssl: "${ssl}"
         uiPassword: "${uiPassword}"
