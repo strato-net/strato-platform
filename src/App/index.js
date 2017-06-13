@@ -7,9 +7,11 @@ import './App.css';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import 'bootstrap/dist/css/bootstrap.css'
+import {NODES} from '../env';
 
 mixpanel.init('62f1bec01cdb0096be8e8bdd693e0081');
-mixpanel.identify(window._NODES_[0].name !== '__NODE_NAME__' ? window._NODES_[0].name : "LOCALHOST");
+mixpanel.identify(NODES[0].name);
+
 class App extends Component {
   render() {
     return (
