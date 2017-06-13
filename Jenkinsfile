@@ -28,7 +28,7 @@ pipeline {
             basil snapshot > Basilfile.snapshot
             basil build
             cd repos/blockapps-swagger
-            git checkout dist/swagger-ui-bundle.js dist/swagger-ui-bundle.js.map dist/swagger-ui.js
+            git checkout dist/swagger-ui-bundle.js dist/swagger-ui-bundle.js.map dist/swagger-ui.js dist/swagger-ui-standalone-preset.js dist/swagger-ui-standalone-preset.js.map
           '''
           echo 'TODO: FIX it: after basil build swagger repo is left dirty with some modified .js files. Workaround: above two lines to reset dirty blockapps-swagger repo with a git checkout'
         }
