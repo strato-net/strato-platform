@@ -19,6 +19,7 @@ import './CreateContract.css';
 
 // TODO: use redux-form
 // TODO: Remove global variables
+// TODO: use solc instead of extabi for compile
 
 let inputs = {};
 class CreateContract extends Component {
