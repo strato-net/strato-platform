@@ -10,7 +10,7 @@ import {
 } from './transactionList.actions';
 import {NODES} from '../../env';
 
-const url = NODES[0].url + "strato-api/eth/v1.2/transaction/last/";
+const url = NODES[0].url + "/strato-api/eth/v1.2/transaction/last/";
 
 function getTx(last) {
   if (last === undefined) last = 15;

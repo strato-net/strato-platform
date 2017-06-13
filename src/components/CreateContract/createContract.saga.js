@@ -17,11 +17,11 @@ import {
 
 import { NODES } from '../../env';
 
-const url = NODES[0].url + "bloc/users/:user/:address/contract"
+const url = NODES[0].url + "/bloc/v2.1/users/:user/:address/contract"
 const compileUrl = NODES[0].url + "/strato-api/eth/v1.2/extabi";
 
 function getAddress(username) {
-  const getAddressUrl = NODES[0].url + "bloc/users/" + username
+  const getAddressUrl = NODES[0].url + "/bloc/v2.1/users/" + username
   return fetch(
     getAddressUrl,
     {

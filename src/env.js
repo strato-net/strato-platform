@@ -1,6 +1,6 @@
 export const NODES = window._NODES_.name !== '__NODE_NAME__' ? [
   {
-    name: 'TESTER14',
-    url: 'http://tester14.eastus.cloudapp.azure.com/'
+    name: 'LOCALHOST',
+    url: 'http://localhost'
   }
 ] : window._NODES_;
