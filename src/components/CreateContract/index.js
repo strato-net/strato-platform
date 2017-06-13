@@ -1,9 +1,18 @@
 import React, {Component} from 'react';
-import {openOverlay, closeOverlay, createContract, compileContract, usernameFormChange, passwordFormChange, contractFormChange} from './createContract.actions';
-import {fetchContracts} from '../Contracts/contracts.actions';
-import {Button, Dialog} from '@blueprintjs/core';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import {
+  openOverlay,
+  closeOverlay,
+  createContract,
+  compileContract,
+  usernameFormChange,
+  passwordFormChange,
+  contractFormChange
+} from './createContract.actions';
+import { fetchAccounts } from '../Accounts/accounts.actions';
+import { fetchContracts } from '../Contracts/contracts.actions';
+import { Button, Dialog } from '@blueprintjs/core';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 
 import './CreateContract.css';
 
@@ -43,11 +52,15 @@ class CreateContract extends Component {
     this.props.fetchContracts();
   };
 
-  // handleCompile = () => {
-  //   this.props.compileContract();
-  // }
+  componentDidMount() {
+    this.props.fetchAccounts();
+  }
 
   render() {
+    const users = Object.getOwnPropertyNames(this.props.accounts);
+    const userAddresses = this.props.accounts && this.props.username ?
+      Object.getOwnPropertyNames(this.props.accounts[this.props.username])
+      : null;
     let src = this.props.abi === undefined ? undefined : this.props.abi.src;
     let args = src === undefined ?
       <div className="input">
@@ -91,18 +104,33 @@ class CreateContract extends Component {
           className="pt-dark"
         >
           <div className="pt-dialog-body">
-            <div className="pt-form-group">
-              <div className="input">
-                <label className="pt-label">
-                  Username
-                </label>
-                <div className="pt-form-content">
-                  <input id="input-a" className={this.props.username === undefined ? "form-width pt-input pt-intent-danger" : "form-width pt-input"} placeholder="Username"
-                              onChange={this.handleUsernameChange}
-                              type="text" dir="auto"/>
-                  <div className="pt-form-helper-text">Enter your username</div>
+            <div className="pt-form-group text-center">
+              <label className="pt-label pt-inline">
+                Username &nbsp;
+                <div className="pt-select">
+                  <select onChange={this.handleUsernameChange}>
+                    {
+                      users.map((user,i) => { return (
+                        <option key={'user' + i} value={user}>{user}</option>
+                      )})
+                    }
+                  </select>
                 </div>
-              </div>
+              </label>
+              <label className="pt-label pt-inline">
+                Address &nbsp;
+                <div className="pt-select">
+                  <select>
+                    {
+                      userAddresses ?
+                        userAddresses.map((address,i) => { return (
+                          <option key={address} value={address}>{address}</option>
+                        )})
+                        : ''
+                    }
+                  </select>
+                </div>
+              </label>
 
               <div className="input">
                 <label className="pt-label">
@@ -154,6 +182,7 @@ function mapStateToProps(state) {
     username: state.createContract.username,
     password: state.createContract.password,
     contract: state.createContract.contract,
+    accounts: state.accounts.accounts,
   };
 }
 
@@ -166,4 +195,5 @@ export default withRouter(connect(mapStateToProps, {
   passwordFormChange,
   contractFormChange,
   fetchContracts,
+  fetchAccounts
 })(CreateContract));
