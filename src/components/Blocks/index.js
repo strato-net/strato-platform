@@ -1,7 +1,13 @@
 import React, {Component} from 'react';
 import BlockTable from './components/BlockTable';
+import mixpanel from 'mixpanel-browser';
+
 
 class Blocks extends Component {
+  componentDidMount() {
+    mixpanel.track('blocks_loaded');
+  }
+
   render() {
     return(
       <div className="container-fluid pt-dark">

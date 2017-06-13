@@ -6,6 +6,7 @@
     "@blueprintjs/core": "^1.17.1",
     "bignumber.js": "^4.0.2",
     "bootstrap": "^3.3.7",
+    "mixpanel-browser": "^2.11.1",
     "moment": "^2.18.1",
     "plottable": "^3.1.1",
     "react": "^15.5.4",
@@ -16,7 +17,7 @@
     "react-router-dom": "^4.1.1",
     "react-router-redux": "^4.0.8",
     "redux": "^3.6.0",
-    "redux-form": "^6.7.0",
+    "redux-form": "^6.8.0",
     "redux-saga": "^0.15.3"
   },
   "devDependencies": {

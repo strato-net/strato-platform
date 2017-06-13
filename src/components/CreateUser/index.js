@@ -5,8 +5,15 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 
 import './CreateUser.css';
+import mixpanel from 'mixpanel-browser';
+// TODO: use redux form
+// TODO: do not use global variables
 const form = {}
 class CreateUser extends Component {
+
+  componentDidMount() {
+    mixpanel.track("create_user_loaded");
+  }
 
   handleUsernameChange(e) {
     form.username = e.target.value;
@@ -17,13 +24,14 @@ class CreateUser extends Component {
   }
 
   submit = () => {
+    mixpanel.track('create_user_submit_click')
     this.props.createUser(form.username === undefined ? '' : form.username, form.password === undefined ? '' : form.password);
   }
 
   render() {
     return (
       <div className="smd-pad-16">
-        <Button onClick={this.props.openOverlay} className="pt-intent-primary pt-icon-add"
+        <Button onClick={()=>{mixpanel.track('create_user_open_click'); this.props.openOverlay()}} className="pt-intent-primary pt-icon-add"
                 text="Create User"/>
         <Dialog
           iconName="inbox"
@@ -82,7 +90,7 @@ class CreateUser extends Component {
 
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
-                <Button text="Cancel" onClick={this.props.closeOverlay}/>
+                <Button text="Cancel" onClick={()=>{mixpanel.track('create_user_close_click');this.props.closeOverlay()}}/>
                 <Button
                   intent={Intent.PRIMARY}
                   onClick={this.submit}

@@ -1,4 +1,5 @@
 import React, {Component} from 'react';
+import mixpanel from 'mixpanel-browser';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
@@ -16,7 +17,7 @@ class Account extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => this.props.history.goBack()}
+              onClick={(e) => { mixpanel.track('account_view_go_back_click'); this.props.history.goBack();}}
               className="pt-icon-arrow-left"
               text="Back"
             />

@@ -3,6 +3,6 @@ export const NODES = window._NODES_[0].name !== '__NODE_NAME__' ?
   [
     {
       name: 'LOCALHOST',
-      url: 'http://localhost/'
+      url: 'http://localhost'
     }
   ];
