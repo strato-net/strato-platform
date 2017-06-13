@@ -5,6 +5,9 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 
 import './CreateUser.css';
+
+// TODO: use redux form
+// TODO: do not use global variables
 const form = {}
 class CreateUser extends Component {
 
