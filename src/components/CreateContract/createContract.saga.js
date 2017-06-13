@@ -27,7 +27,6 @@ function getAddress(username) {
     {
       method: 'GET',
       headers: {
-        'Accept' : 'text/html',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
     })

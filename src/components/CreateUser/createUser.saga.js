@@ -15,7 +15,7 @@ import {
 
 import { NODES } from '../../env';
 
-const url = NODES[0].url + "/bloc/v2.1/users/:user"
+const url = NODES[0].url + "/bloc/v2.1/users/:user?faucet"
 
 function createUserApiCall(username, password) {
   return fetch(
@@ -23,17 +23,17 @@ function createUserApiCall(username, password) {
     {
       method: 'POST',
       headers: {
-        'Accept' : 'text/html',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: "faucet=1&password="+password
-    })
-    .then(function(response) {
-      return response;
-    })
-    .catch(function(error) {
-      throw error;
-    });
+      body: 'password=' + password
+    }
+  )
+  .then(function(response) {
+    return response;
+  })
+  .catch(function(error) {
+    throw error;
+  });
 }
 
 function* createUser(action) {
