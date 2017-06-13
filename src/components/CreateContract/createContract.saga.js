@@ -17,68 +17,44 @@ import {
 
 import { NODES } from '../../env';
 
-const url = NODES[0].url + "bloc/users/:user/:address/contract"
+const url = NODES[0].url + "/bloc/v2.1/users/:user/:address/contract"
 const compileUrl = NODES[0].url + "/strato-api/eth/v1.2/extabi";
 
-function getAddress(username) {
-  const getAddressUrl = NODES[0].url + "bloc/users/" + username
+function createContractApiCall(contract, src, username, address, password, args) {
   return fetch(
-    getAddressUrl,
+    url.replace(":user", username).replace(":address", address),
     {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        'Accept' : 'text/html',
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/json',
       },
-    })
-    .then(function(response) {
-      return response.json();
-    })
-    .catch(function(error) {
-      throw error;
-    });
-}
-
-function createContractApiCall(source, username, password, args) {
-  getAddress(username).then(function(res) {
-    let addr = res[0];
-    let src = source.replace(/\s+/g, " ");
-    return fetch(
-      url.replace(":user", username).replace(":address", addr),
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({password, src, args})
-      })
-      .then(function(response) {
-        return response;
-      })
-      .then(function(res) {
-        return res;
-      })
-      .catch(function(error) {
-        throw error;
-      });
+      body: JSON.stringify({contract, value:0, password, src, args})
+    }
+  )
+  .then(function(response) {
+    return response.json();
   })
+  .catch(function(error) {
+    throw error;
+  });
 }
 
-function compileContractApiCall(src) {
+function compileContractApiCall(name,src) {
     return fetch(
       compileUrl,
       {
         method: 'POST',
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+          "Content-Type": "application/json"
         },
-        body: "src="+encodeURIComponent(src)
+        body: JSON.stringify({
+          contractName: name,
+          searchable: [],
+          source: src
+        })
       })
       .then(function(response) {
         return response.json();
-      })
-      .then(function(res) {
-        return res;
       })
       .catch(function(error) {
         throw error;
@@ -87,10 +63,17 @@ function compileContractApiCall(src) {
 
 function* createContract(action) {
   try {
-    let response = yield call(createContractApiCall, action.payload.fileText,
-      action.payload.username, action.payload.password, action.payload.arguments);
-    yield put(fetchContracts());
+    let response = yield call(
+        createContractApiCall,
+        action.payload.contract,
+        action.payload.fileText,
+        action.payload.username,
+        action.payload.address,
+        action.payload.password,
+        action.payload.arguments
+      );
     yield put(createContractSuccess(response));
+    yield put(fetchContracts());
   }
   catch (err) {
     yield put(createContractFailure(err));
@@ -99,7 +82,7 @@ function* createContract(action) {
 
 function* compileContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.contract);
+    let response = yield call(compileContractApiCall, action.name, action.contract);
     yield put(compileContractSuccess(response));
   }
   catch (err) {
