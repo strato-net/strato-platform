@@ -4,6 +4,7 @@ import {fetchTx} from '../../../TransactionList/transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip} from '@blueprintjs/core';
 import * as moment from 'moment';
+import mixpanel from 'mixpanel-browser';
 
 class TransactionTable extends Component {
 
@@ -27,6 +28,7 @@ class TransactionTable extends Component {
     const history = this.props.history;
 
     function handleClick(hash) {
+      mixpanel.track('transactions_row_click');
       history.push('/transactions/' + hash);
     }
 

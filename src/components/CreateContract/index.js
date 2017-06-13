@@ -14,6 +14,7 @@ import { fetchContracts } from '../Contracts/contracts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
+import mixpanel from 'mixpanel-browser';
 
 import './CreateContract.css';
 
@@ -30,6 +31,7 @@ class CreateContract extends Component {
     const self = this;
     reader.onload = function (event) {
       const fileContents = event.target.result.replace(/\r?\n|\r/g, " ");
+      mixpanel.track("create_contract_file_upload");
       self.props.contractFormChange(
         contract.name,
         fileContents
@@ -64,11 +66,15 @@ class CreateContract extends Component {
         fileText: this.props.contract,
         arguments: inputs,
       }
+      mixpanel.track('create_contract_submit_click_successful');
       this.props.createContract(payload);
+    } else {
+      mixpanel.track('create_contract_submit_click_failure');
     }
   };
 
   componentDidMount() {
+    mixpanel.track("create_contract_loaded");
     this.props.fetchAccounts();
   }
 
@@ -124,7 +130,7 @@ class CreateContract extends Component {
 
     return (
       <div className="smd-pad-16">
-        <Button onClick={this.props.contractOpenModal} className="pt-intent-primary pt-icon-add"
+        <Button onClick={()=>{mixpanel.track("create_contract_open_click"); this.props.contractOpenModal()}} className="pt-intent-primary pt-icon-add"
                 text="Create Contract"/>
         <Dialog
           iconName="inbox"
@@ -231,7 +237,7 @@ class CreateContract extends Component {
 
           <div className="pt-dialog-footer">
             <div className="pt-dialog-footer-actions">
-              <Button text="Cancel" onClick={this.props.contractCloseModal}/>
+              <Button text="Cancel" onClick={()=> {mixpanel.track("create_contract_cancel"); this.props.contractCloseModal()}}/>
               <Button
                 className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                 onClick={this.handleSubmit}
