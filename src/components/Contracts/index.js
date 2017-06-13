@@ -4,10 +4,13 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
+import mixpanel from 'mixpanel-browser';
+
 
 class Contracts extends Component {
 
   componentWillMount() {
+    mixpanel.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts();
   }

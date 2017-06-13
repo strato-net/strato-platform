@@ -1,5 +1,6 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
+import mixpanel from 'mixpanel-browser';
 import {fetchBlockData} from '../../../BlockData/block-data.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip} from '@blueprintjs/core';
@@ -27,6 +28,7 @@ class BlockTable extends Component {
     const history = this.props.history;
 
     function handleClick(blockNumber) {
+      mixpanel.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
 
