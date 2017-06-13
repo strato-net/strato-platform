@@ -10,7 +10,7 @@ import {
 } from './contractCard.actions';
 import {NODES} from '../../../../env.js'
 
-const contractsUrl = NODES[0].url + "bloc/contracts/:contractName/:contractAddress/state";
+const contractsUrl = NODES[0].url + "/bloc/v2.1/contracts/:contractName/:contractAddress/state";
 
 function getState(contractName, contractAddress) {
   return fetch(

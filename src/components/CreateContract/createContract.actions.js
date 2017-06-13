@@ -1,5 +1,5 @@
-export const OPEN_OVERLAY = "CONTRACT_OPEN_MODAL";
-export const CLOSE_OVERLAY = "CONTRACT_CLOSE_MODAL";
+export const CONTRACT_OPEN_MODAL = "CONTRACT_OPEN_MODAL";
+export const CONTRACT_CLOSE_MODAL = "CONTRACT_CLOSE_MODAL";
 export const CREATE_CONTRACT = "CREATE_CONTRACT";
 export const CREATE_CONTRACT_SUCCESS = "CREATE_CONTRACT_SUCCESS";
 export const CREATE_CONTRACT_FAILURE = "CREATE_CONTRACT_FAILURE";
@@ -8,7 +8,15 @@ export const COMPILE_CONTRACT_SUCCESS = "COMPILE_CONTRACT_SUCCESS";
 export const COMPILE_CONTRACT_FAILURE = "COMPILE_CONTRACT_FAILURE";
 export const USERNAME_FORM_CHANGE = "USERNAME_FORM_CHANGE";
 export const PASSWORD_FORM_CHANGE = "PASSWORD_FORM_CHANGE";
+export const ADDRESS_FORM_CHANGE = "ADDRESS_FORM_CHANGE";
 export const CONTRACT_FORM_CHANGE = "CONTRACT_UPLOAD_FORM_CHANGE";
+
+export const addressFormChange = function(address) {
+  return {
+    type: ADDRESS_FORM_CHANGE,
+    address: address
+  }
+}
 
 export const usernameFormChange = function(username) {
   return {
@@ -32,16 +40,16 @@ export const contractFormChange = function(name, contract) {
   }
 }
 
-export const openOverlay = function() {
+export const contractOpenModal = function() {
   return {
-    type: OPEN_OVERLAY,
+    type: CONTRACT_OPEN_MODAL,
     isOpen: true
   }
 }
 
-export const closeOverlay = function() {
+export const contractCloseModal = function() {
   return {
-    type: CLOSE_OVERLAY,
+    type: CONTRACT_CLOSE_MODAL,
     isOpen: false
   }
 }
@@ -73,9 +81,10 @@ export const createContractFailure = function(error) {
   }
 }
 
-export const compileContract = function(contract) {
+export const compileContract = function(name,contract) {
   return {
     type: COMPILE_CONTRACT,
+    name: name,
     contract: contract,
     compileSuccess: false,
     isOpen: true,

@@ -12,6 +12,8 @@ body {
 }
 
 #outer-container {
+  position: relative;
+  top: 48px;
   margin-left: 320px;
   padding: 0px 12px;
 }

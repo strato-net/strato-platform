@@ -6,8 +6,14 @@ import {withRouter} from 'react-router-dom';
 
 import './CreateUser.css';
 import mixpanel from 'mixpanel-browser';
+// TODO: use redux form
+// TODO: do not use global variables
 const form = {}
 class CreateUser extends Component {
+
+  componentDidMount() {
+    mixpanel.track("create_user_loaded");
+  }
 
   handleUsernameChange(e) {
     form.username = e.target.value;
