@@ -4,7 +4,7 @@ import { connect } from 'react-redux';
 import mixpanel from 'mixpanel-browser';
 import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
-import { NODES } from '../../env';
+import { env } from '../../env';
 
 class MenuBar extends Component {
 
@@ -28,10 +28,10 @@ class MenuBar extends Component {
         </div>
         <div className="pt-navbar-group pt-align-right">
           <span className="pt-navbar-divider"/>
-          <Link to={ NODES[0].BLOC_DOC_URL } target="_blank">
+          <Link to={ env.BLOC_DOC_URL } target="_blank">
             <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanel.track("bloc_docs_click")}}>Bloc API</button>
           </Link>
-          <Link to={ NODES[0].STRATO_DOC_URL } target="_blank">
+          <Link to={ env.STRATO_DOC_URL } target="_blank">
             <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanel.track("strato_docs_click")}}>Strato API</button>
           </Link>
         </div>

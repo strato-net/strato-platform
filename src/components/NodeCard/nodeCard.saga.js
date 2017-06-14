@@ -14,12 +14,12 @@ import {
   fetchNodeCoinbaseSuccess,
   fetchNodeCoinbaseFailure
 } from './nodeCard.actions';
-import {NODES} from '../../env';
+import { env } from '../../env';
 
 // TODO: All of this can probably be refactored to be more concise
 
-function getNodeDetailApi(nodeIndex){
-  const detailUrl = NODES[nodeIndex].STRATO_URL + '/uuid';
+function getNodeDetailApi(){
+  const detailUrl = env.STRATO_URL + '/uuid';
   return fetch(
     detailUrl,
     {
@@ -36,8 +36,8 @@ function getNodeDetailApi(nodeIndex){
   })
 }
 
-function getNodePeersApi(nodeIndex) {
-  const peerUrl = NODES[nodeIndex].STRATO_URL + '/peers';
+function getNodePeersApi() {
+  const peerUrl = env.STRATO_URL + '/peers';
   return fetch(
     peerUrl,
     {
@@ -54,8 +54,8 @@ function getNodePeersApi(nodeIndex) {
   })
 }
 
-function getNodeCoinbaseApi(nodeIndex) {
-  const coinbaseUrl = NODES[nodeIndex].STRATO_URL + '/coinbase';
+function getNodeCoinbaseApi() {
+  const coinbaseUrl = env.STRATO_URL + '/coinbase';
   return fetch(
     coinbaseUrl,
     {
@@ -74,7 +74,7 @@ function getNodeCoinbaseApi(nodeIndex) {
 
 function* getNodeDetail(action) {
   try {
-    const response = yield call(getNodeDetailApi, action.nodeIndex);
+    const response = yield call(getNodeDetailApi);
     yield put(fetchNodeDetailSuccess(action.nodeIndex, response));
   }
   catch(err) {
@@ -84,7 +84,7 @@ function* getNodeDetail(action) {
 
 function* getNodePeers(action) {
   try {
-    const response = yield call(getNodePeersApi, action.nodeIndex);
+    const response = yield call(getNodePeersApi);
     yield put(fetchNodePeersSuccess(action.nodeIndex, response));
   }
   catch(err) {
@@ -94,7 +94,7 @@ function* getNodePeers(action) {
 
 function* getNodeCoinbase(action) {
   try {
-    const response = yield call(getNodeCoinbaseApi, action.nodeIndex);
+    const response = yield call(getNodeCoinbaseApi);
     yield put(fetchNodeCoinbaseSuccess(action.nodeIndex, response.coinbase));
   }
   catch(err) {

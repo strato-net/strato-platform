@@ -13,9 +13,9 @@ import {
   fetchAccounts
 } from '../Accounts/accounts.actions';
 
-import { NODES } from '../../env';
+import { env } from '../../env';
 
-const url = NODES[0].BLOC_URL + "/users/:user?faucet"
+const url = env.BLOC_URL + "/users/:user?faucet"
 
 function createUserApiCall(username, password) {
   return fetch(

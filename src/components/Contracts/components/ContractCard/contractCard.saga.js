@@ -8,9 +8,9 @@ import {
   fetchStateSuccess,
   fetchStateFailure
 } from './contractCard.actions';
-import {NODES} from '../../../../env.js'
+import { env } from '../../../../env.js'
 
-const contractsUrl = NODES[0].BLOC_URL + "/contracts/:contractName/:contractAddress/state";
+const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/state";
 
 function getState(contractName, contractAddress) {
   return fetch(

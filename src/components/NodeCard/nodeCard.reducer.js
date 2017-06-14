@@ -4,10 +4,12 @@ import {
   FETCH_NODE_PEERS_FAILURE,
   FETCH_NODE_COINBASE_SUCCESS,
 } from './nodeCard.actions';
-import { NODES } from '../../env';
+import { env } from '../../env';
 
 const initialState = {
-  nodes: NODES
+  nodes: [{
+    name: env.NODE_NAME
+  }]
 };
 
 const reducer = function (state = initialState, action) {

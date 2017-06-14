@@ -15,10 +15,10 @@ import {
   fetchContracts
 } from '../Contracts/contracts.actions';
 
-import { NODES } from '../../env';
+import { env } from '../../env';
 
-const url = NODES[0].BLOC_URL + "/users/:user/:address/contract"
-const compileUrl = NODES[0].STRATO_URL + "/extabi";
+const url = env.BLOC_URL + "/users/:user/:address/contract"
+const compileUrl = env.STRATO_URL + "/extabi";
 
 function createContractApiCall(contract, src, username, address, password, args) {
   return fetch(

@@ -7,10 +7,10 @@ import './App.css';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
 import 'bootstrap/dist/css/bootstrap.css'
-import {NODES} from '../env';
+import { env } from '../env';
 
 mixpanel.init('62f1bec01cdb0096be8e8bdd693e0081');
-mixpanel.identify(NODES[0].NODE_NAME);
+mixpanel.identify(env.NODE_NAME);
 
 class App extends Component {
   render() {
