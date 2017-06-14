@@ -11,7 +11,7 @@ import {
 import { NODES } from '../../env';
 
 
-const url = NODES[0].url + "/strato-api/eth/v1.2/block/last/15"
+const url = NODES[0].STRATO_URL + "/block/last/15"
 
 function getBlockData() {
   return fetch(

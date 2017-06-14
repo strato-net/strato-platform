@@ -19,7 +19,7 @@ import {NODES} from '../../env';
 // TODO: All of this can probably be refactored to be more concise
 
 function getNodeDetailApi(nodeIndex){
-  const detailUrl = NODES[nodeIndex].url + '/strato-api/eth/v1.2/uuid';
+  const detailUrl = NODES[nodeIndex].STRATO_URL + '/uuid';
   return fetch(
     detailUrl,
     {
@@ -37,7 +37,7 @@ function getNodeDetailApi(nodeIndex){
 }
 
 function getNodePeersApi(nodeIndex) {
-  const peerUrl = NODES[nodeIndex].url + '/strato-api/eth/v1.2/peers';
+  const peerUrl = NODES[nodeIndex].STRATO_URL + '/peers';
   return fetch(
     peerUrl,
     {
@@ -55,7 +55,7 @@ function getNodePeersApi(nodeIndex) {
 }
 
 function getNodeCoinbaseApi(nodeIndex) {
-  const coinbaseUrl = NODES[nodeIndex].url + '/strato-api/eth/v1.2/coinbase';
+  const coinbaseUrl = NODES[nodeIndex].STRATO_URL + '/coinbase';
   return fetch(
     coinbaseUrl,
     {

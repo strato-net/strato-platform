@@ -11,7 +11,7 @@ import {
 import {NODES} from '../../env';
 
 
-const contractsUrl = NODES[0].url + "/bloc/v2.1/contracts";
+const contractsUrl = NODES[0].BLOC_URL + "/contracts";
 
 function getContracts() {
   return fetch(

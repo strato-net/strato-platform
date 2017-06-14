@@ -15,7 +15,7 @@ import {
 
 import { NODES } from '../../env';
 
-const url = NODES[0].url + "/bloc/v2.1/users/:user?faucet"
+const url = NODES[0].BLOC_URL + "/users/:user?faucet"
 
 function createUserApiCall(username, password) {
   return fetch(

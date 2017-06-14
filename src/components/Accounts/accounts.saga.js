@@ -19,9 +19,9 @@ import {
 } from './accounts.actions';
 import {NODES} from '../../env';
 
-const accountDataUrl = NODES[0].url + "/strato-api/eth/v1.2/account?address=:address";
-const addressUrl = NODES[0].url + '/bloc/v2.1/users/:user';
-const usernameUrl = NODES[0].url + "/bloc/v2.1/users";
+const accountDataUrl = NODES[0].STRATO_URL + "/account?address=:address";
+const addressUrl = NODES[0].BLOC_URL + '/users/:user';
+const usernameUrl = NODES[0].BLOC_URL + "/users";
 
 function getAccountsApi() {
   return fetch(

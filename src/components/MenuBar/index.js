@@ -28,10 +28,10 @@ class MenuBar extends Component {
         </div>
         <div className="pt-navbar-group pt-align-right">
           <span className="pt-navbar-divider"/>
-          <Link to={ NODES[0].url + '/docs/?url=/bloc/v2.1/swagger.json' } target="_blank">
+          <Link to={ NODES[0].BLOC_DOC_URL } target="_blank">
             <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanel.track("bloc_docs_click")}}>Bloc API</button>
           </Link>
-          <Link to={ NODES[0].url + '/docs/?url=/strato-api/eth/v1.2/swagger.json' } target="_blank">
+          <Link to={ NODES[0].STRATO_DOC_URL } target="_blank">
             <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanel.track("strato_docs_click")}}>Strato API</button>
           </Link>
         </div>
