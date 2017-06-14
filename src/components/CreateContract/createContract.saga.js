@@ -45,14 +45,13 @@ function compileContractApiCall(name,src) {
       {
         method: 'POST',
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: JSON.stringify({
-          contractName: name,
-          searchable: [],
-          source: src
+        body:
+          "contractName="+encodeURIComponent(name)+
+          "&searchable="+encodeURIComponent([])+
+          "&source="+ encodeURIComponent(src)
         })
-      })
       .then(function(response) {
         return response.json();
       })
