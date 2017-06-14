@@ -8,9 +8,9 @@ import {
   fetchTxSuccess,
   fetchTxFailure
 } from './transactionList.actions';
-import {NODES} from '../../env';
+import { env } from '../../env';
 
-const url = NODES[0].url + "/strato-api/eth/v1.2/transaction/last/";
+const url = env.STRATO_URL + "/transaction/last/";
 
 function getTx(last) {
   if (last === undefined) last = 15;

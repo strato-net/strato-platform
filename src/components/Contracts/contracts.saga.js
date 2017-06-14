@@ -8,10 +8,10 @@ import {
   fetchContractsSuccess,
   fetchContractsFailure
 } from './contracts.actions';
-import {NODES} from '../../env';
+import { env } from '../../env';
 
 
-const contractsUrl = NODES[0].url + "/bloc/v2.1/contracts";
+const contractsUrl = env.BLOC_URL + "/contracts";
 
 function getContracts() {
   return fetch(
