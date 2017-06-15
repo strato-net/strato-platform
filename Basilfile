@@ -22,7 +22,10 @@ deployments:
         - "3002:3002"
       environment:
         NODE_NAME: "${NODE_NAME}"
-        NODE_URL: "${NODE_URL}"
+        BLOC_URL: "${BLOC_URL}"
+        BLOC_DOC_URL: "${BLOC_DOC_URL}"
+        STRATO_URL: "${STRATO_URL}"
+        STRATO_DOC_URL: "${STRATO_DOC_URL}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git

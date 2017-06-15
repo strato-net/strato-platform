@@ -39,7 +39,20 @@ pipeline {
         sh '''#!/bin/bash -le
           cd silo
           basil compose > docker-compose.yml
-          NODE_NAME=localhost NODE_URL=http://localhost/ genesisBlock=$(< gb.json) explorerHost=http://explorer:9000 explorerAdvertise=http://localhost stratoHost=nginx cirrusurl=nginx/cirrus ssl=false docker-compose up -d
+
+          NODE_NAME=localhost \
+          BLOC_URL=http://localhost/bloc/v2.1 \
+          BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.1/swagger.json \
+          STRATO_URL=http://localhost/strato-api/eth/v1.2 \
+          STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
+          genesisBlock=$(< gb.json) \
+          stratoHost=nginx \
+          cirrusurl=nginx/cirrus \
+          ssl=false \
+          explorerHost=http://explorer:9000 \
+          explorerAdvertise=http://localhost \
+          docker-compose up -d
+
           docker ps
         '''
       }
