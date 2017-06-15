@@ -27,6 +27,8 @@ apt-get install -y docker-ce
 
 echo "Adding $USER to the docker group..."
 usermod -aG docker $USER &>/dev/null
+chown :$USER /var/run/docker.sock &>/dev/null
+
 echo "You will need to log out and back in to activate your group membership"
 
 echo "Installing docker-compose..."
