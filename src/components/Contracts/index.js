@@ -24,7 +24,7 @@ class Contracts extends Component {
     const filter = this.props.filter;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
 
-    const cards = contractNames.length === 0 ? null : contractNames
+    const cards = contractNames.length === 0 ? [] : contractNames
       .filter(function(contract){
         if(!filter) {
           return true;
@@ -64,7 +64,14 @@ class Contracts extends Component {
           </div>
         </div>
 
-        {cards}
+        {cards.length === 0 ?
+          <div className="row pt-dark" key={'contract-card-'}>
+            <div className="col-sm-12">
+              <h4>No Contracts</h4>
+              <h5>Upload a Contract to View State</h5>
+              <br />
+            </div>
+          </div> : cards.length}
       </div>
     );
   }

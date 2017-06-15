@@ -101,7 +101,7 @@ class BlockTable extends Component {
               </thead>
 
               <tbody>
-              {blockRows}
+              {blockRows.length === 0 ? <tr><td colSpan={6}>No Blocks</td></tr>: blockRows}
               </tbody>
             </table>
           </div>

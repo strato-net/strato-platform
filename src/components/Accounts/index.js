@@ -117,7 +117,7 @@ class Accounts extends Component {
                 </thead>
 
                 <tbody>
-                {rows}
+                {rows.length === 0 ? <tr><td colSpan={3}>No Accounts</td></tr> : rows}
                 </tbody>
               </table>
             </div>
