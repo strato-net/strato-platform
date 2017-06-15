@@ -103,7 +103,7 @@ class BarGraph extends Component {
         <div className="row">
           <div className="col-sm-12 text-center">
             <h1>
-                {(this.props.number === undefined ? this.averageY() : this.props.number) +
+                {this.averageY() !== this.averageY() ? "No Blocks" : this.averageY() +
                 (this.props.units === undefined ? '' : ' ' + this.props.units)
                 }
             </h1>

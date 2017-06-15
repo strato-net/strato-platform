@@ -72,7 +72,7 @@ class TransactionList extends Component {
           </thead>
 
           <tbody>
-          {txRows}
+          {txRows.length === 0 ? <tr><td colSpan={5}>No Data</td></tr> : txRows}
           </tbody>
         </table>
       </div>
