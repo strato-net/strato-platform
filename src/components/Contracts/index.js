@@ -71,7 +71,7 @@ class Contracts extends Component {
               <h5>Upload a Contract to View State</h5>
               <br />
             </div>
-          </div> : cards.length}
+          </div> : cards}
       </div>
     );
   }
