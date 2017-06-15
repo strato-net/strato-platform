@@ -49,8 +49,6 @@ pipeline {
           stratoHost=nginx \
           cirrusurl=nginx/cirrus \
           ssl=false \
-          explorerHost=http://explorer:9000 \
-          explorerAdvertise=http://localhost \
           docker-compose up -d
 
           docker ps
