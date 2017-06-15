@@ -69,7 +69,6 @@ function* createContract(action) {
         action.payload.password,
         action.payload.arguments
       );
-    console.log("CREATE CONTRACT RESPONSE>", response);
     yield put(createContractSuccess(response));
     yield put(fetchContracts());
   }
@@ -81,7 +80,6 @@ function* createContract(action) {
 function* compileContract(action) {
   try {
     let response = yield call(compileContractApiCall, action.name, action.contract);
-    console.log("CONTRACT COMPILE RESPONSE>", response);
     yield put(compileContractSuccess(response));
   }
   catch (err) {
