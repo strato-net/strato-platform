@@ -54,18 +54,6 @@ deployments:
       ports:
        - "6379:6379"
 
-  - name: strato-sync
-    repo: https://github.com/blockapps/strato-sync.git
-    ref: develop
-    compose:
-      restart: always
-      ports:
-      - "9001:9001"
-      - "3000:3000"
-      environment:
-        ENV: "${env}"
-        PORT: "9001"
-
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
     ref: master
@@ -114,8 +102,6 @@ deployments:
         statsFlush: "${statsFlush}"
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
-        explorerHost: "${explorerHost}"
-        explorerAdvertise: "${explorerAdvertise}"
       links:
         - zookeeper
         - kafka
@@ -157,18 +143,6 @@ deployments:
     ref: master
     compose:
       restart: always
-
-  - name: explorer
-    repo: https://github.com/blockapps/strato-explorer.git
-    ref: master
-    compose:
-      ports:
-        - "9000:9000"
-      restart: always
-      environment:
-        peers: "${peers}"
-      links:
-        - strato:strato
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
