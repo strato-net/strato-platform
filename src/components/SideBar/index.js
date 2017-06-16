@@ -14,7 +14,7 @@ class SideBar extends Component {
   render() {
     const navLinksData = (
       [
-        {path: '/dashboard', label: 'Dashboard', id: 'dashboard', icon: "fa-dashboard"},
+        {path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-dashboard"},
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
         {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link"},
         {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange"},
