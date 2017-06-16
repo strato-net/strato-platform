@@ -13,7 +13,7 @@ class MenuBar extends Component {
       <nav className="pt-navbar pt-dark smd-menu-bar" >
         <div className="pt-navbar-group pt-align-left">
           <div>
-            <Link to="/dashboard">
+            <Link to="/home">
               <img
                 src={logo}
                 alt="Blockapps Logo"

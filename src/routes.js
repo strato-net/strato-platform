@@ -14,9 +14,9 @@ import BlockView from './components/Blocks/components/BlockView';
 export const routes = (
   <Switch>
     <Route exact path="/">
-      <Redirect to="/dashboard" />
+      <Redirect to="/home" />
     </Route>
-    <Route exact path="/dashboard" component={Dashboard}/>
+    <Route exact path="/home" component={Dashboard}/>
     <Route exact path="/nodes" component={Nodes} />
     <Route exact path="/blocks" component={Blocks} />
     <Route exact path="/blocks/:block" component={BlockView} />
@@ -25,9 +25,6 @@ export const routes = (
     <Route exact path="/accounts" component={Accounts}/>
     <Route exact path="/accounts/:name/:address" component={Account} />
     <Route exact path="/contracts" component={Contracts}/>
-    {
-      // re-render sidebar on route change
-    }
     <Route component={SideBar}/>
   </Switch>
 );
