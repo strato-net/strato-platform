@@ -4,6 +4,7 @@ import mixpanel from 'mixpanel-browser';
 import {fetchBlockData} from '../../../BlockData/block-data.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip} from '@blueprintjs/core';
+import { env } from '../../../../env';
 import * as moment from 'moment';
 
 class BlockTable extends Component {
@@ -21,7 +22,7 @@ class BlockTable extends Component {
     const fetchTx = this.props.fetchBlockData;
     this.timeout = setInterval(function () {
       fetchTx();
-    }, 5000);
+    }, env.POLLING_FREQUENCY);
   }
 
   render() {

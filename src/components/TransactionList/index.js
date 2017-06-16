@@ -4,6 +4,7 @@ import {fetchTx} from './transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
 import {Text, Tooltip, Position} from '@blueprintjs/core';
+import { env } from '../../env';
 import * as moment from 'moment';
 import mixpanel from 'mixpanel-browser';
 
@@ -22,7 +23,7 @@ class TransactionList extends Component {
     const fetchTx = this.props.fetchTx;
     this.timeout = setInterval(function () {
       fetchTx();
-    }, 5000);
+    }, env.POLLING_FREQUENCY);
   }
 
   render() {

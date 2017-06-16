@@ -3,6 +3,7 @@ import {connect} from 'react-redux';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip} from '@blueprintjs/core';
+import { env } from '../../../../env';
 import * as moment from 'moment';
 import mixpanel from 'mixpanel-browser';
 
@@ -21,7 +22,7 @@ class TransactionTable extends Component {
     const fetchTx = this.props.fetchTx;
     this.timeout = setInterval(function () {
       fetchTx();
-    }, 5000);
+    }, env.POLLING_FREQUENCY);
   }
 
   render() {
