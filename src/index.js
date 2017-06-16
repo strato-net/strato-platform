@@ -77,7 +77,7 @@ sagaMiddleware.run(rootSaga);
 
 ReactDOM.render(
     <Provider store={store}>
-        <Router basename={'smd-ui'}>
+        <Router>
             <App />
         </Router>
     </Provider>,
