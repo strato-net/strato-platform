@@ -12,9 +12,8 @@ describe("Send Transaction Test", function() {
   const alice = util.uid('Alice');
   const bob = util.uid('Bob');
   const password = '1234';
-  const alice_balance = new BigNumber(1000).times(constants.ETHER);
-  const bob_balance = new BigNumber(1000).times(constants.ETHER);
   const delta = new BigNumber(10).mul(constants.ETHER);
+  const startingBalance = new BigNumber(1000).times(constants.ETHER);
 
   it("should send correct amount of ether", function(done) {
     rest
@@ -28,13 +27,13 @@ describe("Send Transaction Test", function() {
         return rest.getAccount(scope.users[bob].address)(scope);
       })
       .then(function(scope) {
-        const alice_address = scope.users[alice].address
-        const bob_address = scope.users[bob].address;
+        const aliceAddress = scope.users[alice].address
+        const bobAddress = scope.users[bob].address;
 
-        const alice_balance = new BigNumber(scope.accounts[alice_address][0].balance);
-        const bob_balance = new BigNumber(scope.accounts[bob_address][0].balance);
+        const aliceBalance = new BigNumber(scope.accounts[aliceAddress][0].balance);
+        const bobBalance = new BigNumber(scope.accounts[bobAddress][0].balance);
 
-        assert.isOk(alice_balance.equals(bob_balance), "balances should be equal before sending ether");
+        assert.isOk(aliceBalance.equals(bobBalance), "balances should be equal before sending ether");
       })
       .then(rest.send(alice, bob, delta))
       .then(function(scope) {
@@ -44,13 +43,14 @@ describe("Send Transaction Test", function() {
         return rest.getAccount(scope.users[bob].address)(scope);
       })
       .then(function(scope) {
-        const alice_address = scope.users[alice].address
-        const bob_address = scope.users[bob].address;
+        const aliceAddress = scope.users[alice].address
+        const bobAddress = scope.users[bob].address;
 
-        const alice_balance = new BigNumber(scope.accounts[alice_address][0].balance);
-        const bob_balance = new BigNumber(scope.accounts[bob_address][0].balance);
-
-        assert.isOk(alice_balance.plus(delta).equals(bob_balance.minus(delta)), "difference in balances should be equal after sending ether");
+        const aliceBalance = new BigNumber(scope.accounts[aliceAddress][0].balance);
+        const bobBalance = new BigNumber(scope.accounts[bobAddress][0].balance);
+        //TODO Calculate gas cost and factor into balance
+        assert.isOk(startingBalance.minus(delta).greaterThan(aliceBalance), "alice's balance should be slightly less than expected due to gas costs");
+        assert.isOk(startingBalance.plus(delta).equals(bobBalance), "bob's balance should be as expected after sending ether");
       })
       .catch(done);
   });
