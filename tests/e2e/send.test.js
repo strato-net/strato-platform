@@ -5,6 +5,7 @@ const util = common.util;
 const BigNumber = common.BigNumber;
 const constants = common.constants;
 const assert = common.assert;
+const config = common.config;
 
 describe("Send Transaction Test", function() {
   this.timeout(config.timeout);

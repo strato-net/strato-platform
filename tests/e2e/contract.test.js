@@ -21,8 +21,8 @@ describe('Contract Test',function() {
     rest
       .setScope(scope)
       .then(rest.createUser(username,password))
-      .then(rest.getContractString(contractName, path.join(config.contractPath, contractFilename)))
-      .then(rest.compile([{item: contractName, searchable: []}]))
+      .then(rest.getContractString(contractName, path.join(config.contractsPath, contractFilename)))
+      .then(rest.compile([{contractName, searchable: []}]))
       .then(function(scope) {
         const results = scope.compile[scope.compile.length-1];
         assert.equal(results[0].codeHash, simpleStorageCodeHash, 'Contract codeHash should be consistent');
@@ -36,7 +36,7 @@ describe('Contract Test',function() {
     rest
       .setScope(scope)
       .then(rest.createUser(username,password))
-      .then(rest.getContractString(contractName, path.join(config.contractPath, contractFilename)))
+      .then(rest.getContractString(contractName, path.join(config.contractsPath, contractFilename)))
       .then(rest.uploadContract(username, password, contractName))
       .then(function(scope) {
         assert.isOk(util.isAddress(scope.contracts[contractName].address), 'Contract should have address after upload');
@@ -63,7 +63,7 @@ describe('Contract Test',function() {
     rest
       .setScope(scope)
       .then(rest.createUser(username,password))
-      .then(rest.getContractString(sampleContractName, path.join(config.contractPath, sampleContractFilename)))
+      .then(rest.getContractString(sampleContractName, path.join(config.contractsPath, sampleContractFilename)))
       .then(rest.uploadContract(username, password, sampleContractName, sampleContractArgs))
       .then(rest.getState(sampleContractName))
       .then(function(scope) {
