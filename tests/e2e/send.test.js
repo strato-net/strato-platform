@@ -2,7 +2,6 @@ const ba = require('blockapps-rest');
 const rest = ba.rest;
 const common = ba.common;
 const util = common.util;
-const config = common.config;
 const BigNumber = common.BigNumber;
 const constants = common.constants;
 const assert = common.assert;
