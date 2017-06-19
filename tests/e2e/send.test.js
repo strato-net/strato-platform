@@ -7,11 +7,14 @@ const constants = common.constants;
 const assert = common.assert;
 
 describe("Send Transaction Test", function() {
+  this.timeout(config.timeout);
+
   const scope = {}
   const alice = util.uid('Alice');
   const bob = util.uid('Bob');
   const password = '1234';
-  const delta = new BigNumber(10).mul(constants.ETHER);
+  const etherToSend = 10;
+  const delta = new BigNumber(etherToSend).mul(constants.ETHER);
   const startingBalance = new BigNumber(1000).times(constants.ETHER);
 
   it("should send correct amount of ether", function(done) {
@@ -33,8 +36,9 @@ describe("Send Transaction Test", function() {
         const bobBalance = new BigNumber(scope.accounts[bobAddress][0].balance);
 
         assert.isOk(aliceBalance.equals(bobBalance), "balances should be equal before sending ether");
+        return scope;
       })
-      .then(rest.send(alice, bob, delta))
+      .then(rest.send(alice, bob, etherToSend))
       .then(function(scope) {
         return rest.getAccount(scope.users[alice].address)(scope);
       })
@@ -50,6 +54,7 @@ describe("Send Transaction Test", function() {
         //TODO Calculate gas cost and factor into balance
         assert.isOk(startingBalance.minus(delta).greaterThan(aliceBalance), "alice's balance should be slightly less than expected due to gas costs");
         assert.isOk(startingBalance.plus(delta).equals(bobBalance), "bob's balance should be as expected after sending ether");
+        done();
       })
       .catch(done);
   });
