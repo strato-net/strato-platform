@@ -25,7 +25,7 @@ describe('User Test',function() {
         const address = scope.users[username].address;
         assert.isOk(util.isAddress(address), 'the address should be valid');
         const balance = new BigNumber(scope.accounts[address][0].balance);
-        assert.isOk(balance.equal(expectedBalance), 'the balance should be equal to 1000 ether');
+        assert.isOk(balance.equals(expectedBalance), 'the balance should be equal to 1000 ether');
         done();
       })
       .catch(done);
