@@ -15,11 +15,11 @@ contract SimpleIntStorage {
         return storedData;
     }
 
-    function set(uint ind, uint value) {
-        storedDatum[ind] = value;
+    function setArray(uint value) {
+        storedDatum.push(value);
     }
 
-    function get(uint ind) returns (uint retVal){
+    function getArray(uint ind) returns (uint retVal){
         return storedDatum[ind];
     }
 

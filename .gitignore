@@ -5,6 +5,7 @@ server.key
 server.pem
 .idea/
 docker-compose.yml
+npm-debug.log
 tmp/
 repos/
 storage/

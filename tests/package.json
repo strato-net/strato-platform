@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "platform tests",
   "scripts": {
-    "test": "node_modules/mocha/bin/mocha --config config.yaml e2e/ -b"
+    "test": "node_modules/mocha/bin/mocha --config tester14.config.yaml e2e/ -b"
   },
   "dependencies": {
     "blockapps-rest": "git+https://github.com/blockapps/blockapps-rest#bloch",
