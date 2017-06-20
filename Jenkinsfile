@@ -79,28 +79,12 @@ pipeline {
               basil build --release
               basil push
               ./docker-publish-images.sh --prepare-tagged-release
+              RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
               RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S')
-              # Create release in blockapps/silo repo
-              SILO_RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
-              github-release delete  $SILO_RELEASE_DETAILS || true
-              github-release release $SILO_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $SILO_RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
-              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
-              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.STRATO-GS.yml" --file ./docker-compose.STRATO-GS.yml
-
-              #echo 'deleting old blockapps/strato-getting-started releases'
-              #for tag in $(git tag); do
-              #  github-release info --user blockapps --repo strato-getting-started --tag $tag && \
-              #      (github-release delete --user blockapps --repo strato-getting-started --tag $tag || true)
-              #  # git push origin :refs/tags/$tag
-              #  # git tag -d $tag
-              #done
-
-              echo 'creating blockapps/strato-getting-started release'
-              STRATOGS_RELEASE_DETAILS="--user blockapps --repo strato-getting-started --tag $TAG_NAME"
-              github-release delete  $STRATOGS_RELEASE_DETAILS || true
-              github-release release $STRATOGS_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $STRATOGS_RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.STRATO-GS.yml
+              github-release delete  $RELEASE_DETAILS || true
+              github-release release $RELEASE_DETAILS --name "master @ $RELEASE_DATE"
+              github-release upload $RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
+              github-release upload $RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
             '''
           }
         }
