@@ -27,10 +27,15 @@ basil targets | while read line ; do
     fi
 done
 
+echo 'creating docker-compose.STRATO-GS.latest.yml'
+cp docker-compose.yml docker-compose.STRATO-GS.latest.yml
+sed -i 's|image: silo-|image: '"$target_dtr"'/'"$project"'/silo-|g' docker-compose.STRATO-GS.latest.yml
+cleanYamlSection docker-compose.STRATO-GS.latest.yml volumes:
+
 if [ $1 == '--prepare-tagged-release' ]
 then
-  echo 'creating docker-compose.STRATO-GS.yml'
-  cp docker-compose.release.yml docker-compose.STRATO-GS.yml
-  sed -i 's|/silo-|/'"$project"'/silo-|g' docker-compose.STRATO-GS.yml
-  cleanYamlSection docker-compose.STRATO-GS.yml volumes:
+  echo 'creating docker-compose.STRATO-GS.release.yml'
+  cp docker-compose.release.yml docker-compose.STRATO-GS.release.yml
+  sed -i 's|/silo-|/'"$project"'/silo-|g' docker-compose.STRATO-GS.release.yml
+  cleanYamlSection docker-compose.STRATO-GS.release.yml volumes:
 fi

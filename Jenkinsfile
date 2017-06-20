@@ -85,6 +85,8 @@ pipeline {
               github-release release $RELEASE_DETAILS --name "master @ $RELEASE_DATE"
               github-release upload $RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
               github-release upload $RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
+              github-release upload $RELEASE_DETAILS --name "docker-compose.STRATO-GS.latest.yml" --file ./docker-compose.STRATO-GS.latest.yml
+              github-release upload $RELEASE_DETAILS --name "docker-compose.STRATO-GS.release.yml" --file ./docker-compose.STRATO-GS.release.yml
             '''
           }
         }
