@@ -1,4 +1,6 @@
-contract greeter is mortal {
+import './Mortal.sol'
+
+contract Greeter is Mortal {
   string greeting;
 
   function greeter(string _greeting) public {
