@@ -79,14 +79,17 @@ pipeline {
               basil build --release
               basil push
               ./docker-publish-images.sh --prepare-tagged-release
-              RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
+              SILO_RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
               RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S')
-              github-release delete  $RELEASE_DETAILS || true
-              github-release release $RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
-              github-release upload $RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
-              github-release upload $RELEASE_DETAILS --name "docker-compose.STRATO-GS.latest.yml" --file ./docker-compose.STRATO-GS.latest.yml
-              github-release upload $RELEASE_DETAILS --name "docker-compose.STRATO-GS.release.yml" --file ./docker-compose.STRATO-GS.release.yml
+              github-release delete  $SILO_RELEASE_DETAILS || true
+              github-release release $SILO_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
+              github-release upload $SILO_RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
+              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
+              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.STRATO-GS.release.yml" --file ./docker-compose.STRATO-GS.release.yml
+              
+              github-release delete --user blockapps --repo strato-getting-started --tag build-latest || true
+              github-release release --pre-release --user blockapps --repo strato-getting-started --tag build-latest --name "master @ $RELEASE_DATE"
+              github-release upload --user blockapps --repo strato-getting-started --tag build-latest --name "docker-compose.latest.yml" --file ./docker-compose.STRATO-GS.latest.yml
             '''
           }
         }
