@@ -25,7 +25,7 @@ describe('SimpleIntegerStorage Contract Test', function () {
   const getFirst2 = 'getFirst2';
   const scope = {};
 
-  it('should upload the integer storage contract', function (done) {
+  before('should upload the integer storage contract', function (done) {
     rest
       .setScope(scope)
       .then(rest.createUser(username, password))
