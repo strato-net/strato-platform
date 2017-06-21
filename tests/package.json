@@ -6,8 +6,9 @@
     "test": "node_modules/mocha/bin/mocha --config tester14.config.yaml e2e/ -b"
   },
   "dependencies": {
-    "blockapps-rest": "git+https://github.com/blockapps/blockapps-rest#bloch",
+    "blockapps-rest": "file:///Work/blockapps/blockapps-rest",
     "chai": "^4.0.2",
+    "co-mocha": "^1.2.0",
     "mocha": "^3.4.2"
   }
 }

@@ -1,0 +1,76 @@
+const ba = require('blockapps-rest');
+require('co-mocha');
+const rest = ba.rest;
+const common = ba.common;
+const util = common.util;
+const config = common.config;
+const assert = common.assert;
+const path = require('path');
+
+describe('uint data type', function () {
+  this.timeout(config.timeout);
+
+  const adminName = util.uid('Admin');
+  const adminPassword = '1234';
+
+  const contractName = "DataTypeUint";
+  const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeUint.sol");
+  const constructorArgs = {_storedData: 4};
+
+  var adminUser;
+  var contract;
+
+  before(function* () {
+    adminUser = yield rest.createUser(adminName, adminPassword);
+    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
+  });
+
+  it('should upload the uint storage contract with constructor arguments', function* () {
+    const state = yield rest.getState(contract);
+    assert.equal(state.storedData, constructorArgs._storedData, 'storedData');
+    assert.equal(state.storedDatum.length, 0, 'storedDatum');
+  });
+
+  it('get() returns (uint)', function* () {
+    const methodName = 'get';
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName);
+    const result = returnsArray[0];
+    assert.equal(constructorArgs._storedData, result, 'uint returned from get()');
+  });
+
+  it('set (uint)', function* () {
+    const methodName = 'set';
+    const args = {value: 10};
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const state = yield rest.getState(contract);
+    assert.equal(state.storedData, args.value, 'uint returned from get()');
+  });
+
+  it('setArray (uint[]) / getArray() returns (uint[])', function* () {
+    // set array
+    const methodName = 'setArray';
+    const args = {values: [10,11,12]};
+    yield rest.callMethod(adminUser, contract, methodName, args);
+    const state = yield rest.getState(contract);
+    const storedDatum = parseIntArray(state.storedDatum);
+    assert.deepEqual(storedDatum, args.values, 'after calling setArray (uint[])');
+    // get array
+    const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
+    const result = parseIntArray(returnsArray[0]);
+    assert.deepEqual(result, args.values, 'after calling getArray()');
+  });
+
+  it('getTuple(uint, uint, uint) returns (uint, uint, uint)', function* () {
+    const methodName = 'getTuple';
+    const args = {v1: 1, v2: 2, v3: 3};
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const result = parseIntArray(returnsArray);
+    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'uint,uint,uint returned from getTuple()');
+  });
+});
+
+function parseIntArray(arrayOfStrings) {
+  return arrayOfStrings.map(function(member) {
+    return parseInt(member);
+  });
+}
