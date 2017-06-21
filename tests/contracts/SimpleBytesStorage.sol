@@ -1,10 +1,16 @@
-contract SimpleIntStorage {
+contract SimpleBytesStorage {
     bytes32 storedData;
 
     bytes32[] storedDatum;
 
-    function SimpleIntStorage(bytes32 _storedData) {
-        storedData = _storedData;
+    function SimpleBytesStorage(string value) {
+        storedData = stringToBytes32(value);
+    }
+
+    function stringToBytes32(string source) returns (bytes32 result) {
+        assembly {
+            result := mload(add(source, 32))
+        }
     }
 
     function set(bytes32 value) {
