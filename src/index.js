@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import registerServiceWorker from './registerServiceWorker';
+import {unregister as unregisterServiceWorker} from './registerServiceWorker';
 
 import {Provider} from 'react-redux';
 import {HashRouter as Router} from 'react-router-dom'
@@ -83,4 +83,4 @@ ReactDOM.render(
     </Provider>,
     document.getElementById('root')
 );
-registerServiceWorker();
+unregisterServiceWorker();
