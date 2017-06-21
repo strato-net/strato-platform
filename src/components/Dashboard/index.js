@@ -116,11 +116,13 @@ class Dashboard extends Component {
             />
           </div>
           <div className="col-sm-3">
-            <NumberCard
-              number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
-              description="Last Block"
-              iconClass="fa-link"
-            />
+            <Link to="/blocks">
+              <NumberCard
+                number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
+                description="Last Block"
+                iconClass="fa-link"
+              />
+            </Link>
           </div>
           <div className="col-sm-3">
             <Link to="/accounts">
