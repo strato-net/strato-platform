@@ -67,6 +67,35 @@ describe('uint data type', function () {
     const result = parseIntArray(returnsArray);
     assert.deepEqual(result, [args.v1, args.v2, args.v3], 'uint,uint,uint returned from getTuple()');
   });
+
+  it('setStruct(uint value, uint[] values) return (uint, uint[])', function* () {
+    // function setStruct(uint value, uint[] values) returns (uint, uint[])
+    const methodName = 'setStruct';
+    const args = {value: 100, values: [101,102,103]};
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    // check the returned tuple
+    assert.equal(returnsArray[0], args.value);
+    assert.deepEqual(parseIntArray(returnsArray[1]), args.values);
+    // check the struct state
+    const state = yield rest.getState(contract);
+    assert.equal(state.storedStruct.value, args.value);
+    assert.deepEqual(parseIntArray(state.storedStruct.values), args.values);
+  });
+
+  it.only('setStructArray(uint value, uint[] values)', function* () {
+    // function setStructArray(uint value, uint[] values)
+    const methodName = 'setStructArray';
+    const args = {value: 200, values: [201,202,203]};
+    yield rest.callMethod(adminUser, contract, methodName, args);
+    // check the struct state
+    const state = yield rest.getState(contract);
+    state.storedStructs.map(function(storedStruct) {
+      assert.equal(storedStruct.value, args.value);
+      assert.deepEqual(parseIntArray(storedStruct.values), args.values);
+    })
+  });
+
+
 });
 
 function parseIntArray(arrayOfStrings) {

@@ -3,6 +3,13 @@ contract DataTypeUint {
 
     uint[] storedDatum;
 
+    struct StoredStruct {
+      uint value;
+      uint[] values;
+    }
+    StoredStruct storedStruct;
+    StoredStruct[] storedStructs;
+
     function DataTypeUint(uint _storedData) {
         storedData = _storedData;
     }
@@ -27,6 +34,18 @@ contract DataTypeUint {
 
     function getTuple(uint v1, uint v2, uint v3) returns (uint, uint, uint) {
       return (v1, v2, v3);
+    }
+
+    function setStruct(uint value, uint[] values) returns (uint, uint[]) {
+      storedStruct = StoredStruct(value, values);
+      return (storedStruct.value, storedStruct.values);
+    }
+
+    function setStructArray(uint value, uint[] values) {
+      StoredStruct memory storedStruct = StoredStruct(value, values);
+      storedStructs.push(storedStruct);
+      storedStructs.push(storedStruct);
+      storedStructs.push(storedStruct);
     }
 
 }
