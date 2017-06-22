@@ -12,7 +12,7 @@ contract DataTypeBool {
 
     mapping (bool => bool) valueMapping;
 
-    function DataTypeUint(bool _storedData) {
+    function DataTypeBool(bool _storedData) {
         storedData = _storedData;
     }
 
