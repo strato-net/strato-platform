@@ -25,15 +25,12 @@ contract DataTypeString {
     }
 
     /* Array of strings as a function argument is not supported by solidity
-     * Using index instead
+     * Using count instead
      */
-    function setArray(string value, uint index) {
-      if(index >= storedDatum.length) {
-        for(uint i = storedDatum.length; i <= index; i++) {
-          storedDatum.push("");
-        }
+    function setArray(string value, uint count) {
+      for(uint i = 0;i < count; i++) {
+        storedDatum.push(value);
       }
-      storedDatum[index] = value;
     }
 
 
@@ -52,24 +49,26 @@ contract DataTypeString {
     /* Array of strings as a function argument is not supported by solidity
      * Using index instead
      */
-    function setStruct(string value, string arrayValue, uint index) returns (string, string) {
+    function setStruct(string value, string arrayValue, uint count) returns (string, uint) {
       storedStruct.value = value;
-      if(index >= storedStruct.values.length) {
-        for(uint i = storedStruct.values.length; i <= index; i++) {
-          storedStruct.values.push("");
-        }
+      for(uint i = 0;i < count; i++) {
+        storedStruct.values.push(arrayValue);
       }
-      storedStruct.values[index] = arrayValue;
-      return (storedStruct.value, storedStruct.values[index]);
+      return (storedStruct.value, storedStruct.values.length);
     }
 
     /* Array of strings as a function argument is not supported by solidity
      * Using storedStruct instead
      */
-    function setStructArray() {
-      storedStructs.push(storedStruct);
-      storedStructs.push(storedStruct);
-      storedStructs.push(storedStruct);
+    function setStructArray(string value, string arrayValue, uint count) {
+      for(uint i = 0; i < count; i++) {
+        string[] memory strArray;
+        for(uint j = 0; j < count; j++) {
+          strArray[j] = arrayValue;
+        }
+        StoredStruct memory storedStruct = StoredStruct(value,strArray);
+        storedStructs.push(storedStruct);
+      }
     }
 
     function setMapping(string value, string key) returns (string) {
