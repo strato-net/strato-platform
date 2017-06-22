@@ -82,7 +82,7 @@ describe('uint data type', function () {
     assert.deepEqual(parseIntArray(state.storedStruct.values), args.values);
   });
 
-  it.only('setStructArray(uint value, uint[] values)', function* () {
+  it('setStructArray(uint value, uint[] values)', function* () {
     // function setStructArray(uint value, uint[] values)
     const methodName = 'setStructArray';
     const args = {value: 200, values: [201,202,203]};
@@ -95,7 +95,14 @@ describe('uint data type', function () {
     })
   });
 
-
+  it.only('setMapping(uint value, uint key)', function* () {
+    // function setMapping(uint value, uint key) returns (uint value)
+    const methodName = 'setMapping';
+    const args = {value: 300, key: 301};
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const result = parseInt(returnsArray[0]);
+    assert.equal(result, args.value);
+  });
 });
 
 function parseIntArray(arrayOfStrings) {

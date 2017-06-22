@@ -10,6 +10,8 @@ contract DataTypeUint {
     StoredStruct storedStruct;
     StoredStruct[] storedStructs;
 
+    mapping (uint => uint) valueMapping;
+
     function DataTypeUint(uint _storedData) {
         storedData = _storedData;
     }
@@ -36,6 +38,8 @@ contract DataTypeUint {
       return (v1, v2, v3);
     }
 
+    // structs can not be returned in solidity
+    // this tests returning tuple(uint, uint[]) instead
     function setStruct(uint value, uint[] values) returns (uint, uint[]) {
       storedStruct = StoredStruct(value, values);
       return (storedStruct.value, storedStruct.values);
@@ -48,4 +52,8 @@ contract DataTypeUint {
       storedStructs.push(storedStruct);
     }
 
+    function setMapping(uint value, uint key) returns (uint) {
+      valueMapping[key] = value;
+      return valueMapping[key];
+    }
 }
