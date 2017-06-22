@@ -90,12 +90,12 @@ describe('uint data type', function () {
     // check the struct state
     const state = yield rest.getState(contract);
     state.storedStructs.map(function(storedStruct) {
-      assert.equal(storedStruct.value, args.value);
+      assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(parseIntArray(storedStruct.values), args.values);
     })
   });
 
-  it.only('setMapping(uint value, uint key)', function* () {
+  it('setMapping(uint value, uint key)', function* () {
     // function setMapping(uint value, uint key) returns (uint value)
     const methodName = 'setMapping';
     const args = {value: 300, key: 301};
