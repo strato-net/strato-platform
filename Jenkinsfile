@@ -63,6 +63,7 @@ pipeline {
             echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
             git clone https://github.com/blockapps/blockapps-ba.git
             cd blockapps-ba
+            npm i
             SERVER=localhost npm run deploy
             SERVER=localhost npm run test
             cd ..
