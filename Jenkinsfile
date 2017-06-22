@@ -58,11 +58,20 @@ pipeline {
 
     stage('E2E-Test') {
       steps {
-      echo 'TODO: Fix inconsistent tests'
-      // sh '''#!/bin/bash -le
-      //  cd silo
-      //  suite="e2e/smoke.test.js" ./test
-      // '''
+        withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+          sh '''#!/bin/bash -le
+            echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
+            git clone https://github.com/blockapps/blockapps-ba.git
+            cd blockapps-ba
+            SERVER=localhost npm run deploy
+            SERVER=localhost npm run test
+            cd ..
+
+            #cd silo
+            #TODO: Fix inconsistent tests
+            #suite="e2e/smoke.test.js" ./test
+          '''
+        }
       }
     }
 
