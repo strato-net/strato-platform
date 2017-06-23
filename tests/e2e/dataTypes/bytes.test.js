@@ -27,7 +27,7 @@ describe('bytes data type', function () {
 
   it('should upload the bytes storage contract with constructor arguments', function* () {
     const state = yield rest.getState(contract);
-    assert.equal(util.fromBytes32(state.storedData), util.fromBytes32(args.value), 'storedData');
+    assert.equal(util.toBytes32(state.storedData), constructorArgs._storedData, 'storedData');
     assert.equal(state.storedDatum.length, 0, 'storedDatum');
   });
 
@@ -35,7 +35,7 @@ describe('bytes data type', function () {
     const methodName = 'get';
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName);
     const result = returnsArray[0];
-    assert.equal(constructorArgs._storedData, util.fromBytes32(result), 'bytes returned from get()');
+    assert.equal(constructorArgs._storedData, util.toBytes32(result), 'bytes returned from get()');
   });
 
   it('set (bytes)', function* () {
@@ -43,14 +43,14 @@ describe('bytes data type', function () {
     const args = {value: util.toBytes32('test2')};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    assert.equal(state.storedData, util.fromBytes32(args.value), 'bytes returned from get()');
+    assert.equal(util.toBytes32(state.storedData), args.value, 'bytes returned from get()');
   });
 
 
   it('setArray (bytes, count) / getArray(index) returns (bytes)', function* () {
     // set array
     const methodName = 'setArray';
-    const resultArray = [util.toBytes32('test1'), util.toBytes32('test2'), util.toBytes32('test3')];
+    const resultArray = [util.toBytes32('test'), util.toBytes32('test'), util.toBytes32('test')];
     const args = {
       value: util.toBytes32('test'),
       count: 3
@@ -59,18 +59,18 @@ describe('bytes data type', function () {
     yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
     const storedDatum = state.storedDatum;
-    assert.deepEqual(storedDatum, resultArray, 'after calling setArray (bytes[])');
+    assert.deepEqual(toBytes32Array(storedDatum), resultArray, 'after calling setArray (bytes[])');
     // get array
     const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray', {index: 1});
-    const result = returnsArray[0];
-    assert.deepEqual(result, resultArray.value, 'after calling getArray()');
+    const result = returnsArray;
+    assert.equal(toBytes32Array(result), resultArray[0], 'after calling getArray()');
   });
 
   it('getTuple(bytes, bytes, bytes) returns (bytes, bytes, bytes)', function* () {
     const methodName = 'getTuple';
     const args = {v1: util.toBytes32('test4'), v2: util.toBytes32('test5'), v3: util.toBytes32('test6')};
     const result = yield rest.callMethod(adminUser, contract, methodName, args);
-    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'bytes,bytes,bytes returned from getTuple()');
+    assert.deepEqual(toBytes32Array(result), [args.v1, args.v2, args.v3], 'bytes,bytes,bytes returned from getTuple()');
   });
 
 
@@ -83,13 +83,13 @@ describe('bytes data type', function () {
       count: 3
     };
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    assert.equal(returnsArray[0], args.value);
-    assert.equal(returnsArray[1], args.count);
+    assert.equal(util.toBytes32(returnsArray[0]), args.value);
+    assert.equal(parseInt(returnsArray[1]), args.count);
 
     // check the struct state
     const state = yield rest.getState(contract);
-    assert.equal(util.trimNulls(state.storedStruct.value), args.value);
-    assert.deepEqual(trimArrayNulls(state.storedStruct.values), ['ola','ola','ola']);
+    assert.equal(util.toBytes32(state.storedStruct.value), args.value);
+    assert.deepEqual(toBytes32Array(state.storedStruct.values), [util.toBytes32('ola'), util.toBytes32('ola'), util.toBytes32('ola'),]);
   });
 
   it.skip('setStructArray(bytes, bytes, int)', function* () {
@@ -103,9 +103,9 @@ describe('bytes data type', function () {
     // check the struct state
 
     const state = yield rest.getState(contract);
-    state.storedStructs.map(function(storedStruct, i) {
-      assert.equal(uitl.trimNulls(storedStruct.value), args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
-      assert.deepEqual(trimArrayNulls(storedStruct.values), ['ola','ola','ola']);
+    state.storedStructs.forEach(function(storedStruct, i) {
+      assert.equal(util.toBytes32(storedStruct.value), args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
+      assert.deepEqual(toBytes32Array(storedStruct.values), [args.arrayValue, args.arrayValue, args.arrayValue]);
     })
   });
 
@@ -115,25 +115,12 @@ describe('bytes data type', function () {
     const args = {value: util.toBytes32('300'), key: util.toBytes32('301')};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const result = returnsArray[0];
-    assert.equal(util.trimNulls(result), args.value);
-  });
-
-  it('should be able to store and retrieve large bytess', function* () {
-    const methodName = 'set';
-    const value = util.toBytes32('0123456789ABCDEF');
-    const args = { value };
-
-    while(args.value.length <= 256) {
-      const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-      const state = yield rest.getState(contract);
-      assert.equal(util.trimNulls(state.storedData), args.value, 'successfully set and read bytes of length ' + args.value.length);
-      args.value += value;
-    }
+    assert.equal(util.toBytes32(result), args.value);
   });
 });
 
-function trimArrayNulls(array) {
+function toBytes32Array(array) {
   return array.map((val) => {
-    return util.trimNulls(val);
+    return util.toBytes32(val);
   });
 }
