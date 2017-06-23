@@ -127,7 +127,7 @@ describe('enum data type: positive case:', function () {
   });
 });
 
-describe('enum data type: illegal values:', function () {
+describe.only('enum data type: illegal values:', function () {
   this.timeout(config.timeout);
 
   var adminUser;
@@ -147,9 +147,9 @@ describe('enum data type: illegal values:', function () {
       const args = {_storedData: illegalValue};
       try {
         yield rest.uploadContract(adminUser, contractName, contractFilename, args);
-      } catch(e) {
+      } catch(httpError) {
         // expected to throw
-        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        assert.equal(httpError.status, expectedStatus, 'illegal value http status');
         return;
       }
       // error - did not throw
@@ -163,9 +163,9 @@ describe('enum data type: illegal values:', function () {
       const args = {value: illegalValue};
       try {
         const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-      } catch(e) {
+      } catch(httpError) {
         // expected to throw
-        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        assert.equal(httpError.status, expectedStatus, 'illegal value http status');
         return;
       }
       // error - did not throw
@@ -180,9 +180,9 @@ describe('enum data type: illegal values:', function () {
       const args = {values: [illegalValue, illegalValue, illegalValue]};
       try {
         const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-      } catch(e) {
+      } catch(httpError) {
         // expected to throw
-        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        assert.equal(httpError.status, expectedStatus, 'illegal value http status');
         return;
       }
       // error - did not throw
