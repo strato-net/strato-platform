@@ -7,16 +7,16 @@ const config = common.config;
 const assert = common.assert;
 const path = require('path');
 
-describe('enum data type', function () {
+const adminName = util.uid('Admin');
+const adminPassword = '1234';
+const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/dataTypes/ErrorCodes.sol')).ErrorCodes;
+
+const contractName = "DataTypeEnum";
+const contractFilename = path.join(config.contractsPath, "/dataTypes/DataTypeEnum.sol");
+const constructorArgs = {_storedData: ErrorCodes.ERROR};
+
+describe('enum data type: positive case:', function () {
   this.timeout(config.timeout);
-
-  const adminName = util.uid('Admin');
-  const adminPassword = '1234';
-  const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/dataTypes/ErrorCodes.sol')).ErrorCodes;
-
-  const contractName = "DataTypeEnum";
-  const contractFilename = path.join(config.contractsPath, "/dataTypes/DataTypeEnum.sol");
-  const constructorArgs = {_storedData: ErrorCodes.ERROR};
 
   var adminUser;
   var contract;
@@ -37,19 +37,28 @@ describe('enum data type', function () {
     const methodName = 'get';
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName);
     const result = returnsArray[0];
-    assert.equal(constructorArgs._storedData, result, 'uint returned from get()');
+    assert.equal(constructorArgs._storedData, result, 'enum returned from get()');
   });
 
-  it('set (uint)', function* () {
+  it('set (enum)', function* () {
     const methodName = 'set';
     const args = {value: ErrorCodes.EXISTS};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
     state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
-    assert.equal(state.storedData, args.value, 'uint returned from get()');
+    assert.equal(state.storedData, args.value, 'enum returned from get()');
   });
 
-  it('setArray (uint[]) / getArray() returns (uint[])', function* () {
+  it('set (enum) string', function* () {
+    const methodName = 'set';
+    const args = {value: ' ' + ErrorCodes.EXISTS};
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const state = yield rest.getState(contract);
+    state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
+    assert.equal(state.storedData, args.value, 'enum returned from get()');
+  });
+
+  it('setArray (enum[]) / getArray() returns (enum[])', function* () {
     // set array
     const methodName = 'setArray';
     const args = {values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.EXISTS]};
@@ -58,23 +67,23 @@ describe('enum data type', function () {
     const storedDatum = state.storedDatum.map(function(member) {
       return ErrorCodes[util.parseEnum(member)];
     });
-    assert.deepEqual(storedDatum, args.values, 'after calling setArray (uint[])');
+    assert.deepEqual(storedDatum, args.values, 'after calling setArray (enum[])');
     // get array
     const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
     const result = parseIntArray(returnsArray[0]);
     assert.deepEqual(result, args.values, 'after calling getArray()');
   });
 
-  it('getTuple(uint, uint, uint) returns (uint, uint, uint)', function* () {
+  it('getTuple(enum, enum, enum) returns (enum, enum, enum)', function* () {
     const methodName = 'getTuple';
     const args = {v1: ErrorCodes.SUCCESS, v2: ErrorCodes.ERROR, v3: ErrorCodes.NOT_FOUND};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const result = parseIntArray(returnsArray);
-    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'uint,uint,uint returned from getTuple()');
+    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'enum,enum,enum returned from getTuple()');
   });
 
-  it('setStruct(uint value, uint[] values) return (uint, uint[])', function* () {
-    // function setStruct(uint value, uint[] values) returns (uint, uint[])
+  it('setStruct(enum value, enum[] values) return (enum, enum[])', function* () {
+    // function setStruct(enum value, enum[] values) returns (enum, enum[])
     const methodName = 'setStruct';
     const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
@@ -91,8 +100,8 @@ describe('enum data type', function () {
     assert.deepEqual(values, args.values);
   });
 
-  it('setStructArray(uint value, uint[] values)', function* () {
-    // function setStructArray(uint value, uint[] values)
+  it('setStructArray(enum value, enum[] values)', function* () {
+    // function setStructArray(enum value, enum[] values)
     const methodName = 'setStructArray';
     const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
     yield rest.callMethod(adminUser, contract, methodName, args);
@@ -108,8 +117,8 @@ describe('enum data type', function () {
     })
   });
 
-  it('setMapping(uint value, uint key)', function* () {
-    // function setMapping(uint value, uint key) returns (uint value)
+  it('setMapping(enum value, enum key)', function* () {
+    // function setMapping(enum value, enum key) returns (enum value)
     const methodName = 'setMapping';
     const args = {value: ErrorCodes.EXISTS, key: 666};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
@@ -117,6 +126,72 @@ describe('enum data type', function () {
     assert.equal(result, args.value);
   });
 });
+
+describe('enum data type: illegal values:', function () {
+  this.timeout(config.timeout);
+
+  var adminUser;
+  var contract;
+
+  before(function* () {
+    adminUser = yield rest.createUser(adminName, adminPassword);
+    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
+  });
+
+  const illegalValue = [ -1, '-1', 12, '12', 'zzz'];
+  const expectedStatus = 400;
+
+  illegalValue.map(function(illegalValue) {
+    it(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      // upload with bad agrs
+      const args = {_storedData: illegalValue};
+      try {
+        yield rest.uploadContract(adminUser, contractName, contractFilename, args);
+      } catch(e) {
+        // expected to throw
+        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `constructor args: illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
+  illegalValue.map(function(illegalValue) {
+    it(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      const methodName = 'set';
+      const args = {value: illegalValue};
+      try {
+        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      } catch(e) {
+        // expected to throw
+        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
+  illegalValue.map(function(illegalValue) {
+    it(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      // set array
+      const methodName = 'setArray';
+      const args = {values: [illegalValue, illegalValue, illegalValue]};
+      try {
+        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      } catch(e) {
+        // expected to throw
+        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
+});
+
 
 function parseIntArray(arrayOfStrings) {
   return arrayOfStrings.map(function(member) {
