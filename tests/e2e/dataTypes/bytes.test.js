@@ -103,10 +103,11 @@ describe('bytes data type', function () {
     // check the struct state
 
     const state = yield rest.getState(contract);
+    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
     state.storedStructs.forEach(function(storedStruct, i) {
       assert.equal(util.toBytes32(storedStruct.value), args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(toBytes32Array(storedStruct.values), [args.arrayValue, args.arrayValue, args.arrayValue]);
-    })
+    });
   });
 
   it('setMapping(bytes value, bytes key)', function* () {

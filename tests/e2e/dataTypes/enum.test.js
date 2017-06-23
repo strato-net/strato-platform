@@ -127,7 +127,7 @@ describe('enum data type: positive case:', function () {
   });
 });
 
-describe.only('enum data type: illegal values:', function () {
+describe.skip('enum data type: illegal values:', function () {
   this.timeout(config.timeout);
 
   var adminUser;
