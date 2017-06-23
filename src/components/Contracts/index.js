@@ -4,6 +4,7 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
+import ContractMethodCall from './components/ContractMethodCall';
 import mixpanel from 'mixpanel-browser';
 
 

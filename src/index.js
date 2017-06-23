@@ -23,8 +23,8 @@ import createUserReducer from './components/CreateUser/createUser.reducer'
 import createContractReducer from './components/CreateContract/createContract.reducer'
 import accountsReducer from './components/Accounts/accounts.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
-import nodeCardReducer from './components/NodeCard/nodeCard.reducer.js';
-
+import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
+import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
@@ -43,6 +43,7 @@ const rootReducer = combineReducers({
   transactions: transactionsReducer,
   createUser: createUserReducer,
   createContract: createContractReducer,
+  methodCall: methodCallReducer,
   accounts: accountsReducer,
   contracts: contractsReducer,
   nodes: nodeCardReducer

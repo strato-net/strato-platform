@@ -4,9 +4,9 @@ import {withRouter} from 'react-router-dom';
 import {Button, Collapse} from '@blueprintjs/core';
 import * as moment from 'moment';
 import { selectContractInstance, fetchState } from './contractCard.actions';
+import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 import mixpanel from 'mixpanel-browser';
-
 
 class ContractCard extends Component {
   constructor(props) {
@@ -60,26 +60,50 @@ class ContractCard extends Component {
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
       if(symbols.length > 0) {
-        symbolTable.push(
-          <tr key={'header' + instance.address}>
-            <th>Symbol</th>
-            <th>State</th>
-          </tr>
-        );
-
         symbols.forEach((symbol, i) => {
-          symbolTable.push(<tr key={symbol + ' ' + i}>
-            <td>{symbol}</td>
-            <td>{instance.state[symbol]}</td>
-          </tr>)
+          const symbolState = instance.state[symbol];
+          symbolTable.push(
+            <tr key={symbol + ' ' + i}>
+              <td>{symbol}</td>
+              <td style={{maxWidth: '300px'}}>
+                <pre>
+                  {
+                    typeof symbolState === 'string' ?
+                      symbolState
+                      : JSON.stringify(symbolState,null,2)
+                  }
+                </pre>
+              </td>
+              <td>
+                {
+                  typeof symbolState === 'string' && symbolState.startsWith('function') ?
+                    <ContractMethodCall
+                      key={'methodCall' + symbol + instance.address}
+                      lookup={'methodCall' + symbol + instance.address}
+                    />
+                    : null
+                }
+              </td>
+            </tr>
+          );
         })
+
       }
       state = (
-        <div className="pt-card pt-dark pt-elevation-2">
+        <div className="pt-card pt-elevation-2">
           <div className="row">
             <div className="col-sm-12">
-              <table className="pt-table pt-condensed pt-striped">
-                {symbolTable}
+              <table className="pt-table pt-condensed pt-striped smd-full-width">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th className="text-right">State</th>
+                    <th style={{width: '105px'}} className="text-right"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {symbolTable}
+                </tbody>
               </table>
             </div>
           </div>
@@ -91,12 +115,12 @@ class ContractCard extends Component {
     return (
       <div className="row">
         <div className="col-sm-6">
-          <div className="pt-card pt-dark pt-elevation-2">
+          <div className="pt-card pt-elevation-2">
             <div className="row">
               <div className="col-sm-6"><h4>{name}</h4></div>
               <div className="col-sm-6 text-right">
                 <Button type="button"
-                   className="pt-dark pt-icon-double-caret-vertical btn-sm"
+                   className="pt-icon-double-caret-vertical btn-sm"
                    onClick={() => {
                      mixpanel.track("contracts_toggle_collapse_click");
                      this.setState({
@@ -111,7 +135,7 @@ class ContractCard extends Component {
             <div className="row">
               <div className="col-sm-12">
                 <Collapse isOpen={this.state.isOpen} component="table" className="col-sm-12" transitionDuration={100}>
-                  <table className="pt-table pt-interactive pt-condensed pt-striped">
+                  <table className="pt-table pt-interactive pt-condensed pt-striped smd-full-width">
                     <thead>
                     <tr>
                       <th>Contract Address</th>
