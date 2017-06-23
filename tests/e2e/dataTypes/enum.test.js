@@ -7,16 +7,16 @@ const config = common.config;
 const assert = common.assert;
 const path = require('path');
 
+const adminName = util.uid('Admin');
+const adminPassword = '1234';
+const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/dataTypes/ErrorCodes.sol')).ErrorCodes;
+
+const contractName = "DataTypeEnum";
+const contractFilename = path.join(config.contractsPath, "/dataTypes/DataTypeEnum.sol");
+const constructorArgs = {_storedData: ErrorCodes.ERROR};
+
 describe('enum data type: positive case:', function () {
   this.timeout(config.timeout);
-
-  const adminName = util.uid('Admin');
-  const adminPassword = '1234';
-  const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/dataTypes/ErrorCodes.sol')).ErrorCodes;
-
-  const contractName = "DataTypeEnum";
-  const contractFilename = path.join(config.contractsPath, "/dataTypes/DataTypeEnum.sol");
-  const constructorArgs = {_storedData: ErrorCodes.ERROR};
 
   var adminUser;
   var contract;
@@ -120,14 +120,6 @@ describe('enum data type: positive case:', function () {
 
 describe.only('enum data type: positive case:', function () {
   this.timeout(config.timeout);
-
-  const adminName = util.uid('Admin');
-  const adminPassword = '1234';
-  const ErrorCodes = rest.getEnums(path.join(config.contractsPath, '/dataTypes/ErrorCodes.sol')).ErrorCodes;
-
-  const contractName = "DataTypeEnum";
-  const contractFilename = path.join(config.contractsPath, "/dataTypes/DataTypeEnum.sol");
-  const constructorArgs = {_storedData: ErrorCodes.ERROR};
 
   var adminUser;
   var contract;
