@@ -49,6 +49,15 @@ describe('enum data type: positive case:', function () {
     assert.equal(state.storedData, args.value, 'enum returned from get()');
   });
 
+  it('set (enum) string', function* () {
+    const methodName = 'set';
+    const args = {value: ' ' + ErrorCodes.EXISTS};
+    const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+    const state = yield rest.getState(contract);
+    state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
+    assert.equal(state.storedData, args.value, 'enum returned from get()');
+  });
+
   it('setArray (enum[]) / getArray() returns (enum[])', function* () {
     // set array
     const methodName = 'setArray';
@@ -118,7 +127,7 @@ describe('enum data type: positive case:', function () {
   });
 });
 
-describe.only('enum data type: positive case:', function () {
+describe('enum data type: illegal values:', function () {
   this.timeout(config.timeout);
 
   var adminUser;
@@ -129,18 +138,58 @@ describe.only('enum data type: positive case:', function () {
     contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
   });
 
-  it('set (enum) illegal values: -1', function* () {
-    const expectedStatus = 400;
-    const methodName = 'set';
-    const args = {value: 999};
-    try {
-      const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
-    } catch(e) {
-      assert.equal(e.status, expectedStatus, 'illegal value http status');
-      return;
-    }
-    assert(false, 'illegal value should have thrown ' + expectedStatus);
+  const illegalValue = [ -1, '-1', 12, '12', 'zzz'];
+  const expectedStatus = 400;
+
+  illegalValue.map(function(illegalValue) {
+    it(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      // upload with bad agrs
+      const args = {_storedData: illegalValue};
+      try {
+        yield rest.uploadContract(adminUser, contractName, contractFilename, args);
+      } catch(e) {
+        // expected to throw
+        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `constructor args: illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
   });
+
+  illegalValue.map(function(illegalValue) {
+    it(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      const methodName = 'set';
+      const args = {value: illegalValue};
+      try {
+        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      } catch(e) {
+        // expected to throw
+        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
+  illegalValue.map(function(illegalValue) {
+    it(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      // set array
+      const methodName = 'setArray';
+      const args = {values: [illegalValue, illegalValue, illegalValue]};
+      try {
+        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      } catch(e) {
+        // expected to throw
+        assert.equal(e.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
 });
 
 
