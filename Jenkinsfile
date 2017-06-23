@@ -8,7 +8,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker-compose kill && docker-compose -v down
+          docker rm -rf $(docker ps -aq); docker system prune -f
           docker ps
           sudo rm -rf repos silo
         '''
@@ -61,6 +61,7 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
             echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
+            rm -rf blockapps-ba
             git clone https://github.com/blockapps/blockapps-ba.git
             cd blockapps-ba
             npm i
