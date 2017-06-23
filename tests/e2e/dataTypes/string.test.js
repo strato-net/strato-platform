@@ -103,10 +103,11 @@ describe('string data type', function () {
     // check the struct state
 
     const state = yield rest.getState(contract);
+    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
     state.storedStructs.map(function(storedStruct, i) {
       assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(storedStruct.values, ['ola','ola','ola']);
-    })
+    });
   });
 
   it('setMapping(string value, string key)', function* () {
