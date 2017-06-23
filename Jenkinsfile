@@ -8,7 +8,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker rm -rf $(docker ps -aq); docker system prune -f
+          docker rm -f $(docker ps -aq); docker system prune -f
           docker ps
           sudo rm -rf repos silo
         '''
