@@ -9,4 +9,4 @@ set -e
 
 cd tests
 npm i
-mocha e2e/* --config config/localhost.config.yaml
+node_modules/mocha/bin/mocha e2e/* --config config/localhost.config.yaml

@@ -60,9 +60,7 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           echo 'Running e2e tests from silo/tests'
-          cd silo
           ./test-instance.sh
-          cd ..
 
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
