@@ -100,7 +100,7 @@ describe('enum data type: positive case:', function () {
     assert.deepEqual(values, args.values);
   });
 
-  it('setStructArray(enum value, enum[] values)', function* () {
+  it.skip('setStructArray(enum value, enum[] values)', function* () {
     // function setStructArray(enum value, enum[] values)
     const methodName = 'setStructArray';
     const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
@@ -127,7 +127,7 @@ describe('enum data type: positive case:', function () {
   });
 });
 
-describe.only('enum data type: illegal values:', function () {
+describe.skip('enum data type: illegal values:', function () {
   this.timeout(config.timeout);
 
   var adminUser;
