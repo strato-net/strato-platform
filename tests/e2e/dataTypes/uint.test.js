@@ -82,7 +82,7 @@ describe('uint data type', function () {
     assert.deepEqual(parseIntArray(state.storedStruct.values), args.values);
   });
 
-  it('setStructArray(uint value, uint[] values)', function* () {
+  it.skip('setStructArray(uint value, uint[] values)', function* () {
     // function setStructArray(uint value, uint[] values)
     const methodName = 'setStructArray';
     const args = {value: 200, values: [201,202,203]};
