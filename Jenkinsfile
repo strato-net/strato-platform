@@ -10,7 +10,7 @@ pipeline {
         sh '''#!/bin/bash -le
           docker rm -f $(docker ps -aq); docker system prune -f
           docker ps
-          sudo rm -rf repos silo
+          sudo rm -rf silo
         '''
        }
     }
@@ -50,7 +50,7 @@ pipeline {
           cirrusurl=nginx/cirrus \
           ssl=false \
           docker-compose up -d
-
+          sleep 32 # wait for cirrus to restart (remove when container dependencies are fixed)
           docker ps
         '''
       }
@@ -58,22 +58,15 @@ pipeline {
 
     stage('E2E-Test') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
-          sh '''#!/bin/bash -le
-            echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
-            rm -rf blockapps-ba
-            git clone https://github.com/blockapps/blockapps-ba.git
-            cd blockapps-ba
-            npm i
-            SERVER=localhost npm run deploy
-            SERVER=localhost npm run test
-            cd ..
-
-            #cd silo
-            #TODO: Fix inconsistent tests
-            #suite="e2e/smoke.test.js" ./test
-          '''
-        }
+        sh '''#!/bin/bash -le
+          echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
+          rm -rf blockapps-ba
+          git clone https://github.com/blockapps/blockapps-ba.git
+          cd blockapps-ba
+          npm i
+          SERVER=localhost npm run deploy
+          SERVER=localhost npm run test
+        '''
       }
     }
 
