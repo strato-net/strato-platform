@@ -100,7 +100,7 @@ describe('enum data type: positive case:', function () {
     assert.deepEqual(values, args.values);
   });
 
-  it('setStructArray(enum value, enum[] values)', function* () {
+  it.skip('setStructArray(enum value, enum[] values)', function* () {
     // function setStructArray(enum value, enum[] values)
     const methodName = 'setStructArray';
     const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
@@ -142,7 +142,7 @@ describe.only('enum data type: illegal values:', function () {
   const expectedStatus = 400;
 
   illegalValue.map(function(illegalValue) {
-    it(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it.skip(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
       // upload with bad agrs
       const args = {_storedData: illegalValue};
       try {
@@ -158,7 +158,7 @@ describe.only('enum data type: illegal values:', function () {
   });
 
   illegalValue.map(function(illegalValue) {
-    it(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it.skip(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
       const methodName = 'set';
       const args = {value: illegalValue};
       try {
@@ -174,7 +174,7 @@ describe.only('enum data type: illegal values:', function () {
   });
 
   illegalValue.map(function(illegalValue) {
-    it(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+    it.skip(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
       // set array
       const methodName = 'setArray';
       const args = {values: [illegalValue, illegalValue, illegalValue]};

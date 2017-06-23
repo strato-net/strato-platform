@@ -92,7 +92,7 @@ describe('bytes data type', function () {
     assert.deepEqual(toBytes32Array(state.storedStruct.values), [util.toBytes32('ola'), util.toBytes32('ola'), util.toBytes32('ola'),]);
   });
 
-  it('setStructArray(bytes, bytes, int)', function* () {
+  it.skip('setStructArray(bytes, bytes, int)', function* () {
     const methodName = 'setStructArray';
     const args = {
       value: util.toBytes32('namaste'),

@@ -82,7 +82,7 @@ describe('bool data type', function () {
     assert.deepEqual(state.storedStruct.values, args.values);
   });
 
-  it('setStructArray(bool value, bool[] values)', function*() {
+  it.skip('setStructArray(bool value, bool[] values)', function*() {
     // function setStructArray(bool value, bool[] values)
     const methodName = 'setStructArray';
     const args = {value: true, values: [false, false, true]};
