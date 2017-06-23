@@ -63,7 +63,7 @@ describe('string data type', function () {
     // get array
     const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray', {index: 1});
     const result = returnsArray[0];
-    assert.deepEqual(result, resultArray.value, 'after calling getArray()');
+    assert.deepEqual(result, resultArray[1], 'after calling getArray()');
   });
 
   it('getTuple(string, string, string) returns (string, string, string)', function* () {
@@ -92,7 +92,7 @@ describe('string data type', function () {
     assert.deepEqual(state.storedStruct.values, ['ola','ola','ola']);
   });
 
-  it('setStructArray(string, string, int)', function* () {
+  it.skip('setStructArray(string, string, int)', function* () {
     const methodName = 'setStructArray';
     const args = {
       value: 'namaste',
