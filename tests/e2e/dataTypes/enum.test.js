@@ -103,10 +103,14 @@ describe('enum data type: positive case:', function () {
   it.skip('setStructArray(enum value, enum[] values)', function* () {
     // function setStructArray(enum value, enum[] values)
     const methodName = 'setStructArray';
-    const args = {value: ErrorCodes.INSUFFICIENT_BALANCE, values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND]};
+    const args = {
+      value: ErrorCodes.INSUFFICIENT_BALANCE,
+      values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.NOT_FOUND],
+      count: 3 };
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
     const state = yield rest.getState(contract);
+    assert.equal(state.storedStructs.length, args.count, 'count');
     state.storedStructs.map(function(storedStruct) {
       const value = ErrorCodes[util.parseEnum(storedStruct.value)];
       assert.equal(value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
