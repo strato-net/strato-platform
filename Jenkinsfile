@@ -58,17 +58,27 @@ pipeline {
 
     stage('E2E-Test') {
       steps {
-      echo 'TODO: Fix inconsistent tests'
-      // sh '''#!/bin/bash -le
-      //  cd silo
-      //  suite="e2e/smoke.test.js" ./test
-      // '''
+        withCredentials([usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+          sh '''#!/bin/bash -le
+            echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
+            git clone https://github.com/blockapps/blockapps-ba.git
+            cd blockapps-ba
+            npm i
+            SERVER=localhost npm run deploy
+            SERVER=localhost npm run test
+            cd ..
+
+            #cd silo
+            #TODO: Fix inconsistent tests
+            #suite="e2e/smoke.test.js" ./test
+          '''
+        }
       }
     }
 
     stage('Release') {
       steps {
-        withEnv(["TAG_NAME=jenkins-build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
+        withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
           withCredentials([
             usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
@@ -78,13 +88,18 @@ pipeline {
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               basil build --release
               basil push
-              ./docker-publish-images.sh
-              RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
+              ./docker-publish-images.sh --prepare-tagged-release
+              SILO_RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
               RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S')
-              github-release delete  $RELEASE_DETAILS || true
-              github-release release $RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
-              github-release upload $RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
+              github-release delete  $SILO_RELEASE_DETAILS || true
+              github-release release $SILO_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
+              github-release upload $SILO_RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
+              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
+              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.STRATO-GS.release.yml" --file ./docker-compose.STRATO-GS.release.yml
+              
+              github-release delete --user blockapps --repo strato-getting-started --tag build-latest || true
+              github-release release --pre-release --user blockapps --repo strato-getting-started --tag build-latest --name "master @ $RELEASE_DATE"
+              github-release upload --user blockapps --repo strato-getting-started --tag build-latest --name "docker-compose.latest.yml" --file ./docker-compose.STRATO-GS.latest.yml
             '''
           }
         }
