@@ -45,7 +45,6 @@ pipeline {
           BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.1/swagger.json \
           STRATO_URL=http://localhost/strato-api/eth/v1.2 \
           STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
-          genesisBlock=$(< gb.json) \
           stratoHost=nginx \
           cirrusurl=nginx/cirrus \
           ssl=false \
