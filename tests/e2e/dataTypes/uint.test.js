@@ -82,13 +82,14 @@ describe('uint data type', function () {
     assert.deepEqual(parseIntArray(state.storedStruct.values), args.values);
   });
 
-  it('setStructArray(uint value, uint[] values)', function* () {
+  it.skip('setStructArray(uint value, uint[] values)', function* () {
     // function setStructArray(uint value, uint[] values)
     const methodName = 'setStructArray';
     const args = {value: 200, values: [201,202,203]};
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
     const state = yield rest.getState(contract);
+    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
     state.storedStructs.map(function(storedStruct) {
       assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(parseIntArray(storedStruct.values), args.values);

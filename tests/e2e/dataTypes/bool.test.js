@@ -7,15 +7,15 @@ const config = common.config;
 const assert = common.assert;
 const path = require('path');
 
-describe('bool data type', function () {
+const adminName = util.uid('Admin');
+const adminPassword = '1234';
+
+const contractName = "DataTypeBool";
+const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeBool.sol");
+const constructorArgs = {_storedData: true};
+
+describe.skip('bool data type', function () {
   this.timeout(config.timeout);
-
-  const adminName = util.uid('Admin');
-  const adminPassword = '1234';
-
-  const contractName = "DataTypeBool";
-  const contractFilename = path.join(config.contractsPath, "dataTypes/DataTypeBool.sol");
-  const constructorArgs = {_storedData: true};
 
   var adminUser;
   var contract;
@@ -82,13 +82,14 @@ describe('bool data type', function () {
     assert.deepEqual(state.storedStruct.values, args.values);
   });
 
-  it('setStructArray(bool value, bool[] values)', function*() {
+  it.skip('setStructArray(bool value, bool[] values)', function*() {
     // function setStructArray(bool value, bool[] values)
     const methodName = 'setStructArray';
     const args = {value: true, values: [false, false, true]};
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
     const state = yield rest.getState(contract);
+    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
     state.storedStructs.map(function (storedStruct) {
       assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(storedStruct.values, args.values);
@@ -114,3 +115,114 @@ function parseBoolArray(arrayOfStrings) {
     return member === "true";
   });
 }
+
+describe('enum data type: illegal values:', function () {
+  this.timeout(config.timeout);
+
+  var adminUser;
+  var contract;
+
+  before(function* () {
+    adminUser = yield rest.createUser(adminName, adminPassword);
+    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
+  });
+
+  const illegalValue = [ 'zzz', 'true 1'];
+  const expectedStatus = 400;
+
+  illegalValue.map(function(illegalValue) {
+    it(`constructor args: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      // upload with bad agrs
+      const args = {_storedData: illegalValue};
+      try {
+        yield rest.uploadContract(adminUser, contractName, contractFilename, args);
+      } catch(httpError) {
+        // expected to throw
+        assert.equal(httpError.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `constructor args: illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
+  illegalValue.map(function(illegalValue) {
+    it(`set (enum) illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      const methodName = 'set';
+      const args = {value: illegalValue};
+      try {
+        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      } catch(httpError) {
+        // expected to throw
+        assert.equal(httpError.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+
+  illegalValue.map(function(illegalValue) {
+    it(`setArray (enum[]) / getArray() returns (enum[]): illegal value: '${typeof illegalValue} ${illegalValue}'`, function* () {
+      // set array
+      const methodName = 'setArray';
+      const args = {values: [illegalValue, illegalValue, illegalValue]};
+      try {
+        const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      } catch(httpError) {
+        // expected to throw
+        assert.equal(httpError.status, expectedStatus, 'illegal value http status');
+        return;
+      }
+      // error - did not throw
+      assert(false, `illegal value '${typeof illegalValue} ${illegalValue}' should have thrown ` + expectedStatus);
+    });
+  });
+});
+
+describe.skip('enum data type: legal values:', function () {
+  this.timeout(config.timeout);
+
+  var adminUser;
+  var contract;
+
+  before(function* () {
+    adminUser = yield rest.createUser(adminName, adminPassword);
+    contract = yield rest.uploadContract(adminUser, contractName, contractFilename, constructorArgs);
+  });
+
+  const values = [ 0, 1, '0', '1', 111, -1, '-1'];
+
+  values.map(function(value) {
+    it(`constructor args: '${typeof value} ${value}'`, function* () {
+      const args = {_storedData: value};
+      contract = yield rest.uploadContract(adminUser, contractName, contractFilename, args);
+      const state = yield rest.getState(contract);
+      assert.equal(state.storedData, value, 'storedData');
+    });
+  });
+
+  values.map(function(value) {
+    it(`set (bool) '${typeof value} ${value}' `, function*() {
+      const methodName = 'set';
+      const args = {value: value};
+      const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
+      const state = yield rest.getState(contract);
+      assert.equal(state.storedData, args.value, 'bool returned from get()');
+    });
+  });
+
+  it('setArray (bool[]) / getArray() returns (bool[])', function*() {
+    // set array
+    const methodName = 'setArray';
+    const args = {values: values};
+    yield rest.callMethod(adminUser, contract, methodName, args);
+    const state = yield rest.getState(contract);
+    const storedDatum = state.storedDatum;
+    assert.deepEqual(storedDatum, args.values, 'after calling setArray (bool[])');
+    // get array
+    const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
+    const result = returnsArray[0];
+    assert.deepEqual(result, args.values, 'after calling getArray()');
+  });
+});

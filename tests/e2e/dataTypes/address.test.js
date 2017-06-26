@@ -82,13 +82,14 @@ describe('address data type', function () {
     assert.deepEqual(addressToString(state.storedStruct.values), addressToString(args.values));
   });
 
-  it('setStructArray(address value, address[] values)', function*() {
+  it.skip('setStructArray(address value, address[] values)', function*() {
     // function setStructArray(address value, address[] values)
     const methodName = 'setStructArray';
     const args = {value: '0e80a58e5c445c4ecdc5998e2803d216786c9a771', values: ['08d12a197cb00d4747a1fe03395095ce2a5cc6819', '0a10af358d01eca18a446ba768585d23ff055a89e', '01e9939daaad6924ad004c2560e90804164900341']};
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
     const state = yield rest.getState(contract);
+    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
     state.storedStructs.map(function (storedStruct) {
       assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(addressToString(storedStruct.values), addressToString(args.values));

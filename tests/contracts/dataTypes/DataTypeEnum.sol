@@ -47,11 +47,11 @@ contract DataTypeEnum is ErrorCodes {
       return (storedStruct.value, storedStruct.values);
     }
 
-    function setStructArray(ErrorCodes value, ErrorCodes[] values) {
-      StoredStruct memory storedStruct = StoredStruct(value, values);
-      storedStructs.push(storedStruct);
-      storedStructs.push(storedStruct);
-      storedStructs.push(storedStruct);
+    function setStructArray(ErrorCodes value, ErrorCodes[] values, uint count) {
+      for(uint i = 0; i < count; i++) {
+        StoredStruct memory storedStruct = StoredStruct(value, values);
+        storedStructs.push(storedStruct);
+      }
     }
 
     function setMapping(uint key, ErrorCodes value) returns (ErrorCodes) {
