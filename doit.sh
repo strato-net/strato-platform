@@ -134,7 +134,7 @@ setEnv redisBDBNumber 0
 
 setEnv explorerHost explorer
 
-setEnv genesis stablenet
+setEnv genesis gettingStarted
 setEnv miningAlgorithm Instant
 
 setEnv networkID 6
