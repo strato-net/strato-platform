@@ -14,7 +14,7 @@ const path = require('path');
 
 const contractFilename = (name) => {return path.join(config.contractsPath, name)};
 
-describe('ImportAndUpload - smoke', function() {
+describe('ImportAndUpload with Constructor - smoke', function() {
 
   var alice;
 
@@ -42,7 +42,7 @@ describe('ImportAndUpload - smoke', function() {
   });
 });
 
-describe('ImportAndUpload - regular', function() {
+describe('ImportAndUpload with Constructor - regular', function() {
 
   var alice;
 
@@ -71,7 +71,7 @@ describe('ImportAndUpload - regular', function() {
   });
 });
 
-describe('ImportAndUpload - transitive', function() {
+describe('ImportAndUpload with Constructor - transitive', function() {
 
   var alice;
 
@@ -100,7 +100,7 @@ describe('ImportAndUpload - transitive', function() {
   });
 });
 
-describe('ImportAndUpload - relative', function() {
+describe('ImportAndUpload with Constructor - relative', function() {
 
   var alice;
 
@@ -144,7 +144,7 @@ describe('ImportAndUpload - relative', function() {
   });
 });
 
-describe('ImportAndUpload - circular', function() {
+describe('ImportAndUpload with Constructor - circular', function() {
 
   var alice;
   const contractAName = 'C';
