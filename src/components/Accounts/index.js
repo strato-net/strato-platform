@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {fetchAccounts, changeAccountFilter} from './accounts.actions';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import {connect} from 'react-redux';
 import {Text, Tooltip, Position} from '@blueprintjs/core';
 import {withRouter} from 'react-router-dom';
@@ -11,7 +11,7 @@ class Accounts extends Component {
 
   componentDidMount() {
     this.props.fetchAccounts();
-    mixpanel.track('accounts_page_load')
+    mixpanelWrapper.track('accounts_page_load')
   }
 
   componentWillUnmount() {
@@ -30,7 +30,7 @@ class Accounts extends Component {
     const rows = [];
 
     function handleClick(user, address) {
-      mixpanel.track('accounts_row_click');
+      mixpanelWrapper.track('accounts_row_click');
       history.push('/accounts/' + user + '/' + address);
     }
 

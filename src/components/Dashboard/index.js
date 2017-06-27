@@ -4,7 +4,7 @@ import { withRouter, Link } from 'react-router-dom';
 import NodeCard from '../NodeCard';
 import TransactionList from '../TransactionList';
 import NumberCard from '../NumberCard';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
@@ -19,7 +19,7 @@ class Dashboard extends Component {
     this.props.fetchBlockData();
     this.props.fetchAccounts();
     this.props.fetchContracts();
-    mixpanel.track('dashboard_page_load');
+    mixpanelWrapper.track('dashboard_page_load');
     this.startPoll();
   }
 

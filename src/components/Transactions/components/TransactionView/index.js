@@ -3,7 +3,7 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
 import * as moment from 'moment';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class TransactionView extends Component {
   render() {
@@ -17,7 +17,7 @@ class TransactionView extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => {mixpanel.track("transactions_view_go_back_click"); this.props.history.goBack()}}
+              onClick={(e) => {mixpanelWrapper.track("transactions_view_go_back_click"); this.props.history.goBack()}}
               className="pt-icon-arrow-left"
               text="Back"
             />

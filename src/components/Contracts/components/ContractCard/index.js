@@ -6,7 +6,7 @@ import * as moment from 'moment';
 import { selectContractInstance, fetchState } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -29,7 +29,7 @@ class ContractCard extends Component {
           <tr
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
-              mixpanel.track("contract_state_clicked")
+              mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
@@ -125,7 +125,7 @@ class ContractCard extends Component {
                 <Button type="button"
                    className="pt-icon-double-caret-vertical btn-sm"
                    onClick={() => {
-                     mixpanel.track("contracts_toggle_collapse_click");
+                     mixpanelWrapper.track("contracts_toggle_collapse_click");
                      this.setState({
                        isOpen: !this.state.isOpen
                      })
