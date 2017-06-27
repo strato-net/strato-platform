@@ -9,8 +9,10 @@ import '@blueprintjs/core/dist/blueprint.css';
 import 'bootstrap/dist/css/bootstrap.css'
 import { env } from '../env';
 
-mixpanel.init('62f1bec01cdb0096be8e8bdd693e0081');
-mixpanel.identify(env.NODE_NAME);
+// if(process.env.NODE_ENV === 'production') {
+  mixpanel.init('62f1bec01cdb0096be8e8bdd693e0081');
+  mixpanel.identify(env.NODE_NAME);
+// }
 
 class App extends Component {
   render() {

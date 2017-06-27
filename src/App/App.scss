@@ -37,3 +37,9 @@ body {
 .smd-pointer {
   cursor: pointer;
 }
+
+.smd-scrollable {
+  max-height: 240px;
+  overflow-x: none;
+  overflow-y: auto;
+}
