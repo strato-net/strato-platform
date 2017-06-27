@@ -30,15 +30,16 @@ describe('ImportAndUpload with Constructor - smoke', function() {
     this.timeout(config.timeout);
     const contractPath = './importConstructor/regular/A.sol';
     const contractName = 'A';
+    const caA = 'caA';
     const methodName = 'test';
 
-    const contractA = yield rest.uploadContract(alice, contractName, contractFilename(contractPath), {caA: contractName});
+    const contractA = yield rest.uploadContract(alice, contractName, contractFilename(contractPath), {caA: caA});
 
     const state = yield rest.getState(contractA);
-    assert.equal(state.storedA, contractName, 'should set instance variable in constructor');
+    assert.equal(state.storedA, caA, 'should set instance variable in constructor');
 
     const callTest = yield rest.callMethod(alice, contractA, methodName);
-    assert.equal(callTest, contractName, 'should call method from parent');
+    assert.equal(callTest, caA, 'should call method from parent');
   });
 });
 
@@ -57,18 +58,19 @@ describe('ImportAndUpload with Constructor - regular', function() {
   it('should compile, upload, execute method call of imported contract', function*() {
     this.timeout(config.timeout);
     const contractBPath = './importConstructor/regular/B.sol';
-    const contractAName = 'A';
     const contractBName = 'B';
+    const caA = 'caA';
+    const caB = 'caB';
     const methodName = 'test';
 
-    const contractB = yield rest.uploadContract(alice, contractBName, contractFilename(contractBPath), {caA: contractAName, caB: contractBName});
+    const contractB = yield rest.uploadContract(alice, contractBName, contractFilename(contractBPath), {caA: caA, caB: caB});
 
     const state = yield rest.getState(contractB);
-    assert.equal(state.storedB, contractBName, 'should set child instance variable in constructor');
-    assert.equal(state.storedA, contractAName, 'should set parent instance variable in constructor');
+    assert.equal(state.storedB, caB, 'should set child instance variable in constructor');
+    assert.equal(state.storedA, caA, 'should set parent instance variable in constructor');
 
     const callTest = yield rest.callMethod(alice, contractB, methodName);
-    assert.equal(callTest, contractAName, 'should call parent method');
+    assert.equal(callTest, caA, 'should call parent method');
   });
 });
 
@@ -87,18 +89,19 @@ describe('ImportAndUpload with Constructor - transitive', function() {
   it('should compile, upload, execute method call of imported contract', function*() {
     this.timeout(config.timeout);
     const contractCPath = './importConstructor/transitive/C.sol';
-    const contractAName = 'A';
     const contractCName = 'C';
+    const caA = 'caA';
+    const caC = 'caB';
     const methodName = 'test';
 
-    const contractC = yield rest.uploadContract(alice, contractCName, contractFilename(contractCPath), {caA: contractAName, caC: contractCName});
+    const contractC = yield rest.uploadContract(alice, contractCName, contractFilename(contractCPath), {caA: caA, caC: caC});
 
     const state = yield rest.getState(contractC);
-    assert.equal(state.storedC, contractCName, 'should set child instance variable in constructor');
-    assert.equal(state.storedA, contractAName, 'should set parent instance variable in constructor');
+    assert.equal(state.storedC, caC, 'should set child instance variable in constructor');
+    assert.equal(state.storedA, caA, 'should set parent instance variable in constructor');
 
     const callTest = yield rest.callMethod(alice, contractC, methodName);
-    assert.equal(callTest, contractAName, 'should call parent method');
+    assert.equal(callTest, caA, 'should call parent method');
   });
 });
 
@@ -117,45 +120,47 @@ describe('ImportAndUpload with Constructor - relative', function() {
   it.skip('should compile, upload, execute parent method call of relative imported child contracts, API-15 BUG: https://blockapps.atlassian.net/browse/API-15', function*() {
     this.timeout(config.timeout);
     const contractCPath = './importConstructor/relative/dir/C.sol';
-    const contractAName = 'A';
-    const contractBName = 'B';
     const contractCName = 'C';
+    const caA = 'caA';
+    const caB = 'caB';
+    const caC = 'caC';
     const methodName = 'test';
 
-    const contractC = yield rest.uploadContract(alice, contractCName, contractFilename(contractCPath), {caA: contractAName, caB: contractBName, caC: contractCName});
+    const contractC = yield rest.uploadContract(alice, contractCName, contractFilename(contractCPath), {caA: caA, caB: caB, caC: caC});
 
     const state = yield rest.getState(contractC);
-    assert.equal(state.storedC, contractCName, 'should set child instance variable in constructor');
-    assert.equal(state.storedB, contractBName, 'should set parent instance variable in constructor');
+    assert.equal(state.storedC, caC, 'should set child instance variable in constructor');
+    assert.equal(state.storedB, caB, 'should set parent instance variable in constructor');
 
     const callTest = yield rest.callMethod(alice, contractC, methodName);
-    assert.equal(callTest, contractBName, 'should call parent method');
+    assert.equal(callTest, caB, 'should call parent method');
   });
 
   it.skip('should compile, upload, execute parent method call of relative imported parent contracts, API-15 BUG: https://blockapps.atlassian.net/browse/API-15', function*() {
     this.timeout(config.timeout);
     const contractAPath = './importConstructor/relative/A.sol';
     const contractAName = 'A';
-    const contractBName = 'B';
+    const caA = 'caA';
+    const caB = 'caB';
     const methodName = 'test';
 
-    const contractA = yield rest.uploadContract(alice, contractAName, contractFilename(contractAPath), {caA: contractAName, caB: contractBName});
+    const contractA = yield rest.uploadContract(alice, contractAName, contractFilename(contractAPath), {caA: caA, caB: caB});
     const state = yield rest.getState(contractA);
-    assert.equal(state.storedA, contractAName, 'should set child instance variable in constructor');
-    assert.equal(state.storedB, contractBName, 'should set parent instance variable in constructor');
+    assert.equal(state.storedA, caA, 'should set child instance variable in constructor');
+    assert.equal(state.storedB, caB, 'should set parent instance variable in constructor');
 
     const callTest = yield rest.callMethod(alice, contractA, methodName);
-    assert.equal(callTest, contractBName, 'should call parent method');
+    assert.equal(callTest, caB, 'should call parent method');
   });
 });
 
 describe('ImportAndUpload with Constructor - circular', function() {
 
   var alice;
-  const contractAName = 'C';
-  const contractBName = 'D';
-  const contractAValue = 1;
-  const contractBValue = 2;
+  const contractCName = 'C';
+  const contractDName = 'D';
+  const caC = 1;
+  const caD = 2;
 
   before(function*() {
     this.timeout(config.timeout);
@@ -170,16 +175,16 @@ describe('ImportAndUpload with Constructor - circular', function() {
     this.timeout(config.timeout);
     /* UPLOAD CONTRACTS */
     const contractAPath = './importConstructor/circular/A.sol';
-    const contractA = yield rest.uploadContract(alice, contractAName, contractFilename(contractAPath), {caC: contractAValue});
+    const contractA = yield rest.uploadContract(alice, contractCName, contractFilename(contractAPath), {caC: caC});
 
     const contractBPath = './importConstructor/circular/B.sol';
-    const contractB = yield rest.uploadContract(alice, contractBName, contractFilename(contractBPath), {caD: contractBValue});
+    const contractB = yield rest.uploadContract(alice, contractDName, contractFilename(contractBPath), {caD: caD});
 
     const stateA = yield rest.getState(contractA);
     const stateB = yield rest.getState(contractB);
 
-    assert.equal(stateA.storedC, contractAValue, 'should compile and upload contract C');
-    assert.equal(stateB.storedD, contractBValue, 'should compile and upload contract D');
+    assert.equal(stateA.storedC, caC, 'should compile and upload contract C');
+    assert.equal(stateB.storedD, caD, 'should compile and upload contract D');
   });
 
   it.skip('should call methods from contract with circular dependencies, Bug API-11 https://blockapps.atlassian.net/browse/API-11', function*() {
@@ -190,10 +195,10 @@ describe('ImportAndUpload with Constructor - circular', function() {
 
     /* UPLOAD CONTRACTS */
     const contractAPath = './importConstructor/circular/A.sol';
-    const contractA = yield rest.uploadContract(alice, contractAName, contractFilename(contractAPath), {caC: contractAValue});
+    const contractA = yield rest.uploadContract(alice, contractCName, contractFilename(contractAPath), {caC: caC});
 
     const contractBPath = './importConstructor/circular/B.sol';
-    const contractB = yield rest.uploadContract(alice, contractBName, contractFilename(contractBPath), {caD: contractBValue});
+    const contractB = yield rest.uploadContract(alice, contractDName, contractFilename(contractBPath), {caD: caD});
 
     var callTest = yield rest.callMethod(alice, contractA, methodName);
     const callTestD = yield rest.callMethod(alice, contractA, methodNameD);
