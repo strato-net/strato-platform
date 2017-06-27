@@ -1,10 +1,10 @@
 import "B.sol";
 
 
-contract C is A("A") {
-    string cValue;
+contract C is A {
+    string storedC;
 
-    function C(string set) {
-        cValue = set;
+    function C(string caC, string caA) A(caA) {
+        storedC = caC;
     }
 }

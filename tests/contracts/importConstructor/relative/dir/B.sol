@@ -1,11 +1,7 @@
 contract B {
-    string value;
+    string storedB;
 
-    function B(string set) {
-        value = set;
-    }
-
-    function test() returns (string retVal) {
-        return value;
+    function B(string caB) {
+        storedB = caB;
     }
 }

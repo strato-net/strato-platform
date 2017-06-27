@@ -1,11 +1,11 @@
 contract A {
-    string value;
+    string storedA;
 
-    function A(string set) {
-        value = set;
+    function A(string caA) {
+        storedA = caA;
     }
 
-    function test() returns (string retVal) {
-        return value;
+    function test() returns (string) {
+        return storedA;
     }
 }

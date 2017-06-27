@@ -4,10 +4,10 @@ import "B.sol";
 contract C {
     D d;
 
-    uint value;
+    uint storedC;
 
-    function C(uint set) {
-        value = set;
+    function C(uint caC) {
+        storedC = caC;
     }
 
     function testD() returns (uint retVal) {
@@ -15,6 +15,6 @@ contract C {
     }
 
     function test() returns (uint retVal) {
-        return value;
+        return storedC;
     }
 }
