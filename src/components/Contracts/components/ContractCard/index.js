@@ -64,7 +64,7 @@ class ContractCard extends Component {
           const symbolState = instance.state[symbol];
           symbolTable.push(
             <tr key={symbol + ' ' + i}>
-              <td>{symbol}</td>
+              <td style={{verticalAlign: 'middle'}}>{symbol}</td>
               <td style={{maxWidth: '300px'}}>
                 <pre>
                   {
@@ -74,12 +74,15 @@ class ContractCard extends Component {
                   }
                 </pre>
               </td>
-              <td>
+              <td style={{verticalAlign: 'middle'}}>
                 {
                   typeof symbolState === 'string' && symbolState.startsWith('function') ?
                     <ContractMethodCall
                       key={'methodCall' + symbol + instance.address}
                       lookup={'methodCall' + symbol + instance.address}
+                      contractName={name}
+                      contractAddress={instance.address}
+                      symbolName={symbol}
                     />
                     : null
                 }

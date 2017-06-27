@@ -8,6 +8,7 @@ import {
     createStore,
     applyMiddleware,
     combineReducers,
+    compose,
 } from 'redux';
 import createSagaMiddleware from 'redux-saga';
 import { fork } from 'redux-saga/effects';
@@ -29,11 +30,12 @@ import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
-import {watchCompileContract} from './components/CreateContract/createContract.saga';
+import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
 import watchFetchState from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
+import { watchMethodCall, watchFetchArgs } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 
 const rootReducer = combineReducers({
   form: formReducer,
@@ -61,16 +63,22 @@ const rootSaga = function* startForeman() {
         fork(watchCompileContract),
         fork(watchFetchState),
         fork(watchFetchNodeData),
+        fork(watchFetchArgs),
+        fork(watchMethodCall),
     ]
 };
 
 // create the saga middleware
 const sagaMiddleware = createSagaMiddleware();
+
+const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+
 // mount it on the Store
 const store = createStore(
     rootReducer,
-    applyMiddleware(sagaMiddleware),
-    //window.devToolsExtension ? window.devToolsExtension() : f => f,
+    process.env.NODE_ENV !== 'production' ?
+      composeEnhancers(applyMiddleware(sagaMiddleware)) //
+      : applyMiddleware(sagaMiddleware),
 );
 
 // then run the saga

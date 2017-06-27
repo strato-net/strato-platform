@@ -2,7 +2,10 @@ import {
   METHOD_CALL_CLOSE_MODAL,
   METHOD_CALL_OPEN_MODAL,
   METHOD_CALL_FETCH_ARGS_SUCCESS,
-  METHOD_CALL_FETCH_ARGS_FAILURE
+  METHOD_CALL_FETCH_ARGS_FAILURE,
+  METHOD_CALL,
+  METHOD_CALL_SUCCESS,
+  METHOD_CALL_FAILURE
 } from './contractMethodCall.actions';
 
 const initialState = {
@@ -16,18 +19,21 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] :  {
-            ...state.modals[action.key],
-            isOpen: true
-          }
+          [action.key] : {
+              ...state.modals[action.key],
+              isOpen: true,
+              result: 'Waiting for method to be called...'
+            }
         }
       }
     case METHOD_CALL_CLOSE_MODAL:
       return {
-        ...state.modals,
-        [action.key] : {
-          ...state.modals[action.key],
-          isOpen: false
+        modals: {
+          ...state.modals,
+          [action.key] : {
+            ...state.modals[action.key],
+            isOpen: false
+          }
         }
       }
     case METHOD_CALL_FETCH_ARGS_SUCCESS:
@@ -47,6 +53,36 @@ const reducer = function (state = initialState, action) {
           [action.key] :  {
             ...state.modals[action.key],
             error: action.error
+          }
+        }
+      }
+    case METHOD_CALL:
+      return {
+        modals: {
+          ...state.modals,
+          [action.key] :  {
+            ...state.modals[action.key],
+            result: 'Sending transaction...'
+          }
+        }
+      }
+    case METHOD_CALL_SUCCESS:
+      return {
+        modals: {
+          ...state.modals,
+          [action.key] :  {
+            ...state.modals[action.key],
+            result: action.result
+          }
+        }
+      }
+    case METHOD_CALL_FAILURE:
+      return {
+        modals: {
+          ...state.modals,
+          [action.key] :  {
+            ...state.modals[action.key],
+            result: action.error
           }
         }
       }

@@ -243,6 +243,7 @@ class CreateContract extends Component {
                 onClick={this.handleSubmit}
                 text="Create Contract"
               />
+
             </div>
           </div>
         </Dialog>
