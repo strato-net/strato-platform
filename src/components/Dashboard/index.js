@@ -8,6 +8,7 @@ import mixpanel from 'mixpanel-browser';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
+import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
@@ -34,7 +35,7 @@ class Dashboard extends Component {
       dashboardFetchStatus();
       fetchAccounts();
       fetchContracts();
-    }, 5000);
+    }, env.POLLING_FREQUENCY);
   }
 
   difficulty(blockData) {

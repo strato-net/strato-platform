@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
+import { env } from '../../env';
 import {Text} from '@blueprintjs/core';
 import {
   fetchNodeDetail,
@@ -28,7 +29,7 @@ class NodeCard extends Component {
 
     this.timeout = setInterval(function () {
       fetchNodePeers(nodeIndex);
-    }, 5000);
+    }, env.POLLING_FREQUENCY);
   }
 
   render() {
