@@ -19,6 +19,7 @@ class ContractMethodCall extends Component {
   handleOpenModal = (e) => {
     e.stopPropagation();
     e.preventDefault();
+    mixpanel.track("method_call_button_click");
     this.props.methodCallOpenModal(this.props.lookup);
     this.props.methodCallFetchArgs(
       this.props.contractName,
@@ -33,6 +34,7 @@ class ContractMethodCall extends Component {
     e.stopPropagation();
     e.preventDefault();
     this.props.reset();
+    mixpanel.track("method_call_cancel");
     this.props.methodCallCloseModal(this.props.lookup);
   }
 
@@ -52,6 +54,7 @@ class ContractMethodCall extends Component {
           return args;
         }, {})
     }
+    mixpanel.track("method_call_submit");
     this.props.methodCall(this.props.lookup, payload);
   }
 
