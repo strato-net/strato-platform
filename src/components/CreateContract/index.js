@@ -30,7 +30,7 @@ class CreateContract extends Component {
     let reader = new FileReader();
     const self = this;
     reader.onload = function (event) {
-      const fileContents = event.target.result.replace(/\r?\n|\r/g, " ");
+      const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
       mixpanelWrapper.track("create_contract_file_upload");
       self.props.contractFormChange(
         contract.name,
@@ -213,13 +213,15 @@ class CreateContract extends Component {
               </div>
             </div>
             <div className="row">
-              <div className="col-sm-3 text-right">
-                <label className="pt-label smd-pad-4">
+              <div className="col-sm-12">
+                <label className="pt-label">
                   Compilation
                 </label>
               </div>
-              <div className="col-sm-9 smd-pad-4">
-                <table className="pt-table pt-condensed pt-striped">
+            </div>
+            <div className="row">
+              <div className="col-sm-12 smd-scrollable">
+                <table className="pt-table pt-condensed pt-striped smd-full-width">
                   <thead>
                     <tr>
                       <th>Arg</th>
