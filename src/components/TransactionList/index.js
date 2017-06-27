@@ -6,7 +6,7 @@ import './TransactionList.css'
 import {Text, Tooltip, Position} from '@blueprintjs/core';
 import { env } from '../../env';
 import * as moment from 'moment';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 class TransactionList extends Component {
 
@@ -33,7 +33,7 @@ class TransactionList extends Component {
         return (
           <tr
             key={i}
-            onClick={e => {mixpanel.track("dashboard_transaction_click"); self.props.history.push('/transactions/' + tx.hash)}}
+            onClick={e => {mixpanelWrapper.track("dashboard_transaction_click"); self.props.history.push('/transactions/' + tx.hash)}}
           >
             <td width="40%">
               <Text ellipsize={true}>

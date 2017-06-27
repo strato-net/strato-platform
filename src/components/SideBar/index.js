@@ -5,7 +5,7 @@ import logo from './blockapps-logo-horizontal-white.png';
 
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 class SideBar extends Component {
 
@@ -34,7 +34,7 @@ class SideBar extends Component {
                 to={data.path}
                 className="menu-item"
                 activeClassName="active-menu-item"
-                onClick={() => {mixpanel.track('nav_link_'+data.id+'_click')}}
+                onClick={() => {mixpanelWrapper.track('nav_link_'+data.id+'_click')}}
               >
                 <i className={ 'fa ' + data.icon }> </i>
                 <span className="menu-text"> {data.label}</span>

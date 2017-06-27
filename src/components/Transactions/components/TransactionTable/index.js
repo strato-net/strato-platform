@@ -5,7 +5,7 @@ import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip} from '@blueprintjs/core';
 import { env } from '../../../../env';
 import * as moment from 'moment';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class TransactionTable extends Component {
 
@@ -29,7 +29,7 @@ class TransactionTable extends Component {
     const history = this.props.history;
 
     function handleClick(hash) {
-      mixpanel.track('transactions_row_click');
+      mixpanelWrapper.track('transactions_row_click');
       history.push('/transactions/' + hash);
     }
 
