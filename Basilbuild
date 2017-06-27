@@ -22,12 +22,13 @@ DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspac
 
 SOLCBRANCH=v0.4.12-develop-nomd
 SOLCREPOSITORY=https://github.com/blockapps/solidity.git
-SOLCBUILDDIR=$(SOLCWORK)/solidity/build
+SOLCSRCDIR=$(SOLCWORK)/solidity
+SOLCBUILDDIR=$(SOLCSRCDIR)/build
 SOLCMAKEFLAGS=-j4
 ifeq ($(USE_DOCKER_BUILD_ENV),)
-SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
+SOLCCMAKE=cd $(SOLCSRCDIR) && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
 else
-SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
+SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCSRCDIR) && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
 endif
 SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
