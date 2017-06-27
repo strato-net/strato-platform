@@ -94,3 +94,40 @@ describe("Send Transaction Test", function() {
     assert.equal(txResult[0].status.type, 'InsufficientFunds', 'tx status Insufficient Funds');
   });
 });
+
+describe("Send Transaction - Nonce", function() {
+  this.timeout(config.timeout);
+
+  const uid = util.uid();
+  const aliceName = 'Alice' + uid;
+  const bobName = 'Bob' + uid;
+  const password = '1234';
+  const etherToSend = 8;
+
+  it('should send correct amount of ether', function* () {
+    const alice = yield rest.createUser(aliceName, password);
+    const bob = yield rest.createUser(bobName, password);
+
+    // must use BigNumber for balances
+    alice.accounts = yield rest.getAccount(alice.address);
+    alice.startingBalance = new BigNumber(alice.accounts[0].balance);
+
+    bob.accounts = yield rest.getAccount(bob.address);
+    bob.startingBalance = new BigNumber(bob.accounts[0].balance);
+
+    assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending ether");
+    // send
+    var receipt = yield rest.send(alice, bob, etherToSend);
+    var txResult = yield rest.transactionResult(receipt.hash);
+    assert.equal(txResult[0].status, 'success', 'tx status');
+
+    // var receipt = yield rest.send(alice, bob, etherToSend);
+    // var txResult = yield rest.transactionResult(receipt.hash);
+    // assert.equal(txResult[0].status, 'success', 'tx status');
+    //
+    // var receipt = yield rest.send(alice, bob, etherToSend);
+    // var txResult = yield rest.transactionResult(receipt.hash);
+    // assert.equal(txResult[0].status, 'success', 'tx status');
+    //
+  });
+});
