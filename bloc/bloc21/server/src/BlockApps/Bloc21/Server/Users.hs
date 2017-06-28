@@ -258,8 +258,10 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
       -- workaround for enums
       let mFormattedResponse = convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
-      methodReturn <-
-        blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+
+      methodReturn <- case transactionresultMessage txResult of
+        "Success!" -> blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+        stratoMsg  -> return [ SolidityValueAsString stratoMsg ]
       return $ MethodResolved methodReturn
   else return $ map MethodHash hashes
 
@@ -320,10 +322,13 @@ postUsersContractMethod
       -- workaround for enums
       mFormattedResponse =
         convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
+    case transactionresultMessage txResult of
+      "Success!" -> do
+        formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+        return $ PostUsersContractMethodResponse formattedResponse
+      stratoMsg  -> throwError $ UserError stratoMsg
 
-    formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
 
-    return $ PostUsersContractMethodResponse formattedResponse
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
