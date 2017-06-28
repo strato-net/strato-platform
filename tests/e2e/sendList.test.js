@@ -215,21 +215,22 @@ describe("Send Transaction List with nonces", function() {
     // send List
     const resolve = false;
     const nonces = [0, 1, 2];
+    const expectedStatii = {success:3, unresolved:0, rejected:0};
     const txs = createBatchTxWithNonce(batchValueEther, bob, nonces);
     const receipts = yield rest.sendList(alice, txs, resolve);
     const results = yield waitTransactionResult(receipts);
-    const failed = results.filter(statusNotSuccess);
-    assert.equal(failed.length, 0, 'some transactions failed ' + JSON.stringify(failed,null,2));
+    const statii = getStatii(results);
+    assert.deepEqual(statii, expectedStatii);
   });
 
-  const listOfNonces = [
-    [0,1,2,3],
-    [0,1,2,3,4,5,6],
-    [6,5,4,3,2,1,0],
+  const testArray = [
+    {nonces: [0,1,2,3], expectedStatii: {success:4, unresolved:0, rejected:0} },
+    {nonces: [0,1,2,3,4,5,6], expectedStatii: {success:7, unresolved:0, rejected:0} },
+    {nonces: [6,5,4,3,2,1,0], expectedStatii: {success:7, unresolved:0, rejected:0} },
   ];
 
-  listOfNonces.map(function(nonces) {
-    it('resolve==false ' + nonces, function* () {
+  testArray.map(function(test) {
+    it('resolve==false ' + test.nonces, function* () {
       const uid = util.uid();
       const aliceName = 'Alice' + uid;
       const bobName = 'Bob' + uid;
@@ -244,15 +245,22 @@ describe("Send Transaction List with nonces", function() {
 
       // send List
       const resolve = false;
-      const txs = createBatchTxWithNonce(batchValueEther, bob, nonces);
+      const txs = createBatchTxWithNonce(batchValueEther, bob, test.nonces);
       const receipts = yield rest.sendList(alice, txs, resolve);
       const results = yield waitTransactionResult(receipts);
-      const failed = results.filter(statusNotSuccess);
-      assert.equal(failed.length, 0, 'some transactions failed ' + JSON.stringify(failed,null,2));
+      const statii = getStatii(results);
+      assert.deepEqual(statii, test.expectedStatii);
     });
   });
-
 });
+
+function getStatii(results) {
+  return {
+    success: results.filter(function(result) { return result.message == 'Success!';}).length,
+    rejected: results.filter(function(result) { return result.message.startsWith('Rejected!');}).length,
+    unresolved: results.filter(function(result) { return result.message.startsWith('Unresolved!');}).length,
+  }
+}
 
 function* waitTransactionResult(receipts) {
   const results = [];
@@ -261,10 +269,6 @@ function* waitTransactionResult(receipts) {
     results.push(result[0])
   }
   return results;
-}
-
-function statusNotSuccess(result) {
-  return result.status != 'success';
 }
 
 /*
@@ -277,8 +281,3 @@ function statusNotSuccess(result) {
     },
 
 */
-function txStatus(result) {
-  if (result.status == 'success')
-    return 'success';
-  return result.status.type;
-}
