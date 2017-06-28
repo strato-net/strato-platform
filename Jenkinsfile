@@ -51,6 +51,10 @@ pipeline {
           docker-compose up -d
           sleep 32 # wait for cirrus to restart (remove when container dependencies are fixed)
           docker ps
+          # Few quick tests
+          curl -f http://localhost/cirrus/search/
+          curl -f http://localhost/strato-api/eth/v1.2/stats/difficulty
+          curl -f http://localhost/bloc/v2.1/users
         '''
       }
     }
@@ -81,7 +85,7 @@ pipeline {
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               basil build --release
               basil push
-              ./docker-publish-images.sh --prepare-tagged-release
+              ./docker-publish-images.sh
               SILO_RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
               RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S')
               github-release delete  $SILO_RELEASE_DETAILS || true
