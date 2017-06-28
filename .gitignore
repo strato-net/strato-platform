@@ -4,7 +4,9 @@ packages
 server.key
 server.pem
 .idea/
-docker-compose.yml
+docker-compose*.yml
 tmp/
 repos/
 storage/
+mgit/
+node_modules/

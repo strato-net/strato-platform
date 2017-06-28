@@ -71,6 +71,11 @@ deployments:
         postgres_password: "${cirrus_pg_password}"
         postgres_host: "${cirrus_pg_host:-postgres}"
         postgres_port: "${cirrus_pg_port:-5432}"
+      healthcheck:
+        test: ["CMD", "curl", "-f", "localhost:3333"]
+        interval: 1s
+        timeout: 1s
+        retries: 40
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
@@ -156,11 +161,11 @@ deployments:
         - "443:443"
         - "80:80"
       depends_on:
-        - strato
-        - smd-ui 
         - bloch
-        - cirrus
+        - cirrus # TODO: Add service_healthy type dependency for cirrus once Basil will support docker compose v.2.1 (structured depends_on)
         - postgrest
+        - smd-ui
+        - strato
       environment:
         ssl: "${ssl}"
         uiPassword: "${uiPassword}"
