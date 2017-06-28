@@ -3,7 +3,11 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Collapse} from '@blueprintjs/core';
 import * as moment from 'moment';
-import { selectContractInstance, fetchState } from './contractCard.actions';
+import {
+  selectContractInstance,
+  fetchState,
+  fetchCirrusInstances
+} from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -39,7 +43,10 @@ class ContractCard extends Component {
               {instance.address}
             </td>
             <td style={{border: 'none'}}>
-              {moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
+              { instance.fromCirrus ?
+                  <span className="pt-tag pt-intent-primary">Indexed by Cirrus</span> :
+                  moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A')
+              }
             </td>
           </tr>
         );
@@ -126,6 +133,7 @@ class ContractCard extends Component {
                    className="pt-icon-double-caret-vertical btn-sm"
                    onClick={() => {
                      mixpanelWrapper.track("contracts_toggle_collapse_click");
+                     this.props.fetchCirrusInstances(name);
                      this.setState({
                        isOpen: !this.state.isOpen
                      })
@@ -167,5 +175,9 @@ function mapStateToProps(state) {
 }
 
 export default withRouter(
-  connect(mapStateToProps, {selectContractInstance, fetchState})(ContractCard)
+  connect(mapStateToProps, {
+    selectContractInstance,
+    fetchState,
+    fetchCirrusInstances
+  })(ContractCard)
 );

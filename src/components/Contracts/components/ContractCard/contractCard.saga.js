@@ -5,16 +5,37 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_STATE,
+  FETCH_CIRRUS_INSTANCES,
   fetchStateSuccess,
-  fetchStateFailure
+  fetchStateFailure,
+  fetchCirrusInstancesSuccess,
+  fetchCirrusInstancesFailure
 } from './contractCard.actions';
 import { env } from '../../../../env.js'
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/state";
+const cirrusUrl = env.CIRRUS_URL + '/:contractName'
 
 function getState(contractName, contractAddress) {
   return fetch(
     contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress),
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+    })
+    .then(function(response) {
+      return response.json()
+    })
+    .catch(function(error) {
+      throw error;
+    });
+}
+
+function getCirrusInstances(contractName){
+  return fetch(
+    cirrusUrl.replace(':contractName', contractName),
     {
       method: 'GET',
       headers: {
@@ -39,6 +60,20 @@ function* fetchState(action) {
   }
 }
 
-export default function* watchFetchState() {
+function* fetchCirrusInstances(action) {
+  try {
+    let response = yield call(getCirrusInstances, action.name);
+    yield put(fetchCirrusInstancesSuccess(action.name, response));
+  }
+  catch(err) {
+    yield put(fetchCirrusInstancesFailure(action.name,err));
+  }
+}
+
+export function* watchFetchCirrusContracts() {
+  yield takeEvery(FETCH_CIRRUS_INSTANCES, fetchCirrusInstances);
+}
+
+export function* watchFetchState() {
   yield takeEvery(FETCH_STATE, fetchState);
 }
