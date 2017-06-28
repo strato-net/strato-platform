@@ -10,10 +10,10 @@ export const fetchContracts = function () {
   }
 };
 
-export const fetchContractsSuccess = function (res) {
+export const fetchContractsSuccess = function (contracts) {
   return {
     type: FETCH_CONTRACTS_SUCCESS,
-    contracts: res
+    contracts: contracts
   }
 };
 

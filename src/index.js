@@ -33,9 +33,15 @@ import watchCreateContract from './components/CreateContract/createContract.saga
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
-import watchFetchState from './components/Contracts/components/ContractCard/contractCard.saga';
+import {
+  watchFetchState,
+  watchFetchCirrusContracts
+} from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
-import { watchMethodCall, watchFetchArgs } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
+import {
+  watchMethodCall,
+  watchFetchArgs
+} from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 
 const rootReducer = combineReducers({
   form: formReducer,
@@ -65,6 +71,7 @@ const rootSaga = function* startForeman() {
         fork(watchFetchNodeData),
         fork(watchFetchArgs),
         fork(watchMethodCall),
+        fork(watchFetchCirrusContracts),
     ]
 };
 
