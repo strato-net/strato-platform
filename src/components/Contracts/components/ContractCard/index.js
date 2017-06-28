@@ -90,6 +90,7 @@ class ContractCard extends Component {
                       contractName={name}
                       contractAddress={instance.address}
                       symbolName={symbol}
+                      fromCirrus={instance.fromCirrus}
                     />
                     : null
                 }
