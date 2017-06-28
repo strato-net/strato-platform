@@ -71,11 +71,12 @@ deployments:
         postgres_password: "${cirrus_pg_password}"
         postgres_host: "${cirrus_pg_host:-postgres}"
         postgres_port: "${cirrus_pg_port:-5432}"
-      healthcheck:
-        test: ["CMD", "curl", "-f", "localhost:3333"]
-        interval: 1s
-        timeout: 1s
-        retries: 40
+      # todo: not working with basil build 138 (lack of support for v2.1 syntax in lib-compose)
+      #healthcheck:
+        #test: ["CMD", "curl", "-f", "localhost:3333"]
+        #interval: 1s
+        #timeout: 1s
+        #retries: 40
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
@@ -162,7 +163,7 @@ deployments:
         - "80:80"
       depends_on:
         - bloch
-        - cirrus # TODO: Add service_healthy type dependency for cirrus once Basil will support docker compose v.2.1 (structured depends_on)
+        - cirrus
         - postgrest
         - smd-ui
         - strato
