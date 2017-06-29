@@ -4,10 +4,8 @@ import {
   contractCloseModal,
   createContract,
   compileContract,
-  usernameFormChange,
-  passwordFormChange,
   contractFormChange,
-  addressFormChange
+  usernameChange
 } from './createContract.actions';
 import {fetchAccounts} from '../Accounts/accounts.actions';
 import {fetchContracts} from '../Contracts/contracts.actions';
@@ -29,22 +27,39 @@ class CreateContract extends Component {
   }
 
   renderDropzoneInput = (field) => {
-  const files = field.input.value;
-  return (
-    <div className="dropzoneContainer text-center">
-      <Dropzone
-        className="dropzone"
-        name={field.name}
-        onDrop={( filesToUpload, e ) => this.onDrop(filesToUpload)}
-      >
-        <h4>{this.props.filename !== '' ? this.props.filename : 'Drop a file here, or click to select files to upload.'}</h4>
-      </Dropzone>
-      {field.meta.touched &&
-      field.meta.error &&
-      <span className="error">{field.meta.error}</span>}
-    </div>
-  );
-};
+    //const files = field.input.value;
+    return (
+      <div className="dropzoneContainer text-center">
+        <Dropzone
+          className="dropzone"
+          activeClassName="dropzoneActive"
+          rejectClassName="dropzoneReject"
+          name={field.name}
+          onDrop={(filesToUpload, e) => this.onDrop(filesToUpload)}
+        >
+          {({isDragActive, isDragReject, acceptedFiles}) => {
+            {
+              if (isDragActive) {
+                return <h4>Drop to Upload!</h4>;
+              }
+              if (isDragReject) {
+                return <h4>This file is not authorized!</h4>;
+              }
+              else
+                return <h4>{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</h4>
+            }
+          }}
+        </Dropzone>
+        {field.meta.touched &&
+        field.meta.error &&
+        <span className="error">{field.meta.error}</span>}
+      </div>
+    );
+  };
+
+  handleUsernameChange = (e) => {
+    this.props.usernameChange(e.target.value);
+  };
 
   handleFileUpload = (files) => {
     const contract = files[0];
@@ -65,11 +80,6 @@ class CreateContract extends Component {
     reader.readAsText(contract);
   };
 
-  handleUsernameChange = (e) => {
-    this.props.usernameFormChange(e.target.value);
-  };
-
-
   submit = (values) => {
     if (!this.props.createDisabled) {
 
@@ -77,7 +87,7 @@ class CreateContract extends Component {
       const abi = this.props.abi.src;
       Object.values(abi).forEach(val => {
         if (val.constr !== undefined) {
-          return Object.getOwnPropertyNames(val.constr).map((arg) => {
+          return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
             if (values[arg] !== undefined)
               args[arg] = values[arg];
           })
@@ -120,8 +130,8 @@ class CreateContract extends Component {
 
     let args = src === undefined ?
       <tr>
-        <td colSpan={3} className="text-center">
-          <i> Upload contract source file to see args </i>
+        <td colSpan={3}>
+          <div className="text-center">Upload Contract</div>
         </td>
       </tr> :
 
@@ -150,15 +160,6 @@ class CreateContract extends Component {
         }
       }));
 
-    // if(args[0] === undefined) {
-    //   args = [];
-    //   args.push(<tr key="argsNoArgs">
-    //     <td colSpan={3} className="text-center">
-    //       <i> Constructor has no arguments </i>
-    //     </td>
-    //   </tr>);
-    // }
-
     return (
       <div className="smd-pad-16">
         <Button onClick={() => {
@@ -175,121 +176,121 @@ class CreateContract extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
-                <div className="row">
-                  <div className="col-sm-3 text-right">
-                    <label className="pt-label smd-pad-4">
-                      Username
-                    </label>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Username
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="username"
+                      onChange={this.handleUsernameChange}
+                      required
+                    >
+                      <option />
+                      {
+                        users.map((user, i) => {
+                          return (
+                            <option key={'user' + i} value={user}>{user}</option>
+                          )
+                        })
+                      }
+                    </Field>
                   </div>
-                  <div className="col-sm-9 smd-pad-4">
-                    <div className="pt-select">
-                      <Field
-                        className="pt-input"
-                        component="select"
-                        name="username"
-                        onChange={this.handleUsernameChange}
-                        required
-                      >
-                        <option />
-                        {
-                          users.map((user, i) => {
+                </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Address
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="address"
+                      required
+                    >
+                      <option />
+                      {
+                        userAddresses ?
+                          userAddresses.map((address, i) => {
                             return (
-                              <option key={'user' + i} value={user}>{user}</option>
+                              <option key={address} value={address}>{address}</option>
                             )
                           })
-                        }
-                      </Field>
-                    </div>
+                          : ''
+                      }
+                    </Field>
                   </div>
                 </div>
-                <div className="row">
-                  <div className="col-sm-3 text-right">
-                    <label className="pt-label smd-pad-4">
-                      Address
-                    </label>
-                  </div>
-                  <div className="col-sm-9 smd-pad-4">
-                    <div className="pt-select">
-                      <Field
-                        className="pt-input"
-                        component="select"
-                        name="address"
-                        required
-                      >
-                        <option />
-                        {
-                          userAddresses ?
-                            userAddresses.map((address, i) => {
-                              return (
-                                <option key={address} value={address}>{address}</option>
-                              )
-                            })
-                            : ''
-                        }
-                      </Field>
-                    </div>
-                  </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Password
+                  </label>
                 </div>
-                <div className="row">
-                  <div className="col-sm-3 text-right">
-                    <label className="pt-label smd-pad-4">
-                      Password
-                    </label>
-                  </div>
-                  <div className="col-sm-9 smd-pad-4">
-                    <Field
-                      id="input-b"
-                      className={this.props.password === undefined ? "form-width pt-input pt-intent-danger" : "form-width pt-input"}
-                      placeholder="Password"
-                      name="password"
-                      type="password"
-                      component="input"
-                      dir="auto"
-                      title="Password"
-                      required
-                    />
-                  </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    id="input-b"
+                    className="form-width pt-input"
+                    placeholder="Password"
+                    name="password"
+                    type="password"
+                    component="input"
+                    dir="auto"
+                    title="Password"
+                    required
+                  />
                 </div>
-                <div className="row">
-                  <div className="col-sm-3 text-right">
-                    <label className="pt-label smd-pad-4">
-                      Source file
-                    </label>
-                  </div>
-                  <div className="col-sm-12 smd-pad-4">
-                    <Field
-                      id="input-b"
-                      className="form-width pt-input"
-                      name="contract"
-                      component={this.renderDropzoneInput}
-                      dir="auto"
-                      title="Contract Source"
-                    />
-                  </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Source file
+                  </label>
                 </div>
-                <div className="row">
-                  <div className="col-sm-12">
-                    <label className="pt-label">
-                      Compilation
-                    </label>
-                  </div>
+                <div className="col-sm-12 smd-pad-4">
+                  <Field
+                    id="input-b"
+                    className="form-width pt-input"
+                    name="contract"
+                    component={this.renderDropzoneInput}
+                    dir="auto"
+                    title="Contract Source"
+                  />
                 </div>
-                <div className="row">
-                  <div className="col-sm-12 smd-scrollable">
-                    <table className="pt-table pt-condensed pt-striped smd-full-width">
-                      <thead>
-                      <tr>
-                        <th>Arg</th>
-                        <th>Type</th>
-                        <th>Value</th>
-                      </tr>
-                      </thead>
-                      <tbody>
-                      {args}
-                      </tbody>
-                    </table>
-                  </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-12">
+                  <label className="pt-label">
+                    Compilation
+                  </label>
                 </div>
+              </div>
+              <div className="row">
+                <div className="col-sm-12 smd-scrollable">
+                  <table className="pt-table pt-condensed pt-striped smd-full-width">
+                    <thead>
+                    <tr>
+                      <th>Arg</th>
+                      <th>Type</th>
+                      <th>Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {args}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             <div className="pt-dialog-footer">
@@ -328,7 +329,7 @@ const validate = (values) => {
   //   }
   // });
 
-  Object.getOwnPropertyNames(values).map((val, i) => {
+  Object.getOwnPropertyNames(values).forEach((val) => {
     if (values[val] === '' || values[val] === undefined) {
       errors[val] = val + " Required";
     }
@@ -340,17 +341,13 @@ const validate = (values) => {
 function mapStateToProps(state) {
   return {
     isOpen: state.createContract.isOpen,
-    spinning: state.createContract.compileSuccess,
     response: state.createContract.response,
-    address: state.createContract.address,
-    compileSuccess: state.createContract.compileSuccess,
     abi: state.createContract.abi,
     createDisabled: state.createContract.createDisabled,
     filename: state.createContract.filename,
-    username: state.createContract.username,
-    password: state.createContract.password,
     contract: state.createContract.contract,
     accounts: state.accounts.accounts,
+    username: state.createContract.username
   };
 }
 
@@ -360,12 +357,10 @@ const connected = connect(mapStateToProps, {
   contractCloseModal,
   createContract,
   compileContract,
-  usernameFormChange,
-  passwordFormChange,
   contractFormChange,
-  addressFormChange,
   fetchContracts,
-  fetchAccounts
+  fetchAccounts,
+  usernameChange
 })(formed);
 
 export default withRouter(connected);
