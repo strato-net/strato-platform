@@ -231,7 +231,7 @@ describe("Send Transaction List with nonces", function() {
   ];
 
   testArray.map(function(test) {
-    it('resolve==false ' + test.nonces, function* () {
+    it('resolve==false ' + JSON.stringify(test), function* () {
       const uid = util.uid();
       const aliceName = 'Alice' + uid;
       const bobName = 'Bob' + uid;
@@ -248,12 +248,11 @@ describe("Send Transaction List with nonces", function() {
       const resolve = false;
       const txs = createBatchTxWithNonce(batchValueEther, bob, test.nonces);
       const receipts = yield rest.sendList(alice, txs, resolve);
-      const results = yield waitTransactionResult(receipts);
+      const results = yield Promise.all(checkResults(receipts));
       const statii = getStatii(results);
       assert.deepEqual(statii, test.expectedStatii);
     });
   });
-
 });
 
 function getStatii(results) {
@@ -276,15 +275,6 @@ function getStatii(results) {
   }
 }
 
-function* waitTransactionResult(receipts) {
-  const results = [];
-  for (let receipt of receipts) {
-    const result = yield rest.waitTransactionResult(receipt.senderBalance);
-    results.push(result[0])
-  }
-  return results;
-}
-
 /*
 "status": {
       "stage": "Validation",
@@ -293,19 +283,20 @@ function* waitTransactionResult(receipts) {
       "type": "InsufficientFunds",
       "reality": 0
     },
-
 */
 
+// input: list of tx hashes
+// output: array of promises, checking the txResults of those hashes
 function checkResults(receipts) {
   return receipts.map(receipt => {
-    return transactionResultPromise(receipt.senderBalance);
+    const hash = receipt.senderBalance;
+    return co(rest.waitTransactionResult(hash, 5*1000))
+      .catch(function(err) {
+        // an HttpError should be thrown
+        if (err.status != undefined)
+          throw err;
+        // timeout error - unresolved
+        return({message:'Unresolved!'});
+      });
   });
-}
-
-function transactionResultPromise(hash) {
-  return co(rest.waitTransactionResult(hash, 10*1000))
-    .catch(function(err) {
-       //console.log(err);
-       return({message:'Unresolved!'});
-    });
 }
