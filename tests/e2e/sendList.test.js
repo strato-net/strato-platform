@@ -224,35 +224,6 @@ describe("Send Transaction List with nonces", function() {
     assert.deepEqual(statii, expectedStatii);
   });
 
-  const testArray = [
-    {nonces: [0,1,2,3], expectedStatii: {success:4, unresolved:0, rejected:0} },
-    {nonces: [0,1,2,3,4,5,6], expectedStatii: {success:7, unresolved:0, rejected:0} },
-    {nonces: [6,5,4,3,2,1,0], expectedStatii: {success:7, unresolved:0, rejected:0} },
-  ];
-
-  testArray.map(function(test) {
-    it('resolve==false ' + JSON.stringify(test), function* () {
-      const uid = util.uid();
-      const aliceName = 'Alice' + uid;
-      const bobName = 'Bob' + uid;
-      const alice = yield rest.createUser(aliceName, password);
-      const bob = yield rest.createUser(bobName, password);
-      const batchValueEther = 2;
-
-      // must use BigNumber for balances
-      alice.startingBalance = yield rest.getBalance(alice.address);
-      bob.startingBalance = yield rest.getBalance(bob.address);
-      assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending ether");
-
-      // send List
-      const resolve = false;
-      const txs = createBatchTxWithNonce(batchValueEther, bob, test.nonces);
-      const receipts = yield rest.sendList(alice, txs, resolve);
-      const results = yield Promise.all(checkResults(receipts));
-      const statii = getStatii(results);
-      assert.deepEqual(statii, test.expectedStatii);
-    });
-  });
 });
 
 function getStatii(results) {
