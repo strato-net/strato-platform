@@ -182,7 +182,10 @@ do  echo "Waiting for Kafka to become available"
     sleep 1
 done
 
-
+until PGPASSWORD=$pgPass psql -h "$pgHost" -U "$pgUser" -c '\l'; do
+  >&2 echo "Waiting for Postgres to become available"
+  sleep 1
+done
 
 global-db --pghost postgres || { echo "Ignoring."; true; } # If it fails, it just means we already created the global db
 newnode
