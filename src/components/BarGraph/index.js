@@ -1,6 +1,5 @@
 import React, {Component} from 'react';
 import * as Plottable from 'plottable';
-import { Tooltip } from '@blueprintjs/core';
 import './bar-graph.css';
 
 class BarGraph extends Component {
@@ -12,8 +11,9 @@ class BarGraph extends Component {
       dataset: null,
       interaction: null,
       tooltipAnchor: null,
-      tooltipVisible: false,
-      tooltipContent: '',
+      tooltipText: null,
+      tooltipBox: null,
+      tooltip: null,
       firstRender: true
     }
   }
@@ -70,16 +70,34 @@ class BarGraph extends Component {
     this.state.interaction = new Plottable.Interactions.Pointer();
     this.state.interaction.onPointerMove(function(p){
       const entity = self.state.plot.entityNearest(p);
-      self.state.tooltipAnchor
-        .attr('cx',entity.position.x)
-        .attr('cy',entity.position.y);
-      self.state.tooltipVisible = true;
-      self.state.tooltipContent = entity.datum.y;
+      if(entity) {
+        self.state.tooltipText
+          .text(entity.datum.y);
+        const bbox = self.state.tooltipText.node().getBBox();
+        self.state.tooltipBox
+          .attr('x',bbox.x-8)
+          .attr('y',bbox.y-3)
+          .attr('width',bbox.width+16)
+          .attr('height',bbox.height+6);
+        self.state.tooltip
+          .attr('points', [
+            0,
+            -20,
+            -5,
+            -15,
+            5,
+            -15
+          ].join(','));
+
+        self.state.tooltipAnchor
+          .attr('transform','translate(' + entity.position.x + ',' + (entity.position.y+20)  + ')')
+          .attr('opacity',1);
+      }
     });
 
     this.state.interaction.onPointerExit(function(){
-      self.state.tooltipVisible = false;
-      self.state.tooltipContent = '';
+      self.state.tooltipAnchor
+        .attr('opacity',0);
     });
 
     this.state.interaction.attachTo(this.state.plot);
@@ -87,17 +105,26 @@ class BarGraph extends Component {
 
     this.state.tooltipAnchor = this.state.plot
       .foreground()
-      .append("circle")
-      .attr('r',5)
-      .attr('opacity', 1);
+      .style('overflow','visible')
+      .append('g')
+      .attr('opacity', 0);
 
-    this.state.tooltip =
-      <Tooltip
-        isOpen={this.state.tooltipVisible}
-        content={this.state.tooltipContent}
-      >
-        this.state.tooltipAnchor.node()
-      </Tooltip>;
+    this.state.tooltipBox = this.state.tooltipAnchor
+      .append('rect')
+      .style('fill','#293742')
+      .attr('rx', 4)
+      .attr('ry', 4);
+
+    this.state.tooltip = this.state.tooltipAnchor
+      .append('polygon')
+      .style('fill','#293742');
+
+    this.state.tooltipText = this.state.tooltipAnchor
+      .append("text")
+      .style('fill','#f5f8fa')
+      .attr('text-anchor','middle')
+      .text('test');
+
   }
 
   componentDidMount() {
@@ -126,6 +153,7 @@ class BarGraph extends Component {
   }
 
   render() {
+
     return (
       <div className="pt-card pt-dark">
         <div className="row">
