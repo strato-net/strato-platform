@@ -117,7 +117,7 @@ const reducer = function (state = initialState, action) {
         isOpen: true,
         compileSuccess: true,
         abi: action.response,
-        createDisabled: !(state.username && state.address && state.password)
+        createDisabled: false,
       };
     default:
       return state;
