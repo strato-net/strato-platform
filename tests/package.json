@@ -8,6 +8,7 @@
   "dependencies": {
     "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#generator",
     "chai": "^4.0.2",
+    "co": "^4.6.0",
     "co-mocha": "^1.2.0",
     "mocha": "^3.4.2"
   }

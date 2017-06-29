@@ -117,17 +117,29 @@ describe("Send Transaction - Nonce", function() {
 
     assert.isOk(alice.startingBalance.equals(bob.startingBalance), "balances should be equal before sending ether");
     // send
-    var receipt = yield rest.send(alice, bob, etherToSend);
+    var receipt = yield rest.send(alice, bob, etherToSend, 0);
     var txResult = yield rest.transactionResult(receipt.hash);
     assert.equal(txResult[0].status, 'success', 'tx status');
 
-    // var receipt = yield rest.send(alice, bob, etherToSend);
-    // var txResult = yield rest.transactionResult(receipt.hash);
-    // assert.equal(txResult[0].status, 'success', 'tx status');
-    //
-    // var receipt = yield rest.send(alice, bob, etherToSend);
-    // var txResult = yield rest.transactionResult(receipt.hash);
-    // assert.equal(txResult[0].status, 'success', 'tx status');
-    //
+    var receipt = yield rest.send(alice, bob, etherToSend, 1);
+    var txResult = yield rest.transactionResult(receipt.hash);
+    assert.equal(txResult[0].status, 'success', 'tx status');
+
+    var receipt = yield rest.send(alice, bob, etherToSend, 2);
+    var txResult = yield rest.transactionResult(receipt.hash);
+    assert.equal(txResult[0].status, 'success', 'tx status');
+
+    //check balances
+    alice.endBalance = yield rest.getBalance(alice.address);
+    bob.endBalance = yield rest.getBalance(bob.address);
+
+    //TODO Calculate gas cost and factor into balance
+    const delta = new BigNumber(etherToSend).mul(constants.ETHER).mul(3);
+    assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
+    assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
   });
+
+  it.skip('send with bad nonce', function* () {
+  });
+
 });

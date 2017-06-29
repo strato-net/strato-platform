@@ -1,5 +1,6 @@
 const ba = require('blockapps-rest');
 require('co-mocha');
+const co = require('co');
 
 const rest = ba.rest;
 const common = ba.common;
@@ -214,11 +215,11 @@ describe("Send Transaction List with nonces", function() {
 
     // send List
     const resolve = false;
-    const nonces = [0, 1, 2];
-    const expectedStatii = {success:3, unresolved:0, rejected:0};
+    const nonces = [0, 1, 2, 4];
+    const expectedStatii = {success:3, unresolved:1, rejected:0};
     const txs = createBatchTxWithNonce(batchValueEther, bob, nonces);
     const receipts = yield rest.sendList(alice, txs, resolve);
-    const results = yield waitTransactionResult(receipts);
+    const results = yield Promise.all(checkResults(receipts));
     const statii = getStatii(results);
     assert.deepEqual(statii, expectedStatii);
   });
@@ -252,13 +253,26 @@ describe("Send Transaction List with nonces", function() {
       assert.deepEqual(statii, test.expectedStatii);
     });
   });
+
 });
 
 function getStatii(results) {
   return {
-    success: results.filter(function(result) { return result.message == 'Success!';}).length,
-    rejected: results.filter(function(result) { return result.message.startsWith('Rejected!');}).length,
-    unresolved: results.filter(function(result) { return result.message.startsWith('Unresolved!');}).length,
+    success: results.filter(function(result) {
+      if (result.length !== undefined)
+        return result[0].message == 'Success!';
+      return result.message == 'Success!';
+    }).length,
+    rejected: results.filter(function(result) {
+      if (result.length !== undefined)
+        return result[0].message.startsWith('Rejected!');
+      return result.message.startsWith('Rejected!');
+    }).length,
+    unresolved: results.filter(function(result) {
+      if (result.length !== undefined)
+        return result[0].message.startsWith('Unresolved!');
+      return result.message.startsWith('Unresolved!');
+    }).length,
   }
 }
 
@@ -281,3 +295,17 @@ function* waitTransactionResult(receipts) {
     },
 
 */
+
+function checkResults(receipts) {
+  return receipts.map(receipt => {
+    return transactionResultPromise(receipt.senderBalance);
+  });
+}
+
+function transactionResultPromise(hash) {
+  return co(rest.waitTransactionResult(hash, 10*1000))
+    .catch(function(err) {
+       //console.log(err);
+       return({message:'Unresolved!'});
+    });
+}
