@@ -18,14 +18,17 @@ import {reducer as formReducer} from 'redux-form';
 import App from "./App/";
 
 
-import blockDataReducer from './components/BlockData/block-data.reducer'
-import transactionsReducer from './components/TransactionList/transactionList.reducer'
-import createUserReducer from './components/CreateUser/createUser.reducer'
-import createContractReducer from './components/CreateContract/createContract.reducer'
 import accountsReducer from './components/Accounts/accounts.reducer';
+import blockDataReducer from './components/BlockData/block-data.reducer'
+import createUserReducer from './components/CreateUser/createUser.reducer';
+import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
-import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
+import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
+import transactionsReducer from './components/TransactionList/transactionList.reducer';
+import transactionTableReducer from './components/Transactions/components/TransactionTable/transactionTable.reducer';
+
+
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
@@ -47,14 +50,15 @@ const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
-  blockData: blockDataReducer,
-  transactions: transactionsReducer,
-  createUser: createUserReducer,
-  createContract: createContractReducer,
-  methodCall: methodCallReducer,
   accounts: accountsReducer,
+  blockData: blockDataReducer,
   contracts: contractsReducer,
-  nodes: nodeCardReducer
+  createContract: createContractReducer,
+  createUser: createUserReducer,
+  methodCall: methodCallReducer,
+  nodes: nodeCardReducer,
+  transactions: transactionsReducer,
+  transactionsTable: transactionTableReducer,
 });
 
 const rootSaga = function* startForeman() {
