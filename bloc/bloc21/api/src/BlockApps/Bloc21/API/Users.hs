@@ -10,24 +10,24 @@
 
 module BlockApps.Bloc21.API.Users where
 
-import           Control.Lens                     (mapped)
-import           Control.Lens.Operators           hiding ((.=))
+import           Control.Lens                       (mapped)
+import           Control.Lens.Operators             hiding ((.=))
 import           Data.Aeson
 import           Data.Aeson.Casing
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy             as ByteString.Lazy
-import           Data.Map                         (Map)
-import qualified Data.Map                         as Map
+import qualified Data.ByteString.Lazy               as ByteString.Lazy
+import           Data.Map                           (Map)
+import qualified Data.Map                           as Map
 import           Data.Proxy
-import           Data.Text                        (Text)
-import qualified Data.Text.Encoding               as Text
+import           Data.Text                          (Text)
+import qualified Data.Text.Encoding                 as Text
 import           Generic.Random.Generic
 import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck
-import           Test.QuickCheck.Instances        ()
+import           Test.QuickCheck.Instances          ()
 
 import           BlockApps.Bloc21.API.SwaggerSchema
 import           BlockApps.Bloc21.API.Utils
@@ -119,7 +119,7 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestContract :: Maybe Text
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
   , postuserscontractrequestTxParams :: Maybe TxParams
-  , postuserscontractrequestValue :: Maybe (Strung Natural)
+  , postuserscontractrequestValue    :: Maybe (Strung Natural)
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
@@ -479,8 +479,10 @@ type PostUsersContractMethodList = "users"
 
 data PostUsersContractMethodListResponse
   = MethodHash Keccak256
-  | MethodResolved [SolidityValue]
+  -- | MethodResolved [SolidityValue]
+  | MethodResolved (Either MethodErrored [SolidityValue])
   deriving (Eq,Show,Generic)
+
 
 instance Arbitrary PostUsersContractMethodListResponse where
   arbitrary = genericArbitrary uniform
@@ -491,7 +493,7 @@ instance FromJSON PostUsersContractMethodListResponse
 instance ToSample PostUsersContractMethodListResponse where
   toSamples _ = samples
     [ MethodHash (keccak256 "foo")
-    , MethodResolved
+    , MethodResolved $ Right
        [ SolidityValueAsString "1"
        , SolidityValueAsString "two"
        , SolidityValueAsString "buckleMyShoe"
@@ -505,11 +507,63 @@ instance ToSchema PostUsersContractMethodListResponse where
      & mapped.schema.example ?~ toJSON ex
      where
        ex :: PostUsersContractMethodListResponse
-       ex = MethodResolved
+       ex = MethodResolved $ Right
          [ SolidityValueAsString "1"
          , SolidityValueAsString "two"
          , SolidityValueAsString "buckleMyShoe"
          ]
+
+data MethodErrored = MethodErrored { erroredMethodCall :: MethodCall
+                                   , errorMessage      :: Text
+                                   }
+  deriving (Eq,Show,Generic)
+
+instance Arbitrary MethodErrored where
+  arbitrary = genericArbitrary uniform
+
+instance ToJSON MethodErrored
+instance FromJSON MethodErrored
+
+instance ToSample MethodErrored where
+  toSamples _ = samples [ex]
+    where
+       ex :: MethodErrored
+       ex =  MethodErrored { erroredMethodCall = exMethodCall
+                            , errorMessage      = "Rejected from mempool at \
+                               \ Execution/Queued due to low account balance \
+                               \ (expected: 1234000000000100000000, actual: 999999999999995067249)"
+                            }
+       exMethodCall :: MethodCall
+       exMethodCall = MethodCall
+         { methodcallTxParams = Nothing
+         , methodcallValue = Strung 10
+         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
+         , methodcallMethodName = "getHoroscope"
+         , methodcallContractAddress = Address 0xdeadbeef
+         , methodcallContractName = "HorroscopeApp"
+         }
+
+instance ToSchema MethodErrored where
+ declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+     & mapped.name ?~ "Method Errored Response"
+     & mapped.schema.description ?~ "response object when method fails in a methodList call"
+     & mapped.schema.example ?~ toJSON ex
+     where
+       ex :: MethodErrored
+       ex =  MethodErrored { erroredMethodCall = exMethodCall
+                            , errorMessage      = "Rejected from mempool at \
+                               \ Execution/Queued due to low account balance \
+                               \ (expected: 1234000000000100000000, actual: 999999999999995067249)"
+                            }
+       exMethodCall :: MethodCall
+       exMethodCall = MethodCall
+         { methodcallTxParams = Nothing
+         , methodcallValue = Strung 10
+         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
+         , methodcallMethodName = "getHoroscope"
+         , methodcallContractAddress = Address 0xdeadbeef
+         , methodcallContractName = "HorroscopeApp"
+         }
 
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password
