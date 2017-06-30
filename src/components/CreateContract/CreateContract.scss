@@ -1,26 +1,19 @@
-.input {
-  padding: 1%;
-  margin-top: 1%;
-  margin-left: 10%;
-}
-
-.input input {
-  width: 80%;
-}
 
 .dropzoneContainer {
-  padding: 1%;
+  padding: 5px;
 }
 
 .dropzone {
   width: 100%;
   height: 100%;
-  border: 2px dashed;
+  border: 1px dashed;
   border-radius: 5px;
+  padding-top: 8px;
 }
 
 .dropzoneActive {
   border-color: #0f9960 !important;
+  color: #0f9960 !important;
 }
 
 .dropzoneRejected {
