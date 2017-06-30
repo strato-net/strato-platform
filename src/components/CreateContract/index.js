@@ -27,27 +27,25 @@ class CreateContract extends Component {
   }
 
   renderDropzoneInput = (field) => {
-    //const files = field.input.value;
+    const files = field.input.value;
     return (
       <div className="dropzoneContainer text-center">
         <Dropzone
-          className="dropzone"
+          className={files.length > 0 && files[0].name.includes('.sol') ? "dropzoneActive" : "dropzone"}
           activeClassName="dropzoneActive"
-          rejectClassName="dropzoneReject"
+          rejectClassName="dropzoneRejected"
           name={field.name}
-          onDrop={(filesToUpload, e) => this.onDrop(filesToUpload)}
+          onDrop={(filesToUpload, e) => {this.onDrop(filesToUpload)}}
         >
           {({isDragActive, isDragReject, acceptedFiles}) => {
-            {
               if (isDragActive) {
-                return <h4>Drop to Upload!</h4>;
+                return <h4 className="pt-intent-success">Drop to Upload!</h4>;
               }
               if (isDragReject) {
-                return <h4>This file is not authorized!</h4>;
+                return <h4 className="pt-intent-warning">This file is not authorized!</h4>;
               }
               else
-                return <h4>{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</h4>
-            }
+                return <h4 className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</h4>
           }}
         </Dropzone>
         {field.meta.touched &&
@@ -63,6 +61,11 @@ class CreateContract extends Component {
 
   handleFileUpload = (files) => {
     const contract = files[0];
+    if (contract && (!contract.name || !contract.name.includes('.sol'))) {
+      console.log('file upload rejected')
+      //TODO: Toaster message for rejected upload
+      return;
+    }
     let reader = new FileReader();
     const self = this;
     reader.onload = function (event) {

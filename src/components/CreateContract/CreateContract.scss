@@ -20,9 +20,9 @@
 }
 
 .dropzoneActive {
-  border: 2px dashed #0f9960;
+  border-color: #0f9960 !important;
 }
 
-.dropzoneActive {
-  border-color: #fd373e;
+.dropzoneRejected {
+  border-color: #fd373e !important;
 }
