@@ -16,7 +16,7 @@ import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
 import           Data.Foldable
 import           Data.Int                          (Int32)
-import           Data.List                         (sortOn)
+import           Data.List                         (sortOn, unzip4)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
@@ -207,37 +207,38 @@ postUsersContractMethodList
   -> PostMethodListRequest
   -> Bloc [PostUsersContractMethodListResponse]
 postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-  txsFuncIdsXabis <- for (zip postmethodlistrequestTxs [0..]) $ \ (MethodCall{..},nonceIncr) -> do
-    cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
-    functionId <- getFunctionId cmId methodcallMethodName
-    xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
-    let eitherErrorOrContract = xAbiToContract xabi
+  txsFuncIdsXabisMethodCall <- for (zip postmethodlistrequestTxs [0..]) $
+    \ (methodCall@MethodCall{..},nonceIncr) -> do
+      cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
+      functionId <- getFunctionId cmId methodcallMethodName
+      xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+      let eitherErrorOrContract = xAbiToContract xabi
 
-    contract' <-
-      either (throwError . UserError . Text.pack) return eitherErrorOrContract
+      contract' <-
+        either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-    let maybeFunc = Map.lookup methodcallMethodName (fields $ mainStruct contract')
+      let maybeFunc = Map.lookup methodcallMethodName (fields $ mainStruct contract')
 
-    sel <-
-      case maybeFunc of
-       Just (_, TypeFunction selector _ _) -> return selector
-       _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+      sel <-
+        case maybeFunc of
+         Just (_, TypeFunction selector _ _) -> return selector
+         _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
 
 
-    argsBin <- buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
-    tx <- prepareTx
-      userName
-      postmethodlistrequestPassword
-      userAddr
-      (Just methodcallContractAddress)
-      (fromMaybe emptyTxParams methodcallTxParams)
-      (eth (fromIntegral $ unStrung methodcallValue))
-      (sel <> argsBin)
-      nonceIncr
-    -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-    return (tx,functionId,xabi)
-  let (txs,funcIds,xabis) = unzip3 txsFuncIdsXabis
+      argsBin <- buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
+      tx <- prepareTx
+        userName
+        postmethodlistrequestPassword
+        userAddr
+        (Just methodcallContractAddress)
+        (fromMaybe emptyTxParams methodcallTxParams)
+        (eth (fromIntegral $ unStrung methodcallValue))
+        (sel <> argsBin)
+        nonceIncr
+      -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+      return (tx,functionId,xabi,methodCall)
+  let (txs,funcIds,xabis, methodCalls) = unzip4 txsFuncIdsXabisMethodCall
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
   if postmethodlistrequestResolve
@@ -247,7 +248,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
     let zipped = resultJoiner <$> zip funcIds hashes
         resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
 
-    for (zip zipped xabis) $ \((funcId,txResult),xabi) -> do
+    for (zip3 zipped xabis methodCalls) $ \((funcId,txResult),xabi,methodCall) -> do
       resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
       let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
       orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
@@ -258,9 +259,12 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
       -- workaround for enums
       let mFormattedResponse = convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
-      methodReturn <-
-        blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-      return $ MethodResolved methodReturn
+
+      case transactionresultMessage txResult of
+        "Success!" ->
+          MethodResolved . Right <$> blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+        stratoMsg  -> return $
+          MethodResolved . Left $ MethodErrored methodCall stratoMsg
   else return $ map MethodHash hashes
 
 postUsersContractMethod
@@ -320,10 +324,13 @@ postUsersContractMethod
       -- workaround for enums
       mFormattedResponse =
         convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
+    case transactionresultMessage txResult of
+      "Success!" -> do
+        formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+        return $ PostUsersContractMethodResponse formattedResponse
+      stratoMsg  -> throwError $ UserError stratoMsg
 
-    formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
 
-    return $ PostUsersContractMethodResponse formattedResponse
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case

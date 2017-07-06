@@ -70,12 +70,14 @@ import           Text.Read
 import           Text.Read.Lex
 import           Web.FormUrlEncoded           hiding (fieldLabelModifier)
 
-import           BlockApps.Ethereum           (Address (..), Keccak256 (..), Nonce (..), addressString, keccak256,
-                                               keccak256lazy, stringAddress)
+import           BlockApps.Ethereum           (Address (..), Keccak256 (..),
+                                               Nonce (..), addressString,
+                                               keccak256, keccak256lazy,
+                                               stringAddress)
 
 import           BlockApps.Solidity.Xabi
 
-newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic)
+newtype FaucetResponse = FaucetResponse Text deriving (Eq, Generic, Show)
 
 newtype Hex n = Hex { unHex :: n } deriving (Eq, Generic)
 

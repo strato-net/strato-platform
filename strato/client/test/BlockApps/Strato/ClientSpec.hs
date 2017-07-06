@@ -110,7 +110,6 @@ spec
 -- orphans
 
 instance Arbitrary TransactionType where arbitrary = genericArbitrary uniform
-instance Arbitrary Addresses where arbitrary = genericArbitrary uniform
 instance (Arbitrary x, Arbitrary y) => Arbitrary (LargeKey x y) where
   arbitrary = LargeKey <$> arbitrary <*> arbitrary
 instance Arbitrary Transaction where arbitrary = genericArbitrary uniform
