@@ -4,7 +4,8 @@
   "private": true,
   "homepage": "/dashboard/",
   "dependencies": {
-    "@blueprintjs/core": "1.17.1",
+    "@blueprintjs/core": "^1.22.0",
+    "@blueprintjs/table": "^1.19.0",
     "bignumber.js": "4.0.2",
     "bootstrap": "3.3.7",
     "mixpanel-browser": "2.11.1",

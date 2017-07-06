@@ -11,6 +11,7 @@ import {
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import { Link } from 'react-router-dom';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -25,6 +26,9 @@ class ContractCard extends Component {
     const instances = contract && contract.instances ? contract.instances : [];
     const self = this;
     const re = /[0-9a-fA-F]{40}$/;
+    const showQueryBuilder = instances.reduce((acc,instance)=> {
+      return acc || instance.fromCirrus;
+    }, false);
 
     instances
       .filter((instance) => {return re.test(instance.address)})
@@ -130,18 +134,31 @@ class ContractCard extends Component {
             <div className="row">
               <div className="col-sm-6"><h4>{name}</h4></div>
               <div className="col-sm-6 text-right">
-                <Button type="button"
-                   className="pt-icon-double-caret-vertical btn-sm"
-                   onClick={() => {
-                     mixpanelWrapper.track("contracts_toggle_collapse_click");
-                     this.props.fetchCirrusInstances(name);
-                     this.setState({
-                       isOpen: !this.state.isOpen
-                     })
-                   }}
-                >
-                  {this.state.isOpen ? "Hide" : "Show"} Contracts
-                </Button>
+                <div className="pt-button-group">
+                  {
+                    showQueryBuilder ?
+                      <Link to={'/contracts/' + name + '/query'}>
+                        <Button type="Button" className="pt-intent-primary">
+                          Query Builder
+                        </Button>
+                      </Link>
+                      : null
+                  }
+                  <Button type="button"
+                     className="pt-icon-double-caret-vertical btn-sm"
+                     onClick={() => {
+                       mixpanelWrapper.track("contracts_toggle_collapse_click");
+                       this.props.fetchCirrusInstances(name);
+                       this.setState({
+                         isOpen: !this.state.isOpen
+                       })
+                     }}
+                  >
+                    {this.state.isOpen ? "Hide" : "Show"} Contracts
+                  </Button>
+
+                </div>
+
               </div>
             </div>
             <div className="row">

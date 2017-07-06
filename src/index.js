@@ -25,6 +25,7 @@ import createContractReducer from './components/CreateContract/createContract.re
 import accountsReducer from './components/Accounts/accounts.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
+import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
@@ -42,6 +43,7 @@ import {
   watchMethodCall,
   watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
+import watchQueryCirrus from './components/ContractQuery/contractQuery.saga';
 
 const rootReducer = combineReducers({
   form: formReducer,
@@ -54,7 +56,8 @@ const rootReducer = combineReducers({
   methodCall: methodCallReducer,
   accounts: accountsReducer,
   contracts: contractsReducer,
-  nodes: nodeCardReducer
+  nodes: nodeCardReducer,
+  contractQuery: contractQueryReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -72,6 +75,7 @@ const rootSaga = function* startForeman() {
         fork(watchFetchArgs),
         fork(watchMethodCall),
         fork(watchFetchCirrusContracts),
+        fork(watchQueryCirrus)
     ]
 };
 
