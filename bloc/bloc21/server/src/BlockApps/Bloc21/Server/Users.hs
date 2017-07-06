@@ -262,7 +262,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
 
       case transactionresultMessage txResult of
         "Success!" ->
-          MethodResolved <$> Right <$> blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+          MethodResolved . Right <$> blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
         stratoMsg  -> return $
           MethodResolved . Left $ MethodErrored methodCall stratoMsg
   else return $ map MethodHash hashes

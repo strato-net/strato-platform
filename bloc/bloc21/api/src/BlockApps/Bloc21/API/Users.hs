@@ -524,46 +524,33 @@ instance Arbitrary MethodErrored where
 instance ToJSON MethodErrored
 instance FromJSON MethodErrored
 
+methodErroredExample :: MethodErrored
+methodErroredExample =
+  MethodErrored { erroredMethodCall = exMethodCall
+                , errorMessage      = "Rejected from mempool at \
+                   \ Execution/Queued due to low account balance \
+                   \ (expected: 1234000000000100000000, actual: 999999999999995067249)"
+                }
+  where
+     exMethodCall :: MethodCall
+     exMethodCall = MethodCall
+       { methodcallTxParams = Nothing
+       , methodcallValue = Strung 10
+       , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
+       , methodcallMethodName = "getHoroscope"
+       , methodcallContractAddress = Address 0xdeadbeef
+       , methodcallContractName = "HorroscopeApp"
+       }
+
+
 instance ToSample MethodErrored where
-  toSamples _ = samples [ex]
-    where
-       ex :: MethodErrored
-       ex =  MethodErrored { erroredMethodCall = exMethodCall
-                            , errorMessage      = "Rejected from mempool at \
-                               \ Execution/Queued due to low account balance \
-                               \ (expected: 1234000000000100000000, actual: 999999999999995067249)"
-                            }
-       exMethodCall :: MethodCall
-       exMethodCall = MethodCall
-         { methodcallTxParams = Nothing
-         , methodcallValue = Strung 10
-         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
-         , methodcallMethodName = "getHoroscope"
-         , methodcallContractAddress = Address 0xdeadbeef
-         , methodcallContractName = "HorroscopeApp"
-         }
+  toSamples _ = samples [methodErroredExample]
 
 instance ToSchema MethodErrored where
  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
      & mapped.name ?~ "Method Errored Response"
      & mapped.schema.description ?~ "response object when method fails in a methodList call"
-     & mapped.schema.example ?~ toJSON ex
-     where
-       ex :: MethodErrored
-       ex =  MethodErrored { erroredMethodCall = exMethodCall
-                            , errorMessage      = "Rejected from mempool at \
-                               \ Execution/Queued due to low account balance \
-                               \ (expected: 1234000000000100000000, actual: 999999999999995067249)"
-                            }
-       exMethodCall :: MethodCall
-       exMethodCall = MethodCall
-         { methodcallTxParams = Nothing
-         , methodcallValue = Strung 10
-         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
-         , methodcallMethodName = "getHoroscope"
-         , methodcallContractAddress = Address 0xdeadbeef
-         , methodcallContractName = "HorroscopeApp"
-         }
+     & mapped.schema.example ?~ toJSON methodErroredExample
 
 data PostMethodListRequest = PostMethodListRequest
   { postmethodlistrequestPassword :: Password
