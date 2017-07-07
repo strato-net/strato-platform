@@ -44,7 +44,7 @@ runSolc optsObj mainSrc importsSrc =
   execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
   where
     solcCompileOpts = concat [
-      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime,metadata", "--metadata-disable"]
+      solcOParam, solcORunsParam, solcStdParam, ["--combined-json=abi,bin,bin-runtime", "--metadata-disable"]
       ]
     solcLinkOpts = concat [solcLinkParam, solcLibsParam]
 
