@@ -4,29 +4,68 @@ import {
   contractCloseModal,
   createContract,
   compileContract,
-  usernameFormChange,
-  passwordFormChange,
   contractFormChange,
-  addressFormChange
+  usernameChange
 } from './createContract.actions';
-import { fetchAccounts } from '../Accounts/accounts.actions';
-import { fetchContracts } from '../Contracts/contracts.actions';
-import { Button, Dialog } from '@blueprintjs/core';
-import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import {fetchAccounts} from '../Accounts/accounts.actions';
+import {fetchContracts} from '../Contracts/contracts.actions';
+import {Button, Dialog} from '@blueprintjs/core';
+import Dropzone from 'react-dropzone'
+import {Field, reduxForm} from 'redux-form';
+import {connect} from 'react-redux';
+import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 import './CreateContract.css';
 
-// TODO: use redux-form
-// TODO: Remove global variables
 // TODO: use solc instead of extabi for compile
 
-let inputs = {};
 class CreateContract extends Component {
 
-  handleFileUpload = (e) => {
-    const contract = e.target.files[0];
+  onDrop = (acceptedFiles, rejectedFiles) => {
+    this.handleFileUpload(acceptedFiles);
+  }
+
+  renderDropzoneInput = (field) => {
+    const files = field.input.value;
+    return (
+      <div className="dropzoneContainer text-center">
+        <Dropzone
+          className={files.length > 0 && files[0].name.includes('.sol') ? "dropzoneActive" : "dropzone"}
+          activeClassName="dropzoneActive"
+          rejectClassName="dropzoneRejected"
+          name={field.name}
+          onDrop={(filesToUpload, e) => {this.onDrop(filesToUpload)}}
+        >
+          {({isDragActive, isDragReject, acceptedFiles}) => {
+              if (isDragActive) {
+                return <p className="pt-intent-success">Drop to Upload!</p>;
+              }
+              if (isDragReject) {
+                return <p className="pt-intent-warning">Invalid file!</p>;
+              }
+              else
+                return <p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>
+          }}
+        </Dropzone>
+        {field.meta.touched &&
+        field.meta.error &&
+        <span className="error">{field.meta.error}</span>}
+      </div>
+    );
+  };
+
+  handleUsernameChange = (e) => {
+    this.props.usernameChange(e.target.value);
+  };
+
+  handleFileUpload = (files) => {
+    const contract = files[0];
+    if (contract && (!contract.name || !contract.name.includes('.sol'))) {
+      console.log('file upload rejected')
+      //TODO: Toaster message for rejected upload
+      return;
+    }
     let reader = new FileReader();
     const self = this;
     reader.onload = function (event) {
@@ -37,37 +76,41 @@ class CreateContract extends Component {
         fileContents
       );
       self.props.compileContract(
-        contract.name.substring(0,contract.name.indexOf('.')),
+        contract.name.substring(0, contract.name.indexOf('.')),
         fileContents
       );
-    }
+    };
     reader.readAsText(contract);
-  }
-
-  handleAddressChange = (e) => {
-    this.props.addressFormChange(e.target.value);
-  }
-
-  handleUsernameChange = (e) => {
-    this.props.usernameFormChange(e.target.value);
   };
 
-  handlePasswordChange = (e) => {
-    this.props.passwordFormChange(e.target.value);
-  };
-
-  handleSubmit = () => {
+  submit = (values) => {
     if (!this.props.createDisabled) {
+
+      const args = {};
+      const abi = this.props.abi.src;
+      Object.values(abi).forEach(val => {
+        if (val.constr !== undefined) {
+          return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
+            if (values[arg] !== undefined)
+              args[arg] = values[arg];
+          })
+        }
+      });
+
       const payload = {
-        contract: this.props.filename.substring(0,this.props.filename.indexOf('.')),
-        username: this.props.username,
-        address: this.props.address,
-        password: this.props.password,
+        contract: this.props.filename.substring(0, this.props.filename.indexOf('.')),
+        username: values.username,
+        address: values.address,
+        password: values.password,
         fileText: this.props.contract,
-        arguments: inputs,
-      }
+        arguments: args,
+      };
+
+      console.log(payload);
+
       mixpanelWrapper.track('create_contract_submit_click_successful');
       this.props.createContract(payload);
+      this.props.reset();
     } else {
       mixpanelWrapper.track('create_contract_submit_click_failure');
     }
@@ -79,7 +122,7 @@ class CreateContract extends Component {
   }
 
   render() {
-
+    const {handleSubmit, pristine, submitting} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
 
     const userAddresses = this.props.accounts && this.props.username ?
@@ -90,196 +133,237 @@ class CreateContract extends Component {
 
     let args = src === undefined ?
       <tr>
-        <td colSpan={3} className="text-center">
-          <i> Upload contract source file to see args </i>
+        <td colSpan={3}>
+          <div className="text-center">Upload Contract</div>
         </td>
       </tr> :
 
-        // eslint-disable-next-line
-        (Object.values(src).map(val => {
-          if (val.constr !== undefined) {
-            return Object.getOwnPropertyNames(val.constr).map((arg,i) => {
-              return (
-                <tr key={'arg' + i}>
-                  <td>{arg}</td>
-                  <td>{val.constr[arg].type}</td>
-                  <td>
-                    <input id="input-b" className="pt-input"
-                      title="Enter value"
-                      onChange={(e) => {
-                        inputs[arg] = e.target.value;
-                      }}
-                      type="text"
-                      dir="auto"
-                    />
-                  </td>
-                </tr>
-              );
-            });
-          }
-        }));
-
-    // if(args[0] === undefined) {
-    //   args = [];
-    //   args.push(<tr key="argsNoArgs">
-    //     <td colSpan={3} className="text-center">
-    //       <i> Constructor has no arguments </i>
-    //     </td>
-    //   </tr>);
-    // }
+      // eslint-disable-next-line
+      (Object.values(src).map(val => {
+        if (val.constr !== undefined) {
+          return Object.getOwnPropertyNames(val.constr).map((arg, i) => {
+            return (
+              <tr key={'arg' + i}>
+                <td>{arg}</td>
+                <td>{val.constr[arg].type}</td>
+                <td>
+                  <Field
+                    id="input-b"
+                    className="pt-input"
+                    component="input"
+                    name={arg}
+                    title="Enter value"
+                    type="text"
+                    dir="auto"
+                  />
+                </td>
+              </tr>
+            );
+          });
+        }
+      }));
 
     return (
       <div className="smd-pad-16">
-        <Button onClick={()=>{mixpanelWrapper.track("create_contract_open_click"); this.props.contractOpenModal()}} className="pt-intent-primary pt-icon-add"
+        <Button onClick={() => {
+          mixpanelWrapper.track("create_contract_open_click");
+          this.props.contractOpenModal()
+        }} className="pt-intent-primary pt-icon-add"
                 text="Create Contract"/>
-        <Dialog
-          iconName="inbox"
-          isOpen={this.props.isOpen}
-          onClose={this.props.contractCloseModal}
-          title="Create New Contract"
-          className="pt-dark"
-        >
-          <div className="pt-dialog-body">
-
-            <div className="row">
-              <div className="col-sm-3 text-right">
-                <label className="pt-label smd-pad-4">
-                  Username
-                </label>
-              </div>
-              <div className="col-sm-9 smd-pad-4">
-                <div className="pt-select">
-                  <select onChange={this.handleUsernameChange}>
-                    <option />
-                    {
-                      users.map((user,i) => { return (
-                        <option key={'user' + i} value={user}>{user}</option>
-                      )})
-                    }
-                  </select>
+        <form>
+          <Dialog
+            iconName="inbox"
+            isOpen={this.props.isOpen}
+            onClose={this.props.contractCloseModal}
+            title="Create New Contract"
+            className="pt-dark"
+          >
+            <div className="pt-dialog-body">
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Username
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="username"
+                      onChange={this.handleUsernameChange}
+                      required
+                    >
+                      <option />
+                      {
+                        users.map((user, i) => {
+                          return (
+                            <option key={'user' + i} value={user}>{user}</option>
+                          )
+                        })
+                      }
+                    </Field>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-3 text-right">
-                <label className="pt-label smd-pad-4">
-                  Address
-                </label>
-              </div>
-              <div className="col-sm-9 smd-pad-4">
-                <div className="pt-select">
-                  <select onChange={this.handleAddressChange}>
-                    <option />
-                    {
-                      userAddresses ?
-                        userAddresses.map((address,i) => { return (
-                          <option key={address} value={address}>{address}</option>
-                        )})
-                        : ''
-                    }
-                  </select>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Address
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                      className="pt-input"
+                      component="select"
+                      name="address"
+                      required
+                    >
+                      <option />
+                      {
+                        userAddresses ?
+                          userAddresses.map((address, i) => {
+                            return (
+                              <option key={address} value={address}>{address}</option>
+                            )
+                          })
+                          : ''
+                      }
+                    </Field>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-3 text-right">
-                <label className="pt-label smd-pad-4">
-                  Password
-                </label>
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Password
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <Field
+                    id="input-b"
+                    className="form-width pt-input"
+                    placeholder="Password"
+                    name="password"
+                    type="password"
+                    component="input"
+                    dir="auto"
+                    title="Password"
+                    required
+                  />
+                </div>
               </div>
-              <div className="col-sm-9 smd-pad-4">
-                <input
-                  id="input-b"
-                  className={this.props.password === undefined ? "form-width pt-input pt-intent-danger" : "form-width pt-input"}
-                  placeholder="Password"
-                  onChange={this.handlePasswordChange}
-                  type="password"
-                  dir="auto"
-                  title="Password"
-                />
+              <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Source file
+                  </label>
+                </div>
+                <div className="col-sm-12 smd-pad-4">
+                  <Field
+                    id="input-b"
+                    className="form-width pt-input"
+                    name="contract"
+                    component={this.renderDropzoneInput}
+                    dir="auto"
+                    title="Contract Source"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-3 text-right">
-                <label className="pt-label smd-pad-4">
-                  Source file
-                </label>
+              <div className="row">
+                <div className="col-sm-12">
+                  <label className="pt-label">
+                    Compilation
+                  </label>
+                </div>
               </div>
-              <div className="col-sm-9 smd-pad-4">
-                <label className="pt-file-upload">
-                  <input type="file" onChange={this.handleFileUpload} />
-                  <span className="pt-file-upload-input">{this.props.filename}</span>
-                </label>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-12">
-                <label className="pt-label">
-                  Compilation
-                </label>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-12 smd-scrollable">
-                <table className="pt-table pt-condensed pt-striped smd-full-width">
-                  <thead>
+              <div className="row">
+                <div className="col-sm-12 smd-scrollable">
+                  <table className="pt-table pt-condensed pt-striped smd-full-width">
+                    <thead>
                     <tr>
                       <th>Arg</th>
                       <th>Type</th>
                       <th>Value</th>
                     </tr>
-                  </thead>
-                  <tbody>
+                    </thead>
+                    <tbody>
                     {args}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="pt-dialog-footer">
-            <div className="pt-dialog-footer-actions">
-              <Button text="Cancel" onClick={()=> {mixpanelWrapper.track("create_contract_cancel"); this.props.contractCloseModal()}}/>
-              <Button
-                className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
-                onClick={this.handleSubmit}
-                text="Create Contract"
-              />
+            <div className="pt-dialog-footer">
+              <div className="pt-dialog-footer-actions">
+                <Button text="Cancel" onClick={() => {
+                  mixpanelWrapper.track("create_contract_cancel");
+                  this.props.contractCloseModal()
+                }}/>
+                <Button
+                  className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
+                  onClick={handleSubmit(this.submit)}
+                  disabled={pristine || submitting}
+                  text="Create Contract"
+                />
 
+              </div>
             </div>
-          </div>
-        </Dialog>
+          </Dialog>
+        </form>
       </div>
     );
   }
 }
 
+const validate = (values) => {
+  const errors = {};
+
+  // const abi = CreateContract.props.abi.src;
+  //
+  // Object.values(abi).forEach(val => {
+  //   if (val.constr !== undefined) {
+  //     return Object.getOwnPropertyNames(val.constr).map((arg) => {
+  //       if (values[arg] === undefined)
+  //         errors[arg] = arg + " Required";
+  //     })
+  //   }
+  // });
+
+  Object.getOwnPropertyNames(values).forEach((val) => {
+    if (values[val] === '' || values[val] === undefined) {
+      errors[val] = val + " Required";
+    }
+  });
+  console.log(errors);
+  return errors
+};
+
 function mapStateToProps(state) {
   return {
     isOpen: state.createContract.isOpen,
-    spinning: state.createContract.compileSuccess,
     response: state.createContract.response,
-    address: state.createContract.address,
-    compileSuccess: state.createContract.compileSuccess,
     abi: state.createContract.abi,
     createDisabled: state.createContract.createDisabled,
     filename: state.createContract.filename,
-    username: state.createContract.username,
-    password: state.createContract.password,
     contract: state.createContract.contract,
     accounts: state.accounts.accounts,
+    username: state.createContract.username
   };
 }
 
-export default withRouter(connect(mapStateToProps, {
+const formed = reduxForm({form: 'create-contract', validate})(CreateContract);
+const connected = connect(mapStateToProps, {
   contractOpenModal,
   contractCloseModal,
   createContract,
   compileContract,
-  usernameFormChange,
-  passwordFormChange,
   contractFormChange,
-  addressFormChange,
   fetchContracts,
-  fetchAccounts
-})(CreateContract));
+  fetchAccounts,
+  usernameChange
+})(formed);
+
+export default withRouter(connected);

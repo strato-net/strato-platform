@@ -78,7 +78,12 @@ class Dashboard extends Component {
     blockData.forEach(function (val) {
       val.forEach(v => { types[v.transactionType]++ });
     })
-    return [ {val: types["FunctionCall"]}, {val: types["Transfer"]}, {val: types["Contract"]} ];
+    return Object.getOwnPropertyNames(types).map((type)=>{
+      return {
+        val: types[type],
+        type: type
+      }
+    });
   }
 
   render() {
