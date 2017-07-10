@@ -23,7 +23,6 @@ import blockDataReducer from './components/BlockData/block-data.reducer'
 import createUserReducer from './components/CreateUser/createUser.reducer';
 import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
-import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
@@ -60,7 +59,7 @@ const rootReducer = combineReducers({
   accounts: accountsReducer,
   blockData: blockDataReducer,
   contracts: contractsReducer,
-  contractQuery: contractQueryReducer
+  contractQuery: contractQueryReducer,
   createContract: createContractReducer,
   createUser: createUserReducer,
   methodCall: methodCallReducer,
