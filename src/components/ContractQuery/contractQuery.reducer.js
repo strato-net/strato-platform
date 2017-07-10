@@ -3,7 +3,8 @@ import {
   QUERY_CIRRUS_SUCCESS,
   QUERY_CIRRUS_FAILURE,
   QUERY_CIRRUS_VARS_SUCCESS,
-  ADD_QUERY_FILTER
+  ADD_QUERY_FILTER,
+  REMOVE_QUERY_FILTER
 } from './contractQuery.actions';
 
 const initialState = {
@@ -47,17 +48,33 @@ const reducer = function(state = initialState, action) {
         vars: action.vars
       }
     case ADD_QUERY_FILTER:
-      const tags = state.tags;
-      tags.push(getTag({
-          field: action.field,
-          operator: action.operator,
-          value: action.value
-        })
-      );
+      const aTags = [
+        ...state.tags,
+        getTag({
+            field: action.field,
+            operator: action.operator,
+            value: action.value
+          })
+      ];
       return {
         ...state,
-        tags: tags,
-        queryString: tags.reduce((queryString,tag) => {
+        tags: aTags,
+        queryString: aTags.reduce((queryString,tag) => {
+          let qs = queryString;
+          if(qs !== '')
+            qs += '&';
+          qs += tag.field + '=' + tag.operator + '.' + tag.value;
+          return qs;
+        },'')
+      }
+    case REMOVE_QUERY_FILTER:
+      const rTags = state.tags.filter((tag,i) => {
+        return i !== action.index;
+      });
+      return {
+        ...state,
+        tags: rTags,
+        queryString: rTags.reduce((queryString,tag) => {
           let qs = queryString;
           if(qs !== '')
             qs += '&';

@@ -43,6 +43,9 @@ function getCirrusInstances(contractName){
       },
     })
     .then(function(response) {
+      if(response.status === 404) {
+        throw new Error('No dice!')
+      }
       return response.json()
     })
     .catch(function(error) {

@@ -1,17 +1,17 @@
 import React, { Component } from 'react';
 import {withRouter} from 'react-router-dom';
 import {connect} from 'react-redux';
-import {Table, Column, Cell} from '@blueprintjs/table';
+import {Table, Column, Cell, JSONFormat, TruncatedFormat} from '@blueprintjs/table';
 import {
   clearQueryString,
   queryCirrusVars,
-  addQueryFilter
+  addQueryFilter,
+  removeQueryFilter,
+  queryCirrus
 } from './contractQuery.actions.js';
 import { env } from '../../env.js';
-
-// TODO: handle enter key
-// TODO: remove tags
-// TODO: render query results on screen
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { Button } from '@blueprintjs/core';
 
 class ContractQuery extends Component {
   constructor(props) {
@@ -27,15 +27,19 @@ class ContractQuery extends Component {
     this.handleOperatorChange = this.handleOperatorChange.bind(this);
     this.handleAddTag = this.handleAddTag.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
+    this.handleRemoveTag = this.handleRemoveTag.bind(this);
   }
 
   handleKeyUp(event) {
-    if(event.key == 'Enter') {
+    if(event.key === 'Enter'
+      && this.state.value !== ''
+      && this.state.field !== 'Select field') {
       this.handleAddTag();
     }
   }
 
   handleFieldChange(event) {
+    mixpanelWrapper.track('contract_query_field_change');
     this.setState({
       ...this.state,
       field: event.target.value
@@ -43,6 +47,7 @@ class ContractQuery extends Component {
   }
 
   handleOperatorChange(event) {
+    mixpanelWrapper.track('contract_query_operator_change');
     this.setState({
       ...this.state,
       operator: event.target.value
@@ -57,6 +62,7 @@ class ContractQuery extends Component {
   }
 
   handleAddTag() {
+    mixpanelWrapper.track('contract_query_add_tag_click');
     this.props.addQueryFilter(this.state.field, this.state.operator, this.state.value);
     this.setState({
       field: 'Select field',
@@ -65,17 +71,49 @@ class ContractQuery extends Component {
     });
   }
 
+  handleRemoveTag(i) {
+    mixpanelWrapper.track('contract_query_remove_tag_click');
+    this.props.removeQueryFilter(i);
+  }
+
+  componentDidMount() {
+    mixpanelWrapper.track('contract_query_load');
+    this.props.queryCirrus(this.props.match.params.name, this.props.contractQuery.queryString);
+  }
+
   componentWillMount() {
     this.props.clearQueryString();
     this.props.queryCirrusVars(this.props.match.params.name);
   }
 
-  render() {
-    const name = this.props.match.params.name;
-    const renderCell = (rowIndex: number) => <Cell>{`$${(rowIndex * 10).toFixed(2)}`}</Cell>;
+  componentWillReceiveProps(nextProps) {
+    if(this.props.contractQuery.queryString !== nextProps.contractQuery.queryString) {
+      this.props.queryCirrus(nextProps.match.params.name, nextProps.contractQuery.queryString);
+    }
+  }
 
-    const selectFields = this.props.contractQuery.vars ?
-      Object
+  render() {
+    const self = this;
+    const name = this.props.match.params.name;
+
+    let selectFields = null;
+    let columns = [
+      <Column
+        key="column-address"
+        name="address"
+        renderCell={
+          (row) =>
+            <Cell>
+              <TruncatedFormat>
+                {self.props.contractQuery.queryResults[row].address}
+              </TruncatedFormat>
+            </Cell>
+        }
+      />
+    ];
+
+    if(this.props.contractQuery.vars) {
+      selectFields = Object
         .getOwnPropertyNames(this.props.contractQuery.vars)
         .filter((propertyName) => {
           return this.props.contractQuery.vars[propertyName].type !== 'Mapping'
@@ -83,14 +121,46 @@ class ContractQuery extends Component {
         })
         .map((propertyName) => {
           return (<option key={name + '-field-' + propertyName} value={propertyName}>{propertyName}</option>);
-        })
-      : null;
+        });
+      columns = columns.concat(
+        Object
+          .getOwnPropertyNames(this.props.contractQuery.vars)
+          .filter((propertyName) => {
+            return this.props.contractQuery.vars[propertyName].type !== 'Mapping'
+          })
+          .map((propertyName) => {
+            return (
+              <Column
+                key={'column-'+propertyName}
+                name={propertyName}
+                renderCell={
+                  (row) =>
+                    <Cell>
+                      {
+                        self.props.contractQuery.vars[propertyName].type === 'Mapping' ||
+                        self.props.contractQuery.vars[propertyName].type === 'Array' ||
+                        self.props.contractQuery.vars[propertyName].type === 'Struct' ?
+                          <JSONFormat>
+                            {self.props.contractQuery.queryResults[row][propertyName]}
+                          </JSONFormat>
+                          :
+                          <TruncatedFormat>
+                            {self.props.contractQuery.queryResults[row][propertyName]}
+                          </TruncatedFormat>
+                      }
+                    </Cell>
+                }
+              />
+          );
+          })
+        );
+    }
 
     const tags = this.props.contractQuery.tags.map((tag, i) => {
       return (
         <span key={'tag-' + tag.field + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
           {tag.field + ' ' + tag.operator + ' ' + tag.value}
-          <button className="pt-tag-remove" />
+          <button className="pt-tag-remove" onClick={ (e) => { self.handleRemoveTag(i); } } />
         </span>
       )
     })
@@ -100,8 +170,20 @@ class ContractQuery extends Component {
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-6">
             <h3>Query {name}</h3>
+          </div>
+          <div className="col-sm-6 smd-pad-16 text-right">
+            <Button
+              onClick={
+                (e) => {
+                  mixpanelWrapper.track('contract_query_go_back_click');
+                  this.props.history.goBack();
+                }
+              }
+              className="pt-icon-arrow-left"
+              text="Back"
+            />
           </div>
         </div>
         <div className="row">
@@ -172,8 +254,9 @@ class ContractQuery extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
-            <Table numRows={10}>
-              <Column name="Dollars" renderCell={renderCell}/>
+            <Table numRows={this.props.contractQuery.queryResults ?
+                this.props.contractQuery.queryResults.length : 0}>
+              {columns}
             </Table>
           </div>
         </div>
@@ -194,7 +277,9 @@ export default withRouter(
     {
       clearQueryString,
       queryCirrusVars,
-      addQueryFilter
+      addQueryFilter,
+      removeQueryFilter,
+      queryCirrus
     }
   )(ContractQuery)
 );

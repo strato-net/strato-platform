@@ -65,3 +65,10 @@ export const addQueryFilter = function(field,operator,value) {
     value
   }
 }
+
+export const removeQueryFilter = function(tagIndex) {
+  return {
+    type: REMOVE_QUERY_FILTER,
+    index: tagIndex
+  }
+}

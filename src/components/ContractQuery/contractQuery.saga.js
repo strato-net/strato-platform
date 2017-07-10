@@ -13,12 +13,12 @@ import {
 } from './contractQuery.actions';
 import { env } from '../../env.js'
 
-const cirrusUrl = env.CIRRUS_URL + '/:contractName';
+const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString';
 const contractUrl = env.BLOC_URL + '/contracts/:contractName/Latest';
 
 function queryCirrusRequest(name, queryString) {
   return fetch(
-    cirrusUrl.replace(":contractName", name) + queryString,
+    cirrusUrl.replace(":contractName", name).replace(':queryString',queryString),
     {
       method: 'GET',
       headers: {
