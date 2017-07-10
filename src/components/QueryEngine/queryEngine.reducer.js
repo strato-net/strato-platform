@@ -33,9 +33,13 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case REMOVE_QUERY:
-      delete state.query[action.queryType];
+      const newQuery = {}
+      Object.getOwnPropertyNames(state.query).forEach((queryType) => {
+        if (queryType !== action.queryType)
+          newQuery[queryType] = state.query[queryType];
+      });
       return {
-        query: state.query,
+        query: newQuery,
         queryResult: state.queryResult,
         error: null,
       };

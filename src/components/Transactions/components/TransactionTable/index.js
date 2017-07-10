@@ -21,11 +21,13 @@ class TransactionTable extends Component {
   }
 
   refresh = () => {
+    this.props.clearQuery();
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
   };
 
   render() {
     const history = this.props.history;
+    console.log("RENDER ");
 
     function handleClick(hash) {
       mixpanelWrapper.track('transactions_row_click');
@@ -125,7 +127,7 @@ class TransactionTable extends Component {
         <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
       {queryType + ': ' + queryValue}
           <button onClick={() => {
-            self.props.removeQuery(queryType)
+            self.props.removeQuery(queryType);
           }} className="pt-tag-remove"/>
     </span>
       )
