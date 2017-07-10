@@ -4,7 +4,30 @@ export const REMOVE_QUERY_FILTER = 'REMOVE_QUERY_FILTER';
 export const QUERY_CIRRUS = 'QUERY_CIRRUS';
 export const QUERY_CIRRUS_SUCCESS = 'QUERY_CIRRUS_SUCCESS';
 export const QUERY_CIRRUS_FAILURE = 'QUERY_CIRRUS_FAILURE';
+export const QUERY_CIRRUS_VARS = 'QUERY_CIRRUS_VARS';
+export const QUERY_CIRRUS_VARS_SUCCESS = 'QUERY_CIRRUS_VARS_SUCCESS';
+export const QUERY_CIRRUS_VARS_FAILURE = 'QUERY_CIRRUS_VARS_FAILURE';
 
+export const queryCirrusVars = function(contractName) {
+  return {
+    type: QUERY_CIRRUS_VARS,
+    contractName
+  }
+}
+
+export const queryCirrusVarsSuccess = function(vars) {
+  return {
+    type: QUERY_CIRRUS_VARS_SUCCESS,
+    vars: vars
+  }
+}
+
+export const queryCirrusVarsFailure = function(error) {
+  return {
+    type: QUERY_CIRRUS_VARS_FAILURE,
+    error: error
+  }
+}
 
 export const clearQueryString = function() {
   return {
@@ -31,5 +54,14 @@ export const queryCirrusFailure = function(error) {
   return {
     type: QUERY_CIRRUS_FAILURE,
     error: error,
+  }
+}
+
+export const addQueryFilter = function(field,operator,value) {
+  return {
+    type: ADD_QUERY_FILTER,
+    field,
+    operator,
+    value
   }
 }

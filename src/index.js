@@ -43,7 +43,10 @@ import {
   watchMethodCall,
   watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
-import watchQueryCirrus from './components/ContractQuery/contractQuery.saga';
+import {
+  watchQueryCirrus,
+  watchQueryCirrusVars
+} from './components/ContractQuery/contractQuery.saga';
 
 const rootReducer = combineReducers({
   form: formReducer,
@@ -75,7 +78,8 @@ const rootSaga = function* startForeman() {
         fork(watchFetchArgs),
         fork(watchMethodCall),
         fork(watchFetchCirrusContracts),
-        fork(watchQueryCirrus)
+        fork(watchQueryCirrus),
+        fork(watchQueryCirrusVars)
     ]
 };
 
