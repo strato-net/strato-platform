@@ -25,7 +25,7 @@ function query(query, resourceType) {
       constructedURL += part + '=' + query[part];
     });
   if (queryParts.length === 1 && queryParts.indexOf(TRANSACTION_QUERY_TYPES.last.key) > -1) {
-    constructedURL += "/last/" + query.last;
+    constructedURL += '/last/' + query.last;
   }
   console.log("QUERY URL", constructedURL);
   return fetch(

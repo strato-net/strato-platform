@@ -3,7 +3,7 @@ import {connect} from 'react-redux';
 import {Field, reduxForm} from 'redux-form';
 import {TRANSACTION_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
-import { queryTypeFieldChange, queryValueFieldChange } from './transactionTable.actions';
+import {queryTypeFieldChange, queryValueFieldChange} from './transactionTable.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
@@ -78,66 +78,72 @@ class TransactionTable extends Component {
     const self = this;
     const queryForm =
       <div className="row smd-pad-4">
-        <form>
-          <div className="col-sm-5 pt-select">
-            <Field
-              className="field"
-              type="select"
-              component="select"
-              placeholder="Query Type"
-              name={"query"}
-              onChange={(e) => {self.props.queryTypeFieldChange(e.target.value);}}
-              required
-            >
-              <option key="Query Type">Query Type</option>
-              {
-                Object.getOwnPropertyNames(queryTypes).map(function (name) {
-                  return <option key={name} value={queryTypes[name].key}>{queryTypes[name].displayName}</option>
-                })
-              }
-            </Field>
-          </div>
-          <div className="col-sm-5">
-            <Field
-              className="pt-input text-left field"
-              type="text"
-              component="input"
-              name={"value"}
-              placeholder="Query Term"
-              onChange={(e) => {self.props.queryValueFieldChange(e.target.value);}}
-              dir="auto"/>
-          </div>
-          <div className="col-sm-2 text-right">
+        <div className="col-sm-12">
+          <div className="pt-control-group smd-full-width">
+            <div className="pt-select">
+              <Field
+                type="select"
+                component="select"
+                placeholder="Query Type"
+                name={"query"}
+                onChange={(e) => {
+                  self.props.queryTypeFieldChange(e.target.value);
+                }}
+                required
+              >
+                <option key="Query Type">Query Type</option>
+                {
+                  Object.getOwnPropertyNames(queryTypes).map(function (name) {
+                    return <option key={name} value={queryTypes[name].key}>{queryTypes[name].displayName}</option>
+                  })
+                }
+              </Field>
+            </div>
+            <div className="input-width">
+              <Field
+                type="text"
+                className="pt-input pt-fill"
+                component="input"
+                name={"value"}
+                placeholder="Query Term"
+                onChange={(e) => {
+                  self.props.queryValueFieldChange(e.target.value);
+                }}
+                dir="auto"/>
+            </div>
             <Button onClick={() => {
               this.props.updateQuery(self.props.queryFields.queryType, self.props.queryFields.queryValue);
-            }} className="pt-intent-primary pt-icon-add fieldButton"/>
+            }} className="pt-button pt-intent-primary pt-icon-arrow-right"/>
           </div>
-        </form>
+        </div>
       </div>
 
-    const q = Object.getOwnPropertyNames(self.props.query).map(function(queryType, i) {
-      return <div className="row smd-pad-4" key={i}>
-        <div className="col-sm-5">{TRANSACTION_QUERY_TYPES[queryType].displayName}</div>
-        <div className="col-sm-5">{self.props.query[queryType]}</div>
-        <div className="col-sm-2"><Button onClick={() => {self.props.removeQuery(queryType)}} className="pt-intent-danger pt-icon-remove"/></div>
-      </div>
+    const query = this.props.query;
+    const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
+      const queryValue = query[queryType];
+      return (
+        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
+      {queryType + ': ' + queryValue}
+          <button onClick={() => {
+            self.props.removeQuery(queryType)
+          }} className="pt-tag-remove"/>
+    </span>
+      )
     });
 
     const queries =
       <div>
         {queryForm}
         <div className="row smd-pad-4">
-          <div className="col-sm-5 text-left">
-            <h4>Query</h4>
-          </div>
-          <div className="col-sm-5 text-left">
-            <h4>Keyword</h4>
+          <div className="col-sm-12">
+            {tags}
           </div>
         </div>
-        {q}
         <div className="row smd-pad-4">
           <div className="col-sm-12 text-right">
-            <Button text="Submit Query" onClick={() => {this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);}} className="pt-intent-primary pt-icon-send-to fieldButton"/></div>
+            <Button text="Submit Query" onClick={() => {
+              this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
+            }} className="pt-intent-primary pt-icon-confirm fieldButton"/></div>
         </div>
       </div>
 
@@ -194,5 +200,12 @@ function mapStateToProps(state) {
   };
 }
 const formed = reduxForm({form: 'transaction-query'})(TransactionTable);
-const connected = connect(mapStateToProps, {updateQuery, removeQuery, executeQuery, clearQuery, queryTypeFieldChange, queryValueFieldChange})(formed);
+const connected = connect(mapStateToProps, {
+  updateQuery,
+  removeQuery,
+  executeQuery,
+  clearQuery,
+  queryTypeFieldChange,
+  queryValueFieldChange
+})(formed);
 export default withRouter(connected);
