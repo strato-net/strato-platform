@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedLists            #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeOperators              #-}
 
 module BlockApps.Bloc21.API.Users where
@@ -487,8 +488,32 @@ data PostUsersContractMethodListResponse
 instance Arbitrary PostUsersContractMethodListResponse where
   arbitrary = genericArbitrary uniform
 
-instance ToJSON PostUsersContractMethodListResponse
-instance FromJSON PostUsersContractMethodListResponse
+instance ToJSON PostUsersContractMethodListResponse where
+  toJSON mlr = case mlr of
+    MethodHash kc     -> object [ "tag" .= ("MethodHash" :: Text)
+                                , "contents" .= (kc::Keccak256)
+                                ]
+    MethodResolved (Left err) -> object [ "tag" .= ("MethodResolved":: Text)
+                                        , "contents" .= (err::MethodErrored)
+                                        , "status" .= ("failed"::Text)
+                                        ]
+    MethodResolved (Right solVals) -> object [ "tag" .= ("MethodResolved":: Text)
+                                             , "contents" .= (solVals::[SolidityValue])
+                                             , "status" .= ("success"::Text)
+                                             ]
+
+instance FromJSON PostUsersContractMethodListResponse where
+  parseJSON = withObject "PostUsersContractMethodListResponse" $ \v -> do
+    tag <- v .: "tag"
+    case tag of
+      ("MethodResolved"::String) -> do
+        status <- v .: "status"
+        case status of
+          ("success"::String) -> MethodResolved <$> (Right <$> v .: "contents")
+          ("fail"::String)    -> MethodResolved <$> (Left <$> v .: "contents")
+          _ -> fail "failed to parseJSON on key `status` of PostUsersContractMethodListResponse"
+      _                          -> MethodHash <$> v .: "contents"
+
 
 instance ToSample PostUsersContractMethodListResponse where
   toSamples _ = samples
