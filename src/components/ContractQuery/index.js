@@ -26,6 +26,13 @@ class ContractQuery extends Component {
     this.handleValueChange = this.handleValueChange.bind(this);
     this.handleOperatorChange = this.handleOperatorChange.bind(this);
     this.handleAddTag = this.handleAddTag.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
+  }
+
+  handleKeyUp(event) {
+    if(event.key == 'Enter') {
+      this.handleAddTag();
+    }
   }
 
   handleFieldChange(event) {
@@ -51,6 +58,11 @@ class ContractQuery extends Component {
 
   handleAddTag() {
     this.props.addQueryFilter(this.state.field, this.state.operator, this.state.value);
+    this.setState({
+      field: 'Select field',
+      operator: 'eq',
+      value: ''
+    });
   }
 
   componentWillMount() {
@@ -76,7 +88,7 @@ class ContractQuery extends Component {
 
     const tags = this.props.contractQuery.tags.map((tag, i) => {
       return (
-        <span key={'tag-' + tag.field + '-' + i } className="pt-tag pt-tag-removable">
+        <span key={'tag-' + tag.field + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
           {tag.field + ' ' + tag.operator + ' ' + tag.value}
           <button className="pt-tag-remove" />
         </span>
@@ -125,8 +137,9 @@ class ContractQuery extends Component {
                 type="text"
                 className="pt-input"
                 placeholder="Enter query value"
-                value={this.state.queryValue}
+                value={this.state.value}
                 onChange={this.handleValueChange}
+                onKeyUp={this.handleKeyUp}
                 style={
                   {
                     width: '80%'
