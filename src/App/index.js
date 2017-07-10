@@ -6,7 +6,8 @@ import mixpanelWrapper from '../lib/mixpanelWrapper';
 import './App.css';
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
-import 'bootstrap/dist/css/bootstrap.css'
+import '@blueprintjs/table/dist/table.css';
+import 'bootstrap/dist/css/bootstrap.css';
 import { env } from '../env';
 
 mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
