@@ -1,9 +1,16 @@
-export const ADD_QUERY = 'ADD_QUERY';
+export const QUERY_TYPE_FIELD_CHANGE = "QUERY_TYPE_FIELD_CHANGE";
+export const QUERY_VALUE_FIELD_CHANGE = "QUERY_VALUE_FIELD_CHANGE";
 
-export const addQuery = function (queryType, queryTerm) {
+export const queryTypeFieldChange = function(queryType) {
   return {
-    type: ADD_QUERY,
-    queryType: queryType,
-    queryTerm: queryTerm
+    type: QUERY_TYPE_FIELD_CHANGE,
+    queryType: queryType
+  }
+};
+
+export const queryValueFieldChange = function(queryValue) {
+  return {
+    type: QUERY_VALUE_FIELD_CHANGE,
+    queryValue: queryValue
   }
 };

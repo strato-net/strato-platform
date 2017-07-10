@@ -84,7 +84,7 @@ function mapStateToProps(state, ownProps) {
   const hash = ownProps.match.params.hash;
 
   return {
-    tx: state.transactions.tx.filter((val) => {return val.hash === hash})[0],
+    tx: state.queryEngine.queryResult.filter((val) => {return val.hash === hash})[0],
   };
 }
 
