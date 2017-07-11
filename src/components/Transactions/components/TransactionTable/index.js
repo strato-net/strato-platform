@@ -121,14 +121,12 @@ class TransactionTable extends Component {
                     (e) => {
                       if (e.key === 'Enter') {
                         this.dispatchSubmit();
+                        mixpanelWrapper.track('transactions_query_submit');
                       }
                     }
                   }
                   dir="auto"/>
               </div>
-              <Button type="submit" onClick={() => {
-                handleSubmit(this.updateQuery);
-              }} className="pt-button pt-intent-primary pt-icon-arrow-right"/>
             </div>
           </form>
         </div>
@@ -143,6 +141,7 @@ class TransactionTable extends Component {
                   {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
+            mixpanelWrapper.track('transactions_query_remove_tag');
           }} className="pt-tag-remove"/>
                   </span>
       )
@@ -160,6 +159,7 @@ class TransactionTable extends Component {
           <div className="col-sm-12 text-right">
             <Button text="Submit Query" onClick={() => {
               this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
+              mixpanelWrapper.track('transactions_query_submit');
             }} className="pt-intent-primary pt-icon-confirm fieldButton"/></div>
         </div>
       </div>
