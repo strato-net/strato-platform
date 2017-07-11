@@ -27,7 +27,6 @@ import contractQueryReducer from './components/ContractQuery/contractQuery.reduc
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import transactionsReducer from './components/TransactionList/transactionList.reducer';
-import transactionTableReducer from './components/Transactions/components/TransactionTable/transactionTable.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -65,7 +64,6 @@ const rootReducer = combineReducers({
   methodCall: methodCallReducer,
   nodes: nodeCardReducer,
   transactions: transactionsReducer,
-  transactionTable: transactionTableReducer,
   queryEngine: queryEngineReducer,
 });
 

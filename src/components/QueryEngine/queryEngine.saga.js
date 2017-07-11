@@ -27,7 +27,6 @@ function query(query, resourceType) {
   if (queryParts.length === 1 && queryParts.indexOf(TRANSACTION_QUERY_TYPES.last.key) > -1) {
     constructedURL += '/last/' + query.last;
   }
-  console.log("QUERY URL", constructedURL);
   return fetch(
     constructedURL,
     {
@@ -49,12 +48,10 @@ function query(query, resourceType) {
 
 function* executeQuery(action) {
   try {
-    console.log('EXECUTING QUERY', action);
     let response = yield call(query, action.query, action.resourceType);
     yield put(executeQuerySuccess(response));
   }
   catch (err) {
-    console.log('CHANNEL ERROR HERE', err);
     yield put(executeQueryFailure(err));
   }
 }

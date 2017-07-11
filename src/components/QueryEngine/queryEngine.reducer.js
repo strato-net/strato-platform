@@ -1,13 +1,10 @@
 import {
   EXECUTE_QUERY_FAILURE,
   EXECUTE_QUERY_SUCCESS,
-  EXECUTE_QUERY,
   REMOVE_QUERY,
   UPDATE_QUERY,
   CLEAR_QUERY
 } from './queryEngine.actions';
-
-import {TRANSACTION_QUERY_TYPES} from './queryTypes';
 
 const initialState = {
   query: {last: 15},
