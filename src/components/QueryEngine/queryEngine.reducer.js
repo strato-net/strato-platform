@@ -6,6 +6,8 @@ import {
   CLEAR_QUERY
 } from './queryEngine.actions';
 
+import {TRANSACTION_QUERY_TYPES} from './queryTypes';
+
 const initialState = {
   query: {last: 15},
   queryResult: [],
@@ -15,6 +17,9 @@ const initialState = {
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case UPDATE_QUERY:
+      if (action.queryType === TRANSACTION_QUERY_TYPES.default.key) {
+        return state;
+      }
       return {
         query: {
           ...state.query,

@@ -1,4 +1,8 @@
 export const TRANSACTION_QUERY_TYPES = {
+  default: {
+    key: 'default',
+    displayName: 'Query Type'
+  },
   blocknumber : {
     key: 'blocknumber',
     displayName : 'Block Number'

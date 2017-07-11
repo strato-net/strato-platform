@@ -103,7 +103,6 @@ class TransactionTable extends Component {
                   name="query"
                   required
                 >
-                  <option key="Query Type" value={'default'}>Query Type</option>
                   {
                     Object.getOwnPropertyNames(queryTypes).map(function (name) {
                       return <option key={name} value={queryTypes[name].key}>{queryTypes[name].displayName}</option>
