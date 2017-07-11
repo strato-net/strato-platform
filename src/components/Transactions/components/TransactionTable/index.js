@@ -1,39 +1,53 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
-import {fetchTx} from '../../../TransactionList/transactionList.actions';
+import {Field, reduxForm, reset, submit} from 'redux-form';
+import {TRANSACTION_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
+import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
-import {Text, Position, Tooltip} from '@blueprintjs/core';
-import { env } from '../../../../env';
+import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import './TransactionTable.css';
 
 class TransactionTable extends Component {
 
   componentDidMount() {
-    this.props.fetchTx(15);
-    this.startPoll();
+    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
   }
 
-  componentWillUnmount() {
-    clearTimeout(this.timeout)
+  componentWillMount() {
+    this.props.clearQuery();
   }
 
-  startPoll() {
-    const fetchTx = this.props.fetchTx;
-    this.timeout = setInterval(function () {
-      fetchTx();
-    }, env.POLLING_FREQUENCY);
+  componentWillReceiveProps(newProps) {
+    if (newProps.query !== this.props.query)
+      newProps.executeQuery(RESOURCE_TYPES.transaction, newProps.query);
   }
+
+  updateQuery = (values) => {
+    this.props.updateQuery(values.query, values.value);
+    this.props.dispatch(reset('transaction-query'));
+  }
+
+  dispatchSubmit = () => {
+    this.props.dispatch(submit('transaction-query'));
+  }
+
+  refresh = () => {
+    this.props.clearQuery();
+    this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
+  };
 
   render() {
     const history = this.props.history;
+    const {handleSubmit} = this.props;
 
     function handleClick(hash) {
       mixpanelWrapper.track('transactions_row_click');
       history.push('/transactions/' + hash);
     }
 
-    let txRows = this.props.tx.map(
+    let txRows = this.props.queryResults.map(
       function (tx, i) {
         return (
           <tr key={i} onClick={() => {
@@ -75,8 +89,95 @@ class TransactionTable extends Component {
       }
     );
 
+    const queryTypes = TRANSACTION_QUERY_TYPES;
+    const queryForm =
+      <div className="row smd-pad-4">
+        <div className="col-sm-12">
+          <form onSubmit={handleSubmit(this.updateQuery)}>
+            <div className="pt-control-group smd-full-width">
+              <div className="pt-select">
+                <Field
+                  type="select"
+                  component="select"
+                  placeholder="Query Type"
+                  name="query"
+                  required
+                >
+                  {
+                    Object.getOwnPropertyNames(queryTypes).map(function (name) {
+                      return <option key={name} value={queryTypes[name].key}>{queryTypes[name].displayName}</option>
+                    })
+                  }
+                </Field>
+              </div>
+              <div className="input-width">
+                <Field
+                  type="text"
+                  className="pt-input pt-fill"
+                  component="input"
+                  name="value"
+                  placeholder="Query Term"
+                  onKeyPress={
+                    (e) => {
+                      if (e.key === 'Enter') {
+                        this.dispatchSubmit();
+                        mixpanelWrapper.track('transactions_query_submit');
+                      }
+                    }
+                  }
+                  dir="auto"/>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    const query = this.props.query;
+    const removeQuery = this.props.removeQuery;
+    const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
+      const queryValue = query[queryType];
+      return (
+        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
+                  {queryType + ': ' + queryValue}
+          <button onClick={() => {
+            removeQuery(queryType);
+            mixpanelWrapper.track('transactions_query_remove_tag');
+          }} className="pt-tag-remove"/>
+                  </span>
+      )
+    });
+
+    const queries =
+      <div>
+        {queryForm}
+        <div className="row smd-pad-4">
+          <div className="col-sm-12">
+            {tags}
+          </div>
+        </div>
+        <div className="row smd-pad-4">
+          <div className="col-sm-12 text-right">
+            <Button text="Submit Query" onClick={() => {
+              this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
+              mixpanelWrapper.track('transactions_query_submit');
+            }} className="pt-intent-primary pt-icon-confirm fieldButton"/></div>
+        </div>
+      </div>
+
+
     return (
       <div className="pt-card pt-dark pt-elevation-2">
+        <div className="row smd-pad-4">
+          <div className="col-sm-11 text-left">
+            <span className="h3">Query Builder</span>
+          </div>
+          <div className="col-sm-1 text-right">
+            <Button onClick={this.refresh} className="pt-intent-primary pt-icon-refresh"/>
+          </div>
+        </div>
+
+        {queries}
+
         <div className="row">
           <div className="col-sm-12">
             <table className="pt-table pt-interactive pt-condensed pt-striped"
@@ -92,20 +193,30 @@ class TransactionTable extends Component {
               </thead>
 
               <tbody>
-              {txRows.length === 0 ? <tr><td colSpan={5}>No Data</td></tr> : txRows}
+              {txRows.length === 0 ? <tr>
+                <td colSpan={5}>No Data</td>
+              </tr> : txRows}
               </tbody>
             </table>
           </div>
         </div>
       </div>
     );
+
   }
 }
 
 function mapStateToProps(state) {
   return {
-    tx: state.transactions.tx
+    query: state.queryEngine.query,
+    queryResults: state.queryEngine.queryResult,
   };
 }
-
-export default withRouter(connect(mapStateToProps, {fetchTx})(TransactionTable));
+const formed = reduxForm({form: 'transaction-query'})(TransactionTable);
+const connected = connect(mapStateToProps, {
+  updateQuery,
+  removeQuery,
+  executeQuery,
+  clearQuery,
+})(formed);
+export default withRouter(connected);

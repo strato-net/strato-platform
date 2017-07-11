@@ -18,15 +18,17 @@ import {reducer as formReducer} from 'redux-form';
 import App from "./App/";
 
 
-import blockDataReducer from './components/BlockData/block-data.reducer'
-import transactionsReducer from './components/TransactionList/transactionList.reducer'
-import createUserReducer from './components/CreateUser/createUser.reducer'
-import createContractReducer from './components/CreateContract/createContract.reducer'
 import accountsReducer from './components/Accounts/accounts.reducer';
+import blockDataReducer from './components/BlockData/block-data.reducer'
+import createUserReducer from './components/CreateUser/createUser.reducer';
+import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
-import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
+import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
+import transactionsReducer from './components/TransactionList/transactionList.reducer';
+import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
+
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
@@ -43,6 +45,7 @@ import {
   watchMethodCall,
   watchFetchArgs
 } from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
+import watchExecuteQuery from './components/QueryEngine/queryEngine.saga';
 import {
   watchQueryCirrus,
   watchQueryCirrusVars
@@ -52,15 +55,16 @@ const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
-  blockData: blockDataReducer,
-  transactions: transactionsReducer,
-  createUser: createUserReducer,
-  createContract: createContractReducer,
-  methodCall: methodCallReducer,
   accounts: accountsReducer,
+  blockData: blockDataReducer,
   contracts: contractsReducer,
+  contractQuery: contractQueryReducer,
+  createContract: createContractReducer,
+  createUser: createUserReducer,
+  methodCall: methodCallReducer,
   nodes: nodeCardReducer,
-  contractQuery: contractQueryReducer
+  transactions: transactionsReducer,
+  queryEngine: queryEngineReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -78,6 +82,7 @@ const rootSaga = function* startForeman() {
         fork(watchFetchArgs),
         fork(watchMethodCall),
         fork(watchFetchCirrusContracts),
+        fork(watchExecuteQuery),
         fork(watchQueryCirrus),
         fork(watchQueryCirrusVars)
     ]
