@@ -337,14 +337,9 @@ instance ToSchema PostUsersContractMethodRequest where
         & required .~ [ "password", "method", "args" ]
         & description ?~ "Post Users Contract Method Request"
         & example ?~ toJSON PostUsersContractRequest
-            { postuserscontractrequestSrc =
-              "contract SimpleStorage { uint storedData; function set(uint x) \
-              \{ storedData = x; } function get() returns (uint retVal) \
-              \{ return storedData; } }"
-            , postuserscontractrequestPassword = "securePassword"
-            , postuserscontractrequestContract = Just "SimpleStorage"
+            { postuserscontractrequestPassword = "securePassword"
+            , postuserscontractrequestMethod = "get"
             , postuserscontractrequestArgs = Nothing
-            , postuserscontractrequestTxParams = Nothing
             , postuserscontractrequestValue = Just $ Strung 1000000
             }
       )
