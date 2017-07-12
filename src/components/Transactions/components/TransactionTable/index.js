@@ -7,7 +7,6 @@ import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import './TransactionTable.css';
 
 class TransactionTable extends Component {
 
@@ -15,7 +14,7 @@ class TransactionTable extends Component {
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
   }
 
-  componentWillMount() {
+  componentWillUnmount() {
     this.props.clearQuery();
   }
 
@@ -25,8 +24,10 @@ class TransactionTable extends Component {
   }
 
   updateQuery = (values) => {
-    this.props.updateQuery(values.query, values.value);
-    this.props.dispatch(reset('transaction-query'));
+    if (values.query && values.value) {
+      this.props.updateQuery(values.query, values.value);
+      this.props.dispatch(reset('transaction-query'));
+    }
   }
 
   dispatchSubmit = () => {
@@ -110,7 +111,7 @@ class TransactionTable extends Component {
                   }
                 </Field>
               </div>
-              <div className="input-width">
+              <div className="smd-input-width">
                 <Field
                   type="text"
                   className="pt-input pt-fill"
@@ -127,6 +128,19 @@ class TransactionTable extends Component {
                   }
                   dir="auto"/>
               </div>
+              <Button onClick={() => {
+                this.dispatchSubmit();
+                mixpanelWrapper.track('transactions_query_submit');
+              }}
+                      onKeyPress={
+                        (e) => {
+                          if (e.key === 'Enter') {
+                            this.dispatchSubmit();
+                            mixpanelWrapper.track('transactions_query_submit');
+                          }
+                        }
+                      }
+                      className="pt-intent-primary pt-icon-arrow-right"/>
             </div>
           </form>
         </div>
@@ -154,13 +168,6 @@ class TransactionTable extends Component {
           <div className="col-sm-12">
             {tags}
           </div>
-        </div>
-        <div className="row smd-pad-4">
-          <div className="col-sm-12 text-right">
-            <Button text="Submit Query" onClick={() => {
-              this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
-              mixpanelWrapper.track('transactions_query_submit');
-            }} className="pt-intent-primary pt-icon-confirm fieldButton"/></div>
         </div>
       </div>
 
