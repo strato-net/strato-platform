@@ -42,7 +42,7 @@ instance ToSchema Password where
   declareNamedSchema _ = return $ NamedSchema (Just "Password")
     ( mempty
       & type_ .~ SwaggerString
-      & example ?~ toJSON (Password "password")
+      & example ?~ toJSON (Password "securePassword")
       & description ?~ "Password" )
 
 instance ToJSON Password where
