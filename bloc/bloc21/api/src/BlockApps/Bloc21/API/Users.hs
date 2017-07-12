@@ -336,11 +336,12 @@ instance ToSchema PostUsersContractMethodRequest where
             ]
         & required .~ [ "password", "method", "args" ]
         & description ?~ "Post Users Contract Method Request"
-        & example ?~ toJSON PostUsersContractRequest
-            { postuserscontractrequestPassword = "securePassword"
-            , postuserscontractrequestMethod = "get"
-            , postuserscontractrequestArgs = Nothing
-            , postuserscontractrequestValue = Just $ Strung 1000000
+        & example ?~ toJSON PostUsersContractMethodRequest
+            { postuserscontractmethodPassword = "securePassword"
+            , postuserscontractmethodMethod = "get"
+            , postuserscontractmethodArgs = Map.empty
+            , postuserscontractmethodValue = Just $ Strung 1000000
+            , postuserscontractmethodTxParams = Nothing
             }
       )
 
