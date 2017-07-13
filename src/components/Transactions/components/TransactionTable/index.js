@@ -90,6 +90,7 @@ class TransactionTable extends Component {
       }
     );
 
+    const required = value => value ? undefined : 'Required'
     const queryTypes = TRANSACTION_QUERY_TYPES;
     const queryForm =
       <div className="row smd-pad-4">
@@ -102,6 +103,7 @@ class TransactionTable extends Component {
                   component="select"
                   placeholder="Query Type"
                   name="query"
+                  validate={required}
                   required
                 >
                   {
@@ -118,10 +120,11 @@ class TransactionTable extends Component {
                   component="input"
                   name="value"
                   placeholder="Query Term"
+                  validate={required}
                   onKeyPress={
                     (e) => {
                       if (e.key === 'Enter') {
-                        this.dispatchSubmit();
+                        //this.dispatchSubmit();
                         mixpanelWrapper.track('transactions_query_submit');
                       }
                     }
@@ -129,17 +132,9 @@ class TransactionTable extends Component {
                   dir="auto"/>
               </div>
               <Button onClick={() => {
-                this.dispatchSubmit();
+                //this.dispatchSubmit();
                 mixpanelWrapper.track('transactions_query_submit');
               }}
-                      onKeyPress={
-                        (e) => {
-                          if (e.key === 'Enter') {
-                            this.dispatchSubmit();
-                            mixpanelWrapper.track('transactions_query_submit');
-                          }
-                        }
-                      }
                       className="pt-intent-primary pt-icon-arrow-right"/>
             </div>
           </form>

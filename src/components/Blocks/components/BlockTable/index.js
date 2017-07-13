@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import {Field, reduxForm, reset, submit} from 'redux-form';
+import {Field, reduxForm, reset, submit, Form} from 'redux-form';
 import {BLOCK_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
@@ -23,14 +23,14 @@ class BlockTable extends Component {
       newProps.executeQuery(RESOURCE_TYPES.block, newProps.query);
   }
 
-  updateQuery = (values) => {
+  // dispatchSubmit = () => {
+  //   this.props.dispatch(submit('block-query'));
+  // }
+
+  submit = (values ) => {
     this.props.updateQuery(values.query, values.value);
     this.props.dispatch(reset('block-query'));
-  }
-
-  dispatchSubmit = () => {
-    this.props.dispatch(submit('block-query'));
-  }
+  };
 
   refresh = () => {
     this.props.clearQuery();
@@ -99,11 +99,12 @@ class BlockTable extends Component {
       }
     );
 
+    const required = value => value ? undefined : 'Required'
     const queryTypes = BLOCK_QUERY_TYPES;
     const queryForm =
       <div className="row smd-pad-4">
         <div className="col-sm-12">
-          <form onSubmit={handleSubmit(this.updateQuery)}>
+          <Form onSubmit={handleSubmit(this.submit)}>
             <div className="pt-control-group smd-full-width">
               <div className="pt-select">
                 <Field
@@ -111,6 +112,7 @@ class BlockTable extends Component {
                   component="select"
                   placeholder="Query Type"
                   name="query"
+                  validate={required}
                   required
                 >
                   {
@@ -127,10 +129,11 @@ class BlockTable extends Component {
                   component="input"
                   name="value"
                   placeholder="Query Term"
+                  validate={required}
                   onKeyPress={
                     (e) => {
                       if (e.key === 'Enter') {
-                        this.dispatchSubmit();
+                        //this.dispatchSubmit();
                         mixpanelWrapper.track('blocks_query_submit');
                       }
                     }
@@ -138,20 +141,12 @@ class BlockTable extends Component {
                   dir="auto"/>
               </div>
               <Button onClick={() => {
-                this.dispatchSubmit();
+                // this.dispatchSubmit();
                 mixpanelWrapper.track('blocks_query_submit');
               }}
-                      onKeyPress={
-                        (e) => {
-                          if (e.key === 'Enter') {
-                            this.dispatchSubmit();
-                            mixpanelWrapper.track('blocks_query_submit');
-                          }
-                        }
-                      }
                       className="pt-intent-primary pt-icon-arrow-right"/>
             </div>
-          </form>
+          </Form>
         </div>
       </div>
 
