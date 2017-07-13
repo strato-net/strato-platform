@@ -5,6 +5,7 @@ const common = ba.common;
 const util = common.util;
 const config = common.config;
 const assert = common.assert;
+const BigNumber = common.BigNumber;
 const path = require('path');
 
 const adminName = util.uid('Admin');
@@ -128,6 +129,23 @@ describe('enum data type: positive case:', function () {
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const result = parseInt(returnsArray[0]);
     assert.equal(result, args.value);
+  });
+
+  it('call method with value', function*() {
+    const methodName = 'get';
+    const methodArgs = {};
+    const setMethodName = 'set';
+    const setMethodArgs = {value: constructorArgs._storedData};
+    const etherToSend = 1;
+
+    //Call method with value
+    yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);
+    const resultWithValue = yield rest.callMethod(adminUser, contract, methodName, methodArgs, etherToSend);
+    assert.equal(resultWithValue[0], constructorArgs._storedData, "method call with value should execute");
+
+    const contractBalance = yield rest.getBalance(contract.address);
+    const expectedBalance = (new BigNumber(etherToSend)).mul(common.constants.ETHER);
+    assert.isOk(expectedBalance.equals(contractBalance), "contract balance should equal value from method call");
   });
 });
 
