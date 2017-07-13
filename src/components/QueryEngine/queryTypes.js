@@ -121,10 +121,6 @@ export const BLOCK_QUERY_TYPES = {
   last: {
     key: 'last',
     displayName: 'Last'
-  },
-  last: {
-    key: 'last',
-    displayName: 'Last'
   }
 };
 
