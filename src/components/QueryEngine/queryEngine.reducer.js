@@ -48,9 +48,7 @@ const reducer = function (state = initialState, action) {
     case EXECUTE_QUERY_SUCCESS:
       let result = action.queryResult;
       if (state.query.last) {
-        console.log("filtering")
         result = result.slice(-15);
-        console.log(result);
       }
       return {
         query: state.query,
