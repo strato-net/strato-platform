@@ -1,7 +1,7 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import {Field, reduxForm, reset, submit, Form} from 'redux-form';
+import {Field, reduxForm, reset, Form} from 'redux-form';
 import {BLOCK_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
