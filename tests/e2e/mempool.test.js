@@ -17,16 +17,16 @@ describe("Send Transaction List with nonces", function() {
   this.timeout(config.timeout);
 
   const testArray = [
-    // {nonces: [0,1,2,3], expectedStatii: {success:4, unresolved:0, rejected:0} },
-    // {nonces: [0,1,2,3,4,5,6], expectedStatii: {success:7, unresolved:0, rejected:0} },
-    // {nonces: [6,5,4,3,2,1,0], expectedStatii: {success:7, unresolved:0, rejected:0} },
-    // {nonces: [0,1,2, 4], expectedStatii: {success:3, unresolved:1, rejected:0} },
+    {nonces: [0,1,2,3], expectedStatii: {success:4, unresolved:0, rejected:0} },
+    {nonces: [0,1,2,3,4,5,6], expectedStatii: {success:7, unresolved:0, rejected:0} },
+    {nonces: [6,5,4,3,2,1,0], expectedStatii: {success:7, unresolved:0, rejected:0} },
+    {nonces: [0,1,2, 4], expectedStatii: {success:3, unresolved:1, rejected:0} },
     {nonces: [0,1,2,3,3,3], expectedStatii: {success:4, unresolved:2, rejected:0} },
     {nonces: [0,1,2, 4, 4, 4, 3], expectedStatii: {success:5, unresolved:2, rejected:0} },
   ];
 
   testArray.map(function(test) {
-    it(JSON.stringify(test), function* () {
+    it.skip(JSON.stringify(test), function* () {
       yield testSendList(test);
     });
   });

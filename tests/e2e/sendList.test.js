@@ -10,10 +10,12 @@ const constants = common.constants;
 const assert = common.assert;
 const config = common.config;
 
+const batchValueEther = 1;
+const password = '1234';
+
 describe("Send Transaction List", function() {
   this.timeout(config.timeout);
 
-  const password = '1234';
 
   it('resolve==true', function* () {
     const uid = util.uid();
@@ -22,7 +24,6 @@ describe("Send Transaction List", function() {
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
     const batchSize = 5;
-    const batchValueEther = 1;
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
@@ -51,7 +52,6 @@ describe("Send Transaction List", function() {
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
     const batchSize = 5;
-    const batchValueEther = 1;
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
@@ -175,7 +175,6 @@ describe("Send Transaction List with nonces", function() {
     const bobName = 'Bob' + uid;
     const alice = yield rest.createUser(aliceName, password);
     const bob = yield rest.createUser(bobName, password);
-    const batchValueEther = 2;
 
     // must use BigNumber for balances
     alice.startingBalance = yield rest.getBalance(alice.address);
