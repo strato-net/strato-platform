@@ -6,8 +6,8 @@ module BlockApps.Bloc21.API.UsersSpec where
 
 import           Control.Concurrent
 import           Data.Either
-import qualified Data.Map.Strict              as Map
-import qualified Data.Text                    as Text
+import qualified Data.Map.Strict                  as Map
+import qualified Data.Text                        as Text
 import           Servant.Client
 import           Test.Hspec
 
@@ -139,4 +139,4 @@ spec = do
       Right responses <- runClientM
         (postUsersContractMethodList userName userAddress postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      responses `shouldSatisfy` all (== MethodResolved [SolidityValueAsString "0"])
+      responses `shouldSatisfy` all (== MethodResolved (Right [SolidityValueAsString "0"]))
