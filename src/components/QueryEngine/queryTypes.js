@@ -117,6 +117,14 @@ export const BLOCK_QUERY_TYPES = {
   hash : {
     key: 'hash',
     displayName : 'Hash'
+  },
+  last: {
+    key: 'last',
+    displayName: 'Last'
+  },
+  last: {
+    key: 'last',
+    displayName: 'Last'
   }
 };
 
