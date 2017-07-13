@@ -140,7 +140,7 @@ class BlockTable extends Component {
                   }
                   dir="auto"/>
               </div>
-              <Button onClick={() => {
+              <Button type="submit" onClick={() => {
                 // this.dispatchSubmit();
                 mixpanelWrapper.track('blocks_query_submit');
               }}

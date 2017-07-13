@@ -131,7 +131,7 @@ class TransactionTable extends Component {
                   }
                   dir="auto"/>
               </div>
-              <Button onClick={() => {
+              <Button type="submit" onClick={() => {
                 //this.dispatchSubmit();
                 mixpanelWrapper.track('transactions_query_submit');
               }}
