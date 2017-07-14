@@ -26,6 +26,7 @@ deployments:
         BLOC_DOC_URL: "${BLOC_DOC_URL}"
         STRATO_URL: "${STRATO_URL}"
         STRATO_DOC_URL: "${STRATO_DOC_URL}"
+        CIRRUS_URL: "${CIRRUS_URL}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
@@ -99,6 +100,7 @@ deployments:
         blockTime: "${blockTime}"
         minBlockDifficulty: "${minBlockDifficulty}"
         debugFail: "${debugFail}"
+        evmDebugMode: "${evmDebugMode}"
         backupblocks: "${backupblocks}"
         redisBDBNumber: "${redisBDBNumber}"
         useSyncMode: "${useSyncMode}"
