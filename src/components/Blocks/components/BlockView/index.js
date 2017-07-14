@@ -134,7 +134,7 @@ function mapStateToProps(state, ownProps) {
   return {
     block: state.blockData.blockData.filter((val) => {
       return val.blockData.number === blockNumber
-    })[0],
+    })[0] || state.queryEngine.queryResult.filter((val) => {return val.blockData.number === blockNumber})[0]
   };
 }
 

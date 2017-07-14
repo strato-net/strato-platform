@@ -55,7 +55,9 @@ class BarGraph extends Component {
 
 
     // TODO: fix this. Do not mutate state directly. Use redux.
+    // eslint-disable-next-line
     this.state.dataset = new Plottable.Dataset(this.props.data);
+    // eslint-disable-next-line
     this.state.plot = new Plottable.Plots.Bar()
       .addDataset(this.state.dataset)
       .x(function (d) {
@@ -67,6 +69,7 @@ class BarGraph extends Component {
       //.animator(Plottable.Plots.Animator.MAIN, new Plottable.Animators.Easing().easingMode('quad'))
       .animated(true);
 
+    // eslint-disable-next-line
     this.state.interaction = new Plottable.Interactions.Pointer();
     this.state.interaction.onPointerMove(function(p){
       const entity = self.state.plot.entityNearest(p);
@@ -103,22 +106,26 @@ class BarGraph extends Component {
     this.state.interaction.attachTo(this.state.plot);
     this.state.plot.renderTo("div#bg" + this.props.identifier);
 
+    // eslint-disable-next-line
     this.state.tooltipAnchor = this.state.plot
       .foreground()
       .style('overflow','visible')
       .append('g')
       .attr('opacity', 0);
 
+    // eslint-disable-next-line
     this.state.tooltipBox = this.state.tooltipAnchor
       .append('rect')
       .style('fill','#293742')
       .attr('rx', 4)
       .attr('ry', 4);
 
+    // eslint-disable-next-line
     this.state.tooltip = this.state.tooltipAnchor
       .append('polygon')
       .style('fill','#293742');
 
+    // eslint-disable-next-line
     this.state.tooltipText = this.state.tooltipAnchor
       .append("text")
       .style('fill','#f5f8fa')
@@ -149,6 +156,7 @@ class BarGraph extends Component {
       .animated(this.state.firstRender);
     this.state.dataset
       .data(this.props.data);
+    // eslint-disable-next-line
     this.state.firstRender = false;
   }
 

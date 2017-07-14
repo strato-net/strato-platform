@@ -15,7 +15,6 @@ const url = env.STRATO_URL;
 
 function query(query, resourceType) {
   let constructedURL = url + resourceType;
-  console.log("query", query);
   const queryParts = Object.getOwnPropertyNames(query);
   queryParts.forEach(function(part) {
       if (part === TRANSACTION_QUERY_TYPES.last.key) {

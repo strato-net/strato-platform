@@ -46,9 +46,13 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case EXECUTE_QUERY_SUCCESS:
+      let result = action.queryResult;
+      if (state.query.last) {
+        result = result.slice(-15);
+      }
       return {
         query: state.query,
-        queryResult: action.queryResult,
+        queryResult: result,
         error: null
       };
     case EXECUTE_QUERY_FAILURE:

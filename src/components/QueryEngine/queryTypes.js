@@ -7,14 +7,6 @@ export const TRANSACTION_QUERY_TYPES = {
     key: 'blocknumber',
     displayName : 'Block Number'
   },
-  // transactionType : {
-  //   key: 'transactiontype',
-  //   displayName : 'Transaction Type'
-  // },
-  // hash : {
-  //   key: 'hash',
-  //   displayName : 'Hash'
-  // },
   to : {
     key: 'to',
     displayName : 'To'
@@ -50,6 +42,85 @@ export const TRANSACTION_QUERY_TYPES = {
   last : {
     key: 'last',
     displayName : 'Last'
+  }
+};
+
+export const BLOCK_QUERY_TYPES = {
+  default: {
+    key: 'default',
+    displayName: 'Query Type'
+  },
+  number : {
+    key: 'number',
+    displayName : 'Block Number'
+  },
+  id : {
+    key: 'id',
+    displayName : 'Block Id'
+  },
+  maxnumber : {
+    key: 'maxnumber',
+    displayName : 'Max Block Number'
+  },
+  minnumber : {
+    key: 'minnumber',
+    displayName : 'Min Block Number'
+  },
+  gaslim: {
+    key: 'gaslim',
+    displayName: 'Gas Limit'
+  },
+  mingaslim: {
+    key: 'mingaslim',
+    displayName: 'Min Gas Limit'
+  },
+  maxgaslim: {
+    key: 'maxgaslim',
+    displayName: 'Max Gas Limit'
+  },
+  gasused : {
+    key: 'gasused',
+    displayName : 'Gas Used'
+  },
+  mingasused: {
+    key: 'mingasused',
+    displayName: 'Min Gas Used'
+  },
+  maxgasused: {
+    key: 'maxgasused',
+    displayName: 'Max Gas Used'
+  },
+  diff: {
+    key: 'diff',
+    displayName: 'Difficulty'
+  },
+  maxdiff: {
+    key: 'maxdiff',
+    displayName: 'Max Difficulty'
+  },
+  mindiff: {
+    key: 'mindiff',
+    displayName: 'Min Difficulty'
+  },
+  txaddress : {
+    key: 'txaddress',
+    displayName : 'Contained Transaction Address'
+  },
+  coinbase : {
+    key: 'coinbase',
+    displayName : 'Coinbase'
+  },
+  address: {
+    key: 'address',
+    displayName: 'Address'
+  },
+  hash : {
+    key: 'hash',
+    displayName : 'Hash'
+  },
+  last: {
+    key: 'last',
+    displayName: 'Last'
   }
 };
 

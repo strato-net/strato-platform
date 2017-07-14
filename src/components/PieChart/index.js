@@ -21,12 +21,15 @@ class PieChart extends Component {
     const colorScale = new Plottable.Scales.InterpolatedColor();
     colorScale.range(["#FA9B4E", "#5279C7"]);
 
+    // eslint-disable-next-line
     this.state.dataset = new Plottable.Dataset(this.props.data);
+    // eslint-disable-next-line
     this.state.plot = new Plottable.Plots.Pie()
       .addDataset(this.state.dataset)
       .sectorValue(function(d) { return d.val; }, scale)
       .attr("fill", function(d) { return d.val; }, colorScale);
 
+    // eslint-disable-next-line
     this.state.interaction = new Plottable.Interactions.Pointer();
     this.state.interaction.onPointerMove(function(p){
       const entities = self.state.plot.entitiesAt(p);
@@ -56,18 +59,21 @@ class PieChart extends Component {
     this.state.plot.renderTo("div#pc");
 
     // TODO: this should be refactored into one component. Also see BarGraph
+    // eslint-disable-next-line
     this.state.tooltipAnchor = this.state.plot
       .foreground()
       .style('overflow','visible')
       .append('g')
       .attr('opacity', 0);
 
+    // eslint-disable-next-line
     this.state.tooltipBox = this.state.tooltipAnchor
       .append('rect')
       .style('fill','#293742')
       .attr('rx', 4)
       .attr('ry', 4);
 
+    // eslint-disable-next-line
     this.state.tooltipText = this.state.tooltipAnchor
       .append("text")
       .style('fill','#f5f8fa')
