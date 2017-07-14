@@ -19,7 +19,7 @@ const mixpanelWrapper = {
     if(process.env.NODE_ENV === 'development') {
       return;
     }
-    mixpanelWrapper.track(eventName);
+    mixpanel.track(eventName);
   }
 }
 
