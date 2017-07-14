@@ -1,9 +1,10 @@
 import React, {Component} from 'react';
 import TransactionTable from './components/TransactionTable';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
+
 class Transactions extends Component {
   componentDidMount() {
-    mixpanel.track("transactions_loaded");
+    mixpanelWrapper.track("transactions_loaded");
   }
 
   render() {

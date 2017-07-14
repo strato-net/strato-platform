@@ -6,6 +6,7 @@ import {
 } from './contracts.actions';
 import {
   FETCH_STATE_SUCCESS,
+  FETCH_CIRRUS_INSTANCES_SUCCESS,
   SELECT_CONTRACT_INSTANCE
 } from './components/ContractCard/contractCard.actions';
 
@@ -62,6 +63,37 @@ const reducer = function (state = initialState, action) {
           ...state.contracts,
           [action.name]: {
             instances: instances
+          }
+        },
+        filter: state.filter,
+        error: state.error
+      }
+    case FETCH_CIRRUS_INSTANCES_SUCCESS:
+      const cirrusInstances = action.instances.map((instance) => {
+        // if instance exists
+        let i = 0;
+        for(i; i < state.contracts[action.name].instances.length; i++) {
+          if(state.contracts[action.name].instances[i].address === instance.address) {
+            break;
+          }
+        }
+
+        if(i === state.contracts[action.name].instances.length) {
+          return {
+            ...instance,
+            fromCirrus: true
+          };
+        }
+
+        return state.contracts[action.name].instances[i];
+
+      });
+
+      return {
+        contracts: {
+          ...state.contracts,
+          [action.name]: {
+            instances: cirrusInstances
           }
         },
         filter: state.filter,

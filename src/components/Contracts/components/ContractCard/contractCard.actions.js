@@ -2,6 +2,9 @@ export const SELECT_CONTRACT_INSTANCE = 'SELECT_CONTRACT_INSTANCE';
 export const FETCH_STATE = 'FETCH_STATE';
 export const FETCH_STATE_SUCCESS = 'FETCH_STATE_SUCCESS';
 export const FETCH_STATE_FAILURE = 'FETCH_STATE_FAILURE';
+export const FETCH_CIRRUS_INSTANCES = 'FETCH_CIRRUS_INSTANCES';
+export const FETCH_CIRRUS_INSTANCES_SUCCESS = 'FETCH_CIRRUS_INSTANCES_SUCCESS';
+export const FETCH_CIRRUS_INSTANCES_FAILURE = 'FETCH_CIRRUS_INSTANCES_FAILURE';
 
 export const fetchState = function (name, address) {
   return {
@@ -34,3 +37,26 @@ export const selectContractInstance = function(name, address) {
     address
   }
 }
+
+export const fetchCirrusInstances = function (contractName) {
+  return {
+    type: FETCH_CIRRUS_INSTANCES,
+    name: contractName
+  }
+};
+
+export const fetchCirrusInstancesSuccess = function (contractName, instances) {
+  return {
+    type: FETCH_CIRRUS_INSTANCES_SUCCESS,
+    name: contractName,
+    instances: instances
+  }
+};
+
+export const fetchCirrusInstancesFailure = function (contractName, error) {
+  return {
+    type: FETCH_CIRRUS_INSTANCES_FAILURE,
+    name: contractName,
+    error: error,
+  }
+};

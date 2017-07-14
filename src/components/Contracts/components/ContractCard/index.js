@@ -3,10 +3,15 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Collapse} from '@blueprintjs/core';
 import * as moment from 'moment';
-import { selectContractInstance, fetchState } from './contractCard.actions';
+import {
+  selectContractInstance,
+  fetchState,
+  fetchCirrusInstances
+} from './contractCard.actions';
+import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
-import mixpanel from 'mixpanel-browser';
-
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import { Link } from 'react-router-dom';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -21,6 +26,9 @@ class ContractCard extends Component {
     const instances = contract && contract.instances ? contract.instances : [];
     const self = this;
     const re = /[0-9a-fA-F]{40}$/;
+    const showQueryBuilder = instances.reduce((acc,instance)=> {
+      return acc || instance.fromCirrus;
+    }, false);
 
     instances
       .filter((instance) => {return re.test(instance.address)})
@@ -29,7 +37,7 @@ class ContractCard extends Component {
           <tr
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
-              mixpanel.track("contract_state_clicked")
+              mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
@@ -39,7 +47,10 @@ class ContractCard extends Component {
               {instance.address}
             </td>
             <td style={{border: 'none'}}>
-              {moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A')}
+              { instance.fromCirrus ?
+                  <span className="pt-tag pt-intent-primary">Indexed by Cirrus</span> :
+                  moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A')
+              }
             </td>
           </tr>
         );
@@ -60,26 +71,54 @@ class ContractCard extends Component {
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
       if(symbols.length > 0) {
-        symbolTable.push(
-          <tr key={'header' + instance.address}>
-            <th>Symbol</th>
-            <th>State</th>
-          </tr>
-        );
-
         symbols.forEach((symbol, i) => {
-          symbolTable.push(<tr key={symbol + ' ' + i}>
-            <td>{symbol}</td>
-            <td>{instance.state[symbol]}</td>
-          </tr>)
+          const symbolState = instance.state[symbol];
+          symbolTable.push(
+            <tr key={symbol + ' ' + i}>
+              <td style={{verticalAlign: 'middle'}}>{symbol}</td>
+              <td style={{maxWidth: '300px'}}>
+                <pre>
+                  {
+                    typeof symbolState === 'string' ?
+                      symbolState
+                      : JSON.stringify(symbolState,null,2)
+                  }
+                </pre>
+              </td>
+              <td style={{verticalAlign: 'middle'}}>
+                {
+                  typeof symbolState === 'string' && symbolState.startsWith('function') ?
+                    <ContractMethodCall
+                      key={'methodCall' + symbol + instance.address}
+                      lookup={'methodCall' + symbol + instance.address}
+                      contractName={name}
+                      contractAddress={instance.address}
+                      symbolName={symbol}
+                      fromCirrus={instance.fromCirrus}
+                    />
+                    : null
+                }
+              </td>
+            </tr>
+          );
         })
+
       }
       state = (
-        <div className="pt-card pt-dark pt-elevation-2">
+        <div className="pt-card pt-elevation-2">
           <div className="row">
             <div className="col-sm-12">
-              <table className="pt-table pt-condensed pt-striped">
-                {symbolTable}
+              <table className="pt-table pt-condensed pt-striped smd-full-width">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th className="text-right">State</th>
+                    <th style={{width: '105px'}} className="text-right"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {symbolTable}
+                </tbody>
               </table>
             </div>
           </div>
@@ -91,27 +130,41 @@ class ContractCard extends Component {
     return (
       <div className="row">
         <div className="col-sm-6">
-          <div className="pt-card pt-dark pt-elevation-2">
+          <div className="pt-card pt-elevation-2">
             <div className="row">
               <div className="col-sm-6"><h4>{name}</h4></div>
               <div className="col-sm-6 text-right">
-                <Button type="button"
-                   className="pt-dark pt-icon-double-caret-vertical btn-sm"
-                   onClick={() => {
-                     mixpanel.track("contracts_toggle_collapse_click");
-                     this.setState({
-                       isOpen: !this.state.isOpen
-                     })
-                   }}
-                >
-                  {this.state.isOpen ? "Hide" : "Show"} Contracts
-                </Button>
+                <div className="pt-button-group">
+                  {
+                    showQueryBuilder ?
+                      <Link to={'/contracts/' + name + '/query'}>
+                        <Button type="Button" className="pt-intent-primary">
+                          Query Builder
+                        </Button>
+                      </Link>
+                      : null
+                  }
+                  <Button type="button"
+                     className="pt-icon-double-caret-vertical btn-sm"
+                     onClick={() => {
+                       mixpanelWrapper.track("contracts_toggle_collapse_click");
+                       this.props.fetchCirrusInstances(name);
+                       this.setState({
+                         isOpen: !this.state.isOpen
+                       })
+                     }}
+                  >
+                    {this.state.isOpen ? "Hide" : "Show"} Contracts
+                  </Button>
+
+                </div>
+
               </div>
             </div>
             <div className="row">
               <div className="col-sm-12">
                 <Collapse isOpen={this.state.isOpen} component="table" className="col-sm-12" transitionDuration={100}>
-                  <table className="pt-table pt-interactive pt-condensed pt-striped">
+                  <table className="pt-table pt-interactive pt-condensed pt-striped smd-full-width">
                     <thead>
                     <tr>
                       <th>Contract Address</th>
@@ -140,5 +193,9 @@ function mapStateToProps(state) {
 }
 
 export default withRouter(
-  connect(mapStateToProps, {selectContractInstance, fetchState})(ContractCard)
+  connect(mapStateToProps, {
+    selectContractInstance,
+    fetchState,
+    fetchCirrusInstances
+  })(ContractCard)
 );

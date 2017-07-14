@@ -1,38 +1,52 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
-import mixpanel from 'mixpanel-browser';
-import {fetchBlockData} from '../../../BlockData/block-data.actions';
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import {Field, reduxForm, reset, Form} from 'redux-form';
+import {BLOCK_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
+import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
-import {Text, Position, Tooltip} from '@blueprintjs/core';
+import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 
 class BlockTable extends Component {
 
   componentDidMount() {
-    this.props.fetchBlockData();
-    this.startPoll();
+    this.props.executeQuery(RESOURCE_TYPES.block, this.props.query);
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
+    this.props.clearQuery();
   }
 
-  startPoll() {
-    const fetchTx = this.props.fetchBlockData;
-    this.timeout = setInterval(function () {
-      fetchTx();
-    }, 5000);
+  componentWillReceiveProps(newProps) {
+    if (newProps.query !== this.props.query)
+      newProps.executeQuery(RESOURCE_TYPES.block, newProps.query);
   }
+
+  // dispatchSubmit = () => {
+  //   this.props.dispatch(submit('block-query'));
+  // }
+
+  submit = (values ) => {
+    this.props.updateQuery(values.query, values.value);
+    this.props.dispatch(reset('block-query'));
+  };
+
+  refresh = () => {
+    this.props.clearQuery();
+    this.props.executeQuery(RESOURCE_TYPES.block, this.props.query);
+  };
 
   render() {
     const history = this.props.history;
+    const {handleSubmit} = this.props;
 
     function handleClick(blockNumber) {
-      mixpanel.track("blocks_row_click");
+      mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
 
-    let blockRows = this.props.blockData.map(
+    let blockRows = this.props.queryResult.map(
       function (block) {
         return (
           <tr key={block.blockData.number} onClick={() => {
@@ -43,7 +57,8 @@ class BlockTable extends Component {
             </td>
             <td width="22.5%">
               <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.parentHash} position={Position.TOP_LEFT}>
+                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.parentHash}
+                         position={Position.TOP_LEFT}>
                   <small>{block.blockData.parentHash}</small>
                 </Tooltip>
               </Text>
@@ -64,7 +79,8 @@ class BlockTable extends Component {
             </td>
             <td width="22.5%">
               <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.coinbase} position={Position.TOP_LEFT}>
+                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.coinbase}
+                         position={Position.TOP_LEFT}>
                   <small>
                     {block.blockData.coinbase}
                   </small>
@@ -83,10 +99,97 @@ class BlockTable extends Component {
       }
     );
 
-    return (
-      <div className="row">
+    const required = value => value ? undefined : 'Required'
+    const queryTypes = BLOCK_QUERY_TYPES;
+    const queryForm =
+      <div className="row smd-pad-4">
         <div className="col-sm-12">
-          <div className="pt-card pt-dark pt-elevation-2">
+          <Form onSubmit={handleSubmit(this.submit)}>
+            <div className="pt-control-group smd-full-width">
+              <div className="pt-select">
+                <Field
+                  type="select"
+                  component="select"
+                  placeholder="Query Type"
+                  name="query"
+                  validate={required}
+                  required
+                >
+                  {
+                    Object.getOwnPropertyNames(queryTypes).map(function (name) {
+                      return <option key={name} value={queryTypes[name].key}>{queryTypes[name].displayName}</option>
+                    })
+                  }
+                </Field>
+              </div>
+              <div className="smd-input-width">
+                <Field
+                  type="text"
+                  className="pt-input pt-fill"
+                  component="input"
+                  name="value"
+                  placeholder="Query Term"
+                  validate={required}
+                  onKeyPress={
+                    (e) => {
+                      if (e.key === 'Enter') {
+                        //this.dispatchSubmit();
+                        mixpanelWrapper.track('blocks_query_submit');
+                      }
+                    }
+                  }
+                  dir="auto"/>
+              </div>
+              <Button type="submit" onClick={() => {
+                // this.dispatchSubmit();
+                mixpanelWrapper.track('blocks_query_submit');
+              }}
+                      className="pt-intent-primary pt-icon-arrow-right"/>
+            </div>
+          </Form>
+        </div>
+      </div>
+
+    const query = this.props.query;
+    const removeQuery = this.props.removeQuery;
+    const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
+      const queryValue = query[queryType];
+      return (
+        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
+                  {queryType + ': ' + queryValue}
+          <button onClick={() => {
+            removeQuery(queryType);
+            mixpanelWrapper.track('blocks_query_remove_tag');
+          }} className="pt-tag-remove"/>
+                  </span>
+      )
+    });
+
+    const queries =
+      <div>
+        {queryForm}
+        <div className="row smd-pad-4">
+          <div className="col-sm-12">
+            {tags}
+          </div>
+        </div>
+      </div>
+
+    return (
+      <div className="pt-card pt-dark pt-elevation-2">
+        <div className="row smd-pad-4">
+          <div className="col-sm-11 text-left">
+            <span className="h3">Query Builder</span>
+          </div>
+          <div className="col-sm-1 text-right">
+            <Button onClick={this.refresh} className="pt-intent-primary pt-icon-refresh"/>
+          </div>
+        </div>
+
+        {queries}
+
+        <div className="row">
+          <div className="col-sm-12">
             <table className="pt-table pt-interactive pt-condensed pt-striped"
                    style={{tableLayout: 'fixed', width: '100%'}}>
               <thead>
@@ -101,7 +204,9 @@ class BlockTable extends Component {
               </thead>
 
               <tbody>
-              {blockRows.length === 0 ? <tr><td colSpan={6}>No Blocks</td></tr>: blockRows}
+              {blockRows.length === 0 ? <tr>
+                <td colSpan={6}>No Blocks</td>
+              </tr> : blockRows}
               </tbody>
             </table>
           </div>
@@ -113,8 +218,15 @@ class BlockTable extends Component {
 
 function mapStateToProps(state) {
   return {
-    blockData: state.blockData.blockData,
+    query: state.queryEngine.query,
+    queryResult: state.queryEngine.queryResult,
   };
 }
-
-export default withRouter(connect(mapStateToProps, {fetchBlockData})(BlockTable));
+const formed = reduxForm({form: 'block-query'})(BlockTable);
+const connected = connect(mapStateToProps, {
+  updateQuery,
+  removeQuery,
+  executeQuery,
+  clearQuery
+})(formed);
+export default withRouter(connected);

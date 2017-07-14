@@ -4,10 +4,11 @@ import { withRouter, Link } from 'react-router-dom';
 import NodeCard from '../NodeCard';
 import TransactionList from '../TransactionList';
 import NumberCard from '../NumberCard';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
+import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
@@ -18,7 +19,7 @@ class Dashboard extends Component {
     this.props.fetchBlockData();
     this.props.fetchAccounts();
     this.props.fetchContracts();
-    mixpanel.track('dashboard_page_load');
+    mixpanelWrapper.track('dashboard_page_load');
     this.startPoll();
   }
 
@@ -34,7 +35,7 @@ class Dashboard extends Component {
       dashboardFetchStatus();
       fetchAccounts();
       fetchContracts();
-    }, 5000);
+    }, env.POLLING_FREQUENCY);
   }
 
   difficulty(blockData) {
@@ -77,7 +78,12 @@ class Dashboard extends Component {
     blockData.forEach(function (val) {
       val.forEach(v => { types[v.transactionType]++ });
     })
-    return [ {val: types["FunctionCall"]}, {val: types["Transfer"]}, {val: types["Contract"]} ];
+    return Object.getOwnPropertyNames(types).map((type)=>{
+      return {
+        val: types[type],
+        type: type
+      }
+    });
   }
 
   render() {
@@ -116,11 +122,13 @@ class Dashboard extends Component {
             />
           </div>
           <div className="col-sm-3">
-            <NumberCard
-              number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
-              description="Last Block"
-              iconClass="fa-link"
-            />
+            <Link to="/blocks">
+              <NumberCard
+                number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
+                description="Last Block"
+                iconClass="fa-link"
+              />
+            </Link>
           </div>
           <div className="col-sm-3">
             <Link to="/accounts">

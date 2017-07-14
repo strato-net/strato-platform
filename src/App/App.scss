@@ -22,6 +22,10 @@ body {
   width: 100%;
 }
 
+.smd-input-width {
+  width: 60%;
+}
+
 .smd-pad-4 {
   padding: 4px;
 }
@@ -34,6 +38,16 @@ body {
   padding: 16px;
 }
 
+.smd-margin-right {
+  margin-right: 4px;
+}
+
 .smd-pointer {
   cursor: pointer;
+}
+
+.smd-scrollable {
+  max-height: 240px;
+  overflow-x: none;
+  overflow-y: auto;
 }

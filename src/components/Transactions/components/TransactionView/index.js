@@ -3,12 +3,13 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
 import * as moment from 'moment';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class TransactionView extends Component {
   render() {
     const hash = this.props.match.params.hash;
     const tx = this.props.tx;
+    if (tx) {
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
@@ -17,7 +18,7 @@ class TransactionView extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => {mixpanel.track("transactions_view_go_back_click"); this.props.history.goBack()}}
+              onClick={(e) => {mixpanelWrapper.track("transactions_view_go_back_click"); this.props.history.goBack()}}
               className="pt-icon-arrow-left"
               text="Back"
             />
@@ -36,11 +37,11 @@ class TransactionView extends Component {
                 <tbody>
                 <tr>
                   <td><strong>Value</strong></td>
-                  <td>{tx.value}</td>
+                  <td>{tx.value === undefined ? '' : tx.value}</td>
                 </tr>
                 <tr>
                   <td><strong>From</strong></td>
-                  <td>{tx.from}</td>
+                  <td>{tx.from === undefined ? '' : tx.from}</td>
                 </tr>
                 <tr>
                   <td><strong>To</strong></td>
@@ -78,13 +79,31 @@ class TransactionView extends Component {
       </div>
     );
   }
+  else {
+    return <div className="container-fluid pt-dark">
+      <div className="row">
+        <div className="col-sm-9">
+          <div className="h3">ERROR</div>
+        </div>
+        <div className="col-sm-3 smd-pad-16 text-right">
+          <Button
+            onClick={(e) => {mixpanelWrapper.track("transactions_view_go_back_click"); this.props.history.goBack()}}
+            className="pt-icon-arrow-left"
+            text="Back"
+          />
+        </div>
+      </div>
+    </div>
+      }
+  }
 }
 
 function mapStateToProps(state, ownProps) {
   const hash = ownProps.match.params.hash;
-
+  console.log("TX", state.transactions.tx.filter((val) => {return val.hash === hash}));
+  console.log("query", state.queryEngine.queryResult);
   return {
-    tx: state.transactions.tx.filter((val) => {return val.hash === hash})[0],
+    tx: state.transactions.tx.filter((val) => {return val.hash === hash})[0] || state.queryEngine.queryResult.filter((val) => {return val.hash === hash})[0]
   };
 }
 

@@ -1,11 +1,11 @@
 import React, {Component} from 'react';
 import BlockTable from './components/BlockTable';
-import mixpanel from 'mixpanel-browser';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 
 class Blocks extends Component {
   componentDidMount() {
-    mixpanel.track('blocks_loaded');
+    mixpanelWrapper.track('blocks_loaded');
   }
 
   render() {
