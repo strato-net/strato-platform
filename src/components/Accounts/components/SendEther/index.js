@@ -232,7 +232,7 @@ class CreateContract extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track("send_ether_cancel");
-                  this.props.contractCloseModal()
+                  this.props.sendEtherCloseModal()
                 }}/>
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
