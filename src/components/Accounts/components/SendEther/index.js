@@ -76,16 +76,19 @@ class CreateContract extends Component {
             isOpen={this.props.isOpen}
             onClose={this.props.sendEtherCloseModal}
             title="Send Ether"
+            style={{
+              width: "560px"
+            }}
             className="pt-dark"
           >
             <div className="pt-dialog-body">
               <div className="row">
-                <div className="col-sm-3 text-right">
+                <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     From
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
+                <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
                     <Field
                       className="pt-input"
@@ -107,12 +110,12 @@ class CreateContract extends Component {
                 </div>
               </div>
               <div className="row">
-                <div className="col-sm-3 text-right">
+                <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     From Address
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
+                <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
                     <Field
                       className="pt-input"
@@ -135,12 +138,12 @@ class CreateContract extends Component {
                 </div>
               </div>
               <div className="row">
-                <div className="col-sm-3 text-right">
+                <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     Password
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
+                <div className="col-sm-8 smd-pad-4">
                   <Field
                     id="input-b"
                     className="form-width pt-input"
@@ -156,12 +159,12 @@ class CreateContract extends Component {
               </div>
 
               <div className="row">
-                <div className="col-sm-3 text-right">
+                <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     To
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
+                <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
                     <Field
                       className="pt-input"
@@ -183,12 +186,12 @@ class CreateContract extends Component {
                 </div>
               </div>
               <div className="row">
-                <div className="col-sm-3 text-right">
+                <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     To Address
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
+                <div className="col-sm-8 smd-pad-4">
                   <div className="pt-select">
                     <Field
                       className="pt-input"
@@ -212,12 +215,12 @@ class CreateContract extends Component {
               </div>
 
               <div className="row">
-                <div className="col-sm-3 text-right">
+                <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     Value
                   </label>
                 </div>
-                <div className="col-sm-9 smd-pad-4">
+                <div className="col-sm-8 smd-pad-4">
                   <Field
                     id="input-b"
                     className="form-width pt-input"

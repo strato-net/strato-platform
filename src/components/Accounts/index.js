@@ -85,9 +85,11 @@ class Accounts extends Component {
           <div className="col-sm-8 text-left">
             <h3>Accounts</h3>
           </div>
-          <div className="col-sm-4 pt-button-group">
-            <CreateUser/>
-            <SendEther/>
+          <div className="col-sm-4 text-right">
+            <div className="pt-button-group">
+              <SendEther/>
+              <CreateUser/>
+            </div>
           </div>
         </div>
         <div className="row">
