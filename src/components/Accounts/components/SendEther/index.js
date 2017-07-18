@@ -45,6 +45,12 @@ class CreateContract extends Component {
     this.props.fetchAccounts();
   }
 
+  componentWillReceiveProps(newProps) {
+    if (this.props.isOpen !== newProps.isOpen) {
+      this.props.fetchAccounts();
+    }
+  }
+
   render() {
     const {handleSubmit, pristine, submitting} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
@@ -242,6 +248,7 @@ class CreateContract extends Component {
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track("send_ether_cancel");
                   this.props.sendEtherCloseModal()
+                  this.props.fetchAccounts()
                 }}/>
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
