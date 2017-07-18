@@ -10,8 +10,7 @@ import {
 
 const initialState = {
   isOpen: false,
-  toUsername: '',
-  fromUsername: '',
+  result: 'Waiting to send...'
 };
 
 
@@ -19,6 +18,7 @@ const reducer = function (state = initialState, action) {
   switch (action.type) {
     case SEND_ETHER:
       return {
+        ...state,
         from: action.from,
         fromAddress: action.fromAddress,
         password: action.password,
@@ -26,16 +26,17 @@ const reducer = function (state = initialState, action) {
         toAddress: action.toAddress,
         value: action.value,
         isOpen: true,
+        result: 'Sending...',
       };
     case SEND_ETHER_SUCCESS:
       return {
-        tx_receipt: action.tx_receipt,
-        ...state
+        ...state,
+        result: ['Send success\n' + JSON.stringify(action.result).replace(",", "\n")]
       };
     case SEND_ETHER_FAILURE:
       return {
-        error: action.tx_receipt,
-        ...state
+        ...state,
+        result: action.error
       };
     case SEND_ETHER_OPEN_MODAL:
       return {
@@ -44,18 +45,17 @@ const reducer = function (state = initialState, action) {
       };
     case SEND_ETHER_CLOSE_MODAL:
       return {
-        ...state,
         isOpen: false
       };
     case TO_USERNAME_CHANGE:
       return {
-        toUsername: action.toUsername,
-        ...state
+        ...state,
+        toUsername: action.toUsername
       };
     case FROM_USERNAME_CHANGE:
       return {
-        fromUsername: action.fromUsername,
-        ...state
+        ...state,
+        fromUsername: action.fromUsername
       };
     default:
       return state;

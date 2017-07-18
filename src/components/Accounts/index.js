@@ -82,10 +82,10 @@ class Accounts extends Component {
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
-          <div className="col-sm-4 text-left">
+          <div className="col-sm-8 text-left">
             <h3>Accounts</h3>
           </div>
-          <div className="col-sm-8 text-right">
+          <div className="col-sm-4 pt-button-group">
             <CreateUser/>
             <SendEther/>
           </div>

@@ -42,7 +42,6 @@ function* sendEther(action) {
         action.value,
         action.password
     );
-    console.log(response);
     yield put(sendEtherSuccess(response));
   }
   catch (err) {

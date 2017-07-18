@@ -8,7 +8,7 @@ import {
 } from './sendEther.actions';
 import {fetchAccounts} from '../../accounts.actions';
 import {Button, Dialog} from '@blueprintjs/core';
-import {Field, reduxForm} from 'redux-form';
+import {Field, reduxForm, formValueSelector} from 'redux-form';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -17,13 +17,13 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class CreateContract extends Component {
 
-  handleFromUsernameChange = (e) => {
-    this.props.fromUsernameChange(e.target.value);
-  };
-
-  handleToUsernameChange = (e) => {
-    this.props.toUsernameChange(e.target.value);
-  };
+  // handleFromUsernameChange = (e) => {
+  //   this.props.fromUsernameChange(e.target.value);
+  // };
+  //
+  // handleToUsernameChange = (e) => {
+  //   this.props.toUsernameChange(e.target.value);
+  // };
 
   submit = (values) => {
       const payload = {
@@ -35,7 +35,6 @@ class CreateContract extends Component {
         value: values.value
       };
 
-      console.log(payload);
       this.props.sendEther(payload);
       mixpanelWrapper.track('send_ether_submit_click_successful');
       this.props.reset();
@@ -52,11 +51,11 @@ class CreateContract extends Component {
 
     const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
-      : null;
+      : [];
 
     const toUserAddresses = this.props.accounts && this.props.toUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.toUsername])
-      : null;
+      : [];
 
     return (
       <div className="smd-pad-16">
@@ -86,7 +85,7 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="from"
-                      onChange={this.handleFromUsernameChange}
+                      // onChange={this.handleFromUsernameChange}
                       required
                     >
                       <option />
@@ -162,7 +161,7 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="to"
-                      onChange={this.handleToUsernameChange}
+                      // onChange={this.handleToUsernameChange}
                       required
                     >
                       <option />
@@ -226,6 +225,16 @@ class CreateContract extends Component {
                   />
                 </div>
               </div>
+
+              <div className="row">
+                <div className="col-sm-12">
+                  <hr />
+                  <h5>Results</h5>
+                  <pre className="smd-scrollable">
+                    {this.props.result} <br/>
+                  </pre>
+                </div>
+              </div>
             </div>
 
             <div className="pt-dialog-footer">
@@ -249,13 +258,15 @@ class CreateContract extends Component {
   }
 }
 
+const selector = formValueSelector('send-ether');
+
 function mapStateToProps(state) {
   return {
     isOpen: state.sendEther.isOpen,
-    tx_receipt: state.sendEther.tx_receipt,
+    result: state.sendEther.result,
     accounts: state.accounts.accounts,
-    fromUsername: state.sendEther.fromUsername,
-    toUsername: state.sendEther.toUsername
+    fromUsername: selector(state, 'from'),
+    toUsername: selector(state, 'to')
   };
 }
 

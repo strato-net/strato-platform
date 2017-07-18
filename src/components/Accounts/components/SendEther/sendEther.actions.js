@@ -15,29 +15,29 @@ export const sendEther = function(payload) {
 
 export const fromUsernameChange = function(from) {
   return {
-    from,
+    fromUsername: from,
     type: FROM_USERNAME_CHANGE
   }
 };
 
 export const toUsernameChange = function(to) {
   return {
-    to,
+    toUsername: to,
     type: TO_USERNAME_CHANGE
   }
 };
 
-export const sendEtherSuccess = function(tx_receipt) {
+export const sendEtherSuccess = function(result) {
   return {
-    tx_receipt,
-    type : SEND_ETHER,
+    result: result,
+    type : SEND_ETHER_SUCCESS,
   }
 };
 
 export const sendEtherFailure = function(error) {
   return {
-    error,
-    type : SEND_ETHER,
+    error: error,
+    type : SEND_ETHER_FAILURE,
   }
 };
 
