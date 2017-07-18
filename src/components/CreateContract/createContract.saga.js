@@ -19,6 +19,7 @@ import { env } from '../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract"
 const compileUrl = env.STRATO_URL + "/extabi";
+const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 function createContractApiCall(contract, src, username, address, password, args) {
   return fetch(
@@ -39,7 +40,27 @@ function createContractApiCall(contract, src, username, address, password, args)
   });
 }
 
-function compileContractApiCall(name,src) {
+function compileContractApiCall(contractName,source, s) {
+  const searchable = [contractName];
+
+  fetch(
+    blocCompileUrl,
+    {
+      method: 'POST',
+      headers: {
+        "accept": "application/json",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify([{"contractName": contractName, "source": source, "searchable": searchable}])
+    })
+    .then(function(response) {
+      console.log(response.json())
+    })
+    .catch(function(error) {
+      console.log(error)
+      throw error;
+    });
+
     return fetch(
       compileUrl,
       {
@@ -48,7 +69,7 @@ function compileContractApiCall(name,src) {
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body:
-          "src="+encodeURIComponent(src)
+          "src="+encodeURIComponent(source)
         })
       .then(function(response) {
         return response.json();
@@ -79,7 +100,8 @@ function* createContract(action) {
 
 function* compileContract(action) {
   try {
-    let response = yield call(compileContractApiCall, action.name, action.contract);
+    console.log(action);
+    let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
     yield put(compileContractSuccess(response));
   }
   catch (err) {

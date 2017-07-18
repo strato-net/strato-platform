@@ -65,11 +65,12 @@ export const createContractFailure = function(error) {
   }
 }
 
-export const compileContract = function(name,contract) {
+export const compileContract = function(name,contract, searchable) {
   return {
     type: COMPILE_CONTRACT,
     name: name,
     contract: contract,
+    searchable: searchable,
     compileSuccess: false,
     isOpen: true,
   }
