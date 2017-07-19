@@ -6,6 +6,7 @@ import {Text, Tooltip, Position} from '@blueprintjs/core';
 import {withRouter} from 'react-router-dom';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
+import SendEther from './components/SendEther';
 
 class Accounts extends Component {
 
@@ -81,11 +82,14 @@ class Accounts extends Component {
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
-          <div className="col-sm-9 text-left">
+          <div className="col-sm-8 text-left">
             <h3>Accounts</h3>
           </div>
-          <div className="col-sm-3 text-right">
-            <CreateUser/>
+          <div className="col-sm-4 text-right">
+            <div className="pt-button-group">
+              <SendEther/>
+              <CreateUser/>
+            </div>
           </div>
         </div>
         <div className="row">
