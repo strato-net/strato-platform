@@ -42,7 +42,6 @@ function createContractApiCall(contract, src, username, address, password, args)
 
 function compileContractApiCall(contractName,source, s) {
   const searchable = [contractName];
-  console.log(s);
   if (s) {
       fetch(
           blocCompileUrl,
@@ -55,10 +54,9 @@ function compileContractApiCall(contractName,source, s) {
               body: JSON.stringify([{"contractName": contractName, "source": source, "searchable": searchable}])
           })
           .then(function (response) {
-              console.log(response.json())
+              return response.json()
           })
           .catch(function (error) {
-              console.log(error)
               throw error;
           });
   }
@@ -102,7 +100,6 @@ function* createContract(action) {
 
 function* compileContract(action) {
   try {
-    console.log(action);
     let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
     yield put(compileContractSuccess(response));
   }

@@ -62,7 +62,6 @@ class CreateContract extends Component {
   handleFileUpload = (files) => {
     const contract = files[0];
     if (contract && (!contract.name || !contract.name.includes('.sol'))) {
-      console.log('file upload rejected')
       //TODO: Toaster message for rejected upload
       return;
     }
@@ -108,7 +107,6 @@ class CreateContract extends Component {
         arguments: args,
       };
 
-      console.log(payload);
 
       mixpanelWrapper.track('create_contract_submit_click_successful');
       this.props.createContract(payload);
@@ -360,7 +358,6 @@ const validate = (values) => {
       errors[val] = val + " Required";
     }
   });
-  console.log(errors);
   return errors
 };
 
