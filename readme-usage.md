@@ -8,14 +8,22 @@ SMD has plenty of features spread across several views
 - View Peers to understand your network topology
 - Metrics like Block Number, Difficulty, Users, and more
 - Live Graphs to monitor network activity
+
 ![Health Check](http://i.imgur.com/kKEaOoc.gif)
+
 - Recent Transactions
+
 ![Recent Transactions](http://i.imgur.com/GEu9ZGM.gif)
 
 ## Blocks
 
 - A query builder that allows you to query your blockchain
+
+![Query Blocks](http://i.imgur.com/c2rJicT.gif)
+
 - Click on a row to see a comprehensive view of a block
+
+![Block Details](http://i.imgur.com/pTvT1q2.gif)
 
 ## Transactions
 
@@ -26,12 +34,44 @@ SMD has plenty of features spread across several views
 
 - A table containing all accounts on your blockchain
 - Click on a row to see a comprehensive view of an account
+
+![Account Details](http://i.imgur.com/AUvv5FM.gif)
+
 - A search function, to quickly get information on a specific account
+
+![Search Accounts](http://i.imgur.com/QKSOpoE.gif)
 
 ## Contracts
 
 - View all contracts on the blockchain
 - View the state of a specific contract, as well as previously uploaded versions of the same contract
+
+![Contract State](http://i.imgur.com/IxRPaSX.gif)
+
+- Upload contracts through a simple drag and drop, supplying constructor arguments as needed
+
+1. Click Create Contract and Fill out the Form
+
+![Upload Contract 1](http://i.imgur.com/Q0CwRIT.gif)
+
+2. Drag and Drop the Contract (.sol file) to Upload
+
+![Upload Contract 2](http://i.imgur.com/7E5ZflL.gif)
+
+3. Provide Constructor Arguments (If there are any)
+4. Upload!
+5. Verify Upload
+
+![Upload Contract 3](http://i.imgur.com/Da1hxMN.gif)
+
 - Query the contract using Cirrus
 - Call Methods on any contract
-- Upload contracts through a simple drag and drop, supplying constructor arguments as needed
+
+1. Click an Instance of A Contract (A row in the table)
+2. Click Call Method, Fill Out the Form
+
+![Call Contract Method 1](http://i.imgur.com/QdhdSkq.gif)
+
+3. Submit and View Results
+
+![Call Contract Method 2](http://i.imgur.com/30bhdEz.gif)
