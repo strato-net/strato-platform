@@ -74,7 +74,11 @@ const reducer = function (state = initialState, action) {
         let i = 0;
         for(i; i < state.contracts[action.name].instances.length; i++) {
           if(state.contracts[action.name].instances[i].address === instance.address) {
-            break;
+            // break;
+              return {
+                  ...instance,
+                  fromCirrus: true
+              };
           }
         }
 
