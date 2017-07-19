@@ -156,6 +156,7 @@ class CreateContract extends Component {
                     title="Enter value"
                     type="text"
                     dir="auto"
+                    required
                   />
                 </td>
               </tr>
@@ -289,6 +290,7 @@ class CreateContract extends Component {
                     component={this.renderDropzoneInput}
                     dir="auto"
                     title="Contract Source"
+                    required
                   />
                 </div>
               </div>
