@@ -6,9 +6,11 @@ SMD has plenty of features spread across several views
 
 - At A Glance health check of your Blockchain
 - View Peers to understand your network topology
-- Recent Transactions
-- Live Graphs to monitor network activity
 - Metrics like Block Number, Difficulty, Users, and more
+- Live Graphs to monitor network activity
+![Health Check](http://i.imgur.com/kKEaOoc.gif)
+- Recent Transactions
+![Recent Transactions](http://i.imgur.com/GEu9ZGM.gif)
 
 ## Blocks
 
