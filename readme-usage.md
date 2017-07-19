@@ -41,6 +41,15 @@ SMD has plenty of features spread across several views
 
 ![Search Accounts](http://i.imgur.com/QKSOpoE.gif)
 
+- A form to send funds between accounts
+1. Click Send Ether and Fill out the Form
+
+![Send Funds 1](http://i.imgur.com/NI0L5SD.gif)
+
+2. Submit and View the Results
+
+![Send Funds 2](http://i.imgur.com/TficfFo.gif)
+
 ## Contracts
 
 - View all contracts on the blockchain
