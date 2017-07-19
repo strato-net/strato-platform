@@ -9,6 +9,7 @@ sed -i "s|__STRATO_DOC_URL__|$STRATO_DOC_URL|g" build/index.html
 sed -i "s|__BLOC_DOC_URL__|$BLOC_DOC_URL|g" build/index.html
 sed -i "s|__CIRRUS_URL__|$CIRRUS_URL|g" build/index.html
 
+STRATO_GS_MODE=${STRATO_GS_MODE:-}
 # Started by non-BA user (smd_container_started)
 if [ "$STRATO_GS_MODE" != "1" ]; then
   curl http://api.mixpanel.com/track/?data=ewogICAgImV2ZW50IjogInNtZF9jb250YWluZXJfc3RhcnRlZCIsCiAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAidG9rZW4iOiAiZGFmMTcxZTkwMzBhYmIzZTMwMmRmOWQ3OGI2YjFhYTAiCiAgICB9Cn0=&ip=1
