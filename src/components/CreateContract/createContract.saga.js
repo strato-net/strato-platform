@@ -42,24 +42,26 @@ function createContractApiCall(contract, src, username, address, password, args)
 
 function compileContractApiCall(contractName,source, s) {
   const searchable = [contractName];
-
-  fetch(
-    blocCompileUrl,
-    {
-      method: 'POST',
-      headers: {
-        "accept": "application/json",
-        "content-type": "application/json"
-      },
-      body: JSON.stringify([{"contractName": contractName, "source": source, "searchable": searchable}])
-    })
-    .then(function(response) {
-      console.log(response.json())
-    })
-    .catch(function(error) {
-      console.log(error)
-      throw error;
-    });
+  console.log(s);
+  if (s) {
+      fetch(
+          blocCompileUrl,
+          {
+              method: 'POST',
+              headers: {
+                  "accept": "application/json",
+                  "content-type": "application/json"
+              },
+              body: JSON.stringify([{"contractName": contractName, "source": source, "searchable": searchable}])
+          })
+          .then(function (response) {
+              console.log(response.json())
+          })
+          .catch(function (error) {
+              console.log(error)
+              throw error;
+          });
+  }
 
     return fetch(
       compileUrl,

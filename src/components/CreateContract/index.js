@@ -258,22 +258,23 @@ class CreateContract extends Component {
                 </div>
               </div>
               <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Searchable
-                  </label>
+                <div className="col-sm-3">
                 </div>
-                <div className="col-sm-9 smd-pad-4 pt-switch">
-                  <Field
-                    id="input-b"
-                    className="form-width"
-                    name="searchable"
-                    type="checkbox"
-                    component="input"
-                    dir="auto"
-                    title="Searchable"
-                    required
-                  />
+                <div className="col-sm-9 smd-pad-4">
+                  <label className="pt-control pt-checkbox">
+                    <Field
+                        id="input-b"
+                        className="form-width"
+                        name="searchable"
+                        type="checkbox"
+                        component="input"
+                        dir="auto"
+                        title="Searchable"
+                        required
+                    />
+                  <span className="pt-control-indicator"></span>
+                    Searchable
+                </label>
                 </div>
               </div>
               <div className="row">
