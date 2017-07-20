@@ -26,7 +26,8 @@ const reducer = function (state = initialState, action) {
       };
     case FETCH_CONTRACTS_SUCCESS:
       let received_contracts = Object.getOwnPropertyNames(action.contracts).reduce(function(result, contractName) {
-        result[contractName] = {instances: action.contracts[contractName]};
+        const instances = action.contracts[contractName].map((contract) => {contract.fromBloc = true; return contract});
+        result[contractName] = {instances: instances};
         return result;
       }, {});
       return {
@@ -77,20 +78,19 @@ const reducer = function (state = initialState, action) {
             // break;
               return {
                   ...instance,
-                  fromCirrus: true
+                  fromCirrus: true,
+                  fromBloc: true
               };
           }
         }
 
-        if(i === state.contracts[action.name].instances.length) {
+        //if(i === state.contracts[action.name].instances.length) {
           return {
             ...instance,
-            fromCirrus: true
+            fromCirrus: false,
+              fromBloc: true
           };
-        }
-
-        return state.contracts[action.name].instances[i];
-
+        //}
       });
 
       return {
@@ -102,7 +102,7 @@ const reducer = function (state = initialState, action) {
         },
         filter: state.filter,
         error: state.error
-      }
+      };
     case SELECT_CONTRACT_INSTANCE:
       const cInstances = state.contracts[action.name].instances
         .map(function(instance, i){
