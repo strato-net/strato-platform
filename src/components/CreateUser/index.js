@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {openOverlay, closeOverlay, createUser} from './createUser.actions';
-import {Button, Dialog, Intent, Spinner} from '@blueprintjs/core';
+import {Button, Dialog, Intent} from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
