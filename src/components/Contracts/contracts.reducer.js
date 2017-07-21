@@ -32,7 +32,7 @@ const reducer = function (state = initialState, action) {
         if (stateContracts[contractName]) {
           newInstances = action.contracts[contractName].map((contract, i) => {
             const contractInStateInstances = stateContracts[contractName].instances;
-            const contractInState = contractInStateInstances ? contractInStateInstances.filter((contractsInState) => {return contractsInState.address === contract.address}) : undefined;
+            const contractInState = contractInStateInstances ? contractInStateInstances.filter((contractsInState) => {return contractsInState.address === contract.address && contractsInState.name === contract.name}) : undefined;
             if (contractInState && contractInState.length > 0 && contractInState[0].fromCirrus) {
               indexed = true;
               return contractInState[0]
@@ -67,7 +67,6 @@ const reducer = function (state = initialState, action) {
           return result;
         }
       }, {});
-
       return {
         contracts: received_contracts,
         filter: state.filter,
