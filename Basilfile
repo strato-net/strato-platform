@@ -17,9 +17,7 @@ deployments:
       restart: always
       depends_on:
         - strato
-        - bloch 
-      ports:
-        - "3002:3002"
+        - bloch
       environment:
         NODE_NAME: "${NODE_NAME}"
         BLOC_URL: "${BLOC_URL}"
@@ -73,12 +71,6 @@ deployments:
         postgres_password: "${cirrus_pg_password}"
         postgres_host: "${cirrus_pg_host:-postgres}"
         postgres_port: "${cirrus_pg_port:-5432}"
-      # todo: not working with basil build 138 (lack of support for v2.1 syntax in lib-compose)
-      #healthcheck:
-        #test: ["CMD", "curl", "-f", "localhost:3333"]
-        #interval: 1s
-        #timeout: 1s
-        #retries: 40
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
@@ -182,7 +174,7 @@ deployments:
         ZOO_MY_ID: "1"
       ports:
         - "2181:2181"
-  
+
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
     ref: master
@@ -192,7 +184,7 @@ deployments:
         API_URL: "/strato-api/eth/v1.2/swagger.json"
       ports:
         - "8080:8080"
-  
+
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
     ref: master
