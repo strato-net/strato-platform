@@ -19,36 +19,49 @@ describe("Send Transaction Test", function() {
   const etherToSend = 8;
 
   before(function* () {
+    // create a pair of users on every node
     for (let node of nodes) {
+      // create
       const aliceName = `Alice_${node.id}_${uid}`;
       const alice = yield rest.createUser(aliceName, password, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
       const bob = yield rest.createUser(bobName, password, node.id);
       const pair = {alice: alice, bob:bob};
       userPairs[node.id]= pair;
-      const users = rest.getUsers(node.id);
+      // test creation on the node
+      const users = yield rest.getUsers(node.id);
+      const found = users.filter(user => {
+        return user === aliceName || user === bobName;
+      });
+      assert.equal(found.length, 2, 'must find both');
     }
   });
 
-  it.only('should send correct amount of ether between all couples', function* () {
-    throw new Error(999);
+  it.only('should send correct amount of ether between all pairs', function* () {
     // for each node
     for (let node of nodes) {
       // send alice->bob on that node
       const pair = userPairs[node.id];
       yield send(node.id, pair.alice, pair.bob, etherToSend);
-      // TODO delay
-      console.log('delay');
+      // delay
+      yield sleep(1*1000);
       // check balance for those accounts on each node
       yield checkBalance(pair.alice, pair.bob, etherToSend);
     }
   });
 
+  function sleep(milli) {
+    console.log('sleep', milli);
+    return new Promise(resolve => setTimeout(resolve, milli));
+  }
+
   function* send(nodeId, alice, bob, etherToSend) {
     console.log('send', nodeId, alice.name, bob.name, etherToSend);
-    const receipt = yield rest.send(alice, bob, etherToSend);
-    const txResult = yield rest.transactionResult(receipt.hash);
+    const nonce = undefined; // NOT specifying nonce
+    const receipt = yield rest.send(alice, bob, etherToSend, nonce, nodeId);
+    const txResult = yield rest.transactionResult(receipt.hash, nodeId);
     assert.equal(txResult[0].status, 'success', 'tx status');
+    return txResult[0];
   }
 
   function* checkBalance(alice, bob, etherToSend) {
