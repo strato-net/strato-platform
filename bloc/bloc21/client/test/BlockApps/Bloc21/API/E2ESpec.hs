@@ -52,7 +52,7 @@ spec =
       let
         Right address1 = postUsersEither1
         Right address2 = postUsersEither2
-        initialWei = etherToWei 1000
+        initialWei = 1000
         params1 = accountsFilterParams {qaAddress = Just address1}
         params2 = accountsFilterParams {qaAddress = Just address2}
       accts1 <- runClientM
@@ -72,8 +72,8 @@ spec =
       balance2 `shouldBe` initialWei
       threadDelay 4000000
       let
-        etherToSend = 100
-        postSendParameters = PostSendParameters address2 (Strung etherToSend) pw txParams
+        weiToSend = 100
+        postSendParameters = PostSendParameters address2 (Strung weiToSend) pw txParams
       postSendEither <- runClientM (postUsersSend userName1 address1 postSendParameters) (ClientEnv mgr blocUrl)
       postSendEither `shouldSatisfy` isRight
       threadDelay 4000000
@@ -84,7 +84,7 @@ spec =
       let
         Right (account2AS : _) = accts2AfterSend
         balance2AS = unStrung (accountBalance account2AS)
-      balance2AS `shouldBe` initialWei + etherToWei etherToSend
+      balance2AS `shouldBe` initialWei + weiToSend
 
     it "should create SimpleStorage contract, call methods and check state" $ \ TestConfig {..} -> do
       let
