@@ -21,15 +21,17 @@ describe("Send Transaction Test", function() {
   before(function* () {
     for (let node of nodes) {
       const aliceName = `Alice_${node.id}_${uid}`;
-      const alice = yield rest.createUser(aliceName, password);
+      const alice = yield rest.createUser(aliceName, password, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
-      const bob = yield rest.createUser(bobName, password);
+      const bob = yield rest.createUser(bobName, password, node.id);
       const pair = {alice: alice, bob:bob};
       userPairs[node.id]= pair;
+      const users = rest.getUsers(node.id);
     }
   });
 
-  it('should send correct amount of ether between all couples', function* () {
+  it.only('should send correct amount of ether between all couples', function* () {
+    throw new Error(999);
     // for each node
     for (let node of nodes) {
       // send alice->bob on that node
