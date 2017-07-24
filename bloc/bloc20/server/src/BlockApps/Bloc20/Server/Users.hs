@@ -80,7 +80,7 @@ postUsersSend userName addr
   (PostSendParameters toAddr value password txParams) = do
     tx <- prepareTx
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-      (eth (fromIntegral $ unStrung value)) ByteString.empty 0
+      (Wei (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
     void $ pollTxResult hash
     return tx
@@ -108,7 +108,7 @@ postUsersContract userName addr
     argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
     tx <- prepareTx
       userName password addr Nothing (fromMaybe emptyTxParams txParams)
-      (eth (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
+      (Wei (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
     txResult <- pollTxResult hash
@@ -143,7 +143,7 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
     tx <- prepareTx
       userName pw addr Nothing (fromMaybe emptyTxParams txParams)
-      (eth (maybe 0 fromIntegral $ fmap unStrung value)) (bin <> argsBin) nonceIncr
+      (Wei (maybe 0 fromIntegral $ fmap unStrung value)) (bin <> argsBin) nonceIncr
     return ((name,cmId),tx)
   let
     namesCmIds = map fst namesCmIdsTxs
@@ -175,7 +175,7 @@ postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSen
 postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
   txs' <- for (zip txs [0..]) $ \ (SendTransaction toAddr value txParams,nonceIncr) -> prepareTx
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
-    (eth (fromIntegral $ unStrung value)) ByteString.empty nonceIncr
+    (Wei (fromIntegral $ unStrung value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
   ret <- if resolve
     then do
@@ -236,7 +236,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       userAddr
       (Just methodcallContractAddress)
       (fromMaybe emptyTxParams methodcallTxParams)
-      (eth (fromIntegral $ unStrung methodcallValue))
+      (Wei (fromIntegral $ unStrung methodcallValue))
       (sel <> argsBin)
       nonceIncr
     -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
@@ -326,7 +326,7 @@ postUsersContractMethod
       userAddr
       (Just contractAddr)
       (fromMaybe emptyTxParams txParams)
-      (eth (maybe 0 (fromIntegral . unStrung) value))
+      (Wei (maybe 0 (fromIntegral . unStrung) value))
       ((sel::ByteString) <> (argsBin::ByteString))
       0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
