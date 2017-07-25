@@ -19,6 +19,16 @@ class ContractCard extends Component {
     this.state = {isOpen: false};
   }
 
+  componentWillReceiveProps(newProps) {
+    const contract = this.props.contract.contract;
+    const newContract = newProps.contract.contract;
+    const name = this.props.contract.name;
+    const newName = newProps.contract.name;
+    if (contract && newContract && name === newName && contract.instances.length < newContract.instances.length) {
+      this.props.fetchCirrusInstances(newName);
+    }
+  }
+
   render() {
     let cardData = [];
     const name = this.props.contract.name;
@@ -95,6 +105,7 @@ class ContractCard extends Component {
                       contractAddress={instance.address}
                       symbolName={symbol}
                       fromCirrus={instance.fromCirrus}
+                      fromBloc={instance.fromBloc}
                     />
                     : null
                 }

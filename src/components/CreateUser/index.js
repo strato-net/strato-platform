@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {openOverlay, closeOverlay, createUser} from './createUser.actions';
-import {Button, Dialog, Intent, Spinner} from '@blueprintjs/core';
+import {Button, Dialog, Intent} from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
@@ -20,6 +20,7 @@ class CreateUser extends Component {
   }
 
   render() {
+
     return (
       <div className="smd-pad-16">
         <Button onClick={() => {
@@ -36,9 +37,8 @@ class CreateUser extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
-              <div className="pt-form-group">
-
-                <div className="input">
+              <div className="pt-form-group input">
+                <div className={"input" + (this.props.errors && this.props.errors.password) ? "pt-form-group pt-intent-danger" : ""}>
                   <label className="pt-label" htmlFor="input-a">
                     Username
                   </label>
@@ -49,12 +49,13 @@ class CreateUser extends Component {
                       type="text"
                       placeholder="Username"
                       className="pt-input form-width"
+                      required
                     />
-                    <div className="pt-form-helper-text">Pick a username</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.username}</div>
                   </div>
                 </div>
 
-                <div className="input">
+                <div className={"input" + (this.props.errors && this.props.errors.password) ? "pt-form-group pt-intent-danger" : ""}>
                   <label className="pt-label" htmlFor="input-b">
                     Password
                   </label>
@@ -62,15 +63,16 @@ class CreateUser extends Component {
                     <Field
                       name="password"
                       component="input"
-                      type="text"
+                      type="password"
                       placeholder="Password"
                       className="pt-input form-width"
+                      required
                     />
-                    <div className="pt-form-helper-text">Pick a password</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.password}</div>
                   </div>
                 </div>
 
-                <div className="input">
+                <div className={"input" + (this.props.errors && this.props.errors.password) ? "pt-form-group pt-intent-danger" : ""}>
                   <label className="pt-label" htmlFor="input-b">
                     Confirm Password
                   </label>
@@ -78,19 +80,19 @@ class CreateUser extends Component {
                     <Field
                       name="confirm_password"
                       component="input"
-                      type="text"
+                      type="password"
                       placeholder="Confirm Password"
                       className="pt-input form-width"
+                      required
                     />
-                    <div className="pt-form-helper-text">Pick a password</div>
+                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.confirm_password}</div>
                   </div>
                 </div>
               </div>
 
               <div>
                 <div className="col-sm-3"></div>
-                <div className="col-sm-3">{this.props.compileSuccess ? <Spinner className="text-center"/> :
-                  <span></span>}</div>
+                <div className="col-sm-3"></div>
                 <div className="col-sm-3"></div>
               </div>
             </div>
@@ -116,13 +118,34 @@ class CreateUser extends Component {
 }
 
 function mapStateToProps(state) {
+  let errors = {errors: undefined};
+  if (state.form && state.form["create-user"]) {
+    errors = {errors: state.form["create-user"].syncErrors}
+  }
   return {
     isOpen: state.createUser.isOpen,
-    spinning: state.createUser.compileSuccess
+    ...errors
   };
 }
 
-const formed = reduxForm({ form: 'create-user' })(CreateUser);
+function validate (values) {
+  const errors = {};
+  if (!values.username) {
+    errors.username = "Username Required";
+  }
+  if (!values.password) {
+    errors.password = "Password Required";
+  }
+  if (!values.confirm_password) {
+    errors.confirm_password = "Must Confirm Password";
+  }
+  if (values.password !== values.confirm_password) {
+    errors.confirm_password = "Passwords Do Not Match";
+  }
+  return errors;
+}
+
+const formed = reduxForm({ form: 'create-user', validate })(CreateUser);
 const connected = connect(
   mapStateToProps,
   {
