@@ -20,10 +20,9 @@ BUILDER_HOME=$(BASIL_HOME)/blockapps/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
 
-SOLCBRANCH=v0.4.12-develop-nomd
-SOLCREPOSITORY=https://github.com/blockapps/solidity.git
-SOLCSRCDIR=$(SOLCWORK)/solidity
-SOLCBUILDDIR=$(SOLCSRCDIR)/build
+SOLCBRANCH=v0.4.10-nomd
+SOLCREPOSITORY=https://github.com/ethereum/solidity.git
+SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 SOLCCMAKE=cd $(SOLCSRCDIR) && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
