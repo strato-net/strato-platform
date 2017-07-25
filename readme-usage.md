@@ -1,6 +1,6 @@
 # Cirrus
 
-Cirrus is a service that indexes smart contracts and allows the use of a RESTful API to query contract data.
+To make it easy to view smart contract state we built Cirrus, a service that indexes smart contracts and allows the use of a RESTful API to query contract data.
 
 ### Uploading a Contract to Cirrus
 
