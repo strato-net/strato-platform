@@ -21,7 +21,7 @@ DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
 
 SOLCBRANCH=v0.4.10-nomd
-SOLCREPOSITORY=https://github.com/ethereum/solidity.git
+SOLCREPOSITORY=https://github.com/blockapps/solidity.git
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
 ifeq ($(USE_DOCKER_BUILD_ENV),)
