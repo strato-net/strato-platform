@@ -15,7 +15,6 @@ import           Data.Maybe
 import qualified Data.Text.Encoding               as Text
 import qualified Data.Text                        as Text
 import qualified Data.Vector                      as Vector
-import           Numeric.Natural
 import           Servant.Client
 import           Test.Hspec
 
@@ -33,9 +32,6 @@ import           BlockApps.Strato.Types
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
-etherToWei :: Natural -> Natural
-etherToWei x = 1000000000000000000 * x
-
 spec :: SpecWith TestConfig
 spec =
   describe "Integration Tests" $ do
@@ -52,7 +48,7 @@ spec =
       let
         Right address1 = postUsersEither1
         Right address2 = postUsersEither2
-        initialWei = 1000
+        initialWei = 1000000000000000000000
         params1 = accountsFilterParams {qaAddress = Just address1}
         params2 = accountsFilterParams {qaAddress = Just address2}
       accts1 <- runClientM
