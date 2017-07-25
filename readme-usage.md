@@ -59,21 +59,24 @@ The management dashboard can be accessed by accessing the machine on which the i
 
 - Upload contracts through a simple drag and drop, supplying constructor arguments as needed
 
-1. Click Create Contract and Fill out the Form
+1. Click Create Contract and Fill out the Form. Check the "Searchable" box if you want to be able to query the state of the contract using Cirrus. You will only have to upload a contract as "Searchable" once for all future instances of that contract to be indexed in Cirrus.
 
-![Upload Contract 1](http://i.imgur.com/Q0CwRIT.gif)
+![Upload Contract 1](http://i.imgur.com/tSVtm4z.gif)
 
 2. Drag and Drop the Contract (.sol file) to Upload
 
-![Upload Contract 2](http://i.imgur.com/7E5ZflL.gif)
+![Upload Contract 2](http://i.imgur.com/s2vB7v8.gif)
 
 3. Provide Constructor Arguments (If there are any)
 4. Upload!
 5. Verify Upload
 
-![Upload Contract 3](http://i.imgur.com/Da1hxMN.gif)
+![Upload Contract 3](http://i.imgur.com/WgSLog1.gif)
 
 - Query the contract using Cirrus
+1. Click the Query Builder button on an *indexed* contract
+2. Form your query using the query builder
+
 - Call Methods on any contract
 
 1. Click an Instance of A Contract (A row in the table)
