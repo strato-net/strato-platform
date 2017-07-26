@@ -27,7 +27,7 @@ SOLCMAKEFLAGS=-j4
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
 else
-SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd $(SOLCBUILDDIR) && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
+SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
 endif
 SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
