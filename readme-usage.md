@@ -1,4 +1,4 @@
-# Strato Management Dashboard
+# STRATO Management Dashboard
 
 The management dashboard can be accessed by accessing the machine on which the installation was performed on port 80. For [strato-getting-started](http://developers.blockapps.net/install/local/), this is the [localhost](http://localhost). SMD has plenty of features spread across several views.
 
