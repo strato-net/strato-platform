@@ -11,7 +11,7 @@ import {fetchAccounts} from '../Accounts/accounts.actions';
 import {fetchContracts} from '../Contracts/contracts.actions';
 import {Button, Dialog} from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
-import {Field, reduxForm} from 'redux-form';
+import {Field, reduxForm, formValueSelector} from 'redux-form';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
@@ -62,7 +62,6 @@ class CreateContract extends Component {
   handleFileUpload = (files) => {
     const contract = files[0];
     if (contract && (!contract.name || !contract.name.includes('.sol'))) {
-      console.log('file upload rejected')
       //TODO: Toaster message for rejected upload
       return;
     }
@@ -77,7 +76,8 @@ class CreateContract extends Component {
       );
       self.props.compileContract(
         contract.name.substring(0, contract.name.indexOf('.')),
-        fileContents
+        fileContents,
+        self.props.searchable
       );
     };
     reader.readAsText(contract);
@@ -102,11 +102,11 @@ class CreateContract extends Component {
         username: values.username,
         address: values.address,
         password: values.password,
+        searchable: values.searchable,
         fileText: this.props.contract,
         arguments: args,
       };
 
-      console.log(payload);
 
       mixpanelWrapper.track('create_contract_submit_click_successful');
       this.props.createContract(payload);
@@ -118,6 +118,7 @@ class CreateContract extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
+    this.props.reset();
     this.props.fetchAccounts();
   }
 
@@ -256,6 +257,26 @@ class CreateContract extends Component {
                 </div>
               </div>
               <div className="row">
+                <div className="col-sm-3">
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <label className="pt-control pt-checkbox">
+                    <Field
+                        id="input-b"
+                        className="form-width"
+                        name="searchable"
+                        type="checkbox"
+                        component="input"
+                        dir="auto"
+                        title="Searchable"
+                        required
+                    />
+                  <span className="pt-control-indicator"></span>
+                    Searchable
+                </label>
+                </div>
+              </div>
+              <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Source file
@@ -339,9 +360,10 @@ const validate = (values) => {
       errors[val] = val + " Required";
     }
   });
-  console.log(errors);
   return errors
 };
+
+const selector = formValueSelector('create-contract');
 
 function mapStateToProps(state) {
   return {
@@ -352,7 +374,8 @@ function mapStateToProps(state) {
     filename: state.createContract.filename,
     contract: state.createContract.contract,
     accounts: state.accounts.accounts,
-    username: state.createContract.username
+    username: state.createContract.username,
+    searchable: selector(state, 'searchable')
   };
 }
 

@@ -100,8 +100,6 @@ class TransactionView extends Component {
 
 function mapStateToProps(state, ownProps) {
   const hash = ownProps.match.params.hash;
-  console.log("TX", state.transactions.tx.filter((val) => {return val.hash === hash}));
-  console.log("query", state.queryEngine.queryResult);
   return {
     tx: state.transactions.tx.filter((val) => {return val.hash === hash})[0] || state.queryEngine.queryResult.filter((val) => {return val.hash === hash})[0]
   };

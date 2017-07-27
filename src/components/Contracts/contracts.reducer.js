@@ -25,9 +25,47 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case FETCH_CONTRACTS_SUCCESS:
-      let received_contracts = Object.getOwnPropertyNames(action.contracts).reduce(function(result, contractName) {
-        result[contractName] = {instances: action.contracts[contractName]};
-        return result;
+      const stateContracts = state.contracts;
+      let received_contracts = Object.getOwnPropertyNames(action.contracts).reduce(function (result, contractName) {
+        let newInstances = [];
+        let indexed = false;
+        if (stateContracts[contractName]) {
+          newInstances = action.contracts[contractName].map((contract, i) => {
+            const contractInStateInstances = stateContracts[contractName].instances;
+            const contractInState = contractInStateInstances ? contractInStateInstances.filter((contractsInState) => {return contractsInState.address === contract.address && contractsInState.name === contract.name}) : undefined;
+            if (contractInState && contractInState.length > 0 && contractInState[0].fromCirrus) {
+              indexed = true;
+              return contractInState[0]
+            }
+            else if (indexed){
+                return {
+                  ...contract,
+                  fromBloc: true,
+                  fromCirrus: true
+                };
+              }
+            else {
+              return {
+                ...contract,
+                fromBloc: true,
+                fromCirrus: false
+              }
+            }
+          });
+          result[contractName] = {instances: newInstances};
+          return result;
+        }
+        else {
+          newInstances = action.contracts[contractName]
+            .map((contract) => {
+              return {
+                ...contract,
+                fromBloc: true
+              }
+          });
+          result[contractName] = {instances: newInstances};
+          return result;
+        }
       }, {});
       return {
         contracts: received_contracts,
@@ -48,8 +86,8 @@ const reducer = function (state = initialState, action) {
       }
     case FETCH_STATE_SUCCESS:
       const instances = state.contracts[action.name].instances
-        .map(function(instance, i){
-          if(instance.address !== action.address) {
+        .map(function (instance, i) {
+          if (instance.address !== action.address) {
             return instance
           }
           return {
@@ -72,21 +110,24 @@ const reducer = function (state = initialState, action) {
       const cirrusInstances = action.instances.map((instance) => {
         // if instance exists
         let i = 0;
-        for(i; i < state.contracts[action.name].instances.length; i++) {
-          if(state.contracts[action.name].instances[i].address === instance.address) {
-            break;
+        for (i; i < state.contracts[action.name].instances.length; i++) {
+          if (state.contracts[action.name].instances[i].address === instance.address) {
+            // break;
+            return {
+              ...instance,
+              fromCirrus: true,
+              fromBloc: true
+            };
           }
         }
 
-        if(i === state.contracts[action.name].instances.length) {
-          return {
-            ...instance,
-            fromCirrus: true
-          };
-        }
-
-        return state.contracts[action.name].instances[i];
-
+        //if(i === state.contracts[action.name].instances.length) {
+        return {
+          ...instance,
+          fromCirrus: false,
+          fromBloc: true
+        };
+        //}
       });
 
       return {
@@ -98,10 +139,10 @@ const reducer = function (state = initialState, action) {
         },
         filter: state.filter,
         error: state.error
-      }
+      };
     case SELECT_CONTRACT_INSTANCE:
       const cInstances = state.contracts[action.name].instances
-        .map(function(instance, i){
+        .map(function (instance, i) {
           return {
             ...instance,
             selected: instance.address === action.address
