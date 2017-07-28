@@ -10,7 +10,7 @@ pipeline {
         sh '''#!/bin/bash -le
           docker rm -f $(docker ps -aq) || true; docker system prune -f
           docker ps
-          sudo rm -rf silo
+          sudo rm -rf repos
         '''
        }
     }
