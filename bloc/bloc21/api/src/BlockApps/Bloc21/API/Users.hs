@@ -325,7 +325,7 @@ instance ToSchema PostUsersContractMethodRequest where
     pwSchema <- declareSchemaRef (Proxy :: Proxy Password)
     argsSchema <- declareSchemaRef (Proxy :: Proxy (Map Text ArgValue))
     txParamsSchema <- declareSchemaRef (Proxy :: Proxy (Maybe TxParams))
-    return $ NamedSchema (Just "Post Users Contract Request")
+    return $ NamedSchema (Just "Post Users Contract Method Request")
       ( mempty
         & type_ .~ SwaggerObject
         & properties .~
