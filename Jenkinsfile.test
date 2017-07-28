@@ -20,10 +20,6 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            git config --global credential.helper store
-            git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
-            cd silo
-            git checkout ${env.GIT_BRANCH}
             basil clone
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
@@ -38,7 +34,6 @@ pipeline {
     stage('Deploy') {
       steps {
         sh '''#!/bin/bash -le
-          cd silo
           basil compose > docker-compose.yml
 
           NODE_NAME=localhost \
