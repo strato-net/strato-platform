@@ -141,7 +141,7 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestContract = Just "SimpleStorage"
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = Nothing
-    , postuserscontractrequestValue = Just $ Strung 1000000
+    , postuserscontractrequestValue = Just $ Strung 10
     }
 
 instance ToSchema PostUsersContractRequest where
