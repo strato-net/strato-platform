@@ -93,13 +93,13 @@ instance ToSample PostSendParameters where
 
 instance ToSchema PostSendParameters where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
-    & mapped.schema.description ?~ "Send ether from one account to another"
+    & mapped.schema.description ?~ "Send ether from one account to another (value is in Wei)"
     & mapped.schema.example ?~ toJSON ex
     where
       ex :: PostSendParameters
       ex = PostSendParameters
         { sendToAddress = Address 0xdeadbeef
-        , sendValue = Strung 10
+        , sendValue = Strung 100000000
         , sendPassword = "securePassword"
         , sendTxParams = Just $ TxParams
             (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876))
@@ -391,7 +391,7 @@ instance ToSample PostSendListRequest where
 instance ToSchema PostSendListRequest where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
     & mapped.name ?~ "Post Users Send List Request"
-    & mapped.schema.description ?~ "Send a list of users some ether"
+    & mapped.schema.description ?~ "Send a list of users some ether (value in Wei)"
     & mapped.schema.example ?~ toJSON ex
     where
       ex :: PostSendListRequest
@@ -403,7 +403,7 @@ instance ToSchema PostSendListRequest where
       sendEx :: SendTransaction
       sendEx = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
-        , sendtransactionValue = Strung 12
+        , sendtransactionValue = Strung 1000000000000000
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         }
@@ -459,7 +459,7 @@ instance ToSchema SendTransaction where
       ex :: SendTransaction
       ex = SendTransaction
         { sendtransactionToAddress = Address 0xdeadbeef
-        , sendtransactionValue = Strung 12
+        , sendtransactionValue = Strung 100000000000000
         , sendtransactionTxParams = Just (TxParams (Just $ Gas 123) (Just $ Wei 345)
             (Just $ Nonce 9876))
         }
@@ -556,7 +556,7 @@ methodErroredExample =
      exMethodCall :: MethodCall
      exMethodCall = MethodCall
        { methodcallTxParams = Nothing
-       , methodcallValue = Strung 10
+       , methodcallValue = Strung 1000000000
        , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
        , methodcallMethodName = "getHoroscope"
        , methodcallContractAddress = Address 0xdeadbeef
@@ -605,7 +605,7 @@ instance ToSchema PostMethodListRequest where
       exMethodCall :: MethodCall
       exMethodCall = MethodCall
         { methodcallTxParams = Nothing
-        , methodcallValue = Strung 10
+        , methodcallValue = Strung 1000000000
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
@@ -638,7 +638,7 @@ instance ToSchema MethodCall where
       ex ::MethodCall
       ex = MethodCall
         { methodcallTxParams = Nothing
-        , methodcallValue = Strung 10
+        , methodcallValue = Strung 1000000000
         , methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)]
         , methodcallMethodName = "getHoroscope"
         , methodcallContractAddress = Address 0xdeadbeef
