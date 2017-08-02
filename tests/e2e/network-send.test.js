@@ -37,7 +37,7 @@ describe("Send Transaction Test", function() {
     }
   });
 
-  it('should send correct amount of ether between all pairs', function* () {
+  it.skip('should send correct amount ONCE between all pairs', function* () {
     // for each node
     for (let node of nodes) {
       // send alice->bob on that node
@@ -46,6 +46,23 @@ describe("Send Transaction Test", function() {
       // check balance for those accounts on each node
       yield checkBalance(pair.alice, pair.bob, value);
     }
+  });
+
+  it('should send correct amount MULTIPLE TIMES between all pairs', function* () {
+    const count = 5;
+    // send multiple
+    for (var i=0; i < count; i++) {
+      // for each node
+      for (let node of nodes) {
+        // send alice->bob on that node
+        const pair = userPairs[node.id];
+        yield send(node.id, pair.alice, pair.bob, value);
+      }
+    }
+    // check balance for those accounts on each node
+    const pair = userPairs[0];
+    const total = value.times(count);
+    yield checkBalance(pair.alice, pair.bob, total);
   });
 
   function sleep(milli) {
