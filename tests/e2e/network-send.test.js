@@ -16,7 +16,7 @@ describe("Send Transaction Test", function() {
   const userPairs = [];
   const nodes = config.nodes;
   const password = '1234';
-  const etherToSend = 8;
+  const value = new BigNumber(8).mul(constants.ETHER); // 8 eth in wei
 
   before(function* () {
     // create a pair of users on every node
@@ -37,16 +37,14 @@ describe("Send Transaction Test", function() {
     }
   });
 
-  it.only('should send correct amount of ether between all pairs', function* () {
+  it('should send correct amount of ether between all pairs', function* () {
     // for each node
     for (let node of nodes) {
       // send alice->bob on that node
       const pair = userPairs[node.id];
-      yield send(node.id, pair.alice, pair.bob, etherToSend);
-      // delay
-      yield sleep(1*1000);
+      yield send(node.id, pair.alice, pair.bob, value);
       // check balance for those accounts on each node
-      yield checkBalance(pair.alice, pair.bob, etherToSend);
+      yield checkBalance(pair.alice, pair.bob, value);
     }
   });
 
@@ -55,31 +53,30 @@ describe("Send Transaction Test", function() {
     return new Promise(resolve => setTimeout(resolve, milli));
   }
 
-  function* send(nodeId, alice, bob, etherToSend) {
-    console.log('send', nodeId, alice.name, bob.name, etherToSend);
+  function* send(nodeId, alice, bob, value) {
+    console.log('send', nodeId, alice.name, bob.name, value.toString());
     const nonce = undefined; // NOT specifying nonce
-    const receipt = yield rest.send(alice, bob, etherToSend, nonce, nodeId);
+    const receipt = yield rest.send(alice, bob, value, nonce, nodeId);
     const txResult = yield rest.transactionResult(receipt.hash, nodeId);
     assert.equal(txResult[0].status, 'success', 'tx status');
     return txResult[0];
   }
 
-  function* checkBalance(alice, bob, etherToSend) {
+  function* checkBalance(alice, bob, value) {
     const ACCOUNT_INDEX = 0;
     const FAUCET_AWARD = new BigNumber(1000).times(constants.ETHER) ;
-    const delta = new BigNumber(etherToSend).mul(constants.ETHER);
 
     for (let node of nodes) {
       const pair = userPairs[node.id];
-      console.log('checkBalance', node.id, pair.alice.name, pair.bob.name, etherToSend);
+      console.log('checkBalance', node.id, pair.alice.name, pair.bob.name, value.toString());
       // check balances
       const aliceBalance = yield rest.getBalance(alice.address, ACCOUNT_INDEX, node.id);
       const bobBalance = yield rest.getBalance(bob.address, ACCOUNT_INDEX, node.id);
-      bobBalance.should.be.bignumber.eq(FAUCET_AWARD.plus(delta));
+      bobBalance.should.be.bignumber.eq(FAUCET_AWARD.plus(value));
     }
   }
 
-  it('should send correct amount of ether', function* () {
+  it.skip('should send correct amount of ether', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
     const bobName = 'Bob' + uid;
