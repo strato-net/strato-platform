@@ -60,7 +60,7 @@ instance PathPiece Address where
  make into a string rather than an object
 -}
 instance AS.ToJSON Address where
-  toJSON (Address x) = String $ T.pack $ padZeros 20 $ showHex x ""
+  toJSON (Address x) = String $ T.pack $ padZeros 40 $ showHex x ""
 
 instance AS.FromJSON Address where
 -- TODO- put this tighter definition back in again....  I needed to loosten the definition because genesis.json breaks some of the format.
