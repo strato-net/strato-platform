@@ -42,7 +42,7 @@ word160ToBytes word = map (fromIntegral . (word `shiftR`)) [160-8, 160-16..0]
 bytesToWord160 :: [Word8] -> Word160
 bytesToWord160 bytes | length bytes == 20 =
   sum $ map (\(shiftBits, byte) -> fromIntegral byte `shiftL` shiftBits) $ zip [160-8,160-16..0] bytes
-bytesToWord160 _ = error "bytesToWord128 was called with the wrong number of bytes"
+bytesToWord160 _ = error "bytesToWord160 was called with the wrong number of bytes"
 
 word256ToBytes :: Word256 -> [Word8]
 word256ToBytes word = map (fromIntegral . (word `shiftR`)) [256-8, 256-16..0]

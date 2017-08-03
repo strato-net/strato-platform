@@ -69,7 +69,7 @@ library
                  , hflags
                  , monad-control
 
-    exposed-modules: 
+    exposed-modules:
                    Blockchain.Constants
                    Blockchain.Data.ArbitraryInstances
                    Blockchain.Data.Address
@@ -101,7 +101,7 @@ library
                    Blockchain.DB.DetailsDB
                    Blockchain.DB.HashDB
                    Blockchain.DB.MemAddressStateDB
-                   Blockchain.DB.SQLDB   
+                   Blockchain.DB.SQLDB
                    Blockchain.DB.StateDB
                    Blockchain.DB.StorageDB
                    Blockchain.Verification
@@ -109,7 +109,7 @@ library
                    Blockchain.Stream.VMEvent
                    Blockchain.Stream.UnminedBlock
                    Blockchain.Data.Blockchain
-    other-modules: Paths_blockapps_data  
+    other-modules: Paths_blockapps_data
     ghc-options: -Wall -O2
     extensions: TemplateHaskell
     buildable: True
@@ -118,7 +118,7 @@ library
 executable global-db
     default-language: Haskell98
     ghc-options: -Wall -O2
-    build-depends: 
+    build-depends:
                    base >= 4 && < 5
                  , blockapps-data
                  , strato-conf
@@ -126,3 +126,18 @@ executable global-db
     buildable: True
     main-is: GlobalDB.hs
     hs-source-dirs: exec_src
+
+test-suite blockapps-data-test
+    type:                exitcode-stdio-1.0
+    hs-source-dirs:      test
+    main-is:             Spec.hs
+    build-depends:       aeson,
+                         base,
+                         base16-bytestring,
+                         blockapps-data,
+                         bytestring,
+                         hspec,
+                         strato-model,
+                         text
+    ghc-options:         -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
+    default-language:    Haskell2010
