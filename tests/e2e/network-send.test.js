@@ -22,6 +22,7 @@ describe("Send Transaction Test", function() {
   before(function* () {
     // create a pair of users on every node
     yield createUserPairs(uid, password, userPairs);
+    yield sleep(30);
   });
 
   it('should send correct amount ONCE between all pairs', function* () {
@@ -35,7 +36,18 @@ describe("Send Transaction Test", function() {
     }
   });
 
-  it.skip('BREAKS SOMETIMES - should send correct amount MULTIPLE TIMES between all pairs', function* () {
+  it.skip('should send correct amount multiple time to ONE pair.  https://blockapps.atlassian.net/browse/API-20', function* () {
+    const count = 10;
+    const node = nodes[0];
+    // send alice->bob on that node
+    const pair = userPairs[node.id];
+    for (var i = 0; i < count; i++) {
+      yield send(node.id, pair.alice, pair.bob, value);
+      yield checkBalance(pair.alice, pair.bob, value.times(i+1));
+    }
+  });
+
+  it.skip('should send correct amount MULTIPLE TIMES between all pairs.  https://blockapps.atlassian.net/browse/API-20', function* () {
     const count = 2;
     // send multiple
     for (var i=0; i < count; i++) {
@@ -51,7 +63,7 @@ describe("Send Transaction Test", function() {
     yield checkBalance(pair.alice, pair.bob, total);
   });
 
-  it.skip('send parallel - doesnt work', function* () {
+  it.skip('send parallel - https://blockapps.atlassian.net/browse/API-20', function* () {
     const promises = [];
     const count = 1;
     var nonce = 0;
