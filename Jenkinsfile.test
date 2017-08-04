@@ -3,6 +3,7 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
+  parameters { string(name: 'SILO_BRANCH_NAME', defaultValue: 'test-', description: 'Silo git branch name to build upon. Skip the \"origin/\" part.\nThis job will build using the pipeline from Jenkinsfile.test and all the code in this branch.') }
 
   stages {
     stage('Prepare') {
@@ -60,20 +61,36 @@ pipeline {
         sh '''#!/bin/bash -le
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
-          git clone https://github.com/blockapps/blockapps-ba.git
+          git clone https://github.com/blockapps/blockapps-ba.git#master
           cd blockapps-ba
-          git checkout generator-wei
           npm i
           SERVER=localhost npm run deploy
           SERVER=localhost npm run test
         '''
       }
     }
+
+    stage('Release') {
+          steps {
+            withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
+              withCredentials([
+                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+              ]) {
+                sh '''#!/bin/bash -le
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  basil build --release
+                  basil push
+                '''
+              }
+            }
+          }
+        }
   }
 
   post {
     success {
-        slackSend (
+      archive "docker-compose.release.yml"
+      slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
         )
