@@ -36,6 +36,45 @@ describe("Send Transaction Test", function() {
     }
   });
 
+  it.skip('should send to one node, and check results on all nodes', function* () {
+    const nodeId = 0;
+    const pair = userPairs[nodeId];
+    const nonce = undefined;
+    const receipt = yield rest.send(pair.alice, pair.bob, value, nonce, nodeId);
+
+    // for each node
+    for (let node of nodes) {
+      const txResult = yield rest.transactionResult(receipt.hash, node.id);
+      assert.equal(txResult[0].status, 'success', 'tx status node ' + node.id);
+    }
+  });
+
+  it.skip('should send to one node, and check results on all nodes in PARALLEL', function* () {
+    const nodeId = 0;
+    const pair = userPairs[nodeId];
+    const nonce = undefined;
+
+    const count = 3;
+    for (var i = 0; i < count; i++) {
+      const receipt = yield rest.send(pair.alice, pair.bob, value, nonce, nodeId);
+      const promises = createPromises(receipt);
+      yield Promise.all(promises).then(function(resultsArray) {
+        resultsArray.map(txResult => {
+          assert.equal(txResult[0].status, 'success', 'tx status');
+        })
+      });
+    }
+
+    function createPromises(receipt) {
+      const promises = [];
+      for (let node of nodes) {
+        const promise = co(rest.transactionResult(receipt.hash, node.id));
+        promises.push(promise);
+      }
+      return promises;
+    }
+  });
+
   it.skip('should send correct amount multiple time to ONE pair.  https://blockapps.atlassian.net/browse/API-20', function* () {
     const count = 10;
     const node = nodes[0];
@@ -48,7 +87,7 @@ describe("Send Transaction Test", function() {
   });
 
   it.skip('should send correct amount MULTIPLE TIMES between all pairs.  https://blockapps.atlassian.net/browse/API-20', function* () {
-    const count = 2;
+    const count = 4;
     // send multiple
     for (var i=0; i < count; i++) {
       for (let node of nodes) {
