@@ -164,7 +164,7 @@ setEnv statsFlush 1000
 setEnv statsPrefix ""
 setEnv statsSuffix ""
 
-setEnv evmDebugMode false
+setEnv evmDebugMode true
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
