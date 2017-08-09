@@ -22,7 +22,10 @@ DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspac
 
 SOLCBRANCH=0.4.8-no-md
 SOLCREPOSITORY=https://github.com/blockapps/solidity.git
+<<<<<<< HEAD
 
+=======
+>>>>>>> bea771033912f36c3cadbb36b098bfc696ee63db
 SOLCBUILDDIR=$(SOLCWORK)/solidity/build
 SOLCMAKEFLAGS=-j4
 ifeq ($(USE_DOCKER_BUILD_ENV),)
