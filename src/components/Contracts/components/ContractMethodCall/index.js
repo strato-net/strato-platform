@@ -13,6 +13,7 @@ import {
 } from './contractMethodCall.actions';
 
 import './contractMethodCall.css';
+import ValueInput from "../../../ValueInput";
 
 class ContractMethodCall extends Component {
 
@@ -193,12 +194,8 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <Field
+                  <ValueInput
                     name="modalValue"
-                    className="pt-input"
-                    placeholder="Ether"
-                    component="input"
-                    type="text"
                     required
                   />
 
