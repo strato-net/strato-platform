@@ -94,6 +94,7 @@ deployments:
         minBlockDifficulty: "${minBlockDifficulty}"
         debugFail: "${debugFail}"
         evmDebugMode: "${evmDebugMode}"
+        evmTraceMode: "${evmTraceMode}"
         backupblocks: "${backupblocks}"
         redisBDBNumber: "${redisBDBNumber}"
         useSyncMode: "${useSyncMode}"
