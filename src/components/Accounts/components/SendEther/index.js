@@ -12,6 +12,7 @@ import {Field, reduxForm, formValueSelector} from 'redux-form';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import ValueInput from '../../../ValueInput';
 
 // TODO: use solc instead of extabi for compile
 
@@ -34,7 +35,6 @@ class CreateContract extends Component {
         toAddress: values.toAddress,
         value: values.value
       };
-
       this.props.sendEther(payload);
       mixpanelWrapper.track('send_ether_submit_click_successful');
       this.props.reset();
@@ -221,17 +221,13 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-8 smd-pad-4">
-                  <Field
-                    id="input-b"
-                    className="form-width pt-input"
-                    placeholder="Value"
-                    name="value"
-                    type="text"
-                    component="input"
-                    dir="auto"
-                    title="Value"
-                    required
-                  />
+                  <div className="form-width">
+                    <Field
+                      name="value"
+                      component={ValueInput}
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
