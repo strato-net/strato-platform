@@ -46,7 +46,7 @@ function newnode {
   runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
                          --diffPublish=true --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --debug=$evmDebugMode >> logs/ethereum-vm 2>&1
+                         --trace=$evmTraceMode --debug=$evmDebugMode >> logs/ethereum-vm 2>&1
 
   if $initialize
   then doRegister
@@ -165,6 +165,7 @@ setEnv statsPrefix ""
 setEnv statsSuffix ""
 
 setEnv evmDebugMode false
+setEnv evmTraceMode false
 
 stratoBootnode=${bootnode:+--stratoBootnode=$bootnode}
 [[ -n $bootnode ]] && addBootnodes=true
