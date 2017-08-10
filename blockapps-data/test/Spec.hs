@@ -17,7 +17,6 @@ main = hspec $ do
         let string = getAddressString n
         let address = stringToAddress string
         let a = T.unpack $ addressToString address in a `shouldBe` string
-      -- let l = T.unpack $ addressToString (snd $ head inputs) in l `shouldBe` (fst $ head inputs)
 
 stringToAddress :: [Char] -> Address
 stringToAddress x = Address
