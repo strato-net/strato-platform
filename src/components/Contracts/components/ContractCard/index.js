@@ -19,15 +19,19 @@ class ContractCard extends Component {
     this.state = {isOpen: false};
   }
 
-  componentWillReceiveProps(newProps) {
-    const contract = this.props.contract.contract;
-    const newContract = newProps.contract.contract;
-    const name = this.props.contract.name;
-    const newName = newProps.contract.name;
-    if (contract && newContract && name === newName && contract.instances.length < newContract.instances.length) {
-      this.props.fetchCirrusInstances(newName);
-    }
+  componentWillMount() {
+    this.props.fetchCirrusInstances(this.props.contract.name);
   }
+
+  // componentWillReceiveProps(newProps) {
+  //   const contract = this.props.contract.contract;
+  //   const newContract = newProps.contract.contract;
+  //   const name = this.props.contract.name;
+  //   const newName = newProps.contract.name;
+  //   if (contract && newContract && name === newName && contract.instances.length < newContract.instances.length) {
+  //     this.props.fetchCirrusInstances(newName);
+  //   }
+  // }
 
   render() {
     let cardData = [];
@@ -54,12 +58,16 @@ class ContractCard extends Component {
             key={'card-data-' + instance.address}
           >
             <td style={{border: 'none'}}>
-              {instance.address}
+              <small>{instance.address}</small>
+            </td>
+            <td className="" style={{border: 'none'}}>
+                <small>
+                { instance.fromBloc ? moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A') : '' }
+                </small>
             </td>
             <td style={{border: 'none'}}>
               { instance.fromCirrus ?
-                  <span className="pt-tag pt-intent-primary">Indexed by Cirrus</span> :
-                  moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A')
+                  <span className="pt-tag pt-intent-primary">Indexed</span> : ''
               }
             </td>
           </tr>
@@ -159,7 +167,6 @@ class ContractCard extends Component {
                      className="pt-icon-double-caret-vertical btn-sm"
                      onClick={() => {
                        mixpanelWrapper.track("contracts_toggle_collapse_click");
-                       this.props.fetchCirrusInstances(name);
                        this.setState({
                          isOpen: !this.state.isOpen
                        })
