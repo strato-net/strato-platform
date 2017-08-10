@@ -25,50 +25,42 @@ const reducer = function (state = initialState, action) {
         error: null,
       };
     case FETCH_CONTRACTS_SUCCESS:
-      const stateContracts = state.contracts;
-      let received_contracts = Object.getOwnPropertyNames(action.contracts).reduce(function (result, contractName) {
-        let newInstances = [];
-        let indexed = false;
-        if (stateContracts[contractName]) {
-          newInstances = action.contracts[contractName].map((contract, i) => {
-            const contractInStateInstances = stateContracts[contractName].instances;
-            const contractInState = contractInStateInstances ? contractInStateInstances.filter((contractsInState) => {return contractsInState.address === contract.address && contractsInState.name === contract.name}) : undefined;
-            if (contractInState && contractInState.length > 0 && contractInState[0].fromCirrus) {
-              indexed = true;
-              return contractInState[0]
-            }
-            else if (indexed){
-                return {
-                  ...contract,
-                  fromBloc: true,
-                  fromCirrus: true
-                };
-              }
-            else {
+      const contractNames = Object.getOwnPropertyNames(action.contracts);
+      const updatedContracts = {};
+      contractNames.forEach((name) => {
+        if(state.contracts[name]) {
+          // new instances
+          const newInstances = action.contracts[name]
+            .filter((instance)=>{
+              return state.contracts[name].instances
+                .filter((i) => {
+                  return i.address === instance.address
+                }).length === 0;
+            })
+            .map((instance)=>{
               return {
-                ...contract,
-                fromBloc: true,
-                fromCirrus: false
-              }
-            }
-          });
-          result[contractName] = {instances: newInstances};
-          return result;
-        }
-        else {
-          newInstances = action.contracts[contractName]
-            .map((contract) => {
-              return {
-                ...contract,
+                ...instance,
                 fromBloc: true
               }
-          });
-          result[contractName] = {instances: newInstances};
-          return result;
+            });
+          updatedContracts[name] = {
+            instances: state.contracts[name].instances.concat(newInstances)
+          };
         }
-      }, {});
+        else {
+          updatedContracts[name]= {
+            instances: action.contracts[name]
+            .map((instance)=>{
+              return {
+                ...instance,
+                fromBloc: true
+              }
+            })
+          };
+        }
+      });
       return {
-        contracts: received_contracts,
+        contracts: updatedContracts,
         filter: state.filter,
         error: state.error,
       };
@@ -107,34 +99,31 @@ const reducer = function (state = initialState, action) {
         error: state.error
       }
     case FETCH_CIRRUS_INSTANCES_SUCCESS:
-      const cirrusInstances = action.instances.map((instance) => {
-        // if instance exists
-        let i = 0;
-        for (i; i < state.contracts[action.name].instances.length; i++) {
-          if (state.contracts[action.name].instances[i].address === instance.address) {
-            // break;
-            return {
-              ...instance,
-              fromCirrus: true,
-              fromBloc: true
-            };
-          }
-        }
-
-        //if(i === state.contracts[action.name].instances.length) {
+      const updatedInstances = state.contracts[action.name].instances.map((instance) => {
         return {
           ...instance,
-          fromCirrus: false,
-          fromBloc: true
+          fromCirrus: action.instances.filter((i) => {
+            return i.address === instance.address
+          }).length === 1
         };
-        //}
       });
 
+      action.instances.forEach((instance) => {
+        const exists = updatedInstances.filter((i) => {
+          return i.address === instance.address
+        }).length === 1;
+        if(!exists) {
+          updatedInstances.push({
+            ...instance,
+            fromCirrus: true
+          });
+        }
+      });
       return {
         contracts: {
           ...state.contracts,
           [action.name]: {
-            instances: cirrusInstances
+            instances: updatedInstances
           }
         },
         filter: state.filter,
