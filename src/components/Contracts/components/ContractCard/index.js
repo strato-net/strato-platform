@@ -50,7 +50,7 @@ class ContractCard extends Component {
             <td style={{border: 'none'}}>
               <small>{instance.address}</small>
             </td>
-            <td className="" style={{border: 'none'}}>
+            <td style={{border: 'none'}}>
                 <small>
                 { instance.fromBloc ? moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A') : '' }
                 </small>
@@ -177,6 +177,7 @@ class ContractCard extends Component {
                     <tr>
                       <th>Contract Address</th>
                       <th>Created At</th>
+                      <th></th>
                     </tr>
                     </thead>
                     <tbody>{cardData}</tbody>
