@@ -194,11 +194,11 @@ class ContractMethodCall extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <ValueInput
+                  <Field
                     name="modalValue"
+                    component={ValueInput}
                     required
                   />
-
                 </div>
               </div>
               <div className="row">
