@@ -119,8 +119,8 @@ function consumeMessage(m) {
   var toUpload = _.flatten(
     [
       createdAccounts.map(a => {
-         addressToState(global.contractMap[state.createdAccounts[a].codeHash].name, a)
-        // stateToBody(state.createdAccounts, a)
+        //  addressToState(global.contractMap[state.createdAccounts[a].codeHash].name, a)
+        stateToBody(state.createdAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
@@ -142,8 +142,8 @@ function consumeMessage(m) {
           .catch(err => console.log("Warn: " + err))
       }),
       updatedAccounts.map(a => {
-        addressToState(global.contractMap[state.updatedAccounts[a].codeHash].name, a)
-        // stateToBody(state.updatedAccounts, a)
+        // addressToState(global.contractMap[state.updatedAccounts[a].codeHash].name, a)
+        stateToBody(state.updatedAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
@@ -283,8 +283,8 @@ function consume(scope) {
     const accountAddrs = Object.keys(accounts);
     console.log('addresses: ', accountAddrs);
     var accountPromises = accountAddrs.map(addr => {
-      return addressToState(global.contractMap[accounts[addr].codeHash].name, addr)
-      // return stateToBody(accounts, addr)
+      // return addressToState(global.contractMap[accounts[addr].codeHash].name, addr)
+      return stateToBody(accounts, addr)
         .then((o) => {
           console.log('>>>>>>>>>o',JSON.stringify(o,null,2))
           return JSON.stringify(o);
