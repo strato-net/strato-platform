@@ -18,6 +18,7 @@ import           Data.Bits
 import qualified Data.ByteArray                   as ByteArray
 import           Data.ByteString                  (ByteString)
 import qualified Data.ByteString                  as ByteString
+import qualified Data.ByteString.Base16           as B16
 import qualified Data.ByteString.Char8            as BC
 import qualified Data.ByteString.Lazy             as BL
 import           Data.LargeWord
@@ -437,7 +438,7 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
      x -> throwError $ Text.unpack mappingName ++ " is not a map, it is of type " ++ show x
 
   -- 78338746147236970124700731725183845421594913511827187288591969170390706184117:1
-     
+
   keyByteString <-
     case fromType of
      TypeInt256 -> do
@@ -454,7 +455,7 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
 
   return val
 
-  
+
 
 
 orFail::Maybe a->String->Either String a
@@ -463,7 +464,7 @@ orFail (Just x) _ = Right x
 
 
 decodeByteString::Storage->Word256->Int->Int->Value
-decodeByteString storage offset byte size = SimpleValue $ ValueBytes $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
+decodeByteString storage offset byte size = SimpleValue $ ValueBytes $ B16.encode $ ByteString.take size $ ByteString.drop (32 - byte - size) $ word256ToByteString $ storage offset
 
 decodeInt::Num t=>
            Storage->Word256->Int->(t->SimpleValue)->Value
