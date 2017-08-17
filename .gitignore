@@ -4,10 +4,10 @@ packages
 server.key
 server.pem
 .idea/
-docker-compose.yml
-npm-debug.log
+docker-compose*.yml
 tmp/
 repos/
 storage/
-
-**/.DS_Store
+mgit/
+node_modules/
+npm-debug.log

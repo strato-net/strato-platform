@@ -3,6 +3,7 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
+  parameters { string(name: 'SILO_BRANCH_NAME', defaultValue: 'test-', description: 'Silo git branch name to build upon. Skip the \"origin/\" part.\nThis job will build using the pipeline from Jenkinsfile.test and all the code in this branch.') }
 
   stages {
     stage('Prepare') {
@@ -10,7 +11,7 @@ pipeline {
         sh '''#!/bin/bash -le
           docker rm -f $(docker ps -aq) || true; docker system prune -f
           docker ps
-          sudo rm -rf silo
+          sudo rm -rf repos
         '''
        }
     }
@@ -20,9 +21,6 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-            git config --global credential.helper store
-            git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
-            cd silo
             basil clone
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
@@ -37,7 +35,6 @@ pipeline {
     stage('Deploy') {
       steps {
         sh '''#!/bin/bash -le
-          cd silo
           basil compose > docker-compose.yml
 
           NODE_NAME=localhost \
@@ -62,12 +59,9 @@ pipeline {
     stage('E2E-Test') {
       steps {
         sh '''#!/bin/bash -le
-          echo 'Running e2e tests from silo/tests'
-          ./test-instance.sh
-
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
-          git clone https://github.com/blockapps/blockapps-ba.git
+          git clone https://github.com/blockapps/blockapps-ba.git -b master
           cd blockapps-ba
           npm i
           SERVER=localhost npm run deploy
@@ -77,39 +71,26 @@ pipeline {
     }
 
     stage('Release') {
-      steps {
-        withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
-          withCredentials([
-            usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-            usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
-          ]) {
-            sh '''#!/bin/bash -le
-              cd silo
-              docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-              basil build --release
-              basil push
-              ./docker-publish-images.sh
-              SILO_RELEASE_DETAILS="--user blockapps --repo silo --tag $TAG_NAME"
-              RELEASE_DATE=$(date +'%Y-%m-%d %H:%M:%S')
-              github-release delete  $SILO_RELEASE_DETAILS || true
-              github-release release $SILO_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $SILO_RELEASE_DETAILS --name "Basilfile" --file ./Basilfile.snapshot
-              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.yml" --file ./docker-compose.release.yml
-              github-release upload $SILO_RELEASE_DETAILS --name "docker-compose.STRATO-GS.release.yml" --file ./docker-compose.STRATO-GS.release.yml
-              
-              github-release delete --user blockapps --repo strato-getting-started --tag build-latest || true
-              github-release release --pre-release --user blockapps --repo strato-getting-started --tag build-latest --name "master @ $RELEASE_DATE"
-              github-release upload --user blockapps --repo strato-getting-started --tag build-latest --name "docker-compose.latest.yml" --file ./docker-compose.STRATO-GS.latest.yml
-            '''
+          steps {
+            withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
+              withCredentials([
+                usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
+              ]) {
+                sh '''#!/bin/bash -le
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  basil build --release
+                  basil push
+                '''
+              }
+            }
           }
         }
-      }
-    }
   }
 
   post {
     success {
-        slackSend (
+      archive "docker-compose.release.yml"
+      slackSend (
         color: 'good',
         message: "Build Successful: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
         )

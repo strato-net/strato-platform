@@ -30,14 +30,6 @@ describe('All services should be alive', function() {
       }).catch(done);
   });
 
-  it('Explorer should be alive', function(done) {
-    return api.explorer.home()
-      .then(function(string) {
-        assert(string.length > 0, 'home page empty');
-        done();
-      }).catch(done);
-  });
-
   it('Bloc should be alive', function(done) {
     return api.bloc.home()
       .then(function(string) {
