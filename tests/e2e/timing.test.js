@@ -1,6 +1,8 @@
 const ba = require('blockapps-rest');
 require('co-mocha');
 const co = require('co');
+const moment = require('moment');
+const fs = require('fs');
 
 const rest = ba.rest;
 const common = ba.common;
@@ -18,8 +20,11 @@ describe("Send Transaction Test", function() {
   const nodes = config.nodes;
   const password = '1234';
   const value = new BigNumber(8).mul(constants.ETHER); // 8 eth in wei
+  const stats = {};
 
   before(function* () {
+    stats.blockNumber = yield rest.getLastBlockNumber();
+    stats.startTime = moment().valueOf();
     // create a pair of users on every node
     yield createUserPairs(uid, password, userPairs);
   });
@@ -40,6 +45,11 @@ describe("Send Transaction Test", function() {
     // check balance for those accounts on each node
     const pair = userPairs[0];
     yield checkBalance(pair.alice, pair.bob, total);
+  });
+
+  after(function (done){
+    stats.endTime = moment().valueOf();
+    fs.appendFileSync('~/timing.log', stats.startTime + ',' + stats.endTime + "," + stats.blockNumber )
   });
 
   it.skip('should send correct amount of ether', function* () {
@@ -96,6 +106,8 @@ describe("Send Transaction Test", function() {
     }
     console.log('DONE creating users');
   }
+
+
 
   function sleep(milli) {
     console.log('sleep', milli);
