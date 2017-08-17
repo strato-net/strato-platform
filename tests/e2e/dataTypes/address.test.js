@@ -90,7 +90,7 @@ describe('address data type', function () {
     yield rest.callMethod(adminUser, contract, methodName, args);
     // check the struct state
     const state = yield rest.getState(contract);
-    assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
+    assert.equal(state.storedStructs.length, 3, "Struct Array should have expected # of elements");
     state.storedStructs.map(function (storedStruct) {
       assert.equal(storedStruct.value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
       assert.deepEqual(addressToString(storedStruct.values), addressToString(args.values));
