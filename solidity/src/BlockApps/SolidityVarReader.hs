@@ -202,7 +202,7 @@ decodeValue
 decodeValue typeDefs' storage offset Struct{..} varName = case Map.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
-     Just $ decodeValue' typeDefs' storage (position `Storage.addBytes` fromIntegral (32*offset)) theType
+     Just $ decodeValue' typeDefs' storage (position `Storage.addOffset` fromIntegral offset) theType
 
 
 decodeValue'
@@ -474,9 +474,16 @@ decodeInt storage offset byte constructor =
 
 
 arrayPosition::Word256->Word256->Storage.Position
-arrayPosition elementSize x =
+arrayPosition elementSize x | elementSize <= 32 =
   let
     itemsPerWord = 32 `quot` elementSize
     (o, b) = x `quotRem` itemsPerWord
   in
    Storage.Position{offset=o, byte=fromIntegral $ elementSize * b}
+
+arrayPosition elementSize x = 
+  let
+    wordsPerItem = elementSize `quot` 32
+    o = x * wordsPerItem
+  in
+    Storage.Position{offset=o, byte=0}
