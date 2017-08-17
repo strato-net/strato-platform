@@ -83,7 +83,7 @@ describe('address data type', function () {
     assert.deepEqual(addressToString(state.storedStruct.values), addressToString(args.values));
   });
 
-  it.skip('setStructArray(address value, address[] values)', function*() {
+  it('setStructArray(address value, address[] values)', function*() {
     // function setStructArray(address value, address[] values)
     const methodName = 'setStructArray';
     const args = {value: '0e80a58e5c445c4ecdc5998e2803d216786c9a771', values: ['08d12a197cb00d4747a1fe03395095ce2a5cc6819', '0a10af358d01eca18a446ba768585d23ff055a89e', '01e9939daaad6924ad004c2560e90804164900341']};
@@ -111,7 +111,7 @@ describe('address data type', function () {
     const methodArgs = {};
     const setMethodName = 'set';
     const setMethodArgs = {value: constructorArgs._storedData};
-    const etherToSend = 1;
+    const etherToSend = 0;
 
     //Call method with value
     yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);

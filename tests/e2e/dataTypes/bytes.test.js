@@ -28,7 +28,7 @@ describe('bytes data type', function () {
 
   it('should upload the bytes storage contract with constructor arguments', function* () {
     const state = yield rest.getState(contract);
-    assert.equal(util.toBytes32(state.storedData), constructorArgs._storedData, 'storedData');
+    assert.equal(state.storedData, constructorArgs._storedData, 'storedData');
     assert.equal(state.storedDatum.length, 0, 'storedDatum');
   });
 
@@ -44,11 +44,11 @@ describe('bytes data type', function () {
     const args = {value: util.toBytes32('test2')};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    assert.equal(util.toBytes32(state.storedData), args.value, 'bytes returned from get()');
+    assert.equal(state.storedData, args.value, 'bytes returned from get()');
   });
 
-
-  it('setArray (bytes, count) / getArray(index) returns (bytes)', function* () {
+  //https://blockapps.atlassian.net/browse/STRATO-182
+  it.skip('setArray (bytes, count) / getArray(index) returns (bytes)', function* () {
     // set array
     const methodName = 'setArray';
     const resultArray = [util.toBytes32('test'), util.toBytes32('test'), util.toBytes32('test')];
@@ -60,22 +60,22 @@ describe('bytes data type', function () {
     yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
     const storedDatum = state.storedDatum;
-    assert.deepEqual(toBytes32Array(storedDatum), resultArray, 'after calling setArray (bytes[])');
+    assert.deepEqual(storedDatum, resultArray, 'after calling setArray (bytes[])');
     // get array
     const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray', {index: 1});
     const result = returnsArray;
-    assert.equal(toBytes32Array(result), resultArray[0], 'after calling getArray()');
+    assert.equal(result[0], resultArray[0], 'after calling getArray()');
   });
 
-  it('getTuple(bytes, bytes, bytes) returns (bytes, bytes, bytes)', function* () {
+  //https://blockapps.atlassian.net/browse/STRATO-182
+  it.skip('getTuple(bytes, bytes, bytes) returns (bytes, bytes, bytes)', function* () {
     const methodName = 'getTuple';
     const args = {v1: util.toBytes32('test4'), v2: util.toBytes32('test5'), v3: util.toBytes32('test6')};
     const result = yield rest.callMethod(adminUser, contract, methodName, args);
-    assert.deepEqual(toBytes32Array(result), [args.v1, args.v2, args.v3], 'bytes,bytes,bytes returned from getTuple()');
+    assert.deepEqual(result, [args.v1, args.v2, args.v3], 'bytes,bytes,bytes returned from getTuple()');
   });
 
-
-  it('setStruct(bytes value, bytes arrayValue, uint index) return (bytes, bytes)', function* () {
+  it.skip('setStruct(bytes value, bytes arrayValue, uint index) return (bytes, bytes)', function* () {
     // function setStruct(bytes value, bytes[] values) returns (bytes, bytes[])
     const methodName = 'setStruct';
     const args = {
@@ -90,7 +90,7 @@ describe('bytes data type', function () {
     // check the struct state
     const state = yield rest.getState(contract);
     assert.equal(util.toBytes32(state.storedStruct.value), args.value);
-    assert.deepEqual(toBytes32Array(state.storedStruct.values), [util.toBytes32('ola'), util.toBytes32('ola'), util.toBytes32('ola'),]);
+    assert.deepEqual(state.storedStruct.values, [util.toBytes32('ola'), util.toBytes32('ola'), util.toBytes32('ola'),]);
   });
 
   it.skip('setStructArray(bytes, bytes, int)', function* () {
@@ -107,7 +107,7 @@ describe('bytes data type', function () {
     assert.equal(state.storedStructs.length, args.count, "Struct Array should have expected # of elements");
     state.storedStructs.forEach(function(storedStruct, i) {
       assert.equal(util.toBytes32(storedStruct.value), args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
-      assert.deepEqual(toBytes32Array(storedStruct.values), [args.arrayValue, args.arrayValue, args.arrayValue]);
+      assert.deepEqual(storedStruct.values, [args.arrayValue, args.arrayValue, args.arrayValue]);
     });
   });
 
@@ -125,7 +125,7 @@ describe('bytes data type', function () {
     const methodArgs = {};
     const setMethodName = 'set';
     const setMethodArgs = {value: constructorArgs._storedData};
-    const etherToSend = 1;
+    const etherToSend = 0;
 
     //Call method with value
     yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);
@@ -137,9 +137,3 @@ describe('bytes data type', function () {
     assert.isOk(expectedBalance.equals(contractBalance), "contract balance should equal value from method call");
   });
 });
-
-function toBytes32Array(array) {
-  return array.map((val) => {
-    return util.toBytes32(val);
-  });
-}

@@ -93,7 +93,7 @@ describe('string data type', function () {
     assert.deepEqual(state.storedStruct.values, ['ola','ola','ola']);
   });
 
-  it.skip('setStructArray(string, string, int)', function* () {
+  it('setStructArray(string, string, int)', function* () {
     const methodName = 'setStructArray';
     const args = {
       value: 'namaste',
@@ -138,7 +138,7 @@ describe('string data type', function () {
     const methodArgs = {};
     const setMethodName = 'set';
     const setMethodArgs = {value: constructorArgs._storedData};
-    const etherToSend = 1;
+    const etherToSend = 0;
 
     //Call method with value
     yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);
