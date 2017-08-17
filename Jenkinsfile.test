@@ -66,8 +66,7 @@ pipeline {
           npm i
           SERVER=localhost npm run deploy
           SERVER=localhost npm run test
-          cd ..
-          cd tests
+          cd ../tests
           npm i
           node_modules/mocha/bin/mocha --config config.yaml e2e/dataTypes -b
         '''
