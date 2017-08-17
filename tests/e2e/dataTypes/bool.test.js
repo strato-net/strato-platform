@@ -83,7 +83,7 @@ describe.skip('bool data type', function () {
     assert.deepEqual(state.storedStruct.values, args.values);
   });
 
-  it.skip('setStructArray(bool value, bool[] values)', function*() {
+  it('setStructArray(bool value, bool[] values)', function*() {
     // function setStructArray(bool value, bool[] values)
     const methodName = 'setStructArray';
     const args = {value: true, values: [false, false, true]};
@@ -111,7 +111,7 @@ describe.skip('bool data type', function () {
     const methodArgs = {};
     const setMethodName = 'set';
     const setMethodArgs = {value: constructorArgs._storedData};
-    const etherToSend = 1;
+    const etherToSend = 0;
 
     //Call method with value
     yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);

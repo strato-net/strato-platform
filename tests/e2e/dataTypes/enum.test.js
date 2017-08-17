@@ -101,7 +101,7 @@ describe('enum data type: positive case:', function () {
     assert.deepEqual(values, args.values);
   });
 
-  it.skip('setStructArray(enum value, enum[] values)', function* () {
+  it('setStructArray(enum value, enum[] values)', function* () {
     // function setStructArray(enum value, enum[] values)
     const methodName = 'setStructArray';
     const args = {
@@ -136,7 +136,7 @@ describe('enum data type: positive case:', function () {
     const methodArgs = {};
     const setMethodName = 'set';
     const setMethodArgs = {value: constructorArgs._storedData};
-    const etherToSend = 1;
+    const etherToSend = 0;
 
     //Call method with value
     yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);

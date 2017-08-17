@@ -10,22 +10,32 @@ metadata:
     init: "#include basil_extensions.js"
 
 deployments:
-  - name: smd-ui 
+  - name: bloc
+    repo: https://github.com/blockapps/bloc.git
+    ref: master
+    compose:
+      environment:
+        apiUrlOverride: ${apiUrlOverride}
+        ssl: ${ssl}
+        stratoHost: ${stratoHost}
+      restart: always
+
+  - name: smd-ui
     repo: https://github.com/blockapps/smd-ui.git
     ref: master
     compose:
       restart: always
       depends_on:
         - strato
-        - bloch
+        - bloch 
+      ports:
+        - "3002:3002"
       environment:
         NODE_NAME: "${NODE_NAME}"
         BLOC_URL: "${BLOC_URL}"
         BLOC_DOC_URL: "${BLOC_DOC_URL}"
         STRATO_URL: "${STRATO_URL}"
         STRATO_DOC_URL: "${STRATO_DOC_URL}"
-        CIRRUS_URL: "${CIRRUS_URL}"
-        STRATO_GS_MODE: "${STRATO_GS_MODE}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
@@ -93,8 +103,6 @@ deployments:
         blockTime: "${blockTime}"
         minBlockDifficulty: "${minBlockDifficulty}"
         debugFail: "${debugFail}"
-        evmDebugMode: "${evmDebugMode}"
-        evmTraceMode: "${evmTraceMode}"
         backupblocks: "${backupblocks}"
         redisBDBNumber: "${redisBDBNumber}"
         useSyncMode: "${useSyncMode}"
@@ -158,11 +166,11 @@ deployments:
         - "443:443"
         - "80:80"
       depends_on:
+        - strato
+        - smd-ui 
         - bloch
         - cirrus
         - postgrest
-        - smd-ui
-        - strato
       environment:
         ssl: "${ssl}"
         uiPassword: "${uiPassword}"
@@ -175,7 +183,7 @@ deployments:
         ZOO_MY_ID: "1"
       ports:
         - "2181:2181"
-
+  
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
     ref: master
@@ -185,7 +193,7 @@ deployments:
         API_URL: "/strato-api/eth/v1.2/swagger.json"
       ports:
         - "8080:8080"
-
+  
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
     ref: master

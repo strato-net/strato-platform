@@ -29,7 +29,7 @@ function DelayPromise(delay) {
 }
 
 describe('Bloc - TX load', function() {
-  this.timeout(120 * 1000);
+  this.timeout(240 * 1000);
 
   const scope = {
     batchResultCount: 0
@@ -67,7 +67,7 @@ describe('Bloc - TX load', function() {
     const batchValue = 0.001;
     const batchSize = 50;
     const batchCount = 5;
-    const batchDelay = 0.1 * 1000;
+    const batchDelay = 0.25 * 1000;
     const uid = util.uid();
     this.timeout( (batchCount * batchDelay) + 150*1000);
 

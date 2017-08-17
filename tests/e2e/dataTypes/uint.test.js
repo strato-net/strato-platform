@@ -83,7 +83,7 @@ describe('uint data type', function () {
     assert.deepEqual(parseIntArray(state.storedStruct.values), args.values);
   });
 
-  it.skip('setStructArray(uint value, uint[] values)', function* () {
+  it('setStructArray(uint value, uint[] values)', function* () {
     // function setStructArray(uint value, uint[] values)
     const methodName = 'setStructArray';
     const args = {value: 200, values: [201,202,203]};
@@ -111,7 +111,7 @@ describe('uint data type', function () {
     const methodArgs = {};
     const setMethodName = 'set';
     const setMethodArgs = {value: constructorArgs._storedData};
-    const etherToSend = 1;
+    const etherToSend = 0;
 
     //Call method with value
     yield rest.callMethod(adminUser, contract, setMethodName, setMethodArgs);
