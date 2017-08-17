@@ -11,7 +11,7 @@ const assert = common.assert;
 const config = common.config;
 
 const password = '1234';
-const batchValueEther = 2;
+const batchValue = new BigNumber(2).mul(constants.ETHER);
 
 describe("Send Transaction List with nonces", function() {
   this.timeout(config.timeout);
@@ -21,17 +21,29 @@ describe("Send Transaction List with nonces", function() {
     {nonces: [0,1,2,3,4,5,6], expectedStatii: {success:7, unresolved:0, rejected:0} },
     {nonces: [6,5,4,3,2,1,0], expectedStatii: {success:7, unresolved:0, rejected:0} },
     {nonces: [0,1,2, 4], expectedStatii: {success:3, unresolved:1, rejected:0} },
-    {nonces: [0,1,2,3,3,3], expectedStatii: {success:4, unresolved:2, rejected:0} },
     {nonces: [0,1,2, 4, 4, 4, 3], expectedStatii: {success:5, unresolved:2, rejected:0} },
   ];
 
   testArray.map(function(test) {
-    it.skip(JSON.stringify(test), function* () {
+    it(JSON.stringify(test), function* () {
       yield testSendList(test);
     });
   });
 });
 
+describe.only("Send Transaction List with nonces", function() {
+  this.timeout(config.timeout);
+
+  const testArray = [
+    {nonces: [0,1,2,3,3,3], expectedStatii: {success:4, unresolved:2, rejected:0} },
+  ];
+
+  testArray.map(function(test) {
+    it(JSON.stringify(test), function* () {
+      yield testSendList(test);
+    });
+  });
+});
 
 
 /**
@@ -82,7 +94,7 @@ describe("Send Transaction List with nonces", function() {
   ];
 
   testArray.map(function(test) {
-    it.only(JSON.stringify(test), function* () {
+    it(JSON.stringify(test), function* () {
       yield testSendList(test);
     });
   });
@@ -137,9 +149,10 @@ function checkResults(receipts) {
 
 function createBatchTxWithNonce(batchValue, toUser, nonces) {
   var txs = [];
+  var count = 0;
   return nonces.map(function(nonce) {
     return {
-      value: batchValue,
+      value: batchValue.plus(count++),
       toAddress: toUser.address,
       txParams: {nonce: nonce},
     };
@@ -160,7 +173,7 @@ function* testSendList(test) {
 
   // send List
   const resolve = false;
-  const txs = createBatchTxWithNonce(batchValueEther, bob, test.nonces);
+  const txs = createBatchTxWithNonce(batchValue, bob, test.nonces);
   const receipts = yield rest.sendList(alice, txs, resolve);
   const results = yield Promise.all(checkResults(receipts));
   const statii = getStatii(results);
@@ -171,7 +184,7 @@ function* testSendList(test) {
   bob.endBalance = yield rest.getBalance(bob.address);
 
   //TODO Calculate gas cost and factor into balance
-  const delta = new BigNumber(batchValueEther).mul(constants.ETHER).mul(test.expectedStatii.success);
+  const delta = new BigNumber(batchValue).mul(test.expectedStatii.success);
   assert.isOk(alice.startingBalance.minus(delta).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
   assert.isOk(bob.startingBalance.plus(delta).equals(bob.endBalance), "bob's balance should be as expected after sending ether");
 }
