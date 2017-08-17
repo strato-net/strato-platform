@@ -23,7 +23,7 @@ describe("Send Transaction Test", function() {
   const stats = {};
 
   before(function* () {
-    stats.blockNumber = yield rest.getLastBlockNumber();
+    //stats.blockNumber = yield rest.getLastBlockNumber();
     stats.startTime = moment().valueOf();
     // create a pair of users on every node
     yield createUserPairs(uid, password, userPairs);
@@ -49,7 +49,7 @@ describe("Send Transaction Test", function() {
 
   after(function (done){
     stats.endTime = moment().valueOf();
-    fs.appendFileSync('~/timing.log', stats.startTime + ',' + stats.endTime + "," + stats.blockNumber )
+    fs.appendFileSync('timing.log', stats.startTime + ',' + stats.endTime );
   });
 
   it.skip('should send correct amount of ether', function* () {
