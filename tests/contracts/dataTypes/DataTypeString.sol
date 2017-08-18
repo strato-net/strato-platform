@@ -5,7 +5,7 @@ contract DataTypeString {
 
     struct StoredStruct {
       string value;
-      string[] values;
+      string[3] values;
     }
     StoredStruct storedStruct;
     StoredStruct[] storedStructs;
@@ -52,7 +52,7 @@ contract DataTypeString {
     function setStruct(string value, string arrayValue, uint count) returns (string, uint) {
       storedStruct.value = value;
       for(uint i = 0;i < count; i++) {
-        storedStruct.values.push(arrayValue);
+        storedStruct.values[i] = arrayValue;
       }
       return (storedStruct.value, storedStruct.values.length);
     }
@@ -62,12 +62,12 @@ contract DataTypeString {
      */
     function setStructArray(string value, string arrayValue, uint count) {
       for(uint i = 0; i < count; i++) {
-        string[] memory strArray;
-        for(uint j = 0; j < count; j++) {
+        string[3] memory strArray;
+        for(uint j = 0; j < 3; j++) {
           strArray[j] = arrayValue;
         }
-        StoredStruct memory storedStruct = StoredStruct(value,strArray);
-        storedStructs.push(storedStruct);
+        StoredStruct memory ss = StoredStruct(value,strArray);
+        storedStructs.push(ss);
       }
     }
 
