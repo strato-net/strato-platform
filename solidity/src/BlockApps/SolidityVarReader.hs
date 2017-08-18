@@ -159,7 +159,7 @@ valueToSolidityValue (SimpleValue (ValueBytes29 bytes)) = SolidityValueAsString 
 valueToSolidityValue (SimpleValue (ValueBytes30 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
 valueToSolidityValue (SimpleValue (ValueBytes31 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
 valueToSolidityValue (SimpleValue (ValueBytes32 bytes)) = SolidityValueAsString $ Text.pack $ BC.unpack bytes
-valueToSolidityValue (ValueEnum name value) = SolidityValueAsString $ name `Text.append` "." `Text.append` value
+valueToSolidityValue (ValueEnum _ _ index)              = SolidityValueAsString $ Text.pack $ show index -- SolidityValueAsString $ name `Text.append` "." `Text.append` value
 valueToSolidityValue (ValueStruct namedItems) =
   SolidityObject $ map (fmap valueToSolidityValue) namedItems
 valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
@@ -407,7 +407,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
        in
         case Bimap.lookup val enumset of
          Nothing -> error "bad enum value"
-         Just x  -> ValueEnum name x
+         Just x  -> ValueEnum name x (fromIntegral val)
 
   TypeStruct name ->
     case Map.lookup name structDefs of
