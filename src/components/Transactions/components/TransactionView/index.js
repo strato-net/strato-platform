@@ -13,10 +13,6 @@ class TransactionView extends Component {
     this.startPoll();
   }
 
-  componentWillUnmount() {
-    this.props.clearQuery();
-  }
-
   startPoll() {
     const fetchTx = this.props.fetchTx;
     this.timeout = setInterval(function () {
