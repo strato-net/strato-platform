@@ -7,10 +7,12 @@ import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import {fetchTx} from '../../../TransactionList/transactionList.actions';
 
 class TransactionTable extends Component {
 
   componentDidMount() {
+    this.props.fetchTx();
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
   }
 
@@ -220,5 +222,6 @@ const connected = connect(mapStateToProps, {
   removeQuery,
   executeQuery,
   clearQuery,
+  fetchTx
 })(formed);
 export default withRouter(connected);

@@ -4,8 +4,13 @@ import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import {fetchTx} from '../../../TransactionList/transactionList.actions';
 
 class TransactionView extends Component {
+  componentDidMount() {
+    this.props.fetchTx();
+  }
+
   render() {
     const hash = this.props.match.params.hash;
     const tx = this.props.tx;
@@ -108,6 +113,6 @@ function mapStateToProps(state, ownProps) {
 export default withRouter(
   connect(
     mapStateToProps,
-    {}
+    {fetchTx}
   )(TransactionView)
 );
