@@ -8,25 +8,16 @@ import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
-import { env } from '../../../../env';
 
 class TransactionTable extends Component {
 
   componentDidMount() {
     this.props.fetchTx();
-    this.startPoll();
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
   }
 
   componentWillUnmount() {
     this.props.clearQuery();
-  }
-
-  startPoll() {
-    const fetchTx = this.props.fetchTx;
-    this.timeout = setInterval(function () {
-      fetchTx();
-    }, env.POLLING_FREQUENCY);
   }
 
   componentWillReceiveProps(newProps) {
