@@ -30,7 +30,7 @@ data Value
   | ValueArrayDynamic [Value]
   | ValueArrayFixed Word [Value]
   | ValueContract Address
-  | ValueEnum Text Text
+  | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   -- | ValueMapping (Map SimpleValue Value)
   | ValueStruct [(Text, Value)]
