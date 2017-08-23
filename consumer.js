@@ -3,7 +3,6 @@ var Promise = require('bluebird'),
  rp = require('request-promise'),
  yaml = require('yaml-parser'),
  child_process = require("child_process"),
- bajs = require('blockapps-js'),
  util = require('./lib/util'),
  traverse = require('traverse'),
  chalk = require('chalk'),
@@ -36,7 +35,6 @@ function start() {
         + "\n\tbloc: "
         + blocRoot
       );
-      bajs.setProfile('strato-dev', stratoRoot);
 
       var client = new kafka.Client(zookeeperConn);
       const payloads = [{
@@ -119,8 +117,7 @@ function consumeMessage(m) {
   var toUpload = _.flatten(
     [
       createdAccounts.map(a => {
-         addressToState(global.contractMap[state.createdAccounts[a].codeHash].name, a)
-        // stateToBody(state.createdAccounts, a)
+         addressToState(state.createdAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
@@ -142,8 +139,7 @@ function consumeMessage(m) {
           .catch(err => console.log("Warn: " + err))
       }),
       updatedAccounts.map(a => {
-        addressToState(global.contractMap[state.updatedAccounts[a].codeHash].name, a)
-        // stateToBody(state.updatedAccounts, a)
+        addressToState(state.updatedAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
@@ -280,39 +276,51 @@ function consume(scope) {
   }
 
   function getStates(accounts) {
-    const accountAddrs = Object.keys(accounts);
-    console.log('addresses: ', accountAddrs);
-    var accountPromises = accountAddrs.map(addr => {
-      return addressToState(global.contractMap[accounts[addr].codeHash].name, addr)
-      // return stateToBody(accounts, addr)
-        .then((o) => {
-          console.log('>>>>>>>>>o',JSON.stringify(o,null,2))
-          return JSON.stringify(o);
-        })
-        .then(JSON.parse)
-        .then(cleanState)
-        .then(x => {
-          x.address = addr;
-          x.codeHash = accounts[addr].codeHash;
-          return x;
+      const accountAddrs = Object.keys(accounts);
+      // console.log('addresses: ', accountAddrs);
+
+      // DEBUG ONLY
+      // for (let hash in global.contractMap) {
+      //   const contract = global.contractMap[hash];
+      //   console.log( 'global', hash, global.contractMap[hash].name);
+      // }
+      // for (let addr in accounts) {
+      //   const account = accounts[addr];
+      //   console.log( 'account', addr, accounts[addr].codeHash);
+      // }
+      // END OF DEBUG STATEMENTS
+
+      var accountPromises = accountAddrs
+        .map(addr => {
+        return addressToState(accounts, addr)
+          .then((o) => {
+            // console.log('>>>>>>>>>o',JSON.stringify(o,null,2));
+            return JSON.stringify(o);
+          })
+          .then(JSON.parse)
+          .then(cleanState)
+          .then(x => {
+            x.address = addr;
+            x.codeHash = accounts[addr].codeHash;
+            return x;
+          })
+          .catch(err => {
+            if(err.message.includes('No table found')) {
+              return;
+            }
+            throw new Error(err);
+          });
+      });
+      return Promise.all(accountPromises)
+        .then(states => {
+          var cleanStates = states.filter(state => { return state != undefined });
+          return cleanStates;
         })
         .catch(err => {
-          if(err.message.includes('No table found')) {
-            return;
-          }
           throw new Error(err);
-        });
-    });
-    return Promise.all(accountPromises)
-      .then(states => {
-        var cleanStates = states.filter(state => { return state != undefined });
-        return cleanStates;
-      })
-      .catch(err => {
-        throw new Error(err);
-      })
+        })
 
-  }
+    }
 
   function insertCirrusUpdates() {
     return scope => {
@@ -436,7 +444,13 @@ function retryErrorHandler(fn, errDesc) {
   })
 }
 
-function addressToState(name, address) {
+function addressToState(accounts, address) {
+
+  if(global.contractMap[accounts[address].codeHash] === undefined) {
+    return Promise.reject(new Error("No table found"));
+  }
+
+  const name = global.contractMap[accounts[address].codeHash].name;
 
   const options = {
     method: 'GET',
@@ -450,40 +464,7 @@ function addressToState(name, address) {
   };
 
   return rp(options);
-}
 
-function stateToBody(state, address) {
-
-  var xabi = global.contractMap[state[address].codeHash];
-  if((typeof xabi) !== 'undefined'){
-
-    var tmpStr = JSON.stringify(global.contractMap[state[address].codeHash]);
-
-    var parsed = JSON.parse(tmpStr);
-
-
-    xabi.address = address;
-    parsed.address = address;
-
-
-    try {
-      var o = bajs.Solidity.attach(parsed);
-      var p = Promise.props(o.state).then(function(sVars) {
-        var parsed = traverse(sVars).forEach(function (x) {
-          if (Buffer.isBuffer(x)) {
-            this.update(x.toString('hex'));
-          }
-        });
-      return sVars;
-      });
-      return p;
-    } catch (error) {
-      console.log(chalk.red("Failed to attach solidity object: " + error));
-      return Promise.reject(new Error("Failed to attach solidity object: " + error));
-    }
-  } else {
-    return Promise.reject(new Error("No table found"));
-  }
 }
 
 // cleanState :: Object -> [{key: value}]
