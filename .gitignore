@@ -1,4 +1,5 @@
 .DS_Store
 client/bower_components
 dist/
-npm-debug.lognode_modules/
+npm-debug.log
+node_modules/

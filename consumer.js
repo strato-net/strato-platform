@@ -3,7 +3,6 @@ var Promise = require('bluebird'),
  rp = require('request-promise'),
  yaml = require('yaml-parser'),
  child_process = require("child_process"),
- bajs = require('blockapps-js'),
  util = require('./lib/util'),
  traverse = require('traverse'),
  chalk = require('chalk'),
@@ -13,7 +12,8 @@ var Promise = require('bluebird'),
  Consumer = kafka.Consumer;
 
 const stratoRoot    = (process.env["stratourl"] || "http://strato:3000");
-const postgrestRoot = (process.env["postgresturl"] || "http://postgrest:3001"); 
+const postgrestRoot = (process.env["postgresturl"] || "http://postgrest:3001");
+const blocRoot       = (process.env["blocurl"]) || "http://bloch:8000/bloc/v2.1";
 const zookeeperConn = (process.env["zookeeper_conn"] || "zookeeper:2181/");
 
 const delay         = (process.env.DELAY || 200);
@@ -26,8 +26,15 @@ var count =  0;
 function start() {
   return function(scope) {
     return new Promise((resolve, reject) => {
-      console.log("Connections are:\n\tstrato: " + stratoRoot + "\n\tpostgrest: " + postgrestRoot + "\n\tzookeeper: " + zookeeperConn);
-      bajs.setProfile('strato-dev', stratoRoot);
+      console.log("Connections are:\n\tstrato: "
+        + stratoRoot
+        + "\n\tpostgrest: "
+        + postgrestRoot
+        + "\n\tzookeeper: "
+        + zookeeperConn
+        + "\n\tbloc: "
+        + blocRoot
+      );
 
       var client = new kafka.Client(zookeeperConn);
       const payloads = [{
@@ -110,7 +117,7 @@ function consumeMessage(m) {
   var toUpload = _.flatten(
     [
       createdAccounts.map(a => {
-        stateToBody(state.createdAccounts, a)
+         addressToState(state.createdAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
@@ -132,7 +139,7 @@ function consumeMessage(m) {
           .catch(err => console.log("Warn: " + err))
       }),
       updatedAccounts.map(a => {
-        stateToBody(state.updatedAccounts, a)
+        addressToState(state.updatedAccounts, a)
           .then(JSON.stringify)
           .then(JSON.parse)
           .then(cleanState)
@@ -269,35 +276,51 @@ function consume(scope) {
   }
 
   function getStates(accounts) {
-    const accountAddrs = Object.keys(accounts);
-    console.log('addresses: ', accountAddrs);
-    var accountPromises = accountAddrs.map(addr => {
-      return stateToBody(accounts, addr)
-        .then(JSON.stringify)
-        .then(JSON.parse)
-        .then(cleanState)
-        .then(x => {
-          x.address = addr;
-          x.codeHash = accounts[addr].codeHash;
-          return x;
+      const accountAddrs = Object.keys(accounts);
+      // console.log('addresses: ', accountAddrs);
+
+      // DEBUG ONLY
+      // for (let hash in global.contractMap) {
+      //   const contract = global.contractMap[hash];
+      //   console.log( 'global', hash, global.contractMap[hash].name);
+      // }
+      // for (let addr in accounts) {
+      //   const account = accounts[addr];
+      //   console.log( 'account', addr, accounts[addr].codeHash);
+      // }
+      // END OF DEBUG STATEMENTS
+
+      var accountPromises = accountAddrs
+        .map(addr => {
+        return addressToState(accounts, addr)
+          .then((o) => {
+            // console.log('>>>>>>>>>o',JSON.stringify(o,null,2));
+            return JSON.stringify(o);
+          })
+          .then(JSON.parse)
+          .then(cleanState)
+          .then(x => {
+            x.address = addr;
+            x.codeHash = accounts[addr].codeHash;
+            return x;
+          })
+          .catch(err => {
+            if(err.message.includes('No table found')) {
+              return;
+            }
+            throw new Error(err);
+          });
+      });
+      return Promise.all(accountPromises)
+        .then(states => {
+          var cleanStates = states.filter(state => { return state != undefined });
+          return cleanStates;
         })
         .catch(err => {
-          if(err.message.includes('No table found')) {
-            return;
-          }
           throw new Error(err);
-        });
-    });
-    return Promise.all(accountPromises)
-      .then(states => {
-        var cleanStates = states.filter(state => { return state != undefined });
-        return cleanStates;
-      })
-      .catch(err => {
-        throw new Error(err);
-      })
+        })
 
-  }
+    }
 
   function insertCirrusUpdates() {
     return scope => {
@@ -421,38 +444,27 @@ function retryErrorHandler(fn, errDesc) {
   })
 }
 
-function stateToBody(state, address) {
+function addressToState(accounts, address) {
 
-  var xabi = global.contractMap[state[address].codeHash];
-  if((typeof xabi) !== 'undefined'){
-
-    var tmpStr = JSON.stringify(global.contractMap[state[address].codeHash]);
-
-    var parsed = JSON.parse(tmpStr);
-
-
-    xabi.address = address;
-    parsed.address = address;
-
-
-    try {
-      var o = bajs.Solidity.attach(parsed);
-      var p = Promise.props(o.state).then(function(sVars) {
-        var parsed = traverse(sVars).forEach(function (x) {
-          if (Buffer.isBuffer(x)) {
-            this.update(x.toString('hex'));
-          }
-        });
-      return sVars;
-      });
-      return p;
-    } catch (error) {
-      console.log(chalk.red("Failed to attach solidity object: " + error));
-      return Promise.reject(new Error("Failed to attach solidity object: " + error));
-    }
-  } else {
+  if(global.contractMap[accounts[address].codeHash] === undefined) {
     return Promise.reject(new Error("No table found"));
   }
+
+  const name = global.contractMap[accounts[address].codeHash].name;
+
+  const options = {
+    method: 'GET',
+    url: blocRoot + '/contracts/' + name + '/' + address + '/state',
+    headers: {
+      'cache-control': 'no-cache',
+      'content-type': 'application/json',
+      'accept': 'application/json'
+    },
+    json: true
+  };
+
+  return rp(options);
+
 }
 
 // cleanState :: Object -> [{key: value}]
