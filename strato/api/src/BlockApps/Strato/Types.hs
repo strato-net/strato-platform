@@ -129,8 +129,11 @@ instance (FromJSON x, Read x) => FromJSON (Strung x) where
 instance ToSchema x => ToSchema (WithNext x) where
   declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
-instance ToSchema x => ToSchema (Strung x)
-instance ToSchema x => ToSchema (NonEmpty x)
+instance ToSchema x => ToSchema (Strung x) where
+  declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
+
+instance ToSchema x => ToSchema (NonEmpty x) where
+  declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy x)
 
 instance ToSchema FaucetResponse where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
