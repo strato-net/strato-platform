@@ -104,7 +104,7 @@ deployments:
         statsFlush: "${statsFlush}"
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
-        noMinPeers: "${noMinPeers:-false}"
+        noMinPeers: "${noMinPeers}"
       links:
         - zookeeper
         - kafka
