@@ -10,7 +10,7 @@ metadata:
     init: "#include basil_extensions.js"
 
 deployments:
-  - name: smd-ui 
+  - name: smd-ui
     repo: https://github.com/blockapps/smd-ui.git
     ref: master
     compose:
@@ -104,6 +104,7 @@ deployments:
         statsFlush: "${statsFlush}"
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
+        noMinPeers: "${noMinPeers}"
       links:
         - zookeeper
         - kafka
@@ -148,7 +149,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: master 
+    ref: master
     compose:
       restart: always
       volumes:
