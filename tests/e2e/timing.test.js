@@ -47,11 +47,6 @@ describe("Send Transaction Test", function() {
     yield checkBalance(pair.alice, pair.bob, total);
   });
 
-  after(function (done){
-    stats.endTime = moment().valueOf();
-    fs.appendFileSync('timing.log', stats.startTime + ',' + stats.endTime );
-  });
-
   it.skip('should send correct amount of ether', function* () {
     const uid = util.uid();
     const aliceName = 'Alice' + uid;
