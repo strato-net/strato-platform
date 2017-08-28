@@ -40,8 +40,18 @@ waitNewBlock = do
       . head <$> getBlocksLast 0
 
 waitNewAccount :: Address -> ClientM Account
-waitNewAccount addr = untilJust $ listToMaybe <$>
-  getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+waitNewAccount addr = go 1
+  where
+    attempts = 30 :: Int
+    addrString = addressString addr
+    go n | n > attempts = blocError . AnError . Text.pack $ "Strato result polling timeout after " ++ show attempts ++ " attempts to create account: " ++ addrString
+         | otherwise = do
+      liftIO $ threadDelay 1000000
+      logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling result for account: " ++ addrString
+      result <- getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+      case listToMaybe <$> result of
+        Nothing  -> go (n+1)
+        Just res -> return res
 
 pollTxResult :: Keccak256 -> Bloc TransactionResult
 pollTxResult hash = go 1
