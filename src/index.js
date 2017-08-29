@@ -53,8 +53,19 @@ import {
 } from './components/ContractQuery/contractQuery.saga';
 import watchSendEther from './components/Accounts/components/SendEther/sendEther.saga';
 
+import {CREATE_USER_SUCCESS} from './components/CreateUser/createUser.actions';
+
 const rootReducer = combineReducers({
-  form: formReducer,
+  form: formReducer.plugin({
+    'create-user': (state, action) => {
+      switch(action.type) {
+        case CREATE_USER_SUCCESS:
+          return undefined;
+        default:
+          return state;
+      }
+    }
+  }),
   routing: routerReducer,
   // YOUR REDUCERS HERE
   accounts: accountsReducer,
