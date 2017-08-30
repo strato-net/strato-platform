@@ -1,6 +1,9 @@
 #!/bin/bash
 
-until curl strato:3000 >& /dev/null
+stratourl=${stratourl:-strato:3000}
+echo "stratourl is: ${stratourl}"
+
+until curl stratourl >& /dev/null
 do  echo "Waiting for STRATO port 3000 to become available"
     sleep 1
 done
