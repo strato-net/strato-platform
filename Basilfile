@@ -65,7 +65,6 @@ deployments:
       environment:
         stratourl: "${stratourl}"
         zookeeper_conn: "${cirrus_zookeeper_conn}"
-        stateDiffTopic: "${stateDiffTopic}"
         postgres_db: "${cirrus_pg_db:-cirrus}"
         postgres_user: "${cirrus_pg_user:-postgres}"
         postgres_password: "${cirrus_pg_password}"
