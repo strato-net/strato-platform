@@ -1,6 +1,6 @@
 #!/bin/bash
 
-stratourl=${stratourl:-strato:3000}
+stratourl=${stratourl:-http://strato:3000}
 echo "stratourl is: ${stratourl}"
 
 until curl ${stratourl} >& /dev/null
