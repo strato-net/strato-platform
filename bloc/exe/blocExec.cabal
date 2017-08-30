@@ -16,8 +16,6 @@ executable blockapps-bloc
   main-is: Main.hs
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
   build-depends: base
-               , blockapps-bloc20-api
-               , blockapps-bloc20-server
                , blockapps-bloc21-api
                , blockapps-bloc21-server
                , blockapps-strato-api

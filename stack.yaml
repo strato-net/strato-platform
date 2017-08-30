@@ -1,8 +1,5 @@
 resolver: nightly-2017-04-21
 packages:
-- bloc/bloc20/api
-- bloc/bloc20/client
-- bloc/bloc20/server
 - bloc/bloc21/api
 - bloc/bloc21/client
 - bloc/bloc21/server

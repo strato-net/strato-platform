@@ -30,9 +30,8 @@ pipeline {
     
     stage('Integration Tests') {
       steps {
-        echo "TODO: Run Integration Tests for client 2.0 and 2.1"
+        echo "TODO: Run Integration Tests for client 2.1"
         // sh 'stack test blockapps-bloc21-client'
-        // sh 'stack test blockapps-bloc20-client'
       }
     }
 
