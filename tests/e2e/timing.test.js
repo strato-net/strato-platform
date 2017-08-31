@@ -3,6 +3,7 @@ require('co-mocha');
 const co = require('co');
 
 const rest = ba.rest;
+const api = ba.common.api;
 const common = ba.common;
 const util = common.util;
 const BigNumber = common.BigNumber;
@@ -19,13 +20,15 @@ describe("Send Transaction Test", function() {
   const password = '1234';
   const value = new BigNumber(8).mul(constants.ETHER); // 8 eth in wei
 
+  const txTiming = [];
+
   before(function* () {
     // create a pair of users on every node
     yield createUserPairs(uid, password, userPairs);
   });
 
   it('should send correct amount MULTIPLE TIMES between all pairs.  https://blockapps.atlassian.net/browse/API-20', function* () {
-    const count = 20;
+    const count = 30;
     var total = new BigNumber(0);
     // send multiple
     for (var i=0; i < count; i++) {
@@ -37,6 +40,11 @@ describe("Send Transaction Test", function() {
         yield send(node.id, pair.alice, pair.bob, nodeValue);
       }
     }
+    // write timing to file
+    console.log(JSON.stringify(txTiming, null, 2));
+    var jsonToCSV = require('json-to-csv');
+    jsonToCSV(txTiming, 'txTiming.csv');  //  FIXME thats a promise
+
     // check balance for those accounts on each node
     const pair = userPairs[0];
     yield checkBalance(pair.alice, pair.bob, total);
@@ -102,12 +110,36 @@ describe("Send Transaction Test", function() {
     return new Promise(resolve => setTimeout(resolve, milli));
   }
 
+  function timerStart() {
+    const now = new Date().getTime();
+    return now;
+  }
+
+  function timerStop(startTime) {
+    const now = new Date().getTime();
+    return now - startTime;
+  }
+
   function* send(nodeId, alice, bob, value, nonce) {
     // it is OK for nonce to be undefined!
     console.log('send', nodeId, alice.name, bob.name, value.toString(), nonce);
+    const startTime = timerStart();
     const receipt = yield rest.send(alice, bob, value, nonce, nodeId);
+    const txElapsed = timerStop(startTime);
     const txResult = yield rest.transactionResult(receipt.hash, nodeId);
+    const blockElapsed = yield getLastBlockTime(nodeId);
+    const txTimingObject = {
+      node: nodeId,
+      txElapsed: txElapsed,
+      txResultTime: txResult[0].time,
+      blockElapsed: blockElapsed,
+      blockHash: txResult[0].blockHash,
+      //txResult: txResult,
+    };
+    txTiming.push(txTimingObject);
+    console.log('send tx: elapsed', elapsed, 'txResult.time', txResult[0].time);
     assert.equal(txResult[0].status, 'success', 'tx status');
+
     return txResult[0];
   }
 
@@ -123,6 +155,26 @@ describe("Send Transaction Test", function() {
       const bobBalance = yield rest.getBalance(bob.address, ACCOUNT_INDEX, node.id);
       bobBalance.should.be.bignumber.eq(FAUCET_AWARD.plus(value));
     }
+  }
+
+  function* getBlockTimes(count, node) {
+    const blocks = yield api.strato.last(count, node);
+    const blockTimes = blocks.map(block => {
+      return {
+        time: Date.parse(block.blockData.timestamp),
+      };
+    });
+    return blockTimes;
+  }
+
+  function* getLastBlockTime(node) {
+    const blocks = yield api.strato.last(2, node);
+    // console.log(blocks);
+    const t0 = Date.parse(blocks[0].blockData.timestamp);
+    const t1 = Date.parse(blocks[1].blockData.timestamp);
+    const elapsed = t0 - t1;
+    console.log('block elapsed', elapsed, t0, t1);
+    return elapsed;
   }
 
 });
