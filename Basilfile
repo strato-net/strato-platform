@@ -104,6 +104,7 @@ deployments:
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
         noMinPeers: "${noMinPeers:-false}"
+        mineBlocks: "${mineBlocks:-true}"
       links:
         - zookeeper
         - kafka
