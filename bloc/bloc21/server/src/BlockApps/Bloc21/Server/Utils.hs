@@ -40,8 +40,16 @@ waitNewBlock = do
       . head <$> getBlocksLast 0
 
 waitNewAccount :: Address -> ClientM Account
-waitNewAccount addr = untilJust $ listToMaybe <$>
-  getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+waitNewAccount addr = do
+  account <- getAccount
+  case account of 
+    Just acc -> return acc 
+    Nothing -> untilJust $ delay1 >> getAccount
+  where
+    getAccount = listToMaybe <$> getAccountsFilter accountsFilterParams{qaAddress = Just addr}
+    delay1 = liftIO $ do
+      putStrLn $ "Waiting on transaction result for new account at address " ++ addressString addr
+      threadDelay 1000000
 
 pollTxResult :: Keccak256 -> Bloc TransactionResult
 pollTxResult hash = go 1
