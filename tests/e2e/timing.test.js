@@ -13,6 +13,17 @@ const constants = common.constants;
 const assert = common.assert;
 const config = common.config;
 
+
+describe.only("block times", function() {
+  this.timeout(config.timeout);
+  it('block timea', function* () {
+    const blockTimes = yield getBlockTimes(100);
+    const jsonToCSV2 = require('json-to-csv');
+    jsonToCSV2(blockTimes, 'blockTiming.csv');  //  FIXME thats a promise
+  });
+});
+
+
 describe("Send Transaction Test", function() {
   this.timeout(config.timeout);
 
@@ -33,7 +44,7 @@ describe("Send Transaction Test", function() {
   });
 
   it('should send correct amount MULTIPLE TIMES between all pairs.  https://blockapps.atlassian.net/browse/API-20', function* () {
-    const count = 30;
+    const count = 20;
     var total = new BigNumber(0);
     // send multiple
     for (var i=0; i < count; i++) {
@@ -45,10 +56,15 @@ describe("Send Transaction Test", function() {
         yield send(node.id, pair.alice, pair.bob, nodeValue);
       }
     }
+    // block times
+    const blockTimes = yield getBlockTimes(count*nodes.length + 20);
     // write timing to file
     console.log(JSON.stringify(txTiming, null, 2));
-    var jsonToCSV = require('json-to-csv');
-    jsonToCSV(txTiming, 'txTiming.csv');  //  FIXME thats a promise
+    const jsonToCSV1 = require('json-to-csv');
+    jsonToCSV1(txTiming, 'txTiming.csv');  //  FIXME thats a promise
+    const jsonToCSV2 = require('json-to-csv');
+    jsonToCSV2(blockTimes, 'blockTiming.csv');  //  FIXME thats a promise
+
 
     // check balance for those accounts on each node
     const pair = userPairs[0];
@@ -144,7 +160,7 @@ describe("Send Transaction Test", function() {
       //txResult: txResult,
     };
     txTiming.push(txTimingObject);
-    console.log('send tx: elapsed', elapsed, 'txResult.time', txResult[0].time);
+    console.log('send tx: txElapsed', txElapsed, 'txResult.time', txResult[0].time);
     assert.equal(txResult[0].status, 'success', 'tx status');
 
     return txResult[0];
@@ -166,12 +182,24 @@ describe("Send Transaction Test", function() {
 
   function* getBlockTimes(count, node) {
     const blocks = yield api.strato.last(count, node);
-    const blockTimes = blocks.map(block => {
+    const blockTimeStamps = blocks.map(block => {
       return {
         time: Date.parse(block.blockData.timestamp),
+        difficulty: block.blockData.difficulty,
       };
     });
-    return blockTimes;
+
+    const blockTimeDelta = blockTimeStamps
+      .slice(1)
+      .map((block, index) => {
+        const delta = blockTimeStamps[index+0].time - blockTimeStamps[index+1].time;
+        return {
+          delta: delta,
+          difficulty: block.difficulty,
+        };
+      });
+
+    return blockTimeDelta;
   }
 
   function* getLastBlockTime(node) {
@@ -185,3 +213,28 @@ describe("Send Transaction Test", function() {
   }
 
 });
+
+
+function* getBlockTimes(count, node) {
+  const blocks = yield api.strato.last(count, node);
+  const blockTimeStamps = blocks.map(block => {
+    return {
+      time: Date.parse(block.blockData.timestamp),
+      difficulty: block.blockData.difficulty,
+      number: block.blockData.number,
+    };
+  });
+
+  const blockTimeDelta = blockTimeStamps
+    .slice(1)
+    .map((block, index) => {
+      const delta = blockTimeStamps[index+0].time - blockTimeStamps[index+1].time;
+      return {
+        delta: delta,
+        difficulty: block.difficulty,
+        number: block.number,
+      };
+    });
+
+  return blockTimeDelta;
+}
