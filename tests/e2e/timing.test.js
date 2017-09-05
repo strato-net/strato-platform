@@ -14,14 +14,14 @@ const assert = common.assert;
 const config = common.config;
 
 
-describe.only("block times", function() {
+/* describe.only("block times", function() {
   this.timeout(config.timeout);
   it('block timea', function* () {
     const blockTimes = yield getBlockTimes(100);
     const jsonToCSV2 = require('json-to-csv');
     jsonToCSV2(blockTimes, 'blockTiming.csv');  //  FIXME thats a promise
   });
-});
+}); */
 
 
 describe("Send Transaction Test", function() {
