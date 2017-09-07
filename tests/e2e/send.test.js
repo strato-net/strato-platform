@@ -94,7 +94,7 @@ describe("Send Transaction Test", function() {
   });
 });
 
-describe.skip("Send Transaction - Nonce", function() {
+describe.only("Send Transaction - Nonce", function() {
   this.timeout(config.timeout);
 
   const uid = util.uid();
@@ -133,8 +133,9 @@ describe.skip("Send Transaction - Nonce", function() {
     bob.endBalance = yield rest.getBalance(bob.address);
 
     //TODO Calculate gas cost and factor into balance
-    assert.isOk(alice.startingBalance.minus(value).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
-    assert.isOk(bob.startingBalance.plus(value).equals(bob.endBalance), "bob's balance should be as expected after sending wei");
+    const total = value.mul(3);
+    assert.isOk(alice.startingBalance.minus(total).greaterThan(alice.endBalance), "alice's balance should be slightly less than expected due to gas costs");
+    assert.isOk(bob.startingBalance.plus(total).equals(bob.endBalance), "bob's balance should be as expected after sending wei");
   });
 
   it.skip('send with bad nonce', function* () {
