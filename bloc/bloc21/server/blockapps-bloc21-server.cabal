@@ -15,6 +15,7 @@ cabal-version: >=1.10
 library
   hs-source-dirs: src
   exposed-modules:
+    BlockApps.Bloc21.Database.Solc
     BlockApps.Bloc21.Database.Create
     BlockApps.Bloc21.Database.Queries
     BlockApps.Bloc21.Database.Tables
@@ -42,11 +43,13 @@ library
                , containers
                , contravariant
                , cryptonite
+               , directory
+               , filepath
                , bytestring
                , base16-bytestring
                , generic-random
+               , either
                , hflags
-               , http-api-data
                , http-client
                , http-media
                , http-types
@@ -61,6 +64,7 @@ library
                , network
                , opaleye
                , postgresql-simple
+               , process
                , product-profunctors
                , profunctors
                , QuickCheck
@@ -78,6 +82,7 @@ library
                , stm
                , swagger2
                , text
+               , temporary
                , time
                , transformers-base
                , unordered-containers
