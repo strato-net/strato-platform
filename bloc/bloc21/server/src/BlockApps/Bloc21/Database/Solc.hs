@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module BlockApps.Bloc21.Database.Solc where
+module BlockApps.Bloc21.Database.Solc (compileSolc) where
 
+import           Control.Arrow              (first)
 import           Control.Monad              hiding (mapM_)
 import           Data.Aeson
 import qualified Data.List                  as List
@@ -26,6 +27,8 @@ import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
+import qualified Data.HashMap.Lazy          as HM
+
 import BlockApps.Bloc21.Monad
 
 -- Query parameters allowed:
@@ -38,13 +41,13 @@ import BlockApps.Bloc21.Monad
 -- Response:
 --   { <contract name> : { abi : <solidity contract abi>, bin : <hex string> } }
 
-postSolcR :: Text -> Bloc Text
-postSolcR mainSrc = do
+compileSolc :: Text -> Bloc Aeson.Value
+compileSolc mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   case eRes of
     Left err -> blocError . AnError . Text.pack $ err
-    Right res -> return . aesonEncodeUtf8 $ res
+    Right res -> return . Aeson.Object . HM.fromList . List.map (first Text.pack) . Map.toList $ res
 
 runSolc :: Map String String
         -> Map String String
@@ -153,9 +156,6 @@ optNoArg opt opts =
 optWithArg :: String -> Map String String -> [String]
 optWithArg opt opts =
   maybe [] (\arg -> ["--" ++ opt, arg]) $ Map.lookup opt opts
-
-aesonEncodeUtf8 :: (ToJSON a) => a -> Text
-aesonEncodeUtf8 = Text.decodeUtf8 . BL.toStrict . Aeson.encode
 
 aesonDecodeUtf8 :: (FromJSON a) => Text -> Either String a
 aesonDecodeUtf8 = Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8

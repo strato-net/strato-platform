@@ -18,6 +18,7 @@ import           Crypto.Hash
 import qualified Crypto.Saltine.Class            as Saltine
 import qualified Crypto.Saltine.Core.SecretBox   as SecretBox
 import           Crypto.Secp256k1
+import           Data.Aeson                      (Result(..),fromJSON)
 import qualified Data.ByteArray                  as ByteArray
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as Char8
@@ -41,6 +42,7 @@ import qualified Opaleye                         (not, null)
 import           BlockApps.Bloc21.API.Utils
 import           BlockApps.Bloc21.Crypto
 import           BlockApps.Bloc21.Database.Tables
+import           BlockApps.Bloc21.Database.Solc
 import           BlockApps.Bloc21.Monad
 import           BlockApps.Bloc21.Server.Utils
 import           BlockApps.Ethereum
@@ -48,7 +50,6 @@ import           BlockApps.Solidity.Parse.Parser
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
-import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -958,7 +959,11 @@ compileContract source = do
 --  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
 --     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
 
-  SolcResponse abiBins <- blocStrato $ postSolc (Src source)
+  eabiBins <- fromJSON <$> compileSolc source
+
+  abiBins <- case eabiBins of
+    Error err -> blocError . AnError . Text.pack $ err
+    Success res -> return res
   --TODO - clean this up, what should filename be instead of "-"
   --       get rid of error
   --       name nicer, mabye merge with next let
