@@ -3,7 +3,6 @@
 
 module BlockApps.Bloc21.Database.Solc (compileSolc) where
 
-import           Control.Arrow              (first)
 import           Control.Monad              hiding (mapM_)
 import           Data.Aeson
 import qualified Data.List                  as List
@@ -27,7 +26,6 @@ import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
-import qualified Data.HashMap.Lazy          as HM
 
 import BlockApps.Bloc21.Monad
 
@@ -41,13 +39,18 @@ import BlockApps.Bloc21.Monad
 -- Response:
 --   { <contract name> : { abi : <solidity contract abi>, bin : <hex string> } }
 
+
+-- This is really hard to understand and highly non-idomatic for json formation or parsing.
+-- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
+-- this if it is something we want to maintain.
 compileSolc :: Text -> Bloc Aeson.Value
 compileSolc mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   case eRes of
     Left err -> blocError . AnError . Text.pack $ err
-    Right res -> return . Aeson.Object . HM.fromList . List.map (first Text.pack) . Map.toList $ res
+    Right res ->
+      maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact") return $ Map.lookup "src" res
 
 runSolc :: Map String String
         -> Map String String

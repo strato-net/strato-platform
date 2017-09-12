@@ -960,7 +960,6 @@ compileContract source = do
 --     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
 
   eabiBins <- fromJSON <$> compileSolc source
-
   abiBins <- case eabiBins of
     Error err -> blocError . AnError . Text.pack $ err
     Success res -> return res
