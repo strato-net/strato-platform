@@ -75,8 +75,7 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
   where
     mineNewBlock b = do
       liftIO (theMiner b) >>= maybe (return ()) (miningSuccess b)
-      !nnow <- liftIO getCPUTime
-      mineBlock mv nnow (i + 1) (m,mi)
+      mineBlock mv t (i + 1) (m,mi)
     miningSuccess b nonce = do
       !now <- liftIO getCPUTime
       toLog "mineBlock/success" mi $ "Mining success after passes: " ++ show i ++ " for miner " ++ show mi ++ " with " ++ show ( 10^ (12 :: Integer) * i `div` (1 + now - t)) ++ " hash/s "
