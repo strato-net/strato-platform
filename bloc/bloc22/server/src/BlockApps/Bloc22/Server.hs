@@ -1,0 +1,69 @@
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TypeOperators     #-}
+
+module BlockApps.Bloc22.Server where
+
+import           Control.Lens             ((&), (.~), (?~))
+import           Data.Proxy
+import           Data.Swagger
+import           Servant
+import           Servant.Swagger
+
+import           BlockApps.Bloc22.API
+import           BlockApps.Bloc22.Monad
+import           BlockApps.Bloc22.Server.Addresses
+import           BlockApps.Bloc22.Server.Contracts
+import           BlockApps.Bloc22.Server.Git
+import           BlockApps.Bloc22.Server.Search
+import           BlockApps.Bloc22.Server.Users
+
+bloc :: ServerT BlocAPI Bloc
+bloc = getHomepage
+  :<|> getUsers
+  :<|> postUsersUser
+  :<|> getUsersUser
+  :<|> postUsersSend
+  :<|> postUsersContract
+  :<|> postUsersUploadList
+  :<|> postUsersContractMethod
+  :<|> postUsersSendList
+  :<|> postUsersContractMethodList
+  :<|> getAddresses
+  :<|> getContracts
+  :<|> getContractsData
+  :<|> getContractsContract
+  :<|> getContractsState
+  :<|> getContractsFunctions
+  :<|> getContractsSymbols
+  :<|> getContractsStateMapping
+  :<|> getContractsStates
+  :<|> getContractsEnum
+  :<|> postContractsCompile
+  :<|> getSearchContract
+  :<|> getSearchContractState
+  :<|> getSearchContractStateReduced
+
+getHomepage :: Bloc Homepage
+getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
+
+serveBloc :: BlocEnv -> Server BlocAPI
+serveBloc env = enter (NT (enterBloc env)) bloc
+
+blocSwagger :: Swagger
+blocSwagger = toSwagger (Proxy @BlocAPI)
+    & info.title   .~ "Bloc API"
+    & info.version .~ "2.1"
+    & info.description ?~ "This is the V2.1 API for the BlocH"
+    & basePath ?~ "/bloc/v2.1"
+
+type BlocDocsAPI = "swagger.json" :> Get '[JSON] Swagger
+
+serveBlocAndDocs
+  :: BlocEnv
+  -> Server (BlocAPI :<|> GetGitInfo :<|> BlocDocsAPI)
+serveBlocAndDocs blocEnv = serveBloc blocEnv
+  :<|> getGitInfo
+  :<|> return blocSwagger
