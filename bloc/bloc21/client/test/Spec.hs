@@ -124,7 +124,7 @@ setup = do
     Right cfg -> return cfg
 
 defaultBloc :: BaseUrl
-defaultBloc = BaseUrl Http "localhost" 8000 "/bloc/v2.1"
+defaultBloc = BaseUrl Http "localhost" 80 "/bloc/v2.1"
 
 defaultStrato :: BaseUrl
-defaultStrato = BaseUrl Http "strato-int.centralus.cloudapp.azure.com" 80 "/strato-api/eth/v1.2"
+defaultStrato = BaseUrl Http "localhost" 80 "/strato-api/eth/v1.2"

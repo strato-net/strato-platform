@@ -3,6 +3,9 @@ packages:
 - bloc/bloc21/api
 - bloc/bloc21/client
 - bloc/bloc21/server
+- bloc/bloc22/api
+- bloc/bloc22/client
+- bloc/bloc22/server
 - bloc/exe
 - cirrus/api
 - cirrus/client

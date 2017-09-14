@@ -359,8 +359,8 @@ spec =
         Right (PostUsersContractMethodResponse values) = postUsersContractMethodEitherGet
       values `shouldBe`
         [ SolidityArray
-          [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-          , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          [ SolidityValueAsString (Text.pack $ concat $ replicate 32 "a")
+          , SolidityValueAsString (Text.pack $ concat $ replicate 32 "b")
           ]
         ]
 
@@ -378,8 +378,8 @@ spec =
       let
         Just storedData' = mStoredData'
       storedData' `shouldBe` SolidityArray
-        [ SolidityValueAsString "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        , SolidityValueAsString "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        [ SolidityValueAsString (Text.pack $ concat $ replicate 32 "61")
+        , SolidityValueAsString (Text.pack $ concat $ replicate 32 "62")
         ]
 
     it "should create BytesComboTest contract, call methods and check state" $ \ TestConfig {..} -> do
@@ -947,6 +947,7 @@ spec =
       vs `shouldBe` [SolidityValueAsString "Account Data should be able to be as long as you want ideally 12343432442431"]
 
     it "should create IAM contracts and run them all" $ \ TestConfig {..} -> do
+      pendingWith "BadgerIam.sol not yet complete"
       let
           iamUsername = UserName "IAM"
 

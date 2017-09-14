@@ -3,7 +3,7 @@
 
 module Main where
 
-import           BlockApps.Bloc21.API       (blocApi)
+import           BlockApps.Bloc22.API       (blocApi)
 import           Control.Lens             ((&), (.~), (?~))
 import           Data.Swagger
 import           Data.String
@@ -24,7 +24,7 @@ blocPort :: Num x => x
 blocPort = 8000
 
 blocPath :: FilePath
-blocPath = "/bloc/v2.1"
+blocPath = "/bloc/v2.2"
 
 docPort :: Num x => x
 docPort = 8080
@@ -32,7 +32,7 @@ docPort = 8080
 blocSwagger :: Swagger
 blocSwagger = toSwagger blocApi
     & info.title   .~ "Bloc API"
-    & info.version .~ "2.1"
+    & info.version .~ "2.2"
     & info.description ?~ "This is the API for the BlocH"
     & host ?~ Host blocHost (Just blocPort)
     & basePath .~ Just blocPath
