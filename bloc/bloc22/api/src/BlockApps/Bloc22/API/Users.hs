@@ -43,6 +43,16 @@ import           BlockApps.Strato.Types
 -- | Routes and types
 --------------------------------------------------------------------------------
 
+data BlocTransactionStatus = Success | Failure | Pending
+
+data BlocTransactionType   = Send | Upload | Call
+
+data BlocTransactionResult = BlocTransactionResult
+  { blocTxStatus :: BlocTransactionStatus
+  , blocTxType   :: BlocTransactionType
+  , blocTxHash   :: Keccak256
+  }
+
 type GetUsers = "users" :> Get '[JSON] [UserName]
 
 type GetUsersUser = "users"
