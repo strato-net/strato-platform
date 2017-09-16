@@ -46,7 +46,7 @@ function fetchABIs() {
   return function(scope) {
     console.log('fetching abi data');
     var postgrestRoot = (process.env["postgrestRoot"] || "http://postgrest:3001")
-    
+
     var options = {
       method: 'GET',
       url: postgrestRoot + '/contract',
@@ -112,7 +112,6 @@ function generateContractTables() {
 
 function getKafkaTopic() {
   return function(scope) {
-    console.log('made it!');
     var stratoRoot = (process.env["stratourl"] || 'http://strato:3000');
     var options = {
       method: 'GET',
@@ -122,7 +121,7 @@ function getKafkaTopic() {
     if(process.env["stateDiffTopic"]){
       var sd = process.env["stateDiffTopic"];
       scope.kafkaTopic = sd;
-      return Promise.resolve(sd);
+      return Promise.resolve(scope);
     } else {
       return rp(options)
         .then(function(r) {
