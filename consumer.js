@@ -21,6 +21,8 @@ const totalAttempts = (process.env.ATTEMPTS || 5);
 const startOffset   = (process.env.OFFSET || 0);
 const fetchMaxMegabytes = (process.env.FETCHMAX_MB || 15); // unit megabytes
 
+const emptyStringHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
+
 var count =  0;
 
 function start() {
@@ -99,11 +101,11 @@ function consumeMessage(m) {
 
   if(state.createdAccounts) {
     // for now, remove accounts that have no code
-    state.createdAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
+    state.createdAccounts = _.omitBy(v => v.codeHash == emptyStringHash || v.codeHash == "0x" + emptyStringHash)(state.createdAccounts)
     createdAccounts = Object.keys(state.createdAccounts);
   }
   if(state.updatedAccounts) {
-    state.updatedAccounts = _.omitBy(v => v.codeHash == "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")(state.createdAccounts)
+    state.updatedAccounts = _.omitBy(v => v.codeHash == emptyStringHash || v.codeHash == "0x" + emptyStringHash)(state.UpdatedAccounts)
     updatedAccounts = Object.keys(state.updatedAccounts);
   }
   if(state.deletedAccounts) {
@@ -123,6 +125,7 @@ function consumeMessage(m) {
           .then(cleanState)
           .then(x => {
             x.address = a;
+            codeHash = removeHexPrefix(state.createdAccounts[a].codeHash)
             var options = { method: 'POST',
               url: postgrestRoot + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
               headers:
@@ -218,7 +221,6 @@ function consume(scope) {
 
   // --Support functions for consume(scope)-- //
   function getAccountsForStateDiffss(m) {
-    const emptyStringHash = "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
     const state = JSON.parse(m.value);
     var accounts = {
       createdAccounts: [],
@@ -289,7 +291,6 @@ function consume(scope) {
       //   console.log( 'account', addr, accounts[addr].codeHash);
       // }
       // END OF DEBUG STATEMENTS
-
       var accountPromises = accountAddrs
         .map(addr => {
         return addressToState(accounts, addr)
@@ -342,7 +343,7 @@ function consume(scope) {
     }
     if(httpMethod === 'POST') {
       options = states.map(state => {
-        const codeHash = state.codeHash;
+        const codeHash = removeHexPrefix(state.codeHash);
         const url = postgrestRoot + '/'
                     + global.contractMap[codeHash].name;
         delete state.codeHash;
@@ -350,7 +351,7 @@ function consume(scope) {
       });
     } else if (httpMethod === 'PATCH') {
       options = states.map(state => {
-        const codeHash = state.codeHash;
+        const codeHash = removeHexPrefix(state.codeHash);
         const url = postgrestRoot + '/'
                     + global.contractMap[codeHash].name
                     + '?address=eq.' + state.address;
@@ -359,7 +360,7 @@ function consume(scope) {
       });
     } else if (httpMethod === 'DELETE') {
       options = states.map(state => {
-        const codeHash = state.codeHash;
+        const codeHash = removeHexPrefix(state.codeHash);
         const url = postgrestRoot + '/'
                     + global.contractMap[codeHash].name
                     + '?address=eq.' + state.address;
@@ -446,15 +447,17 @@ function retryErrorHandler(fn, errDesc) {
 
 function addressToState(accounts, address) {
 
-  if(global.contractMap[accounts[address].codeHash] === undefined) {
+  let codeHash = removeHexPrefix(accounts[address].codeHash);
+      addressFormatted = removeHexPrefix(address);
+
+  if(global.contractMap[codeHash] === undefined) {
     return Promise.reject(new Error("No table found"));
   }
-
-  const name = global.contractMap[accounts[address].codeHash].name;
+  const name = global.contractMap[codeHash].name;
 
   const options = {
     method: 'GET',
-    url: blocRoot + '/contracts/' + name + '/' + address + '/state',
+    url: blocRoot + '/contracts/' + name + '/' + addressFormatted + '/state',
     headers: {
       'cache-control': 'no-cache',
       'content-type': 'application/json',
@@ -476,6 +479,13 @@ function cleanState(o) {
    ,_.mapValues(v => (typeof v !== 'object' || v === 'null') ? v : (v.key === undefined ? v : v.key)) // reduce enums
   )(o)
 };
+
+function removeHexPrefix(str) {
+  if (str.includes("0x")) {
+    return str.slice(2);
+  }
+  return str;
+}
 
 
 module.exports = {
