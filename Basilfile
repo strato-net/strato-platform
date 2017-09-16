@@ -70,6 +70,7 @@ deployments:
         postgres_password: "${cirrus_pg_password}"
         postgres_host: "${cirrus_pg_host:-postgres}"
         postgres_port: "${cirrus_pg_port:-5432}"
+        stateDiffTopic: "${stateDiffTopic}" 
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
