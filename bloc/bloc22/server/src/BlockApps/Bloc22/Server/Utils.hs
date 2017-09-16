@@ -15,6 +15,7 @@ import qualified Data.Text                as Text
 import qualified Data.Text.Encoding               as Text
 import           Servant.Client
 
+import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Monad
 import           BlockApps.Ethereum
@@ -50,6 +51,32 @@ waitNewAccount addr = do
     delay1 = liftIO $ do
       putStrLn $ "Waiting on transaction result for new account at address " ++ addressString addr
       threadDelay 1000000
+
+maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
+maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
+
+getBlocTxResult :: Keccak256 -> Bloc BlocTransactionResult
+getBlocTxResult hash = do
+  maybeResult <- maybeTxResult hash
+  case maybeResult of
+    Nothing -> return $ BlocTransactionResult Pending hash Nothing Nothing
+    Just res -> case transactionresultMessage res of
+      "Success!" -> return $ BlocTransactionResult Success hash (Just res) Nothing
+      _          -> return $ BlocTransactionResult Failure hash (Just res) Nothing
+    
+pollBlocTxResult :: Keccak256 -> Bloc BlocTransactionResult
+pollBlocTxResult hash = go 1
+  where
+    attempts = 30 :: Int
+    hashString = keccak256String hash
+    go n = do
+      logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling result for transaction hash: " ++ hashString
+      result <- getBlocTxResult hash
+      case blocTransactionStatus result of
+        Pending -> if n > attempts 
+                     then return result
+                     else return (threadDelay 1000000) >> go (n+1)
+        _       -> return result
 
 pollTxResult :: Keccak256 -> Bloc TransactionResult
 pollTxResult hash = go 1

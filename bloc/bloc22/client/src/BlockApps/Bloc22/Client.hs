@@ -38,7 +38,7 @@ import           BlockApps.Bloc22.API
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
-import           BlockApps.Strato.Types
+import           BlockApps.Strato.Types()
 
 getHomepage :: ClientM Homepage
 getHomepage = client (Proxy @ GetHomepage)
@@ -71,9 +71,9 @@ getContractsSymbols
   :: ContractName -> MaybeNamed Address -> ClientM [SymbolName]
 getContractsSymbols = client (Proxy @ GetContractsSymbols)
 
-getContractsEnum
-  :: ContractName -> MaybeNamed Address -> EnumName -> ClientM [EnumValue]
-getContractsEnum = client (Proxy @ GetContractsEnum)
+--getContractsEnum
+--  :: ContractName -> MaybeNamed Address -> EnumName -> ClientM [EnumValue]
+--getContractsEnum = client (Proxy @ GetContractsEnum)
 
 getContractsStateMapping
   :: ContractName
@@ -109,7 +109,7 @@ postUsersUser :: UserName -> Bool -> Password -> ClientM Address
 postUsersUser = client (Proxy @ PostUsersUser)
 
 postUsersSend
-  :: UserName -> Address -> PostSendParameters -> ClientM PostTransaction
+  :: UserName -> Address -> Bool -> PostSendParameters -> ClientM BlocTransactionResult
 postUsersSend = client (Proxy @ PostUsersSend)
 
 postUsersContract

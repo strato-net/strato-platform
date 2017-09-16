@@ -72,15 +72,20 @@ postUsersUser (UserName name) faucet pass = blocTransaction $ do
       void $ waitNewAccount addr
   return addr
 
-postUsersSend :: UserName -> Address -> PostSendParameters -> Bloc PostTransaction
-postUsersSend userName addr
+postUsersSend :: UserName -> Address -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
+postUsersSend userName addr resolve
   (PostSendParameters toAddr value password txParams) = do
     tx <- prepareTx
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
-    void $ pollTxResult hash
-    return tx
+    result <- getBlocTxResult hash
+    case blocTransactionStatus result of
+      Pending -> 
+        if resolve 
+          then pollBlocTxResult hash
+          else return result
+      _ -> return result
 
 postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
 postUsersContract userName addr

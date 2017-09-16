@@ -13,9 +13,9 @@ module BlockApps.Bloc22.API.Users where
 
 import           Control.Lens                       (mapped)
 import           Control.Lens.Operators             hiding ((.=))
-import           Data.Aeson
+import           Data.Aeson                         hiding (Success)
 import           Data.Aeson.Casing
-import           Data.Aeson.Types
+import           Data.Aeson.Types                   hiding (Success)
 import qualified Data.ByteString.Lazy               as ByteString.Lazy
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
@@ -27,7 +27,7 @@ import           GHC.Generics
 import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
-import           Test.QuickCheck
+import           Test.QuickCheck                    hiding (Success,Failure)
 import           Test.QuickCheck.Instances          ()
 
 import           BlockApps.Bloc22.API.SwaggerSchema
@@ -43,15 +43,126 @@ import           BlockApps.Strato.Types
 -- | Routes and types
 --------------------------------------------------------------------------------
 
-data BlocTransactionStatus = Success | Failure | Pending
+data BlocTransactionStatus = Success | Failure | Pending deriving (Eq, Show, Generic)
 
-data BlocTransactionType   = Send | Upload | Call
+instance Arbitrary BlocTransactionStatus where
+  arbitrary = elements [Success,Failure,Pending]
+
+instance FromJSON BlocTransactionStatus where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToJSON BlocTransactionStatus where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance ToSchema BlocTransactionStatus where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Bloc Transaction Status"
+    & mapped.schema.example ?~ toJSON Success
+
+data BlocTransactionData = Send   PostTransaction
+                         | Upload ContractDetails
+                         | Call   [SolidityValue]
+                         deriving (Eq, Show, Generic)
+
+instance Arbitrary BlocTransactionData where
+  arbitrary = elements [Call []]
+
+instance ToJSON BlocTransactionData where
+  toJSON btd = case btd of
+    Send   transaction -> object [ "tag" .= ("Send" :: Text)
+                                 , "contents" .= (transaction::PostTransaction)
+                                 ]
+    Upload details     -> object [ "tag" .= ("Upload":: Text)
+                                 , "contents" .= (details::ContractDetails)
+                                 ]  
+    Call   solVals     -> object [ "tag" .= ("Call":: Text)
+                                 , "contents" .= (solVals::[SolidityValue])
+                                 ]
+
+instance FromJSON BlocTransactionData where
+  parseJSON = withObject "BlocTransactionData" $ \v -> do
+    tag <- v .: "tag"
+    case tag of
+      ("Send"  ::String) -> Send   <$> v .: "contents"
+      ("Upload"::String) -> Upload <$> v .: "contents"
+      _                  -> Call   <$> v .: "contents"
+
+
+instance ToSample BlocTransactionData where
+  toSamples _ = samples
+    [ Send PostTransaction {
+        posttransactionHash       = keccak256 "foo"
+      , posttransactionGasLimit   = Strung 100000
+      , posttransactionCodeOrData = "Code or Data"
+      , posttransactionGasPrice   = Strung 1
+      , posttransactionTo         = Just $ Address 0xdeadbeef
+      , posttransactionFrom       = Address 0x12345678
+      , posttransactionValue      = Strung 0
+      , posttransactionR          = Hex 0xdeadbeef
+      , posttransactionS          = Hex 0xdeadbeef
+      , posttransactionV          = Hex 0x1c
+      , posttransactionNonce      = Strung 9876
+      }
+    , Upload ContractDetails {
+        contractdetailsBin        = "Contract Bin"
+      , contractdetailsAddress    = Just (Named "Latest")
+      , contractdetailsBinRuntime = "Contract Bin Runtime"
+      , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
+      , contractdetailsName       = "Contract Name"
+      , contractdetailsXabi       = Xabi {
+                                      xabiFuncs  = Map.fromList []
+                                    , xabiConstr = Map.fromList []
+                                    , xabiVars   = Map.fromList []
+                                    , xabiTypes  = Map.fromList []
+                                    }
+      }
+    , Call [] -- probably make a better Call sample
+    ]
+
+instance ToSchema BlocTransactionData where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+      & mapped.name ?~ "Bloc Transaction Data"
+      & mapped.schema.description ?~ "Bloc Transaction Data"
+      & mapped.schema.example ?~ toJSON ex
+      where
+        ex :: BlocTransactionData
+        ex = Call [] -- probably make a better ToSchema example
 
 data BlocTransactionResult = BlocTransactionResult
-  { blocTxStatus :: BlocTransactionStatus
-  , blocTxType   :: BlocTransactionType
-  , blocTxHash   :: Keccak256
-  }
+  { blocTransactionStatus :: BlocTransactionStatus
+  , blocTransactionHash   :: Keccak256
+  , blocTransactionResult :: Maybe TransactionResult
+  , blocTransactionData   :: Maybe BlocTransactionData
+  } deriving (Eq, Show, Generic)
+
+instance Arbitrary BlocTransactionResult where arbitrary = elements [BlocTransactionResult Success (keccak256 "foo") Nothing Nothing]
+
+instance ToJSON BlocTransactionResult where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON BlocTransactionResult where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance ToSample BlocTransactionResult where
+  toSamples _ = singleSample BlocTransactionResult
+    { blocTransactionStatus = Success
+    , blocTransactionHash = keccak256 "foo"
+    , blocTransactionResult = Nothing
+    , blocTransactionData = Nothing
+    }
+
+instance ToSchema BlocTransactionResult where
+  declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
+    & mapped.schema.description ?~ "Bloc Transaction Result"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: BlocTransactionResult
+      ex = BlocTransactionResult
+        { blocTransactionStatus = Success
+        , blocTransactionHash = keccak256 "foo"
+        , blocTransactionResult = Nothing
+        , blocTransactionData = Nothing
+        }
 
 type GetUsers = "users" :> Get '[JSON] [UserName]
 
@@ -69,14 +180,19 @@ instance ToParam (QueryFlag "faucet") where
   toParam _ =
     DocQueryParam "faucet" ["0","1",""] "flag for fauceting a new user" Flag
 
+instance ToParam (QueryFlag "resolve") where
+  toParam _ =
+    DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
+
 --------------------------------------------------------------------------------
 
 type PostUsersSend = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "send"
+  :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostSendParameters
-  :> Post '[JSON] PostTransaction
+  :> Post '[JSON] BlocTransactionResult
 
 data PostSendParameters = PostSendParameters
   { sendToAddress :: Address
