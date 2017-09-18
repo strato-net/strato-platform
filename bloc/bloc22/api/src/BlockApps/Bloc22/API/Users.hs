@@ -43,10 +43,10 @@ import           BlockApps.Strato.Types
 -- | Routes and types
 --------------------------------------------------------------------------------
 
-data BlocTransactionStatus = Success | Failure | Pending deriving (Eq, Show, Generic)
+data BlocTransactionStatus = Success | Failure | Pending deriving (Eq,Show,Generic)
 
 instance Arbitrary BlocTransactionStatus where
-  arbitrary = elements [Success,Failure,Pending]
+  arbitrary = genericArbitrary uniform
 
 instance FromJSON BlocTransactionStatus where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
@@ -62,10 +62,10 @@ instance ToSchema BlocTransactionStatus where
 data BlocTransactionData = Send   PostTransaction
                          | Upload ContractDetails
                          | Call   [SolidityValue]
-                         deriving (Eq, Show, Generic)
+                         deriving (Eq,Show,Generic)
 
 instance Arbitrary BlocTransactionData where
-  arbitrary = elements [Call []]
+  arbitrary = genericArbitrary uniform
 
 instance ToJSON BlocTransactionData where
   toJSON btd = case btd of
@@ -135,7 +135,8 @@ data BlocTransactionResult = BlocTransactionResult
   , blocTransactionData   :: Maybe BlocTransactionData
   } deriving (Eq, Show, Generic)
 
-instance Arbitrary BlocTransactionResult where arbitrary = elements [BlocTransactionResult Success (keccak256 "foo") Nothing Nothing]
+instance Arbitrary BlocTransactionResult where
+  arbitrary = genericArbitrary uniform
 
 instance ToJSON BlocTransactionResult where
   toJSON = genericToJSON (aesonPrefix camelCase)
