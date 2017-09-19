@@ -59,28 +59,28 @@ putBlocTxData BlocTransactionResult{..} = BlocTransactionResult blocTransactionS
 maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
 maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
 
-getBlocTxResult :: Keccak256 -> Bloc BlocTransactionResult
-getBlocTxResult hash = do
+getBlocTxStatus :: Keccak256 -> Bloc BlocTransactionStatus
+getBlocTxStatus hash = do
   maybeResult <- maybeTxResult hash
   case maybeResult of
-    Nothing -> return $ BlocTransactionResult Pending hash Nothing
+    Nothing -> return Pending
     Just res -> case transactionresultMessage res of
-      "Success!" -> return $ BlocTransactionResult Success hash Nothing
-      _          -> return $ BlocTransactionResult Failure hash Nothing
-    
-pollBlocTxResult :: Keccak256 -> Bloc BlocTransactionResult
-pollBlocTxResult hash = go 1
+      "Success!" -> return Success
+      _          -> return Failure
+
+pollBlocTxStatus :: Keccak256 -> Bloc BlocTransactionStatus
+pollBlocTxStatus hash = go 1
   where
     attempts = 30 :: Int
     hashString = keccak256String hash
     go n = do
-      logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling result for transaction hash: " ++ hashString
-      result <- getBlocTxResult hash
-      case blocTransactionStatus result of
+      logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling BlocTransactionStatus for transaction hash: " ++ hashString
+      status <- getBlocTxStatus hash
+      case status of
         Pending -> if n > attempts 
-                     then return result
+                     then return status
                      else return (threadDelay 1000000) >> go (n+1)
-        _       -> return result
+        _       -> return status
 
 pollTxResult :: Keccak256 -> Bloc TransactionResult
 pollTxResult hash = go 1
