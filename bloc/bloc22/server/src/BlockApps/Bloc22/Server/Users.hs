@@ -80,13 +80,7 @@ postUsersSend userName addr resolve
       (Wei (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
     {--}
-    result <- getBlocTxResult hash
-    case blocTransactionStatus result of
-      Pending -> 
-        if resolve 
-          then pollBlocTxResult hash
-          else return result
-      _ -> return result
+    getBlocTransactionResult hash resolve
 
 {-  
     void $ pollTxResult hash
@@ -119,15 +113,6 @@ postUsersContract userName addr
       (Wei (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
-    {--}
-    result <- getBlocTxResult hash
-    case blocTransactionStatus result of
-      Pending -> 
-        if resolve 
-          then pollBlocTxResult hash
-          else return result
-      _ -> return result
-{-
     txResult <- pollTxResult hash
     let
       addressMaybe = do
@@ -146,7 +131,6 @@ postUsersContract userName addr
           , Nothing
           )
         return addr'
--}
 
 postUsersUploadList :: UserName -> Address -> UploadListRequest -> Bloc [PostUsersUploadListResponse]
 postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
@@ -351,7 +335,18 @@ postUsersContractMethod
         return $ PostUsersContractMethodResponse formattedResponse
       stratoMsg  -> throwError $ UserError stratoMsg
 
+getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
+getBlocTransactionResult hash resolve = do
+  result <- getBlocTxResult hash
+  case blocTransactionStatus result of
+    Pending -> 
+      if resolve 
+        then pollBlocTxResult hash
+        else return result
+    _ -> return result
 
+postUsersResolve :: Keccak256 -> Bool -> Bloc BlocTransactionResult
+postUsersResolve = getBlocTransactionResult
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
