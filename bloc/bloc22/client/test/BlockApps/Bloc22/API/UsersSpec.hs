@@ -40,8 +40,8 @@ spec = do
       let
         postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParams
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" txParams
-      Right postSend <- runClientM (postUsersSend userName userAddress postSendParameters) (ClientEnv mgr blocUrl)
-      postSend `shouldSatisfy` (== Strung 100) . posttransactionValue
+      Right postSend <- runClientM (postUsersSend userName userAddress False postSendParameters) (ClientEnv mgr blocUrl)
+      postSend `shouldSatisfy` (== Strung 100) . posttransactionValue . blocTransactionData
       postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr blocUrl)
       postSendEitherBad `shouldSatisfy` isLeft
   describe "postUsersContract" $
