@@ -357,18 +357,18 @@ postUsersContractMethod
 
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash resolve = do
-  result <- getBlocTxResult hash
-  case blocTransactionStatus result of
+  status <- getBlocTxStatus hash
+  case status of
     Pending -> 
       if resolve 
-        then pollBlocTxResult hash
-        else return result
-    Failure -> return result
+        then pollBlocTxStatus hash >> getBlocTransactionResult hash False
+        else return $ BlocTransactionResult Pending hash Nothing
+    Failure -> return $ BlocTransactionResult Failure hash Nothing
     Success -> do
       Just txResult <- maybeTxResult hash
       ref <- getBlocReferenceData hash
       case ref of 
-        SendData   tx -> return $ putBlocTxData result (Just $ Send tx)
+        SendData   tx -> return $ BlocTransactionResult Success hash (Just $ Send tx)
         UploadData (name,cmId) -> do
           let
             addressMaybe = do
@@ -387,7 +387,7 @@ getBlocTransactionResult hash resolve = do
                 , Nothing
                 )
               details <- getContractDetails (ContractName name) (Unnamed addr')
-              return $ putBlocTxData result (Just $ Upload details)
+              return $ BlocTransactionResult Success hash (Just $ Upload details)
         CallData MethodCall{..} -> do
           cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
           functionId <- getFunctionId cmId methodcallMethodName
@@ -411,7 +411,7 @@ getBlocTransactionResult hash resolve = do
           case transactionresultMessage txResult of
             "Success!" -> do
               formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-              return $ putBlocTxData result (Just $ Call formattedResponse)
+              return $ BlocTransactionResult Success hash (Just $ Call formattedResponse)
             stratoMsg  -> throwError $ UserError stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
