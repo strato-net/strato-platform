@@ -388,7 +388,31 @@ getBlocTransactionResult hash resolve = do
                 )
               details <- getContractDetails (ContractName name) (Unnamed addr')
               return $ putBlocTxData result (Just $ Upload details)
-        CallData _ -> return result --TODO: implement case for CallData
+            CallData MethodCall{..} -> do
+              cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
+              functionId <- getFunctionId cmId methodcallMethodName
+          
+              xabi <- getContractXabiByMetadataId cmId
+              resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+              let
+                orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+              orderedResultTypes <-
+                for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+                  either (throwError . UserError . Text.pack) return $
+                    xabiTypeToType xabi indexedTypeType
+          
+              let
+                txResp = transactionresultResponse txResult
+          
+                -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+                -- workaround for enums
+                mFormattedResponse =
+                  convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
+              case transactionresultMessage txResult of
+                "Success!" -> do
+                  formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+                  return $ putBlocTxData result (Just $ Call formattedResponse)
+                stratoMsg  -> throwError $ UserError stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
