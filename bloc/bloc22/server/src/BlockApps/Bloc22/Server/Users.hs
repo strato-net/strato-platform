@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE TypeApplications    #-}
 
 module BlockApps.Bloc22.Server.Users where
 
@@ -11,6 +12,7 @@ import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
 import           Crypto.Secp256k1
+import qualified Data.Binary                       as Binary
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
@@ -51,6 +53,29 @@ import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import           BlockApps.XAbiConverter
 
+
+data BlocReferenceData = SendData   PostTransaction
+                       | UploadData (Text,Int32)
+                       | CallData   MethodCall
+
+putBlocReferenceData :: Keccak256 -> BlocReferenceData -> Bloc () --TODO: put BlocReferenceData in database
+putBlocReferenceData _ _ = return ()
+
+getBlocReferenceData :: Keccak256 -> Bloc BlocReferenceData --TODO: retrieve BlocReferenceData from database
+getBlocReferenceData _ = return $ SendData $ PostTransaction { 
+  posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
+, posttransactionGasLimit = Strung 21000
+, posttransactionCodeOrData = ""
+, posttransactionGasPrice = Strung 50000000000
+, posttransactionTo = Just $ Address 0xdeadbeef
+, posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
+, posttransactionValue = Strung 10000000000000000000
+, posttransactionR = Hex 1 -- make valid examples
+, posttransactionS = Hex 1 -- make valid examples
+, posttransactionV = Hex 0x1c
+, posttransactionNonce = Strung 0
+}
+
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
@@ -79,13 +104,8 @@ postUsersSend userName addr resolve
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
-    {--}
+    putBlocReferenceData hash (SendData tx)
     getBlocTransactionResult hash resolve
-
-{-  
-    void $ pollTxResult hash
-    return tx 
--}
 
 postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
 postUsersContract userName addr
@@ -343,10 +363,32 @@ getBlocTransactionResult hash resolve = do
       if resolve 
         then pollBlocTxResult hash
         else return result
-    _ -> return result
-
-postUsersResolve :: Keccak256 -> Bool -> Bloc BlocTransactionResult
-postUsersResolve = getBlocTransactionResult
+    Failure -> return result
+    Success -> do
+      Just txResult <- maybeTxResult hash
+      ref <- getBlocReferenceData hash
+      case ref of 
+        SendData   tx -> return $ putBlocTxData result (Just $ Send tx)
+        UploadData (name,cmId) -> do
+          let
+            addressMaybe = do
+              str <- listToMaybe $
+                Text.splitOn "," (transactionresultContractsCreated txResult)
+              stringAddress $ Text.unpack str
+          case addressMaybe of
+            Nothing -> case transactionresultMessage txResult of
+              "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+              stratoMsg  -> throwError $ UserError stratoMsg
+            Just addr' -> do
+              void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+                ( Nothing
+                , constant cmId
+                , constant addr'
+                , Nothing
+                )
+              details <- getContractDetails (ContractName name) (Unnamed addr')
+              return $ putBlocTxData result (Just $ Upload details)
+        CallData _ -> return result --TODO: implement case for CallData
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case

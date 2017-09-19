@@ -60,6 +60,7 @@ type BlocAPI =
   :<|> GetSearchContract
   :<|> GetSearchContractState
   :<|> GetSearchContractStateReduced
+  :<|> GetBlocTransactionResult
 
 markdownBloc :: String
 markdownBloc = markdown $ docs blocApi

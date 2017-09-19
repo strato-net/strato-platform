@@ -45,6 +45,7 @@ bloc = getHomepage
   :<|> getSearchContract
   :<|> getSearchContractState
   :<|> getSearchContractStateReduced
+  :<|> getBlocTransactionResult
 
 getHomepage :: Bloc Homepage
 getHomepage = return whoWouldveThoughtThisIsActuallyTheHomepage
