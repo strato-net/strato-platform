@@ -64,6 +64,10 @@ data BlocTransactionData = Send   PostTransaction
                          | Call   [SolidityValue]
                          deriving (Eq,Show,Generic)
 
+data BlocReferenceData = SendData   PostTransaction
+                       | UploadData Text
+                       | CallData   MethodCall
+
 instance Arbitrary BlocTransactionData where
   arbitrary = genericArbitrary uniform
 
@@ -131,7 +135,6 @@ instance ToSchema BlocTransactionData where
 data BlocTransactionResult = BlocTransactionResult
   { blocTransactionStatus :: BlocTransactionStatus
   , blocTransactionHash   :: Keccak256
-  , blocTransactionResult :: Maybe TransactionResult
   , blocTransactionData   :: Maybe BlocTransactionData
   } deriving (Eq, Show, Generic)
 
@@ -148,7 +151,6 @@ instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
     , blocTransactionHash = keccak256 "foo"
-    , blocTransactionResult = Nothing
     , blocTransactionData = Nothing
     }
 
@@ -161,7 +163,6 @@ instance ToSchema BlocTransactionResult where
       ex = BlocTransactionResult
         { blocTransactionStatus = Success
         , blocTransactionHash = keccak256 "foo"
-        , blocTransactionResult = Nothing
         , blocTransactionData = Nothing
         }
 
