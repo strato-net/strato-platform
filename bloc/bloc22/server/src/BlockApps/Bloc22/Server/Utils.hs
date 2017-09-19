@@ -52,6 +52,9 @@ waitNewAccount addr = do
       putStrLn $ "Waiting on transaction result for new account at address " ++ addressString addr
       threadDelay 1000000
 
+putBlocTxData :: BlocTransactionResult -> Maybe BlocTransactionData -> BlocTransactionResult
+putBlocTxData BlocTransactionResult{..} = BlocTransactionResult $ blocTransactionStatus blocTransactionHash  
+
 maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
 maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
 
@@ -59,10 +62,10 @@ getBlocTxResult :: Keccak256 -> Bloc BlocTransactionResult
 getBlocTxResult hash = do
   maybeResult <- maybeTxResult hash
   case maybeResult of
-    Nothing -> return $ BlocTransactionResult Pending hash Nothing Nothing
+    Nothing -> return $ BlocTransactionResult Pending hash Nothing
     Just res -> case transactionresultMessage res of
-      "Success!" -> return $ BlocTransactionResult Success hash (Just res) Nothing
-      _          -> return $ BlocTransactionResult Failure hash (Just res) Nothing
+      "Success!" -> return $ BlocTransactionResult Success hash Nothing
+      _          -> return $ BlocTransactionResult Failure hash Nothing
     
 pollBlocTxResult :: Keccak256 -> Bloc BlocTransactionResult
 pollBlocTxResult hash = go 1
