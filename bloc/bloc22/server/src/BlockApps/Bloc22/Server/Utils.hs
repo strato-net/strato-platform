@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 module BlockApps.Bloc22.Server.Utils where
 
 import           Control.Concurrent
@@ -53,7 +54,7 @@ waitNewAccount addr = do
       threadDelay 1000000
 
 putBlocTxData :: BlocTransactionResult -> Maybe BlocTransactionData -> BlocTransactionResult
-putBlocTxData BlocTransactionResult{..} = BlocTransactionResult $ blocTransactionStatus blocTransactionHash  
+putBlocTxData BlocTransactionResult{..} = BlocTransactionResult blocTransactionStatus blocTransactionHash
 
 maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
 maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
