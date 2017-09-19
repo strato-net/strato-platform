@@ -49,10 +49,10 @@ instance Arbitrary BlocTransactionStatus where
   arbitrary = genericArbitrary uniform
 
 instance FromJSON BlocTransactionStatus where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON defaultOptions
 
 instance ToJSON BlocTransactionStatus where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON defaultOptions
 
 instance ToSchema BlocTransactionStatus where
   declareNamedSchema proxy = genericDeclareNamedSchema blocSchemaOptions proxy
@@ -63,10 +63,6 @@ data BlocTransactionData = Send   PostTransaction
                          | Upload ContractDetails
                          | Call   [SolidityValue]
                          deriving (Eq,Show,Generic)
-
-data BlocReferenceData = SendData   PostTransaction
-                       | UploadData Text
-                       | CallData   MethodCall
 
 instance Arbitrary BlocTransactionData where
   arbitrary = genericArbitrary uniform
@@ -135,6 +131,7 @@ instance ToSchema BlocTransactionData where
 data BlocTransactionResult = BlocTransactionResult
   { blocTransactionStatus :: BlocTransactionStatus
   , blocTransactionHash   :: Keccak256
+--  , blocTransactionResult :: Maybe TransactionResult
   , blocTransactionData   :: Maybe BlocTransactionData
   } deriving (Eq, Show, Generic)
 
@@ -142,10 +139,10 @@ instance Arbitrary BlocTransactionResult where
   arbitrary = genericArbitrary uniform
 
 instance ToJSON BlocTransactionResult where
-  toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonDrop 15 camelCase)
 
 instance FromJSON BlocTransactionResult where
-  parseJSON = genericParseJSON (aesonPrefix camelCase)
+  parseJSON = genericParseJSON (aesonDrop 15 camelCase)
 
 instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
@@ -165,6 +162,12 @@ instance ToSchema BlocTransactionResult where
         , blocTransactionHash = keccak256 "foo"
         , blocTransactionData = Nothing
         }
+
+type GetBlocTransactionResult = "transactions"
+  :> Capture "hash" Keccak256
+  :> "result"
+  :> QueryFlag "resolve"
+  :> Get '[JSON] BlocTransactionResult
 
 type GetUsers = "users" :> Get '[JSON] [UserName]
 
