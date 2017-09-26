@@ -49,12 +49,13 @@ data TxsFilterParams = TxsFilterParams
   , qtMaxGasLimit :: Maybe Natural
   , qtMinGasLimit :: Maybe Natural
   , qtBlockNumber :: Maybe Natural
+  , qtHash        :: Maybe Keccak256
   } deriving (Eq, Show, Generic)
 
 txsFilterParams :: TxsFilterParams
 txsFilterParams = TxsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing
-  Nothing Nothing Nothing Nothing Nothing
+  Nothing Nothing Nothing Nothing Nothing Nothing
 
 data BlocksFilterParams = BlocksFilterParams
   { qbNumber     :: Maybe Natural
@@ -159,7 +160,7 @@ getTxsFilter
     uncurryTxsFilterParams f TxsFilterParams{..} = f
       qtFrom qtTo qtAddress qtValue qtMaxValue qtMinValue qtGasPrice
       qtMaxGasPrice qtMinGasPrice qtGasLimit qtMaxGasLimit qtMinGasLimit
-      qtBlockNumber
+      qtBlockNumber qtHash
     uncurryBlocksFilterParams f BlocksFilterParams{..} = f
       qbNumber qbMinNumber qbMaxNumber qbGasLim qbMinGasLim
       qbMaxGasLim qbGasUsed qbMinGasUsed qbMaxGasUsed qbDiff qbMinDiff

@@ -25,6 +25,7 @@ type API =
     :> QueryParam "maxgaslimit" Natural
     :> QueryParam "mingaslimit" Natural
     :> QueryParam "blocknumber" Natural
+    :> QueryParam "hash" Keccak256
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> "last"
