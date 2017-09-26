@@ -12,10 +12,10 @@ import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
 import           Crypto.Secp256k1
-import qualified Data.Binary                       as Binary
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
+import qualified Data.ByteString.Char8             as Char8
 import           Data.Foldable
 import           Data.Int                          (Int32)
 import           Data.List                         (sortOn, unzip4)
@@ -40,7 +40,8 @@ import           BlockApps.Bloc22.Monad
 import           BlockApps.Bloc22.Server.Utils
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.ArgValue
-import           BlockApps.Solidity.Contract
+import           BlockApps.Solidity.Contract()
+import qualified BlockApps.Solidity.Contract       as C
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Storage
 import           BlockApps.Solidity.Struct
@@ -49,32 +50,11 @@ import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
+import qualified BlockApps.Storage                 as Storage
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
+import qualified BlockApps.Strato.Types            as T
 import           BlockApps.XAbiConverter
-
-
-data BlocReferenceData = SendData   PostTransaction
-                       | UploadData (Text,Int32)
-                       | CallData   MethodCall
-
-putBlocReferenceData :: Keccak256 -> BlocReferenceData -> Bloc () --TODO: put BlocReferenceData in database
-putBlocReferenceData _ _ = return ()
-
-getBlocReferenceData :: Keccak256 -> Bloc BlocReferenceData --TODO: retrieve BlocReferenceData from database
-getBlocReferenceData _ = return $ SendData $ PostTransaction { 
-  posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-, posttransactionGasLimit = Strung 21000
-, posttransactionCodeOrData = ""
-, posttransactionGasPrice = Strung 50000000000
-, posttransactionTo = Just $ Address 0xdeadbeef
-, posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
-, posttransactionValue = Strung 10000000000000000000
-, posttransactionR = Hex 1 -- make valid examples
-, posttransactionS = Hex 1 -- make valid examples
-, posttransactionV = Hex 0x1c
-, posttransactionNonce = Strung 0
-}
 
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
@@ -104,7 +84,6 @@ postUsersSend userName addr resolve
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
-    putBlocReferenceData hash (SendData tx)
     getBlocTransactionResult hash resolve
 
 postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
@@ -242,7 +221,7 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
       contract' <-
         either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-      let maybeFunc = Map.lookup methodcallMethodName (fields $ mainStruct contract')
+      let maybeFunc = Map.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
       sel <-
         case maybeFunc of
@@ -314,7 +293,7 @@ postUsersContractMethod
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-    let maybeFunc = Map.lookup funcName (fields $ mainStruct contract')
+    let maybeFunc = Map.lookup funcName (fields $ C.mainStruct contract')
 
     sel <-
       case maybeFunc of
@@ -355,6 +334,41 @@ postUsersContractMethod
         return $ PostUsersContractMethodResponse formattedResponse
       stratoMsg  -> throwError $ UserError stratoMsg
 
+getFunctionNameFromFields :: ByteString -> [(Text, (Storage.Position, Type))] -> Bloc Text
+getFunctionNameFromFields selector [] =
+  throwError . UserError . Text.pack $ "Couldn't find selector " ++ (Char8.unpack selector)
+getFunctionNameFromFields selector (x:xs) = 
+  case fieldType of
+    TypeFunction sel _ _ -> 
+      if sel == selector
+        then return name
+        else getFunctionNameFromFields selector xs
+    _ -> getFunctionNameFromFields selector xs
+  where (name,posType) = x
+        fieldType = snd posType
+
+getFunctionNameFromContract :: ByteString -> C.Contract -> Bloc Text
+getFunctionNameFromContract selector = 
+  getFunctionNameFromFields selector 
+    . Map.toList 
+    . fields 
+    . C.mainStruct
+
+getFunctionNameFromXabi :: ByteString -> Xabi -> Bloc Text
+getFunctionNameFromXabi selector xabi = 
+  case xAbiToContract xabi of
+    Left err -> throwError . UserError . Text.pack $ err
+    Right contract' -> getFunctionNameFromContract selector contract'
+
+getFunctionNameFromAddress :: ByteString -> Address -> Bloc (Int32,Text)
+getFunctionNameFromAddress selector contractAddress = do
+  cmId <- blocQuery1 $ proc () -> do
+    (cmId',_,_,_,_,_,_,_) <- contractByAddressOnly contractAddress -< ()
+    returnA -< cmId'
+  xabi <- getContractXabiByMetadataId cmId
+  funcName <- getFunctionNameFromXabi selector xabi
+  return (cmId,funcName)
+
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash resolve = do
   status <- getBlocTxStatus hash
@@ -365,54 +379,69 @@ getBlocTransactionResult hash resolve = do
         else return $ BlocTransactionResult Pending hash Nothing
     Failure -> return $ BlocTransactionResult Failure hash Nothing
     Success -> do
-      Just txResult <- maybeTxResult hash
-      ref <- getBlocReferenceData hash
-      case ref of 
-        SendData   tx -> return $ BlocTransactionResult Success hash (Just $ Send tx)
-        UploadData (name,cmId) -> do
-          let
-            addressMaybe = do
-              str <- listToMaybe $
-                Text.splitOn "," (transactionresultContractsCreated txResult)
-              stringAddress $ Text.unpack str
-          case addressMaybe of
-            Nothing -> case transactionresultMessage txResult of
-              "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-              stratoMsg  -> throwError $ UserError stratoMsg
-            Just addr' -> do
-              void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-                ( Nothing
-                , constant cmId
-                , constant addr'
-                , Nothing
-                )
-              details <- getContractDetails (ContractName name) (Unnamed addr')
-              return $ BlocTransactionResult Success hash (Just $ Upload details)
-        CallData MethodCall{..} -> do
-          cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
-          functionId <- getFunctionId cmId methodcallMethodName
-      
-          xabi <- getContractXabiByMetadataId cmId
-          resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-          let
-            orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-          orderedResultTypes <-
-            for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-              either (throwError . UserError . Text.pack) return $
-                xabiTypeToType xabi indexedTypeType
-      
-          let
-            txResp = transactionresultResponse txResult
-      
-            -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-            -- workaround for enums
-            mFormattedResponse =
-              convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
-          case transactionresultMessage txResult of
-            "Success!" -> do
-              formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-              return $ BlocTransactionResult Success hash (Just $ Call formattedResponse)
-            stratoMsg  -> throwError $ UserError stratoMsg
+      mtx <- maybeTx hash
+      case mtx of
+        Nothing -> do
+          throwError $ UserError . Text.pack $ "Transaction not found: " ++ keccak256String hash
+        Just tx -> do
+          mtxr <- maybeTxResult hash
+          case mtxr of
+            Nothing -> do
+              throwError $ UserError . Text.pack $ "Transaction result not found: " ++ keccak256String hash
+            Just txResult -> do
+              case T.transactionTransactionType tx of 
+                Transfer -> return $ BlocTransactionResult Success hash (Just $ Send $ toPostTx tx)
+                Contract -> do
+                    let 
+                      Just to = T.transactionTo tx
+                      addressMaybe = do
+                        str <- listToMaybe $
+                          Text.splitOn "," (transactionresultContractsCreated txResult)
+                        stringAddress $ Text.unpack str
+                    (cmId,name)::(Int32,Text) <- blocQuery1 $ proc () -> do
+                      (cmId,name,_,_,_,_,_,_) <- contractByAddressOnly to -< ()
+                      returnA -< (cmId,name)
+                    case addressMaybe of
+                      Nothing -> case transactionresultMessage txResult of
+                        "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+                        stratoMsg  -> throwError $ UserError stratoMsg
+                      Just addr' -> do
+                        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+                          ( Nothing
+                          , constant cmId
+                          , constant addr'
+                          , Nothing
+                          )
+                        details <- getContractDetails (ContractName name) (Unnamed addr')
+                        return $ BlocTransactionResult Success hash (Just $ Upload details)
+                FunctionCall -> do
+                    let 
+                      Just to = T.transactionTo tx
+                      selector = Char8.pack $ take 4 $ Text.unpack $ fromJust $ T.transactionCodeOrData tx
+                    (cmId,funcName) <- getFunctionNameFromAddress selector to
+                    functionId <- getFunctionId cmId funcName
+                
+                    xabi <- getContractXabiByMetadataId cmId
+                    resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+                    let
+                      orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+                    orderedResultTypes <-
+                      for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+                        either (throwError . UserError . Text.pack) return $
+                          xabiTypeToType xabi indexedTypeType
+                
+                    let
+                      txResp = transactionresultResponse txResult
+                
+                      -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+                      -- workaround for enums
+                      mFormattedResponse =
+                        convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
+                    case transactionresultMessage txResult of
+                      "Success!" -> do
+                        formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+                        return $ BlocTransactionResult Success hash (Just $ Call formattedResponse)
+                      stratoMsg  -> throwError $ UserError stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case

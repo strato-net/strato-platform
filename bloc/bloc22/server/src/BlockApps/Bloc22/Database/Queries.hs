@@ -161,6 +161,23 @@ contractByAddress contractName contractAddress = proc () -> do
   restrict -< addr .== constant contractAddress
   returnA -< contract
 
+contractByAddressOnly
+  :: Address
+  -> Query
+    ( Column PGInt4
+    , Column PGText
+    , Column PGBytea
+    , Column PGTimestamptz
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    , Column PGBytea
+    )
+contractByAddressOnly contractAddress = proc () -> do
+  contract@(_,_,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+  restrict -< addr .== constant contractAddress
+  returnA -< contract
+
 linkedContractsJoinTable :: Query
   ( Column PGBytea
   , Column PGBytea

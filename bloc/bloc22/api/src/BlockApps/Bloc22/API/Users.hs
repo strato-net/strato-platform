@@ -28,7 +28,6 @@ import           Numeric.Natural
 import           Servant.API
 import           Servant.Docs
 import           Test.QuickCheck                    hiding (Success,Failure)
-import           Test.QuickCheck.Instances          ()
 
 import           BlockApps.Bloc22.API.SwaggerSchema
 import           BlockApps.Bloc22.API.Utils

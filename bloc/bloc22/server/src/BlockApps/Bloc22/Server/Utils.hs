@@ -19,7 +19,7 @@ import           Servant.Client
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Ethereum
+import           BlockApps.Ethereum         hiding (Transaction (..))
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
 
@@ -53,11 +53,15 @@ waitNewAccount addr = do
       putStrLn $ "Waiting on transaction result for new account at address " ++ addressString addr
       threadDelay 1000000
 
-putBlocTxData :: BlocTransactionResult -> Maybe BlocTransactionData -> BlocTransactionResult
-putBlocTxData BlocTransactionResult{..} = BlocTransactionResult blocTransactionStatus blocTransactionHash
-
 maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
 maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
+
+maybeTx :: Keccak256 -> Bloc (Maybe Transaction)
+maybeTx hash = do
+  mtx <- blocStrato $ listToMaybe <$> getTxsFilter txsFilterParams{qtHash = Just hash}
+  case mtx of 
+    Just tx -> return $ Just $ withoutNext tx
+    Nothing -> return Nothing
 
 getBlocTxStatus :: Keccak256 -> Bloc BlocTransactionStatus
 getBlocTxStatus hash = do
