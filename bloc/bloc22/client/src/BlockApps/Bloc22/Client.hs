@@ -114,14 +114,15 @@ postUsersSend
 postUsersSend = client (Proxy @ PostUsersSend)
 
 postUsersContract
-  :: UserName -> Address -> PostUsersContractRequest -> ClientM Address
+  :: UserName -> Address -> Bool -> PostUsersContractRequest -> ClientM BlocTransactionResult
 postUsersContract = client (Proxy @ PostUsersContract)
 
 postUsersUploadList
   :: UserName
   -> Address
+  -> Bool 
   -> UploadListRequest
-  -> ClientM [PostUsersUploadListResponse]
+  -> ClientM [BlocTransactionResult]
 postUsersUploadList = client (Proxy @ PostUsersUploadList)
 
 postUsersContractMethod
@@ -129,19 +130,21 @@ postUsersContractMethod
   -> Address
   -> ContractName
   -> Address
+  -> Bool
   -> PostUsersContractMethodRequest
-  -> ClientM PostUsersContractMethodResponse
+  -> ClientM BlocTransactionResult
 postUsersContractMethod = client (Proxy @ PostUsersContractMethod)
 
 postUsersSendList
-  :: UserName -> Address -> PostSendListRequest -> ClientM [PostSendListResponse]
+  :: UserName -> Address -> Bool -> PostSendListRequest -> ClientM [BlocTransactionResult]
 postUsersSendList = client (Proxy @ PostUsersSendList)
 
 postUsersContractMethodList
   :: UserName
   -> Address
+  -> Bool
   -> PostMethodListRequest
-  -> ClientM [PostUsersContractMethodListResponse]
+  -> ClientM [BlocTransactionResult]
 postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 
 getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
