@@ -241,8 +241,9 @@ type PostUsersContract = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "contract"
+  :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostUsersContractRequest
-  :> Post '[JSON] Address
+  :> Post '[JSON] BlocTransactionResult
 
 data PostUsersContractRequest = PostUsersContractRequest
   { postuserscontractrequestSrc      :: Text
@@ -315,8 +316,9 @@ type PostUsersUploadList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "uploadList"
+  :> QueryFlag "resolve"
   :> ReqBody '[JSON] UploadListRequest
-  :> Post '[JSON] [PostUsersUploadListResponse]
+  :> Post '[JSON] [BlocTransactionResult]
 
 data UploadListRequest = UploadListRequest
   { uploadlistPassword  :: Password
@@ -419,8 +421,9 @@ type PostUsersContractMethod = "users"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" Address
   :> "call"
+  :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostUsersContractMethodRequest
-  :> Post '[JSON] PostUsersContractMethodResponse
+  :> Post '[JSON] BlocTransactionResult
 
 data PostUsersContractMethodRequest = PostUsersContractMethodRequest
   { postuserscontractmethodPassword :: Password
@@ -498,8 +501,9 @@ type PostUsersSendList = "users"
   :> Capture "user" UserName
   :> Capture "userAddress" Address
   :> "sendList"
+  :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostSendListRequest
-  :> Post '[JSON] [PostSendListResponse]
+  :> Post '[JSON] [BlocTransactionResult]
 
 data PostSendListRequest = PostSendListRequest
   { postsendlistrequestPassword :: Password
@@ -601,8 +605,9 @@ type PostUsersContractMethodList = "users"
   :> Capture "user" UserName
   :> Capture "address" Address
   :> "callList"
+  :> QueryFlag "resolve"
   :> ReqBody '[JSON] PostMethodListRequest
-  :> Post '[JSON] [PostUsersContractMethodListResponse]
+  :> Post '[JSON] [BlocTransactionResult]
 
 data PostUsersContractMethodListResponse
   = MethodHash Keccak256

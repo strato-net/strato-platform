@@ -18,7 +18,7 @@ import qualified Data.ByteString.Base16            as Base16
 import qualified Data.ByteString.Char8             as Char8
 import           Data.Foldable
 import           Data.Int                          (Int32)
-import           Data.List                         (sortOn, unzip4)
+import           Data.List                         (sortOn)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Maybe
@@ -86,8 +86,8 @@ postUsersSend userName addr resolve
     hash <- blocStrato $ postTx tx
     getBlocTransactionResult hash resolve
 
-postUsersContract :: UserName -> Address -> PostUsersContractRequest -> Bloc Address
-postUsersContract userName addr
+postUsersContract :: UserName -> Address -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
+postUsersContract userName addr resolve
   (PostUsersContractRequest src password maybeContract args txParams value) = blocTransaction $ do
     --TODO: check what happens with mismatching args
     idsAndDetails <- compileContract src
@@ -112,27 +112,10 @@ postUsersContract userName addr
       (Wei (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
-    txResult <- pollTxResult hash
-    let
-      addressMaybe = do
-        str <- listToMaybe $
-          Text.splitOn "," (transactionresultContractsCreated txResult)
-        stringAddress $ Text.unpack str
-    case addressMaybe of
-      Nothing -> case transactionresultMessage txResult of
-        "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-        stratoMsg  -> throwError $ UserError stratoMsg
-      Just addr' -> do
-        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-          ( Nothing
-          , constant cmId
-          , constant addr'
-          , Nothing
-          )
-        return addr'
+    getBlocTransactionResult hash resolve
 
-postUsersUploadList :: UserName -> Address -> UploadListRequest -> Bloc [PostUsersUploadListResponse]
-postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
+postUsersUploadList :: UserName -> Address -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
+postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resolve) = do
   namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args txParams value,nonceIncr) -> do
     (bin16,cmId) <- blocQuery1 $ proc () -> do
       (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
@@ -147,51 +130,17 @@ postUsersUploadList userName addr (UploadListRequest pw contracts _resolve) = do
       (Wei (maybe 0 fromIntegral $ fmap unStrung value)) (bin <> argsBin) nonceIncr
     return ((name,cmId),tx)
   let
-    namesCmIds = map fst namesCmIdsTxs
     txs = map snd namesCmIdsTxs
   hashes <- blocStrato (postTxList txs)
-  -- TODO: use `ensureMostRecentSuccessfulTx`
-  results <- unBatchTransactionResult <$> pollTxResultBatch hashes -- pollTxResultBatch will always have at least one result for a hash
-  let zipped = resultJoiner <$> zip namesCmIds hashes
-      resultJoiner (nc, hash) = (nc, head . fromJust $ Map.lookup hash results)
-  resps <- for zipped $ \((name,cmId),txResult) -> do
-    let addressMaybe = do
-          str <- listToMaybe $ Text.splitOn "," (transactionresultContractsCreated txResult)
-          stringAddress (Text.unpack str)
-    case addressMaybe of
-      Nothing -> case transactionresultMessage txResult of
-        "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-        stratoMsg  -> throwError $ UserError stratoMsg
-      Just addr' -> do
-        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-          ( Nothing
-          , constant cmId
-          , constant addr'
-          , Nothing
-          )
-        getContractDetails (ContractName name) (Unnamed addr')
-  return $ PostUsersUploadListResponse <$> resps
+  mapM (flip getBlocTransactionResult (resolve || _resolve)) hashes
 
-postUsersSendList :: UserName -> Address -> PostSendListRequest -> Bloc [PostSendListResponse]
-postUsersSendList userName addr (PostSendListRequest pw resolve txs) = do
+postUsersSendList :: UserName -> Address -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
+postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = do
   txs' <- for (zip txs [0..]) $ \ (SendTransaction toAddr value txParams,nonceIncr) -> prepareTx
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
     (Wei (fromIntegral $ unStrung value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
-  ret <- if resolve
-    then do
-      resolved <- pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
-      results <- traverse ensureMostRecentSuccessfulTx $
-        Map.elems (unBatchTransactionResult resolved)
-      senderAccounts <- blocStrato $ getAccountsFilter
-        accountsFilterParams{qaAddress = Just addr}
-      case senderAccounts of
-        [] -> throwError $ AnError "No sender account found"
-        senderAccount:_ -> return $
-          let strungBalance = Text.pack . show . unStrung $ accountBalance senderAccount
-          in const strungBalance <$> results
-    else return (Text.pack . keccak256String <$> hashes)
-  return $ PostSendListResponse <$> ret
+  mapM (flip getBlocTransactionResult (resolve || resolve')) hashes
 
 ensureMostRecentSuccessfulTx
   :: [TransactionResult]
@@ -208,11 +157,12 @@ ensureMostRecentSuccessfulTx results = blocMaybe err . listToMaybe $
 postUsersContractMethodList
   :: UserName
   -> Address
+  -> Bool
   -> PostMethodListRequest
-  -> Bloc [PostUsersContractMethodListResponse]
-postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
-  txsFuncIdsXabisMethodCall <- for (zip postmethodlistrequestTxs [0..]) $
-    \ (methodCall@MethodCall{..},nonceIncr) -> do
+  -> Bloc [BlocTransactionResult]
+postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} = do
+  txs <- for (zip postmethodlistrequestTxs [0..]) $
+    \ (MethodCall{..},nonceIncr) -> do
       cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
       functionId <- getFunctionId cmId methodcallMethodName
       xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
@@ -241,48 +191,25 @@ postUsersContractMethodList userName userAddr PostMethodListRequest{..} = do
         (sel <> argsBin)
         nonceIncr
       -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-      return (tx,functionId,xabi,methodCall)
-  let (txs,funcIds,xabis, methodCalls) = unzip4 txsFuncIdsXabisMethodCall
+      return tx --(tx,functionId,xabi,methodCall)
   logWith logNotice ("txs are: " <> Text.pack (show txs))
   hashes <- blocStrato $ postTxList txs
-  if postmethodlistrequestResolve
-  then do
-    -- TODO: use `ensureMostRecentSuccessfulTx`
-    txResults <- unBatchTransactionResult <$> pollTxResultBatch hashes -- chosen by fair dice roll, guaranteed to have at least one tx result for each hash
-    let zipped = resultJoiner <$> zip funcIds hashes
-        resultJoiner (fi, hash) = (fi, head . fromJust $ Map.lookup hash txResults)
-
-    for (zip3 zipped xabis methodCalls) $ \((funcId,txResult),xabi,methodCall) -> do
-      resultXabiTypes <- getXabiFunctionsReturnValuesQuery funcId
-      let orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-      orderedResultTypes <- for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-                              either (throwError . UserError . Text.pack) return $
-                                xabiTypeToType xabi indexedTypeType
-      let txResp = transactionresultResponse txResult
-
-      -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-      -- workaround for enums
-      let mFormattedResponse = convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
-
-      case transactionresultMessage txResult of
-        "Success!" ->
-          MethodResolved . Right <$> blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-        stratoMsg  -> return $
-          MethodResolved . Left $ MethodErrored methodCall stratoMsg
-  else return $ map MethodHash hashes
+  mapM (flip getBlocTransactionResult (resolve || postmethodlistrequestResolve)) hashes
 
 postUsersContractMethod
   :: UserName
   -> Address
   -> ContractName
   -> Address
+  -> Bool
   -> PostUsersContractMethodRequest
-  -> Bloc PostUsersContractMethodResponse
+  -> Bloc BlocTransactionResult
 postUsersContractMethod
   userName
   userAddr
   (ContractName contractName)
   contractAddr
+  resolve
   (PostUsersContractMethodRequest password funcName args value txParams) = do
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
     functionId <- getFunctionId cmId funcName
@@ -311,28 +238,7 @@ postUsersContractMethod
       0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
-    resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-    let
-      orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-    orderedResultTypes <-
-      for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-        either (throwError . UserError . Text.pack) return $
-          xabiTypeToType xabi indexedTypeType
-
-    txResult <- pollTxResult hash
-
-    let
-      txResp = transactionresultResponse txResult
-
-      -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-      -- workaround for enums
-      mFormattedResponse =
-        convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
-    case transactionresultMessage txResult of
-      "Success!" -> do
-        formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-        return $ PostUsersContractMethodResponse formattedResponse
-      stratoMsg  -> throwError $ UserError stratoMsg
+    getBlocTransactionResult hash resolve
 
 getFunctionNameFromFields :: ByteString -> [(Text, (Storage.Position, Type))] -> Bloc Text
 getFunctionNameFromFields selector [] =
