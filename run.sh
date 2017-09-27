@@ -8,6 +8,7 @@ else
   htpasswd -cb /etc/nginx/auth.htpasswd admin ${uiPassword}
 fi
 
+echo 'testline: add no-auth nginx.conf here'
 ln -sf nginx-$(${ssl:-false} || echo "no")ssl.conf /etc/nginx/nginx.conf
 service nginx start || exit 1 # Restart container if nginx failed to start (wait for all upstreams to become available)
 tail -n0 -F /var/log/nginx/*.log
