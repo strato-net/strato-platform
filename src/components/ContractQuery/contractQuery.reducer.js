@@ -6,6 +6,7 @@ import {
   ADD_QUERY_FILTER,
   REMOVE_QUERY_FILTER
 } from './contractQuery.actions';
+import { generateQueryString } from '../../lib/postgrestUtils'
 
 const initialState = {
   queryString: '',
@@ -22,7 +23,6 @@ function getTag(tag) {
     display: displayValue
   }
 }
-
 
 const reducer = function(state = initialState, action) {
   switch(action.type) {
@@ -59,13 +59,7 @@ const reducer = function(state = initialState, action) {
       return {
         ...state,
         tags: aTags,
-        queryString: aTags.reduce((queryString,tag) => {
-          let qs = queryString;
-          if(qs !== '')
-            qs += '&';
-          qs += tag.field + '=' + tag.operator + '.' + tag.value;
-          return qs;
-        },'')
+        queryString: generateQueryString(aTags)
       }
     case REMOVE_QUERY_FILTER:
       const rTags = state.tags.filter((tag,i) => {
