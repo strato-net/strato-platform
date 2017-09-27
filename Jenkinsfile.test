@@ -20,8 +20,11 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+            # Make sure all repos are cloned
             basil clone
+            # Checkout branches specified in Basilfile
             basil checkout
+            # Git pull all the latest
             dirs=($(find ./repos -mindepth 1 -maxdepth 1 -type d))
             for dir in "${dirs[@]}"; do
               (cd "$dir" && git pull)
