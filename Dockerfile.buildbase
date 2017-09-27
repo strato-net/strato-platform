@@ -1,0 +1,14 @@
+FROM node:boron
+
+WORKDIR /usr/src/app/
+
+COPY ./ /usr/src/app/
+
+RUN npm i && \
+    mkdir /dist_ready && \
+    mv dist/* /dist_ready/ && \
+    rm -r /usr/src/app
+
+VOLUME /volume
+
+CMD ["cp", "-R", "/dist_ready/.", "/volume"]

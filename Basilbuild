@@ -5,6 +5,7 @@ endif
 all: build
 
 build:
-	npm i
-	npm run build
+  docker build -f Dockerfile.buildbase -t blockapps-docs-buildbase .
+  rm -rf dist_built
+  docker run -it --rm=true -v $(pwd)/dist_built/:/volume blockapps-docs-buildbase
 	docker build -t $(BASIL_DOCKER_TAG) .
