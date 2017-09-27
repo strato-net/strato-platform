@@ -5,9 +5,9 @@
 module BlockApps.Bloc22.API.UsersSpec where
 
 import           Control.Concurrent
+import           Data.Maybe
 import           Data.Either
 import qualified Data.Map.Strict                  as Map
-import qualified Data.Text                        as Text
 import           Servant.Client
 import           Test.Hspec
 
@@ -17,6 +17,7 @@ import           BlockApps.Bloc22.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Strato.Types
+
 
 -- TODO: user/contract methods Addresses may need to be Maybe (Named Address)
 spec :: SpecWith TestConfig
@@ -36,16 +37,18 @@ spec = do
       postUsersEither <- runClientM (postUsersUser username True pw) (ClientEnv mgr blocUrl)
       postUsersEither `shouldSatisfy` isRight
   describe "postUsersSend" $
-    it "should send ethers to another address" $ \ TestConfig {..} -> do
+    it "should send ethers to another address" $ \ testConfig@TestConfig {..} -> do
       let
         postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParams
         postSendParametersBad = PostSendParameters (Address 0xddb9fa06155e06d3fcf274b8e0a6680d0dc95370) (Strung 100) "12345" txParams
-      Right postSend <- runClientM (postUsersSend userName userAddress False postSendParameters) (ClientEnv mgr blocUrl)
-      postSend `shouldSatisfy` (== Strung 100) . posttransactionValue . blocTransactionData
-      postSendEitherBad <- runClientM (postUsersSend userName userAddress postSendParametersBad) (ClientEnv mgr blocUrl)
-      postSendEitherBad `shouldSatisfy` isLeft
+      Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParameters) (ClientEnv mgr blocUrl)
+      let
+        Send postTransaction = fromJust $ blocTransactionData result
+      postTransaction `shouldSatisfy` (== Strung 100) . posttransactionValue
+      Right resultBad <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParametersBad) (ClientEnv mgr blocUrl)
+      resultBad `shouldSatisfy` (== Failure) . blocTransactionStatus
   describe "postUsersContract" $
-    it "should upload a contract" $ \ TestConfig {..} -> do
+    it "should upload a contract" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay
       let
         postUsersContractRequest = PostUsersContractRequest
@@ -56,8 +59,8 @@ spec = do
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
           }
-      postUsersContractEither <- runClientM (postUsersContract userName userAddress postUsersContractRequest) (ClientEnv mgr blocUrl)
-      postUsersContractEither `shouldSatisfy` isRight
+      Right result <- getResolvedTx testConfig $ runClientM (postUsersContract userName userAddress False postUsersContractRequest) (ClientEnv mgr blocUrl)
+      result `shouldSatisfy` (== Success) . blocTransactionStatus
   describe "postUsersUploadList" $
     it "should upload a list of contracts" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -79,12 +82,12 @@ spec = do
         uploadListRequest = UploadListRequest
           { uploadlistPassword = pw
           , uploadlistContracts = uploadListContracts
-          , uploadlistResolve = True
+          , uploadlistResolve = False
           }
-      postUsersUploadEither <- runClientM (postUsersUploadList userName userAddress uploadListRequest) (ClientEnv mgr blocUrl)
-      postUsersUploadEither `shouldSatisfy` isRight
+      results <- runClientM (postUsersUploadList userName userAddress False uploadListRequest) (ClientEnv mgr blocUrl)
+      results `shouldSatisfy` isRight
   describe "postUsersContractMethod" $
-    it "should call a contract method" $ \ TestConfig {..} -> do
+    it "should call a contract method" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay
       let
         contractName = ContractName simpleStorageContractName
@@ -96,17 +99,17 @@ spec = do
           , postuserscontractmethodValue = Just $ Strung 0
           , postuserscontractmethodTxParams = txParams
           }
-      Right (PostUsersContractMethodResponse response) <- runClientM
-        (postUsersContractMethod userName userAddress contractName contractAddress postUsersContractMethodRequest)
+      Right result <- getResolvedTx testConfig $ runClientM
+        (postUsersContractMethod userName userAddress contractName contractAddress False postUsersContractMethodRequest)
         (ClientEnv mgr blocUrl)
-      response `shouldBe` [SolidityValueAsString "0"]
+      fromJust (blocTransactionData result) `shouldBe` Call [SolidityValueAsString "0"]
   describe "postUsersSendList" $
     it "should post a list of send transactions" $ \ TestConfig {..} -> do
       threadDelay delay
       let
         postSendListRequest = PostSendListRequest
           { postsendlistrequestPassword  = pw
-          , postsendlistrequestResolve = True
+          , postsendlistrequestResolve = False
           , postsendlistrequestTxs = replicate 3
               SendTransaction
               { sendtransactionToAddress = toUserAddress
@@ -114,18 +117,17 @@ spec = do
               , sendtransactionTxParams = txParams
               }
           }
-      Right balances <- runClientM
-        (postUsersSendList userName userAddress postSendListRequest)
+      results <- runClientM
+        (postUsersSendList userName userAddress False postSendListRequest)
         (ClientEnv mgr blocUrl)
-      balances `shouldSatisfy` all (\(PostSendListResponse balance) ->
-        read (Text.unpack balance) <= (1000000000000000000000 - 300 :: Integer))
+      results `shouldSatisfy` isRight
   describe "postUsersContractMethodList" $
     it "should call a list of methods" $ \ TestConfig {..} -> do
       threadDelay delay
       let
         postMethodListRequest = PostMethodListRequest
           { postmethodlistrequestPassword = pw
-          , postmethodlistrequestResolve = True
+          , postmethodlistrequestResolve = False
           , postmethodlistrequestTxs = replicate 3
               MethodCall
               { methodcallContractName = simpleStorageContractName
@@ -136,7 +138,7 @@ spec = do
               , methodcallTxParams = txParams
               }
           }
-      Right responses <- runClientM
-        (postUsersContractMethodList userName userAddress postMethodListRequest)
+      results <- runClientM
+        (postUsersContractMethodList userName userAddress False postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      responses `shouldSatisfy` all (== MethodResolved (Right [SolidityValueAsString "0"]))
+      results `shouldSatisfy` isRight
