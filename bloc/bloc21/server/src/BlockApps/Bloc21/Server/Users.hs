@@ -67,9 +67,7 @@ postUsersUser (UserName name) faucet pass = blocTransaction $ do
     addr = keystoreAcctAddress keyStore
   when faucet $ do
     logWith logNotice "Waiting for faucet transaction to be mined"
-    blocStrato $ do
-      void $ postFaucet addr
-      void $ waitNewAccount addr
+    void $ blocStrato $ postFaucet addr
   return addr
 
 postUsersSend :: UserName -> Address -> PostSendParameters -> Bloc PostTransaction

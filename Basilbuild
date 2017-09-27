@@ -5,6 +5,7 @@ endif
 BASILWORK=.basil-work
 BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
 STACKWORK=$(BASILWORK)/stack
+SOLCWORK=$(BASILWORK)/solc
 FAKEROOT=$(BASILWORK)/fakeroot
 BLOCHOME=$(FAKEROOT)/usr/bin/bloc
 BUILDER_HOME=$(BASILWORK_ABS)/builder_home
@@ -12,6 +13,18 @@ DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
 BUILDBASE_NAME=bloch-buildbase
 DEPLOYBASE_NAME=bloch-deploybase
 DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root $(BUILDBASE_NAME):latest bash -c
+
+
+SOLCBRANCH=0.4.8-no-md
+SOLCREPOSITORY=https://github.com/blockapps/solidity.git
+SOLCBUILDDIR=$(SOLCWORK)/solidity/build
+SOLCMAKEFLAGS=-j4
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
+else
+SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
+endif
+SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
 EXTRADEPS=doit.sh
 
@@ -28,10 +41,29 @@ all: build_docker
 prebuild:
 	mkdir -p $(BASILWORK)
 	mkdir -p $(STACKWORK)
+	mkdir -p $(SOLCWORK)
 	mkdir -p $(FAKEROOT)/usr/bin
 	mkdir -p $(BLOCHOME)
 	mkdir -p $(BUILDER_HOME)
 	mkdir -p /tmp/docker-dummy
+
+build_solidity: prebuild
+ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
+	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
+else
+ifneq ("$(wildcard $(SOLCWORK)/solidity/.git)","")
+	echo "solidity already cloned, will skip"
+else
+	git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY)
+endif
+	mkdir -p $(SOLCBUILDDIR)
+	$(SOLCCMAKE)
+endif
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	$(SOLCMAKEINSTALL)
+else
+	$(DOCKER_SHELL) "$(SOLCMAKEINSTALL)"
+endif
 
 build_haskell: build_buildbase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
@@ -54,7 +86,7 @@ else
 	rm -f /tmp/docker-dummy/Dockerfile.buildbase
 endif
 
-build_docker: build_deploybase build_haskell
+build_docker: build_deploybase build_solidity build_haskell
 	cp -f Dockerfile $(FAKEROOT)
 	cp -f $(EXTRADEPS) $(BLOCHOME)
 	cp -f $(FAKEROOT)/usr/bin/blockapps-strato-server $(BLOCHOME)

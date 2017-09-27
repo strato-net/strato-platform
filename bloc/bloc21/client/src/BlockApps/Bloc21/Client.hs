@@ -71,9 +71,9 @@ getContractsSymbols
   :: ContractName -> MaybeNamed Address -> ClientM [SymbolName]
 getContractsSymbols = client (Proxy @ GetContractsSymbols)
 
-getContractsEnum
-  :: ContractName -> MaybeNamed Address -> EnumName -> ClientM [EnumValue]
-getContractsEnum = client (Proxy @ GetContractsEnum)
+--getContractsEnum
+--  :: ContractName -> MaybeNamed Address -> EnumName -> ClientM [EnumValue]
+--getContractsEnum = client (Proxy @ GetContractsEnum)
 
 getContractsStateMapping
   :: ContractName
