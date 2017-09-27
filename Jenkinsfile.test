@@ -9,9 +9,8 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker rm -f $(docker ps -aq) || true; docker system prune -f
+          docker-compose kill && docker-compose down -v
           docker ps
-          sudo rm -rf repos
         '''
        }
     }
@@ -22,6 +21,7 @@ pipeline {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             basil clone
+            basil checkout
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
             basil build
