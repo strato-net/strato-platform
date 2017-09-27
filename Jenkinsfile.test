@@ -21,7 +21,7 @@ pipeline {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             basil clone
-            dirs=($(find ./repos/ -type d))
+            dirs=($(find ./repos -mindepth 1 -maxdepth 1 -type d))
             for dir in "${dirs[@]}"; do
               (cd "$dir" && git pull)
             done
