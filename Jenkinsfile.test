@@ -23,7 +23,7 @@ pipeline {
             basil clone
             dirs=($(find ./repos/ -type d))
             for dir in "${dirs[@]}"; do
-              git pull
+              (cd "repos/$dir" && git pull)
             done
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
