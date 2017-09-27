@@ -5,10 +5,7 @@ WORKDIR /usr/src/app/
 COPY ./ /usr/src/app/
 
 RUN npm i && \
-    mkdir /dist_ready && \
-    mv dist/* /dist_ready/ && \
+    npm run build && \
+    mkdir /dist_built && \
+    mv dist/* /dist_built/ && \
     rm -r /usr/src/app
-
-VOLUME /volume
-
-CMD ["cp", "-R", "/dist_ready/.", "/volume"]

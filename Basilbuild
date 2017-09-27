@@ -7,6 +7,8 @@ all: build
 build:
 	docker build -f Dockerfile.buildbase -t blockapps-docs-buildbase .
 	rm -rf dist_built
-	mkdir dist_built
-	docker run -it --rm=true -v $(pwd)/dist_built/:/volume blockapps-docs-buildbase
+	docker rm -f extract
+	docker create --name extract blockapps-docs-buildbase
+	docker cp extract:/dist_built/ dist_built
+	docker rm -f extract
 	docker build -t $(BASIL_DOCKER_TAG) .
