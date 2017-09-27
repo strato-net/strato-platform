@@ -299,19 +299,18 @@ getBlocTransactionResult hash resolve = do
                 Transfer -> return $ BlocTransactionResult Success hash (Just $ Send $ toPostTx tx)
                 Contract -> do
                     let 
-                      Just to = T.transactionTo tx
                       addressMaybe = do
                         str <- listToMaybe $
                           Text.splitOn "," (transactionresultContractsCreated txResult)
                         stringAddress $ Text.unpack str
-                    (cmId,name)::(Int32,Text) <- blocQuery1 $ proc () -> do
-                      (cmId,name,_,_,_,_,_,_) <- contractByAddressOnly to -< ()
-                      returnA -< (cmId,name)
                     case addressMaybe of
                       Nothing -> case transactionresultMessage txResult of
                         "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
                         stratoMsg  -> throwError $ UserError stratoMsg
                       Just addr' -> do
+                        (cmId,name)::(Int32,Text) <- blocQuery1 $ proc () -> do
+                          (cmId,name,_,_,_,_,_,_) <- contractByAddressOnly addr' -< ()
+                          returnA -< (cmId,name)
                         void . blocModify $ \conn -> runInsert conn contractsInstanceTable
                           ( Nothing
                           , constant cmId
