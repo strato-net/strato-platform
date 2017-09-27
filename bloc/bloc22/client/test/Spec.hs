@@ -102,11 +102,15 @@ setup = do
       addr1 <- postUsersUser (userName testConfig) True (pw testConfig)
       addr2 <- postUsersUser (toUserName testConfig) True (pw testConfig)
       _ <- postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
-      PostUsersUploadListResponse simpleStorageDetails
-        : PostUsersUploadListResponse testDetails
-        : PostUsersUploadListResponse simpleMappingDetails
-        : _ <- postUsersUploadList (userName testConfig) addr1 uploadListRequest
+      unresolvedResults <- postUsersUploadList (userName testConfig) addr1 True uploadListRequest
+      simpleStorageResult
+        : testResult
+        : simpleMappingResult
+        : _ <- sequence $ map resolveBlocTx unresolvedResults
       let
+        Just (Upload simpleStorageDetails) = blocTransactionData simpleStorageResult
+        Just (Upload testDetails) = blocTransactionData testResult
+        Just (Upload simpleMappingDetails) = blocTransactionData simpleMappingResult
         Just (Unnamed sscAddr) = contractdetailsAddress simpleStorageDetails
         Just (Unnamed tcAddr) = contractdetailsAddress testDetails
         Just (Unnamed smcAddr) = contractdetailsAddress simpleMappingDetails
