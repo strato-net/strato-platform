@@ -17,6 +17,7 @@ library
   exposed-modules:
     BlockApps.Bloc22.Database.Create
     BlockApps.Bloc22.Database.Queries
+    BlockApps.Bloc22.Database.Solc
     BlockApps.Bloc22.Database.Tables
     BlockApps.Bloc22.Monad
     BlockApps.Bloc22.Server
@@ -42,11 +43,13 @@ library
                , containers
                , contravariant
                , cryptonite
+               , directory
+               , filepath
                , bytestring
                , base16-bytestring
                , generic-random
+               , either
                , hflags
-               , http-api-data
                , http-client
                , http-media
                , http-types
@@ -61,6 +64,7 @@ library
                , network
                , opaleye
                , postgresql-simple
+               , process
                , product-profunctors
                , profunctors
                , QuickCheck
@@ -78,6 +82,7 @@ library
                , stm
                , swagger2
                , text
+               , temporary
                , time
                , transformers-base
                , unordered-containers
