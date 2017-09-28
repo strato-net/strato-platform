@@ -15,7 +15,7 @@ authBasic=${authBasic:-true}
 if [ "$authBasic" = true ] ; then
 	ln -sf nginx-$(${ssl:-false} || echo "no")ssl.conf /etc/nginx/nginx.conf
 else
-	sed '/auth_basic/d' ./nginx-nossl.conf > nginx-nossl-noauth.conf
+	sed '/auth_basic/d' nginx-nossl.conf > nginx-nossl-noauth.conf
 	ln -sf nginx-nossl-noauth.conf /etc/nginx/nginx.conf
 fi
 
