@@ -167,6 +167,7 @@ deployments:
         - strato
       environment:
         ssl: "${ssl}"
+        authBasic: "${authBasic}"
         uiPassword: "${uiPassword}"
 
   - name: zookeeper
