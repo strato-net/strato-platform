@@ -150,7 +150,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: master
+    ref: bloc22
     compose:
       restart: always
       volumes:
@@ -169,6 +169,7 @@ deployments:
         ssl: "${ssl}"
         authBasic: "${authBasic}"
         uiPassword: "${uiPassword}"
+        blockTime: "${blockTime}"
 
   - name: zookeeper
     compose:
