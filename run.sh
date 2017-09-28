@@ -11,8 +11,8 @@ else
   htpasswd -cb /etc/nginx/auth.htpasswd admin ${uiPassword}
 fi
 
-auth_basic=${auth_basic:-true}
-if [ "$auth_basic" = true ] ; then
+authBasic=${authBasic:-true}
+if [ "$authBasic" = true ] ; then
 	ln -sf nginx-$(${ssl:-false} || echo "no")ssl.conf /etc/nginx/nginx.conf
 else
 	sed '/auth_basic/d' ./nginx-nossl.conf > nginx-nossl-noauth.conf
