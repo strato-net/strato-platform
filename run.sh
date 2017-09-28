@@ -3,7 +3,7 @@
 set -x
 set -e
 authBasic=${authBasic:-true}
-blockTime=${blockTime:-13}
+blockTime=${blockTime:-13} # keep default the same as strato
 
 if [ -z "$uiPassword" ]
 then
