@@ -48,6 +48,9 @@ function newnode {
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode >> logs/ethereum-vm 2>&1
 
+  echo "Configuring log maintenance"
+  runForever cleanupLogs
+
   if $initialize
   then doRegister
   fi
@@ -99,6 +102,14 @@ function doRegister {
       until [[ $(curl -s -d "url=$explorerAdvertise/" $explorerHost/api/nodes) == "SUCCESS" ]] ; do : ; done
     fi
   fi
+}
+
+function cleanupLogs {
+  while true
+  do
+    sleep 900 ;
+    find /var/lib/strato/logs/ -type f -size +10M -exec truncate -s 10M {} \;
+  done
 }
 
 function runForever {
