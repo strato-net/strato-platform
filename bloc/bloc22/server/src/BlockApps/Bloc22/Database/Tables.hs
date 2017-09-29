@@ -45,6 +45,24 @@ keyStoreTable = Table "keystore" $ p8
   , required "user_id"
   )
 
+hashNameTable :: Table
+  ( Maybe (Column PGInt4)
+  , Column PGBytea
+  , Column PGInt4
+  , Column PGText
+  )
+  ( Column PGInt4
+  , Column PGBytea
+  , Column PGInt4
+  , Column PGText
+  )
+hashNameTable = Table "hash_name" $ p4
+  ( optional "id"
+  , required "hash"
+  , required "contract_metaddata_id"
+  , required "contract_name"
+  )
+
 contractsTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGText

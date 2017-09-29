@@ -112,6 +112,12 @@ postUsersContract userName addr resolve
       (Wei (fromIntegral (maybe 0 unStrung value))) (bin <> argsBin) 0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
+    void . blocModify $ \conn -> runInsert conn hashNameTable
+      ( Nothing
+      , constant hash
+      , constant cmId
+      , constant contractdetailsName
+      )
     getBlocTransactionResult hash resolve
 
 postUsersUploadList :: UserName -> Address -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
@@ -132,7 +138,14 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
   let
     txs = map snd namesCmIdsTxs
   hashes <- blocStrato (postTxList txs)
-  mapM (flip getBlocTransactionResult (resolve || _resolve)) hashes
+  flip mapM (zip hashes (map fst namesCmIdsTxs)) $ \(hash,(name,cmId)) -> do
+    void . blocModify $ \conn -> runInsert conn hashNameTable
+      ( Nothing
+      , constant hash
+      , constant cmId
+      , constant name
+      )
+    getBlocTransactionResult hash (resolve || _resolve)
 
 postUsersSendList :: UserName -> Address -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
 postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = do
@@ -279,8 +292,8 @@ getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash resolve = do
   status <- getBlocTxStatus hash
   case status of
-    Pending -> 
-      if resolve 
+    Pending ->
+      if resolve
         then pollBlocTxStatus hash >> getBlocTransactionResult hash False
         else return $ BlocTransactionResult Pending hash Nothing
     Failure -> return $ BlocTransactionResult Failure hash Nothing
@@ -295,37 +308,34 @@ getBlocTransactionResult hash resolve = do
             Nothing -> do
               throwError $ UserError . Text.pack $ "Transaction result not found: " ++ keccak256String hash
             Just txResult -> do
-              case T.transactionTransactionType tx of 
+              case T.transactionTransactionType tx of
                 Transfer -> return $ BlocTransactionResult Success hash (Just $ Send $ toPostTx tx)
                 Contract -> do
-                    let 
-                      addressMaybe = do
-                        str <- listToMaybe $
-                          Text.splitOn "," (transactionresultContractsCreated txResult)
-                        stringAddress $ Text.unpack str
-                    case addressMaybe of
-                      Nothing -> case transactionresultMessage txResult of
-                        "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-                        stratoMsg  -> throwError $ UserError stratoMsg
-                      Just addr' -> do
-                        (cmId,name)::(Int32,Text) <- blocQuery1 $ proc () -> do
-                          (cmId,name,_,_,_,_,_,_) <- contractByAddressOnly addr' -< ()
-                          returnA -< (cmId,name)
-                        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-                          ( Nothing
-                          , constant cmId
-                          , constant addr'
-                          , Nothing
-                          )
-                        details <- getContractDetails (ContractName name) (Unnamed addr')
-                        return $ BlocTransactionResult Success hash (Just $ Upload details)
+                  let
+                    addressMaybe = do
+                      str <- listToMaybe $
+                        Text.splitOn "," (transactionresultContractsCreated txResult)
+                      stringAddress $ Text.unpack str
+                  case addressMaybe of
+                    Nothing -> case transactionresultMessage txResult of
+                      "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+                      stratoMsg  -> throwError $ UserError stratoMsg
+                    Just addr' -> do
+                      (cmId,name)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
+                      void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+                        ( Nothing
+                        , constant cmId
+                        , constant addr'
+                        , Nothing
+                        )
+                      details <- getContractDetails (ContractName name) (Unnamed addr')
+                      return $ BlocTransactionResult Success hash (Just $ Upload details)
                 FunctionCall -> do
-                    let 
+                    let
                       Just to = T.transactionTo tx
                       selector = Char8.pack $ take 4 $ Text.unpack $ fromJust $ T.transactionCodeOrData tx
                     (cmId,funcName) <- getFunctionNameFromAddress selector to
                     functionId <- getFunctionId cmId funcName
-                
                     xabi <- getContractXabiByMetadataId cmId
                     resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
                     let
@@ -334,10 +344,8 @@ getBlocTransactionResult hash resolve = do
                       for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
                         either (throwError . UserError . Text.pack) return $
                           xabiTypeToType xabi indexedTypeType
-                
                     let
                       txResp = transactionresultResponse txResult
-                
                       -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
                       -- workaround for enums
                       mFormattedResponse =
