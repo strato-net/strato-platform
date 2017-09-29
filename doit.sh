@@ -48,6 +48,9 @@ function newnode {
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode >> logs/ethereum-vm 2>&1
 
+  echo "Configuring log maintenance"
+  runForever find /var/lib/strato/logs/ -type f -size +10M -exec truncate -s 10M {} \; 
+
   if $initialize
   then doRegister
   fi
