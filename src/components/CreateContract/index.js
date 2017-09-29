@@ -15,27 +15,23 @@ import {Field, reduxForm, formValueSelector} from 'redux-form';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-
+import { required } from '../../lib/reduxFormsValidations'
 import './CreateContract.css';
 
 // TODO: use solc instead of extabi for compile
 
 class CreateContract extends Component {
 
-  onDrop = (acceptedFiles, rejectedFiles) => {
-    this.handleFileUpload(acceptedFiles);
-  }
-
   renderDropzoneInput = (field) => {
-    const files = field.input.value;
+    const touchedAndHasErrors = field.meta.touched && field.meta.error
     return (
       <div className="dropzoneContainer text-center">
         <Dropzone
-          className={files.length > 0 && files[0].name.includes('.sol') ? "dropzoneActive" : "dropzone"}
+          className={ touchedAndHasErrors ? "dropzone" : "dropzoneActive"}
           activeClassName="dropzoneActive"
           rejectClassName="dropzoneRejected"
           name={field.name}
-          onDrop={(filesToUpload, e) => {this.onDrop(filesToUpload)}}
+          onDrop = { ( filesToUpload, e ) => this.handleFileDrop(filesToUpload, field) }
         >
           {({isDragActive, isDragReject, acceptedFiles}) => {
               if (isDragActive) {
@@ -48,9 +44,7 @@ class CreateContract extends Component {
                 return <p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>
           }}
         </Dropzone>
-        {field.meta.touched &&
-        field.meta.error &&
-        <span className="error">{field.meta.error}</span>}
+        {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
       </div>
     );
   };
@@ -59,12 +53,11 @@ class CreateContract extends Component {
     this.props.usernameChange(e.target.value);
   };
 
-  handleFileUpload = (files) => {
+  handleFileDrop = (files, dropZoneField) => {
+    this.props.touch('contract')
+    dropZoneField.input.onChange(files)
     const contract = files[0];
-    if (contract && (!contract.name || !contract.name.includes('.sol'))) {
-      //TODO: Toaster message for rejected upload
-      return;
-    }
+
     let reader = new FileReader();
     const self = this;
     reader.onload = function (event) {
@@ -81,6 +74,14 @@ class CreateContract extends Component {
       );
     };
     reader.readAsText(contract);
+  };
+
+  isValidFileType = (files) => {
+    if (!files || !files[0])
+      return 'Please add contract source file'
+    const contractSource = files[0];
+    if (!contractSource.name.includes('.sol'))
+      return 'It should be an .sol extention file';
   };
 
   submit = (values) => {
@@ -123,7 +124,7 @@ class CreateContract extends Component {
   }
 
   render() {
-    const {handleSubmit, pristine, submitting} = this.props;
+    const {handleSubmit, pristine, submitting, valid} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
 
     const userAddresses = this.props.accounts && this.props.username ?
@@ -156,6 +157,7 @@ class CreateContract extends Component {
                     title="Enter value"
                     type="text"
                     dir="auto"
+                    validate={required}
                     required
                   />
                 </td>
@@ -172,7 +174,7 @@ class CreateContract extends Component {
           this.props.contractOpenModal()
         }} className="pt-intent-primary pt-icon-add"
                 text="Create Contract"/>
-        <form>
+        <form >
           <Dialog
             iconName="inbox"
             isOpen={this.props.isOpen}
@@ -194,6 +196,7 @@ class CreateContract extends Component {
                       component="select"
                       name="username"
                       onChange={this.handleUsernameChange}
+                      validate={required}
                       required
                     >
                       <option />
@@ -220,6 +223,7 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="address"
+                      validate={required}
                       required
                     >
                       <option />
@@ -252,6 +256,7 @@ class CreateContract extends Component {
                     component="input"
                     dir="auto"
                     title="Password"
+                    validate={required}
                     required
                   />
                 </div>
@@ -269,7 +274,6 @@ class CreateContract extends Component {
                         component="input"
                         dir="auto"
                         title="Searchable"
-                        required
                     />
                   <span className="pt-control-indicator"></span>
                     Searchable
@@ -290,6 +294,7 @@ class CreateContract extends Component {
                     component={this.renderDropzoneInput}
                     dir="auto"
                     title="Contract Source"
+                    validate={this.isValidFileType}
                     required
                   />
                 </div>
@@ -326,9 +331,10 @@ class CreateContract extends Component {
                   this.props.contractCloseModal()
                 }}/>
                 <Button
-                  className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
+                  type="submit"
                   onClick={handleSubmit(this.submit)}
-                  disabled={pristine || submitting}
+                  className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
+                  disabled={pristine || submitting || !valid}
                   text="Create Contract"
                 />
 
@@ -345,7 +351,7 @@ const validate = (values) => {
   const errors = {};
 
   // const abi = CreateContract.props.abi.src;
-  //
+  
   // Object.values(abi).forEach(val => {
   //   if (val.constr !== undefined) {
   //     return Object.getOwnPropertyNames(val.constr).map((arg) => {
@@ -368,7 +374,6 @@ const selector = formValueSelector('create-contract');
 function mapStateToProps(state) {
   return {
     isOpen: state.createContract.isOpen,
-    response: state.createContract.response,
     abi: state.createContract.abi,
     createDisabled: state.createContract.createDisabled,
     filename: state.createContract.filename,
@@ -379,7 +384,9 @@ function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({form: 'create-contract', validate})(CreateContract);
+export const CREATE_CONTRACT_FORM = 'create-contract'
+
+const formed = reduxForm({form: CREATE_CONTRACT_FORM, validate})(CreateContract);
 const connected = connect(mapStateToProps, {
   contractOpenModal,
   contractCloseModal,

@@ -14,7 +14,8 @@ import {
 import {
   fetchContracts
 } from '../Contracts/contracts.actions';
-
+import { stopSubmit } from 'redux-form'
+import { CREATE_CONTRACT_FORM } from './'
 import { env } from '../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract"
@@ -105,6 +106,7 @@ function* compileContract(action) {
   }
   catch (err) {
     yield put(compileContractFailure(err));
+    yield put( stopSubmit(CREATE_CONTRACT_FORM, { contract: String(err)} ) )
   }
 
 }
