@@ -14,7 +14,7 @@ import {
 import {
   fetchContracts
 } from '../Contracts/contracts.actions';
-
+import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contractCard.actions'
 import { env } from '../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract"
@@ -92,6 +92,7 @@ function* createContract(action) {
       );
     yield put(createContractSuccess(response));
     yield put(fetchContracts());
+    yield put(fetchCirrusInstances(action.payload.contract));
   }
   catch (err) {
     yield put(createContractFailure(err));
