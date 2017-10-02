@@ -198,6 +198,7 @@ createTables :: Query
 createTables = mconcat
   [ usersTable
   , keyStoreTable
+  , hashNameTable
   , contractsTable
   , contractsMetaDataTable
   , contractsInstanceTable
