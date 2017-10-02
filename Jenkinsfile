@@ -8,7 +8,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker-compose kill && docker-compose down -v
+          docker rm -f $(docker ps -aq) || true; docker system prune -fa
           docker ps
           sudo rm -rf silo
         '''
