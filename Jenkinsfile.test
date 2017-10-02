@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "strato-integration"
+    label "cd10"
   }
   options { disableConcurrentBuilds() }
   parameters { string(name: 'SILO_BRANCH_NAME', defaultValue: 'test-', description: 'Silo git branch name to build upon. Skip the \"origin/\" part.\nThis job will build using the pipeline from Jenkinsfile.test and all the code in this branch.') }
