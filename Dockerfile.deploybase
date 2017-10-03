@@ -1,7 +1,5 @@
 FROM ubuntu:16.04
 RUN apt-get -y update                                          && \
-    apt-get install -y curl                                    && \
-    curl -sL -f https://deb.nodesource.com/setup_6.x | bash -  && \
     apt-get install -y libleveldb-dev libpq-dev libpcre3-dev      \
 	 	       autoconf libblas-dev liblapack-dev libsodium-dev \
                        libboost-all-dev libjsoncpp-dev netbase    \
