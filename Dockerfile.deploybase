@@ -5,9 +5,10 @@ RUN apt-get -y update                                          && \
                        libboost-all-dev libjsoncpp-dev netbase    \
                        netcat-openbsd libstdc++6 locales       && \
     apt-get autoremove                                         && \
-    rm -rf /var/lib/apt/lists/*
-RUN mkdir -p /usr/bin/bloc
-RUN locale-gen en_US.UTF-8  
-ENV LANG en_US.UTF-8  
-ENV LANGUAGE en_US:en  
-ENV LC_ALL en_US.UTF-8
+    rm -rf /var/lib/apt/lists/*                                && \
+    mkdir -p /usr/bin/bloc                                     && \
+    locale-gen en_US.UTF-8
+
+ENV LANG="en_US.UTF-8" \
+    LANGUAGE="en_US:en" \
+    LC_ALL="en_US.UTF-8"
