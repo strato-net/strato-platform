@@ -2,6 +2,8 @@
 
 set -x
 set -e
+
+MIN_TIMEOUT=60
 authBasic=${authBasic:-true}
 blockTime=${blockTime:-13} # keep default the same as strato
 
@@ -16,6 +18,11 @@ fi
 ln -sf nginx-$(${ssl:-false} || echo "no")ssl.conf /etc/nginx/nginx.conf
 
 BLOC_TIMEOUT=$((blockTime * 5))
+if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT} ]
+then
+  BLOC_TIMEOUT=${MIN_TIMEOUT}
+fi
+
 sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /etc/nginx/nginx.conf
 
 if [ "$authBasic" != true ] ; then
