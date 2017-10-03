@@ -47,7 +47,7 @@ prebuild:
 	mkdir -p $(BUILDER_HOME)
 	mkdir -p /tmp/docker-dummy
 
-build_solidity: prebuild
+build_solidity: prebuild build_buildbase
 ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
 	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
 else
