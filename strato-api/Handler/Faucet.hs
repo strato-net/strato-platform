@@ -2,20 +2,23 @@
 
 module Handler.Faucet where
 
-import qualified Data.Binary                 as BN
-import qualified Data.Text                   as T
-import qualified Database.Esqueleto          as E
-import qualified Network.Haskoin.Crypto      as H
-import qualified Prelude                     as P
+import qualified Data.Binary                    as BN
+import qualified Data.Text                      as T
+import qualified Database.Esqueleto             as E
+import qualified Network.Haskoin.Crypto         as H
+import qualified Prelude                        as P
 
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.Transaction
+import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TXOrigin
-import           Blockchain.EthConf          (runKafkaConfigured)
-import           Blockchain.Sequencer.Event  (IngestEvent (IETx), IngestTx (..))
-import           Blockchain.Sequencer.Kafka  (writeUnseqEvents)
-import           Blockchain.Util             (getCurrentMicrotime)
+import           Blockchain.EthConf             (runKafkaConfigured)
+import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))
+import           Blockchain.Sequencer.Kafka     (writeUnseqEvents)
+import           Blockchain.Strato.Model.Class
+import           Blockchain.Strato.Model.SHA
+import           Blockchain.Util                (getCurrentMicrotime)
 import           Handler.Common
 import           Handler.Filters
 import           Import
@@ -80,6 +83,7 @@ postFaucetR = do
       tx <- makeTX k (toAddr v) n
       _ <- insertTXIfNew API Nothing [tx]
       emitKafkaTransactions [tx]
-      return $ "/account?address=" ++ v
+
+      return . T.pack . shaToHex . txHash $ tx
 
 
