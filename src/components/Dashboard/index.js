@@ -20,11 +20,47 @@ const tourSteps = [
   {
     title: 'Welcome!',
     text: 'This is your new dashboard',
-    selector:".tour-welcome",
+    selector: '.tour-welcome',
     position: 'bottom', type: 'hover',
     isFixed: true,
-  }
+  },
+  {
+    title: 'Your Accounts',
+    text: 'Here are your accounts',
+    selector: '#accounts',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  },
+  {
+    title: 'Create User',
+    text: 'Create a user here',
+    selector: '#accounts-create-user-button',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  },
+  {
+    title: 'Your Transactions',
+    text: 'Click on this link to see them',
+    selector: '#transactions',
+    position: 'bottom',
+    isFixed: true,
+  },
 ];
+
+const tourCallback = function tourCallback(trigger) {
+  if(trigger.type === 'step:after') {
+    // Route to
+    switch(trigger.step.selector) {
+        case '#transactions': {
+            this.props.history.push('transactions');
+        }
+        case '#accounts': {
+            this.props.history.push('accounts');
+        }
+    }
+
+  }
+};
 
 class Dashboard extends Component {
 
@@ -132,6 +168,9 @@ class Dashboard extends Component {
           type="continuous"
           debug={true}
           autoStart={true}
+          callback={tourCallback.bind(this)}
+          disableOverlay={true}
+          showSkipButton={true}
         />
         <div className="row tour-welcome">
           <div className="col-sm-9 text-left">

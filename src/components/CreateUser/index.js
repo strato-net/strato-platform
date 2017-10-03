@@ -27,7 +27,9 @@ class CreateUser extends Component {
           mixpanelWrapper.track('create_user_open_click');
           this.props.openOverlay()
         }} className="pt-intent-primary pt-icon-add"
+        id="accounts-create-user-button"
                 text="Create User"/>
+
         <form>
           <Dialog
             iconName="inbox"
