@@ -171,7 +171,7 @@ class CreateContract extends Component {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
         }} className="pt-intent-primary pt-icon-add"
-                text="Create Contract"/>
+                text="Create Contract" id="tour-create-contract-button"/>
         <form>
           <Dialog
             iconName="inbox"
@@ -327,6 +327,7 @@ class CreateContract extends Component {
                 }}/>
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
+                  id="tour-create-contract-button"
                   onClick={handleSubmit(this.submit)}
                   disabled={pristine || submitting}
                   text="Create Contract"

@@ -19,9 +19,9 @@ const tourSteps = [
     isFixed: true,
   },
   {
-    title: 'Your Transactions',
+    title: 'Your Contracts',
     text: 'Click on this link to see them',
-    selector: '#transactions',
+    selector: '#contracts',
     position: 'bottom',
     isFixed: true,
   },
@@ -100,8 +100,8 @@ class Accounts extends Component {
     return (
       <div className="container-fluid pt-dark">
         <Tour ref="accountTour" run={true} steps={tourSteps} callback={ (event) => {
-            if(event.type === 'step:after' && event.step.selector == '#transactions') {
-              this.props.history.push('transactions');
+            if(event.type === 'step:after' && event.step.selector == '#contracts') {
+              this.props.history.push('contracts');
             }
         }}/>
         <div className="row">

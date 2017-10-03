@@ -28,11 +28,7 @@ class Transactions extends Component {
   render() {
     return (
       <div className="container-fluid pt-dark">
-        <Tour steps={tourSteps} ref="transactionsTour" callback={(event) => {
-          if(event.type === "") {
-            
-          }
-        }}/>
+        <Tour steps={tourSteps} ref="transactionsTour"/>
         <div className="row">
           <div className="col-sm-12">
             <h3>Transactions</h3>

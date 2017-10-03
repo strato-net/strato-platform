@@ -5,7 +5,24 @@ import {withRouter} from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import Tour from '../Tour';
 
+const tourSteps = [
+  {
+    title: 'Create Contract',
+    text: 'Where queries are to be found.',
+    selector: '#tour-create-contract-button',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  },
+  {
+    title: 'Your Transactions',
+    text: 'Click on this link to see them',
+    selector: '#transactions',
+    position: 'bottom',
+    isFixed: true,
+  },
+];
 
 class Contracts extends Component {
 
@@ -44,6 +61,11 @@ class Contracts extends Component {
 
     return (
       <div className="container-fluid">
+        <Tour steps={tourSteps} ref="transactionsTour" callback={ (event) => {
+            if(event.type === 'step:after' && event.step.selector == '#transactions') {
+              this.props.history.push('transactions');
+            }
+        }}/>
         <div className="row pt-dark">
           <div className="col-md-3 text-left">
             <h3>Contracts</h3>
