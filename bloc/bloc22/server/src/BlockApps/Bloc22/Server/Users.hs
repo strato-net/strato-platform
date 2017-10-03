@@ -15,7 +15,6 @@ import           Crypto.Secp256k1
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
 import qualified Data.ByteString.Base16            as Base16
-import qualified Data.ByteString.Char8             as Char8
 import           Data.Foldable
 import           Data.Int                          (Int32)
 import           Data.List                         (sortOn)
@@ -50,7 +49,6 @@ import           BlockApps.Solidity.Value
 import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
-import qualified BlockApps.Storage                 as Storage
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
 import qualified BlockApps.Strato.Types            as T
@@ -174,7 +172,7 @@ postUsersContractMethodList
   -> PostMethodListRequest
   -> Bloc [BlocTransactionResult]
 postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} = do
-  txs <- for (zip postmethodlistrequestTxs [0..]) $
+  txsCmIdsFuncNames <- for (zip postmethodlistrequestTxs [0..]) $
     \ (MethodCall{..},nonceIncr) -> do
       cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
       functionId <- getFunctionId cmId methodcallMethodName
@@ -204,10 +202,18 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
         (sel <> argsBin)
         nonceIncr
       -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-      return tx --(tx,functionId,xabi,methodCall)
-  logWith logNotice ("txs are: " <> Text.pack (show txs))
+      return (tx,cmId,methodcallMethodName)
+  txs <- for txsCmIdsFuncNames $ \(tx,_,_) -> return tx
+  mapM_ (logWith logNotice . (<>) "txs are: " . Text.pack . show) txs
   hashes <- blocStrato $ postTxList txs
-  mapM (flip getBlocTransactionResult (resolve || postmethodlistrequestResolve)) hashes
+  flip mapM (zip hashes txsCmIdsFuncNames) $ \(hash,(_,cmId,funcName)) -> do
+    void . blocModify $ \conn -> runInsert conn hashNameTable
+      ( Nothing
+      , constant hash
+      , constant cmId
+      , constant funcName
+      )
+    getBlocTransactionResult hash (resolve || postmethodlistrequestResolve)
 
 postUsersContractMethod
   :: UserName
@@ -251,42 +257,13 @@ postUsersContractMethod
       0
     logWith logNotice ("tx is: " <> Text.pack (show tx))
     hash <- blocStrato $ postTx tx
+    void . blocModify $ \conn -> runInsert conn hashNameTable
+      ( Nothing
+      , constant hash
+      , constant cmId
+      , constant funcName
+      )
     getBlocTransactionResult hash resolve
-
-getFunctionNameFromFields :: ByteString -> [(Text, (Storage.Position, Type))] -> Bloc Text
-getFunctionNameFromFields selector [] =
-  throwError . UserError . Text.pack $ "Couldn't find selector " ++ (Char8.unpack selector)
-getFunctionNameFromFields selector (x:xs) = 
-  case fieldType of
-    TypeFunction sel _ _ -> 
-      if sel == selector
-        then return name
-        else getFunctionNameFromFields selector xs
-    _ -> getFunctionNameFromFields selector xs
-  where (name,posType) = x
-        fieldType = snd posType
-
-getFunctionNameFromContract :: ByteString -> C.Contract -> Bloc Text
-getFunctionNameFromContract selector = 
-  getFunctionNameFromFields selector 
-    . Map.toList 
-    . fields 
-    . C.mainStruct
-
-getFunctionNameFromXabi :: ByteString -> Xabi -> Bloc Text
-getFunctionNameFromXabi selector xabi = 
-  case xAbiToContract xabi of
-    Left err -> throwError . UserError . Text.pack $ err
-    Right contract' -> getFunctionNameFromContract selector contract'
-
-getFunctionNameFromAddress :: ByteString -> Address -> Bloc (Int32,Text)
-getFunctionNameFromAddress selector contractAddress = do
-  cmId <- blocQuery1 $ proc () -> do
-    (cmId',_,_,_,_,_,_,_) <- contractByAddressOnly contractAddress -< ()
-    returnA -< cmId'
-  xabi <- getContractXabiByMetadataId cmId
-  funcName <- getFunctionNameFromXabi selector xabi
-  return (cmId,funcName)
 
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash resolve = do
@@ -322,19 +299,20 @@ getBlocTransactionResult hash resolve = do
                       stratoMsg  -> throwError $ UserError stratoMsg
                     Just addr' -> do
                       (cmId,name)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
-                      void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-                        ( Nothing
-                        , constant cmId
-                        , constant addr'
-                        , Nothing
-                        )
+                      xs::[Int32] <- blocQuery $ proc () -> do
+                        (cmId',_,_,_,_,_,_,_) <- contractByAddress name addr' -< ()
+                        returnA -< cmId'
+                      when (isNothing $ listToMaybe xs) $ do
+                        void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+                          ( Nothing
+                          , constant cmId
+                          , constant addr'
+                          , Nothing
+                          )
                       details <- getContractDetails (ContractName name) (Unnamed addr')
                       return $ BlocTransactionResult Success hash (Just $ Upload details)
                 FunctionCall -> do
-                    let
-                      Just to = T.transactionTo tx
-                      selector = Char8.pack $ take 4 $ Text.unpack $ fromJust $ T.transactionCodeOrData tx
-                    (cmId,funcName) <- getFunctionNameFromAddress selector to
+                    (cmId,funcName)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
                     functionId <- getFunctionId cmId funcName
                     xabi <- getContractXabiByMetadataId cmId
                     resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId

@@ -45,8 +45,8 @@ spec = do
       let
         Send postTransaction = fromJust $ blocTransactionData result
       postTransaction `shouldSatisfy` (== Strung 100) . posttransactionValue
-      Right resultBad <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParametersBad) (ClientEnv mgr blocUrl)
-      resultBad `shouldSatisfy` (== Failure) . blocTransactionStatus
+      resultBad <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParametersBad) (ClientEnv mgr blocUrl)
+      resultBad `shouldSatisfy` isLeft
   describe "postUsersContract" $
     it "should upload a contract" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay

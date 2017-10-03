@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS hash_name(
   id serial PRIMARY KEY,
   hash bytea NOT NULL,
   contract_metadata_id int NOT NULL REFERENCES contracts_metadata(id),
-  contract_name varchar(512) NOT NULL
+  data_string varchar(512) NOT NULL
 );
 |]
 

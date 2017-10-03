@@ -59,8 +59,8 @@ hashNameTable :: Table
 hashNameTable = Table "hash_name" $ p4
   ( optional "id"
   , required "hash"
-  , required "contract_metaddata_id"
-  , required "contract_name"
+  , required "contract_metadata_id"
+  , required "data_string"
   )
 
 contractsTable :: Table
