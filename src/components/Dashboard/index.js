@@ -8,10 +8,23 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
+import { toggleDashboardTour, addStepsToTour } from './dashboard.actions';
 import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
+import Joyride from 'react-joyride';
+
 import './dashboard.css';
+
+const tourSteps = [
+  {
+    title: 'Welcome!',
+    text: 'This is your new dashboard',
+    selector:".tour-welcome",
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  }
+];
 
 class Dashboard extends Component {
 
@@ -20,6 +33,8 @@ class Dashboard extends Component {
     this.props.fetchAccounts();
     this.props.fetchContracts();
     mixpanelWrapper.track('dashboard_page_load');
+    this.props.addStepsToTour(tourSteps);
+    this.props.toggleDashboardTour()
     this.startPoll();
   }
 
@@ -105,9 +120,20 @@ class Dashboard extends Component {
     const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
     const userCount = Object.getOwnPropertyNames(this.props.accounts).length;
     const contractCount = Object.getOwnPropertyNames(this.props.contracts).length;
+    const tour = this.props.tour;
+
     return (
       <div className="container-fluid pt-dark">
-        <div className="row">
+        <Joyride
+          ref = "dashboardTour"
+          steps={tour.steps}
+          run={tour.running}
+          showStepsProgress={true}
+          type="continuous"
+          debug={true}
+          autoStart={true}
+        />
+        <div className="row tour-welcome">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
           </div>
@@ -190,7 +216,8 @@ function mapStateToProps(state) {
     blockData: state.blockData.blockData,
     nodes: state.nodes.nodes,
     accounts: state.accounts.accounts,
-    contracts: state.contracts.contracts
+    contracts: state.contracts.contracts,
+    tour: state.dashboard.tour,
   };
 }
 
@@ -200,7 +227,9 @@ export default withRouter(
     {
       fetchBlockData,
       fetchAccounts,
-      fetchContracts
+      fetchContracts,
+      addStepsToTour,
+      toggleDashboardTour,
     }
   )(Dashboard)
 );

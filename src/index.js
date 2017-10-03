@@ -24,6 +24,7 @@ import createUserReducer from './components/CreateUser/createUser.reducer';
 import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
 import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
+import dashboardReducer from './components/Dashboard/dashboard.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import transactionsReducer from './components/TransactionList/transactionList.reducer';
@@ -57,6 +58,7 @@ const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
+  dashboard: dashboardReducer,
   accounts: accountsReducer,
   blockData: blockDataReducer,
   contracts: contractsReducer,
