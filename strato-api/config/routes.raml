@@ -367,50 +367,6 @@ protocols: [ HTTP ]
   get:
    description: Query the storage
 
-/solc:
-  description: | 
-    handler:  SolcR
-  post:
-    description: Compiles solidity files.
-    body:
-      src:
-        description: a solidity source main file
-        required: false
-        type: string
-        example: "src=contract C{}"
-      main:
-        description: a solidity source main file
-        required: false
-        type: file
-        repeat: true
-        example:
-      import:
-        description: a solidity source file imported by a main file
-        required: false
-        type: file
-        repeat: true
-        example:
-      optimize:
-        description: solc flag
-        required: false
-        example:
-      optimize-runs:
-        description: solc flag
-        required: false
-        example:
-      add-std:
-        description: solc flag
-        required: false
-        example:
-      link:
-        description: solc flag
-        required: false
-        example:
-      libraries:
-        description: solc flag
-        required: false
-        example:
-
 /register: 
   description: | 
     handler: RegisterAppR
