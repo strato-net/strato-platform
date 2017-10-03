@@ -13,24 +13,8 @@ import { env } from '../env';
 mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
 mixpanelWrapper.identify(env.NODE_NAME);
 
-const tourCallback = function tourCallback(trigger) {
-  if(trigger.type === 'step:after') {
-    // Route to
-    switch(trigger.step.selector) {
-        case '#accounts': {
-            this.props.history.push('accounts');
-        }
-        case '#transactions': {
-            this.props.history.push('transactions');
-        }
-    }
-  }
-};
-
 class App extends Component {
   render() {
-    const tour = this.props.tour;
-
     return (
       <div className="App" >
         <MenuBar />
