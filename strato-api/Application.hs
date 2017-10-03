@@ -48,7 +48,6 @@ import           Handler.PushTransaction
 import           Handler.QueuedTransactions
 import           Handler.Raml
 import           Handler.RegisterApp
-import           Handler.Solc
 import           Handler.Stats
 import           Handler.StorageInfo
 import           Handler.Test
