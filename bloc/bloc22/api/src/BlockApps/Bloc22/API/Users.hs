@@ -176,19 +176,22 @@ type GetUsersUser = "users"
 
 type PostUsersUser = "users"
   :> Capture "user" UserName
-  :> QueryFlag "faucet"
   :> ReqBody '[JSON, FormUrlEncoded] Password
   :> Post '[JSON] Address
-
-instance ToParam (QueryFlag "faucet") where
-  toParam _ =
-    DocQueryParam "faucet" ["0","1",""] "flag for fauceting a new user" Flag
 
 instance ToParam (QueryFlag "resolve") where
   toParam _ =
     DocQueryParam "resolve" ["0","1",""] "flag for resolving a transaction result" Flag
 
 --------------------------------------------------------------------------------
+
+type PostUsersFill = "users"
+  :> Capture "user" UserName
+  :> Capture "address" Address
+  :> "fill"
+  :> QueryFlag "resolve"
+  :> ReqBody '[JSON, FormUrlEncoded] Password
+  :> Post '[JSON] BlocTransactionResult
 
 type PostUsersSend = "users"
   :> Capture "user" UserName

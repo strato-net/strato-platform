@@ -21,6 +21,7 @@ module BlockApps.Bloc22.Client
   , getUsers
   , getUsersUser
   , postUsersUser
+  , postUsersFill
   , postUsersSend
   , postUsersContract
   , postUsersUploadList
@@ -106,8 +107,11 @@ getUsers = client (Proxy @ GetUsers)
 getUsersUser :: UserName -> ClientM [Address]
 getUsersUser = client (Proxy @ GetUsersUser)
 
-postUsersUser :: UserName -> Bool -> Password -> ClientM Address
+postUsersUser :: UserName -> Password -> ClientM Address
 postUsersUser = client (Proxy @ PostUsersUser)
+
+postUsersFill :: UserName -> Address -> Bool -> Password -> ClientM BlocTransactionResult
+postUsersFill = client (Proxy @ PostUsersFill)
 
 postUsersSend
   :: UserName -> Address -> Bool -> PostSendParameters -> ClientM BlocTransactionResult

@@ -107,7 +107,7 @@ getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
 getStorage :: Maybe Address -> ClientM [Storage]
-postFaucet :: Address -> ClientM FaucetResponse
+postFaucet :: Address -> ClientM Keccak256
 postSolc :: Src -> ClientM SolcResponse
 postExtabi :: Src -> ClientM ExtabiResponse
 getTxsFilter
