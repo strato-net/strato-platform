@@ -111,11 +111,11 @@ describe("Send Transaction Test", function() {
       const aliceName = `Alice_${node.id}_${uid}`;
       const alice = yield rest.createUser(aliceName, password, node.id);
       console.log('alice', alice);
-      sleep(60*1000); //Done to allow p2p network to sync new faucet nonce and make it adjust for block time
+      for(var i=0; i<1000000000; i++) {}; //about 3s delay. Done to allow p2p network to sync new faucet nonce and make it adjust for block time
       const bobName = `Bob_${node.id}_${uid}`;
       const bob = yield rest.createUser(bobName, password, node.id);
       console.log('bob', bob);
-      sleep(60*1000); //Done to allow p2p network to sync new faucet nonce and make it adjust for block time
+      for(var i=0; i<1000000000; i++) {}; //about 3s delay. Done to allow p2p network to sync new faucet nonce and make it adjust for block time
       const pair = {alice: alice, bob:bob};
       pairs[node.id]= pair;
       // test creation on the node
