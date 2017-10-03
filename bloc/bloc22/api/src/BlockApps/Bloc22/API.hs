@@ -37,6 +37,7 @@ type BlocAPI =
   :<|> GetUsers
   :<|> PostUsersUser
   :<|> GetUsersUser
+  :<|> PostUsersFill
   :<|> PostUsersSend
   :<|> PostUsersContract
   :<|> PostUsersUploadList

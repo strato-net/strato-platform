@@ -34,8 +34,12 @@ spec = do
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
         username = "blockapps"
-      postUsersEither <- runClientM (postUsersUser username True pw) (ClientEnv mgr blocUrl)
+      postUsersEither <- runClientM (postUsersUser username pw) (ClientEnv mgr blocUrl)
       postUsersEither `shouldSatisfy` isRight
+      let
+        Right address = postUsersEither
+      postUsersFillEither <- runClientM (postUsersFill username address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither `shouldSatisfy` isRight
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ testConfig@TestConfig {..} -> do
       let

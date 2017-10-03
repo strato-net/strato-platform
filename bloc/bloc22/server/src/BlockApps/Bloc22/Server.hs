@@ -25,6 +25,7 @@ bloc = getHomepage
   :<|> getUsers
   :<|> postUsersUser
   :<|> getUsersUser
+  :<|> postUsersFill
   :<|> postUsersSend
   :<|> postUsersContract
   :<|> postUsersUploadList
