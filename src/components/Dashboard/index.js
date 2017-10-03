@@ -8,11 +8,12 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-import { toggleDashboardTour, addStepsToTour } from './dashboard.actions';
+import { startTour } from '../Tour/tour.actions';
+import Tour from '../Tour';
+
 import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
-import Joyride from 'react-joyride';
 
 import './dashboard.css';
 
@@ -20,7 +21,7 @@ const tourSteps = [
   {
     title: 'Welcome!',
     text: 'This is your new dashboard',
-    selector: '.tour-welcome',
+    selector: '#tour-welcome',
     position: 'bottom', type: 'hover',
     isFixed: true,
   },
@@ -31,36 +32,7 @@ const tourSteps = [
     position: 'bottom', type: 'hover',
     isFixed: true,
   },
-  {
-    title: 'Create User',
-    text: 'Create a user here',
-    selector: '#accounts-create-user-button',
-    position: 'bottom', type: 'hover',
-    isFixed: true,
-  },
-  {
-    title: 'Your Transactions',
-    text: 'Click on this link to see them',
-    selector: '#transactions',
-    position: 'bottom',
-    isFixed: true,
-  },
 ];
-
-const tourCallback = function tourCallback(trigger) {
-  if(trigger.type === 'step:after') {
-    // Route to
-    switch(trigger.step.selector) {
-        case '#transactions': {
-            this.props.history.push('transactions');
-        }
-        case '#accounts': {
-            this.props.history.push('accounts');
-        }
-    }
-
-  }
-};
 
 class Dashboard extends Component {
 
@@ -69,8 +41,7 @@ class Dashboard extends Component {
     this.props.fetchAccounts();
     this.props.fetchContracts();
     mixpanelWrapper.track('dashboard_page_load');
-    this.props.addStepsToTour(tourSteps);
-    this.props.toggleDashboardTour()
+    this.props.startTour();
     this.startPoll();
   }
 
@@ -156,23 +127,15 @@ class Dashboard extends Component {
     const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
     const userCount = Object.getOwnPropertyNames(this.props.accounts).length;
     const contractCount = Object.getOwnPropertyNames(this.props.contracts).length;
-    const tour = this.props.tour;
 
     return (
-      <div className="container-fluid pt-dark">
-        <Joyride
-          ref = "dashboardTour"
-          steps={tour.steps}
-          run={tour.running}
-          showStepsProgress={true}
-          type="continuous"
-          debug={true}
-          autoStart={true}
-          callback={tourCallback.bind(this)}
-          disableOverlay={true}
-          showSkipButton={true}
-        />
-        <div className="row tour-welcome">
+      <div className="container-fluid pt-dark" id="tour-welcome">
+        <Tour ref="dashboardTour" callback={(event) => {
+          if(event.type === 'step:after' && event.step.selector == '#accounts') {
+              this.props.history.push('accounts');
+          }
+        }} steps={ tourSteps }/>
+        <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
           </div>
@@ -256,7 +219,6 @@ function mapStateToProps(state) {
     nodes: state.nodes.nodes,
     accounts: state.accounts.accounts,
     contracts: state.contracts.contracts,
-    tour: state.dashboard.tour,
   };
 }
 
@@ -267,8 +229,7 @@ export default withRouter(
       fetchBlockData,
       fetchAccounts,
       fetchContracts,
-      addStepsToTour,
-      toggleDashboardTour,
+      startTour,
     }
   )(Dashboard)
 );

@@ -153,7 +153,7 @@ const connected = connect(
   {
     openOverlay,
     closeOverlay,
-    createUser
+    createUser,
   }
 )(formed);
 

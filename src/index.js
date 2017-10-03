@@ -24,10 +24,10 @@ import createUserReducer from './components/CreateUser/createUser.reducer';
 import createContractReducer from './components/CreateContract/createContract.reducer';
 import contractsReducer from './components/Contracts/contracts.reducer';
 import contractQueryReducer from './components/ContractQuery/contractQuery.reducer';
-import dashboardReducer from './components/Dashboard/dashboard.reducer';
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import transactionsReducer from './components/TransactionList/transactionList.reducer';
+import tourReducer from './components/Tour/tour.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendEtherReducer from './components/Accounts/components/SendEther/sendEther.reducer';
 
@@ -58,7 +58,6 @@ const rootReducer = combineReducers({
   form: formReducer,
   routing: routerReducer,
   // YOUR REDUCERS HERE
-  dashboard: dashboardReducer,
   accounts: accountsReducer,
   blockData: blockDataReducer,
   contracts: contractsReducer,
@@ -69,7 +68,8 @@ const rootReducer = combineReducers({
   nodes: nodeCardReducer,
   transactions: transactionsReducer,
   queryEngine: queryEngineReducer,
-  sendEther: sendEtherReducer
+  sendEther: sendEtherReducer,
+  tour: tourReducer,
 });
 
 const rootSaga = function* startForeman() {

@@ -8,6 +8,25 @@ import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
 
+import Tour from '../Tour';
+
+const tourSteps = [
+  {
+    title: 'Create User',
+    text: 'Create a user here',
+    selector: '#accounts-create-user-button',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  },
+  {
+    title: 'Your Transactions',
+    text: 'Click on this link to see them',
+    selector: '#transactions',
+    position: 'bottom',
+    isFixed: true,
+  },
+];
+
 class Accounts extends Component {
 
   componentDidMount() {
@@ -21,7 +40,6 @@ class Accounts extends Component {
   updateFilter(filter) {
     this.props.changeAccountFilter(filter);
   };
-
 
   render() {
     const accounts = this.props.accounts;
@@ -81,6 +99,11 @@ class Accounts extends Component {
 
     return (
       <div className="container-fluid pt-dark">
+        <Tour ref="accountTour" run={true} steps={tourSteps} callback={ (event) => {
+            if(event.type === 'step:after' && event.step.selector == '#transactions') {
+              this.props.history.push('transactions');
+            }
+        }}/>
         <div className="row">
           <div className="col-sm-8 text-left">
             <h3>Accounts</h3>
@@ -88,7 +111,7 @@ class Accounts extends Component {
           <div className="col-sm-4 text-right">
             <div className="pt-button-group">
               <SendEther/>
-              <CreateUser/>
+              <CreateUser />
             </div>
           </div>
         </div>
