@@ -130,7 +130,7 @@ instance ToSchema BlocTransactionData where
 data BlocTransactionResult = BlocTransactionResult
   { blocTransactionStatus :: BlocTransactionStatus
   , blocTransactionHash   :: Keccak256
---  , blocTransactionResult :: Maybe TransactionResult
+  , blocTransactionTxResult :: Maybe TransactionResult
   , blocTransactionData   :: Maybe BlocTransactionData
   } deriving (Eq, Show, Generic)
 
@@ -147,6 +147,7 @@ instance ToSample BlocTransactionResult where
   toSamples _ = singleSample BlocTransactionResult
     { blocTransactionStatus = Success
     , blocTransactionHash = keccak256 "foo"
+    , blocTransactionTxResult = Nothing
     , blocTransactionData = Nothing
     }
 
@@ -159,6 +160,7 @@ instance ToSchema BlocTransactionResult where
       ex = BlocTransactionResult
         { blocTransactionStatus = Success
         , blocTransactionHash = keccak256 "foo"
+        , blocTransactionTxResult = Nothing
         , blocTransactionData = Nothing
         }
 
