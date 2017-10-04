@@ -63,14 +63,18 @@ maybeTx hash = do
     Just tx -> return $ Just $ withoutNext tx
     Nothing -> return Nothing
 
-getBlocTxStatus :: Keccak256 -> Bloc BlocTransactionStatus
+getBlocTxStatus :: Keccak256 -> Bloc (BlocTransactionStatus, Maybe Transaction, Maybe TransactionResult)
 getBlocTxStatus hash = do
-  maybeResult <- maybeTxResult hash
-  case maybeResult of
-    Nothing -> return Pending
-    Just res -> case transactionresultMessage res of
-      "Success!" -> return Success
-      _          -> return Failure
+  mtx <- maybeTx hash
+  mtxr <- maybeTxResult hash
+  case mtx of
+    Nothing -> return (Pending, mtx, mtxr)
+    Just _ -> do
+      case mtxr of
+        Nothing -> return (Pending, mtx, mtxr)
+        Just txr -> case transactionresultMessage txr of
+          "Success!" -> return (Success, mtx, mtxr)
+          _          -> return (Failure, mtx, mtxr)
 
 pollBlocTxStatus :: Keccak256 -> Bloc BlocTransactionStatus
 pollBlocTxStatus hash = go 1
@@ -79,7 +83,7 @@ pollBlocTxStatus hash = go 1
     hashString = keccak256String hash
     go n = do
       logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling BlocTransactionStatus for transaction hash: " ++ hashString
-      status <- getBlocTxStatus hash
+      (status,_,_) <- getBlocTxStatus hash
       case status of
         Pending -> if n > attempts 
                      then return status
