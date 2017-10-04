@@ -6,7 +6,8 @@ import * as moment from 'moment';
 import {
   selectContractInstance,
   fetchState,
-  fetchCirrusInstances
+  fetchCirrusInstances,
+  fetchAccount
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
@@ -33,7 +34,7 @@ class ContractCard extends Component {
     const showQueryBuilder = instances.reduce((acc,instance)=> {
       return acc || instance.fromCirrus;
     }, false);
-
+    
     instances
       .filter((instance) => {return re.test(instance.address)})
       .forEach(function (instance) {
@@ -43,6 +44,7 @@ class ContractCard extends Component {
             onClick={() => {
               mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address);
+              self.props.fetchAccount(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
             key={'card-data-' + instance.address}
@@ -117,6 +119,7 @@ class ContractCard extends Component {
         <div className="pt-card pt-elevation-2">
           <div className="row">
             <div className="col-sm-12">
+            <div> {instance && instance.balance ? <div> Balance : {instance.balance} </div>: ''} </div>
               <table className="pt-table pt-condensed pt-striped smd-full-width">
                 <thead>
                   <tr>
@@ -205,6 +208,7 @@ export default withRouter(
   connect(mapStateToProps, {
     selectContractInstance,
     fetchState,
-    fetchCirrusInstances
+    fetchCirrusInstances,
+    fetchAccount
   })(ContractCard)
 );

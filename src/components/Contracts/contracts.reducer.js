@@ -7,7 +7,8 @@ import {
 import {
   FETCH_STATE_SUCCESS,
   FETCH_CIRRUS_INSTANCES_SUCCESS,
-  SELECT_CONTRACT_INSTANCE
+  SELECT_CONTRACT_INSTANCE,
+  FETCH_ACCOUNT_SUCCESS
 } from './components/ContractCard/contractCard.actions';
 
 const initialState = {
@@ -21,6 +22,20 @@ const reducer = function (state = initialState, action) {
     case FETCH_CONTRACTS:
       return {
         contracts: state.contracts,
+        filter: state.filter,
+        error: null,
+      };
+    case FETCH_ACCOUNT_SUCCESS:
+      let contracts = state.contracts;
+      const contractArray = state.contracts[action.name].instances;
+      contractArray.forEach((contract) => {
+        if (action.address === contract.address) {
+          contract['balance'] = action.account[0].balance;
+        }
+      })
+      contracts[action.name].instances = contractArray;
+      return {
+        contracts,
         filter: state.filter,
         error: null,
       };

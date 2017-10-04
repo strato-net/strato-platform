@@ -39,7 +39,8 @@ import watchFetchAccounts from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
 import {
   watchFetchState,
-  watchFetchCirrusContracts
+  watchFetchCirrusContracts,
+  watchAccount
 } from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
 import {
@@ -99,7 +100,8 @@ const rootSaga = function* startForeman() {
         fork(watchExecuteQuery),
         fork(watchQueryCirrus),
         fork(watchQueryCirrusVars),
-        fork(watchSendEther)
+        fork(watchSendEther),
+        fork(watchAccount)
     ]
 };
 
