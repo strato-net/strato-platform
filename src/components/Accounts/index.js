@@ -11,16 +11,17 @@ import SendEther from './components/SendEther';
 import Tour from '../Tour';
 
 const tourSteps = [
-  {
+/* {
     title: 'Create User',
     text: 'Create a user here',
     selector: '#accounts-create-user-button',
     position: 'bottom', type: 'hover',
     isFixed: true,
-  },
+  }, ) */
   {
-    title: 'Your Contracts',
-    text: 'Click on this link to see them',
+    title: 'Upload a Smart Contract',
+    text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your Smart Contract from within the STRATO dashboard.',
+   /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
     selector: '#contracts',
     position: 'bottom',
     isFixed: true,

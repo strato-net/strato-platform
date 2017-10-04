@@ -8,16 +8,16 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 
 const tourSteps = [
-  {
+/*  {
     title: 'Create Contract',
     text: 'Where queries are to be found.',
     selector: '#tour-create-contract-button',
     position: 'bottom', type: 'hover',
     isFixed: true,
-  },
+  }, */
   {
-    title: 'Your Transactions',
-    text: 'Click on this link to see them',
+    title: 'View Transactions',
+    text: 'Scroll through all transactions launched from your Smart Contract.',
     selector: '#transactions',
     position: 'bottom',
     isFixed: true,
