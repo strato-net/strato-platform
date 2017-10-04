@@ -4,9 +4,9 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  FETCH_NODE_DETAIL,
-  FETCH_NODE_PEERS,
-  FETCH_NODE_COINBASE,
+  FETCH_NODE_DETAIL_REQUEST,
+  FETCH_NODE_PEERS_REQUEST,
+  FETCH_NODE_COINBASE_REQUEST,
   fetchNodeDetailSuccess,
   fetchNodeDetailFailure,
   fetchNodePeersSuccess,
@@ -104,8 +104,8 @@ function* getNodeCoinbase(action) {
 
 export default function* watchFetchNodeData() {
   yield [
-    takeEvery(FETCH_NODE_DETAIL, getNodeDetail),
-    takeEvery(FETCH_NODE_PEERS, getNodePeers),
-    takeEvery(FETCH_NODE_COINBASE, getNodeCoinbase)
+    takeEvery(FETCH_NODE_DETAIL_REQUEST, getNodeDetail),
+    takeEvery(FETCH_NODE_PEERS_REQUEST, getNodePeers),
+    takeEvery(FETCH_NODE_COINBASE_REQUEST, getNodeCoinbase)
   ]
 }

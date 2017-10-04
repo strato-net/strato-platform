@@ -14,9 +14,8 @@ import createSagaMiddleware from 'redux-saga';
 import { fork } from 'redux-saga/effects';
 import {routerReducer} from 'react-router-redux';
 import {reducer as formReducer} from 'redux-form';
-
+import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
 import App from "./App/";
-
 
 import accountsReducer from './components/Accounts/accounts.reducer';
 import blockDataReducer from './components/BlockData/block-data.reducer'
@@ -78,7 +77,8 @@ const rootReducer = combineReducers({
   nodes: nodeCardReducer,
   transactions: transactionsReducer,
   queryEngine: queryEngineReducer,
-  sendEther: sendEtherReducer
+  sendEther: sendEtherReducer,
+  loadingBar: loadingBarReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -106,14 +106,18 @@ const rootSaga = function* startForeman() {
 // create the saga middleware
 const sagaMiddleware = createSagaMiddleware();
 
+const loadingMiddleware = loadingBarMiddleware({
+                            promiseTypeSuffixes: ['REQUEST', 'SUCCESS', 'FAILURE'],
+                          });
+
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 
 // mount it on the Store
 const store = createStore(
     rootReducer,
     process.env.NODE_ENV !== 'production' ?
-      composeEnhancers(applyMiddleware(sagaMiddleware)) //
-      : applyMiddleware(sagaMiddleware),
+      composeEnhancers(applyMiddleware(sagaMiddleware, loadingMiddleware)) //
+      : applyMiddleware(sagaMiddleware, loadingMiddleware),
 );
 
 // then run the saga

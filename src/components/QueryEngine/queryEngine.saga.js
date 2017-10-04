@@ -4,7 +4,7 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  EXECUTE_QUERY,
+  EXECUTE_QUERY_REQUEST,
   executeQuerySuccess,
   executeQueryFailure
 } from './queryEngine.actions';
@@ -56,5 +56,5 @@ function* executeQuery(action) {
 }
 
 export default function* watchExecuteQuery() {
-  yield takeEvery(EXECUTE_QUERY, executeQuery);
+  yield takeEvery(EXECUTE_QUERY_REQUEST, executeQuery);
 }

@@ -4,7 +4,7 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  SEND_ETHER,
+  SEND_ETHER_REQUEST,
   sendEtherSuccess,
   sendEtherFailure
 } from './sendEther.actions';
@@ -50,5 +50,5 @@ function* sendEther(action) {
 }
 
 export default function* watchSendEther() {
-  yield takeLatest(SEND_ETHER, sendEther);
+  yield takeLatest(SEND_ETHER_REQUEST, sendEther);
 }

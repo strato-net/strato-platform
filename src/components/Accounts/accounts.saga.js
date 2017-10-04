@@ -5,9 +5,9 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  FETCH_ACCOUNTS,
-  FETCH_USER_ADDRESSES,
-  FETCH_ACCOUNT_DETAIL,
+  FETCH_ACCOUNTS_REQUEST,
+  FETCH_ACCOUNT_ADDRESS_REQUEST,
+  FETCH_ACCOUNT_DETAIL_REQUEST,
   fetchAccountsSuccess,
   fetchAccountsFailure,
   fetchUserAddresses,
@@ -112,8 +112,8 @@ function* getAccountDetail(action) {
 
 export default function* watchFetchAccounts() {
   yield [
-    takeLatest(FETCH_ACCOUNTS, getAccounts),
-    takeEvery(FETCH_USER_ADDRESSES, getUserAddresses),
-    takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail)
+    takeLatest(FETCH_ACCOUNTS_REQUEST, getAccounts),
+    takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
+    takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail)
   ];
 }

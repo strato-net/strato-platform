@@ -3,7 +3,7 @@ import {
   METHOD_CALL_OPEN_MODAL,
   METHOD_CALL_FETCH_ARGS_SUCCESS,
   METHOD_CALL_FETCH_ARGS_FAILURE,
-  METHOD_CALL,
+  METHOD_CALL_REQUEST,
   METHOD_CALL_SUCCESS,
   METHOD_CALL_FAILURE
 } from './contractMethodCall.actions';
@@ -56,7 +56,7 @@ const reducer = function (state = initialState, action) {
           }
         }
       }
-    case METHOD_CALL:
+    case METHOD_CALL_REQUEST:
       return {
         modals: {
           ...state.modals,

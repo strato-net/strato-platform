@@ -1,5 +1,5 @@
 import {
-  FETCH_TX,
+  FETCH_TX_REQUEST,
   FETCH_TX_SUCCESS,
   FETCH_TX_FAILURE,
 } from './transactionList.actions';
@@ -11,7 +11,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_TX:
+    case FETCH_TX_REQUEST:
       return {
         tx: state.tx,
         error: null,
