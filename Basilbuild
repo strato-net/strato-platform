@@ -18,7 +18,7 @@ STRATOHOME=$(FAKEROOT)/var/lib/strato
 LIBHOME=$(FAKEROOT)/var/lib
 BUILDER_HOME=$(BASIL_HOME)/blockapps/builder_home
 DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
-DOCKER_SHELL=docker run -it --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
+DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
 
 SOLCBRANCH=0.4.8-no-md
 SOLCREPOSITORY=https://github.com/blockapps/solidity.git
@@ -51,7 +51,7 @@ prebuild:
 	mkdir -p $(STRATOHOME)
 	mkdir -p /tmp/docker-dummy
 
-build_solidity: prebuild
+build_solidity: prebuild build_buildbase
 ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
 	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
 else
@@ -85,9 +85,9 @@ build_buildbase: build_deploybase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 	echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
 else
-	cp -f Dockerfile.buildbase /tmp/docker-dummy
+	cp -f Dockerfile.buildbase stack.yaml /tmp/docker-dummy
 	docker build -t strato-buildbase:latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
-	rm -f /tmp/docker-dummy/Dockerfile.buildbase
+	rm -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy/stack.yaml
 	mkdir -p $(BUILDER_HOME)
 	$(DOCKER_SHELL) "chown root:root /root" || true
 endif
