@@ -81,9 +81,9 @@ build_buildbase: build_deploybase prebuild
 ifeq ($(USE_DOCKER_BUILD_ENV),)
 	echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
 else
-	cp -f Dockerfile.buildbase /tmp/docker-dummy
+	cp -f Dockerfile.buildbase stack.yaml /tmp/docker-dummy
 	docker build -t $(BUILDBASE_NAME):latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
-	rm -f /tmp/docker-dummy/Dockerfile.buildbase
+	rm -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy/stack.yaml
 endif
 
 build_docker: build_deploybase build_solidity build_haskell
