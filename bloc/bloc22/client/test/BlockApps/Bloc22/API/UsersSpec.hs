@@ -40,7 +40,7 @@ spec = do
       postUsersEither `shouldSatisfy` isRight
       let
         Right address = postUsersEither
-      postUsersFillEither <- runClientM (postUsersFill username address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill username address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
   describe "postUsersSend" $
     it "should send ethers to another address" $ \ testConfig@TestConfig {..} -> do

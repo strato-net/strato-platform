@@ -48,8 +48,8 @@ spec =
       let
         Right address1 = postUsersEither1
         Right address2 = postUsersEither2
-      postUsersFillEither1 <- runClientM (postUsersFill userName1 address1 True pw) (ClientEnv mgr blocUrl)
-      postUsersFillEither2 <- runClientM (postUsersFill userName2 address2 True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither1 <- runClientM (postUsersFill userName1 address1 True) (ClientEnv mgr blocUrl)
+      postUsersFillEither2 <- runClientM (postUsersFill userName2 address2 True) (ClientEnv mgr blocUrl)
       postUsersFillEither1 `shouldSatisfy` isRight
       postUsersFillEither2 `shouldSatisfy` isRight
       let
@@ -94,7 +94,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -194,7 +194,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       simpleStorageAddressSrc <- readSolFile "SimpleStorageAddress.sol"
       threadDelay 4000000
@@ -295,7 +295,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "SimpleStorageBytes32Array.sol"
       threadDelay 4000000
@@ -411,7 +411,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight  
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       simpleStorageBytes32ArraySrc <- readSolFile "BytesComboTest.sol"
       threadDelay 4000000
@@ -505,7 +505,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -558,7 +558,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -593,7 +593,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -627,7 +627,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -661,7 +661,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -699,7 +699,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -740,7 +740,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       simpleTupleSrc <- readSolFile "SimpleTuple.sol"
       threadDelay 4000000
@@ -852,7 +852,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       testSrc' <- readSolFile "Bytes32Test.sol"
       threadDelay 4000000
@@ -938,7 +938,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       testSrc' <- readSolFile "StorageBlob.sol"
       threadDelay 4000000
@@ -1025,7 +1025,7 @@ spec =
       postIAMEither `shouldSatisfy` isRight
       let
         Right addressIAM = postIAMEither
-      postUsersFillEitherIAM <- runClientM (postUsersFill iamUsername addressIAM True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEitherIAM <- runClientM (postUsersFill iamUsername addressIAM True) (ClientEnv mgr blocUrl)
       postUsersFillEitherIAM `shouldSatisfy` isRight
       iamBlob <- readSolFile "BadgerIam.sol"
       threadDelay 4000000
@@ -1063,7 +1063,7 @@ spec =
       postBobEither `shouldSatisfy` isRight
       let
         Right address = postBobEither
-      postUsersFillEither <- runClientM (postUsersFill bobName address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill bobName address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       threadDelay 4000000
       let
@@ -1103,7 +1103,7 @@ spec =
       postUsersEither1 `shouldSatisfy` isRight
       let
         Right address = postUsersEither1
-      postUsersFillEither <- runClientM (postUsersFill userName1 address True pw) (ClientEnv mgr blocUrl)
+      postUsersFillEither <- runClientM (postUsersFill userName1 address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
       returnTupleSrc <- readSolFile "ReturnTuple.sol"
       let
