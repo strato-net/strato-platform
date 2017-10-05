@@ -135,7 +135,7 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
   let
     txs = map snd namesCmIdsTxs
   hashes <- blocStrato (postTxList txs)
-  flip mapM (zip hashes (map fst namesCmIdsTxs)) $ \(hash,(name,cmId)) -> do
+  forM (zip hashes (map fst namesCmIdsTxs)) $ \(hash,(name,cmId)) -> do
     void . blocModify $ \conn -> runInsert conn hashNameTable
       ( Nothing
       , constant hash
@@ -150,7 +150,7 @@ postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = 
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
     (Wei (fromIntegral $ unStrung value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
-  mapM (flip getBlocTransactionResult (resolve || resolve')) hashes
+  forM hashes $ flip getBlocTransactionResult (resolve || resolve')
 
 ensureMostRecentSuccessfulTx
   :: [TransactionResult]
@@ -205,7 +205,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
   txs <- for txsCmIdsFuncNames $ \(tx,_,_) -> return tx
   mapM_ (logWith logNotice . (<>) "txs are: " . Text.pack . show) txs
   hashes <- blocStrato $ postTxList txs
-  flip mapM (zip hashes txsCmIdsFuncNames) $ \(hash,(_,cmId,funcName)) -> do
+  forM (zip hashes txsCmIdsFuncNames) $ \(hash,(_,cmId,funcName)) -> do
     void . blocModify $ \conn -> runInsert conn hashNameTable
       ( Nothing
       , constant hash

@@ -5,6 +5,7 @@
 module BlockApps.Bloc22.API.UsersSpec where
 
 import           Control.Concurrent
+import           Control.Monad
 import           Data.Maybe
 import           Data.Either
 import qualified Data.Map.Strict                  as Map
@@ -16,6 +17,7 @@ import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.SolidityValue
+import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
 
@@ -65,6 +67,13 @@ spec = do
           }
       Right result <- getResolvedTx testConfig $ runClientM (postUsersContract userName userAddress False postUsersContractRequest) (ClientEnv mgr blocUrl)
       result `shouldSatisfy` (== Success) . blocTransactionStatus
+      result `shouldSatisfy` isJust . blocTransactionTxResult
+      result `shouldSatisfy` isJust . blocTransactionData
+      let
+        --Just txResult = blocTransactionTxResult result
+        Just (Upload details) = blocTransactionData result
+      contractdetailsName details `shouldSatisfy` (== simpleStorageContractName)
+
   describe "postUsersUploadList" $
     it "should upload a list of contracts" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -88,8 +97,12 @@ spec = do
           , uploadlistContracts = uploadListContracts
           , uploadlistResolve = False
           }
-      results <- runClientM (postUsersUploadList userName userAddress False uploadListRequest) (ClientEnv mgr blocUrl)
-      results `shouldSatisfy` isRight
+      eResults <- runClientM (postUsersUploadList userName userAddress False uploadListRequest) (ClientEnv mgr blocUrl)
+      eResults `shouldSatisfy` isRight
+      let
+        Right unresolved = eResults
+      results <- forM unresolved $ \r -> runClientM (resolveBlocTx r) (ClientEnv mgr blocUrl)
+      results `shouldSatisfy` all isRight
   describe "postUsersContractMethod" $
     it "should call a contract method" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay
@@ -121,10 +134,14 @@ spec = do
               , sendtransactionTxParams = txParams
               }
           }
-      results <- runClientM
+      eResults <- runClientM
         (postUsersSendList userName userAddress False postSendListRequest)
         (ClientEnv mgr blocUrl)
-      results `shouldSatisfy` isRight
+      eResults `shouldSatisfy` isRight
+      let
+        Right unresolved = eResults
+      results <- forM unresolved $ \r -> runClientM (resolveBlocTx r) (ClientEnv mgr blocUrl)
+      results `shouldSatisfy` all isRight
   describe "postUsersContractMethodList" $
     it "should call a list of methods" $ \ TestConfig {..} -> do
       threadDelay delay
@@ -142,7 +159,11 @@ spec = do
               , methodcallTxParams = txParams
               }
           }
-      results <- runClientM
+      eResults <- runClientM
         (postUsersContractMethodList userName userAddress False postMethodListRequest)
         (ClientEnv mgr blocUrl)
-      results `shouldSatisfy` isRight
+      eResults `shouldSatisfy` isRight
+      let
+        Right unresolved = eResults
+      results <- forM unresolved $ \r -> runClientM (resolveBlocTx r) (ClientEnv mgr blocUrl)
+      results `shouldSatisfy` all isRight
