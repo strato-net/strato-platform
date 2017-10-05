@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "strato-integration"
+    label "cd10"
   }
   options { disableConcurrentBuilds() }
   parameters { string(name: 'SILO_BRANCH_NAME', defaultValue: 'test-', description: 'Silo git branch name to build upon. Skip the \"origin/\" part.\nThis job will build using the pipeline from Jenkinsfile.test and all the code in this branch.') }
@@ -11,7 +11,6 @@ pipeline {
         sh '''#!/bin/bash -le
           docker rm -f $(docker ps -aq) || true; docker system prune -f
           docker ps
-          sudo rm -rf repos
         '''
        }
     }
@@ -21,14 +20,19 @@ pipeline {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+            # Make sure all repos are cloned
             basil clone
+            # Checkout branches specified in Basilfile
+            basil checkout
+            # Git pull all the latest
+            dirs=($(find ./repos -mindepth 1 -maxdepth 1 -type d))
+            for dir in "${dirs[@]}"; do
+              (cd "$dir" && git pull)
+            done
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
             basil build
-            cd repos/blockapps-swagger
-            git checkout dist/swagger-ui-bundle.js dist/swagger-ui-bundle.js.map dist/swagger-ui.js dist/swagger-ui-standalone-preset.js dist/swagger-ui-standalone-preset.js.map
-          '''
-          echo 'TODO: FIX it: after basil build swagger repo is left dirty with some modified .js files. Workaround: above two lines to reset dirty blockapps-swagger repo with a git checkout'
+         	'''
         }
       }
     }
