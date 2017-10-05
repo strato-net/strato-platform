@@ -29,7 +29,7 @@ deployments:
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: master
+    ref: tsm-master
     compose:
       restart: always
       depends_on:
