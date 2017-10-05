@@ -110,7 +110,7 @@ getUsersUser = client (Proxy @ GetUsersUser)
 postUsersUser :: UserName -> Password -> ClientM Address
 postUsersUser = client (Proxy @ PostUsersUser)
 
-postUsersFill :: UserName -> Address -> Bool -> Password -> ClientM BlocTransactionResult
+postUsersFill :: UserName -> Address -> Bool -> ClientM BlocTransactionResult
 postUsersFill = client (Proxy @ PostUsersFill)
 
 postUsersSend

@@ -192,7 +192,6 @@ type PostUsersFill = "users"
   :> Capture "address" Address
   :> "fill"
   :> QueryFlag "resolve"
-  :> ReqBody '[JSON, FormUrlEncoded] Password
   :> Post '[JSON] BlocTransactionResult
 
 type PostUsersSend = "users"
