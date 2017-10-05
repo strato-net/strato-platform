@@ -2,7 +2,8 @@ import {
   takeLatest,
   takeEvery,
   put,
-  call
+  call,
+  cancelled
 } from 'redux-saga/effects';
 import {
   FETCH_ACCOUNTS_REQUEST,
@@ -18,6 +19,7 @@ import {
   fetchAccountDetailFailure
 } from './accounts.actions';
 import { env } from '../../env';
+import { hideLoading } from 'react-redux-loading-bar';
 
 const accountDataUrl = env.STRATO_URL + "/account?address=:address";
 const addressUrl = env.BLOC_URL + '/users/:user';
@@ -85,6 +87,10 @@ function* getAccounts(action) {
   }
   catch (err) {
     yield put(fetchAccountsFailure(err));
+  } finally {
+    if (yield cancelled()){
+      yield put(hideLoading());
+    }
   }
 }
 
