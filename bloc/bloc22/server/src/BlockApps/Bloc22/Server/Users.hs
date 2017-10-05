@@ -68,9 +68,9 @@ postUsersUser (UserName name) pass = blocTransaction $ do
   unless createdUser (throwError (DBError "failed to create user"))
   return $ keystoreAcctAddress keyStore
 
-postUsersFill :: UserName -> Address -> Bool -> Password -> Bloc BlocTransactionResult
-postUsersFill _ addr resolve _ = blocTransaction $ do
-  logWith logNotice "Waiting for faucet transaction to be mined"
+postUsersFill :: UserName  -> Address -> Bool-> Bloc BlocTransactionResult
+postUsersFill _ addr resolve = blocTransaction $ do
+  when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
   hash <- blocStrato $ postFaucet addr
   getBlocTransactionResult hash resolve
 
