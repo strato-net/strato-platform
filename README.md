@@ -48,4 +48,3 @@ npm run start
 ```
 docker run -d --name smd-ui -p 3035:3002 -e NODE_NAME=BAYAR6 -e BLOC_URL=http://bayar6.eastus.cloudapp.azure.com/bloc/v2.1 -e STRATO_URL=http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2 blockapps/smd-ui
 ```
-# smd
