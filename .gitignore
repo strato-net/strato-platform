@@ -57,3 +57,7 @@ typings/
 # dotenv environment variables file
 .env
 
+# Misc
+.DS_Store
+.node-xmlhttprequest*
+.idea

@@ -1,0 +1,39 @@
+{
+  "name": "soteria",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "npm-run-all -p start-server node-ping",
+    "start-server": "PORT=${PORT:-3001} node $NODE_DEBUG_OPTION ./bin/www",
+    "start-server:dev": "PORT=${PORT:-3001} DOMAIN=localhost node $NODE_DEBUG_OPTION ./bin/www",
+    "node-ping": "DELAY=5000 RETENTION=1 node node-ping/index.js",
+    "migrate": "sequelize db:migrate",
+    "test": "NODE_ENV=test mocha",
+    "start:dev": "npm-run-all -p start-server:dev node-ping"
+  },
+  "dependencies": {
+    "bcrypt": "1.0.3",
+    "body-parser": "1.18.2",
+    "chai": "4.1.2",
+    "chai-http": "3.0.0",
+    "cookie-parser": "1.4.3",
+    "cors": "2.8.4",
+    "debug": "3.1.0",
+    "express": "4.16.1",
+    "is-reachable": "2.3.3",
+    "jwt-simple": "0.5.1",
+    "mocha": "4.0.0",
+    "moment": "2.18.1",
+    "morgan": "1.9.0",
+    "pg": "7.3.0",
+    "pg-hstore": "2.3.2",
+    "rand-token": "0.3.0",
+    "sequelize": "4.13.5",
+    "sequelize-cli": "3.0.0",
+    "serve-favicon": "2.4.5",
+    "winston-color": "1.0.0"
+  },
+  "devDependencies": {
+    "npm-run-all": "4.1.1"
+  }
+}
