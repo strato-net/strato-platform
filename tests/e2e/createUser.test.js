@@ -10,18 +10,19 @@ const constants = common.constants;
 const assert = common.assert;
 const config = common.config;
 
-describe("Create User - async (do not resolve)", function() {
+const password = '1234';
 
-  const password = '1234';
+describe("Create User - isAsync (do not resolve)", function() {
 
   it('should create a new user and get an address', function* () {
     this.timeout(config.timeout);
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const doNotResolve = true;
-    const user = yield rest.createUser(username, password, doNotResolve);
+    const isAsync = true;
+    const user = yield rest.createUser(username, password, isAsync);
     assert.isDefined(user, "should exist");
+    assert.isDefined(user.address, "should be defined");
     assert.notEqual(user.address, 0, "should be a nonzero address");
   });
 
@@ -30,8 +31,8 @@ describe("Create User - async (do not resolve)", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const doNotResolve = true;
-    const user = yield rest.createUser(username, password, doNotResolve);
+    const isAsync = true;
+    const user = yield rest.createUser(username, password, isAsync);
     // fill
     const resolve = false;
     const txResult = yield rest.fill(user, resolve);
@@ -45,8 +46,8 @@ describe("Create User - async (do not resolve)", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const doNotResolve = true;
-    const user = yield rest.createUser(username, password, doNotResolve);
+    const isAsync = true;
+    const user = yield rest.createUser(username, password, isAsync);
     // fill
     const resolve = true;
     const txResult = yield rest.fill(user, resolve);
@@ -60,8 +61,8 @@ describe("Create User - async (do not resolve)", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const doNotResolve = true;
-    const user = yield rest.createUser(username, password, doNotResolve);
+    const isAsync = true;
+    const user = yield rest.createUser(username, password, isAsync);
     // fill
     const resolve = true;
     const txResult = yield rest.fill(user, resolve);
@@ -69,10 +70,29 @@ describe("Create User - async (do not resolve)", function() {
     assert.isObject(txResult);
     assert.equal(txResult.status, constants.SUCCESS, 'status with resolve should be success');
     // check account
+
+    // FIXME: this might fail in multinode, since fill() will take longer
     const account = yield rest.getAccount(user.address);
     assert.isDefined(account, "account should exist");
-    const expected = new BigNumber(1000).mul(constants.ETHER);
-    account[0].balance.should.be.bignumber.eq(expected);
+    account[0].balance.should.be.bignumber.eq(constants.FAUCET_REWARD);
   });
 
+});
+
+describe("Create User - sync (resolve)", function() {
+
+  it('should create a new user and get an address', function* () {
+    this.timeout(config.timeout);
+    const uid = util.uid();
+    const username = 'User' + uid;
+    // create user
+    const user = yield rest.createUser(username, password);
+    assert.isDefined(user, "should exist");
+    assert.isDefined(user.address, "should be defined");
+    assert.notEqual(user.address, 0, "should be a nonzero address");
+    // check account
+    const account = yield rest.getAccount(user.address);
+    assert.isDefined(account, "account should exist");
+    account[0].balance.should.be.bignumber.eq(constants.FAUCET_REWARD);
+  });
 });
