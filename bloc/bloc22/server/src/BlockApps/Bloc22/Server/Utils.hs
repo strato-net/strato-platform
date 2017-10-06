@@ -44,8 +44,8 @@ waitNewBlock = do
 waitNewAccount :: Address -> ClientM Account
 waitNewAccount addr = do
   account <- getAccount
-  case account of 
-    Just acc -> return acc 
+  case account of
+    Just acc -> return acc
     Nothing -> untilJust $ delay1 >> getAccount
   where
     getAccount = listToMaybe <$> getAccountsFilter accountsFilterParams{qaAddress = Just addr}
@@ -59,36 +59,22 @@ maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
 maybeTx :: Keccak256 -> Bloc (Maybe Transaction)
 maybeTx hash = do
   mtx <- blocStrato $ listToMaybe <$> getTxsFilter txsFilterParams{qtHash = Just hash}
-  case mtx of 
+  case mtx of
     Just tx -> return $ Just $ withoutNext tx
     Nothing -> return Nothing
 
 getBlocTxStatus :: Keccak256 -> Bloc (BlocTransactionStatus, Maybe Transaction, Maybe TransactionResult)
 getBlocTxStatus hash = do
-  mtx <- maybeTx hash
   mtxr <- maybeTxResult hash
-  case mtx of
-    Nothing -> return (Pending, mtx, mtxr)
-    Just _ -> do
-      case mtxr of
+  case mtxr of
+    Nothing -> return (Pending, Nothing, mtxr)
+    Just txr -> do
+      mtx <- maybeTx hash
+      case mtx of
         Nothing -> return (Pending, mtx, mtxr)
-        Just txr -> case transactionresultMessage txr of
+        Just _ -> case transactionresultMessage txr of
           "Success!" -> return (Success, mtx, mtxr)
           _          -> return (Failure, mtx, mtxr)
-
-pollBlocTxStatus :: Keccak256 -> Bloc BlocTransactionStatus
-pollBlocTxStatus hash = go 1
-  where
-    attempts = 30 :: Int
-    hashString = keccak256String hash
-    go n = do
-      logWith logNotice . Text.pack $ "[" ++ show n ++ "/" ++ show attempts ++ "] Polling BlocTransactionStatus for transaction hash: " ++ hashString
-      (status,_,_) <- getBlocTxStatus hash
-      case status of
-        Pending -> if n > attempts 
-                     then return status
-                     else return (threadDelay 1000000) >> go (n+1)
-        _       -> return status
 
 pollTxResult :: Keccak256 -> Bloc TransactionResult
 pollTxResult hash = go 1

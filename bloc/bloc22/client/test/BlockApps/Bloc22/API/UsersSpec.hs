@@ -103,6 +103,10 @@ spec = do
         Right unresolved = eResults
       results <- forM unresolved $ \r -> runClientM (resolveBlocTx r) (ClientEnv mgr blocUrl)
       results `shouldSatisfy` all isRight
+      for_ results $ \Right result -> do
+        void $ result `shouldSatisfy` (== Success) . blocTransactionStatus
+        void $ result `shouldSatisfy` isJust . blocTransactionTxResult
+        void $ result `shouldSatisfy` isJust . blocTransactionData
   describe "postUsersContractMethod" $
     it "should call a contract method" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay

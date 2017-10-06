@@ -8,6 +8,7 @@
 
 module BlockApps.Bloc22.Server.Users where
 
+import           Control.Concurrent
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
@@ -270,11 +271,13 @@ getBlocTransactionResult hash resolve = do
   case status of
     Pending ->
       if resolve
-        then pollBlocTxStatus hash >> getBlocTransactionResult hash False
+        then do
+          logWith logNotice . Text.pack $ "Polling BlocTransactionStatus for transaction hash: " ++ keccak256String hash
+          return (threadDelay 1000000) >> getBlocTransactionResult hash True
         else return $ BlocTransactionResult Pending hash Nothing Nothing
     Failure -> return $ BlocTransactionResult Failure hash mtxr Nothing
     Success -> do
-      let 
+      let
         Just tx = mtx
         Just txResult = mtxr
       case T.transactionTransactionType tx of
