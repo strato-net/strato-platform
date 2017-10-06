@@ -171,7 +171,7 @@ class CreateContract extends Component {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
         }} className="pt-intent-primary pt-icon-add"
-                text="Create Contract"/>
+                text="Create Contract" id="tour-create-contract-button"/>
         <form>
           <Dialog
             iconName="inbox"
