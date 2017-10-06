@@ -11,6 +11,7 @@ import SideBar from './components/SideBar';
 import TransactionView from './components/Transactions/components/TransactionView';
 import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
+import CodeEditor from './components/CodeEditor';
 
 export const routes = (
   <Switch>
@@ -27,6 +28,7 @@ export const routes = (
     <Route exact path="/accounts/:name/:address" component={Account} />
     <Route exact path="/contracts" component={Contracts}/>
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
+    <Route exact path="/code_editor" component={CodeEditor}/>
     <Route component={SideBar}/>
   </Switch>
 );
