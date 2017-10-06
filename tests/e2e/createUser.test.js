@@ -10,7 +10,7 @@ const constants = common.constants;
 const assert = common.assert;
 const config = common.config;
 
-describe("Create User", function() {
+describe("Create User - async (do not resolve)", function() {
 
   const password = '1234';
 
@@ -19,7 +19,8 @@ describe("Create User", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const user = yield rest.createUser(username, password);
+    const doNotResolve = true;
+    const user = yield rest.createUser(username, password, doNotResolve);
     assert.isDefined(user, "should exist");
     assert.notEqual(user.address, 0, "should be a nonzero address");
   });
@@ -29,7 +30,8 @@ describe("Create User", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const user = yield rest.createUser(username, password);
+    const doNotResolve = true;
+    const user = yield rest.createUser(username, password, doNotResolve);
     // fill
     const resolve = false;
     const txResult = yield rest.fill(user, resolve);
@@ -43,7 +45,8 @@ describe("Create User", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const user = yield rest.createUser(username, password);
+    const doNotResolve = true;
+    const user = yield rest.createUser(username, password, doNotResolve);
     // fill
     const resolve = true;
     const txResult = yield rest.fill(user, resolve);
@@ -57,7 +60,8 @@ describe("Create User", function() {
     const uid = util.uid();
     const username = 'User' + uid;
     // create user
-    const user = yield rest.createUser(username, password);
+    const doNotResolve = true;
+    const user = yield rest.createUser(username, password, doNotResolve);
     // fill
     const resolve = true;
     const txResult = yield rest.fill(user, resolve);
@@ -72,21 +76,3 @@ describe("Create User", function() {
   });
 
 });
-
-function sleep(milli) {
-    console.log('sleep', milli);
-    return new Promise(resolve => setTimeout(resolve, milli));
-  }
-
-
-  // it('should faucet a new user', function* () {
-  //   this.timeout(config.timeout);
-  //   const alice = yield rest.createUser(aliceName, password);
-  //   assert.isOk(alice, "should exist");
-  //   assert.notEqual(alice.address, 0, "should be a nonzero address");
-  //   //yield sleep(20*1000);
-  //   const account = yield rest.getAccount(alice.address);
-  //   assert.isDefined(account, "account should exist");
-  //   account[0].balance.should.be.bignumber.eq(1000*1000000000000000000);
-  //
-  // });
