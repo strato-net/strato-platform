@@ -8,7 +8,8 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-import { startTour } from '../Tour/tour.actions';
+import { endTour } from '../Tour/tour.actions';
+
 import Tour from '../Tour';
 
 import { env } from '../../env';
@@ -41,7 +42,6 @@ class Dashboard extends Component {
     this.props.fetchAccounts();
     this.props.fetchContracts();
     mixpanelWrapper.track('dashboard_page_load');
-    this.props.startTour();
     this.startPoll();
   }
 
@@ -130,9 +130,11 @@ class Dashboard extends Component {
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        <Tour ref="dashboardTour" callback={(event) => {
+        <Tour name="dashboard" callback={(event) => {
           if(event.type === 'step:after' && event.step.selector == '#accounts') {
               this.props.history.push('accounts');
+              // End tour
+              this.props.endTour('dashboard');
           }
         }} steps={ tourSteps }/>
         <div className="row">
@@ -229,7 +231,7 @@ export default withRouter(
       fetchBlockData,
       fetchAccounts,
       fetchContracts,
-      startTour,
+      endTour,
     }
   )(Dashboard)
 );

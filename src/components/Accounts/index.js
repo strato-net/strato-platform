@@ -7,6 +7,7 @@ import {withRouter} from 'react-router-dom';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
+import {endTour} from '../Tour/tour.actions';
 
 import Tour from '../Tour';
 
@@ -99,9 +100,10 @@ class Accounts extends Component {
 
     return (
       <div className="container-fluid pt-dark">
-        <Tour ref="accountTour" run={true} steps={tourSteps} callback={ (event) => {
+        <Tour name="accounts" steps={tourSteps} callback={ (event) => {
             if(event.type === 'step:after' && event.step.selector == '#contracts') {
               this.props.history.push('contracts');
+              this.props.endTour('accounts');
             }
         }}/>
         <div className="row">
@@ -170,6 +172,10 @@ function mapStateToProps(state) {
 export default withRouter(
   connect(
     mapStateToProps,
-    {fetchAccounts, changeAccountFilter}
+    {
+      fetchAccounts,
+      changeAccountFilter,
+      endTour,
+    }
   )(Accounts)
 );

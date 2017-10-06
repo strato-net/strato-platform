@@ -327,7 +327,6 @@ class CreateContract extends Component {
                 }}/>
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
-                  id="tour-create-contract-button"
                   onClick={handleSubmit(this.submit)}
                   disabled={pristine || submitting}
                   text="Create Contract"

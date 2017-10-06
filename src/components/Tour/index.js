@@ -3,10 +3,9 @@ import './Tour.css';
 import Joyride from 'react-joyride';
 import { connect } from 'react-redux';
 
-const Tour = ({callback, run, steps, ref}) => {
+const Tour = ({name, callback, run, steps, ref}) => {
   return (
     <Joyride
-      ref = {ref}
       steps={steps}
       run={run}
       locale={{last: 'Continue', next: 'Continue', back: 'Back', skip: 'Skip', close: 'Close'}}
@@ -21,9 +20,8 @@ const Tour = ({callback, run, steps, ref}) => {
 }
 
 
-export default connect(state => {
+export default connect((state, ownProps) => {
   return {
-    run: state.tour.run,
-    // steps: state.tour.steps,
+    run: state.tour[ownProps.name].run,
   }
 })(Tour);

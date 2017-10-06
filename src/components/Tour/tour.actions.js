@@ -1,10 +1,5 @@
-export const START_TOUR = 'TOGGLE_TOUR';
-export const ADD_STEPS_TO_TOUR = 'ADD_STEPS_TO_TOUR';
+export const END_TOUR = 'END_TOUR';
 
-export const startTour = () => {
-  return { type: START_TOUR };
-}
-
-export const addStepsToTour = (steps) => {
-  return { type: ADD_STEPS_TO_TOUR, steps};
+export const endTour = (name) => {
+  return { type: END_TOUR, name};
 }
