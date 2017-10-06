@@ -9,6 +9,7 @@ import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
 import { endTour } from '../Tour/tour.actions';
+import { callAfterTour } from '../Tour/tour.helpers';
 
 import Tour from '../Tour';
 
@@ -130,13 +131,10 @@ class Dashboard extends Component {
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        <Tour name="dashboard" callback={(event) => {
-          if(event.type === 'step:after' && event.step.selector == '#accounts') {
-              this.props.history.push('accounts');
-              // End tour
-              this.props.endTour('dashboard');
-          }
-        }} steps={ tourSteps }/>
+        <Tour name="dashboard" callback={callAfterTour('#accounts', () => {
+          this.props.history.push('accounts');
+          this.props.endTour('dashboard');
+        })} steps={ tourSteps }/>
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>

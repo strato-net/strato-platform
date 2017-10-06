@@ -7,6 +7,7 @@ import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 import {endTour} from '../Tour/tour.actions';
+import {callAfterTour} from '../Tour/tour.helpers';
 
 const tourSteps = [
   {
@@ -62,12 +63,11 @@ class Contracts extends Component {
 
     return (
       <div className="container-fluid">
-        <Tour steps={tourSteps} name="contracts" callback={ (event) => {
-            if(event.type === 'step:after' && event.step.selector == '#transactions') {
-              this.props.history.push('transactions');
-              this.props.endTour('contracts');
-            }
-        }}/>
+        <Tour steps={tourSteps} name="contracts" callback={ callAfterTour('#transactions', () => {
+            this.props.history.push('transactions');
+            this.props.endTour('contracts');
+          })}
+        />
         <div className="row pt-dark">
           <div className="col-md-3 text-left">
             <h3>Contracts</h3>

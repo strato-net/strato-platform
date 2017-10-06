@@ -8,6 +8,7 @@ import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
 import {endTour} from '../Tour/tour.actions';
+import { callAfterTour } from '../Tour/tour.helpers';
 
 import Tour from '../Tour';
 
@@ -100,12 +101,11 @@ class Accounts extends Component {
 
     return (
       <div className="container-fluid pt-dark">
-        <Tour name="accounts" steps={tourSteps} callback={ (event) => {
-            if(event.type === 'step:after' && event.step.selector == '#contracts') {
-              this.props.history.push('contracts');
-              this.props.endTour('accounts');
-            }
-        }}/>
+        <Tour name="accounts" steps={tourSteps} callback={ callAfterTour('#contracts', () => {
+            this.props.history.push('contracts');
+            this.props.endTour('accounts');
+          })}
+        />
         <div className="row">
           <div className="col-sm-8 text-left">
             <h3>Accounts</h3>

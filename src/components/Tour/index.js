@@ -12,6 +12,7 @@ const Tour = ({name, callback, run, steps, ref}) => {
       type="continuous"
       debug={true}
       autoStart={true}
+      showBackButton={false}
       callback={callback}
       disableOverlay={true}
       showSkipButton={true}
