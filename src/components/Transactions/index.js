@@ -8,15 +8,15 @@ import { connect } from 'react-redux';
 
 const tourSteps = [
   {
-    title: 'Query Type',
-    text: 'Where queries are to be found.',
+    title: 'Search your Transactions',
+    text: 'Run search queries against all transactions launched by your Smart Contracts.',
     selector: '#tour-query-type',
     position: 'bottom', type: 'hover',
     isFixed: true,
   },
   {
-    title: 'Bloc API',
-    text: 'Button to the Bloc API',
+    title: 'Add API endpoints to your application',
+    text: '<strong>Bloc API</strong> offers a library of API endpoints you may use in any web application. Send and receive JSON data to your custom blockchains using <strong>Bloc API</strong>.',
     selector: '#tour-bloc-api-button',
     position: 'bottom', type: 'hover',
     isFixed: true,
