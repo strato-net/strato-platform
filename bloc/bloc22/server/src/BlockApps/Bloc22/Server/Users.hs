@@ -189,7 +189,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
          Just (_, TypeFunction selector _ _) -> return selector
          _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
-
+ 
 
       argsBin <- buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
       tx <- prepareTx
@@ -265,9 +265,13 @@ postUsersContractMethod
       )
     getBlocTransactionResult hash resolve
 
+getBatchBlocTransactionResult :: [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
+getBatchBlocTransactionResult hashes resolve = do
+  forM hashes $ \h -> getBlocTransactionResult h resolve
+
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash resolve = do
-  (status,mtx,mtxr) <- getBlocTxStatus hash
+  (status,mtxr) <- getBlocTxStatus hash
   case status of
     Pending ->
       if resolve
@@ -278,8 +282,8 @@ getBlocTransactionResult hash resolve = do
     Failure -> return $ BlocTransactionResult Failure hash mtxr Nothing
     Success -> do
       let
-        Just tx = mtx
         Just txResult = mtxr
+      tx <- pollTx hash
       case T.transactionTransactionType tx of
         Transfer -> return $ BlocTransactionResult Success hash mtxr (Just $ Send $ toPostTx tx)
         Contract -> do
