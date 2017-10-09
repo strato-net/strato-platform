@@ -63,6 +63,7 @@ deployments:
         - strato:strato
         - postgres-cirrus:postgres
       environment:
+        blocurl: "${blocurl}"
         stratourl: "${stratourl}"
         zookeeper_conn: "${cirrus_zookeeper_conn}"
         postgres_db: "${cirrus_pg_db:-cirrus}"
