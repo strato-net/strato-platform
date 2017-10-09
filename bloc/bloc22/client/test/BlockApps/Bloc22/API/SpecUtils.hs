@@ -1,0 +1,80 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+module BlockApps.Bloc22.API.SpecUtils where
+
+import           Data.Text                 (Text, pack)
+import           GHC.Generics
+import           Servant.Client
+import           Test.QuickCheck.Instances ()
+
+import           BlockApps.Bloc22.API
+import           BlockApps.Bloc22.Client
+import           BlockApps.Ethereum
+import           Network.HTTP.Client
+
+
+data TestConfig = TestConfig
+  { mgr                          :: Manager
+  , blocUrl                      :: BaseUrl
+  , stratoUrl                    :: BaseUrl
+  , userName                     :: UserName
+  , userAddress                  :: Address
+  , toUserName                   :: UserName
+  , toUserAddress                :: Address
+  , pw                           :: Password
+  , simpleStorageContractName    :: Text
+  , simpleStorageContractAddress :: Address
+  , testContractName             :: Text
+  , testContractAddress          :: Address
+  , simpleMappingContractName    :: Text
+  , simpleMappingContractAddress :: Address
+  , txParams                     :: Maybe TxParams
+  , txParamsLowNonce             :: Maybe TxParams
+  , simpleStorageSrc             :: Text
+  , testSrc                      :: Text
+  , simpleMappingSrc             :: Text
+  , delay                        :: Int --microsecond
+  } deriving (Generic)
+
+
+contractFilePath :: String -> String
+contractFilePath filename = "./test/Contracts/" ++ filename
+
+readSolFile :: String -> IO Text
+readSolFile filename = do
+  let
+    filepath = contractFilePath filename
+  soliditySrc <- readFile filepath
+  return (pack soliditySrc)
+
+resolveTx :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
+resolveTx testConfig@TestConfig{..} hash = do
+  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocUrl)
+  case eResult of
+    Left _ -> return eResult
+    Right result -> 
+      case blocTransactionStatus result of
+        Pending -> resolveTx testConfig hash
+        _ -> return eResult
+
+getResolvedTx :: TestConfig -> IO (Either ServantError BlocTransactionResult) -> IO (Either ServantError BlocTransactionResult)
+getResolvedTx testConfig io = do
+  eResult <- io
+  case eResult of
+    Left _ -> return eResult
+    Right result -> resolveTx testConfig $ blocTransactionHash result
+
+resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
+resolveBlocTx bloc = do
+  result <- flip getBlocTransactionResult True $ blocTransactionHash bloc
+  case blocTransactionStatus result of 
+    Pending -> resolveBlocTx result
+    _ -> return result
+
+
+

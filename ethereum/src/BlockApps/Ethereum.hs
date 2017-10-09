@@ -224,6 +224,9 @@ instance MimeUnrender PlainText [Keccak256] where
 instance Arbitrary Keccak256 where
   arbitrary = keccak256lazy . Binary.encode @ Integer <$> arbitrary
 
+instance ToCapture (Capture "hash" Keccak256) where
+  toCapture _ = DocCapture "hash" "a transaction hash"
+
 keccak256 :: ByteString -> Keccak256
 keccak256 = Keccak256 . hash
 

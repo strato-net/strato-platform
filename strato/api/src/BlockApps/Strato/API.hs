@@ -25,6 +25,7 @@ type API =
     :> QueryParam "maxgaslimit" Natural
     :> QueryParam "mingaslimit" Natural
     :> QueryParam "blocknumber" Natural
+    :> QueryParam "hash" Keccak256
     :> Get '[JSON] [WithNext Transaction]
   :<|> "transaction"
     :> "last"
@@ -85,7 +86,7 @@ type API =
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address
-    :> Post '[PlainText] FaucetResponse
+    :> Post '[PlainText] Keccak256
   :<|> "solc"
     :> ReqBody '[FormUrlEncoded] Src
     :> Post '[PlainText] SolcResponse

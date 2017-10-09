@@ -9,18 +9,18 @@ import           Servant.Client
 import           System.Environment
 import           Test.Hspec
 
-import qualified BlockApps.Bloc21.API.AddressesSpec as Addresses
-import           BlockApps.Bloc21.API.Contracts
-import qualified BlockApps.Bloc21.API.ContractsSpec as Contracts
-import           BlockApps.Bloc21.API.E2ESpec       as E2E
-import qualified BlockApps.Bloc21.API.SearchSpec    as Search
-import           BlockApps.Bloc21.API.SpecUtils
-import           BlockApps.Bloc21.API.Users
-import qualified BlockApps.Bloc21.API.UsersSpec     as Users
-import           BlockApps.Bloc21.API.Utils
-import           BlockApps.Bloc21.Client
+import qualified BlockApps.Bloc22.API.AddressesSpec as Addresses
+import           BlockApps.Bloc22.API.Contracts
+import qualified BlockApps.Bloc22.API.ContractsSpec as Contracts
+import           BlockApps.Bloc22.API.E2ESpec       as E2E
+import qualified BlockApps.Bloc22.API.SearchSpec    as Search
+import           BlockApps.Bloc22.API.SpecUtils
+import           BlockApps.Bloc22.API.Users
+import qualified BlockApps.Bloc22.API.UsersSpec     as Users
+import           BlockApps.Bloc22.API.Utils
+import           BlockApps.Bloc22.Client
 import           BlockApps.Ethereum
--- import BlockApps.Bloc21.Server.Utils
+-- import BlockApps.Bloc22.Server.Utils
 import           BlockApps.Solidity.Xabi
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
@@ -63,6 +63,7 @@ setup = do
       , simpleMappingContractName = "SimpleMapping"
       , simpleMappingContractAddress = Address 0x0
       , txParams = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
+      , txParamsLowNonce = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) (Just $ Nonce 0)
       , simpleStorageSrc = simpleStorageSource
       , testSrc = testSource
       , simpleMappingSrc = simpleMappingSource
@@ -99,14 +100,20 @@ setup = do
       , uploadlistResolve = True
       }
     clients = do
-      addr1 <- postUsersUser (userName testConfig) True (pw testConfig)
-      addr2 <- postUsersUser (toUserName testConfig) True (pw testConfig)
+      addr1 <- postUsersUser (userName testConfig) (pw testConfig)
+      addr2 <- postUsersUser (toUserName testConfig) (pw testConfig)
+      _ <- postUsersFill (userName testConfig) addr1 True
+      _ <- postUsersFill (userName testConfig) addr2 True
       _ <- postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
-      PostUsersUploadListResponse simpleStorageDetails
-        : PostUsersUploadListResponse testDetails
-        : PostUsersUploadListResponse simpleMappingDetails
-        : _ <- postUsersUploadList (userName testConfig) addr1 uploadListRequest
+      unresolvedResults <- postUsersUploadList (userName testConfig) addr1 True uploadListRequest
+      simpleStorageResult
+        : testResult
+        : simpleMappingResult
+        : _ <- sequence $ map resolveBlocTx unresolvedResults
       let
+        Just (Upload simpleStorageDetails) = blocTransactionData simpleStorageResult
+        Just (Upload testDetails) = blocTransactionData testResult
+        Just (Upload simpleMappingDetails) = blocTransactionData simpleMappingResult
         Just (Unnamed sscAddr) = contractdetailsAddress simpleStorageDetails
         Just (Unnamed tcAddr) = contractdetailsAddress testDetails
         Just (Unnamed smcAddr) = contractdetailsAddress simpleMappingDetails
@@ -124,7 +131,7 @@ setup = do
     Right cfg -> return cfg
 
 defaultBloc :: BaseUrl
-defaultBloc = BaseUrl Http "localhost" 80 "/bloc/v2.1"
+defaultBloc = BaseUrl Http "localhost" 80 "/bloc/v2.2"
 
 defaultStrato :: BaseUrl
 defaultStrato = BaseUrl Http "localhost" 80 "/strato-api/eth/v1.2"
