@@ -5,7 +5,8 @@ import {
   createContract,
   compileContract,
   contractFormChange,
-  usernameChange
+  usernameChange,
+  contractNameChange
 } from './createContract.actions';
 import {fetchAccounts} from '../Accounts/accounts.actions';
 import {fetchContracts} from '../Contracts/contracts.actions';
@@ -59,6 +60,12 @@ class CreateContract extends Component {
     this.props.usernameChange(e.target.value);
   };
 
+  handleContractNameChange = (e) => {
+    this.props.contractNameChange(
+      e.target.value
+    );
+  }
+
   handleFileUpload = (files) => {
     const contract = files[0];
     if (contract && (!contract.name || !contract.name.includes('.sol'))) {
@@ -71,7 +78,6 @@ class CreateContract extends Component {
       const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
       mixpanelWrapper.track("create_contract_file_upload");
       self.props.contractFormChange(
-        contract.name,
         fileContents
       );
       self.props.compileContract(
@@ -98,7 +104,7 @@ class CreateContract extends Component {
       });
 
       const payload = {
-        contract: this.props.filename.substring(0, this.props.filename.indexOf('.')),
+        contract: this.props.contractName,
         username: values.username,
         address: values.address,
         password: values.password,
@@ -125,6 +131,7 @@ class CreateContract extends Component {
   render() {
     const {handleSubmit, pristine, submitting} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
+    const contracts = this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
 
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
@@ -262,14 +269,14 @@ class CreateContract extends Component {
                 <div className="col-sm-9 smd-pad-4">
                   <label className="pt-control pt-checkbox">
                     <Field
-                        id="input-b"
-                        className="form-width"
-                        name="searchable"
-                        type="checkbox"
-                        component="input"
-                        dir="auto"
-                        title="Searchable"
-                        required
+                      id="input-b"
+                      className="form-width"
+                      name="searchable"
+                      type="checkbox"
+                      component="input"
+                      dir="auto"
+                      title="Searchable"
+                      required
                     />
                   <span className="pt-control-indicator"></span>
                     Searchable
@@ -294,6 +301,32 @@ class CreateContract extends Component {
                   />
                 </div>
               </div>
+              {contracts && <div className="row">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Contracts
+                  </label>
+                </div>
+                <div className="col-sm-9 smd-pad-4">
+                  <div className="pt-select">
+                    <Field
+                        className="pt-select"
+                        component="select"
+                        name="contractName"
+                        onChange={this.handleContractNameChange}
+                      >
+                        <option />
+                        {
+                          contracts.map((value, index) => {
+                            return (
+                              <option key={value} value={value}>{value}</option>
+                            )
+                          })
+                        }
+                      </Field>
+                    </div>
+                </div> 
+              </div>}
               <div className="row">
                 <div className="col-sm-12">
                   <label className="pt-label">
@@ -371,7 +404,7 @@ function mapStateToProps(state) {
     response: state.createContract.response,
     abi: state.createContract.abi,
     createDisabled: state.createContract.createDisabled,
-    filename: state.createContract.filename,
+    contractName: state.createContract.contractName,
     contract: state.createContract.contract,
     accounts: state.accounts.accounts,
     username: state.createContract.username,
@@ -388,7 +421,8 @@ const connected = connect(mapStateToProps, {
   contractFormChange,
   fetchContracts,
   fetchAccounts,
-  usernameChange
+  usernameChange,
+  contractNameChange
 })(formed);
 
 export default withRouter(connected);

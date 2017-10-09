@@ -8,12 +8,19 @@ export const COMPILE_CONTRACT_SUCCESS = "COMPILE_CONTRACT_SUCCESS";
 export const COMPILE_CONTRACT_FAILURE = "COMPILE_CONTRACT_FAILURE";
 export const USERNAME_FORM_CHANGE = "USERNAME_FORM_CHANGE";
 export const CONTRACT_FORM_CHANGE = "CONTRACT_UPLOAD_FORM_CHANGE";
+export const CONTRACT_NAME_CHANGE = "CONTRACT_NAME_CHANGE";
 
-export const contractFormChange = function(name, contract) {
+export const contractFormChange = function(contract) {
   return {
     type : CONTRACT_FORM_CHANGE,
-    name: name,
-    contract: contract,
+    contract: contract
+  }
+}
+
+export const contractNameChange = function(contractName) {
+  return {
+    type: CONTRACT_NAME_CHANGE,
+    contractName: contractName
   }
 }
 
@@ -65,7 +72,7 @@ export const createContractFailure = function(error) {
   }
 }
 
-export const compileContract = function(name,contract, searchable) {
+export const compileContract = function(name, contract, searchable) {
   return {
     type: COMPILE_CONTRACT,
     name: name,

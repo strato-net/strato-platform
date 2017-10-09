@@ -9,6 +9,7 @@ import {
   COMPILE_CONTRACT_SUCCESS,
   USERNAME_FORM_CHANGE,
   CONTRACT_FORM_CHANGE,
+  CONTRACT_NAME_CHANGE
 } from './createContract.actions';
 
 const initialState = {
@@ -18,7 +19,7 @@ const initialState = {
   response: "Status: Upload Contract",
   username: '',
   contract: '',
-  filename: undefined,
+  contractName: undefined,
   createDisabled: true,
 };
 
@@ -31,7 +32,7 @@ const reducer = function (state = initialState, action) {
         abi: '',
         response: "Status: Upload Contract",
         contract: '',
-        filename: '',
+        contractName: '',
         createDisabled: true,
       };
     case USERNAME_FORM_CHANGE:
@@ -44,11 +45,15 @@ const reducer = function (state = initialState, action) {
           ...state,
           isOpen: false
         };
+    case CONTRACT_NAME_CHANGE: 
+      return {
+        ...state,
+        contractName: action.contractName
+      };
     case CONTRACT_FORM_CHANGE:
       return {
         ...state,
-        contract: action.contract,
-        filename: action.name,
+        contract: action.contract
       };
     case CREATE_CONTRACT:
       return {
