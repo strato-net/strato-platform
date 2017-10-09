@@ -1,5 +1,5 @@
 import {
-    takeLatest,
+    takeEvery,
     put,
     call
   } from 'redux-saga/effects';
@@ -15,7 +15,7 @@ import {
   const compileUrl = env.STRATO_URL + "/extabi";
   const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
   
-  function compileSourceApiCall(contractName, source, s) { 
+  function compileSourceApiCall(contractName, source, s) {
       return fetch(
         compileUrl,
         {
@@ -46,6 +46,6 @@ import {
   }
   
   export function* watchCompileSourceFromEditor() {
-    yield takeLatest(CODE_EDITOR_COMPILE, compileCodeFromEditor);
+    yield takeEvery(CODE_EDITOR_COMPILE, compileCodeFromEditor);
   }
  

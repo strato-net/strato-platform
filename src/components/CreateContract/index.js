@@ -90,10 +90,10 @@ class CreateContract extends Component {
   };
 
   submit = (values) => {
-    if (!this.props.createDisabled) {
+    if (!this.props.createDisabled || this.props.sourceFromEditor) {
 
       const args = {};
-      const abi = this.props.abi.src;
+      const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
       Object.values(abi).forEach(val => {
         if (val.constr !== undefined) {
           return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
@@ -102,6 +102,7 @@ class CreateContract extends Component {
           })
         }
       });
+      const fileText = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
 
       const payload = {
         contract: this.props.contractName,
@@ -109,11 +110,10 @@ class CreateContract extends Component {
         address: values.address,
         password: values.password,
         searchable: values.searchable,
-        fileText: this.props.contract,
+        fileText: fileText,
         arguments: args,
       };
-
-
+      
       mixpanelWrapper.track('create_contract_submit_click_successful');
       this.props.createContract(payload);
       this.props.reset();
@@ -131,13 +131,12 @@ class CreateContract extends Component {
   render() {
     const {handleSubmit, pristine, submitting} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    const contracts = this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-
+    const contracts = this.props.sourceFromEditor? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : null;
 
-    const src = this.props.abi === undefined ? undefined : this.props.abi.src;
+    const src =  this.props.sourceFromEditor?this.props.sourceFromEditor:(this.props.abi === undefined ? undefined : this.props.abi.src);
 
     let args = src === undefined ?
       <tr>
@@ -283,7 +282,7 @@ class CreateContract extends Component {
                 </label>
                 </div>
               </div>
-              <div className="row">
+              {!this.props.sourceFromEditor && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
                     Source file
@@ -300,7 +299,7 @@ class CreateContract extends Component {
                     required
                   />
                 </div>
-              </div>
+              </div>}
               {contracts && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -359,7 +358,7 @@ class CreateContract extends Component {
                   this.props.contractCloseModal()
                 }}/>
                 <Button
-                  className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
+                  className={this.props.createDisabled || this.props.sourceFromEditor ? "pt-disabled" : "pt-intent-primary"}
                   onClick={handleSubmit(this.submit)}
                   disabled={pristine || submitting}
                   text="Create Contract"

@@ -16,8 +16,6 @@ export const compileCodeFromEditor = function(name, code, searchable) {
     return {
       type: CODE_EDITOR_COMPILE_SUCCESS,
       response: response,
-      compileSuccess: false,
-      isOpen: true,
     }
   }
   
@@ -25,7 +23,5 @@ export const compileCodeFromEditor = function(name, code, searchable) {
     return {
       type: CODE_EDITOR_COMPILE_FAILURE,
       error: error,
-      compileSuccess: false,
-      isOpen: false,
     }
   }

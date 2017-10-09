@@ -5,11 +5,10 @@ import {
   } from './codeEditor.actions';
   
   const initialState = {
-    compileSuccess: false,
+    codeCompileSuccess: undefined,
     abi: undefined,
-    response: "Status: Upload Source Code",
     filename: undefined,
-    createDisabled: true,    
+    createDisabled: true,
   };
   
   
@@ -18,21 +17,21 @@ import {
       case CODE_EDITOR_COMPILE:
         return {
           ...state,
-          response: "Uploading Source Code...",
+          response: "Uploading Contract...",
           createDisabled: true
         };
       case CODE_EDITOR_COMPILE_SUCCESS:
         return {
           ...state,
-          response: "Error Uploading Source Code...: " + action.error,
-          error: action.error,
-          createDisabled: true,
+          response: action.response,
+          codeCompileSuccess:true
         };
       case CODE_EDITOR_COMPILE_FAILURE:
         return {
           ...state,
-          abi: action.response,
-          createDisabled: false,
+          response: "Error Uploading Contract...: " + action.error,
+          error: action.error,
+          codeCompileSuccess:false
         };
       default:
         return state;
