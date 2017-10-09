@@ -38,7 +38,7 @@ pipeline {
           basil compose > docker-compose.yml
 
           NODE_NAME=localhost \
-          BLOC_URL=http://localhost/bloc/v2.1 \
+          BLOC_URL=http://localhost/bloc/v2.2 \
           BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.1/swagger.json \
           STRATO_URL=http://localhost/strato-api/eth/v1.2 \
           STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
