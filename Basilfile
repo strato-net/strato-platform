@@ -35,8 +35,6 @@ deployments:
       depends_on:
         - strato
         - postgres
-      ports:
-        - "10001:8000"
       environment:
         ssl: "${ssl}"
         stratoHost: "${stratoHost}"
@@ -51,8 +49,6 @@ deployments:
       image: redis:3.2
       restart: always
       command: redis-server --appendonly yes
-      ports:
-       - "6379:6379"
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
@@ -78,9 +74,7 @@ deployments:
     compose:
       restart: always
       ports:
-        - "30303:30303"
         - "30303:30303/udp"
-        - "33000:3000"
       environment:
         networkID : "${networkID}"
         genesis: "${genesis}"
@@ -125,8 +119,6 @@ deployments:
         POSTGRES_USER: postgres
         PG_ENV_POSTGRES_DB: cirrus
         PG_ENV_POSTGRES_USER: postgres
-      ports:
-        - '5434:5432'
 
   - name: postgrest
     repo: https://github.com/blockapps/postgrest-packager.git
@@ -139,8 +131,6 @@ deployments:
         PG_ENV_POSTGRES_PASSWORD: ""
         PG_ENV_POSTGRES_HOST: "postgres-cirrus"
         PG_PORT_5432_TCP_PORT: "5432"
-      ports:
-        - '3001:3001'
 
   - name: postgres
     repo: https://github.com/blockapps/postgres-packager.git
@@ -177,8 +167,6 @@ deployments:
       restart: always
       environment:
         ZOO_MY_ID: "1"
-      ports:
-        - "2181:2181"
 
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
@@ -187,8 +175,6 @@ deployments:
       restart: always
       environment:
         API_URL: "/strato-api/eth/v1.2/swagger.json"
-      ports:
-        - "8080:8080"
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
@@ -204,5 +190,3 @@ deployments:
         KAFKA_DELETE_TOPIC_ENABLE: "true"
         KAFKA_LOG_CLEANER_ENABLE: "false"
         KAFKA_LOG_RETENTION_HOURS: "2147483647"
-      ports:
-        - "9092:9092"
