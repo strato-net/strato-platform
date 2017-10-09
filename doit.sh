@@ -1,7 +1,7 @@
 #!/bin/bash
 
 stratourl=${stratourl:-http://strato:3000}
-blocurl=${BLOC_URL:-http://bloch:8000/bloc/v2.2}
+blocurl=${blocurl:-http://bloch:8000/bloc/v2.2}
 echo "stratourl is: ${stratourl}"
 
 until curl ${stratourl} >& /dev/null
