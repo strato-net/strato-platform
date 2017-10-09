@@ -25,4 +25,5 @@ RUN wget "$DOCKERIZE_SOURCE/$DOCKERIZE_VERSION/$DOCKERIZE_FILE"  && \
     tar -C /usr/local/bin -xvzf $DOCKERIZE_FILE
 COPY doit.sh /doit.sh
 RUN chmod a+x /doit.sh
+EXPOSE 3001
 ENTRYPOINT ["/doit.sh"]
