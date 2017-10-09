@@ -34,7 +34,7 @@ class ContractCard extends Component {
     const showQueryBuilder = instances.reduce((acc,instance)=> {
       return acc || instance.fromCirrus;
     }, false);
-    
+
     instances
       .filter((instance) => {return re.test(instance.address)})
       .forEach(function (instance) {
@@ -118,8 +118,12 @@ class ContractCard extends Component {
       state = (
         <div className="pt-card pt-elevation-2">
           <div className="row">
+            <div className="col-sm-12 text-right">
+              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div>: ''} </span>
+            </div>
+          </div>
+          <div className="row">
             <div className="col-sm-12">
-            <div> {instance && instance.balance ? <div> Balance : {instance.balance} </div>: ''} </div>
               <table className="pt-table pt-condensed pt-striped smd-full-width">
                 <thead>
                   <tr>
