@@ -5,7 +5,8 @@ import {Button, Collapse} from '@blueprintjs/core';
 import {
   selectContractInstance,
   fetchState,
-  fetchCirrusInstances
+  fetchCirrusInstances,
+  fetchAccount
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
@@ -42,6 +43,7 @@ class ContractCard extends Component {
             onClick={() => {
               mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address);
+              self.props.fetchAccount(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
             key={'card-data-' + instance.address}
@@ -109,6 +111,11 @@ class ContractCard extends Component {
       }
       state = (
         <div className="pt-card pt-elevation-2">
+          <div className="row">
+            <div className="col-sm-12 text-right">
+              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div>: ''} </span>
+            </div>
+          </div>
           <div className="row">
             <div className="col-sm-12">
               <table className="pt-table pt-condensed pt-striped smd-full-width">
@@ -198,6 +205,7 @@ export default withRouter(
   connect(mapStateToProps, {
     selectContractInstance,
     fetchState,
-    fetchCirrusInstances
+    fetchCirrusInstances,
+    fetchAccount
   })(ContractCard)
 );
