@@ -2,7 +2,6 @@ import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Collapse} from '@blueprintjs/core';
-import * as moment from 'moment';
 import {
   selectContractInstance,
   fetchState,
@@ -49,11 +48,6 @@ class ContractCard extends Component {
           >
             <td style={{border: 'none'}}>
               <small>{instance.address}</small>
-            </td>
-            <td style={{border: 'none'}}>
-                <small>
-                { instance.fromBloc ? moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A') : '' }
-                </small>
             </td>
             <td style={{border: 'none'}}>
               { instance.fromCirrus ?
@@ -176,7 +170,6 @@ class ContractCard extends Component {
                     <thead>
                     <tr>
                       <th>Contract Address</th>
-                      <th>Created At</th>
                       <th></th>
                     </tr>
                     </thead>
