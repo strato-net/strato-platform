@@ -63,6 +63,7 @@ setup = do
       , simpleMappingContractName = "SimpleMapping"
       , simpleMappingContractAddress = Address 0x0
       , txParams = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
+      , txParamsLowNonce = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) (Just $ Nonce 0)
       , simpleStorageSrc = simpleStorageSource
       , testSrc = testSource
       , simpleMappingSrc = simpleMappingSource

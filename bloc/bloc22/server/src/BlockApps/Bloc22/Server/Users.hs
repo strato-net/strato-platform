@@ -283,55 +283,61 @@ getBlocTransactionResult hash resolve = do
     Success -> do
       let
         Just txResult = mtxr
-      tx <- pollTx hash
-      case T.transactionTransactionType tx of
-        Transfer -> return $ BlocTransactionResult Success hash mtxr (Just $ Send $ toPostTx tx)
-        Contract -> do
-          let
-            addressMaybe = do
-              str <- listToMaybe $
-                Text.splitOn "," (transactionresultContractsCreated txResult)
-              stringAddress $ Text.unpack str
-          case addressMaybe of
-            Nothing -> case transactionresultMessage txResult of
-              "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
-              stratoMsg  -> throwError $ UserError stratoMsg
-            Just addr' -> do
-              (cmId,name)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
-              xs::[Int32] <- blocQuery $ proc () -> do
-                (cmId',_,_,_,_,_,_,_) <- contractByAddress name addr' -< ()
-                returnA -< cmId'
-              when (isNothing $ listToMaybe xs) $ do
-                void . blocModify $ \conn -> runInsert conn contractsInstanceTable
-                  ( Nothing
-                  , constant cmId
-                  , constant addr'
-                  , Nothing
-                  )
-              details <- getContractDetails (ContractName name) (Unnamed addr')
-              return $ BlocTransactionResult Success hash mtxr (Just $ Upload details)
-        FunctionCall -> do
-            (cmId,funcName)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
-            functionId <- getFunctionId cmId funcName
-            xabi <- getContractXabiByMetadataId cmId
-            resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-            let
-              orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-            orderedResultTypes <-
-              for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-                either (throwError . UserError . Text.pack) return $
-                  xabiTypeToType xabi indexedTypeType
-            let
-              txResp = transactionresultResponse txResult
-              -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-              -- workaround for enums
-              mFormattedResponse =
-                convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
-            case transactionresultMessage txResult of
-              "Success!" -> do
-                formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-                return $ BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse)
-              stratoMsg  -> throwError $ UserError stratoMsg
+      mtx <- maybeTx hash
+      case mtx of
+        Nothing ->
+          if resolve
+            then return (threadDelay 1000000) >> getBlocTransactionResult hash True
+            else return $ BlocTransactionResult Pending hash Nothing Nothing
+        Just tx ->
+          case T.transactionTransactionType tx of
+            Transfer -> return $ BlocTransactionResult Success hash mtxr (Just $ Send $ toPostTx tx)
+            Contract -> do
+              let
+                addressMaybe = do
+                  str <- listToMaybe $
+                    Text.splitOn "," (transactionresultContractsCreated txResult)
+                  stringAddress $ Text.unpack str
+              case addressMaybe of
+                Nothing -> case transactionresultMessage txResult of
+                  "Success!" -> throwError $ AnError "Unknown error while trying to create contract"
+                  stratoMsg  -> throwError $ UserError stratoMsg
+                Just addr' -> do
+                  (cmId,name)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
+                  xs::[Int32] <- blocQuery $ proc () -> do
+                    (cmId',_,_,_,_,_,_,_) <- contractByAddress name addr' -< ()
+                    returnA -< cmId'
+                  when (isNothing $ listToMaybe xs) $ do
+                    void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+                      ( Nothing
+                      , constant cmId
+                      , constant addr'
+                      , Nothing
+                      )
+                  details <- getContractDetails (ContractName name) (Unnamed addr')
+                  return $ BlocTransactionResult Success hash mtxr (Just $ Upload details)
+            FunctionCall -> do
+                (cmId,funcName)::(Int32,Text) <- blocQuery1 $ contractByTxHash hash
+                functionId <- getFunctionId cmId funcName
+                xabi <- getContractXabiByMetadataId cmId
+                resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
+                let
+                  orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+                orderedResultTypes <-
+                  for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+                    either (throwError . UserError . Text.pack) return $
+                      xabiTypeToType xabi indexedTypeType
+                let
+                  txResp = transactionresultResponse txResult
+                  -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
+                  -- workaround for enums
+                  mFormattedResponse =
+                    convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
+                case transactionresultMessage txResult of
+                  "Success!" -> do
+                    formattedResponse <- blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
+                    return $ BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse)
+                  stratoMsg  -> throwError $ UserError stratoMsg
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case

@@ -20,7 +20,6 @@ import           BlockApps.Solidity.SolidityValue
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Strato.Types
 
-
 -- TODO: user/contract methods Addresses may need to be Maybe (Named Address)
 spec :: SpecWith TestConfig
 spec = do
@@ -32,7 +31,7 @@ spec = do
     it "should get a list of user's addresses" $ \ TestConfig {..} -> do
       Right userAddresses <- runClientM (getUsersUser userName) (ClientEnv mgr blocUrl)
       userAddresses `shouldContain` [userAddress]
-  describe "postUsersUser" $
+  describe "postUsersUser" $ do
     it "should create and faucet a user address" $ \ TestConfig {..} -> do
       let
         username = "blockapps"
@@ -42,7 +41,36 @@ spec = do
         Right address = postUsersEither
       postUsersFillEither <- runClientM (postUsersFill username address True) (ClientEnv mgr blocUrl)
       postUsersFillEither `shouldSatisfy` isRight
-  describe "postUsersSend" $
+
+    it "should create two new users and faucet both addresses simultaneously" $ \ TestConfig {..} -> do
+      let
+        username1 = "blockapps1"
+        username2 = "blockapps2"
+      postUsersEither1 <- runClientM (postUsersUser username1 pw) (ClientEnv mgr blocUrl)
+      postUsersEither2 <- runClientM (postUsersUser username2 pw) (ClientEnv mgr blocUrl)
+      postUsersEither1 `shouldSatisfy` isRight
+      postUsersEither2 `shouldSatisfy` isRight
+      let
+        Right address1 = postUsersEither1
+        Right address2 = postUsersEither2
+      postUsersFillEither1 <- runClientM (postUsersFill username1 address1 False) (ClientEnv mgr blocUrl)
+      postUsersFillEither2 <- runClientM (postUsersFill username2 address2 True) (ClientEnv mgr blocUrl)
+      postUsersFillEither1 `shouldSatisfy` isRight
+      postUsersFillEither2 `shouldSatisfy` isRight
+      let
+        Right result1 = postUsersFillEither1
+        Right result2 = postUsersFillEither2
+      eResult1 <- runClientM (getBlocTransactionResult (blocTransactionHash result1) True) (ClientEnv mgr blocUrl)
+      eResult1 `shouldSatisfy` isRight
+      let
+        Right resolved1 = eResult1
+      putStrLn . ("Unresolved faucet transaction 1: " ++) . show . blocTransactionStatus $ result1
+      putStrLn . ("Resolved faucet transaction 1: " ++) . show . blocTransactionStatus $ resolved1
+      putStrLn . ("Resolved faucet transaction 2: " ++) . show . blocTransactionStatus $ result2
+      --result1 `shouldSatisfy` (== Pending) . blocTransactionStatus
+      --resolved1 `shouldSatisfy` (== Success) . blocTransactionStatus
+      --result2 `shouldSatisfy` (== Failure) . blocTransactionStatus
+  describe "postUsersSend" $ do
     it "should send ethers to another address" $ \ testConfig@TestConfig {..} -> do
       let
         postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParams
@@ -53,6 +81,13 @@ spec = do
       postTransaction `shouldSatisfy` (== Strung 100) . posttransactionValue
       resultBad <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParametersBad) (ClientEnv mgr blocUrl)
       resultBad `shouldSatisfy` isLeft
+
+    it "should send ethers to another address with low nonce" $ \ testConfig@TestConfig {..} -> do
+      let
+        postSendParameters = PostSendParameters toUserAddress (Strung 100) pw txParamsLowNonce
+      Right result <- getResolvedTx testConfig $ runClientM (postUsersSend userName userAddress False postSendParameters) (ClientEnv mgr blocUrl)
+      result `shouldSatisfy` (== Failure) . blocTransactionStatus
+      putStrLn $ show result
   describe "postUsersContract" $
     it "should upload a contract" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay
@@ -103,10 +138,6 @@ spec = do
         Right unresolved = eResults
       results <- forM unresolved $ \r -> runClientM (resolveBlocTx r) (ClientEnv mgr blocUrl)
       results `shouldSatisfy` all isRight
-      for_ results $ \Right result -> do
-        void $ result `shouldSatisfy` (== Success) . blocTransactionStatus
-        void $ result `shouldSatisfy` isJust . blocTransactionTxResult
-        void $ result `shouldSatisfy` isJust . blocTransactionData
   describe "postUsersContractMethod" $
     it "should call a contract method" $ \ testConfig@TestConfig {..} -> do
       threadDelay delay

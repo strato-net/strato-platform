@@ -34,6 +34,7 @@ data TestConfig = TestConfig
   , simpleMappingContractName    :: Text
   , simpleMappingContractAddress :: Address
   , txParams                     :: Maybe TxParams
+  , txParamsLowNonce             :: Maybe TxParams
   , simpleStorageSrc             :: Text
   , testSrc                      :: Text
   , simpleMappingSrc             :: Text
