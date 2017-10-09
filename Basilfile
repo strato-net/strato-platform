@@ -56,7 +56,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: master
+    ref: transaction-state-management
     compose:
       restart: always
       links:
