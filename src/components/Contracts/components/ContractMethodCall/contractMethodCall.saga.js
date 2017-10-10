@@ -4,10 +4,10 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  METHOD_CALL,
+  METHOD_CALL_REQUEST,
   methodCallSuccess,
   methodCallFailure,
-  METHOD_CALL_FETCH_ARGS,
+  METHOD_CALL_FETCH_ARGS_REQUEST,
   methodCallFetchArgsSuccess,
   methodCallFetchArgsFailure
 } from './contractMethodCall.actions';
@@ -86,9 +86,9 @@ function* fetchArgs(action) {
 }
 
 export function* watchMethodCall() {
-  yield takeEvery(METHOD_CALL, methodCall);
+  yield takeEvery(METHOD_CALL_REQUEST, methodCall);
 }
 
 export function* watchFetchArgs() {
-  yield takeEvery(METHOD_CALL_FETCH_ARGS, fetchArgs);
+  yield takeEvery(METHOD_CALL_FETCH_ARGS_REQUEST, fetchArgs);
 }

@@ -1,7 +1,7 @@
 import {
   OPEN_OVERLAY,
   CLOSE_OVERLAY,
-  CREATE_USER,
+  CREATE_USER_REQUEST,
   CREATE_USER_FAILURE,
   CREATE_USER_SUCCESS,
 } from './createUser.actions';
@@ -21,7 +21,7 @@ const reducer = function (state = initialState, action) {
       return {
         isOpen: false
       };
-    case CREATE_USER:
+    case CREATE_USER_REQUEST:
       return {
         isOpen: true,
         spinning: true,

@@ -4,7 +4,7 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  FETCH_BLOCK_DATA,
+  FETCH_BLOCK_DATA_REQUEST,
   fetchBlockDataSuccess,
   fetchBlockDataFailure
 } from './block-data.actions';
@@ -44,5 +44,5 @@ function* fetchBlockData(action) {
 }
 
 export default function* watchFetchBlockData() {
-  yield takeEvery(FETCH_BLOCK_DATA, fetchBlockData);
+  yield takeEvery(FETCH_BLOCK_DATA_REQUEST, fetchBlockData);
 }

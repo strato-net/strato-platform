@@ -2,12 +2,13 @@ import {
   takeLatest,
   takeEvery,
   put,
-  call
+  call,
+  cancelled
 } from 'redux-saga/effects';
 import {
-  FETCH_ACCOUNTS,
-  FETCH_USER_ADDRESSES,
-  FETCH_ACCOUNT_DETAIL,
+  FETCH_ACCOUNTS_REQUEST,
+  FETCH_ACCOUNT_ADDRESS_REQUEST,
+  FETCH_ACCOUNT_DETAIL_REQUEST,
   fetchAccountsSuccess,
   fetchAccountsFailure,
   fetchUserAddresses,
@@ -18,6 +19,7 @@ import {
   fetchAccountDetailFailure
 } from './accounts.actions';
 import { env } from '../../env';
+import { hideLoading } from 'react-redux-loading-bar';
 
 const accountDataUrl = env.STRATO_URL + "/account?address=:address";
 const addressUrl = env.BLOC_URL + '/users/:user';
@@ -85,6 +87,10 @@ function* getAccounts(action) {
   }
   catch (err) {
     yield put(fetchAccountsFailure(err));
+  } finally {
+    if (yield cancelled()){
+      yield put(hideLoading());
+    }
   }
 }
 
@@ -112,8 +118,8 @@ function* getAccountDetail(action) {
 
 export default function* watchFetchAccounts() {
   yield [
-    takeLatest(FETCH_ACCOUNTS, getAccounts),
-    takeEvery(FETCH_USER_ADDRESSES, getUserAddresses),
-    takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail)
+    takeLatest(FETCH_ACCOUNTS_REQUEST, getAccounts),
+    takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
+    takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail)
   ];
 }

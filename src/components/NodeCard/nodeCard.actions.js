@@ -1,17 +1,17 @@
-export const FETCH_NODE_DETAIL = 'FETCH_NODE_DETAIL';
+export const FETCH_NODE_DETAIL_REQUEST = 'FETCH_NODE_DETAIL_REQUEST';
 export const FETCH_NODE_DETAIL_SUCCESS = 'FETCH_NODE_DETAIL_SUCCESS';
 export const FETCH_NODE_DETAIL_FAILURE = 'FETCH_NODE_DETAIL_FAILURE';
-export const FETCH_NODE_PEERS = 'FETCH_NODE_PEERS';
+export const FETCH_NODE_PEERS_REQUEST = 'FETCH_NODE_PEERS_REQUEST';
 export const FETCH_NODE_PEERS_SUCCESS = 'FETCH_NODE_PEERS_SUCCESS';
 export const FETCH_NODE_PEERS_FAILURE = 'FETCH_NODE_PEERS_FAILURE';
-export const FETCH_NODE_COINBASE = 'FETCH_NODE_COINBASE';
+export const FETCH_NODE_COINBASE_REQUEST = 'FETCH_NODE_COINBASE_REQUEST';
 export const FETCH_NODE_COINBASE_SUCCESS = 'FETCH_NODE_COINBASE_SUCCESS';
 export const FETCH_NODE_COINBASE_FAILURE = 'FETCH_NODE_COINBASE_FAILURE';
 
 
 export const fetchNodeDetail = function(nodeIndex){
   return {
-    type: FETCH_NODE_DETAIL,
+    type: FETCH_NODE_DETAIL_REQUEST,
     nodeIndex: nodeIndex
   }
 };
@@ -34,7 +34,7 @@ export const fetchNodeDetailFailure = function(nodeIndex, error) {
 
 export const fetchNodePeers = function(nodeIndex) {
   return {
-    type: FETCH_NODE_PEERS,
+    type: FETCH_NODE_PEERS_REQUEST,
     nodeIndex: nodeIndex
   }
 };
@@ -57,7 +57,7 @@ export const fetchNodePeersFailure = function(nodeIndex, error) {
 
 export const fetchNodeCoinbase = function(nodeIndex) {
   return {
-    type: FETCH_NODE_COINBASE,
+    type: FETCH_NODE_COINBASE_REQUEST,
     nodeIndex: nodeIndex
   }
 };

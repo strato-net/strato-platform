@@ -1,5 +1,5 @@
 import {
-  SEND_ETHER,
+  SEND_ETHER_REQUEST,
   SEND_ETHER_SUCCESS,
   SEND_ETHER_FAILURE,
   SEND_ETHER_OPEN_MODAL,
@@ -16,7 +16,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case SEND_ETHER:
+    case SEND_ETHER_REQUEST:
       return {
         ...state,
         from: action.from,

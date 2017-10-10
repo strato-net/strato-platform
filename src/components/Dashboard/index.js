@@ -18,6 +18,7 @@ import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 
 import './dashboard.css';
+import { hideLoading } from 'react-redux-loading-bar';
 
 const tourSteps = [
   {
@@ -51,13 +52,17 @@ class Dashboard extends Component {
   }
 
   startPoll() {
+    const hideLoading = this.props.hideLoading
     const dashboardFetchStatus = this.props.fetchBlockData;
     const fetchAccounts = this.props.fetchAccounts;
     const fetchContracts = this.props.fetchContracts;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
+      hideLoading()
       fetchAccounts();
+      hideLoading()
       fetchContracts();
+      hideLoading()
     }, env.POLLING_FREQUENCY);
   }
 
@@ -229,6 +234,7 @@ export default withRouter(
       fetchBlockData,
       fetchAccounts,
       fetchContracts,
+      hideLoading
       endTour,
     }
   )(Dashboard)

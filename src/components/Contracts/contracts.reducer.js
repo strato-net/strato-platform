@@ -1,5 +1,5 @@
 import {
-  FETCH_CONTRACTS,
+  FETCH_CONTRACTS_REQUEST,
   FETCH_CONTRACTS_SUCCESS,
   FETCH_CONTRACTS_FAILURE,
   CHANGE_CONTRACT_FILTER,
@@ -19,7 +19,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_CONTRACTS:
+    case FETCH_CONTRACTS_REQUEST:
       return {
         contracts: state.contracts,
         filter: state.filter,

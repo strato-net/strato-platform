@@ -4,10 +4,10 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  CREATE_CONTRACT,
+  CREATE_CONTRACT_REQUEST,
   createContractSuccess,
   createContractFailure,
-  COMPILE_CONTRACT,
+  COMPILE_CONTRACT_REQUEST,
   compileContractSuccess,
   compileContractFailure
 } from './createContract.actions';
@@ -111,9 +111,9 @@ function* compileContract(action) {
 }
 
 export function* watchCompileContract() {
-  yield takeLatest(COMPILE_CONTRACT, compileContract);
+  yield takeLatest(COMPILE_CONTRACT_REQUEST, compileContract);
 }
 
 export default function* watchCreateContract() {
-  yield takeLatest(CREATE_CONTRACT, createContract);
+  yield takeLatest(CREATE_CONTRACT_REQUEST, createContract);
 }

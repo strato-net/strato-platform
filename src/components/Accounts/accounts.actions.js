@@ -1,17 +1,17 @@
-export const FETCH_ACCOUNTS = 'FETCH_ACCOUNTS';
+export const FETCH_ACCOUNTS_REQUEST = 'FETCH_ACCOUNTS_REQUEST';
 export const FETCH_ACCOUNTS_SUCCESS = 'FETCH_ACCOUNTS_SUCCESS';
 export const FETCH_ACCOUNTS_FAILURE = 'FETCH_ACCOUNTS_FAILURE';
 export const CHANGE_ACCOUNT_FILTER = 'CHANGE_ACCOUNT_FILTER';
-export const FETCH_USER_ADDRESSES = 'FETCH_ACCOUNT_ADDRESS';
+export const FETCH_ACCOUNT_ADDRESS_REQUEST = 'FETCH_ACCOUNT_ADDRESS_REQUEST';
 export const FETCH_USER_ADDRESSES_SUCCESS = 'FETCH_ACCOUNT_ADDRESS_SUCCESS';
 export const FETCH_USER_ADDRESSES_FAILURE = 'FETCH_ACCOUNT_ADDRESS_FAILURE';
-export const FETCH_ACCOUNT_DETAIL = 'FETCH_ACCOUNT_DETAIL';
+export const FETCH_ACCOUNT_DETAIL_REQUEST = 'FETCH_ACCOUNT_DETAIL_REQUEST';
 export const FETCH_ACCOUNT_DETAIL_SUCCESS = 'FETCH_ACCOUNT_DETAIL_SUCCESS';
 export const FETCH_ACCOUNT_DETAIL_FAILURE = 'FETCH_ACCOUNT_DETAIL_FAILURE';
 
 export const fetchAccounts = function () {
   return {
-    type: FETCH_ACCOUNTS,
+    type: FETCH_ACCOUNTS_REQUEST,
   }
 };
 
@@ -38,7 +38,7 @@ export const changeAccountFilter = function(filter) {
 
 export const fetchUserAddresses = function (name) {
   return {
-    type: FETCH_USER_ADDRESSES,
+    type: FETCH_ACCOUNT_ADDRESS_REQUEST,
     name: name
   }
 };
@@ -61,7 +61,7 @@ export const fetchUserAddressesFailure = function (name, error) {
 
 export const fetchAccountDetail = function(name, address) {
   return {
-    type: FETCH_ACCOUNT_DETAIL,
+    type: FETCH_ACCOUNT_DETAIL_REQUEST,
     name: name,
     address: address
   }

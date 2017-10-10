@@ -1,10 +1,10 @@
-export const FETCH_TX = 'FETCH_TX';
+export const FETCH_TX_REQUEST = 'FETCH_TX_REQUEST';
 export const FETCH_TX_SUCCESS = 'FETCH_TX_SUCCESS';
 export const FETCH_TX_FAILURE = 'FETCH_TX_FAILURE';
 
 export const fetchTx = function (last) {
   return {
-    type: FETCH_TX,
+    type: FETCH_TX_REQUEST,
     last: last,
   }
 };
