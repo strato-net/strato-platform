@@ -33,7 +33,6 @@ describe('drop table in cirrus', function () {
     const compileResults = yield rest.compileSearch(searchableArray, contractName, contractFilename);
     const queryResult = yield rest.waitQuery(`${contractName}?address=eq.${contract.address}`, 1);
     assert.equal(constructorArgs._storedData, queryResult[0].storedData, 'storedData should be the same value as the constructorArgs');
-    console.log('==========================================================',changedContractFilename)
     const changedContract = yield rest.uploadContract(adminUser, contractName, changedContractFilename, changedConstructorArgs);
     const compileResultsC = yield rest.compileSearch(searchableArray, contractName, changedContractFilename);
     const queryResultC = yield rest.waitQuery(`${contractName}?address=eq.${changedContract.address}`, 1);
