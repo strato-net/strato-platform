@@ -37,7 +37,7 @@ class CreateContract extends Component {
   }
 
   submit = (values) => {
-    const toAddress = this.state.form.userSelected ? values.toAddress : values.contractAddress
+    const toAddress = this.state.form.userSelected ? values.toAddress : values.address
     const payload = {
       from: values.from,
       fromAddress: values.fromAddress,
@@ -192,7 +192,7 @@ class CreateContract extends Component {
                     component="input"
                     type="radio"
                     value={1}
-                    label='Contract'
+                    label='Address'
                     checked={!this.state.form.userSelected}
                     onClick={
                       () => {
@@ -201,25 +201,25 @@ class CreateContract extends Component {
                         });
                       }
                     }
-                  /> Contract
+                  /> Address
                 </div>
               </div>
 
               {!this.state.form.userSelected && <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
-                    Contract Address
+                    Address
                   </label>
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <Field
                     id="input-b"
                     className="form-width pt-input"
-                    placeholder="Contract address"
-                    name="contractAddress"
+                    placeholder="address"
+                    name="address"
                     component="input"
                     dir="auto"
-                    title="Contract address"
+                    title="address"
                     required
                   />
                 </div>
