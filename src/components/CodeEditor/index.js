@@ -12,6 +12,7 @@ class CodeEditor extends Component {
         super(props);
         this.state = {
             code: undefined,
+            enableCreateContract:false
         }
     }
 
@@ -27,6 +28,7 @@ class CodeEditor extends Component {
                 vs: 'https://as.alipayobjects.com/g/cicada/monaco-editor-mirror/0.6.1/min/vs'
             }
         };
+       
         return (
             <div className="container-fluid">
                 <div className="row pt-dark">
@@ -45,7 +47,7 @@ class CodeEditor extends Component {
                                       );
                                 }} className="pt-intent-primary"
                                     text="Compile" />
-                                <CreateContract style={{display: 'inline-block'}} textFromEditor={this.state.code} sourceFromEditor={this.props.codeEditorData.response&&this.props.codeEditorData.response.src}/>
+                                <CreateContract enableCreateContract={this.state.enableCreateContract} style={{display: 'inline-block'}} textFromEditor={this.state.code} sourceFromEditor={this.props.codeEditorData.response&&this.props.codeEditorData.response.src}/>
                             </div>
                         </div>
                     </div>
@@ -57,7 +59,7 @@ class CodeEditor extends Component {
                             defaultValue={code}
                             requireConfig={requireConfig}
                             editorWillMount={this.editorWillMount}
-                            onChange={(value,e)=>this.setState({code:value})}
+                            onChange={(value,e)=>this.setState({code:value,enableCreateContract:false})}
                         />
                     </div>
                     Result:

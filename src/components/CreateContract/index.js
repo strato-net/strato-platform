@@ -90,7 +90,7 @@ class CreateContract extends Component {
   };
 
   submit = (values) => {
-    if (!this.props.createDisabled || this.props.sourceFromEditor) {
+    if (!this.props.createDisabled ) {
 
       const args = {};
       const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
@@ -176,8 +176,11 @@ class CreateContract extends Component {
         <Button onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
-        }} className="pt-intent-primary pt-icon-add"
-                text="Create Contract"/>
+        }}
+          className="pt-intent-primary pt-icon-add"
+          text="Create Contract"
+          disabled={(this.props.enableCreateContract!=undefined &&!this.props.enableCreateContract)?true:false}
+           />
         <form>
           <Dialog
             iconName="inbox"
@@ -358,7 +361,7 @@ class CreateContract extends Component {
                   this.props.contractCloseModal()
                 }}/>
                 <Button
-                  className={this.props.createDisabled || this.props.sourceFromEditor ? "pt-disabled" : "pt-intent-primary"}
+                  className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                   onClick={handleSubmit(this.submit)}
                   disabled={pristine || submitting}
                   text="Create Contract"
