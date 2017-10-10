@@ -20,7 +20,6 @@ const validate = (values) => {
     if(values.radio === "0" && !values.toAddress ) {
         errors.value = "Please select address"
     }
-
     if (values.radio === "1" && !values.address) {
         errors.value = "Please enter address"
     }

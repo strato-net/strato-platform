@@ -1,6 +1,6 @@
 export const FETCH_CONTRACTS = 'FETCH_CONTRACTS';
-export const FETCH_CONTRACTS_SUCCESS = 'FETCH_CONTRACTS_SUCCESS';
-export const FETCH_CONTRACTS_FAILURE = 'FETCH_CONTRACTS_FAILURE';
+export const FETCH_CONTRACTS_SUCCESSFUL = 'FETCH_CONTRACTS_SUCCESSFUL';
+export const FETCH_CONTRACTS_FAILED = 'FETCH_CONTRACTS_FAILED';
 export const CHANGE_CONTRACT_FILTER = 'CHANGE_CONTRACT_FILTER';
 export const TOGGLE_COLLAPSE_TABLE = 'TOGGLE_COLLAPSE_TABLE';
 
@@ -12,14 +12,14 @@ export const fetchContracts = function () {
 
 export const fetchContractsSuccess = function (contracts) {
   return {
-    type: FETCH_CONTRACTS_SUCCESS,
+    type: FETCH_CONTRACTS_SUCCESSFUL,
     contracts: contracts
   }
 };
 
 export const fetchContractsFailure = function (error) {
   return {
-    type: FETCH_CONTRACTS_FAILURE,
+    type: FETCH_CONTRACTS_FAILED,
     error: error,
   }
 };

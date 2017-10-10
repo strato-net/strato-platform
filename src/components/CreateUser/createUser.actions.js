@@ -1,6 +1,6 @@
 export const OPEN_OVERLAY = "BID_OPEN_MODAL";
 export const CLOSE_OVERLAY = "BID_CLOSE_MODAL";
-export const CREATE_USER = "CREATE_USER";
+export const CREATE_USER_REQUEST = "CREATE_USER_REQUEST";
 export const CREATE_USER_SUCCESS = "CREATE_USER_SUCCESS";
 export const CREATE_USER_FAILURE = "CREATE_USER_FAILURE";
 
@@ -20,7 +20,7 @@ export const closeOverlay = function() {
 
 export const createUser = function(username, password) {
   return {
-    type: CREATE_USER,
+    type: CREATE_USER_REQUEST,
     username,
     password,
     spinning: true,
