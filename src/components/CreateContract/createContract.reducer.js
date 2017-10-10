@@ -90,11 +90,13 @@ const reducer = function (state = initialState, action) {
         createDisabled: true,
       };
     case COMPILE_CONTRACT_SUCCESS:
+    let contracts = action.response && action.response.src && Object.keys(action.response.src);
       return {
         ...state,
         isOpen: true,
         abi: action.response,
         createDisabled: false,
+        contractName: contracts && contracts[0]
       };
     default:
       return state;

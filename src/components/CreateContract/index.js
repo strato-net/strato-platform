@@ -26,7 +26,7 @@ class CreateContract extends Component {
   onDrop = (acceptedFiles, rejectedFiles) => {
     this.handleFileUpload(acceptedFiles);
   }
-
+  
   renderDropzoneInput = (field) => {
     const files = field.input.value;
     return (
@@ -91,9 +91,8 @@ class CreateContract extends Component {
 
   handleContractSearchabilityChange = (e) => {
     if (this.props.contract.length) {
-      const contractNameByFileName = this.props.filename.substring(0, this.props.filename.indexOf('.'))
       this.props.compileContract(
-        contractNameByFileName,
+        this.props.contractName,
         this.props.contract,
         this.props.searchable
       );
@@ -139,49 +138,55 @@ class CreateContract extends Component {
     this.props.fetchAccounts();
   }
 
+  compilation() {
+    const src = this.props.abi === undefined ? undefined : this.props.abi.src;
+    
+    if (src === undefined) {
+      return (<tr>
+        <td colSpan={3}>
+          <div className="text-center">Upload Contract</div>
+        </td>
+      </tr>);
+    } else {
+      let contract = src[this.props.contractName];
+      if (contract && contract['constr'] !== undefined) {
+        return Object.getOwnPropertyNames(contract['constr']).map((arg, i) => {
+          return (
+            <tr key={'arg' + i}>
+              <td>{arg}</td>
+              <td>{contract.constr[arg].type}</td>
+              <td>
+                <Field
+                  id="input-b"
+                  className="pt-input"
+                  component="input"
+                  name={arg}
+                  title="Enter value"
+                  type="text"
+                  dir="auto"
+                  required
+                />
+              </td>
+            </tr>
+          );
+        });
+      } else {
+        return (<tr>
+          <td colSpan={3}>
+            <div className="text-center">No Data</div>
+          </td>
+        </tr>)
+      }
+    }
+  }
+
   render() {
     const {handleSubmit, pristine, submitting} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
     const contracts = this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : null;
-
-    const src = this.props.abi === undefined ? undefined : this.props.abi.src;
-
-    let args = src === undefined ?
-      <tr>
-        <td colSpan={3}>
-          <div className="text-center">Upload Contract</div>
-        </td>
-      </tr> :
-
-      // eslint-disable-next-line
-      (Object.values(src).map(val => {
-        if (val.constr !== undefined) {
-          return Object.getOwnPropertyNames(val.constr).map((arg, i) => {
-            return (
-              <tr key={'arg' + i}>
-                <td>{arg}</td>
-                <td>{val.constr[arg].type}</td>
-                <td>
-                  <Field
-                    id="input-b"
-                    className="pt-input"
-                    component="input"
-                    name={arg}
-                    title="Enter value"
-                    type="text"
-                    dir="auto"
-                    required
-                  />
-                </td>
-              </tr>
-            );
-          });
-        }
-      }));
 
     return (
       <div className="smd-pad-16">
@@ -327,7 +332,6 @@ class CreateContract extends Component {
                         name="contractName"
                         onChange={this.handleContractNameChange}
                       >
-                        <option />
                         {
                           contracts.map((value, index) => {
                             return (
@@ -357,7 +361,7 @@ class CreateContract extends Component {
                     </tr>
                     </thead>
                     <tbody>
-                    {args}
+                    {this.compilation()}
                     </tbody>
                   </table>
                 </div>
