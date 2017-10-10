@@ -89,6 +89,17 @@ class CreateContract extends Component {
     reader.readAsText(contract);
   };
 
+  handleContractSearchabilityChange = (e) => {
+    if (this.props.contract.length) {
+      const contractNameByFileName = this.props.filename.substring(0, this.props.filename.indexOf('.'))
+      this.props.compileContract(
+        contractNameByFileName,
+        this.props.contract,
+        this.props.searchable
+      );
+    }
+  };
+
   submit = (values) => {
     if (!this.props.createDisabled) {
 
@@ -178,7 +189,7 @@ class CreateContract extends Component {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
         }} className="pt-intent-primary pt-icon-add"
-                text="Create Contract"/>
+                text="Create Contract" id="tour-create-contract-button"/>
         <form>
           <Dialog
             iconName="inbox"
@@ -276,6 +287,7 @@ class CreateContract extends Component {
                       component="input"
                       dir="auto"
                       title="Searchable"
+                      onClick={this.handleContractSearchabilityChange}
                       required
                     />
                   <span className="pt-control-indicator"></span>

@@ -27,6 +27,7 @@ import contractQueryReducer from './components/ContractQuery/contractQuery.reduc
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import transactionsReducer from './components/TransactionList/transactionList.reducer';
+import tourReducer from './components/Tour/tour.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendEtherReducer from './components/Accounts/components/SendEther/sendEther.reducer';
 
@@ -39,7 +40,8 @@ import watchFetchAccounts from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
 import {
   watchFetchState,
-  watchFetchCirrusContracts
+  watchFetchCirrusContracts,
+  watchAccount
 } from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
 import {
@@ -78,7 +80,8 @@ const rootReducer = combineReducers({
   nodes: nodeCardReducer,
   transactions: transactionsReducer,
   queryEngine: queryEngineReducer,
-  sendEther: sendEtherReducer
+  sendEther: sendEtherReducer,
+  tour: tourReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -99,7 +102,8 @@ const rootSaga = function* startForeman() {
         fork(watchExecuteQuery),
         fork(watchQueryCirrus),
         fork(watchQueryCirrusVars),
-        fork(watchSendEther)
+        fork(watchSendEther),
+        fork(watchAccount)
     ]
 };
 

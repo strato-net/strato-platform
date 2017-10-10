@@ -6,15 +6,19 @@ import {
 import {
   FETCH_STATE,
   FETCH_CIRRUS_INSTANCES,
+  FETCH_ACCOUNT_REQUEST,
   fetchStateSuccess,
   fetchStateFailure,
   fetchCirrusInstancesSuccess,
-  fetchCirrusInstancesFailure
+  fetchCirrusInstancesFailure,
+  fetchAccountSuccess,
+  fetchAccountFailure
 } from './contractCard.actions';
 import { env } from '../../../../env.js'
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/state";
 const cirrusUrl = env.CIRRUS_URL + '/:contractName'
+const accountUrl = env.STRATO_URL + '/account?address=:address'
 
 function getState(contractName, contractAddress) {
   return fetch(
@@ -53,6 +57,22 @@ function getCirrusInstances(contractName){
     });
 }
 
+function getAccount(address) {
+  return fetch(
+    accountUrl.replace(":address", address),
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      },
+    })
+    .then(function(response) {
+      return response.json();
+    }).catch(function(error){
+      throw error;
+    });
+}
+
 function* fetchState(action) {
   try {
     let response = yield call(getState, action.name, action.address);
@@ -73,10 +93,24 @@ function* fetchCirrusInstances(action) {
   }
 }
 
+function* fetchAccount(action) {
+  try {
+    let response = yield call(getAccount, action.address);
+    yield put(fetchAccountSuccess(action.name, action.address, response));
+  }
+  catch(err) {
+    yield put(fetchAccountFailure(action.name, action.address, err));
+  }
+}
+
 export function* watchFetchCirrusContracts() {
   yield takeEvery(FETCH_CIRRUS_INSTANCES, fetchCirrusInstances);
 }
 
 export function* watchFetchState() {
   yield takeEvery(FETCH_STATE, fetchState);
+}
+
+export function* watchAccount() {
+  yield takeEvery(FETCH_ACCOUNT_REQUEST, fetchAccount);
 }
