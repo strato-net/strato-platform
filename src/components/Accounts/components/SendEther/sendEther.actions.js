@@ -1,4 +1,4 @@
-export const SEND_ETHER = "SEND_ETHER";
+export const SEND_ETHER_REQUEST = "SEND_ETHER_REQUEST";
 export const SEND_ETHER_SUCCESS = "SEND_ETHER_SUCCESS";
 export const SEND_ETHER_FAILURE = "SEND_ETHER_FAILURE";
 export const SEND_ETHER_OPEN_MODAL = "SEND_ETHER_OPEN_MODAL";
@@ -9,7 +9,7 @@ export const TO_USERNAME_CHANGE = 'TO_USERNAME_CHANGE';
 export const sendEther = function(payload) {
   return {
     ...payload,
-    type : SEND_ETHER,
+    type : SEND_ETHER_REQUEST,
   }
 };
 

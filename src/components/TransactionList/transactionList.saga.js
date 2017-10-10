@@ -4,7 +4,7 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  FETCH_TX,
+  FETCH_TX_REQUEST,
   fetchTxSuccess,
   fetchTxFailure
 } from './transactionList.actions';
@@ -44,5 +44,5 @@ function* fetchTx(action) {
 }
 
 export default function* watchFetchTx() {
-  yield takeEvery(FETCH_TX, fetchTx);
+  yield takeEvery(FETCH_TX_REQUEST, fetchTx);
 }

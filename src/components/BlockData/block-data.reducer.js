@@ -1,5 +1,5 @@
 import {
-  FETCH_BLOCK_DATA,
+  FETCH_BLOCK_DATA_REQUEST,
   FETCH_BLOCK_DATA_SUCCESS,
   FETCH_BLOCK_DATA_FAILURE,
 } from './block-data.actions';
@@ -11,7 +11,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_BLOCK_DATA:
+    case FETCH_BLOCK_DATA_REQUEST:
       return {
         blockData: state.blockData,
         error: null,

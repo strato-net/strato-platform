@@ -4,10 +4,10 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  CREATE_CONTRACT,
+  CREATE_CONTRACT_REQUEST,
   createContractSuccess,
   createContractFailure,
-  COMPILE_CONTRACT,
+  COMPILE_CONTRACT_REQUEST,
   compileContractSuccess,
   compileContractFailure
 } from './createContract.actions';
@@ -16,6 +16,7 @@ import {
 } from '../Contracts/contracts.actions';
 import { stopSubmit } from 'redux-form'
 import { CREATE_CONTRACT_FORM } from './'
+import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contractCard.actions'
 import { env } from '../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/contract"
@@ -105,6 +106,7 @@ function* createContract(action) {
       );
     yield put(createContractSuccess(response));
     yield put(fetchContracts());
+    yield put(fetchCirrusInstances(action.payload.contract));
   }
   catch (err) {
     yield put(createContractFailure(err));
@@ -124,9 +126,9 @@ function* compileContract(action) {
 }
 
 export function* watchCompileContract() {
-  yield takeLatest(COMPILE_CONTRACT, compileContract);
+  yield takeLatest(COMPILE_CONTRACT_REQUEST, compileContract);
 }
 
 export default function* watchCreateContract() {
-  yield takeLatest(CREATE_CONTRACT, createContract);
+  yield takeLatest(CREATE_CONTRACT_REQUEST, createContract);
 }

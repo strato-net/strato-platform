@@ -99,7 +99,7 @@ class TransactionTable extends Component {
         <div className="col-sm-12">
           <form onSubmit={handleSubmit(this.updateQuery)}>
             <div className="pt-control-group smd-full-width">
-              <div className="pt-select">
+              <div className="pt-select" id="tour-query-type">
                 <Field
                   type="select"
                   component="select"

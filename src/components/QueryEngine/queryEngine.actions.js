@@ -1,5 +1,5 @@
 export const UPDATE_QUERY = 'UPDATE_QUERY';
-export const EXECUTE_QUERY = 'EXECUTE_QUERY';
+export const EXECUTE_QUERY_REQUEST = 'EXECUTE_QUERY_REQUEST';
 export const EXECUTE_QUERY_SUCCESS = 'EXECUTE_QUERY_SUCCESS';
 export const EXECUTE_QUERY_FAILURE = 'EXECUTE_QUERY_FAILURE';
 export const CLEAR_QUERY = 'CLEAR_QUERY';
@@ -22,7 +22,7 @@ export const removeQuery = function(queryType) {
 
 export const executeQuery = function(resourceType, query) {
   return {
-    type: EXECUTE_QUERY,
+    type: EXECUTE_QUERY_REQUEST,
     resourceType: resourceType,
     query: query
   }
