@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import {
   sendEtherOpenModal,
   sendEtherCloseModal,
@@ -6,13 +6,14 @@ import {
   fromUsernameChange,
   toUsernameChange
 } from './sendEther.actions';
-import {fetchAccounts} from '../../accounts.actions';
-import {Button, Dialog} from '@blueprintjs/core';
-import {Field, reduxForm, formValueSelector} from 'redux-form';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import { fetchAccounts } from '../../accounts.actions';
+import { Button, Dialog } from '@blueprintjs/core';
+import { Field, reduxForm, formValueSelector } from 'redux-form';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import ValueInput from '../../../ValueInput';
+import validate from './validate';
 
 // TODO: use solc instead of extabi for compile
 
@@ -26,18 +27,27 @@ class CreateContract extends Component {
   //   this.props.toUsernameChange(e.target.value);
   // };
 
+  constructor(props) {
+    super(props)
+    this.state = {
+      form: {
+        userSelected: true
+      }
+    }
+  }
+
   submit = (values) => {
-      const payload = {
-        from: values.from,
-        fromAddress: values.fromAddress,
-        password: values.password,
-        to: values.to,
-        toAddress: values.toAddress,
-        value: values.value
-      };
-      this.props.sendEther(payload);
-      mixpanelWrapper.track('send_ether_submit_click_successful');
-      this.props.reset();
+    const toAddress = this.state.form.userSelected ? values.toAddress : values.address
+    const payload = {
+      from: values.from,
+      fromAddress: values.fromAddress,
+      password: values.password,
+      toAddress: toAddress,
+      value: values.value
+    };
+    this.props.sendEther(payload);
+    mixpanelWrapper.track('send_ether_submit_click_successful');
+    this.props.reset();
   };
 
   componentDidMount() {
@@ -52,7 +62,7 @@ class CreateContract extends Component {
   }
 
   render() {
-    const {handleSubmit, pristine, submitting} = this.props;
+    const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
 
     const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
@@ -69,7 +79,7 @@ class CreateContract extends Component {
           mixpanelWrapper.track("send_ether_open_click");
           this.props.sendEtherOpenModal()
         }} className="pt-intent-primary pt-icon-add"
-                text="Send Ether"/>
+          text="Send Ether" />
         <form>
           <Dialog
             iconName="inbox"
@@ -159,6 +169,63 @@ class CreateContract extends Component {
               </div>
 
               <div className="row">
+                <div className="col-sm-4 text-right" />
+                <div className="col-sm-8 smd-pad-4">
+                  <Field
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={0}
+                    label='User'
+                    checked={this.state.form.userSelected}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return { form: { userSelected: !prevState.form.userSelected } };
+                        });
+                      }
+                    }
+                  /> User
+                    <Field
+                    style={{ marginLeft: 25 }}
+                    name="radio"
+                    component="input"
+                    type="radio"
+                    value={1}
+                    label='Address'
+                    checked={!this.state.form.userSelected}
+                    onClick={
+                      () => {
+                        this.setState((prevState) => {
+                          return { form: { userSelected: !prevState.form.userSelected } };
+                        });
+                      }
+                    }
+                  /> Address
+                </div>
+              </div>
+
+              {!this.state.form.userSelected && <div className="row">
+                <div className="col-sm-4 text-right">
+                  <label className="pt-label smd-pad-4">
+                    Address
+                  </label>
+                </div>
+                <div className="col-sm-8 smd-pad-4">
+                  <Field
+                    id="input-b"
+                    className="form-width pt-input"
+                    placeholder="address"
+                    name="address"
+                    component="input"
+                    dir="auto"
+                    title="address"
+                    required
+                  />
+                </div>
+              </div>}
+
+              {this.state.form.userSelected && <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     To
@@ -184,8 +251,9 @@ class CreateContract extends Component {
                     </Field>
                   </div>
                 </div>
-              </div>
-              <div className="row">
+              </div>}
+
+              {this.state.form.userSelected && <div className="row">
                 <div className="col-sm-4 text-right">
                   <label className="pt-label smd-pad-4">
                     To Address
@@ -212,7 +280,7 @@ class CreateContract extends Component {
                     </Field>
                   </div>
                 </div>
-              </div>
+              </div>}
 
               <div className="row">
                 <div className="col-sm-4 text-right">
@@ -236,7 +304,7 @@ class CreateContract extends Component {
                   <hr />
                   <h5>Results</h5>
                   <pre className="smd-scrollable">
-                    {this.props.result} <br/>
+                    {this.props.result} <br />
                   </pre>
                 </div>
               </div>
@@ -248,11 +316,11 @@ class CreateContract extends Component {
                   mixpanelWrapper.track("send_ether_cancel");
                   this.props.sendEtherCloseModal()
                   this.props.fetchAccounts()
-                }}/>
+                }} />
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                   onClick={handleSubmit(this.submit)}
-                  disabled={pristine || submitting}
+                  disabled={pristine || submitting || !valid}
                   text="Send Ether"
                 />
               </div>
@@ -276,7 +344,7 @@ function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({form: 'send-ether'})(CreateContract);
+const formed = reduxForm({ form: 'send-ether', validate })(CreateContract);
 const connected = connect(mapStateToProps, {
   sendEtherOpenModal,
   sendEtherCloseModal,
