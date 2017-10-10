@@ -71,7 +71,6 @@ export const compileContract = function(name,contract, searchable) {
     name: name,
     contract: contract,
     searchable: searchable,
-    compileSuccess: false,
     isOpen: true,
   }
 }
@@ -80,7 +79,6 @@ export const compileContractSuccess = function(response) {
   return {
     type: COMPILE_CONTRACT_SUCCESS,
     response: response,
-    compileSuccess: false,
     isOpen: true,
   }
 }
@@ -89,7 +87,6 @@ export const compileContractFailure = function(error) {
   return {
     type: COMPILE_CONTRACT_FAILURE,
     error: error,
-    compileSuccess: false,
     isOpen: false,
   }
 }

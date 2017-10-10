@@ -13,13 +13,12 @@ import {
 
 const initialState = {
   isOpen: false,
-  compileSuccess: false,
+  contractCompileErrors: undefined,
   abi: undefined,
   response: "Status: Upload Contract",
   username: '',
   contract: '',
   filename: undefined,
-  createDisabled: true,
 };
 
 
@@ -32,23 +31,21 @@ const reducer = function (state = initialState, action) {
         response: "Status: Upload Contract",
         contract: '',
         filename: '',
-        createDisabled: true,
+        // createDisabled: true,
       };
+    case CONTRACT_CLOSE_MODAL:
+      return initialState;
     case USERNAME_FORM_CHANGE:
       return {
         ...state,
         username: action.name
       };
-    case CONTRACT_CLOSE_MODAL:
-        return {
-          ...state,
-          isOpen: false
-        };
     case CONTRACT_FORM_CHANGE:
       return {
         ...state,
         contract: action.contract,
         filename: action.name,
+        contractCompileErrors: undefined,
       };
     case CREATE_CONTRACT_REQUEST:
       return {
@@ -74,7 +71,6 @@ const reducer = function (state = initialState, action) {
         ...state,
         isOpen: true,
         response: "Uploading Contract...",
-        createDisabled: true
       };
     case COMPILE_CONTRACT_FAILURE:
       return {
@@ -82,14 +78,14 @@ const reducer = function (state = initialState, action) {
         isOpen: true,
         response: "Error Uploading Contract...: " + action.error,
         error: action.error,
-        createDisabled: true,
+        contractCompileErrors: `Unable to compile contract: ${action.error}`,
       };
     case COMPILE_CONTRACT_SUCCESS:
       return {
         ...state,
         isOpen: true,
         abi: action.response,
-        createDisabled: false,
+        contractCompileErrors: undefined,        
       };
     default:
       return state;
