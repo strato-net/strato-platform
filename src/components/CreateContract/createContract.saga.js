@@ -54,11 +54,17 @@ function compileContractApiCall(contractName,source, s) {
               },
               body: JSON.stringify([{"contractName": contractName, "source": source, "searchable": searchable}])
           })
-          .then(function (response) {
-              return response.json()
+          .then(function(res) {
+            if (res.ok) {
+              return res.json();
+            } else {
+              return res.text().then(function(value) {
+                  throw value;
+                });
+            }
           })
-          .catch(function (error) {
-              throw error;
+          .catch(function(error) {
+            throw error;
           });
   }
 
@@ -72,8 +78,14 @@ function compileContractApiCall(contractName,source, s) {
         body:
           "src="+encodeURIComponent(source)
         })
-      .then(function(response) {
-        return response.json();
+      .then(function(res) {
+        if (res.ok) {
+          return res.json();
+        } else {
+          return res.text().then(function(value) {
+              throw value;
+            });
+        }
       })
       .catch(function(error) {
         throw error;
