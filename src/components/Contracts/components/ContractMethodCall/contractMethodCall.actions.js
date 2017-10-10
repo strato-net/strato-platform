@@ -1,9 +1,9 @@
 export const METHOD_CALL_OPEN_MODAL = 'METHOD_CALL_OPEN_MODAL';
 export const METHOD_CALL_CLOSE_MODAL = 'METHOD_CALL_CLOSE_MODAL';
-export const METHOD_CALL_FETCH_ARGS = 'METHOD_CALL_FETCH_ARGS';
+export const METHOD_CALL_FETCH_ARGS_REQUEST = 'METHOD_CALL_FETCH_ARGS_REQUEST';
 export const METHOD_CALL_FETCH_ARGS_SUCCESS = 'METHOD_CALL_FETCH_ARGS_SUCCESS';
 export const METHOD_CALL_FETCH_ARGS_FAILURE = 'METHOD_CALL_FETCH_ARGS_FAILURE';
-export const METHOD_CALL = 'METHOD_CALL';
+export const METHOD_CALL_REQUEST = 'METHOD_CALL_REQUEST';
 export const METHOD_CALL_SUCCESS = 'METHOD_CALL_SUCCESS';
 export const METHOD_CALL_FAILURE = 'METHOD_CALL_FAILURE';
 
@@ -23,7 +23,7 @@ export const methodCallCloseModal = function(key) {
 
 export const methodCallFetchArgs = function(name, address, symbol, key) {
   return {
-    type: METHOD_CALL_FETCH_ARGS,
+    type: METHOD_CALL_FETCH_ARGS_REQUEST,
     name: name,
     address: address,
     symbol: symbol,
@@ -49,7 +49,7 @@ export const methodCallFetchArgsFailure = function(key, error) {
 
 export const methodCall = function(key, payload) {
   return {
-    type: METHOD_CALL,
+    type: METHOD_CALL_REQUEST,
     payload: payload,
     key: key
   };

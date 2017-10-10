@@ -1,5 +1,5 @@
 import {
-  FETCH_ACCOUNTS,
+  FETCH_ACCOUNTS_REQUEST,
   FETCH_ACCOUNTS_SUCCESS,
   FETCH_ACCOUNTS_FAILURE,
   CHANGE_ACCOUNT_FILTER,
@@ -17,7 +17,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_ACCOUNTS:
+    case FETCH_ACCOUNTS_REQUEST:
       return {
         accounts: state.accounts,
         filter: state.filter,

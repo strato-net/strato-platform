@@ -4,8 +4,8 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  FETCH_STATE,
-  FETCH_CIRRUS_INSTANCES,
+  FETCH_STATE_REQUEST,
+  FETCH_CIRRUS_INSTANCES_REQUEST,
   FETCH_ACCOUNT_REQUEST,
   fetchStateSuccess,
   fetchStateFailure,
@@ -104,11 +104,11 @@ function* fetchAccount(action) {
 }
 
 export function* watchFetchCirrusContracts() {
-  yield takeEvery(FETCH_CIRRUS_INSTANCES, fetchCirrusInstances);
+  yield takeEvery(FETCH_CIRRUS_INSTANCES_REQUEST, fetchCirrusInstances);
 }
 
 export function* watchFetchState() {
-  yield takeEvery(FETCH_STATE, fetchState);
+  yield takeEvery(FETCH_STATE_REQUEST, fetchState);
 }
 
 export function* watchAccount() {
