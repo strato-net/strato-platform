@@ -8,11 +8,34 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
+import { endTour } from '../Tour/tour.actions';
+import { callAfterTour } from '../Tour/tour.helpers';
+
+import Tour from '../Tour';
+
 import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
+
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
+
+const tourSteps = [
+  {
+    title: 'Welcome to STRATO!',
+    text: '<strong>STRATO</strong> makes it easy to create and manage your custom blockchains.<br><br><strong>Ready to get started?</strong>',
+    selector: '#tour-welcome',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  },
+  {
+    title: 'Adding Users',
+    text: 'Before you write a Smart Contract, you must add some users that your Smart Contract will interact with.<br><br>For example, if you are splitting the bill for a monthly apartment rental, you might add <i>Roommate 1</i>, <i>Roommate 2</i>, and <i> Roommate 3.</i>',
+    selector: '#accounts',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  },
+];
 
 class Dashboard extends Component {
 
@@ -110,8 +133,13 @@ class Dashboard extends Component {
     const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
     const userCount = Object.getOwnPropertyNames(this.props.accounts).length;
     const contractCount = Object.getOwnPropertyNames(this.props.contracts).length;
+
     return (
-      <div className="container-fluid pt-dark">
+      <div className="container-fluid pt-dark" id="tour-welcome">
+        <Tour name="dashboard" callback={callAfterTour('#accounts', () => {
+          this.props.history.push('accounts');
+          this.props.endTour('dashboard');
+        })} steps={ tourSteps }/>
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
@@ -195,7 +223,7 @@ function mapStateToProps(state) {
     blockData: state.blockData.blockData,
     nodes: state.nodes.nodes,
     accounts: state.accounts.accounts,
-    contracts: state.contracts.contracts
+    contracts: state.contracts.contracts,
   };
 }
 
@@ -207,6 +235,7 @@ export default withRouter(
       fetchAccounts,
       fetchContracts,
       hideLoading
+      endTour,
     }
   )(Dashboard)
 );
