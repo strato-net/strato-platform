@@ -9,9 +9,9 @@ import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
 import { endTour } from '../Tour/tour.actions';
-import { callAfterTour } from '../Tour/tour.helpers';
+// import { callAfterTour } from '../Tour/tour.helpers';
 
-import Tour from '../Tour';
+// import Tour from '../Tour';
 
 import { env } from '../../env';
 import BarGraph from '../BarGraph';
@@ -20,7 +20,7 @@ import PieChart from '../PieChart';
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
 
-const tourSteps = [
+/*const tourSteps = [
   {
     title: 'Welcome to STRATO!',
     text: '<strong>STRATO</strong> makes it easy to create and manage your custom blockchains.<br><br><strong>Ready to get started?</strong>',
@@ -35,7 +35,7 @@ const tourSteps = [
     position: 'bottom', type: 'hover',
     isFixed: true,
   },
-];
+];*/
 
 class Dashboard extends Component {
 
@@ -52,17 +52,13 @@ class Dashboard extends Component {
   }
 
   startPoll() {
-    const hideLoading = this.props.hideLoading
     const dashboardFetchStatus = this.props.fetchBlockData;
     const fetchAccounts = this.props.fetchAccounts;
     const fetchContracts = this.props.fetchContracts;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
-      hideLoading()
       fetchAccounts();
-      hideLoading()
       fetchContracts();
-      hideLoading()
     }, env.POLLING_FREQUENCY);
   }
 
@@ -136,10 +132,12 @@ class Dashboard extends Component {
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        <Tour name="dashboard" callback={callAfterTour('#accounts', () => {
-          this.props.history.push('accounts');
-          this.props.endTour('dashboard');
-        })} steps={ tourSteps }/>
+        {/*
+          <Tour name="dashboard" callback={callAfterTour('#accounts', () => {
+            this.props.history.push('accounts');
+            this.props.endTour('dashboard');
+          })} steps={ tourSteps }/>
+        */}
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
@@ -234,7 +232,7 @@ export default withRouter(
       fetchBlockData,
       fetchAccounts,
       fetchContracts,
-      hideLoading
+      hideLoading,
       endTour,
     }
   )(Dashboard)

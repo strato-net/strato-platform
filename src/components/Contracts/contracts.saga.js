@@ -4,7 +4,7 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  FETCH_CONTRACTS_REQUEST,
+  FETCH_CONTRACTS,
   fetchContractsSuccess,
   fetchContractsFailure
 } from './contracts.actions';
@@ -41,5 +41,5 @@ function* fetchContracts(action) {
 }
 
 export default function* watchFetchContracts() {
-  yield takeEvery(FETCH_CONTRACTS_REQUEST, fetchContracts);
+  yield takeEvery(FETCH_CONTRACTS, fetchContracts);
 }

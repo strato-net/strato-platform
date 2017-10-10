@@ -1,12 +1,12 @@
 import {
-  FETCH_ACCOUNTS_REQUEST,
-  FETCH_ACCOUNTS_SUCCESS,
-  FETCH_ACCOUNTS_FAILURE,
+  FETCH_ACCOUNTS,
+  FETCH_ACCOUNTS_SUCCESSFULL,
+  FETCH_ACCOUNTS_FAILED,
   CHANGE_ACCOUNT_FILTER,
-  FETCH_USER_ADDRESSES_SUCCESS,
-  FETCH_USER_ADDRESSES_FAILURE,
-  FETCH_ACCOUNT_DETAIL_SUCCESS,
-  FETCH_ACCOUNT_DETAIL_FAILURE
+  FETCH_USER_ADDRESSES_SUCCESSFUL,
+  FETCH_USER_ADDRESSES_FAILED,
+  FETCH_ACCOUNT_DETAIL_SUCCESSFULL,
+  FETCH_ACCOUNT_DETAIL_FAILED
 } from './accounts.actions';
 
 const initialState = {
@@ -17,13 +17,13 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_ACCOUNTS_REQUEST:
+    case FETCH_ACCOUNTS:
       return {
         accounts: state.accounts,
         filter: state.filter,
         error: null,
       };
-    case FETCH_ACCOUNTS_SUCCESS:
+    case FETCH_ACCOUNTS_SUCCESSFULL:
       const accounts = action.accounts.reduce(function(result, item){
         result[item] = {};
         return result;
@@ -33,7 +33,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: null,
       };
-    case FETCH_ACCOUNTS_FAILURE:
+    case FETCH_ACCOUNTS_FAILED:
       return {
         accounts: state.accounts,
         filter: state.filter,
@@ -45,7 +45,7 @@ const reducer = function (state = initialState, action) {
         filter: action.filter,
         error: state.error,
       }
-    case FETCH_USER_ADDRESSES_SUCCESS:
+    case FETCH_USER_ADDRESSES_SUCCESSFUL:
       const addresses = action.addresses.reduce(function(result, address){
         result[address] = {
           error: null
@@ -60,7 +60,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
-    case FETCH_USER_ADDRESSES_FAILURE:
+    case FETCH_USER_ADDRESSES_FAILED:
       return {
         accounts: {
           ...state.accounts,
@@ -71,7 +71,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
-    case FETCH_ACCOUNT_DETAIL_SUCCESS:
+    case FETCH_ACCOUNT_DETAIL_SUCCESSFULL:
       return {
         accounts: {
           ...state.accounts,
@@ -86,7 +86,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
-    case FETCH_ACCOUNT_DETAIL_FAILURE:
+    case FETCH_ACCOUNT_DETAIL_FAILED:
       return {
         accounts: {
           ...state.accounts,

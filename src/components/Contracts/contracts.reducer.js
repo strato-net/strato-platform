@@ -1,7 +1,7 @@
 import {
-  FETCH_CONTRACTS_REQUEST,
-  FETCH_CONTRACTS_SUCCESS,
-  FETCH_CONTRACTS_FAILURE,
+  FETCH_CONTRACTS,
+  FETCH_CONTRACTS_SUCCESSFUL,
+  FETCH_CONTRACTS_FAILED,
   CHANGE_CONTRACT_FILTER,
 } from './contracts.actions';
 import {
@@ -19,7 +19,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case FETCH_CONTRACTS_REQUEST:
+    case FETCH_CONTRACTS:
       return {
         contracts: state.contracts,
         filter: state.filter,
@@ -39,7 +39,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: null,
       };
-    case FETCH_CONTRACTS_SUCCESS:
+    case FETCH_CONTRACTS_SUCCESSFUL:
       const contractNames = Object.getOwnPropertyNames(action.contracts);
       const updatedContracts = {};
       contractNames.forEach((name) => {
@@ -79,7 +79,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error,
       };
-    case FETCH_CONTRACTS_FAILURE:
+    case FETCH_CONTRACTS_FAILED:
       return {
         contracts: state.contracts,
         filter: state.filter,

@@ -8,27 +8,27 @@ import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
 import {endTour} from '../Tour/tour.actions';
-import { callAfterTour } from '../Tour/tour.helpers';
+// import { callAfterTour } from '../Tour/tour.helpers';
 
-import Tour from '../Tour';
+// import Tour from '../Tour';
 
-const tourSteps = [
-/* {
-    title: 'Create User',
-    text: 'Create a user here',
-    selector: '#accounts-create-user-button',
-    position: 'bottom', type: 'hover',
-    isFixed: true,
-  }, ) */
-  {
-    title: 'Upload a Smart Contract',
-    text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your Smart Contract from within the STRATO dashboard.',
-   /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
-    selector: '#contracts',
-    position: 'bottom',
-    isFixed: true,
-  },
-];
+// const tourSteps = [
+// /* {
+//     title: 'Create User',
+//     text: 'Create a user here',
+//     selector: '#accounts-create-user-button',
+//     position: 'bottom', type: 'hover',
+//     isFixed: true,
+//   }, ) */
+//   {
+//     title: 'Upload a Smart Contract',
+//     text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your Smart Contract from within the STRATO dashboard.',
+//    /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
+//     selector: '#contracts',
+//     position: 'bottom',
+//     isFixed: true,
+//   },
+// ];
 
 class Accounts extends Component {
 
@@ -102,11 +102,13 @@ class Accounts extends Component {
 
     return (
       <div className="container-fluid pt-dark">
+        {/*
         <Tour name="accounts" steps={tourSteps} callback={ callAfterTour('#contracts', () => {
             this.props.history.push('contracts');
             this.props.endTour('accounts');
           })}
         />
+        */}
         <div className="row">
           <div className="col-sm-8 text-left">
             <h3>Accounts</h3>

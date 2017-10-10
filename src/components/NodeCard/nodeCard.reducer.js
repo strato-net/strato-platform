@@ -1,8 +1,8 @@
 import {
   FETCH_NODE_DETAIL_SUCCESS,
-  FETCH_NODE_PEERS_SUCCESS,
-  FETCH_NODE_PEERS_FAILURE,
-  FETCH_NODE_COINBASE_SUCCESS,
+  FETCH_NODE_PEERS_SUCCESSFUL,
+  FETCH_NODE_PEERS_FAILED,
+  FETCH_NODE_COINBASE_SUCCESSFUL,
 } from './nodeCard.actions';
 import { env } from '../../env';
 
@@ -27,7 +27,7 @@ const reducer = function (state = initialState, action) {
           }
         })
       }
-    case FETCH_NODE_PEERS_SUCCESS:
+    case FETCH_NODE_PEERS_SUCCESSFUL:
       return {
         nodes: state.nodes.map((node,index) => {
           if(index !== action.nodeIndex) {
@@ -41,7 +41,7 @@ const reducer = function (state = initialState, action) {
           }
         })
       }
-    case FETCH_NODE_PEERS_FAILURE:
+    case FETCH_NODE_PEERS_FAILED:
       return {
         nodes: state.nodes.map((node,index) => {
           if(index !== action.nodeIndex) {
@@ -54,7 +54,7 @@ const reducer = function (state = initialState, action) {
           }
         })
       }
-    case FETCH_NODE_COINBASE_SUCCESS:
+    case FETCH_NODE_COINBASE_SUCCESSFUL:
       return {
         nodes: state.nodes.map((node,index) => {
           if(index !== action.nodeIndex) {
