@@ -18,7 +18,7 @@ class App extends Component {
   render() {
     return (
       <div className="App" >
-        <LoadingBar style={{top: '0px', backgroundColor: '#5279c7', zIndex: 999}} />
+        <LoadingBar style={{top: '0px', backgroundColor: '#5279c7', zIndex: 999, height: '4px'}} />
         <MenuBar />
         <SideBar />
         <main id="outer-container">

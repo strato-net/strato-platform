@@ -16,7 +16,11 @@ import {
   fetchUserAddressesFailure,
   fetchAccountDetail,
   fetchAccountDetailSuccess,
-  fetchAccountDetailFailure
+  fetchAccountDetailFailure,
+  FAUCET_REQUEST,
+  FAUCET_SUCCESS,
+  faucetSuccess,
+  faucetFailure
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -24,6 +28,7 @@ import { hideLoading } from 'react-redux-loading-bar';
 const accountDataUrl = env.STRATO_URL + "/account?address=:address";
 const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
+const faucetUrl = env.STRATO_URL + "/faucet"
 
 function getAccountsApi() {
   return fetch(
@@ -78,6 +83,26 @@ function getAccountDetailApi(address) {
   });
 }
 
+function postFaucet(address) {
+  return fetch(
+    faucetUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `address=${address}`
+    }
+  )
+  .then(function(response) {
+    console.log(response);
+    return;
+  })
+  .catch(function(error) {
+    throw error;
+  })
+}
+
 function* getAccounts(action) {
   try {
     const response = yield call(getAccountsApi);
@@ -116,10 +141,22 @@ function* getAccountDetail(action) {
   }
 }
 
-export default function* watchFetchAccounts() {
+function* faucetAccount(action) {
+  try {
+    yield call(postFaucet, action.address);
+    yield put(faucetSuccess());
+  }
+  catch(err) {
+    yield put(faucetFailure(err))
+  }
+}
+
+export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
+    takeLatest(FAUCET_SUCCESS, getAccounts),
     takeEvery(FETCH_ACCOUNT_ADDRESS, getUserAddresses),
-    takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail)
+    takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail),
+    takeLatest(FAUCET_REQUEST, faucetAccount)
   ];
 }
