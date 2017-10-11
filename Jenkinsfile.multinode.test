@@ -1,0 +1,63 @@
+githubCredentials = [[$class: 'UsernamePasswordMultiBinding', usernameVariable: 'USR', passwordVariable: 'GITHUB_TOKEN', credentialsId: 'blockapps-cd-github']]
+ansiColor('xterm') {
+    node('hackathon1') {
+        withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+            stage('DeployNode0-Bootnode') {
+                  //withCredentials(githubCredentials) {
+                   withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                    sh '''#!/bin/bash -l
+                    docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                    docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+                    rm -rf silo strato-getting-started || true
+                    git config --global credential.helper store
+                    git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                    git clone https://github.com/blockapps/strato-getting-started
+                    cd strato-getting-started
+                    STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh -stable
+                    docker ps    
+                    '''
+                    }
+            }
+            }
+        }  
+        node('hackathon2') {
+        withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+            stage('DeployNode1') {
+                  //withCredentials(githubCredentials) {
+                   withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                    sh '''#!/bin/bash -l
+                    docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                    docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+                    rm -rf silo strato-getting-started || true
+                    git config --global credential.helper store
+                    git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                    git clone https://github.com/blockapps/strato-getting-started
+                    cd strato-getting-started
+                    STRATO_GS_MODE="1" NODE_HOST=hackathon-2.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh -stable
+                    docker ps    
+                    '''
+                    }
+            }
+            }
+        }  
+        node('hackathon3') {
+        withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+            stage('DeployNode2') {
+                  //withCredentials(githubCredentials) {
+                   withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                    sh '''#!/bin/bash -l
+                    docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                    docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+                    rm -rf silo strato-getting-started || true
+                    git config --global credential.helper store
+                    git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                    git clone https://github.com/blockapps/strato-getting-started
+                    cd strato-getting-started
+                    STRATO_GS_MODE="1" NODE_HOST=hackathon-3.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh -stable
+                    docker ps    
+                    '''
+                    }
+            }
+            }
+        }  
+}
