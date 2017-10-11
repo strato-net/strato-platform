@@ -35,23 +35,23 @@ const reducer = function (state = initialState, action) {
         contract: '',
         contractName: '',
         createDisabled: true,
-
         filename: '',
         // createDisabled: true,
       };
-    case CONTRACT_CLOSE_MODAL:
-      return initialState;
+
     case USERNAME_FORM_CHANGE:
       return {
         ...state,
         username: action.name
       };
-    // case CONTRACT_CLOSE_MODAL:
-    //     return {
-    //       ...state,
-    //       isOpen: false
-    //     };
-    case CONTRACT_NAME_CHANGE: 
+
+    case CONTRACT_CLOSE_MODAL:
+      return {
+        ...state,
+        isOpen: false
+      };
+
+    case CONTRACT_NAME_CHANGE:
       return {
         ...state,
         contractName: action.contractName
@@ -98,11 +98,14 @@ const reducer = function (state = initialState, action) {
         contractCompileErrors: `Unable to compile contract: ${action.error}`,
       };
     case COMPILE_CONTRACT_SUCCESS:
+      let contracts = action.response && action.response.src && Object.keys(action.response.src);
       return {
         ...state,
         isOpen: true,
         abi: action.response,
-        contractCompileErrors: undefined,        
+        createDisabled: false,
+        contractName: contracts && contracts[0],
+        contractCompileErrors: undefined,
       };
     default:
       return state;

@@ -4,7 +4,7 @@ import {
     call
   } from 'redux-saga/effects';
   import {
-    CODE_EDITOR_COMPILE,
+    CODE_EDITOR_COMPILE_REQUEST,
     compileCodeFromEditorSuccess,
     compileCodeFromEditorFailure
   } from './codeEditor.actions';
@@ -52,6 +52,6 @@ import {
   }
   
   export function* watchCompileSourceFromEditor() {
-    yield takeEvery(CODE_EDITOR_COMPILE, compileCodeFromEditor);
+    yield takeEvery(CODE_EDITOR_COMPILE_REQUEST, compileCodeFromEditor);
   }
  

@@ -1,4 +1,4 @@
-export const CODE_EDITOR_COMPILE = "CODE_EDITOR_COMPILE";
+export const CODE_EDITOR_COMPILE_REQUEST = "CODE_EDITOR_COMPILE_REQUEST";
 export const CODE_EDITOR_COMPILE_SUCCESS = "CODE_EDITOR_COMPILE_SUCCESS";
 export const CODE_EDITOR_COMPILE_FAILURE = "CODE_EDITOR_COMPILE_FAILURE";
 export const CODE_EDITOR_CHANGE_CREATEACTION = "CODE_EDITOR_CHANGE_CREATEACTION";
@@ -13,7 +13,7 @@ export const changeCreateActionState = function(value,sourceCode){
 
 export const compileCodeFromEditor = function(name, code, searchable) {
     return {
-      type: CODE_EDITOR_COMPILE,
+      type: CODE_EDITOR_COMPILE_REQUEST,
       name: name,
       code: code,
       searchable: searchable

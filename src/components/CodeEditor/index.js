@@ -8,10 +8,7 @@ import { compileCodeFromEditor, changeCreateActionState } from './codeEditor.act
 import CreateContract from '../CreateContract';
 
 class CodeEditor extends Component {
-    constructor(props) {
-        super(props);
-    }
-
+   
     editorWillMount = (monaco) => {
         console.log('Languagues:', monaco.languages.getLanguages())
     } 
@@ -28,11 +25,11 @@ class CodeEditor extends Component {
             <div className="container-fluid">
                 <div className="row pt-dark">
                     <div className="row">
-                        <div className="col-md-3 text-left">
+                        <div className="col-md-4 text-left">
                             <h3>Contract Editor</h3>
                         </div>
                         <div className="col-md-8 text-right smd-pad-8">
-                            <div className="smd-pad-4">
+                            <div className="smd-pad-8">
                                 <Button onClick={() => {
                                     mixpanelWrapper.track("compile_contract_code_click");
                                     this.props.compileCodeFromEditor(
@@ -42,14 +39,15 @@ class CodeEditor extends Component {
                                       );
                                 }} className="pt-intent-primary"
                                     text="Compile" />
-                                <CreateContract enableCreateContract={this.props.codeEditorData.enableCreateAction} style={{display: 'inline-block'}} textFromEditor={this.props.codeEditorData.sourceCode} sourceFromEditor={this.props.codeEditorData.response&&this.props.codeEditorData.response.src}/>
+                                <CreateContract contractNameFromEditor={this.props.codeEditorData.contractName} enableCreateContract={this.props.codeEditorData.enableCreateAction} textFromEditor={this.props.codeEditorData.sourceCode} sourceFromEditor={this.props.codeEditorData.response&&this.props.codeEditorData.response.src}/>
                             </div>
                         </div>
                     </div>
-                    <div className="row">
+                    <div className="row" style={{margin:20}}>
                         <MonacoEditor
-                            width={'80%'}
-                            height="200"
+                            className="col-md-4 text-center"
+                            width={'100%'}
+                            height="400"
                             language="solidity"
                             defaultValue={this.props.codeEditorData.sourceCode}
                             requireConfig={requireConfig}
@@ -59,9 +57,9 @@ class CodeEditor extends Component {
                             }}
                         />
                     </div>
-                    Result:
-                    <div className="row">
-                        {this.props.codeEditorData.codeCompileSuccess?'Contract compiled successfully': this.props.codeEditorData.response}
+                    <div style={{margin:20}}>
+                        Result:
+                        {this.props.codeEditorData.codeCompileSuccess?' Contract compiled successfully': ' '+this.props.codeEditorData.response}
                     </div>
                 </div>
 

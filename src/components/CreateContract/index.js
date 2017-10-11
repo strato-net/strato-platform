@@ -61,8 +61,9 @@ class CreateContract extends Component {
   }
 
   handleFileDrop = (files, dropZoneField) => {
-    this.props.touch('contract')
-    dropZoneField.input.onChange(files)
+
+    this.props.touch('contract');
+    dropZoneField.input.onChange(files);
     const contract = files[0];
 
     let reader = new FileReader();
@@ -91,11 +92,12 @@ class CreateContract extends Component {
   };
 
   handleContractSearchabilityChange = (e) => {
-    if (this.props.contract.length) {
-      const contractNameByFileName = this.props.filename.substring(0, this.props.filename.indexOf('.'))
+    const contractName = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName      
+    const source = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
+    if (source.length) {
       this.props.compileContract(
-        contractNameByFileName,
-        this.props.contract,
+        contractName,
+        source,
         this.props.searchable
       );
     }
@@ -103,6 +105,7 @@ class CreateContract extends Component {
 
   submit = (values) => {
       const args = {};
+      const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName      
       const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
       Object.values(abi).forEach(val => {
         if (val.constr !== undefined) {
@@ -115,7 +118,7 @@ class CreateContract extends Component {
       const fileText = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
 
       const payload = {
-        contract: this.props.contractName,
+        contract: contractname,
         username: values.username,
         address: values.address,
         password: values.password,
@@ -135,6 +138,48 @@ class CreateContract extends Component {
     this.props.fetchAccounts();
   }
 
+  compilation() {
+    const src =  this.props.sourceFromEditor?this.props.sourceFromEditor:(this.props.abi === undefined ? undefined : this.props.abi.src);
+    const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
+    if (src === undefined) {
+      return (<tr>
+        <td colSpan={3}>
+          <div className="text-center">Upload Contract</div>
+        </td>
+      </tr>);
+    } else {
+      let contract = src[contractname];
+      if (contract && contract['constr'] !== undefined) {
+        return Object.getOwnPropertyNames(contract['constr']).map((arg, i) => {
+          return (
+            <tr key={'arg' + i}>
+              <td>{arg}</td>
+              <td>{contract.constr[arg].type}</td>
+              <td>
+                <Field
+                  id="input-b"
+                  className="pt-input"
+                  component="input"
+                  name={arg}
+                  title="Enter value"
+                  type="text"
+                  dir="auto"
+                  required
+                />
+              </td>
+            </tr>
+          );
+        });
+      } else {
+        return (<tr>
+          <td colSpan={3}>
+            <div className="text-center">No Data</div>
+          </td>
+        </tr>)
+      }
+    }
+  }
+
   render() {
     const {handleSubmit, pristine, submitting, valid} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
@@ -143,44 +188,8 @@ class CreateContract extends Component {
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : null;
 
-    const src =  this.props.sourceFromEditor?this.props.sourceFromEditor:(this.props.abi === undefined ? undefined : this.props.abi.src);
-
-    let args = src === undefined ?
-      <tr>
-        <td colSpan={3}>
-          <div className="text-center">Upload Contract</div>
-        </td>
-      </tr> :
-
-      // eslint-disable-next-line
-      (Object.values(src).map(val => {
-        if (val.constr !== undefined) {
-          return Object.getOwnPropertyNames(val.constr).map((arg, i) => {
-            return (
-              <tr key={'arg' + i}>
-                <td>{arg}</td>
-                <td>{val.constr[arg].type}</td>
-                <td>
-                  <Field
-                    id="input-b"
-                    className="pt-input"
-                    component="input"
-                    name={arg}
-                    title="Enter value"
-                    type="text"
-                    dir="auto"
-                    validate={required}
-                    required
-                  />
-                </td>
-              </tr>
-            );
-          });
-        }
-      }));
-
     return (
-      <div className="smd-pad-16">
+      <div className="smd-pad-16" style={{display:'inline-block'}}>
         <Button onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
@@ -188,7 +197,7 @@ class CreateContract extends Component {
         id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
           text="Create Contract"
-          disabled={(this.props.enableCreateContract!=undefined &&!this.props.enableCreateContract)?true:false}
+          disabled={(this.props.enableCreateContract!==undefined &&!this.props.enableCreateContract)?true:false}
            />
         <form>
           <Dialog
@@ -283,7 +292,6 @@ class CreateContract extends Component {
                 <div className="col-sm-9 smd-pad-4">
                   <label className="pt-control pt-checkbox">
                     <Field
-
                         id="input-b"
                         className="form-width"
                         name="searchable"
@@ -332,7 +340,6 @@ class CreateContract extends Component {
                         name="contractName"
                         onChange={this.handleContractNameChange}
                       >
-                        <option />
                         {
                           contracts.map((value, index) => {
                             return (
@@ -362,7 +369,7 @@ class CreateContract extends Component {
                     </tr>
                     </thead>
                     <tbody>
-                    {args}
+                    {this.compilation()}
                     </tbody>
                   </table>
                 </div>
