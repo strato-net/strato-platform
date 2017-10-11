@@ -4,10 +4,10 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  QUERY_CIRRUS,
+  QUERY_CIRRUS_REQUEST,
   queryCirrusSuccess,
   queryCirrusFailure,
-  QUERY_CIRRUS_VARS,
+  QUERY_CIRRUS_VARS_REQUEST,
   queryCirrusVarsSuccess,
   queryCirrusVarsFailure
 } from './contractQuery.actions';
@@ -71,9 +71,9 @@ function* queryCirrus(action){
 }
 
 export function* watchQueryCirrusVars() {
-  yield takeEvery(QUERY_CIRRUS_VARS, queryCirrusVars);
+  yield takeEvery(QUERY_CIRRUS_VARS_REQUEST, queryCirrusVars);
 }
 
 export function* watchQueryCirrus() {
-  yield takeEvery(QUERY_CIRRUS, queryCirrus);
+  yield takeEvery(QUERY_CIRRUS_REQUEST, queryCirrus);
 }

@@ -5,7 +5,26 @@ import {withRouter} from 'react-router-dom';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-
+// import Tour from '../Tour';
+import {endTour} from '../Tour/tour.actions';
+// import {callAfterTour} from '../Tour/tour.helpers';
+// 
+// const tourSteps = [
+// /*  {
+//     title: 'Create Contract',
+//     text: 'Where queries are to be found.',
+//     selector: '#tour-create-contract-button',
+//     position: 'bottom', type: 'hover',
+//     isFixed: true,
+//   }, */
+//   {
+//     title: 'View Transactions',
+//     text: 'Scroll through all transactions launched from your Smart Contract.',
+//     selector: '#transactions',
+//     position: 'bottom',
+//     isFixed: true,
+//   },
+// ];
 
 class Contracts extends Component {
 
@@ -44,6 +63,13 @@ class Contracts extends Component {
 
     return (
       <div className="container-fluid">
+        {/*
+          <Tour steps={tourSteps} name="contracts" callback={ callAfterTour('#transactions', () => {
+              this.props.history.push('transactions');
+              this.props.endTour('contracts');
+            })}
+          />
+        */}
         <div className="row pt-dark">
           <div className="col-md-3 text-left">
             <h3>Contracts</h3>
@@ -84,4 +110,4 @@ function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchContracts, changeContractFilter})(Contracts));
+export default withRouter(connect(mapStateToProps, {fetchContracts, changeContractFilter, endTour})(Contracts));

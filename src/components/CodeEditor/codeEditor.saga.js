@@ -26,12 +26,18 @@ import {
           body:
             "src="+encodeURIComponent(source)
           })
-        .then(function(response) {
-          return response.json();
-        })
-        .catch(function(error) {
-          throw error;
-        });
+          .then(function(res) {
+            if (res.ok) {
+              return res.json();
+            } else {
+              return res.text().then(function(value) {
+                  throw value;
+                });
+            }
+          })
+          .catch(function(error) {
+            throw error;
+          });
   }
     
   function* compileCodeFromEditor(action) {

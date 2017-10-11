@@ -4,7 +4,7 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  CREATE_USER,
+  CREATE_USER_REQUEST,
   createUserSuccess,
   createUserFailure,
 } from './createUser.actions';
@@ -48,5 +48,5 @@ function* createUser(action) {
 }
 
 export default function* watchCreateUser() {
-  yield takeLatest(CREATE_USER, createUser);
+  yield takeLatest(CREATE_USER_REQUEST, createUser);
 }

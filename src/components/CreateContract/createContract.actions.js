@@ -1,9 +1,9 @@
 export const CONTRACT_OPEN_MODAL = "CONTRACT_OPEN_MODAL";
 export const CONTRACT_CLOSE_MODAL = "CONTRACT_CLOSE_MODAL";
-export const CREATE_CONTRACT = "CREATE_CONTRACT";
+export const CREATE_CONTRACT_REQUEST = "CREATE_CONTRACT_REQUEST";
 export const CREATE_CONTRACT_SUCCESS = "CREATE_CONTRACT_SUCCESS";
 export const CREATE_CONTRACT_FAILURE = "CREATE_CONTRACT_FAILURE";
-export const COMPILE_CONTRACT = "COMPILE_CONTRACT";
+export const COMPILE_CONTRACT_REQUEST = "COMPILE_CONTRACT_REQUEST";
 export const COMPILE_CONTRACT_SUCCESS = "COMPILE_CONTRACT_SUCCESS";
 export const COMPILE_CONTRACT_FAILURE = "COMPILE_CONTRACT_FAILURE";
 export const USERNAME_FORM_CHANGE = "USERNAME_FORM_CHANGE";
@@ -47,7 +47,7 @@ export const contractCloseModal = function() {
 
 export const createContract = function(payload) {
   return {
-    type: CREATE_CONTRACT,
+    type: CREATE_CONTRACT_REQUEST,
     payload,
     spinning: true,
     isOpen: true,
@@ -74,11 +74,10 @@ export const createContractFailure = function(error) {
 
 export const compileContract = function(name, contract, searchable) {
   return {
-    type: COMPILE_CONTRACT,
+    type: COMPILE_CONTRACT_REQUEST,
     name: name,
     contract: contract,
     searchable: searchable,
-    compileSuccess: false,
     isOpen: true,
   }
 }
@@ -87,7 +86,6 @@ export const compileContractSuccess = function(response) {
   return {
     type: COMPILE_CONTRACT_SUCCESS,
     response: response,
-    compileSuccess: false,
     isOpen: true,
   }
 }
@@ -96,7 +94,6 @@ export const compileContractFailure = function(error) {
   return {
     type: COMPILE_CONTRACT_FAILURE,
     error: error,
-    compileSuccess: false,
     isOpen: false,
   }
 }
