@@ -7,26 +7,29 @@ import Transactions from './components/Transactions';
 import Accounts from './components/Accounts';
 import Account from './components/Account';
 import Contracts from './components/Contracts';
-import SideBar from './components/SideBar';
 import TransactionView from './components/Transactions/components/TransactionView';
 import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
+import App from './App';
+import Login from './components/Login';
+import ProtectedRoute from './components/ProtectedRoute';
+// import EnsureLoggedInContainer from './components/Auth';
 
 export const routes = (
   <Switch>
-    <Route exact path="/">
-      <Redirect to="/home" />
+    <Route exact path="/" component={App}>
+      <Redirect to="/login" />
     </Route>
-    <Route exact path="/home" component={Dashboard}/>
-    <Route exact path="/nodes" component={Nodes} />
-    <Route exact path="/blocks" component={Blocks} />
-    <Route exact path="/blocks/:block" component={BlockView} />
-    <Route exact path="/transactions" component={Transactions} />
-    <Route exact path="/transactions/:hash" component={TransactionView} />
-    <Route exact path="/accounts" component={Accounts}/>
-    <Route exact path="/accounts/:name/:address" component={Account} />
-    <Route exact path="/contracts" component={Contracts}/>
-    <Route exact path="/contracts/:name/query" component={ContractQuery} />
-    <Route component={SideBar}/>
+      <Route exact path="/login" component={Login} />
+      <ProtectedRoute exact path="/home" component={Dashboard}/>
+      <ProtectedRoute exact path="/nodes" component={Nodes} />
+      <ProtectedRoute exact path="/blocks" component={Blocks} />
+      <ProtectedRoute exact path="/blocks/:block" component={BlockView} />
+      <ProtectedRoute exact path="/transactions" component={Transactions} />
+      <ProtectedRoute exact path="/transactions/:hash" component={TransactionView} />
+      <ProtectedRoute exact path="/accounts" component={Accounts}/>
+      <ProtectedRoute exact path="/accounts/:name/:address" component={Account} />
+      <ProtectedRoute exact path="/contracts" component={Contracts}/>
+      <ProtectedRoute exact path="/contracts/:name/query" component={ContractQuery} />
   </Switch>
 );
