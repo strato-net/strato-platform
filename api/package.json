@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "npm-run-all -p start-server node-ping",
+    "start": "npm-run-all -p start-server",
     "start-server": "PORT=${PORT:-3001} node $NODE_DEBUG_OPTION ./bin/www",
     "start-server:dev": "PORT=${PORT:-3001} DOMAIN=localhost node $NODE_DEBUG_OPTION ./bin/www",
     "node-ping": "DELAY=5000 RETENTION=1 node node-ping/index.js",

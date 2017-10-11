@@ -1,5 +1,4 @@
 module.exports = {
-  // initialUserName: 'admin',
   passwordSaltRounds : 10,
   jwtConfig: {
     jwtSecret: 'JWT_SECRET_PLACEHOLDER', // random string

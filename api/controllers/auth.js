@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt');
+const fs = require('fs');
 const moment = require('moment');
-// const randToken = require('rand-token');
 
 const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
@@ -64,7 +64,7 @@ module.exports = {
           }
         });
       }
-    });
+    }).catch(err => next(err));
   },
 
   logout: function (req, res) {
@@ -75,11 +75,50 @@ module.exports = {
   },
 
   create: function(req, res, next) {
-    const userToken = req.body.username;
+    const key = req.body.key;
     const username = req.body.username;
     const password = req.body.password;
 
-    // TODO: check if token is the one stored in container's file system
+    if (!key || !username || !password) {
+      let err = new Error("wrong params, expected: {key, username, password}");
+      err.status = 400;
+      return next(err);
+    }
+
+    fs.readFile('USERKEY', 'utf8', function (err,data) {
+      if (err) {
+        let err = new Error('USERKEY file does not exist - initial user is already created');
+        err.status = 403;
+        return next(err);
+      }
+      if (data === key) {
+        // Create user
+        models.User.create(
+          {
+            username: username,
+            passwordHash: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
+          }
+        ).then(function (newUser) {
+          models.Role.findOne({
+            where: {
+              name: 'admin'
+            }
+          }).then(function (adminRole) {
+            newUser.addRole(adminRole).then(() => {
+              fs.unlink('USERKEY', function () {
+                res.status(200).json({
+                  message: 'user created'
+                });
+              });
+            })
+          });
+        }).catch(err => next(err));
+      } else {
+        let err = new Error('wrong key provided');
+        err.status = 403;
+        return next(err);
+      }
+    });
   },
 
 };

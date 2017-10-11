@@ -6,12 +6,6 @@ module.exports = function(sequelize, DataTypes) {
   });
 
   Node.associate = function(models) {
-    Node.belongsTo(models.User, {
-      onDelete: "CASCADE",
-      foreignKey: {
-        allowNull: false
-      }
-    });
     Node.hasMany(models.Stat);
   };
 

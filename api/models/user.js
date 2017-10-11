@@ -1,15 +1,13 @@
 'use strict';
 module.exports = function (sequelize, DataTypes) {
   let User = sequelize.define('User', {
-    username: {type: DataTypes.STRING, allowNull: false, unique: true},
-    passwordHash: {type: DataTypes.STRING},
-    confirmationToken: {type: DataTypes.STRING},
-    isConfirmed: {type: DataTypes.BOOLEAN, defaultValue: false, allowNull: false}
+    username: {type: DataTypes.STRING, unique: true, allowNull: false},
+    passwordHash: {type: DataTypes.STRING}
   });
 
   User.associate = function(models) {
     User.belongsToMany(models.Role, {through: 'UserRole'});
-    User.hasMany(models.Node);
+    User.hasMany(models.Token)
   };
 
   /**

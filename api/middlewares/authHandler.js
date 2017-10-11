@@ -13,7 +13,7 @@ function isTokenValid(token) {
     && (token.exp)
     && (token.user)
     && (token.user.id.toString())
-    && (token.user.email)
+    && (token.user.username)
     && (moment(token.exp).isValid())
     && (!moment().isSameOrAfter(token.exp))
 }
@@ -32,7 +32,7 @@ const authHandler = {
       exp: expireDate,
       user: {
         id: user.id,
-        email: user.email,
+        username: user.username,
       },
     };
 
