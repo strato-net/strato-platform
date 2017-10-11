@@ -11,9 +11,7 @@ import {
     
   import { env } from '../../env';
   
-  const url = env.BLOC_URL + "/users/:user/:address/contract"
   const compileUrl = env.STRATO_URL + "/extabi";
-  const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
   
   function compileSourceApiCall(contractName, source, s) {
       return fetch(

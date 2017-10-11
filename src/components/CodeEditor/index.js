@@ -59,7 +59,7 @@ class CodeEditor extends Component {
                     </div>
                     <div style={{margin:20}}>
                         Result:
-                        {this.props.codeEditorData.codeCompileSuccess?' Contract compiled successfully': ' '+this.props.codeEditorData.response}
+                        {this.props.codeEditorData.codeCompileSuccess?' Contract compiled successfully': this.props.codeEditorData.response?' '+this.props.codeEditorData.response:''}
                     </div>
                 </div>
 
