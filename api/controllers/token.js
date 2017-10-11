@@ -16,6 +16,7 @@ module.exports = {
     models.Token.create({
       UserId: req.user.id,
       name: name,
+      // TODO: add the part of hashed name as a prefix to token (to be able to find out the name by token) - see sendgrid tokens list as an example
       token: randToken.generate(64),
     }).then(token => {
         res.status(200).json({token: token});
