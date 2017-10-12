@@ -38,8 +38,8 @@ pipeline {
           basil compose > docker-compose.yml
 
           NODE_NAME=localhost \
-          BLOC_URL=http://localhost/bloc/v2.1 \
-          BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.1/swagger.json \
+          BLOC_URL=http://localhost/bloc/v2.2 \
+          BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.2/swagger.json \
           STRATO_URL=http://localhost/strato-api/eth/v1.2 \
           STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
           stratoHost=nginx \
@@ -51,7 +51,7 @@ pipeline {
           # Few quick tests
           curl -f http://localhost/cirrus/search/
           curl -f http://localhost/strato-api/eth/v1.2/stats/difficulty
-          curl -f http://localhost/bloc/v2.1/users
+          curl -f http://localhost/bloc/v2.2/users
         '''
       }
     }
