@@ -309,11 +309,11 @@ class CreateContract extends Component {
               </div>
               {!this.props.sourceFromEditor && <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
+                  <label className="pt-label smd-pad-4" style={{margin:0}}>
                     Source file
                   </label>
                 </div>
-                <div className="col-sm-12 smd-pad-4">
+                <div className="col-sm-12">
                   <Field
                     id="input-b"
                     className="form-width pt-input"
