@@ -4,17 +4,17 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  VERIFY_USER,
-  LOGOUT_USER,
-  handleUserSuccess,
-  handleUserFailure,
+  LOGIN_REQUEST,
+  LOGOUT_REQUEST,
+  loginSuccess,
+  loginFailure,
   logoutSuccess
 } from './user.actions';
 import { setCookie } from '../../lib/parsejwt';
 import { token } from '../../mock_api/token';
 const user = require('../../mock_api/user.json'); // Remove this when actual API is implemented
 
-function getUser(email, password) {
+function loginRequest(email, password) {
   return user;
   // return fetch(
   //   verifyUserUrl,
@@ -53,16 +53,16 @@ function logoutAccount() {
   // )
 }
 
-function* verifyUser(action) {
+function* login(action) {
   try {
-    const response = yield call(getUser, action.email, action.password);
-    yield put(handleUserSuccess(action.email, response));
+    const response = yield call(loginRequest, action.email, action.password);
+    yield put(loginSuccess(action.email, response));
     /*Please remove when acutal API is integrated*/
     setCookie('token', token, 1);
     /* ----------------- */
 
   } catch(err) {
-    yield put(handleUserFailure(action.email, err));
+    yield put(loginFailure(action.email, err));
   }
 }
 
@@ -80,7 +80,7 @@ function* logout() {
 
 export default function* watchFetchUser() {
   yield [
-    takeEvery(VERIFY_USER, verifyUser),
-    takeEvery(LOGOUT_USER, logout)
+    takeEvery(LOGIN_REQUEST, login),
+    takeEvery(LOGOUT_REQUEST, logout)
   ];
 }

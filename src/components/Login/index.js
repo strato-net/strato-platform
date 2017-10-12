@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { verifyUser } from '../User/user.actions';
+import { login } from '../User/user.actions';
 import { Button } from '@blueprintjs/core';
 import validate from './validate.js';
 
@@ -23,7 +23,7 @@ class Login extends Component {
         password: values.password
       };
   
-      this.props.verifyUser(payload);
+      this.props.login(payload);
       this.props.history.push('/home');
     } 
   }
@@ -112,7 +112,7 @@ const formed = reduxForm({ form: 'login' })(Login);
 const connected = connect(
   mapStateToProps,
   {
-    verifyUser
+    login
   }
 )(formed);
 

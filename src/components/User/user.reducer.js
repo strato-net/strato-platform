@@ -1,7 +1,7 @@
 import {
-  HANDLE_USER_SUCCESS,
-  HANDLE_USER_FAILURE,
-  LOGOUT_USER_SUCCESS,
+  LOGIN_REQUEST_SUCCESS,
+  LOGIN_REQUEST_FAILURE,
+  LOGOUT_REQUEST_SUCCESS,
   SET_CURRENT_USER
 } from './user.actions';
 
@@ -14,21 +14,21 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case HANDLE_USER_SUCCESS: 
+    case LOGIN_REQUEST_SUCCESS: 
       return {
         currentUser: action.currentUser,
         email: action.email,
         isLoggedIn: true,
         error: null,
       };
-    case HANDLE_USER_FAILURE:
+    case LOGIN_REQUEST_FAILURE:
       return {
         currentUser: {},
         email: action.email,
         isLoggedIn: false,
         error: action.error,
       };
-    case LOGOUT_USER_SUCCESS:
+    case LOGOUT_REQUEST_SUCCESS:
       return {
         currentUser: {},
         email: null,

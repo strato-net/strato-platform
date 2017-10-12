@@ -1,29 +1,29 @@
-export const VERIFY_USER = 'VERIFY_USER';
-export const HANDLE_USER_SUCCESS = 'HANDLE_USER_SUCCESS';
-export const HANDLE_USER_FAILURE = 'HANDLE_USER_FAILURE';
-export const LOGOUT_USER = 'LOGOUT_USER';
-export const LOGOUT_USER_SUCCESS = 'LOGOUT_USER_SUCCESS';
+export const LOGIN_REQUEST = 'LOGIN_REQUEST';
+export const LOGIN_REQUEST_SUCCESS = 'LOGIN_REQUEST_SUCCESS';
+export const LOGIN_REQUEST_FAILURE = 'LOGIN_REQUEST_FAILURE';
+export const LOGOUT_REQUEST = 'LOGOUT_REQUEST';
+export const LOGOUT_REQUEST_SUCCESS = 'LOGOUT_REQUEST_SUCCESS';
 export const SET_CURRENT_USER = 'SET_CURRENT_USER';
 
-export const verifyUser = function (payload) {
+export const login = function (payload) {
   return {
-    type: VERIFY_USER,
+    type: LOGIN_REQUEST,
     email: payload.email,
     password: payload.password
   }
 }
 
-export const handleUserSuccess = function (email, response) {
+export const loginSuccess = function (email, response) {
   return {
-    type: HANDLE_USER_SUCCESS,
+    type: LOGIN_REQUEST_SUCCESS,
     email,
     currentUser: response
   }
 }
 
-export const handleUserFailure = function (email, error) {
+export const loginFailure = function (email, error) {
   return {
-    type: HANDLE_USER_FAILURE,
+    type: LOGIN_REQUEST_FAILURE,
     email,
     error
   }
@@ -31,13 +31,13 @@ export const handleUserFailure = function (email, error) {
 
 export const logout = function () {
   return {
-    type: LOGOUT_USER
+    type: LOGOUT_REQUEST
   }
 }
 
 export const logoutSuccess = function () {
   return {
-    type: LOGOUT_USER_SUCCESS
+    type: LOGOUT_REQUEST_SUCCESS
   }
 }
 
