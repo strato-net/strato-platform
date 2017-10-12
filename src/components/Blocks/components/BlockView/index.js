@@ -3,10 +3,14 @@ import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Text} from '@blueprintjs/core';
+import { fetchBlockData } from '../../../BlockData/block-data.actions';
 import * as moment from 'moment';
 
 class BlockView extends Component {
 
+  componentDidMount() {
+    this.props.fetchBlockData();
+  }
 
   render() {
     const blockNumber = this.props.match.params.block;
@@ -140,7 +144,8 @@ function mapStateToProps(state, ownProps) {
 
 export default withRouter(
   connect(
-    mapStateToProps,
-    {}
+    mapStateToProps, {
+      fetchBlockData
+    }
   )(BlockView)
 );

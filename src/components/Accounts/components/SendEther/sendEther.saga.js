@@ -4,14 +4,14 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  SEND_ETHER,
+  SEND_ETHER_REQUEST,
   sendEtherSuccess,
   sendEtherFailure
 } from './sendEther.actions';
 
 import { env } from '../../../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/send"
+const url = env.BLOC_URL + "/users/:user/:address/send?resolve"
 
 function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
   return fetch(
@@ -50,5 +50,5 @@ function* sendEther(action) {
 }
 
 export default function* watchSendEther() {
-  yield takeLatest(SEND_ETHER, sendEther);
+  yield takeLatest(SEND_ETHER_REQUEST, sendEther);
 }

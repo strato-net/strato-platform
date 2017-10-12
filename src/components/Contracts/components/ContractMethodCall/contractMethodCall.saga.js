@@ -4,10 +4,10 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  METHOD_CALL,
+  METHOD_CALL_REQUEST,
   methodCallSuccess,
   methodCallFailure,
-  METHOD_CALL_FETCH_ARGS,
+  METHOD_CALL_FETCH_ARGS_REQUEST,
   methodCallFetchArgsSuccess,
   methodCallFetchArgsFailure
 } from './contractMethodCall.actions';
@@ -16,7 +16,7 @@ import { env } from '../../../../env.js'
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress";
 const methodUrl = env.BLOC_URL +
-  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call";
+  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve";
 
 function getArgs(contractName, contractAddress, symbol) {
   return fetch(
@@ -86,9 +86,9 @@ function* fetchArgs(action) {
 }
 
 export function* watchMethodCall() {
-  yield takeEvery(METHOD_CALL, methodCall);
+  yield takeEvery(METHOD_CALL_REQUEST, methodCall);
 }
 
 export function* watchFetchArgs() {
-  yield takeEvery(METHOD_CALL_FETCH_ARGS, fetchArgs);
+  yield takeEvery(METHOD_CALL_FETCH_ARGS_REQUEST, fetchArgs);
 }

@@ -1,7 +1,7 @@
 import {
   FETCH_BLOCK_DATA,
-  FETCH_BLOCK_DATA_SUCCESS,
-  FETCH_BLOCK_DATA_FAILURE,
+  FETCH_BLOCK_DATA_SUCCESSFUL,
+  FETCH_BLOCK_DATA_FAILED,
 } from './block-data.actions';
 
 const initialState = {
@@ -16,12 +16,12 @@ const reducer = function (state = initialState, action) {
         blockData: state.blockData,
         error: null,
       };
-    case FETCH_BLOCK_DATA_SUCCESS:
+    case FETCH_BLOCK_DATA_SUCCESSFUL:
       return {
         blockData: action.blockData,
         error: null,
       };
-    case FETCH_BLOCK_DATA_FAILURE:
+    case FETCH_BLOCK_DATA_FAILED:
       return {
         blockData: state.blockData,
         error: action.error

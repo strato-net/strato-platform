@@ -29,7 +29,7 @@ class MenuBar extends Component {
         <div className="pt-navbar-group pt-align-right">
           <small className="pt-text-muted">v{ process.env.REACT_APP_VERSION } </small>
           <span className="pt-navbar-divider"/>
-          <a href={ env.BLOC_DOC_URL } target="_blank" rel="noopener noreferrer">
+          <a href={ env.BLOC_DOC_URL } target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">
             <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanelWrapper.track("bloc_docs_click")}}>Bloc API</button>
           </a>
           <a href={ env.STRATO_DOC_URL } target="_blank" rel="noopener noreferrer">

@@ -1,6 +1,6 @@
 export const FETCH_TX = 'FETCH_TX';
-export const FETCH_TX_SUCCESS = 'FETCH_TX_SUCCESS';
-export const FETCH_TX_FAILURE = 'FETCH_TX_FAILURE';
+export const FETCH_TX_SUCCESSFUL = 'FETCH_TX_SUCCESSFUL';
+export const FETCH_TX_FAILED = 'FETCH_TX_FAILED';
 
 export const fetchTx = function (last) {
   return {
@@ -11,14 +11,14 @@ export const fetchTx = function (last) {
 
 export const fetchTxSuccess = function (res) {
   return {
-    type: FETCH_TX_SUCCESS,
+    type: FETCH_TX_SUCCESSFUL,
     tx: res
   }
 };
 
 export const fetchTxFailure = function (error) {
   return {
-    type: FETCH_TX_FAILURE,
+    type: FETCH_TX_FAILED,
     error: error,
   }
 };

@@ -1,16 +1,16 @@
 export const CLEAR_QUERY_STRING = 'CLEAR_QUERY_STRING';
 export const ADD_QUERY_FILTER = 'ADD_QUERY_FILTER';
 export const REMOVE_QUERY_FILTER = 'REMOVE_QUERY_FILTER';
-export const QUERY_CIRRUS = 'QUERY_CIRRUS';
+export const QUERY_CIRRUS_REQUEST = 'QUERY_CIRRUS_REQUEST';
 export const QUERY_CIRRUS_SUCCESS = 'QUERY_CIRRUS_SUCCESS';
 export const QUERY_CIRRUS_FAILURE = 'QUERY_CIRRUS_FAILURE';
-export const QUERY_CIRRUS_VARS = 'QUERY_CIRRUS_VARS';
+export const QUERY_CIRRUS_VARS_REQUEST = 'QUERY_CIRRUS_VARS_REQUEST';
 export const QUERY_CIRRUS_VARS_SUCCESS = 'QUERY_CIRRUS_VARS_SUCCESS';
 export const QUERY_CIRRUS_VARS_FAILURE = 'QUERY_CIRRUS_VARS_FAILURE';
 
 export const queryCirrusVars = function(contractName) {
   return {
-    type: QUERY_CIRRUS_VARS,
+    type: QUERY_CIRRUS_VARS_REQUEST,
     contractName
   }
 }
@@ -37,7 +37,7 @@ export const clearQueryString = function() {
 
 export const queryCirrus = function(name, queryString) {
   return {
-    type: QUERY_CIRRUS,
+    type: QUERY_CIRRUS_REQUEST,
     contractName: name,
     queryString: queryString
   };

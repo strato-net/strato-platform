@@ -14,9 +14,8 @@ import createSagaMiddleware from 'redux-saga';
 import { fork } from 'redux-saga/effects';
 import {routerReducer} from 'react-router-redux';
 import {reducer as formReducer} from 'redux-form';
-
+import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
 import App from "./App/";
-
 
 import accountsReducer from './components/Accounts/accounts.reducer';
 import blockDataReducer from './components/BlockData/block-data.reducer'
@@ -27,6 +26,7 @@ import contractQueryReducer from './components/ContractQuery/contractQuery.reduc
 import methodCallReducer from './components/Contracts/components/ContractMethodCall/contractMethodCall.reducer';
 import nodeCardReducer from './components/NodeCard/nodeCard.reducer';
 import transactionsReducer from './components/TransactionList/transactionList.reducer';
+import tourReducer from './components/Tour/tour.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendEtherReducer from './components/Accounts/components/SendEther/sendEther.reducer';
 
@@ -35,11 +35,12 @@ import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
-import watchFetchAccounts from './components/Accounts/accounts.saga';
+import watchAccountActions from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
 import {
   watchFetchState,
-  watchFetchCirrusContracts
+  watchFetchCirrusContracts,
+  watchAccount
 } from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
 import {
@@ -53,8 +54,19 @@ import {
 } from './components/ContractQuery/contractQuery.saga';
 import watchSendEther from './components/Accounts/components/SendEther/sendEther.saga';
 
+import {CREATE_USER_SUCCESS} from './components/CreateUser/createUser.actions';
+
 const rootReducer = combineReducers({
-  form: formReducer,
+  form: formReducer.plugin({
+    'create-user': (state, action) => {
+      switch(action.type) {
+        case CREATE_USER_SUCCESS:
+          return undefined;
+        default:
+          return state;
+      }
+    }
+  }),
   routing: routerReducer,
   // YOUR REDUCERS HERE
   accounts: accountsReducer,
@@ -67,7 +79,9 @@ const rootReducer = combineReducers({
   nodes: nodeCardReducer,
   transactions: transactionsReducer,
   queryEngine: queryEngineReducer,
-  sendEther: sendEtherReducer
+  sendEther: sendEtherReducer,
+  loadingBar: loadingBarReducer,
+  tour: tourReducer,
 });
 
 const rootSaga = function* startForeman() {
@@ -76,7 +90,7 @@ const rootSaga = function* startForeman() {
         fork(watchFetchBlockData),
         fork(watchFetchTx),
         fork(watchCreateUser),
-        fork(watchFetchAccounts),
+        fork(watchAccountActions),
         fork(watchCreateContract),
         fork(watchFetchContracts),
         fork(watchCompileContract),
@@ -88,12 +102,17 @@ const rootSaga = function* startForeman() {
         fork(watchExecuteQuery),
         fork(watchQueryCirrus),
         fork(watchQueryCirrusVars),
-        fork(watchSendEther)
+        fork(watchSendEther),
+        fork(watchAccount)
     ]
 };
 
 // create the saga middleware
 const sagaMiddleware = createSagaMiddleware();
+
+const loadingMiddleware = loadingBarMiddleware({
+                            promiseTypeSuffixes: ['REQUEST', 'SUCCESS', 'FAILURE'],
+                          });
 
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 
@@ -101,8 +120,8 @@ const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 const store = createStore(
     rootReducer,
     process.env.NODE_ENV !== 'production' ?
-      composeEnhancers(applyMiddleware(sagaMiddleware)) //
-      : applyMiddleware(sagaMiddleware),
+      composeEnhancers(applyMiddleware(sagaMiddleware, loadingMiddleware)) //
+      : applyMiddleware(sagaMiddleware, loadingMiddleware),
 );
 
 // then run the saga

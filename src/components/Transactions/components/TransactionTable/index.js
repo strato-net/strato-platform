@@ -7,10 +7,12 @@ import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+import {fetchTx} from '../../../TransactionList/transactionList.actions';
 
 class TransactionTable extends Component {
 
   componentDidMount() {
+    this.props.fetchTx();
     this.props.executeQuery(RESOURCE_TYPES.transaction, this.props.query);
   }
 
@@ -97,7 +99,7 @@ class TransactionTable extends Component {
         <div className="col-sm-12">
           <form onSubmit={handleSubmit(this.updateQuery)}>
             <div className="pt-control-group smd-full-width">
-              <div className="pt-select">
+              <div className="pt-select" id="tour-query-type">
                 <Field
                   type="select"
                   component="select"
@@ -220,5 +222,6 @@ const connected = connect(mapStateToProps, {
   removeQuery,
   executeQuery,
   clearQuery,
+  fetchTx
 })(formed);
 export default withRouter(connected);

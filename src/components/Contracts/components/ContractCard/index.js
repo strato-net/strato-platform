@@ -2,11 +2,11 @@ import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Collapse} from '@blueprintjs/core';
-import * as moment from 'moment';
 import {
   selectContractInstance,
   fetchState,
-  fetchCirrusInstances
+  fetchCirrusInstances,
+  fetchAccount
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
@@ -43,6 +43,7 @@ class ContractCard extends Component {
             onClick={() => {
               mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address);
+              self.props.fetchAccount(name, instance.address);
               self.props.selectContractInstance(name, instance.address);
             }}
             key={'card-data-' + instance.address}
@@ -51,13 +52,11 @@ class ContractCard extends Component {
               <small>{instance.address}</small>
             </td>
             <td style={{border: 'none'}}>
-                <small>
-                { instance.fromBloc ? moment(instance.createdAt).format('YYYY-MM-DD hh:mm:ss A') : '' }
-                </small>
-            </td>
-            <td style={{border: 'none'}}>
+              { instance.fromBloc ?
+                  <span className="pt-tag pt-intent-success smd-margin-right-4">Bloc</span> : ''
+              }
               { instance.fromCirrus ?
-                  <span className="pt-tag pt-intent-primary">Indexed</span> : ''
+                  <span className="pt-tag pt-intent-primary">Cirrus</span> : ''
               }
             </td>
           </tr>
@@ -116,6 +115,11 @@ class ContractCard extends Component {
       state = (
         <div className="pt-card pt-elevation-2">
           <div className="row">
+            <div className="col-sm-12 text-right">
+              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div>: ''} </span>
+            </div>
+          </div>
+          <div className="row">
             <div className="col-sm-12">
               <table className="pt-table pt-condensed pt-striped smd-full-width">
                 <thead>
@@ -141,8 +145,8 @@ class ContractCard extends Component {
         <div className="col-sm-6">
           <div className="pt-card pt-elevation-2">
             <div className="row">
-              <div className="col-sm-6"><h4>{name}</h4></div>
-              <div className="col-sm-6 text-right">
+              <div className="col-sm-4"><h4>{name}</h4></div>
+              <div className="col-sm-8 text-right">
                 <div className="pt-button-group">
                   {
                     showQueryBuilder ?
@@ -176,7 +180,6 @@ class ContractCard extends Component {
                     <thead>
                     <tr>
                       <th>Contract Address</th>
-                      <th>Created At</th>
                       <th></th>
                     </tr>
                     </thead>
@@ -205,6 +208,7 @@ export default withRouter(
   connect(mapStateToProps, {
     selectContractInstance,
     fetchState,
-    fetchCirrusInstances
+    fetchCirrusInstances,
+    fetchAccount
   })(ContractCard)
 );

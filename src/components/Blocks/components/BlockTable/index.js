@@ -3,6 +3,7 @@ import {connect} from 'react-redux';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {Field, reduxForm, reset, Form} from 'redux-form';
 import {BLOCK_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
+import { fetchBlockData } from '../../../BlockData/block-data.actions';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
@@ -11,6 +12,7 @@ import * as moment from 'moment';
 class BlockTable extends Component {
 
   componentDidMount() {
+    this.props.fetchBlockData();
     this.props.executeQuery(RESOURCE_TYPES.block, this.props.query);
   }
 
@@ -224,6 +226,7 @@ function mapStateToProps(state) {
 }
 const formed = reduxForm({form: 'block-query'})(BlockTable);
 const connected = connect(mapStateToProps, {
+  fetchBlockData,
   updateQuery,
   removeQuery,
   executeQuery,
