@@ -75,6 +75,7 @@ deployments:
     compose:
       restart: always
       ports:
+        - "30303:30303"
         - "30303:30303/udp"
       environment:
         networkID : "${networkID}"
