@@ -31,6 +31,7 @@ const reducer = function (state = initialState, action) {
         response: "Status: Upload Contract",
         contract: '',
         filename: '',
+        username: '',
         // createDisabled: true,
       };
     case CONTRACT_CLOSE_MODAL:
@@ -85,7 +86,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         isOpen: true,
         abi: action.response,
-        contractCompileErrors: undefined,        
+        contractCompileErrors: undefined,
       };
     default:
       return state;

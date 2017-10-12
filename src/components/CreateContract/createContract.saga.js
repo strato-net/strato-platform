@@ -19,7 +19,7 @@ import { CREATE_CONTRACT_FORM } from './'
 import { fetchCirrusInstances } from '../Contracts/components/ContractCard/contractCard.actions'
 import { env } from '../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/contract"
+const url = env.BLOC_URL + "/users/:user/:address/contract?resolve"
 const compileUrl = env.STRATO_URL + "/extabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
@@ -95,7 +95,8 @@ function compileContractApiCall(contractName,source, s) {
 
 function* createContract(action) {
   try {
-    let response = yield call(
+    let response =
+      yield call(
         createContractApiCall,
         action.payload.contract,
         action.payload.fileText,
@@ -104,6 +105,7 @@ function* createContract(action) {
         action.payload.password,
         action.payload.arguments
       );
+    console.log(response);
     yield put(createContractSuccess(response));
     yield put(fetchContracts());
     yield put(fetchCirrusInstances(action.payload.contract));

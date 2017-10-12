@@ -97,7 +97,6 @@ class CreateContract extends Component {
 
   submit = (values) => {
     if (!this.props.createDisabled) {
-
       const args = {};
       const abi = this.props.abi.src;
       Object.values(abi).forEach(val => {
@@ -364,7 +363,7 @@ const validate = (values) => {
   const errors = {};
 
   // const abi = CreateContract.props.abi.src;
-  
+
   // Object.values(abi).forEach(val => {
   //   if (val.constr !== undefined) {
   //     return Object.getOwnPropertyNames(val.constr).map((arg) => {

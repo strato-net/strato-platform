@@ -52,8 +52,11 @@ class ContractCard extends Component {
               <small>{instance.address}</small>
             </td>
             <td style={{border: 'none'}}>
+              { instance.fromBloc ?
+                  <span className="pt-tag pt-intent-success smd-margin-right-4">Bloc</span> : ''
+              }
               { instance.fromCirrus ?
-                  <span className="pt-tag pt-intent-primary">Indexed</span> : ''
+                  <span className="pt-tag pt-intent-primary">Cirrus</span> : ''
               }
             </td>
           </tr>
@@ -142,8 +145,8 @@ class ContractCard extends Component {
         <div className="col-sm-6">
           <div className="pt-card pt-elevation-2">
             <div className="row">
-              <div className="col-sm-6"><h4>{name}</h4></div>
-              <div className="col-sm-6 text-right">
+              <div className="col-sm-4"><h4>{name}</h4></div>
+              <div className="col-sm-8 text-right">
                 <div className="pt-button-group">
                   {
                     showQueryBuilder ?
