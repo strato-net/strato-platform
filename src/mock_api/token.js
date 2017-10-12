@@ -1,0 +1,2 @@
+// Temprory JWT token only for exexcution of login demo. Please remove this file after API implementation
+export const token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiVGVtcCBOYW1lIiwiZW1haWwiOiJ0ZW1wQGdtYWlsLmNvbSIsImp0aSI6IjdlZDcxYTEzLTgyNmMtNDUwZC05YmFiLWFjNzA5OTlkN2I5OSIsImlhdCI6MTUwNzc4MzgxNywiZXhwIjoxNTA3ODAzODMyfQ.89ZSnaMu0YnEqO5jc6kiguJZ9fKlt2KcWPEFrz2xzRQ';

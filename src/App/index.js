@@ -28,7 +28,7 @@ class App extends Component {
         <LoadingBar style={{top: '0px', backgroundColor: '#5279c7', zIndex: 999}} />
         <MenuBar />
         { this.sideBar() }
-        <main id="outer-container">
+        <main id="outer-container" style={{marginLeft: this.props.isLoggedIn ? '320px' : '0'}} >
           {scenes}
         </main>
       </div>
@@ -38,7 +38,7 @@ class App extends Component {
 
 function mapStateToProps(state) {
   return {
-    isLoggedIn: state.account.isLoggedIn
+    isLoggedIn: state.user.isLoggedIn
   };
 }
 

@@ -5,7 +5,7 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
 import { env } from '../../env';
-import { logout } from '../Account/account.actions';
+import { logout } from '../User/user.actions';
 
 class MenuBar extends Component {
 
@@ -60,8 +60,8 @@ class MenuBar extends Component {
 
 function mapStateToProps(state) {
   return {
-    isLoggedIn: state.account.isLoggedIn,
-    currentUser: state.account.currentUser,
+    isLoggedIn: state.user.isLoggedIn,
+    currentUser: state.user.currentUser,
   };
 }
 
