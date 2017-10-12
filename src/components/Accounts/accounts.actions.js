@@ -8,6 +8,9 @@ export const FETCH_USER_ADDRESSES_FAILED = 'FETCH_ACCOUNT_ADDRESS_FAILURE';
 export const FETCH_ACCOUNT_DETAIL = 'FETCH_ACCOUNT_DETAIL';
 export const FETCH_ACCOUNT_DETAIL_SUCCESSFULL = 'FETCH_ACCOUNT_DETAIL_SUCCESSFULL';
 export const FETCH_ACCOUNT_DETAIL_FAILED = 'FETCH_ACCOUNT_DETAIL_FAILED';
+export const FAUCET_REQUEST = "FAUCET_REQUEST";
+export const FAUCET_SUCCESS = "FAUCET_SUCCESS";
+export const FAUCET_FAILURE = "FAUCET_FAILURE";
 
 export const fetchAccounts = function () {
   return {
@@ -82,5 +85,26 @@ export const fetchAccountDetailFailure = function(name, address, error) {
     name: name,
     address: address,
     error: error
+  }
+};
+
+
+export const faucetRequest = function(address) {
+  return {
+    type: FAUCET_REQUEST,
+    address: address
+  }
+};
+
+export const faucetSuccess = function() {
+  return {
+    type: FAUCET_SUCCESS
+  }
+};
+
+export const faucetFailure = function(err) {
+  return {
+    type: FAUCET_FAILURE,
+    error: err
   }
 };

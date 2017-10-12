@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {fetchAccounts, changeAccountFilter} from './accounts.actions';
+import {fetchAccounts, changeAccountFilter, faucetRequest} from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import {connect} from 'react-redux';
 import {Text, Tooltip, Position} from '@blueprintjs/core';
@@ -48,6 +48,7 @@ class Accounts extends Component {
     const accounts = this.props.accounts;
     const filter = this.props.filter;
     const history = this.props.history;
+    const faucetRequest = this.props.faucetRequest;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
 
@@ -73,21 +74,35 @@ class Accounts extends Component {
           }
           rows.push(
             <tr key={address} onClick={(e) => handleClick(user, address)}>
-              <td width="33%">
+              <td>
+                <button
+                  className="pt-button pt-intent-primary pt-small"
+                  onClick={(e) =>
+                    {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      faucetRequest(address); 
+                    }
+                  }
+                >
+                  Faucet
+                </button>
+              </td>
+              <td>
                 <Text ellipsize={true}>
                   <Tooltip tooltipClassName="smd-padding-8" content={user} position={Position.TOP_LEFT}>
                     <small>{user}</small>
                   </Tooltip>
                 </Text>
               </td>
-              <td width="33%">
+              <td>
                 <Text ellipsize={true}>
                   <Tooltip tooltipClassName="smd-padding-8" content={address} position={Position.TOP_LEFT}>
                     <small>{address}</small>
                   </Tooltip>
                 </Text>
               </td>
-              <td width="33%">
+              <td>
                 <Text ellipsize={true}>
                   <Tooltip tooltipClassName="smd-padding-8" content={accounts[user][address].balance} position={Position.TOP_LEFT}>
                     <small>{accounts[user][address].balance} wei</small>
@@ -110,10 +125,10 @@ class Accounts extends Component {
         />
         */}
         <div className="row">
-          <div className="col-sm-8 text-left">
+          <div className="col-sm-4 text-left">
             <h3>Accounts</h3>
           </div>
-          <div className="col-sm-4 text-right">
+          <div className="col-sm-8 text-right">
             <div className="pt-button-group">
               <SendEther/>
               <CreateUser />
@@ -142,14 +157,15 @@ class Accounts extends Component {
               <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed', width: '100%'}}>
                 <thead>
                 <tr>
-                  <th width="33%"><h4>Username</h4></th>
-                  <th width="33%"><h4>Account</h4></th>
-                  <th width="33%"><h4>Balance</h4></th>
+                  <th></th>
+                  <th><h4>Username</h4></th>
+                  <th><h4>Account</h4></th>
+                  <th><h4>Balance</h4></th>
                 </tr>
                 </thead>
 
                 <tbody>
-                {rows.length === 0 ? <tr><td colSpan={3}>No Accounts</td></tr> : rows}
+                  {rows.length === 0 ? <tr><td colSpan={3}>No Accounts</td></tr> : rows}
                 </tbody>
               </table>
             </div>
@@ -179,6 +195,7 @@ export default withRouter(
       fetchAccounts,
       changeAccountFilter,
       endTour,
+      faucetRequest
     }
   )(Accounts)
 );

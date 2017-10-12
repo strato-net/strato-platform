@@ -35,7 +35,7 @@ import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
-import watchFetchAccounts from './components/Accounts/accounts.saga';
+import watchAccountActions from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
 import {
   watchFetchState,
@@ -90,7 +90,7 @@ const rootSaga = function* startForeman() {
         fork(watchFetchBlockData),
         fork(watchFetchTx),
         fork(watchCreateUser),
-        fork(watchFetchAccounts),
+        fork(watchAccountActions),
         fork(watchCreateContract),
         fork(watchFetchContracts),
         fork(watchCompileContract),
