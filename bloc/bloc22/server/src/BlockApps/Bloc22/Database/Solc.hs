@@ -48,14 +48,15 @@ compileSolc mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   case eRes of
-    Left err -> blocError . AnError . Text.pack $ err
+    Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
+    Left (err,_) -> blocError . AnError . Text.pack $ err
     Right res ->
       maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact") return $ Map.lookup "src" res
 
 runSolc :: Map String String
         -> Map String String
         -> Map String String
-        -> EitherT String IO (Map String Aeson.Value)
+        -> EitherT (String, ExitCode) IO (Map String Aeson.Value)
 runSolc optsObj mainSrc importsSrc =
   execSolc solcCompileOpts solcLinkOpts mainSrc importsSrc
   where
@@ -74,10 +75,10 @@ runSolc optsObj mainSrc importsSrc =
 
 
 execSolc :: [String] -> [String] -> Map String String -> Map String String
-            -> EitherT String IO (Map String Aeson.Value)
+            -> EitherT (String, ExitCode) IO (Map String Aeson.Value)
 execSolc compileOpts linkOpts mainSrc importsSrc =
   doWithEitherT withTempDir $ \dir -> do
-    makeSrcFiles dir $ Map.union mainSrc importsSrc
+    bimapEitherT (\x -> (x,ExitFailure 0)) id $ makeSrcFiles dir $ Map.union mainSrc importsSrc
     compiledFiles <- Trv.sequence $ Map.mapWithKey (const . solcFile compileOpts linkOpts dir) mainSrc
     return $ Map.filter
       (\file -> case file of
@@ -85,7 +86,7 @@ execSolc compileOpts linkOpts mainSrc importsSrc =
           _          -> True)
       compiledFiles
 
-solcFile :: [String] -> [String] -> String -> String -> EitherT String IO Aeson.Value
+solcFile :: [String] -> [String] -> String -> String -> EitherT (String, ExitCode) IO Aeson.Value
 solcFile compileOpts linkOpts dir fileName = do
   solcOutput <- callSolc compileOpts dir fileName
   solcJSON0 <- hoistEither $ aesonDecodeUtf8 $ Text.pack solcOutput
@@ -95,7 +96,7 @@ solcFile compileOpts linkOpts dir fileName = do
   mapEitherT (nullOutput $ Aeson.Null) $ do
     solcJSON :: Map String (Map String Aeson.Value) <-
       case Aeson.fromJSON <$> solcJSON1 of
-        Just (Aeson.Error err) -> left $ Just err
+        Just (Aeson.Error err) -> left $ Just (err, ExitFailure 0)
         Just (Aeson.Success m) -> right m
         Nothing                -> left Nothing
 
@@ -109,7 +110,7 @@ solcFile compileOpts linkOpts dir fileName = do
     linkJSON <- Trv.forM solcJSON $ \binabi ->
       bimapEitherT Just id $ mapEitherT (nullOutput Map.empty) $ do
         let lookupTag tag = case Aeson.fromJSON <$> Map.lookup tag binabi of
-              Just (Aeson.Error err)  -> left $ Just err
+              Just (Aeson.Error err)  -> left $ Just (err, ExitFailure 0)
               Just (Aeson.Success "") -> left Nothing
               Just (Aeson.Success s)  -> right s
               Nothing                 -> left Nothing
@@ -120,7 +121,7 @@ solcFile compileOpts linkOpts dir fileName = do
 
     return $ Aeson.toJSON $ Map.filter (not . Map.null) linkJSON
 
-callSolc :: [String] -> String -> String -> EitherT String IO String
+callSolc :: [String] -> String -> String -> EitherT (String, ExitCode) IO String
 callSolc opts dir fileName =
   let solcCmd = (proc "solc" $ opts ++ [fileName]){ cwd = Just dir }
   in execWithEitherT $ readCreateProcessWithExitCode solcCmd ""
@@ -142,12 +143,12 @@ doWithEitherT runner cmd = do
   resultE <- liftIO $ runner cmdIO
   hoistEither resultE
 
-execWithEitherT :: IO (ExitCode, String, String) -> EitherT String IO String
+execWithEitherT :: IO (ExitCode, String, String) -> EitherT (String,ExitCode) IO String
 execWithEitherT op = do
   (exitCode, stdOut, stdErr) <- liftIO op
   case exitCode of
     ExitSuccess -> right stdOut
-    _           -> left stdErr
+    _           -> left (stdErr,exitCode)
 
 withTempDir :: (String -> IO a) -> IO a
 withTempDir act = withSystemTempDirectory "solc" act
@@ -160,8 +161,10 @@ optWithArg :: String -> Map String String -> [String]
 optWithArg opt opts =
   maybe [] (\arg -> ["--" ++ opt, arg]) $ Map.lookup opt opts
 
-aesonDecodeUtf8 :: (FromJSON a) => Text -> Either String a
-aesonDecodeUtf8 = Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8
+aesonDecodeUtf8 :: (FromJSON a) => Text -> Either (String, ExitCode) a
+aesonDecodeUtf8 x = case Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8 $ x of
+  Left err -> Left (err,ExitFailure 0)
+  Right y -> Right y
 
 getSolSrc :: MonadIO m => Text -> m (Map String String, Map String String, Map String String)
 getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)

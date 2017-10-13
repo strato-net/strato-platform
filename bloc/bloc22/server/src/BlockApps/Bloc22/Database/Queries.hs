@@ -991,18 +991,16 @@ compileContract source = do
   --       name nicer, mabye merge with next let
   let maybeXabis = parseXabi "-" $ Text.unpack source
       xabis = either (error . show) Map.fromList maybeXabis
-
-  let
-    contracts = Map.intersectionWith (,) xabis abiBins
-    details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
-      ContractDetails
-      { contractdetailsBin = bin
-      , contractdetailsAddress = Just (Named "Latest")
-      , contractdetailsBinRuntime = binRuntime
-      , contractdetailsCodeHash =  binRuntimeToCodeHash binRuntime
-      , contractdetailsName = contrName
-      , contractdetailsXabi = xabi
-      }
+      contracts = Map.intersectionWith (,) xabis abiBins
+      details = flip Map.mapWithKey contracts $ \ contrName (xabi,AbiBin{..}) ->
+        ContractDetails
+        { contractdetailsBin = bin
+        , contractdetailsAddress = Just (Named "Latest")
+        , contractdetailsBinRuntime = binRuntime
+        , contractdetailsCodeHash =  binRuntimeToCodeHash binRuntime
+        , contractdetailsName = contrName
+        , contractdetailsXabi = xabi
+        }
 
   metadataIds <- flip Map.traverseWithKey details $ \ contrName (detail@ContractDetails{..}) -> do
     let
