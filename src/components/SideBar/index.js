@@ -19,7 +19,7 @@ class SideBar extends Component {
         {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link"},
         {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange"},
         {path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users"},
-        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel"},
+        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel"}
       ]
     );
 
@@ -43,6 +43,18 @@ class SideBar extends Component {
           }
         </div>
         <hr />
+        <div className="menu">
+          <NavLink
+            id={'apps'}
+            to={'/apps'}
+            className="menu-item"
+            activeClassName="active-menu-item"
+            onClick={() => {mixpanelWrapper.track('nav_link_contracts_click')}}
+          >
+            <i className='fa fa-rocket'> </i>
+            <span className="menu-text">Apps</span>
+          </NavLink>
+        </div>
         <div>
         </div>
         <div className="smd-sidebar-logo">
