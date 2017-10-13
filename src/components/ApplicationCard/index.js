@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Button } from '@blueprintjs/core';
-import './applicationCard.css'
+import './applications-card.css'
 
 class ApplicationCard extends Component {
 
