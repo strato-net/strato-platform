@@ -7,8 +7,6 @@ import {withRouter} from 'react-router-dom';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
-import {endTour} from '../Tour/tour.actions';
-import { callAfterTour } from '../Tour/tour.helpers';
 
 import Tour from '../Tour';
 
@@ -172,7 +170,6 @@ export default withRouter(
     {
       fetchAccounts,
       changeAccountFilter,
-      endTour,
     }
   )(Accounts)
 );

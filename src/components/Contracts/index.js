@@ -6,8 +6,6 @@ import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
-import {endTour} from '../Tour/tour.actions';
-import {callAfterTour} from '../Tour/tour.helpers';
 
 const tourSteps = [
 /*  {
@@ -104,4 +102,4 @@ function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchContracts, changeContractFilter, endTour})(Contracts));
+export default withRouter(connect(mapStateToProps, {fetchContracts, changeContractFilter})(Contracts));

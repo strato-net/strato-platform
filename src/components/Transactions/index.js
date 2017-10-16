@@ -2,9 +2,6 @@ import React, {Component} from 'react';
 import TransactionTable from './components/TransactionTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
-import { endTour } from '../Tour/tour.actions';
-import { callAfterTour } from '../Tour/tour.helpers';
-import { connect } from 'react-redux';
 
 const tourSteps = [
   {
@@ -43,4 +40,4 @@ class Transactions extends Component {
   }
 }
 
-export default connect(state => { return {} }, {endTour})(Transactions);
+export default Transactions;

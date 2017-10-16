@@ -3,7 +3,6 @@ import './Tour.css';
 import Joyride from 'react-joyride';
 import { connect } from 'react-redux';
 import { stopAllToursFromAutostarting, endTour } from './tour.actions';
-import { callAfterTour } from './tour.helpers';
 import { withRouter } from 'react-router';
 
 const Tour = ({name, callback, run, steps, ref, autoStart, endTour, stopAllToursFromAutostarting, finalStepSelector, nextPage = null, history}) => {
@@ -17,14 +16,14 @@ const Tour = ({name, callback, run, steps, ref, autoStart, endTour, stopAllTours
       autoStart={autoStart}
       showBackButton={false}
       callback={event => {
-        callAfterTour(finalStepSelector, () => {
-          if(nextPage) history.push(nextPage);
-          endTour(name);
-        })(event);
-
         if(event.isTourSkipped || event.action === 'close') {
           endTour(name);
           stopAllToursFromAutostarting();
+        }
+        else if((event.type === 'step:after' && event.step.selector === finalStepSelector)) {
+          console.log("THERE");
+          if(nextPage) history.push(nextPage);
+          endTour(name);
         }
       }}
       showOverlay={false}
