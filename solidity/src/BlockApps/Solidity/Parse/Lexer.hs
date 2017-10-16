@@ -44,7 +44,7 @@ solidityLexer = P.makeTokenParser solidityLanguage
 
 solidityLanguage = javaStyle {
   P.reservedNames = [
-     "import", "library", "using",
+     "pragma", "import", "library", "using",
      "contract", "is", "public", "internal", "private", "external", "import",
      "event", "indexed", "anonymous",
      "bool", "true", "false",
