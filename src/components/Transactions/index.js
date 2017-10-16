@@ -31,9 +31,7 @@ class Transactions extends Component {
   render() {
     return (
       <div className="container-fluid pt-dark">
-        <Tour steps={tourSteps} name="transactions" callback={callAfterTour('#tour-bloc-api-button',() => {
-          this.props.endTour('transactions');
-        })}/>
+        <Tour steps={tourSteps} name="transactions" finalStepSelector='#tour-bloc-api-button' />
         <div className="row">
           <div className="col-sm-12">
             <h3>Transactions</h3>

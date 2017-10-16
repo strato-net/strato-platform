@@ -102,11 +102,7 @@ class Accounts extends Component {
 
     return (
       <div className="container-fluid pt-dark">
-        <Tour name="accounts" steps={tourSteps} callback={ callAfterTour('#contracts', () => {
-            this.props.history.push('contracts');
-            this.props.endTour('accounts');
-          })}
-        />
+        <Tour name="accounts" steps={tourSteps}  finalStepSelector='#contracts' nextPage='contracts' />
         <div className="row">
           <div className="col-sm-8 text-left">
             <h3>Accounts</h3>

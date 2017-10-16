@@ -2,9 +2,11 @@ import React from 'react';
 import './Tour.css';
 import Joyride from 'react-joyride';
 import { connect } from 'react-redux';
-import { stopAllToursFromAutostarting } from './tour.actions';
+import { stopAllToursFromAutostarting, endTour } from './tour.actions';
+import { callAfterTour } from './tour.helpers';
+import { withRouter } from 'react-router';
 
-const Tour = ({name, callback, run, steps, ref, autoStart, stopAllToursFromAutostarting}) => {
+const Tour = ({name, callback, run, steps, ref, autoStart, endTour, stopAllToursFromAutostarting, finalStepSelector, nextPage = null, history}) => {
   return (
     <Joyride
       steps={steps}
@@ -15,8 +17,13 @@ const Tour = ({name, callback, run, steps, ref, autoStart, stopAllToursFromAutos
       autoStart={autoStart}
       showBackButton={false}
       callback={event => {
-        callback(event);
-        if((event.type === 'finished') || event.isSkipped || event.action === 'close') {
+        callAfterTour(finalStepSelector, () => {
+          if(nextPage) history.push(nextPage);
+          endTour(name);
+        })(event);
+
+        if(event.isTourSkipped || event.action === 'close') {
+          endTour(name);
           stopAllToursFromAutostarting();
         }
       }}
@@ -27,9 +34,9 @@ const Tour = ({name, callback, run, steps, ref, autoStart, stopAllToursFromAutos
 }
 
 
-export default connect((state, ownProps) => {
+export default withRouter(connect((state, ownProps) => {
   return {
     run: state.tour[ownProps.name].run && state.tour.all.run,
     autoStart: state.tour[ownProps.name].autoStart && state.tour.all.autoStart,
   }
-}, { stopAllToursFromAutostarting })(Tour);
+}, { stopAllToursFromAutostarting, endTour })(Tour));

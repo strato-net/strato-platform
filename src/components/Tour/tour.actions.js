@@ -12,7 +12,6 @@ export const endAllTours = () => {
 }
 
 export const stopAllToursFromAutostarting = () => {
-  debugger;
   return { type: STOP_ALL_TOUR_AUTOSTARTS };
 }
 
