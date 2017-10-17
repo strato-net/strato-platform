@@ -13,10 +13,50 @@ import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
 
 data Version = Version {
-                   majorVersion :: Int
-                 , minorVersion :: Int
-                 , patchVersion :: Int
+                   majorVersion :: Maybe Int
+                 , minorVersion :: Maybe Int
+                 , patchVersion :: Maybe Int
                  } deriving Show
+
+instance Eq Version where
+  v1 == v2 =
+    let
+      maj1 = from $ majorVersion v1
+      min1 = from $ minorVersion v1
+      pat1 = from $ patchVersion v1
+      maj2 = from $ majorVersion v2
+      min2 = from $ minorVersion v2
+      pat2 = from $ patchVersion v2
+    in (maj1 == maj2) && (min1 == min2) && (pat1 == pat2)
+    where from = maybe 0 id
+
+instance Ord Version where
+  v1 `compare` v2 =
+    let
+      maj1 = from $ majorVersion v1
+      min1 = from $ minorVersion v1
+      pat1 = from $ patchVersion v1
+      maj2 = from $ majorVersion v2
+      min2 = from $ minorVersion v2
+      pat2 = from $ patchVersion v2
+    in if maj1 /= maj2
+         then maj1 `compare` maj2
+         else if min1 /= min2
+           then min1 `compare` min2
+           else pat1 `compare` pat2
+    where from = maybe 0 id
+
+toVersion :: Int -> Int -> Int -> Version
+toVersion mj mn pt = Version (Just mj) (Just mn) (Just pt)
+
+currentSolidityVersion :: Version
+currentSolidityVersion = toVersion 0 4 8
+
+minVersion :: Version
+minVersion = toVersion 0 0 0
+
+maxVersion :: Version
+maxVersion = toVersion maxBound maxBound maxBound
 
 data VersionRange = VersionRange {
                         lowerVersion :: Version
@@ -24,33 +64,15 @@ data VersionRange = VersionRange {
                       } deriving Show
 
 versionVersionRange :: Version -> VersionRange
-versionVersionRange v@Version{..} = VersionRange v v{patchVersion = patchVersion + 1}
-
-rangeVersionSet :: VersionRange -> VersionSet
-rangeVersionSet range = (\v -> (v >= lowerVersion range) && (v < upperVersion range))
+versionVersionRange (Version Nothing  _        _       ) = VersionRange  minVersion        maxVersion
+versionVersionRange (Version (Just i) Nothing  _       ) = VersionRange (toVersion i 0 0) (toVersion (i+1)  0     0   )
+versionVersionRange (Version (Just i) (Just j) Nothing ) = VersionRange (toVersion i j 0) (toVersion  i    (j+1)  0   )
+versionVersionRange (Version (Just i) (Just j) (Just k)) = VersionRange (toVersion i j k) (toVersion  i     j    (k+1))
 
 type VersionSet = Version->Bool
 
-instance Eq Version where
-  v1 == v2 = (majorVersion v1 == majorVersion v2)
-          && (minorVersion v1 == minorVersion v2)
-          && (patchVersion v1 == patchVersion v2)
-
-instance Ord Version where
-  v1 `compare` v2 = if majorVersion v1 /= majorVersion v2
-                      then majorVersion v1 `compare` majorVersion v2
-                      else if minorVersion v1 /= minorVersion v2
-                        then minorVersion v1 `compare` minorVersion v2
-                        else patchVersion v1 `compare` patchVersion v2
-
-currentSolidityVersion :: Version
-currentSolidityVersion = Version 0 4 8
-
-minVersion :: Version
-minVersion = Version 0 0 0
-
-maxVersion :: Version
-maxVersion = Version maxBound maxBound maxBound
+rangeVersionSet :: VersionRange -> VersionSet
+rangeVersionSet range = (\v -> (v >= lowerVersion range) && (v < upperVersion range))
 
 evaluateVersionSets :: Version -> [VersionSet] -> Bool
 evaluateVersionSets v = all (flip ($) v)
@@ -68,14 +90,15 @@ solidityPragma = do
       else return $ Just "SyntaxError: Source file requires different compiler version"
 
 comparatorSets :: SolidityParser [[VersionSet]]
-comparatorSets = (many1 versionSet) `sepBy` (reservedOp "||" >> whiteSpace)
+comparatorSets = (many1 versionSet) `sepBy` lexeme (reservedOp "||")
 
 versionSet :: SolidityParser VersionSet
-versionSet = versionIdentifier >>= (return . rangeVersionSet)
+versionSet = (lexeme versionIdentifier) >>= (return . rangeVersionSet)
 
 versionIdentifier :: SolidityParser VersionRange
 versionIdentifier = do
   v <- try versionRange
+   <|> versionTilde
    <|> versionCarat
    <|> try versionGT
    <|> try versionLT
@@ -83,111 +106,71 @@ versionIdentifier = do
    <|> versionLTE
    <|> versionEQ
    <?> "Invalid version identifier"
-  optional whiteSpace
   return v
 
 versionRange :: SolidityParser VersionRange
 versionRange = do
-  v1 <- versionNumber
-  whiteSpace >> char '-' >> whiteSpace
+  v1 <- lexeme versionNumber
+  lexeme (char '-')
   v2 <- versionNumber
-  return $ VersionRange (lowerVersion v1) (upperVersion v2)
+  let
+    vr1 = versionVersionRange v1
+    vr2 = versionVersionRange v2
+  return $ VersionRange (lowerVersion vr1) (upperVersion vr2)
+
+versionTilde :: SolidityParser VersionRange
+versionTilde = do
+  char '~'
+  v@Version{..} <- versionNumber
+  case majorVersion of
+    Nothing -> unexpected "wildcard for major version number"
+    Just _ -> do
+      case patchVersion of
+        Just _ -> return . versionVersionRange $ Version majorVersion minorVersion Nothing
+        Nothing -> return $ versionVersionRange v
 
 versionCarat :: SolidityParser VersionRange
 versionCarat = do
   char '^'
-  VersionRange{..} <- versionNumber
+  VersionRange{..} <- versionNumber >>= (return . versionVersionRange)
   let
-    major = majorVersion lowerVersion
-    minor = minorVersion lowerVersion
-    patch = patchVersion lowerVersion
+    major = from $ majorVersion lowerVersion
+    minor = from $ minorVersion lowerVersion
+    patch = from $ patchVersion lowerVersion
   if major > 0
-    then return . VersionRange lowerVersion $ Version (major+1) 0 0
+    then return . VersionRange lowerVersion $ toVersion (major+1) 0 0
     else
       if minor > 0
-        then return . VersionRange lowerVersion $ Version 0 (minor+1) 0
-        else return . VersionRange lowerVersion $ Version 0 0 (patch+1)
+        then return . VersionRange lowerVersion $ toVersion 0 (minor+1) 0
+        else return . VersionRange lowerVersion $ toVersion 0 0 (patch+1)
+  where from = maybe 0 id
 
 versionEQ :: SolidityParser VersionRange
-versionEQ = do
-  optional (char '=')
-  range <- versionNumber
-  return range
+versionEQ = optional (char '=') >> versionNumber >>= (return . versionVersionRange)
 
 versionGT :: SolidityParser VersionRange
-versionGT = do
-  char '>'
-  range <- versionNumber
-  return $ VersionRange (upperVersion range) maxVersion
+versionGT = char '>' >> versionNumber >>= (return . flip VersionRange maxVersion . upperVersion . versionVersionRange)
 
 versionLT :: SolidityParser VersionRange
-versionLT = do
-  char '<'
-  range <- versionNumber
-  return $ VersionRange minVersion (lowerVersion range)
+versionLT = char '<' >> versionNumber >>= (return . VersionRange minVersion . lowerVersion . versionVersionRange)
 
 versionGTE :: SolidityParser VersionRange
-versionGTE = do
-  string ">="
-  range <- versionNumber
-  return $ VersionRange (lowerVersion range) maxVersion
+versionGTE = string ">=" >> versionNumber >>= (return . flip VersionRange maxVersion . lowerVersion . versionVersionRange)
 
 versionLTE :: SolidityParser VersionRange
-versionLTE = do
-  string "<="
-  range <- versionNumber
-  return $ VersionRange minVersion (upperVersion range)
+versionLTE = string "<=" >> versionNumber >>= (return . VersionRange minVersion . upperVersion . versionVersionRange)
 
-versionNumber :: SolidityParser VersionRange
+versionNumber :: SolidityParser Version
 versionNumber = do
   optional (char 'v')
-  range <- try threePartWildcard
-       <|> try threePartVersion
-       <|> try twoPartWildcard
-       <|> try twoPartVersion
-       <|> onePartWildcard
-       <|> onePartVersion
-       <?> "Couldn't parse version number"
-  return range
+  major <- versionPart
+  option (Version major Nothing Nothing) $ do
+    dot
+    minor <- versionPart
+    option (Version major minor Nothing) $ do
+      dot
+      patch <- versionPart
+      return (Version major minor patch)
 
-threePartVersion :: SolidityParser VersionRange
-threePartVersion = do
-  major <- int
-  dot
-  minor <- int
-  dot
-  patch <- int
-  return . versionVersionRange $ Version major minor patch
-
-twoPartVersion :: SolidityParser VersionRange
-twoPartVersion = do
-  major <- int
-  dot
-  minor <- int
-  return $ VersionRange (Version major minor 0) (Version major (minor+1) 0)
-
-onePartVersion :: SolidityParser VersionRange
-onePartVersion = do
-  major <- int
-  return $ VersionRange (Version major 0 0) (Version (major+1) 0 0)
-
-threePartWildcard :: SolidityParser VersionRange
-threePartWildcard = do
-  major <- int
-  dot
-  minor <- int
-  dot
-  oneOf "Xx*"
-  return $ VersionRange (Version major minor 0) (Version major (minor+1) 0)
-
-twoPartWildcard :: SolidityParser VersionRange
-twoPartWildcard = do
-  major <- int
-  dot
-  oneOf "Xx*"
-  return $ VersionRange (Version major 0 0) (Version (major+1) 0 0)
-
-onePartWildcard :: SolidityParser VersionRange
-onePartWildcard = do
-  oneOf "Xx*"
-  return $ VersionRange minVersion maxVersion
+versionPart :: SolidityParser (Maybe Int)
+versionPart = (int >>= return . Just) <|> (oneOf "Xx*" >> return Nothing)

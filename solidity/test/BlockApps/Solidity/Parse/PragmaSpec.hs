@@ -40,6 +40,10 @@ spec = do
     srcCaratBad = "pragma solidity ^0.3.0;"
     srcOr2 = "pragma solidity 0.3.6 || 0.4.0 || 0.4.8;"
     srcCaratOr = "pragma solidity ^0.3.6 || ^0.4.8;"
+    srcTilde = "pragma solidity ~0.4;"
+    srcTildeBad = "pragma solidity ~0.3;"
+    srcTilde' = "pragma solidity ~0;"
+    srcTildeStar = "pragma solidity ~*;"
     srcGT = "pragma solidity >0.4.0;"
     srcGTE = "pragma solidity >=0.4.8;"
     srcLT = "pragma solidity <0.5.0;"
@@ -54,6 +58,10 @@ spec = do
     srcRange' = "pragma solidity 0.2.3 - 0.4;"
 
   describe "Pragma" $ do
+    it "should successfully parse a solidity contract with no pragma" $ do
+      let
+        parsedXabi = sol ""
+      parsedXabi `shouldSatisfy` isRight
     it "should successfully parse a solidity pragma" $ do
       let
         parsedXabi = sol srcVersion
@@ -98,6 +106,22 @@ spec = do
       let
         parsedXabi = sol srcCaratOr
       parsedXabi `shouldSatisfy` isRight
+    it "should successfully parse a solidity pragma that uses the tilde symbol" $ do
+      let
+        parsedXabi = sol srcTilde
+      parsedXabi `shouldSatisfy` isRight
+    it "should return an error when solidity pragma that uses the tilde symbol doesn't include current version" $ do
+      let
+        parsedXabi = sol srcTildeBad
+      parsedXabi `shouldSatisfy` isLeft
+    it "should successfully parse a solidity pragma that uses the tilde symbol with no minor version" $ do
+      let
+        parsedXabi = sol srcTilde'
+      parsedXabi `shouldSatisfy` isRight
+    it "should return an error when solidity pragma that uses the tilde symbol on the wildcard version" $ do
+      let
+        parsedXabi = sol srcTildeStar
+      parsedXabi `shouldSatisfy` isLeft
     it "should successfully parse a solidity pragma that uses the greater than operator" $ do
       let
         parsedXabi = sol srcGT

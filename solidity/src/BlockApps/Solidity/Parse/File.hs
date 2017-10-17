@@ -36,7 +36,6 @@ solidityFile = do
   return $ uncurry Xabi $ partitionEithers toplevel
 -}
 
-
 solidityFile :: SolidityParser [(Text, (Xabi, [Text]))]
 solidityFile = do
   whiteSpace
