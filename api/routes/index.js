@@ -8,7 +8,9 @@ const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 
 
-router.post('/upload', dappController.upload);
+router.post('/dapps', dappController.upload);
+
+// router.get('/dapps', dappController.list);
 
 // TODO: uncomment when auth needed
 // router.post('/login', authController.login);

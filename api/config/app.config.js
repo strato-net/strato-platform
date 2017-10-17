@@ -4,7 +4,7 @@ module.exports = {
     jwtSecret: 'JWT_SECRET_PLACEHOLDER', // random string
     jwtAlgorithm: 'HS512',
     jwtValidity: 14, //in days
-    authCookieName: 'soteriaAuth',
+    authCookieName: 'soteria',
     authCookieSecure: false,
     authCookieDomain: process.env['HOST_NAME'] || '', //if backend hosted on a domain different from the frontend,
     // Development use only
