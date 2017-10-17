@@ -123,7 +123,7 @@ versionTilde = do
   char '~'
   v@Version{..} <- versionNumber
   case majorVersion of
-    Nothing -> unexpected "wildcard for major version number"
+    Nothing -> unexpected "Illegal use of wildcard pattern"
     Just _ -> do
       case patchVersion of
         Just _ -> return . versionVersionRange $ Version majorVersion minorVersion Nothing
@@ -132,18 +132,21 @@ versionTilde = do
 versionCarat :: SolidityParser VersionRange
 versionCarat = do
   char '^'
-  VersionRange{..} <- versionNumber >>= (return . versionVersionRange)
-  let
-    major = from $ majorVersion lowerVersion
-    minor = from $ minorVersion lowerVersion
-    patch = from $ patchVersion lowerVersion
-  if major > 0
-    then return . VersionRange lowerVersion $ toVersion (major+1) 0 0
-    else
-      if minor > 0
-        then return . VersionRange lowerVersion $ toVersion 0 (minor+1) 0
-        else return . VersionRange lowerVersion $ toVersion 0 0 (patch+1)
-  where from = maybe 0 id
+  v <- versionNumber
+  case majorVersion v of
+    Nothing -> unexpected "Illegal use of wildcard pattern"
+    Just _ -> do
+      let
+        major = from $ majorVersion v
+        minor = from $ minorVersion v
+        patch = from $ patchVersion v
+      if major > 0
+        then return . VersionRange v $ toVersion (major+1) 0 0
+        else
+          if minor > 0
+            then return . VersionRange v $ toVersion 0 (minor+1) 0
+            else return . VersionRange v $ toVersion 0 0 (patch+1)
+      where from = maybe 0 id
 
 versionEQ :: SolidityParser VersionRange
 versionEQ = optional (char '=') >> versionNumber >>= (return . versionVersionRange)
