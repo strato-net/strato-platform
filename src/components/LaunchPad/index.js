@@ -58,7 +58,7 @@ class LaunchPad extends Component {
                     name="appUsername"
                     className="pt-input smd-input-width"
                     component="input"
-                    type="tect"
+                    type="text"
                     placeholder="Username"
                     dir="auto"
                     required
