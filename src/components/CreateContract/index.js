@@ -381,7 +381,9 @@ const validate = (values) => {
   return errors
 };
 
-const selector = formValueSelector('create-contract');
+export const CREATE_CONTRACT_FORM = 'create-contract'
+
+const selector = formValueSelector(CREATE_CONTRACT_FORM);
 
 function mapStateToProps(state) {
   return {
@@ -396,7 +398,6 @@ function mapStateToProps(state) {
   };
 }
 
-export const CREATE_CONTRACT_FORM = 'create-contract'
 
 const formed = reduxForm({form: CREATE_CONTRACT_FORM, validate})(CreateContract);
 const connected = connect(mapStateToProps, {
