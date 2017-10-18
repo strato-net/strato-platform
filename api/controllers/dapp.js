@@ -2,10 +2,13 @@ const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
 const fs = require('fs');
+const mkdirp = require('mkdirp');
 const multer  = require('multer');
 const path = require('path');
 const rp = require('request-promise');
 
+const appConfig = require('../config/app.config');
+const appMetadata = require('../lib/appMetadata/appMetadata');
 
 const tmpFolder = 'tmp';
 
@@ -66,8 +69,41 @@ checkFileCompiles = function(directory, fileName) {
   })
 };
 
-registerDapp = function() {
-  // TODO: register dapp on blockchain (call AppMetadata lib function with username/password provided)
+registerDapp = function*(username, address, password, packageMetadata, dappUrl) {
+  const args = {
+    _appName: packageMetadata['name'],
+    _version: packageMetadata['version'],
+    _url: dappUrl,
+    _description: packageMetadata['description'],
+    _maintainer: packageMetadata['maintainer'],
+  };
+  const userCredentials = {
+    name: username,
+    address: address,
+    password: password,
+  };
+  try {
+    return yield appMetadata.uploadContract(userCredentials, args);
+  } catch (error) {
+    let err = new Error('could not register application on the blockchain');
+    // TODO: add better error handling for bloc API errors (if it's possible...)
+    switch (error.status) {
+      case 404:
+        err.message += ': wrong username or address';
+        err.status = 401;
+        break;
+      case 400:
+        if (error.data === 'incorrect password') {
+          err.message += ': incorrect password';
+          err.status = 401
+        } else if (error.data === 'strato error: failed to find account') {
+          err.message += ': account does not have any ether';
+          err.status = 400
+        }
+        break;
+    }
+    throw(err)
+  }
 };
 
 parsePackageMetadata = function(packageTmpFolder) {
@@ -79,6 +115,7 @@ parsePackageMetadata = function(packageTmpFolder) {
       }
       try {
         const metadata = JSON.parse(data);
+        validatePackageMetadata(metadata);
         return resolve(metadata);
       } catch(error) {
         let err = new Error('could not parse metadata.json: ' + error);
@@ -87,6 +124,12 @@ parsePackageMetadata = function(packageTmpFolder) {
       }
     });
   });
+};
+
+validatePackageMetadata = function(metadata) {
+  if (!metadata['name'] || !metadata['version'] || !metadata['description'] || !metadata['maintainer']) {
+    throw 'wrong params, expected: {name, version, description, maintainer}'
+  }
 };
 
 upload = function (req, res, next) {
@@ -158,12 +201,31 @@ upload = function (req, res, next) {
         // TODO: refactor: collect all contracts in single array with one bloc call instead
         // files compilation order is random (no cross-file import statement support)
         Promise.all(compilationPromises)
-          .then(values => {
-            // console.log(values); // [...solFiles[...contractsInFile{codeHash, contractName},],]
+          .then(values => { // values === [solFiles[contractsInFile{codeHash, contractName},],]
             co(function*() {
-              const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
-              registerDapp(); // TODO
-              // TODO: move app from tmp/ to app/ // ${encodeURIComponent(username)}
+              // TODO: refactor: move packageMetadata right after unzipping the package to validate before compiling contracts
+              let packageMetadata = yield parsePackageMetadata(packageTmpFolder);
+              const dappPathArray = [
+                appConfig.apps.directory,
+                encodeURIComponent(username),
+                encodeURIComponent(packageMetadata['name']),
+              ];
+              const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
+
+              // TODO: refactor: move the app files first, then register dapp and clean files if error
+              yield registerDapp(username, address, password, packageMetadata, dappUrl);
+              // make sure if apps/username folder exists
+              mkdirp(path.join(dappPathArray[0], dappPathArray[1]), function (err) {
+                if (err) {
+                  return next(err);
+                }
+                fs.rename(packageTmpFolder, path.join(...dappPathArray), function (err) {
+                  if (err) {
+                    return next(err);
+                  }
+                  res.status(200).json({metadata: packageMetadata, url: dappUrl});
+                });
+              });
             }).catch(err => {
               return next(err);
             })
