@@ -1,0 +1,19 @@
+{
+  "name": "soteria",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "",
+    "build": "",
+    "test": "",
+    "eject": ""
+  },
+  "dependencies": {
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git",
+    "chai": "^4.0.2",
+    "co": "^4.6.0",
+    "co-mocha": "^1.2.0",
+    "expect": "latest",
+    "mocha": "^3.4.2"
+  }
+}
