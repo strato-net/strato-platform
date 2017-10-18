@@ -35,13 +35,13 @@ class CreateContract extends Component {
         >
           {({isDragActive, isDragReject, acceptedFiles}) => {
               if (isDragActive) {
-                return <p className="pt-intent-success">Drop to Upload!</p>;
+                return (<p className="pt-intent-success">Drop to Upload!</p>);
               }
               if (isDragReject) {
-                return <p className="pt-intent-warning">Invalid file!</p>;
+                return (<p className="pt-intent-warning">Invalid file!</p>);
               }
               else
-                return <p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>
+                return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}

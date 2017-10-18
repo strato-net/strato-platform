@@ -30,6 +30,7 @@ import tourReducer from './components/Tour/tour.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendEtherReducer from './components/Accounts/components/SendEther/sendEther.reducer';
 import applicationsReducer from './components/Applications/applications.reducer';
+import launchPadReducer from './components/LaunchPad/launchPad.reducer';
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
@@ -84,7 +85,8 @@ const rootReducer = combineReducers({
   sendEther: sendEtherReducer,
   loadingBar: loadingBarReducer,
   tour: tourReducer,
-  applications: applicationsReducer
+  applications: applicationsReducer,
+  launchPad: launchPadReducer
 });
 
 const rootSaga = function* startForeman() {
