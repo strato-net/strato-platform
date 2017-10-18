@@ -1,9 +1,6 @@
 const ba = require('blockapps-rest');
 const rest = ba.rest;
-const util = ba.common.util;
-const config = ba.common.config;
-const BigNumber = ba.common.BigNumber;
-const constants = ba.common.constants
+
 
 const contractName = 'AppMetadata';
 const contractFilename = `./lib/appMetadata/contracts/AppMetadata.sol`;
