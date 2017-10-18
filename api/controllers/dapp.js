@@ -12,6 +12,8 @@ const appMetadata = require('../lib/appMetadata/appMetadata');
 
 const tmpFolder = 'tmp';
 
+// TODO: clean the uploaded files from uploaded/ and tmp/ after responding to user with error or success
+
 /**
  * Parse the solidity source
  * @param data {string}
