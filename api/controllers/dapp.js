@@ -1,8 +1,7 @@
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
-const fs = require('fs');
-const mkdirp = require('mkdirp');
+const fs = require('fs-extra');
 const multer  = require('multer');
 const path = require('path');
 const rp = require('request-promise');
@@ -20,9 +19,10 @@ const tmpFolder = 'tmp';
  * @returns {Promise}
  */
 parseContractData = function*(data) {
+  // todo: find another way (using solc.js) or change bloc endpoint to have an option to make ALL contracts searchable instead of listing by one
   const options = {
     method: 'POST',
-    uri: 'http://' + process.env['NODE_HOST']+'/strato-api/eth/v1.2/extabi',
+    uri: 'http://' + process.env['STRATO_LOCAL_HOST']+'/strato-api/eth/v1.2/extabi',
     headers: {
       'content-type': 'application/x-www-form-urlencoded'
     },
@@ -217,17 +217,9 @@ upload = function (req, res, next) {
               // TODO: refactor: move the app files first, then register dapp and clean files if error
               yield registerDapp(username, address, password, packageMetadata, dappUrl);
               // make sure if apps/username folder exists
-              mkdirp(path.join(dappPathArray[0], dappPathArray[1]), function (err) {
-                if (err) {
-                  return next(err);
-                }
-                fs.rename(packageTmpFolder, path.join(...dappPathArray), function (err) {
-                  if (err) {
-                    return next(err);
-                  }
-                  res.status(200).json({metadata: packageMetadata, url: dappUrl});
-                });
-              });
+              yield fs.mkdirp(path.join(dappPathArray[0], dappPathArray[1]));
+              yield fs.move(packageTmpFolder, path.join(...dappPathArray), { overwrite: true });
+              res.status(200).json({metadata: packageMetadata, url: dappUrl});
             }).catch(err => {
               return next(err);
             })

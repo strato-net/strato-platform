@@ -16,4 +16,6 @@ COPY . /usr/src/app
 
 EXPOSE 3001
 
+VOLUME /usr/src/app/apps
+
 CMD [ "sh", "/usr/src/app/docker-run.sh" ]
