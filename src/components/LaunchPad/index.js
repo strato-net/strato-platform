@@ -7,13 +7,17 @@ import { required } from '../../lib/reduxFormsValidations'
 
 import {
   loadLaunchPad,
-  usernameChange
+  usernameChange,
+  appUploadRequest,
+  appReset
 } from './launchPad.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 
 class LaunchPad extends Component {
 
   componentWillMount() {
+
+
     if(this.props.launchPad.firstLoad) {
       if(Object.getOwnPropertyNames(this.props.accounts).length === 0) {
         this.props.fetchAccounts();
@@ -22,17 +26,34 @@ class LaunchPad extends Component {
     }
   }
 
+  handleFileDrop = (files, field) => {
+    field.input.onChange(files);
+  }
+
+  componentDidUpdate() {
+    if(this.props.launchPad.requestCompleted) {
+      this.props.appReset();
+      this.props.history.push('/apps');
+    }
+  }
+
   renderDropzoneInput = (field) => {
     const touchedAndHasErrors = field.meta.touched && field.meta.error
+    const files = field.input.value;
     return (
       <div className="dropzoneContainer text-center">
         <Dropzone
           className={ touchedAndHasErrors ? "dropzone" : "dropzoneActive"}
           activeClassName="dropzoneActive"
           rejectClassName="dropzoneRejected"
+          onDrop = {(files,e) => { this.handleFileDrop(files, field) }}
           name={field.name}
         >
-          <p style={{'float': 'left'}}>Drop the package here or click to browse</p>
+          {
+            files && Array.isArray(files) && files.length > 0
+            ? ( <p style={{'float': 'left'}}>{files[0].name}</p> )
+            : ( <p style={{'float': 'left'}}>Drop the package here or click to browse</p> )
+          }
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
       </div>
@@ -44,7 +65,7 @@ class LaunchPad extends Component {
   };
 
   submit = (values) => {
-
+    this.props.appUploadRequest(values);
   };
 
   render() {
@@ -202,7 +223,9 @@ function validate (values) {
   if (!values.appPassword) {
     errors.appPassword = "Password required";
   }
-  // TODO: check file
+  if(!values.appPackage) {
+    errors.appPackage = "Upload file";
+  }
   return errors;
 }
 
@@ -223,6 +246,8 @@ export default withRouter(
       usernameChange,
       loadLaunchPad,
       fetchAccounts,
+      appUploadRequest,
+      appReset
     }
   )(formed)
 );

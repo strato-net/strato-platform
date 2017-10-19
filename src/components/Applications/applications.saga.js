@@ -8,28 +8,25 @@ import {
   fetchApplicationsSuccess,
   fetchApplicationsFailure
 } from './applications.actions';
+import { env } from '../../env';
 
-// removed app.json json file when actual API is implemented 
-const applications = require('../../mock_apps/apps.json');
-
-// const applicationsUrl = '/apps';
+const applicationsUrl = env.CIRRUS_URL + '/AppMetadata';
 
 function getApplications() {
-  return applications;
-  // return fetch(
-  //   applicationsUrl,
-  //   {
-  //     method: 'GET',
-  //     headers: {
-  //       'Accept': 'application/json'
-  //   },
-  // })
-  // .then(function(response) {
-  //   return response.json()
-  // })
-  // .catch(function(error) {
-  //   throw error;
-  // });
+  return fetch(
+    applicationsUrl,
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+    },
+  })
+  .then(function(response) {
+    return response.json()
+  })
+  .catch(function(error) {
+    throw error;
+  });
 }
 
 function* fetchApplications(action) {

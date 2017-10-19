@@ -3,6 +3,13 @@ export const LAUNCHPAD_LOAD = 'LAUNCHPAD_LOAD'
 export const APP_UPLOAD_REQUEST = 'APP_UPLOAD_REQUEST';
 export const APP_UPLOAD_SUCCESS = 'APP_UPLOAD_SUCCESS';
 export const APP_UPLOAD_FAILURE = 'APP_UPLOAD_FAILURE';
+export const APP_RESET = 'APP_RESET';
+
+export const appReset = function() {
+  return {
+    type: APP_RESET
+  }
+}
 
 export const loadLaunchPad =   function() {
   return {
