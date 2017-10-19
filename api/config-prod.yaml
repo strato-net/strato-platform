@@ -1,0 +1,8 @@
+# WARNING - extra strict syntax
+# DO NOT change the nodes order
+# node 0 is the default url for all single node api calls
+nodes:
+  - id: 0
+    stratoUrl: 'http://__STRATO_LOCAL_HOST__/strato-api'
+    blocUrl: 'http://__STRATO_LOCAL_HOST__/bloc/v2.2'
+    searchUrl: 'http://__STRATO_LOCAL_HOST__/cirrus'

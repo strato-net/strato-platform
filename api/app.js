@@ -44,6 +44,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve uploaded dApps
+app.use('/apps/', express.static('apps'));
+
 app.use('/', index);
 // app.use('/users', users);
 
