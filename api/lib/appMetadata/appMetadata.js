@@ -7,8 +7,7 @@ const contractFilename = `./lib/appMetadata/contracts/AppMetadata.sol`;
 
 function* uploadContract(admin, args) {
   const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-  
-  bool isContractCompiled = yield rest.isCompiled(contract.codeHash);
+  const isContractCompiled = yield rest.isCompiled(contract.codeHash);
   if(!isContractCompiled) {
     yield compileSearch();
   }
