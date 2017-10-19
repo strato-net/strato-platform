@@ -40,13 +40,13 @@ class Applications extends Component {
             </Link>
           </div>
         </div>
-        <div className="pt-card" style={{'padding-top': '48px' }}>
+        <div className="pt-card" style={{'paddingTop': '48px' }}>
         {
           this.props.applications && this.props.applications.length > 0 ?
           this.props.applications.map((app, index) => {
             return( <ApplicationCard app={app} key={index} /> );
           }) :
-          <div className="row" style={{'padding-bottom': '40px' }}>
+          <div className="row" style={{'paddingBottom': '40px' }}>
             <div className="col-sm-12 text-center">
               Nothing to show Sparky! Deploy an application to get started
             </div>
