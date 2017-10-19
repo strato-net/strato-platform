@@ -37,14 +37,17 @@ pipeline {
           cd silo
           basil compose > docker-compose.yml
 
-          NODE_NAME=localhost \
-          BLOC_URL=http://localhost/bloc/v2.2 \
-          BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.2/swagger.json \
-          STRATO_URL=http://localhost/strato-api/eth/v1.2 \
-          STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
-          stratoHost=nginx \
-          cirrusurl=nginx/cirrus \
-          ssl=false \
+          export NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com}
+          export NODE_NAME=${NODE_NAME:-$NODE_HOST}
+          export BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2}
+          export BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json}
+          export STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2}
+          export STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json}
+          export CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search}
+          export XAPI_URL=${XAPI_URL:-http://$NODE_HOST/x-api}
+          export cirrusurl=nginx/cirrus
+          export stratoHost=nginx
+          export ssl=false
           docker-compose up -d
           sleep 32 # wait for cirrus to restart (remove when container dependencies are fixed)
           docker ps
