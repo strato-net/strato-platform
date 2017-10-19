@@ -95,7 +95,6 @@ function postFaucet(address) {
     }
   )
   .then(function(response) {
-    console.log(response);
     return;
   })
   .catch(function(error) {
