@@ -9,8 +9,9 @@ import {
   appUploadFailure
 } from './launchPad.actions';
 // import { handleApiError } from '../../lib/apiErrorHandler';
+import { env } from '../../env';
 
-const url = 'http://localhost:3001/dapps';
+const url = env.XAPI_URL + '/dapps';
 
 function uploadAppCall(username, userAddress, password, files) {
   const body = new FormData();
