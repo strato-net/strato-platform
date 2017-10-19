@@ -7,7 +7,12 @@ const contractFilename = `./lib/appMetadata/contracts/AppMetadata.sol`;
 
 function* uploadContract(admin, args) {
   const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
-  yield compileSearch(contract);
+  
+  bool isContractCompiled = yield rest.isCompiled(contract.codeHash);
+  if(!isContractCompiled) {
+    yield compileSearch();
+  }
+  
   contract.src = 'removed';
   return setContract(admin, contract);
 }
@@ -24,11 +29,8 @@ function setContract(admin, contract) {
   return contract;
 }
 
-function* compileSearch(contract) {
+function* compileSearch() {
   rest.verbose('compileSearch', contractName);
-  if (yield rest.isCompiled(contract.codeHash)) {
-    return;
-  }
   const searchable = [contractName];
   yield rest.compileSearch(searchable, contractName, contractFilename);
 }
@@ -51,7 +53,7 @@ function* getAppMetadata(address) {
 }
 
 module.exports = {
+  compileSearch: compileSearch,
   uploadContract: uploadContract,
-  //
   getAppMetadata: getAppMetadata,
 };
