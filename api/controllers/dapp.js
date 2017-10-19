@@ -87,6 +87,7 @@ registerDapp = function*(username, address, password, packageMetadata, dappUrl) 
   try {
     return yield appMetadata.uploadContract(userCredentials, args);
   } catch (error) {
+    console.warn('appMetadata contract upload error:', error);
     let err = new Error('could not register application on the blockchain');
     // TODO: add better error handling for bloc API errors (if it's possible...)
     switch (error.status) {
@@ -97,6 +98,12 @@ registerDapp = function*(username, address, password, packageMetadata, dappUrl) 
       case 400:
         if (error.data === 'incorrect password') {
           err.message += ': incorrect password';
+          err.status = 401
+        } else if (error.data.includes('no user found with name')) {
+          err.message += ': user does not exist on the node';
+          err.status = 401
+        } else if (error.data.includes('address does not exist for user')) {
+          err.message += ': wrong address provided for the user';
           err.status = 401
         } else if (error.data === 'strato error: failed to find account') {
           err.message += ': account does not have any ether';
@@ -155,6 +162,7 @@ upload = function (req, res, next) {
 
   upload.single('file')(req, res, function (errorMessage) {
     if (errorMessage) {
+      console.warn('file upload failed: ' + errorMessage);
       let err = new Error(errorMessage);
       err.status = 400;
       return next(err);
@@ -218,6 +226,7 @@ upload = function (req, res, next) {
               yield registerDapp(username, address, password, packageMetadata, dappUrl);
               // make sure if apps/username folder exists
               yield fs.mkdirp(path.join(dappPathArray[0], dappPathArray[1]));
+              // TODO: check if dir is fully re-written (no old files left from previous versions)
               yield fs.move(packageTmpFolder, path.join(...dappPathArray), { overwrite: true });
               res.status(200).json({metadata: packageMetadata, url: dappUrl});
             }).catch(err => {
