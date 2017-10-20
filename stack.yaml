@@ -35,6 +35,7 @@ extra-deps:
   - hflags-0.4.2
   - saltine-0.0.0.4
   - servant-options-0.1.0.0
+  - parsec3-numbers-0.1.0
 flags: {}
 extra-package-dbs: []
 

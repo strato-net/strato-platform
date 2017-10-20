@@ -19,6 +19,7 @@ import           Prelude                               hiding (lookup)
 import           BlockApps.Solidity.Parse.Declarations
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
+import           BlockApps.Solidity.Parse.Pragmas
 import           BlockApps.Solidity.Xabi
 
 -- TODO- oops, it looks like xabis can contain multiple contracts and imports.  For now I'll just hardcode a single contract to match the XABI type.
@@ -35,13 +36,16 @@ solidityFile = do
   return $ uncurry Xabi $ partitionEithers toplevel
 -}
 
-
 solidityFile :: SolidityParser [(Text, (Xabi, [Text]))]
 solidityFile = do
   whiteSpace
-  contracts <- many solidityContract
-  eof
-  return contracts
+  versionOk <- option Nothing solidityPragma
+  case versionOk of
+    Just msg -> fail msg
+    Nothing -> do
+      contracts <- many solidityContract
+      eof
+      return contracts
 
 {-
 data Xabi = Xabi

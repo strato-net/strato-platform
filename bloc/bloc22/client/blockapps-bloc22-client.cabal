@@ -37,6 +37,7 @@ test-suite blockapps-bloc22-client-test
     BlockApps.Bloc22.API.AddressesSpec
     BlockApps.Bloc22.API.ContractsSpec
     BlockApps.Bloc22.API.E2ESpec
+    BlockApps.Bloc22.API.PragmaSpec
     BlockApps.Bloc22.API.SearchSpec
     BlockApps.Bloc22.API.UsersSpec
     BlockApps.Bloc22.API.SpecUtils
@@ -44,6 +45,7 @@ test-suite blockapps-bloc22-client-test
   build-depends: base >=4 && < 5
     , blockapps-bloc22-api
     , blockapps-bloc22-client
+    , blockapps-bloc22-server
     , blockapps-strato-api
     , blockapps-strato-client
     , blockapps-solidity
@@ -52,6 +54,7 @@ test-suite blockapps-bloc22-client-test
     , bytestring
     , containers
     , directory
+    , either
     , generic-random
     , hspec
     , http-client

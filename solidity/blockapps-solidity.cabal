@@ -37,6 +37,7 @@ library
                  BlockApps.Solidity.Parse.File
                  BlockApps.Solidity.Parse.Lexer
                  BlockApps.Solidity.Parse.ParserTypes
+                 BlockApps.Solidity.Parse.Pragmas
                  BlockApps.Solidity.Parse.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror
@@ -59,6 +60,7 @@ library
                , memory
                , mtl
                , parsec
+               , parsec3-numbers
                , QuickCheck
                , quickcheck-instances
                , servant
@@ -78,6 +80,7 @@ test-suite blockapps-solidity-test
     BlockApps.SoliditySpec
     BlockApps.Solidity.StorageSpec
     BlockApps.Solidity.Parse.SelectorSpec
+    BlockApps.Solidity.Parse.PragmaSpec
     BlockApps.XAbiConverterSpec
   build-depends: base >=4 && < 5
                , aeson
@@ -87,6 +90,7 @@ test-suite blockapps-solidity-test
                , bytestring
                , containers
                , hspec
+               , parsec
                , raw-strings-qq
                , text
 

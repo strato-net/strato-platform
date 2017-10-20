@@ -12,9 +12,11 @@ import qualified Data.Map                             as Map
 import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
+--import           Data.Char
 
 import           Text.Parsec
 import           Text.Parsec.Perm
+--import           Text.Parsec.Number
 
 import           BlockApps.Solidity.Parse.Lexer
 import           BlockApps.Solidity.Parse.ParserTypes
@@ -24,6 +26,8 @@ import           BlockApps.Solidity.Xabi              (Xabi (..))
 import qualified BlockApps.Solidity.Xabi              as Xabi
 import qualified BlockApps.Solidity.Xabi.Def          as Xabi
 import qualified BlockApps.Solidity.Xabi.Type         as Xabitype
+
+
 
 
 -- | Parses an entire Solidity contract
