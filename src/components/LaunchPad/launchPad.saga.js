@@ -11,7 +11,7 @@ import {
 import { handleApiError } from '../../lib/apiErrorHandler';
 import { env } from '../../env';
 
-const url = env.XAPI_URL + '/dapps';
+const url = env.APEX_URL + '/dapps';
 
 function uploadAppCall(username, userAddress, password, files) {
   const body = new FormData();
