@@ -25,6 +25,7 @@ deployments:
         STRATO_URL: "${STRATO_URL}"
         STRATO_DOC_URL: "${STRATO_DOC_URL}"
         CIRRUS_URL: "${CIRRUS_URL}"
+        APEX_URL: "${APEX_URL}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
 
   - name: bloch
