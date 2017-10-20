@@ -46,6 +46,10 @@ class LaunchPad extends Component {
     }
   }
 
+  componentWillUnmount() {
+    this.props.appReset();
+  }
+
   renderDropzoneInput = (field) => {
     const files = field.input.value;
     const appSetError = this.props.appSetError;
