@@ -1,3 +1,3 @@
-# STRATO-Network-Management and Authentication
+# APEX
 
-Name of this module derived from: http://www.theoi.com/Daimon/Soteria.html
+### SMD backend / STRATO Network Management / Authentication server

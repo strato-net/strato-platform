@@ -2,7 +2,7 @@
   "development": {
     "username": "postgres",
     "password": "",
-    "database": "soteria_dev",
+    "database": "apex_dev",
     "host": "localhost",
     "port": "5432",
     "dialect": "postgres"
@@ -10,7 +10,7 @@
   "test": {
     "username": "postgres",
     "password": "",
-    "database": "soteria_test",
+    "database": "apex_test",
     "host": "127.0.0.1",
     "port": "5432",
     "dialect": "postgres"
@@ -18,7 +18,7 @@
   "production" : {
     "username": "postgres",
     "password": "",
-    "database": "soteria_prod",
+    "database": "apex_prod",
     "host": "postgres",
     "port": "5432",
     "dialect": "postgres"
