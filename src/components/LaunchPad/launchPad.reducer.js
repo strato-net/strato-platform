@@ -3,7 +3,8 @@ import {
   LAUNCHPAD_LOAD,
   APP_UPLOAD_SUCCESS,
   APP_UPLOAD_FAILURE,
-  APP_RESET
+  APP_RESET,
+  APP_SET_ERROR
 } from './launchPad.actions';
 
 const initialState = {
@@ -35,7 +36,12 @@ const reducer = function(state=initialState, action) {
     case APP_UPLOAD_FAILURE:
       return {
         ...state,
-        error: action.error.message
+        error: action.error
+      }
+    case APP_SET_ERROR:
+      return {
+        ...state,
+        error: action.message
       }
     case APP_RESET:
       return initialState;

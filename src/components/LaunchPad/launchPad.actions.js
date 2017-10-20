@@ -3,6 +3,7 @@ export const LAUNCHPAD_LOAD = 'LAUNCHPAD_LOAD'
 export const APP_UPLOAD_REQUEST = 'APP_UPLOAD_REQUEST';
 export const APP_UPLOAD_SUCCESS = 'APP_UPLOAD_SUCCESS';
 export const APP_UPLOAD_FAILURE = 'APP_UPLOAD_FAILURE';
+export const APP_SET_ERROR = 'APP_SET_ERROR';
 export const APP_RESET = 'APP_RESET';
 
 export const appReset = function() {
@@ -41,5 +42,12 @@ export const appUploadFailure = function(error) {
   return {
     type: APP_UPLOAD_FAILURE,
     error: error
+  }
+}
+
+export const appSetError = function(message) {
+  return {
+    type: APP_SET_ERROR,
+    message: message
   }
 }

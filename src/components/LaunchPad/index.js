@@ -9,6 +9,7 @@ import {
   loadLaunchPad,
   usernameChange,
   appUploadRequest,
+  appSetError,
   appReset
 } from './launchPad.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
@@ -16,8 +17,6 @@ import { fetchAccounts } from '../Accounts/accounts.actions';
 class LaunchPad extends Component {
 
   componentWillMount() {
-
-
     if(this.props.launchPad.firstLoad) {
       if(Object.getOwnPropertyNames(this.props.accounts).length === 0) {
         this.props.fetchAccounts();
@@ -26,7 +25,17 @@ class LaunchPad extends Component {
     }
   }
 
-  handleFileDrop = (files, field) => {
+  handleFileDrop = (files, field, appSetError) => {
+    if(files.length > 1) {
+      appSetError('Expected a zip archive, got multiple files');
+      return;
+    }
+    const regex = new RegExp(/.zip$/,'i');
+    if(!regex.test(files[0].name)) {
+      appSetError(`Please upload a zip archive`);
+      return;
+    }
+    appSetError('');
     field.input.onChange(files);
   }
 
@@ -38,24 +47,26 @@ class LaunchPad extends Component {
   }
 
   renderDropzoneInput = (field) => {
-    const touchedAndHasErrors = field.meta.touched && field.meta.error
     const files = field.input.value;
+    const appSetError = this.props.appSetError;
     return (
       <div className="dropzoneContainer text-center">
         <Dropzone
-          className={ touchedAndHasErrors ? "dropzone" : "dropzoneActive"}
-          activeClassName="dropzoneActive"
-          rejectClassName="dropzoneRejected"
-          onDrop = {(files,e) => { this.handleFileDrop(files, field) }}
+          className="dropzone"
+          onDrop = {(files,e) => { this.handleFileDrop(files, field, appSetError) }}
           name={field.name}
         >
-          {
-            files && Array.isArray(files) && files.length > 0
-            ? ( <p style={{'float': 'left'}}>{files[0].name}</p> )
-            : ( <p style={{'float': 'left'}}>Drop the package here or click to browse</p> )
-          }
+          {({isDragActive, isDragReject, acceptedFiles}) => {
+            if(isDragActive) {
+              return (<span>Drop to Upload!</span>);
+            }
+            return (
+              files && Array.isArray(files) && files.length > 0
+              ? ( <span>{files[0].name}</span> )
+              : ( <span>Drop the package here or click to browse</span> )
+            );
+          }}
         </Dropzone>
-        {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
       </div>
     );
   };
@@ -191,7 +202,7 @@ class LaunchPad extends Component {
                   </div>
                 </div>
                 <div className="row">
-                  <div className="col-sm-offset-2 col-sm-10">
+                  <div className="col-sm-offset-2 col-sm-1">
                     <button
                       type="submit"
                       onClick={handleSubmit(this.submit)}
@@ -200,6 +211,11 @@ class LaunchPad extends Component {
                     >
                       Upload
                     </button>
+                  </div>
+                  <div className="col-sm-9">
+                    <div className="smd-pad-4 smd-text-warning">
+                      {this.props.launchPad.error}
+                    </div>
                   </div>
                 </div>
               </form>
@@ -247,6 +263,7 @@ export default withRouter(
       loadLaunchPad,
       fetchAccounts,
       appUploadRequest,
+      appSetError,
       appReset
     }
   )(formed)

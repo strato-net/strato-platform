@@ -8,7 +8,7 @@ import {
   appUploadSuccess,
   appUploadFailure
 } from './launchPad.actions';
-// import { handleApiError } from '../../lib/apiErrorHandler';
+import { handleApiError } from '../../lib/apiErrorHandler';
 import { env } from '../../env';
 
 const url = env.XAPI_URL + '/dapps';
@@ -30,7 +30,7 @@ function uploadAppCall(username, userAddress, password, files) {
   .then((res) => {
     return res.json();
   })
-  // .then(handleApiError)
+  .then(handleApiError)
   .catch((err) => {
     throw err;
   })
