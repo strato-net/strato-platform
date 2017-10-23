@@ -40,7 +40,7 @@ class Applications extends Component {
             </Link>
           </div>
         </div>
-        <div className="pt-card" style={{'paddingTop': '48px' }}>
+        <div>
         {
           this.props.applications && this.props.applications.length > 0 ?
           this.props.applications.map((app, index) => {
