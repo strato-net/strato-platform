@@ -117,21 +117,25 @@ registerDapp = function*(username, address, password, packageMetadata, dappUrl) 
 
 parsePackageMetadata = function(packageTmpFolder) {
   return new Promise(function(resolve, reject) {
-    fs.readFile(path.join(packageTmpFolder, 'metadata.json'), 'utf8', function (err, data) {
-      if (err) {
-        console.error(err);
-        return reject(new Error('could not read the metadata.json'));
-      }
-      try {
-        const metadata = JSON.parse(data);
-        validatePackageMetadata(metadata);
-        return resolve(metadata);
-      } catch(error) {
-        let err = new Error('could not parse metadata.json: ' + error);
-        err.status = 400;
-        return reject(err)
-      }
-    });
+    try {
+      fs.readFile(path.join(packageTmpFolder, 'metadata.json'), 'utf8', function (err, data) {
+        if (err) {
+          throw err;
+        }
+        try {
+          const metadata = JSON.parse(data);
+          validatePackageMetadata(metadata);
+          return resolve(metadata);
+        } catch (error) {
+          let err = new Error('could not parse metadata.json: ' + error);
+          err.status = 400;
+          return reject(err)
+        }
+      });
+    } catch(err) {
+      console.error(err);
+      return reject(new Error('could not read the metadata.json'));
+    }
   });
 };
 
@@ -139,6 +143,24 @@ validatePackageMetadata = function(metadata) {
   if (!metadata['name'] || !metadata['version'] || !metadata['description'] || !metadata['maintainer']) {
     throw 'wrong params, expected: {name, version, description, maintainer}'
   }
+};
+
+validatePackageStructure = function*(packageFolderPath) {
+  const expectedRootPaths = [
+    'metadata.json',
+    'contracts',
+    'ui'
+  ];
+
+  const expectedFullPaths = expectedRootPaths.map(p => path.join(packageFolderPath, p));
+  const semaphores = yield Promise.all(expectedFullPaths.map(path => fs.pathExists(path)));
+  semaphores.forEach((value, index) => {
+    if (!value) {
+      let err = new Error(`could not find the path in the root of archive: '${expectedRootPaths[index]}', please check the archive contents`);
+      err.status = 400;
+      throw err;
+    }
+  })
 };
 
 upload = function (req, res, next) {
@@ -192,12 +214,19 @@ upload = function (req, res, next) {
         return next(err);
       }
 
-      // TODO: validate the file structure of the package (required files, folders), contracts/ contains .sol files only
+      co(function* () {
+        try {
+          yield validatePackageStructure(packageTmpFolder);
+        } catch(error) {
+          return next(error);
+        }
 
-      // check if all contracts from tmp/contracts/ are compile
-      const contractsTmpFolder = path.join(packageTmpFolder, 'contracts');
-      fs.readdir(contractsTmpFolder, function(error, files) {
-        if (error) {
+        // check if all contracts from tmp/contracts/ are compile
+        const contractsTmpFolder = path.join(packageTmpFolder, 'contracts');
+        let files;
+        try {
+          files = yield fs.readdir(contractsTmpFolder);
+        } catch(error) {
           let err = new Error('could not read the contracts/ directory of the package');
           err.status = 400;
           return next(err);
@@ -210,35 +239,34 @@ upload = function (req, res, next) {
 
         // TODO: refactor: collect all contracts in single array with one bloc call instead
         // files compilation order is random (no cross-file import statement support)
-        Promise.all(compilationPromises)
-          .then(values => { // values === [solFiles[contractsInFile{codeHash, contractName},],]
-            co(function*() {
-              // TODO: refactor: move packageMetadata right after unzipping the package to validate before compiling contracts
-              let packageMetadata = yield parsePackageMetadata(packageTmpFolder);
-              const dappPathArray = [
-                appConfig.apps.directory,
-                encodeURIComponent(username),
-                encodeURIComponent(packageMetadata['name']),
-              ];
-              const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
+        try {
+          yield Promise.all(compilationPromises) // returns [solFiles[contractsInFile{codeHash, contractName},],]
+        } catch(error) {
+          let err = new Error('unable to compile contract: ' + error);
+          err.status = 400;
+          return next(err);
+        }
+        // TODO: refactor: move packageMetadata right after unzipping the package to validate before compiling contracts
+        try {
+          let packageMetadata = yield parsePackageMetadata(packageTmpFolder);
+          const dappPathArray = [
+            appConfig.apps.directory,
+            encodeURIComponent(username),
+            encodeURIComponent(packageMetadata['name']),
+          ];
+          const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
 
-              // TODO: refactor: move the app files first, then register dapp and clean files if error
-              yield registerDapp(username, address, password, packageMetadata, dappUrl);
-              // make sure if apps/username folder exists
-              yield fs.mkdirp(path.join(dappPathArray[0], dappPathArray[1]));
-              // TODO: check if dir is fully re-written (no old files left from previous versions)
-              yield fs.move(packageTmpFolder, path.join(...dappPathArray), { overwrite: true });
-              res.status(200).json({metadata: packageMetadata, url: dappUrl});
-            }).catch(err => {
-              return next(err);
-            })
-          })
-          .catch(error => {
-            let err = new Error('unable to compile contract: ' + error);
-            err.status = 400;
-            return next(err);
-          })
-      });
+          // TODO: refactor: move the app files first, then register dapp and clean files if error
+          yield registerDapp(username, address, password, packageMetadata, dappUrl);
+          // make sure if apps/username folder exists
+          yield fs.mkdirp(path.join(dappPathArray[0], dappPathArray[1]));
+          // TODO: check if dir is fully re-written (no old files left from previous versions)
+          yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
+          res.status(200).json({metadata: packageMetadata, url: dappUrl});
+        } catch(err) {
+          return next(err);
+        }
+      })
     });
   })
 };
