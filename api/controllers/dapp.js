@@ -11,7 +11,6 @@ const appMetadata = require('../lib/appMetadata/appMetadata');
 
 const tmpFolder = 'tmp';
 
-// TODO: clean the uploaded files from uploaded/ and tmp/ after responding to user with error or success
 
 /**
  * Parse the solidity source
@@ -71,6 +70,15 @@ checkFileCompiles = function(directory, fileName) {
   })
 };
 
+/**
+ * Register the dapp on the blockchain
+ * @param username String
+ * @param address String
+ * @param password String
+ * @param packageMetadata Object - parsed metadata
+ * @param dappUrl - url of the hosted dapp
+ * @returns contract state
+ */
 registerDapp = function*(username, address, password, packageMetadata, dappUrl) {
   const args = {
     _appName: packageMetadata['name'],
@@ -115,6 +123,11 @@ registerDapp = function*(username, address, password, packageMetadata, dappUrl) 
   }
 };
 
+/**
+ * Fetch the dapp metadata from the metadata.json of the package
+ * @param packageTmpFolder
+ * @returns {Promise}
+ */
 parsePackageMetadata = function(packageTmpFolder) {
   return new Promise(function(resolve, reject) {
     try {
@@ -139,12 +152,20 @@ parsePackageMetadata = function(packageTmpFolder) {
   });
 };
 
+/**
+ * Validate the metadata.json parameters
+ * @param metadata Object - the parsed JSON object of metadata.json contents
+ */
 validatePackageMetadata = function(metadata) {
   if (!metadata['name'] || !metadata['version'] || !metadata['description'] || !metadata['maintainer']) {
     throw 'wrong params, expected: {name, version, description, maintainer}'
   }
 };
 
+/**
+ * Validate the archive package file structure
+ * @param packageFolderPath String - the path of the unzipped package
+ */
 validatePackageStructure = function*(packageFolderPath) {
   const expectedRootPaths = [
     'metadata.json',
@@ -153,6 +174,7 @@ validatePackageStructure = function*(packageFolderPath) {
   ];
 
   const expectedFullPaths = expectedRootPaths.map(p => path.join(packageFolderPath, p));
+
   const semaphores = yield Promise.all(expectedFullPaths.map(path => fs.pathExists(path)));
   semaphores.forEach((value, index) => {
     if (!value) {
@@ -163,7 +185,34 @@ validatePackageStructure = function*(packageFolderPath) {
   })
 };
 
+/**
+ * Remove files or directories if they exist
+ * @param paths String|Array - the absolute or relative (to apex/api/) path of the file
+ */
+removePathsIfExist = function(paths) {
+  if (typeof paths === 'string') {
+    paths = [paths];
+  }
+  paths.forEach(path => {
+    fs.remove(path)
+      .then(() => {
+        console.log(`path ${path} is removed or did not exist`)
+      })
+      .catch(err => {
+        console.error(`could not remove path: ${path}`, err)
+      })
+  });
+
+};
+
+/**
+ * ExpressJS route controller to upload the dApp
+ * @param req
+ * @param res
+ * @param next
+ */
 upload = function (req, res, next) {
+  let tempPaths = [];
   const upload = multer(
     {
       dest: 'uploads/',
@@ -189,6 +238,7 @@ upload = function (req, res, next) {
       err.status = 400;
       return next(err);
     }
+    tempPaths.push(req.file.path);
 
     const username = req.body.username;
     const address = req.body.address;
@@ -196,6 +246,7 @@ upload = function (req, res, next) {
     const file = req.file;
 
     if (!username || !address || !password || !file) {
+      removePathsIfExist(tempPaths);
       let err = new Error("wrong params, expected: {username, address, password, file}");
       err.status = 400;
       return next(err);
@@ -209,15 +260,18 @@ upload = function (req, res, next) {
 
     zip.extractAllToAsync(packageTmpFolder, true, function(error) {
       if (error) {
+        removePathsIfExist(tempPaths);
         let err = new Error('unable to unzip the package');
         err.status = 400;
         return next(err);
       }
+      tempPaths.push(packageTmpFolder);
 
       co(function* () {
         try {
           yield validatePackageStructure(packageTmpFolder);
         } catch(error) {
+          removePathsIfExist(tempPaths);
           return next(error);
         }
 
@@ -227,6 +281,7 @@ upload = function (req, res, next) {
         try {
           files = yield fs.readdir(contractsTmpFolder);
         } catch(error) {
+          removePathsIfExist(tempPaths);
           let err = new Error('could not read the contracts/ directory of the package');
           err.status = 400;
           return next(err);
@@ -242,6 +297,7 @@ upload = function (req, res, next) {
         try {
           yield Promise.all(compilationPromises) // returns [solFiles[contractsInFile{codeHash, contractName},],]
         } catch(error) {
+          removePathsIfExist(tempPaths);
           let err = new Error('unable to compile contract: ' + error);
           err.status = 400;
           return next(err);
@@ -263,7 +319,9 @@ upload = function (req, res, next) {
           // TODO: check if dir is fully re-written (no old files left from previous versions)
           yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
           res.status(200).json({metadata: packageMetadata, url: dappUrl});
+          removePathsIfExist(tempPaths);
         } catch(err) {
+          removePathsIfExist(tempPaths);
           return next(err);
         }
       })
