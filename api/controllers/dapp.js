@@ -268,8 +268,10 @@ upload = function (req, res, next) {
       tempPaths.push(packageTmpFolder);
 
       co(function* () {
+        let packageMetadata;
         try {
           yield validatePackageStructure(packageTmpFolder);
+          packageMetadata = yield parsePackageMetadata(packageTmpFolder);
         } catch(error) {
           removePathsIfExist(tempPaths);
           return next(error);
@@ -302,9 +304,7 @@ upload = function (req, res, next) {
           err.status = 400;
           return next(err);
         }
-        // TODO: refactor: move packageMetadata right after unzipping the package to validate before compiling contracts
         try {
-          let packageMetadata = yield parsePackageMetadata(packageTmpFolder);
           const dappPathArray = [
             appConfig.apps.directory,
             encodeURIComponent(username),
