@@ -15,6 +15,10 @@ class Applications extends Component {
     this.startPoll();
   }
 
+  componentWillUnmount() {
+    clearTimeout(this.timeout)
+  }
+
   startPoll() {
     const fetchApplications = this.props.fetchApplications;
     this.timeout = setInterval(function () {
