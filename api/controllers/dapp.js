@@ -312,11 +312,11 @@ upload = function (req, res, next) {
           ];
           const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
 
-          // TODO: refactor: move the app files first, then register dapp and clean files if error
+          // Register the dApp prior to moving the files (to prevent overriting the prev version of the user's app in same folder if register will fail)
           yield registerDapp(username, address, password, packageMetadata, dappUrl);
-          // make sure if apps/username folder exists
+          // Making sure apps/username folder exists
           yield fs.mkdirp(path.join(dappPathArray[0], dappPathArray[1]));
-          // TODO: check if dir is fully re-written (no old files left from previous versions)
+          // Replace the dapp folder with the new one (all older files will be removed)
           yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
           res.status(200).json({metadata: packageMetadata, url: dappUrl});
           removePathsIfExist(tempPaths);
