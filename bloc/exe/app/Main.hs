@@ -73,7 +73,7 @@ main = do
 
   conn22 <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc22 password=" ++ flags_password
-  
+
   conn21 <- connectPostgreSQL $ fromString $
     "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc21 password=" ++ flags_password
 
@@ -97,7 +97,7 @@ dbExistsQuery21 = "SELECT 1 FROM pg_database WHERE datname='bloc21';"
 
 appBloc :: Bloc22.BlocEnv -> Bloc21.BlocEnv -> Application
 appBloc env22 env21 =
-  logStdoutDev
+  logStdout
   . cors (const $ Just policy)
   . provideOptions (Proxy @ (Bloc22.BlocAPI :<|> Bloc21.BlocAPI))
   . serve (Proxy @ (
