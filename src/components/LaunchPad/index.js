@@ -102,6 +102,7 @@ class LaunchPad extends Component {
                 type="button"
                 className="pt-button pt-intent-primary"
               >
+                <i className='fa fa-rocket smd-margin-right-8'> </i>
                 Apps
               </button>
             </Link>
@@ -110,7 +111,19 @@ class LaunchPad extends Component {
         <div className="row">
           <div className="col-sm-12">
             <div className="pt-card">
-              <h4>Enter application details</h4>
+              <div className="row">
+                <div className="col-sm-6">
+                  <h4>Enter application details</h4>
+                </div>
+                <div className="col-sm-6 text-right">
+                  <a href="https://github.com/blockapps/lottery-demo-app" target="_blank" rel="noopener noreferrer">
+                    <button className="pt-button pt-intent-primary">
+                      <i className='fa fa-paper-plane smd-margin-right-8'> </i>
+                      Show me an example
+                    </button>
+                  </a>
+                </div>
+              </div>
               <hr />
               <form>
                 <div className="row smd-pad-top-12">
