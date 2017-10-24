@@ -15,5 +15,4 @@ getBlkLastR n      =            do addHeader "Access-Control-Allow-Origin" "*"
                                         E.limit $ P.max 1 $ P.min (fromIntegral n :: Int64) fetchLimit
                                         E.orderBy [E.desc (a E.^. BlockDataRefNumber)]
                                         return t
-                                   returnJson $ nub $ P.map bToBPrime' (P.map entityVal (blks :: [Entity Block])) -- consider removing nub - it takes time n^{2}
-
+                                   returnJson $ P.map bToBPrime' (P.map entityVal (blks :: [Entity Block]))
