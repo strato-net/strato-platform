@@ -47,7 +47,7 @@ class BlockTable extends Component {
       mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
-
+    console.log(this.props.queryResult.length);
     let blockRows = this.props.queryResult.map(
       function (block) {
         return (
@@ -157,7 +157,7 @@ class BlockTable extends Component {
     const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
       const queryValue = query[queryType];
       return (
-        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
+        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right-4">
                   {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
