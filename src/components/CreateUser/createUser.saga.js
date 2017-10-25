@@ -40,7 +40,7 @@ function* createUser(action) {
   try {
     let response = yield call(createUserApiCall, action.username, action.password);
     yield put(createUserSuccess(response));
-    yield put(fetchAccounts());
+    yield put(fetchAccounts(true, true));
   }
   catch (err) {
     yield put(createUserFailure(err));

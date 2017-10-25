@@ -19,7 +19,7 @@ class LaunchPad extends Component {
   componentWillMount() {
     if(this.props.launchPad.firstLoad) {
       if(Object.getOwnPropertyNames(this.props.accounts).length === 0) {
-        this.props.fetchAccounts();
+        this.props.fetchAccounts(true, false);
       }
       this.props.loadLaunchPad();
     }

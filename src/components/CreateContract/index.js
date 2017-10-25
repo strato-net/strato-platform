@@ -123,7 +123,7 @@ class CreateContract extends Component {
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(true, false);
   }
 
   render() {

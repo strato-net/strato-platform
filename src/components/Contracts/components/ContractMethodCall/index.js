@@ -28,7 +28,7 @@ class ContractMethodCall extends Component {
       this.props.symbolName,
       this.props.lookup
     );
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(true, false);
   }
 
   handleCloseModal = (e) => {
