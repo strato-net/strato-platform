@@ -3,24 +3,45 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
-import {Button} from '@blueprintjs/core';
-import { compileCodeFromEditor, changeCreateActionState } from './codeEditor.actions';
+import { Button, Tab2, Tabs2 } from '@blueprintjs/core';
+import { compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import CreateContract from '../CreateContract';
 
 class CodeEditor extends Component {
-   
-    editorWillMount = (monaco) => {
-        console.log('Languagues:', monaco.languages.getLanguages())
-    } 
 
     render() {
+        const options = {
+            theme: 'vs-dark',
+            automaticLayout: true
+        };
+
         const requireConfig = {
             url: 'https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.1/require.min.js',
             paths: {
                 vs: 'https://as.alipayobjects.com/g/cicada/monaco-editor-mirror/0.6.1/min/vs'
             }
         };
-       
+        const tabData = this.props.codeEditorData.tab
+        const tabMenus = tabData.map((item, index) =>
+            <Tab2 id={index} title={item.title} panel={<MonacoEditor
+                className="col-md-4 text-center"
+                width={'100%'}
+                height="400"
+                defaultValue={item.text}
+                requireConfig={requireConfig}
+                editorWillMount={this.editorWillMount}
+                options={options}
+                onChange={(value, e) => {
+                    this.props.changeCreateActionState(false, value, index)
+                }} />}>
+                <span className="pt-icon-standard pt-icon-cross pt-align-right smd-pad-8"
+                    onClick={() => {
+                       this.props.removeTab(index)
+                    }}>
+                </span>
+            </Tab2>
+        )
+
         return (
             <div className="container-fluid">
                 <div className="row pt-dark">
@@ -36,30 +57,30 @@ class CodeEditor extends Component {
                                         'Greeter',
                                         this.props.codeEditorData.sourceCode,
                                         false
-                                      );
+                                    );
                                 }} className="pt-intent-primary"
                                     text="Compile" />
-                                <CreateContract contractNameFromEditor={this.props.codeEditorData.contractName} enableCreateContract={this.props.codeEditorData.enableCreateAction} textFromEditor={this.props.codeEditorData.sourceCode} sourceFromEditor={this.props.codeEditorData.response&&this.props.codeEditorData.response.src}/>
+                                <CreateContract contractNameFromEditor={this.props.codeEditorData.contractName} enableCreateContract={this.props.codeEditorData.enableCreateAction} textFromEditor={this.props.codeEditorData.sourceCode} sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
                             </div>
                         </div>
                     </div>
-                    <div className="row" style={{margin:20}}>
-                        <MonacoEditor
-                            className="col-md-4 text-center"
-                            width={'100%'}
-                            height="400"
-                            language="solidity"
-                            defaultValue={this.props.codeEditorData.sourceCode}
-                            requireConfig={requireConfig}
-                            editorWillMount={this.editorWillMount}
-                            onChange={(value, e) => {
-                                this.props.changeCreateActionState(false,value)
-                            }}
-                        />
+                    <div className="row">
+                        <div className="col-md-6">
+                            <Button className="pt-icon-add"
+                                text="Add File"
+                                onClick={() => {
+                                    this.props.addNewFileTab()
+                                }} />
+                        </div>
                     </div>
-                    <div style={{margin:20}}>
+                    <div className="row" style={{ margin: 20 }}>
+                        <Tabs2 id="Tabs2Example" defaultSelectedTabId={this.props.codeEditorData.lastTabSelected} onChange = {(newTab,prevTab,event) => this.props.onTabChange(prevTab,newTab)}>
+                            {tabMenus}
+                        </Tabs2>
+                    </div>
+                    <div style={{ margin: 20 }}>
                         Result:
-                        {this.props.codeEditorData.codeCompileSuccess?' Contract compiled successfully': this.props.codeEditorData.response?' '+this.props.codeEditorData.response:''}
+                        {this.props.codeEditorData.codeCompileSuccess ? ' Contract compiled successfully' : this.props.codeEditorData.response ? ' ' + this.props.codeEditorData.response : ''}
                     </div>
                 </div>
 
@@ -76,5 +97,8 @@ function mapStateToProps(state) {
 
 export default withRouter(connect(mapStateToProps, {
     compileCodeFromEditor,
-    changeCreateActionState
+    changeCreateActionState,
+    addNewFileTab,
+    removeTab,
+    onTabChange
 })(CodeEditor));
