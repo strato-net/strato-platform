@@ -116,7 +116,7 @@ class LaunchPad extends Component {
                   <h4>Enter application details</h4>
                 </div>
                 <div className="col-sm-6 text-right">
-                  <a href="https://developers.blockapps.net/advanced/launch-a-dapp/" target="_blank" rel="noopener noreferrer">
+                  <a href="https://developers.blockapps.net/advanced/launch-dapp/" target="_blank" rel="noopener noreferrer">
                     <button className="pt-button pt-minimal pt-intent-primary">
                       <i className='fa fa-book smd-margin-right-8'> </i>
                       Read the docs
