@@ -28,6 +28,16 @@ deployments:
         APEX_URL: "${APEX_URL}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
 
+  - name: apex
+    repo: https://github.com/blockapps/apex.git
+    ref: master
+    compose:
+      restart: always
+      volumes:
+        - ./dapps:/usr/src/app/apps
+      environment:
+        NODE_HOST: "${NODE_HOST}"
+
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
     ref: master
@@ -158,6 +168,7 @@ deployments:
         - postgrest
         - smd-ui
         - strato
+        - apex
       environment:
         ssl: "${ssl}"
         authBasic: "${authBasic}"
