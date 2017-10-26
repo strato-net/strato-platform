@@ -14,7 +14,7 @@ import           Data.Ord
 --import           Data.Traversable
 import           Data.Tree
 import           Database.Redis                            hiding (sortBy)
-import           Lens.Family2
+import           Lens.Family2                              hiding (set)
 import           Test.Hspec
 import qualified Test.HUnit                                as HUnit
 import           Test.QuickCheck
@@ -361,6 +361,7 @@ specTest = around (withConn 1) $ do
 
     flushDB
     it "Should fork a chain and call commonAncestorHelper with the new chain data being the shorter chain" $ \conn -> do
+      pending
       g <- makeGenesisBlock
       chain <- extendChain 4 [g]
       oldChain <- extendChain 7 chain
@@ -376,6 +377,90 @@ specTest = around (withConn 1) $ do
       HUnit.assertBool ("Modifications and deletions share common entries")
        (intersect (map snd modifications) deletions == [])
 
+  describe "commonAncestorHelper unit tests" $ do
+    flushDB
+    it "Should propose a new block with the same parent as best block" $ \conn -> do
+      g <- makeGenesisBlock
+      baseChain <- extendChain 1 [g]
+      oldChain <- extendChain 1 baseChain
+      newChain <- extendChain 2 baseChain
+      canon <- runRedis conn $ insertAndUpdateChain g oldChain newChain
+      HUnit.assertBool "Got an invalid chain from Redis" (validateChain $ map snd canon)
+
+    flushDB
+    it "Should propose a new block with the same grandparent as best block" $ \conn -> do
+      g <- makeGenesisBlock
+      baseChain <- extendChain 1 [g]
+      oldChain <- extendChain 2 baseChain
+      newChain <- extendChain 3 baseChain
+      canon <- runRedis conn $ insertAndUpdateChain g oldChain newChain
+      HUnit.assertBool "Got an invalid chain from Redis" (validateChain $ map snd canon)
+
+    flushDB
+    it "Should propose a new block when new chain is shorter than old chain" $ \conn -> do
+      g <- makeGenesisBlock
+      baseChain <- extendChain 1 [g]
+      oldChain <- extendChain 3 baseChain
+      newChain <- extendChain 2 baseChain
+      canon <- runRedis conn $ insertAndUpdateChain g oldChain newChain
+      HUnit.assertBool "Got an invalid chain from Redis" (validateChain $ map snd canon)
+
+    flushDB
+    it "Should merge an invalid chain into the canonical chain" $ \conn -> do
+      g <- makeGenesisBlock
+      chain <- extendChain 4 [g]
+      oldChain <- extendChain 5 chain
+      newChain <- extendChainIncorrectly 7 chain
+      oldCanon <- runRedis conn $ do
+          forM_ oldChain RDB.putHeader
+          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
+          workChain RDB.putBestBlockInfo oldChain
+          let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
+          canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+          return $ map snd canon
+      newCanon <- runRedis conn $ do
+          forM_ newChain RDB.putHeader
+          workChain RDB.putBestBlockInfo newChain
+          let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
+          canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+          return $ map snd canon
+      putStrLn . ("Old chain: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockDataParentHash $ b)) oldChain
+      putStrLn . ("Old canon: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockDataParentHash $ b)) oldCanon
+      putStrLn . ("New chain: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockDataParentHash $ b)) newChain
+      putStrLn . ("New canon: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockDataParentHash $ b)) newCanon
+
+      HUnit.assertEqual
+          ("Couldn't validate the canonical chain")
+          newChain newCanon
+
+    flushDB
+    it "Should merge an invalid chain into the canonical chain" $ \conn -> do
+      g <- makeGenesisBlock
+      chain <- extendChain 4 [g]
+      oldChain <- extendChain 5 chain
+      newChain <- extendChain 1 chain >>= extendChainIncorrectly 6
+      oldCanon <- runRedis conn $ do
+          forM_ oldChain RDB.putHeader
+          void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
+          workChain RDB.putBestBlockInfo oldChain
+          let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
+          canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+          return $ map snd canon
+      newCanon <- runRedis conn $ do
+          forM_ newChain RDB.putHeader
+          workChain RDB.putBestBlockInfo newChain
+          let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
+          canon <- RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
+          return $ map snd canon
+      putStrLn . ("Old chain: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockHeaderHash $ b, showHash . blockDataParentHash $ b)) oldChain
+      putStrLn . ("Old canon: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockHeaderHash $ b, showHash . blockDataParentHash $ b)) oldCanon
+      putStrLn . ("New chain: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockHeaderHash $ b, showHash . blockDataParentHash $ b)) newChain
+      putStrLn . ("New canon: " ++) . show $ map (\b -> (blockDataNumber b, showHash . blockHeaderHash $ b, showHash . blockDataParentHash $ b)) newCanon
+
+      HUnit.assertEqual
+          ("Couldn't validate the canonical chain")
+          newChain newCanon
+
 callCommonAncestor :: [BlockData] -> [BlockData] -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
 
 callCommonAncestor old new =
@@ -385,6 +470,18 @@ callCommonAncestor old new =
     oldSha = (blockHeaderHash . last) old
     newSha = (blockHeaderHash . last) new
   in RDB.commonAncestorHelper oldNumber newNumber oldSha newSha
+
+insertAndUpdateChain :: BlockData -> [BlockData] -> [BlockData] -> Redis [(SHA, BlockData)]
+insertAndUpdateChain g oldChain newChain = do
+        void $ RDB.forceBestBlockInfo (blockHeaderHash g) (blockDataNumber g) 0
+        forM_ oldChain $ RDB.putBlock . (\b -> Block b [] [])
+        forM_ newChain $ RDB.putBlock . (\b -> Block b [] [])
+        forM_ oldChain $ \b -> set (RDB.inNamespace Canonical $ blockDataNumber b) (toValue $ blockHeaderHash b)
+        Right (mods, dels) <- callCommonAncestor oldChain newChain
+        forM_ mods $ \(sha, num) -> set (RDB.inNamespace Canonical $ num) (toValue sha)
+        unless (null dels) . void . del $ RDB.inNamespace Canonical . toKey <$> dels
+        let maxN = (+1) . fromIntegral . blockDataNumber . last $ newChain
+        RDB.getCanonicalHeaderChain 0 maxN :: Redis [(SHA, BlockData)]
 
 workChain :: (SHA -> Integer -> Integer -> Redis (Either Reply Status)) -> [BlockData] -> Redis ()
 workChain g chain = forM_ zC f

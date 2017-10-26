@@ -52,6 +52,18 @@ makeNextBlock block = do
             . (over _blockDataNumber     (const nextNumber))
             ) child
 
+makeNextBlockIncorrectly :: BlockData -> IO BlockData
+makeNextBlockIncorrectly block = do
+  let
+    parent = blockHeaderHash block
+    nextNumber = (blockDataNumber block) + 2
+  diff <- ((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
+  child <- generate arbitrary :: IO BlockData
+  return $ ( (over _blockDataParentHash (const parent))
+            . (over _blockDataDifficulty (const diff))
+            . (over _blockDataNumber     (const nextNumber))
+            ) child
+
 extendChain :: Int -> [BlockData] -> IO [BlockData]
 extendChain n blocks | n <= 0 = return blocks
 extendChain n [] = makeGenesisBlock >>= makeNextBlock >>= (\b -> extendChain (n-1) [b])
@@ -59,6 +71,14 @@ extendChain n blocks = blocks' >>= extendChain (n-1)
   where
     blocks' = newBlock >>= (\b -> return (blocks ++ [b]))
     newBlock = makeNextBlock $ last blocks
+
+extendChainIncorrectly :: Int -> [BlockData] -> IO [BlockData]
+extendChainIncorrectly n blocks | n <= 0 = return blocks
+extendChainIncorrectly n [] = makeGenesisBlock >>= makeNextBlockIncorrectly >>= (\b -> extendChain (n-1) [b])
+extendChainIncorrectly n blocks = blocks' >>= extendChain (n-1)
+  where
+    blocks' = newBlock >>= (\b -> return (blocks ++ [b]))
+    newBlock = makeNextBlockIncorrectly $ last blocks
 
 createChain :: Int -> IO [BlockData]
 createChain = flip extendChain []

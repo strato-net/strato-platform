@@ -8,7 +8,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( getSHAsByNumber
+    ( inNamespace, getSHAsByNumber
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getUncles
