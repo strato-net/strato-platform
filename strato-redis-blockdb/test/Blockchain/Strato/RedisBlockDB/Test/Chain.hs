@@ -40,6 +40,37 @@ buildChain seed depth maxSiblings = do
     tree <- buildTree seed depth maxSiblings
     return $ toList tree
 
+makeNextBlock :: BlockData -> IO BlockData
+makeNextBlock block = do
+  let
+    parent = blockHeaderHash block
+    nextNumber = (blockDataNumber block) + 1
+  diff <- ((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
+  child <- generate arbitrary :: IO BlockData
+  return $ ( (over _blockDataParentHash (const parent))
+            . (over _blockDataDifficulty (const diff))
+            . (over _blockDataNumber     (const nextNumber))
+            ) child
+
+extendChain :: Int -> [BlockData] -> IO [BlockData]
+extendChain n blocks | n <= 0 = return blocks
+extendChain n [] = makeGenesisBlock >>= makeNextBlock >>= (\b -> extendChain (n-1) [b])
+extendChain n blocks = blocks' >>= extendChain (n-1)
+  where
+    blocks' = newBlock >>= (\b -> return (blocks ++ [b]))
+    newBlock = makeNextBlock $ last blocks
+
+createChain :: Int -> IO [BlockData]
+createChain = flip extendChain []
+
+validateChain :: [BlockData] -> Bool
+validateChain [] = True
+validateChain [_] = True
+validateChain (x:xs) = (compareHashes x $ head xs) && (validateChain xs)
+                       where
+                         compareHashes parent child =
+                           (blockHeaderHash parent) == (blockDataParentHash child)
+
 --------------------
 --                /o
 --  o-o-o-o-o-o-o--o
