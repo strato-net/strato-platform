@@ -53,7 +53,7 @@ checkFileCompiles = function(directory, fileName) {
         const compilationResult = yield blockappsRest.compile(
           [
             {
-              "contractName": contractNames[0], // todo: check if it's correct
+              "contractName": contractNames[0],
               "searchable": contractNames,
               "source": data
             }
@@ -97,7 +97,7 @@ registerDapp = function*(username, address, password, packageMetadata, dappUrl) 
   } catch (error) {
     console.warn('appMetadata contract upload error:', error);
     let err = new Error('could not register application on the blockchain');
-    // TODO: add better error handling for bloc API errors (if it's possible...)
+    // the only possible error handling for current bloc errors
     switch (error.status) {
       case 404:
         err.message += ': wrong username or address';
@@ -159,6 +159,10 @@ parsePackageMetadata = function(packageTmpFolder) {
 validatePackageMetadata = function(metadata) {
   if (!metadata['name'] || !metadata['version'] || !metadata['description'] || !metadata['maintainer']) {
     throw 'wrong params, expected: {name, version, description, maintainer}'
+  }
+  const appNameRegexp = /^[^|;,!@#$()<>\/\\"'`~{}\[\]=&^]+$/;
+  if(appNameRegexp.exec(metadata['name']) === null) {
+    throw "application name can not contain characters: invalid characters in application name";
   }
 };
 
@@ -252,7 +256,7 @@ upload = function (req, res, next) {
       return next(err);
     }
 
-    // TODO: check if there are any ways to validate username-address-password bunch for validity before processing the package and compiling contracts from it
+    // TODO: check if there are any ways to validate username-address-password bunch for validity before processing the package and compiling contracts from it - currently we can only validate when we compile contracts with bloc
 
     // unpack files to tmp folder
     const zip = new admZip(file.path);
@@ -307,8 +311,8 @@ upload = function (req, res, next) {
         try {
           const dappPathArray = [
             appConfig.apps.directory,
-            encodeURIComponent(username),
-            encodeURIComponent(packageMetadata['name']),
+            username,
+            packageMetadata['name'],
           ];
           const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
 
