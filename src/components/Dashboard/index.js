@@ -41,7 +41,7 @@ class Dashboard extends Component {
 
   componentDidMount() {
     this.props.fetchBlockData();
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(false, false);
     this.props.fetchContracts();
     mixpanelWrapper.track('dashboard_page_load');
     this.startPoll();
@@ -57,7 +57,7 @@ class Dashboard extends Component {
     const fetchContracts = this.props.fetchContracts;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
-      fetchAccounts();
+      fetchAccounts(false, false);
       fetchContracts();
     }, env.POLLING_FREQUENCY);
   }

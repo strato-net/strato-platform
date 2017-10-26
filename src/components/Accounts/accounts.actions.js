@@ -12,9 +12,11 @@ export const FAUCET_REQUEST = "FAUCET_REQUEST";
 export const FAUCET_SUCCESS = "FAUCET_SUCCESS";
 export const FAUCET_FAILURE = "FAUCET_FAILURE";
 
-export const fetchAccounts = function () {
+export const fetchAccounts = function (loadAddresses, loadBalances) {
   return {
     type: FETCH_ACCOUNTS,
+    loadAddresses: loadAddresses,
+    loadBalances: loadBalances
   }
 };
 
@@ -39,10 +41,11 @@ export const changeAccountFilter = function(filter) {
   }
 };
 
-export const fetchUserAddresses = function (name) {
+export const fetchUserAddresses = function (name, loadBalances) {
   return {
     type: FETCH_ACCOUNT_ADDRESS,
-    name: name
+    name: name,
+    loadBalances: loadBalances
   }
 };
 
@@ -89,9 +92,10 @@ export const fetchAccountDetailFailure = function(name, address, error) {
 };
 
 
-export const faucetRequest = function(address) {
+export const faucetRequest = function(name, address) {
   return {
     type: FAUCET_REQUEST,
+    name: name,
     address: address
   }
 };

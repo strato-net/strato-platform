@@ -51,6 +51,7 @@ class CreateUser extends Component {
                       type="text"
                       placeholder="Username"
                       className="pt-input form-width"
+                      tabIndex="1"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.username}</div>
@@ -68,6 +69,7 @@ class CreateUser extends Component {
                       type="password"
                       placeholder="Password"
                       className="pt-input form-width"
+                      tabIndex="2"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.password}</div>
@@ -85,6 +87,7 @@ class CreateUser extends Component {
                       type="password"
                       placeholder="Confirm Password"
                       className="pt-input form-width"
+                      tabIndex="3"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.confirm_password}</div>

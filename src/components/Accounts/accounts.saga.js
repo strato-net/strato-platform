@@ -18,7 +18,6 @@ import {
   fetchAccountDetailSuccess,
   fetchAccountDetailFailure,
   FAUCET_REQUEST,
-  FAUCET_SUCCESS,
   faucetSuccess,
   faucetFailure
 } from './accounts.actions';
@@ -95,7 +94,6 @@ function postFaucet(address) {
     }
   )
   .then(function(response) {
-    console.log(response);
     return;
   })
   .catch(function(error) {
@@ -107,8 +105,10 @@ function* getAccounts(action) {
   try {
     const response = yield call(getAccountsApi);
     yield put(fetchAccountsSuccess(response));
-    // dispatch the action
-    yield response.map(account => put(fetchUserAddresses(account)));
+    // dispatch the action if necessary
+    if(action.loadAddresses) {
+      yield response.map(account => put(fetchUserAddresses(account, action.loadBalances)));
+    }
   }
   catch (err) {
     yield put(fetchAccountsFailure(err));
@@ -123,7 +123,9 @@ function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
     yield put(fetchUserAddressesSuccess(action.name, response));
-    yield response.map(address => put(fetchAccountDetail(action.name,address)));
+    if(action.loadBalances) {
+      yield response.map(address => put(fetchAccountDetail(action.name,address)));
+    }
   }
   catch(err) {
     yield put(fetchUserAddressesFailure(action.name,err));
@@ -145,6 +147,7 @@ function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.address);
     yield put(faucetSuccess());
+    yield put(fetchAccountDetail(action.name, action.address));
   }
   catch(err) {
     yield put(faucetFailure(err))
@@ -154,7 +157,6 @@ function* faucetAccount(action) {
 export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
-    takeLatest(FAUCET_SUCCESS, getAccounts),
     takeEvery(FETCH_ACCOUNT_ADDRESS, getUserAddresses),
     takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail),
     takeLatest(FAUCET_REQUEST, faucetAccount)

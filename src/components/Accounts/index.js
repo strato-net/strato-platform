@@ -33,7 +33,7 @@ import {endTour} from '../Tour/tour.actions';
 class Accounts extends Component {
 
   componentDidMount() {
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(true, true);
     mixpanelWrapper.track('accounts_page_load')
   }
 
@@ -81,7 +81,7 @@ class Accounts extends Component {
                     {
                       e.preventDefault();
                       e.stopPropagation();
-                      faucetRequest(address); 
+                      faucetRequest(user, address);
                     }
                   }
                 >
