@@ -29,5 +29,5 @@ if [ "$authBasic" != true ] ; then
 	sed -i '/auth_basic/d' /etc/nginx/nginx.conf
 fi
 
-service nginx start || exit 1 # Restart container if nginx failed to start (wait for all upstreams to become available)
+service nginx start || (tail -n 5 /var/log/nginx/error.log && exit 1) # Restart container if nginx failed to start (wait for all upstreams to become available)
 tail -n0 -F /var/log/nginx/*.log
