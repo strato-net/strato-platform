@@ -116,10 +116,10 @@ class LaunchPad extends Component {
                   <h4>Enter application details</h4>
                 </div>
                 <div className="col-sm-6 text-right">
-                  <a href="https://github.com/blockapps/lottery-demo-app" target="_blank" rel="noopener noreferrer">
-                    <button className="pt-button pt-intent-primary">
-                      <i className='fa fa-paper-plane smd-margin-right-8'> </i>
-                      Show me an example
+                  <a href="https://developers.blockapps.net/advanced/launch-a-dapp/" target="_blank" rel="noopener noreferrer">
+                    <button className="pt-button pt-minimal pt-intent-primary">
+                      <i className='fa fa-book smd-margin-right-8'> </i>
+                      Read the docs
                     </button>
                   </a>
                 </div>
