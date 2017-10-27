@@ -52,7 +52,7 @@ class Applications extends Component {
           }) :
           <div className="row" style={{'paddingBottom': '40px' }}>
             <div className="col-sm-12 text-center">
-              Nothing to show Sparky! Deploy an application to get started
+              Deploy an application to get started
             </div>
           </div>
         }
