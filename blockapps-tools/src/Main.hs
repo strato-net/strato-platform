@@ -10,6 +10,7 @@ import           BlockGO
 import           Checkpoints
 import           Code
 import           DumpKafkaBlocks
+import           CanonRedis
 import           DumpKafkaRaw
 import           DumpKafkaSequencer
 import           DumpKafkaStateDiff
@@ -47,6 +48,7 @@ data Options = State{root::String, db::String}
              | DumpKafkaRaw{streamName::String, startingBlock::Int}
              | DumpKafkaStateDiff{startingBlock::Int}
              | DumpRedis{databaseNumber::Integer}
+             | CanonRedis{ipAddress::String, start::Int, range::Int}
              | Psql{}
              | InsertTX{}
              deriving (Show, Data, Typeable)
@@ -58,6 +60,14 @@ stateOptions =
     db := def += typ "DBSTRING" += argPos 0
     ]
 
+canonRedisOptions :: Annotate Ann
+canonRedisOptions =
+  record CanonRedis{ipAddress=undefined, start=undefined, range=undefined} [
+    ipAddress := def += typ "IPADDRESS" += argPos 0,
+    start := def += typ "STARTINGBLOCK" += argPos 1,
+    range := def += typ "RANGE" += argPos 2
+  ]
+  
 redisOptions :: Annotate Ann
 redisOptions =
   record DumpRedis{databaseNumber=undefined} [
@@ -174,25 +184,26 @@ checkpointOptions =
     where nil = undefined
 
 options::Annotate Ann
-options = modes_ [stateOptions
-                , redisOptions
+options = modes_ [blockGoOptions
                 , blockOptions
-                , blockGoOptions
-                , hashOptions
+                , canonRedisOptions
+                , checkpointOptions
                 , codeOptions
-                , rawOptions
-                , rlpOptions
-                , rawMPOptions
-                , fRawMPOptions
                 , dumpKafkaBlocksOptions
+                , dumpKafkaRawOptions
                 , dumpKafkaSequencerOptions
+                , dumpKafkaStateDiffOptions
                 , dumpKafkaUnSequencerOptions
                 , dumpKafkaUnminedBlocksOptions
-                , dumpKafkaRawOptions
-                , dumpKafkaStateDiffOptions
-                , psqlOptions
+                , fRawMPOptions
+                , hashOptions
                 , insertTXOptions
-                , checkpointOptions]
+                , psqlOptions
+                , rawMPOptions
+                , rawOptions
+                , redisOptions
+                , rlpOptions
+                , stateOptions]
 
 --      += summary "Apply shims, reorganize, and generate to the input"
 
@@ -206,6 +217,7 @@ main = do
 run::Options->IO ()
 run State{..}                  = let sr = MP.StateRoot $ fst $ B16.decode $ BC.pack root in State.doit db sr
 run DumpRedis{..}              = dumpRedis databaseNumber
+run CanonRedis{..}             = canonRedis ipAddress start range
 run Block{..}                  = Block.doit db hash
 run BlockGO{..}                = BlockGO.doit hash
 run Hash{..}                   = Hash.doit db hash
