@@ -83,13 +83,16 @@ extendChainIncorrectly n blocks = blocks' >>= extendChain (n-1)
 createChain :: Int -> IO [BlockData]
 createChain = flip extendChain []
 
+validateLink :: BlockData -> BlockData -> Bool
+validateLink parent child =
+  ((blockHeaderHash parent) == (blockDataParentHash child))
+  &&
+  (((blockDataNumber parent) + 1) == (blockDataNumber child))
+
 validateChain :: [BlockData] -> Bool
 validateChain [] = True
 validateChain [_] = True
-validateChain (x:xs) = (compareHashes x $ head xs) && (validateChain xs)
-                       where
-                         compareHashes parent child =
-                           (blockHeaderHash parent) == (blockDataParentHash child)
+validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 --------------------
 --                /o

@@ -29,6 +29,7 @@ import           Blockchain.Output
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
+import           Blockchain.Data.BlockHeader           as BH
 
 import           Control.Arrow                         (second)
 import           Control.Concurrent                    (threadDelay)
@@ -198,9 +199,7 @@ getCanonical :: Integer
 getCanonical n = getInNamespace Canonical n >>= \case
     Left _           -> return Nothing
     Right Nothing    -> return Nothing
-    Right (Just sha) -> do
-      liftIO . putStrLn . show $ sha
-      return . Just $ fromValue sha
+    Right (Just sha) -> return . Just $ fromValue sha
 
 getCanonicalHeader :: (BlockHeaderLike h)
                    => Integer
@@ -280,7 +279,7 @@ putHeader :: (BlockHeaderLike h)
 putHeader h = do
     let sha       = blockHeaderHash h
         parent    = blockHeaderParentHash h
-        number    = blockHeaderBlockNumber h
+        number'    = blockHeaderBlockNumber h
         storeHead = morphBlockHeader h :: RedisHeader
         inNS'     = flip inNamespace sha
 
@@ -288,7 +287,7 @@ putHeader h = do
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
         void $ sadd (inNamespace Children parent) [toValue sha]
-        sadd (inNamespace Numbers number) [toValue sha]
+        sadd (inNamespace Numbers number') [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
@@ -305,7 +304,7 @@ putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
 putBlock b = do
     let sha     = blockHash b
         header  = blockHeader b
-        number  = blockHeaderBlockNumber header
+        number'  = blockHeaderBlockNumber header
         parent  = blockHeaderParentHash header
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
@@ -317,7 +316,7 @@ putBlock b = do
         void $ setnx (inNS' Uncles) (toValue uncles)
         void $ setnx (inNS' Parent) (toValue parent)
         void $ sadd (inNamespace Children parent) [toKey sha]
-        sadd (inNamespace Numbers number) [toKey sha]
+        sadd (inNamespace Numbers number') [toKey sha]
         --forM_ uncles -- todo index the uncles' headers/numbers/etc?
     case res of
         TxSuccess _ -> pure $ Right Ok
@@ -334,26 +333,42 @@ putBestBlockInfo :: SHA
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
-    liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
+    --liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-        Just (RedisBestBlock oldSha oldNumber oldTDiff) -> do
-            liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
+        Just (RedisBestBlock oldSha oldNumber _) -> do
+            --liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
-                    liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
-                    liftIO . putStrLn $ "Deletions: \n" ++ show deletions
+                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
+                    --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                     res <- multiExec $ do
                         forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                         unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
                         forceBestBlockInfo newSha newNumber newTDiff
+                    unless (null updates) $ do
+                      chain <- getCanonicalHeaderChain ((fromIntegral . snd . head $ updates) - 1) (fromIntegral . snd . last $ updates)
+                      let validChain = validateChain chain
+                      unless validChain $ do
+                        liftIO . putStrLn $ "!!!!!!INVALID BLOCKCHAIN!!!!!!"
+                        mapM_ printBlockHeader chain
                     case res of
                         TxSuccess _ -> return $ Right Ok
                         TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
                         TxError e   -> return . Left $ SingleLine (S8.pack e)
+  where
+    printBlockHeader (sha,RedisHeader h) = do
+      liftIO . putStrLn $
+        "(" ++
+        show (blockHeaderBlockNumber h) ++
+        "," ++
+        shaToHex (blockHeaderParentHash h) ++
+        "," ++
+        shaToHex (sha) ++
+        ")"
 
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
@@ -366,8 +381,6 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                       newSha = head newShaChain
                   ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
                   let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
-                  liftIO . putStrLn $ "seen:  " ++ show seen
-                  liftIO . putStrLn $ "seen': " ++ show seen'
                   if newParent `Set.member` seen
                   then complete newParent (mkParentChain newParent newShaChain)
                   else if oldParent `Set.member` seen
@@ -393,7 +406,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain
                       Just (ancestor :: RedisHeader) -> do
-                          liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
@@ -403,10 +416,20 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- safeTail [] = []
               -- safeTail xs = tail xs
 
+validateLink :: (SHA,RedisHeader) -> (SHA, RedisHeader) -> Bool
+validateLink (psha,RedisHeader parentHeader) (_,RedisHeader childHeader) =
+  (psha == (parentHash childHeader))
+  &&
+  (((number parentHeader) + 1) == (number childHeader))
+
+validateChain :: [(SHA,RedisHeader)] -> Bool
+validateChain [] = True
+validateChain [_] = True
+validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
+
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
-        liftIO . putStrLn $ "forceBestBlockInfo: " ++ show sha ++ " " ++ show i ++ " " ++ show j
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)
