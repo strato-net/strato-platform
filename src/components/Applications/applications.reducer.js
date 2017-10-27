@@ -15,10 +15,11 @@ const reducer = function (state = initialState, action) {
       const applications = action
         .applications
         .map((a) => {
-           a.address = undefined;
-           a.url = a.url.replace('localhost', 'localhost:3001');
-           a.url += '/ui';
-           return a;
+          return {
+            ...a,
+            address: undefined,
+            url: a.url + '/ui'
+          };
          })
         .filter((app,i,v) => {
           return v.findIndex((a) => {
