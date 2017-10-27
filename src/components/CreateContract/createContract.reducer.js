@@ -24,7 +24,6 @@ const initialState = {
   filename: undefined,
 };
 
-
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case CONTRACT_OPEN_MODAL:
@@ -36,6 +35,7 @@ const reducer = function (state = initialState, action) {
         contractName: '',
         createDisabled: true,
         filename: '',
+        username: '',
         // createDisabled: true,
       };
 

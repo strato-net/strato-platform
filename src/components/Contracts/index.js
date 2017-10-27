@@ -8,7 +8,7 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 // import Tour from '../Tour';
 import {endTour} from '../Tour/tour.actions';
 // import {callAfterTour} from '../Tour/tour.helpers';
-// 
+//
 // const tourSteps = [
 // /*  {
 //     title: 'Create Contract',
@@ -71,10 +71,10 @@ class Contracts extends Component {
           />
         */}
         <div className="row pt-dark">
-          <div className="col-md-3 text-left">
+          <div className="col-sm-3 text-left">
             <h3>Contracts</h3>
           </div>
-          <div className="col-md-6 smd-pad-16">
+          <div className="col-sm-5 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
               <input
@@ -85,7 +85,7 @@ class Contracts extends Component {
                 dir="auto"/>
             </div>
           </div>
-          <div className="col-md-3 text-right smd-pad-8">
+          <div className="col-sm-4 text-right smd-pad-8">
             <CreateContract/>
           </div>
         </div>

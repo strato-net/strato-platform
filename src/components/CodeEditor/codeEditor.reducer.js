@@ -2,10 +2,7 @@ import {
   CODE_EDITOR_COMPILE_REQUEST,
   CODE_EDITOR_COMPILE_SUCCESS,
   CODE_EDITOR_COMPILE_FAILURE,
-  CODE_EDITOR_CHANGE_CREATEACTION,
-  ADD_NEW_TAB,
-  REMOVE_TAB,
-  ON_TAB_CHANGE
+  CODE_EDITOR_CHANGE_CREATEACTION
 } from './codeEditor.actions';
 
 const initialState = {
@@ -16,11 +13,6 @@ const initialState = {
   enableCreateAction: false,
   sourceCode: undefined,
   contractName: undefined,
-  tab: [{
-    text: '',
-    title: 'Main.sol'
-  }],
-  lastTabSelected:0
 };
 
 const reducer = function (state = initialState, action) {
@@ -53,39 +45,11 @@ const reducer = function (state = initialState, action) {
       };
 
     case CODE_EDITOR_CHANGE_CREATEACTION:
-      const tabItems = [...state.tab];
-      tabItems[action.index].text = action.sourceCode;  //new value
       return {
         ...state,
         enableCreateAction: action.createActionEnable,
         sourceCode: action.sourceCode,
-        tab: tabItems
       };
-
-    case ADD_NEW_TAB:
-      const id = state.tab.length + 1
-      return {
-        ...state,
-        tab: [...state.tab, { title: `untitled${id}`, text: '' }]
-      };
-
-    case REMOVE_TAB:
-      const tabs = state.tab.slice();
-      tabs.splice(action.index, 1);
-      return {
-        ...state,
-        tab: tabs
-      };
-
-    case ON_TAB_CHANGE:
-      const changedTab = state.tab.slice();
-      const text = changedTab[action.nextTab] && changedTab[action.nextTab].text
-      return {
-        ...state,
-        tab:changedTab,
-        sourceCode: text,
-        lastTabSelected:action.nextTab
-      }
 
     default:
       return state;

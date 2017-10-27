@@ -4,17 +4,12 @@ import {unregister as unregisterServiceWorker} from './registerServiceWorker';
 
 import {Provider} from 'react-redux';
 import {HashRouter as Router} from 'react-router-dom'
-import {
-    createStore,
-    applyMiddleware,
-    combineReducers,
-    compose,
-} from 'redux';
+import {createStore, applyMiddleware, combineReducers, compose} from 'redux';
 import createSagaMiddleware from 'redux-saga';
-import { fork } from 'redux-saga/effects';
+import {fork} from 'redux-saga/effects';
 import {routerReducer} from 'react-router-redux';
 import {reducer as formReducer} from 'redux-form';
-import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
+import {loadingBarReducer, loadingBarMiddleware} from 'react-redux-loading-bar'
 import App from "./App/";
 
 import accountsReducer from './components/Accounts/accounts.reducer';
@@ -30,38 +25,32 @@ import tourReducer from './components/Tour/tour.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendEtherReducer from './components/Accounts/components/SendEther/sendEther.reducer';
 import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
-
+import applicationsReducer from './components/Applications/applications.reducer';
+import launchPadReducer from './components/LaunchPad/launchPad.reducer';
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
-import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import {watchCompileSourceFromEditor} from './components/CodeEditor/codeEditor.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
+import {watchCompileContract} from './components/CreateContract/createContract.saga';
+import watchAccountActions from './components/Accounts/accounts.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
-import {
-  watchFetchState,
-  watchFetchCirrusContracts,
-  watchAccount
-} from './components/Contracts/components/ContractCard/contractCard.saga';
+import {watchFetchState, watchFetchCirrusContracts, watchAccount} from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
-import {
-  watchMethodCall,
-  watchFetchArgs
-} from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
+import {watchMethodCall, watchFetchArgs} from './components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 import watchExecuteQuery from './components/QueryEngine/queryEngine.saga';
-import {
-  watchQueryCirrus,
-  watchQueryCirrusVars
-} from './components/ContractQuery/contractQuery.saga';
+import {watchQueryCirrus, watchQueryCirrusVars} from './components/ContractQuery/contractQuery.saga';
 import watchSendEther from './components/Accounts/components/SendEther/sendEther.saga';
+import watchFetchApplications from './components/Applications/applications.saga';
+import watchAppUpload from './components/LaunchPad/launchPad.saga';
 
 import {CREATE_USER_SUCCESS} from './components/CreateUser/createUser.actions';
 
 const rootReducer = combineReducers({
   form: formReducer.plugin({
     'create-user': (state, action) => {
-      switch(action.type) {
+      switch (action.type) {
         case CREATE_USER_SUCCESS:
           return undefined;
         default:
@@ -85,58 +74,56 @@ const rootReducer = combineReducers({
   codeEditor: codeEditorReducer,
   loadingBar: loadingBarReducer,
   tour: tourReducer,
+  applications: applicationsReducer,
+  launchPad: launchPadReducer
 });
 
-const rootSaga = function* startForeman() {
-    yield [
-        // YOUR SAGAS HERE
-        fork(watchFetchBlockData),
-        fork(watchFetchTx),
-        fork(watchCreateUser),
-        fork(watchFetchAccounts),
-        fork(watchCreateContract),
-        fork(watchFetchContracts),
-        fork(watchCompileContract),
-        fork(watchCompileSourceFromEditor),
-        fork(watchFetchState),
-        fork(watchFetchNodeData),
-        fork(watchFetchArgs),
-        fork(watchMethodCall),
-        fork(watchFetchCirrusContracts),
-        fork(watchExecuteQuery),
-        fork(watchQueryCirrus),
-        fork(watchQueryCirrusVars),
-        fork(watchSendEther),
-        fork(watchAccount)
-    ]
+const rootSaga = function * startForeman() {
+  yield[// YOUR SAGAS HERE
+    fork(watchFetchBlockData),
+    fork(watchFetchTx),
+    fork(watchCreateUser),
+    fork(watchAccountActions),
+    fork(watchFetchAccounts),
+    fork(watchCompileSourceFromEditor),
+    fork(watchCreateContract),
+    fork(watchFetchContracts),
+    fork(watchCompileContract),
+    fork(watchFetchState),
+    fork(watchFetchNodeData),
+    fork(watchFetchArgs),
+    fork(watchMethodCall),
+    fork(watchFetchCirrusContracts),
+    fork(watchExecuteQuery),
+    fork(watchQueryCirrus),
+    fork(watchQueryCirrusVars),
+    fork(watchSendEther),
+    fork(watchAccount),
+    fork(watchFetchApplications),
+    fork(watchAppUpload)]
 };
 
 // create the saga middleware
 const sagaMiddleware = createSagaMiddleware();
 
 const loadingMiddleware = loadingBarMiddleware({
-                            promiseTypeSuffixes: ['REQUEST', 'SUCCESS', 'FAILURE'],
-                          });
+  promiseTypeSuffixes: ['REQUEST', 'SUCCESS', 'FAILURE']
+});
 
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
 
 // mount it on the Store
-const store = createStore(
-    rootReducer,
-    process.env.NODE_ENV !== 'production' ?
-      composeEnhancers(applyMiddleware(sagaMiddleware, loadingMiddleware)) //
-      : applyMiddleware(sagaMiddleware, loadingMiddleware),
-);
+const store = createStore(rootReducer, process.env.NODE_ENV !== 'production'
+  ? composeEnhancers(applyMiddleware(sagaMiddleware, loadingMiddleware)) //
+  : applyMiddleware(sagaMiddleware, loadingMiddleware),);
 
 // then run the saga
 sagaMiddleware.run(rootSaga);
 
 ReactDOM.render(
-    <Provider store={store}>
-        <Router>
-            <App />
-        </Router>
-    </Provider>,
-    document.getElementById('root')
-);
+  <Provider store={store}>
+  <Router>
+    <App/>
+  </Router>
+</Provider>, document.getElementById('root'));
 unregisterServiceWorker();
