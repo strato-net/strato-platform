@@ -198,7 +198,9 @@ getCanonical :: Integer
 getCanonical n = getInNamespace Canonical n >>= \case
     Left _           -> return Nothing
     Right Nothing    -> return Nothing
-    Right (Just sha) -> return . Just $ fromValue sha
+    Right (Just sha) -> do
+      liftIO . putStrLn . show $ sha
+      return . Just $ fromValue sha
 
 getCanonicalHeader :: (BlockHeaderLike h)
                    => Integer
@@ -336,7 +338,7 @@ putBestBlockInfo newSha newNumber newTDiff = do
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-        Just (RedisBestBlock oldSha oldNumber _) -> do
+        Just (RedisBestBlock oldSha oldNumber oldTDiff) -> do
             liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
@@ -404,6 +406,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
+        liftIO . putStrLn $ "forceBestBlockInfo: " ++ show sha ++ " " ++ show i ++ " " ++ show j
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)

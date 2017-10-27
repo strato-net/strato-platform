@@ -11,7 +11,7 @@ import           Data.Foldable
 import           Data.List
 import           Data.Maybe
 import           Data.Ord
-import           Data.Traversable
+--import           Data.Traversable
 import           Data.Tree
 import           Database.Redis                            hiding (sortBy)
 import           Lens.Family2
