@@ -32,7 +32,6 @@ import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
-import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import {watchCompileSourceFromEditor} from './components/CodeEditor/codeEditor.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import {watchCompileContract} from './components/CreateContract/createContract.saga';

@@ -300,33 +300,27 @@ class CreateContract extends Component {
                 </label>
                 </div>
               </div>
-              {!this.props.sourceFromEditor && <div className="row">
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4" style={{margin:0}}>
-                    Source file
-                  </label>
+              {!this.props.sourceFromEditor &&
+                <div className="row">
+                  <div className="col-sm-3 text-right">
+                    <label className="pt-label smd-pad-4" style={{margin:0}}>
+                      Source file
+                    </label>
+                  </div>
+                  <div className="col-sm-9 smd-pad-4">
+                    <Field
+                      id="input-b"
+                      className="form-width pt-input"
+                      name="contract"
+                      component={this.renderDropzoneInput}
+                      dir="auto"
+                      title="Contract Source"
+                      validate={this.isValidFileType}
+                      required
+                    />
+                  </div>
                 </div>
-<<<<<<< HEAD
-<<<<<<< HEAD
-                <div className="col-sm-12">
-=======
-                <div className="col-sm-9 smd-pad-4">
->>>>>>> develop
-=======
-                <div className="col-sm-9 smd-pad-4">
->>>>>>> 44dfa2e6a1efd139afed9f7310098c16540018e7
-                  <Field
-                    id="input-b"
-                    className="form-width pt-input"
-                    name="contract"
-                    component={this.renderDropzoneInput}
-                    dir="auto"
-                    title="Contract Source"
-                    validate={this.isValidFileType}
-                    required
-                  />
-                </div>
-              </div>}
+              }
               {contracts && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
@@ -392,6 +386,7 @@ class CreateContract extends Component {
 
               </div>
             </div>
+
           </Dialog>
         </form>
       </div>
