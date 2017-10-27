@@ -24,25 +24,19 @@ import transactionsReducer from './components/TransactionList/transactionList.re
 import tourReducer from './components/Tour/tour.reducer';
 import queryEngineReducer from './components/QueryEngine/queryEngine.reducer';
 import sendEtherReducer from './components/Accounts/components/SendEther/sendEther.reducer';
-<<<<<<< HEAD
 import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
-=======
 import applicationsReducer from './components/Applications/applications.reducer';
 import launchPadReducer from './components/LaunchPad/launchPad.reducer';
->>>>>>> develop
 
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
 import watchCreateContract from './components/CreateContract/createContract.saga';
-<<<<<<< HEAD
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import {watchCompileSourceFromEditor} from './components/CodeEditor/codeEditor.saga';
 import watchFetchAccounts from './components/Accounts/accounts.saga';
-=======
 import {watchCompileContract} from './components/CreateContract/createContract.saga';
 import watchAccountActions from './components/Accounts/accounts.saga';
->>>>>>> develop
 import watchFetchContracts from './components/Contracts/contracts.saga';
 import {watchFetchState, watchFetchCirrusContracts, watchAccount} from './components/Contracts/components/ContractCard/contractCard.saga';
 import watchFetchNodeData from './components/NodeCard/nodeCard.saga';
@@ -86,39 +80,18 @@ const rootReducer = combineReducers({
   launchPad: launchPadReducer
 });
 
-<<<<<<< HEAD
-const rootSaga = function* startForeman() {
-    yield [
-        // YOUR SAGAS HERE
-        fork(watchFetchBlockData),
-        fork(watchFetchTx),
-        fork(watchCreateUser),
-        fork(watchFetchAccounts),
-        fork(watchCreateContract),
-        fork(watchFetchContracts),
-        fork(watchCompileContract),
-        fork(watchCompileSourceFromEditor),
-        fork(watchFetchState),
-        fork(watchFetchNodeData),
-        fork(watchFetchArgs),
-        fork(watchMethodCall),
-        fork(watchFetchCirrusContracts),
-        fork(watchExecuteQuery),
-        fork(watchQueryCirrus),
-        fork(watchQueryCirrusVars),
-        fork(watchSendEther),
-        fork(watchAccount)
-    ]
-=======
 const rootSaga = function * startForeman() {
   yield[// YOUR SAGAS HERE
     fork(watchFetchBlockData),
     fork(watchFetchTx),
     fork(watchCreateUser),
     fork(watchAccountActions),
+    fork(watchFetchAccounts),
+    fork(watchCompileSourceFromEditor),
     fork(watchCreateContract),
     fork(watchFetchContracts),
     fork(watchCompileContract),
+    fork(watchCompileSourceFromEditor),
     fork(watchFetchState),
     fork(watchFetchNodeData),
     fork(watchFetchArgs),
@@ -131,7 +104,6 @@ const rootSaga = function * startForeman() {
     fork(watchAccount),
     fork(watchFetchApplications),
     fork(watchAppUpload)]
->>>>>>> develop
 };
 
 // create the saga middleware

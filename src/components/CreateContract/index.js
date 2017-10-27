@@ -307,10 +307,14 @@ class CreateContract extends Component {
                   </label>
                 </div>
 <<<<<<< HEAD
+<<<<<<< HEAD
                 <div className="col-sm-12">
 =======
                 <div className="col-sm-9 smd-pad-4">
 >>>>>>> develop
+=======
+                <div className="col-sm-9 smd-pad-4">
+>>>>>>> 44dfa2e6a1efd139afed9f7310098c16540018e7
                   <Field
                     id="input-b"
                     className="form-width pt-input"
@@ -349,8 +353,8 @@ class CreateContract extends Component {
                 </div>
               </div>}
               <div className="row">
-                <div className="col-sm-12">
-                  <label className="pt-label">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
                     Compilation
                   </label>
                 </div>

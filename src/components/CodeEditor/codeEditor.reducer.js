@@ -11,10 +11,9 @@ const initialState = {
   filename: undefined,
   createDisabled: true,
   enableCreateAction: false,
-  sourceCode:undefined,
+  sourceCode: undefined,
   contractName: undefined,
 };
-
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
@@ -25,15 +24,17 @@ const reducer = function (state = initialState, action) {
         createDisabled: true,
         enableCreateAction: false
       };
+
     case CODE_EDITOR_COMPILE_SUCCESS:
-    let contracts = action.response && action.response.src && Object.keys(action.response.src);    
+      let contracts = action.response && action.response.src && Object.keys(action.response.src);
       return {
         ...state,
-        contractName: contracts && contracts[0],        
+        contractName: contracts && contracts[0],
         response: action.response,
         codeCompileSuccess: true,
         enableCreateAction: true
       };
+
     case CODE_EDITOR_COMPILE_FAILURE:
       return {
         ...state,
@@ -42,12 +43,14 @@ const reducer = function (state = initialState, action) {
         codeCompileSuccess: false,
         enableCreateAction: false
       };
+
     case CODE_EDITOR_CHANGE_CREATEACTION:
       return {
         ...state,
         enableCreateAction: action.createActionEnable,
-        sourceCode: action.sourceCode
-      }
+        sourceCode: action.sourceCode,
+      };
+
     default:
       return state;
   }
