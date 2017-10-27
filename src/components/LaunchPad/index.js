@@ -17,7 +17,7 @@ import { fetchAccounts } from '../Accounts/accounts.actions';
 
 class LaunchPad extends Component {
 
-  componentDidUpdate() {
+  componentDidMount() {
     mixpanelWrapper.track('launchpad_deploy_load');
   }
 
