@@ -12,7 +12,9 @@ import TransactionView from './components/Transactions/components/TransactionVie
 import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
 import Applications from './components/Applications/';
-import LaunchPad from './components/LaunchPad/'
+import LaunchPad from './components/LaunchPad/';
+import CodeEditor from './components/CodeEditor';
+
 export const routes = (
   <Switch>
     <Route exact path="/">
@@ -28,6 +30,7 @@ export const routes = (
     <Route exact path="/accounts/:name/:address" component={Account} />
     <Route exact path="/contracts" component={Contracts}/>
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
+    <Route exact path="/code_editor" component={CodeEditor}/>
     <Route exact path="/apps" component={Applications} />
     <Route exact path="/launchpad" component={LaunchPad} />
     <Route component={SideBar}/>

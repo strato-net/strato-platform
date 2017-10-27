@@ -19,7 +19,8 @@ class SideBar extends Component {
         {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link"},
         {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange"},
         {path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users"},
-        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel"}
+        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel"},
+        {path: '/code_editor', label: 'Code Editor', id: 'code_editor', icon: "fa-code"},
       ]
     );
 

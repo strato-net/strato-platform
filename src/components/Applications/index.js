@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 import { fetchApplications } from '../Applications/applications.actions';
 import ApplicationCard from '../ApplicationCard';
@@ -11,6 +12,8 @@ import { env } from '../../env';
 class Applications extends Component {
 
   componentDidMount() {
+    mixpanelWrapper.track('launchpad_load');
+
     this.props.fetchApplications();
     this.startPoll();
   }
