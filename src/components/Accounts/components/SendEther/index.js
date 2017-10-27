@@ -36,6 +36,11 @@ class CreateContract extends Component {
     }
   }
 
+  closeModal = () => {
+    this.props.sendEtherCloseModal();
+    this.props.fetchAccounts(true, true);
+  }
+
   submit = (values) => {
     const toAddress = this.state.form.userSelected ? values.toAddress : values.address
     const payload = {
@@ -52,13 +57,6 @@ class CreateContract extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("send_ether_loaded");
-    this.props.fetchAccounts();
-  }
-
-  componentWillReceiveProps(newProps) {
-    if (this.props.isOpen !== newProps.isOpen) {
-      this.props.fetchAccounts();
-    }
   }
 
   render() {
@@ -84,7 +82,7 @@ class CreateContract extends Component {
           <Dialog
             iconName="inbox"
             isOpen={this.props.isOpen}
-            onClose={this.props.sendEtherCloseModal}
+            onClose={this.closeModal}
             title="Send Ether"
             style={{
               width: "560px"
@@ -314,8 +312,7 @@ class CreateContract extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track("send_ether_cancel");
-                  this.props.sendEtherCloseModal()
-                  this.props.fetchAccounts()
+                  this.closeModal();
                 }} />
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}

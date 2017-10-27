@@ -16,7 +16,7 @@ import { env } from '../../../../env.js'
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress";
 const methodUrl = env.BLOC_URL +
-  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call";
+  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve";
 
 function getArgs(contractName, contractAddress, symbol) {
   return fetch(

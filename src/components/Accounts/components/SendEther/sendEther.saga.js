@@ -11,7 +11,7 @@ import {
 
 import { env } from '../../../../env';
 
-const url = env.BLOC_URL + "/users/:user/:address/send"
+const url = env.BLOC_URL + "/users/:user/:address/send?resolve"
 
 function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
   return fetch(

@@ -17,7 +17,6 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
-import './CreateContract.css';
 
 // TODO: use solc instead of extabi for compile
 
@@ -28,21 +27,15 @@ class CreateContract extends Component {
     return (
       <div className="dropzoneContainer text-center">
         <Dropzone
-          className={ touchedAndHasErrors ? "dropzone" : "dropzoneActive"}
-          activeClassName="dropzoneActive"
-          rejectClassName="dropzoneRejected"
+          className="dropzone"
           name={field.name}
           onDrop = { ( filesToUpload, e ) => this.handleFileDrop(filesToUpload, field) }
         >
           {({isDragActive, isDragReject, acceptedFiles}) => {
               if (isDragActive) {
-                return <p className="pt-intent-success">Drop to Upload!</p>;
+                return (<p className="pt-intent-success">Drop to Upload!</p>);
               }
-              if (isDragReject) {
-                return <p className="pt-intent-warning">Invalid file!</p>;
-              }
-              else
-                return <p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>
+              return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
@@ -92,7 +85,7 @@ class CreateContract extends Component {
   };
 
   handleContractSearchabilityChange = (e) => {
-    const contractName = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName      
+    const contractName = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
     const source = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
     if (source.length) {
       this.props.compileContract(
@@ -104,38 +97,38 @@ class CreateContract extends Component {
   };
 
   submit = (values) => {
-      const args = {};
-      const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName      
-      const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
-      Object.values(abi).forEach(val => {
-        if (val.constr !== undefined) {
-          return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
-            if (values[arg] !== undefined)
-              args[arg] = values[arg];
-          })
-        }
-      });
-      const fileText = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
+    const args = {};
+    const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
+    const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
+    Object.values(abi).forEach(val => {
+      if (val.constr !== undefined) {
+        return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
+          if (values[arg] !== undefined)
+            args[arg] = values[arg];
+        })
+      }
+    });
+    const fileText = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
 
-      const payload = {
-        contract: contractname,
-        username: values.username,
-        address: values.address,
-        password: values.password,
-        searchable: values.searchable,
-        fileText: fileText,
-        arguments: args,
-      };
-      
-      mixpanelWrapper.track('create_contract_submit_click_successful');
-      this.props.createContract(payload);
-      this.props.reset();
+    const payload = {
+      contract: contractname,
+      username: values.username,
+      address: values.address,
+      password: values.password,
+      searchable: values.searchable,
+      fileText: fileText,
+      arguments: args,
+    };
+
+    mixpanelWrapper.track('create_contract_submit_click_successful');
+    this.props.createContract(payload);
+    this.props.reset();
   };
 
   componentDidMount() {
     mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(true, false);
   }
 
   compilation() {
@@ -313,7 +306,11 @@ class CreateContract extends Component {
                     Source file
                   </label>
                 </div>
+<<<<<<< HEAD
                 <div className="col-sm-12">
+=======
+                <div className="col-sm-9 smd-pad-4">
+>>>>>>> develop
                   <Field
                     id="input-b"
                     className="form-width pt-input"
@@ -349,7 +346,7 @@ class CreateContract extends Component {
                         }
                       </Field>
                     </div>
-                </div> 
+                </div>
               </div>}
               <div className="row">
                 <div className="col-sm-12">
@@ -402,7 +399,7 @@ const validate = (values) => {
   const errors = {};
 
   // const abi = CreateContract.props.abi.src;
-  
+
   // Object.values(abi).forEach(val => {
   //   if (val.constr !== undefined) {
   //     return Object.getOwnPropertyNames(val.constr).map((arg) => {
@@ -420,7 +417,9 @@ const validate = (values) => {
   return errors
 };
 
-const selector = formValueSelector('create-contract');
+export const CREATE_CONTRACT_FORM = 'create-contract'
+
+const selector = formValueSelector(CREATE_CONTRACT_FORM);
 
 function mapStateToProps(state) {
   return {
@@ -435,7 +434,6 @@ function mapStateToProps(state) {
   };
 }
 
-export const CREATE_CONTRACT_FORM = 'create-contract'
 
 const formed = reduxForm({form: CREATE_CONTRACT_FORM, validate})(CreateContract);
 const connected = connect(mapStateToProps, {

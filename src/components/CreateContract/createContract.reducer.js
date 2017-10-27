@@ -36,6 +36,7 @@ const reducer = function (state = initialState, action) {
         contractName: '',
         createDisabled: true,
         filename: '',
+        username: '',
         // createDisabled: true,
       };
 
