@@ -5,7 +5,8 @@ import {
   createContract,
   compileContract,
   contractFormChange,
-  usernameChange
+  usernameChange,
+  contractNameChange
 } from './createContract.actions';
 import {fetchAccounts} from '../Accounts/accounts.actions';
 import {fetchContracts} from '../Contracts/contracts.actions';
@@ -46,9 +47,16 @@ class CreateContract extends Component {
     this.props.usernameChange(e.target.value);
   };
 
+  handleContractNameChange = (e) => {
+    this.props.contractNameChange(
+      e.target.value
+    );
+  }
+
   handleFileDrop = (files, dropZoneField) => {
-    this.props.touch('contract')
-    dropZoneField.input.onChange(files)
+
+    this.props.touch('contract');
+    dropZoneField.input.onChange(files);
     const contract = files[0];
 
     let reader = new FileReader();
@@ -57,7 +65,6 @@ class CreateContract extends Component {
       const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
       mixpanelWrapper.track("create_contract_file_upload");
       self.props.contractFormChange(
-        contract.name,
         fileContents
       );
       self.props.compileContract(
@@ -78,46 +85,44 @@ class CreateContract extends Component {
   };
 
   handleContractSearchabilityChange = (e) => {
-    if (this.props.contract.length) {
-      const contractNameByFileName = this.props.filename.substring(0, this.props.filename.indexOf('.'))
+    const contractName = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
+    const source = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
+    if (source.length) {
       this.props.compileContract(
-        contractNameByFileName,
-        this.props.contract,
+        contractName,
+        source,
         this.props.searchable
       );
     }
   };
 
   submit = (values) => {
-    if (!this.props.createDisabled) {
-      const args = {};
-      const abi = this.props.abi.src;
-      Object.values(abi).forEach(val => {
-        if (val.constr !== undefined) {
-          return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
-            if (values[arg] !== undefined)
-              args[arg] = values[arg];
-          })
-        }
-      });
+    const args = {};
+    const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
+    const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
+    Object.values(abi).forEach(val => {
+      if (val.constr !== undefined) {
+        return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
+          if (values[arg] !== undefined)
+            args[arg] = values[arg];
+        })
+      }
+    });
+    const fileText = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
 
-      const payload = {
-        contract: this.props.filename.substring(0, this.props.filename.indexOf('.')),
-        username: values.username,
-        address: values.address,
-        password: values.password,
-        searchable: values.searchable,
-        fileText: this.props.contract,
-        arguments: args,
-      };
+    const payload = {
+      contract: contractname,
+      username: values.username,
+      address: values.address,
+      password: values.password,
+      searchable: values.searchable,
+      fileText: fileText,
+      arguments: args,
+    };
 
-
-      mixpanelWrapper.track('create_contract_submit_click_successful');
-      this.props.createContract(payload);
-      this.props.reset();
-    } else {
-      mixpanelWrapper.track('create_contract_submit_click_failure');
-    }
+    mixpanelWrapper.track('create_contract_submit_click_successful');
+    this.props.createContract(payload);
+    this.props.reset();
   };
 
   componentDidMount() {
@@ -126,57 +131,67 @@ class CreateContract extends Component {
     this.props.fetchAccounts(true, false);
   }
 
+  compilation() {
+    const src =  this.props.sourceFromEditor?this.props.sourceFromEditor:(this.props.abi === undefined ? undefined : this.props.abi.src);
+    const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
+    if (src === undefined) {
+      return (<tr>
+        <td colSpan={3}>
+          <div className="text-center">Upload Contract</div>
+        </td>
+      </tr>);
+    } else {
+      let contract = src[contractname];
+      if (contract && contract['constr'] !== undefined) {
+        return Object.getOwnPropertyNames(contract['constr']).map((arg, i) => {
+          return (
+            <tr key={'arg' + i}>
+              <td>{arg}</td>
+              <td>{contract.constr[arg].type}</td>
+              <td>
+                <Field
+                  id="input-b"
+                  className="pt-input"
+                  component="input"
+                  name={arg}
+                  title="Enter value"
+                  type="text"
+                  dir="auto"
+                  required
+                />
+              </td>
+            </tr>
+          );
+        });
+      } else {
+        return (<tr>
+          <td colSpan={3}>
+            <div className="text-center">No Data</div>
+          </td>
+        </tr>)
+      }
+    }
+  }
+
   render() {
     const {handleSubmit, pristine, submitting, valid} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
-
+    const contracts = this.props.sourceFromEditor? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : null;
 
-    const src = this.props.abi === undefined ? undefined : this.props.abi.src;
-
-    let args = src === undefined ?
-      <tr>
-        <td colSpan={3}>
-          <div className="text-center">Upload Contract</div>
-        </td>
-      </tr> :
-
-      // eslint-disable-next-line
-      (Object.values(src).map(val => {
-        if (val.constr !== undefined) {
-          return Object.getOwnPropertyNames(val.constr).map((arg, i) => {
-            return (
-              <tr key={'arg' + i}>
-                <td>{arg}</td>
-                <td>{val.constr[arg].type}</td>
-                <td>
-                  <Field
-                    id="input-b"
-                    className="pt-input"
-                    component="input"
-                    name={arg}
-                    title="Enter value"
-                    type="text"
-                    dir="auto"
-                    validate={required}
-                    required
-                  />
-                </td>
-              </tr>
-            );
-          });
-        }
-      }));
-
     return (
-      <div className="smd-pad-16">
+      <div className="smd-pad-16" style={{display:'inline-block'}}>
         <Button onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
-        }} className="pt-intent-primary pt-icon-add"
-             text="Create Contract" id="tour-create-contract-button"/>
+        }}
+        id="tour-create-contract-button"
+          className="pt-intent-primary pt-icon-add"
+          text="Create Contract"
+          disabled={(this.props.enableCreateContract!==undefined &&!this.props.enableCreateContract)?true:false}
+           />
         <form>
           <Dialog
             iconName="inbox"
@@ -285,28 +300,55 @@ class CreateContract extends Component {
                 </label>
                 </div>
               </div>
-              <div className="row">
+              {!this.props.sourceFromEditor &&
+                <div className="row">
+                  <div className="col-sm-3 text-right">
+                    <label className="pt-label smd-pad-4" style={{margin:0}}>
+                      Source file
+                    </label>
+                  </div>
+                  <div className="col-sm-9 smd-pad-4">
+                    <Field
+                      id="input-b"
+                      className="form-width pt-input"
+                      name="contract"
+                      component={this.renderDropzoneInput}
+                      dir="auto"
+                      title="Contract Source"
+                      validate={this.isValidFileType}
+                      required
+                    />
+                  </div>
+                </div>
+              }
+              {contracts && <div className="row">
                 <div className="col-sm-3 text-right">
                   <label className="pt-label smd-pad-4">
-                    Source file
+                    Contracts
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <Field
-                    id="input-b"
-                    className="form-width pt-input"
-                    name="contract"
-                    component={this.renderDropzoneInput}
-                    dir="auto"
-                    title="Contract Source"
-                    validate={this.isValidFileType}
-                    required
-                  />
+                  <div className="pt-select">
+                    <Field
+                        className="pt-select"
+                        component="select"
+                        name="contractName"
+                        onChange={this.handleContractNameChange}
+                      >
+                        {
+                          contracts.map((value, index) => {
+                            return (
+                              <option key={value} value={value}>{value}</option>
+                            )
+                          })
+                        }
+                      </Field>
+                    </div>
                 </div>
-              </div>
+              </div>}
               <div className="row">
-                <div className="col-sm-12">
-                  <label className="pt-label">
+                <div className="col-sm-3 text-right">
+                  <label className="pt-label smd-pad-4">
                     Compilation
                   </label>
                 </div>
@@ -322,7 +364,7 @@ class CreateContract extends Component {
                     </tr>
                     </thead>
                     <tbody>
-                    {args}
+                    {this.compilation()}
                     </tbody>
                   </table>
                 </div>
@@ -338,13 +380,13 @@ class CreateContract extends Component {
                 <Button
                   type="submit"
                   onClick={handleSubmit(this.submit)}
-                  className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                   disabled={pristine || submitting || !valid}
                   text="Create Contract"
                 />
 
               </div>
             </div>
+
           </Dialog>
         </form>
       </div>
@@ -383,7 +425,7 @@ function mapStateToProps(state) {
     isOpen: state.createContract.isOpen,
     abi: state.createContract.abi,
     createDisabled: state.createContract.createDisabled,
-    filename: state.createContract.filename,
+    contractName: state.createContract.contractName,
     contract: state.createContract.contract,
     accounts: state.accounts.accounts,
     username: state.createContract.username,
@@ -401,7 +443,8 @@ const connected = connect(mapStateToProps, {
   contractFormChange,
   fetchContracts,
   fetchAccounts,
-  usernameChange
+  usernameChange,
+  contractNameChange
 })(formed);
 
 export default withRouter(connected);
