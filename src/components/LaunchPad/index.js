@@ -4,6 +4,7 @@ import { withRouter, Link } from 'react-router-dom';
 import { Field, reduxForm } from 'redux-form';
 import Dropzone from 'react-dropzone';
 import { required } from '../../lib/reduxFormsValidations'
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 import {
   loadLaunchPad,
@@ -15,6 +16,10 @@ import {
 import { fetchAccounts } from '../Accounts/accounts.actions';
 
 class LaunchPad extends Component {
+
+  componentDidUpdate() {
+    mixpanelWrapper.track('launchpad_deploy_load');
+  }
 
   componentWillMount() {
     if(this.props.launchPad.firstLoad) {
@@ -81,6 +86,7 @@ class LaunchPad extends Component {
 
   submit = (values) => {
     this.props.appUploadRequest(values);
+    mixpanelWrapper.track('launchpad_upload_app');
   };
 
   render() {
