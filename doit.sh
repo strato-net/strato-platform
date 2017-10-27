@@ -104,13 +104,13 @@ function doRegister {
   fi
 }
 
-function cleanupLogs {
-  while true
-  do
-    sleep 900 ;
-    find /var/lib/strato/logs/ -type f -size +10M -exec truncate -s 10M {} \;
-  done
-}
+#function cleanupLogs {
+#  while true
+#  do
+#    sleep 900 ;
+#    find /var/lib/strato/logs/ -type f -size +10M -exec truncate -s 10M {} \;
+#  done
+#}
 
 function runForever {
   while :
