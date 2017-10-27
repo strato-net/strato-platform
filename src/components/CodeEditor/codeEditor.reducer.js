@@ -18,7 +18,7 @@ const initialState = {
   contractName: undefined,
   tab: [{
     text: '',
-    title: 'untitled'
+    title: 'Main.sol'
   }],
   lastTabSelected:0
 };

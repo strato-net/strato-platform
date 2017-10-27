@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
-import { Button, Tab2, Tabs2 } from '@blueprintjs/core';
+import { Button, Tab2, Tabs2, Popover } from '@blueprintjs/core';
 import { compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import CreateContract from '../CreateContract';
 
@@ -12,7 +12,8 @@ class CodeEditor extends Component {
     render() {
         const options = {
             theme: 'vs-dark',
-            automaticLayout: true
+            automaticLayout: true,
+            language: 'vs/basic-languages/src/solidity'
         };
 
         const requireConfig = {
@@ -28,6 +29,7 @@ class CodeEditor extends Component {
                 width={'100%'}
                 height="400"
                 defaultValue={item.text}
+                language='vs/basic-languages/src/solidity'
                 requireConfig={requireConfig}
                 editorWillMount={this.editorWillMount}
                 options={options}
@@ -66,11 +68,19 @@ class CodeEditor extends Component {
                     </div>
                     <div className="row">
                         <div className="col-md-6">
-                            <Button className="pt-icon-add"
-                                text="Add File"
-                                onClick={() => {
-                                    this.props.addNewFileTab()
-                                }} />
+                            {/* onClick={() => {
+                                        this.props.addNewFileTab()
+                                    }} */}
+                            <Popover
+                                content={
+                                    <div className="smd-pad-8" style={{ height: 50 }}>
+                                        <input className="pt-input .modifier" type="text" placeholder="Enter File Name" dir="auto" />
+                                        <button type="button" className="pt-button pt-icon-add">Add</button>
+                                    </div>}
+                                target={<Button className="pt-icon-add"
+                                    text="Add File"
+                                />}
+                            />
                         </div>
                     </div>
                     <div className="row" style={{ margin: 20 }}>
