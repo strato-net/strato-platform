@@ -198,7 +198,9 @@ getCanonical :: Integer
 getCanonical n = getInNamespace Canonical n >>= \case
     Left _           -> return Nothing
     Right Nothing    -> return Nothing
-    Right (Just sha) -> return . Just $ fromValue sha
+    Right (Just sha) -> do
+      liftIO . putStrLn . show $ sha
+      return . Just $ fromValue sha
 
 getCanonicalHeader :: (BlockHeaderLike h)
                    => Integer
@@ -332,18 +334,18 @@ putBestBlockInfo :: SHA
                  -> Integer
                  -> Redis (Either Reply Status)
 putBestBlockInfo newSha newNumber newTDiff = do
-    --liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
+    liftIO . putStrLn . ("New args" ++) $ show (shaToHex newSha, newNumber, newTDiff)
     oldBBI' <- getBestBlockInfo
     case oldBBI' of
         Nothing      -> return (Left $ SingleLine "Got no block from getBetstBlockInfo")
-        Just (RedisBestBlock oldSha oldNumber _) -> do
-            --liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
+        Just (RedisBestBlock oldSha oldNumber oldTDiff) -> do
+            liftIO . putStrLn . ("Old args" ++) $ show (shaToHex oldSha, oldNumber, oldTDiff)
             helper' <- commonAncestorHelper oldNumber newNumber oldSha newSha
             case helper' of
                 Left err -> error $ "god save the queen! " ++ show err
                 Right (updates, deletions) -> do
-                    --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
-                    --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
+                    liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
+                    liftIO . putStrLn $ "Deletions: \n" ++ show deletions
                     res <- multiExec $ do
                         forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
                         unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
@@ -364,6 +366,8 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                       newSha = head newShaChain
                   ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
                   let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
+                  liftIO . putStrLn $ "seen:  " ++ show seen
+                  liftIO . putStrLn $ "seen': " ++ show seen'
                   if newParent `Set.member` seen
                   then complete newParent (mkParentChain newParent newShaChain)
                   else if oldParent `Set.member` seen
@@ -389,7 +393,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain
                       Just (ancestor :: RedisHeader) -> do
-                          -- liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
@@ -402,6 +406,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
 forceBestBlockInfo sha i j = do
+        liftIO . putStrLn $ "forceBestBlockInfo: " ++ show sha ++ " " ++ show i ++ " " ++ show j
         forceBestBlockInfo' bestBlockInfoKey (RedisBestBlock sha i j) --`totalRecall` (,,)
 
 forceBestBlockInfo' :: (RedisCtx m f, MonadIO m) => S8.ByteString -> RedisBestBlock -> m (f Status)

@@ -33,7 +33,6 @@ library
                      Handler.Test
                      Handler.QueuedTransactions
                      Handler.PushTransaction
-                     Handler.Solc
                      Handler.AfterSubmission
                      Handler.TransactionDemo
                      Handler.StorageInfo
