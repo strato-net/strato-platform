@@ -345,20 +345,26 @@ putBestBlockInfo newSha newNumber newTDiff = do
                 Right (updates, deletions) -> do
                     --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
-                    res <- multiExec $ do
-                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
-                        unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
-                        forceBestBlockInfo newSha newNumber newTDiff
-                    unless (null updates) $ do
-                      chain <- getCanonicalHeaderChain ((fromIntegral . snd . head $ updates) - 1) (fromIntegral . snd . last $ updates)
-                      let validChain = validateChain chain
-                      unless validChain $ do
-                        liftIO . putStrLn $ "!!!!!!INVALID BLOCKCHAIN!!!!!!"
+                    (validChain,chain) <- if null updates then return (True,[]) else do
+                      mchain <- getHeaders (map fst updates) --((fromIntegral . snd . head $ updates) - 1) (fromIntegral . snd . last $ updates)
+                      chain' <- mapM (\(sha, Just h) -> return (sha,h)) mchain
+                      let isValid = validateChain chain'
+                      --unless isValid (mapM_ printBlockHeader chain)
+                      return (isValid,chain')
+                    if validChain
+                      then do
+                        res <- multiExec $ do
+                            forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
+                            unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
+                            forceBestBlockInfo newSha newNumber newTDiff
+                        case res of
+                            TxSuccess _ -> return $ Right Ok
+                            TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
+                            TxError e   -> return . Left $ SingleLine (S8.pack e)
+                      else do
+                        --liftIO . putStrLn $ "!!!!!!INVALID BLOCKCHAIN!!!!!!"
                         mapM_ printBlockHeader chain
-                    case res of
-                        TxSuccess _ -> return $ Right Ok
-                        TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
-                        TxError e   -> return . Left $ SingleLine (S8.pack e)
+                        return . Left $ SingleLine (S8.pack "!!!!!!INVALID BLOCKCHAIN!!!!!!")
   where
     printBlockHeader (sha,RedisHeader h) = do
       liftIO . putStrLn $
