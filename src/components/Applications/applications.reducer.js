@@ -16,7 +16,7 @@ const reducer = function (state = initialState, action) {
         .applications
         .map((a) => {
            a.address = undefined;
-           a.url = a.url.replace('localhost', 'localhost:3001');
+           a.url = a.url;
            a.url += '/ui';
            return a;
          })
