@@ -13,7 +13,30 @@ const initialState = {
   enableCreateAction: false,
   sourceCode: undefined,
   contractName: undefined,
-};
+}
+
+
+const formatCompilationErrors = function(error) {
+  if(error.indexOf('\n') === -1) {
+    return error;
+  }
+  let text = error
+    .split('\n')
+    .reduce((a,part,i)=>{
+      if(i===0 || part === '') {
+        return a;
+      }
+      return a + ' ' + part;
+     },'');
+
+  try {
+    const jErrors = JSON.parse(text);
+    console.log(jErrors);
+    return jErrors.error;
+  } catch(e) {
+    return text;
+  }
+}
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
@@ -38,7 +61,7 @@ const reducer = function (state = initialState, action) {
     case CODE_EDITOR_COMPILE_FAILURE:
       return {
         ...state,
-        response: "Error Uploading Contract...: " + action.error,
+        response: formatCompilationErrors(action.error),
         error: action.error,
         codeCompileSuccess: false,
         enableCreateAction: false

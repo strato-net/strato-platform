@@ -25,56 +25,57 @@ class CodeEditor extends Component {
       }
     };
     return (
-      <div className="container-fluid">
-        <div className="row pt-dark">
-          <div className="row">
-            <div className="col-md-4 text-left">
-              <h3>Contract Editor</h3>
-            </div>
-            <div className="col-md-8 text-right smd-pad-8">
-              <div className="smd-pad-8">
-                <Button onClick={() => {
-                  mixpanelWrapper.track("code_editor_compile_click");
-                  this.props.compileCodeFromEditor('Greeter', this.props.codeEditorData.sourceCode, false);
-                }} className="pt-intent-primary" text="Compile"/>
-                <CreateContract contractNameFromEditor={this.props.codeEditorData.contractName} enableCreateContract={this.props.codeEditorData.enableCreateAction} textFromEditor={this.props.codeEditorData.sourceCode} sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src}/>
-              </div>
-            </div>
+      <div className="container-fluid pt-dark">
+        <div className="row">
+          <div className="col-md-4 text-left">
+            <h3>Contract Editor</h3>
           </div>
-          <div className="row" style={{
-            margin: 20
-          }}>
+          <div className="col-md-8 text-right">
+            <Button
+              onClick={() => {
+                mixpanelWrapper.track("code_editor_compile_click");
+                this.props.compileCodeFromEditor('Greeter', this.props.codeEditorData.sourceCode, false);
+              }}
+              className="pt-intent-primary"
+              text="Compile"
+            />
+            <CreateContract contractNameFromEditor={this.props.codeEditorData.contractName} enableCreateContract={this.props.codeEditorData.enableCreateAction} textFromEditor={this.props.codeEditorData.sourceCode} sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src}/>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-12">
             <Tabs2 id="Tabs2Example">
-              <Tab2 id={1} title={'Main.sol'} panel={< MonacoEditor className = "col-md-4 text-center" width = {
-                '100%'
-              }
-              defaultValue = {
-                this.props.codeEditorData.sourceCode
-              }
-              height = "400" language = 'solidity' requireConfig = {
-                requireConfig
-              }
-              editorWillMount = {
-                this.editorWillMount
-              }
-              options = {
-                options
-              }
-              onChange = {
-                (value, e) => {
-                  this.props.changeCreateActionState(false, value)
+              <Tab2
+                id={1}
+                title={'Main.sol'}
+                panel={
+                  <MonacoEditor
+                    className="col-md-4 text-center"
+                    width = {'100%'}
+                    defaultValue = {this.props.codeEditorData.sourceCode}
+                    height = {window.innerHeight-320 < 480 ? 480 : window.innerHeight-320}
+                    language = 'solidity'
+                    requireConfig = {requireConfig}
+                    editorWillMount = {this.editorWillMount}
+                    options = {options}
+                    onChange = {(value, e) => {this.props.changeCreateActionState(false, value)}}
+                  />
                 }
-              } />}/>
+              />
             </Tabs2>
           </div>
-          <div style={{
-            margin: 20
-          }}>
-            Result: {this.props.codeEditorData.codeCompileSuccess
-              ? ' Contract compiled successfully'
-              : this.props.codeEditorData.response
-                ? ' ' + this.props.codeEditorData.response
-                : ''}
+        </div>
+        <div className="row">
+          <div className="col-12">
+            <pre className="pt-text-muted" style={{height: '120px', fontSize: '11px'}}>
+              {
+                this.props.codeEditorData.codeCompileSuccess
+                ? ' Contract compiled successfully'
+                : this.props.codeEditorData.response
+                  ? ' ' + this.props.codeEditorData.response
+                  : ''
+              }
+            </pre>
           </div>
         </div>
       </div>
