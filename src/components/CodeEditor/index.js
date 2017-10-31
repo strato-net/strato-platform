@@ -23,20 +23,22 @@ class CodeEditor extends Component {
   }
 
   renderPopUpContent = () => {
-    return <div className="row">
-      <input
-        className="pt-input .modifier"
-        type="text"
-        placeholder="Enter file name"
-        dir="auto"
-        onChange={(e) => this.setState({ fileName: e.target.value })} />
-      <Button
-        className="pt-intent-primary pt-popover-dismiss"
-        text="Add file"
-        onClick={() => {
-          this.state.fileName && this.state.fileName.length > 0 && this.props.addNewFileTab(this.state.fileName)
-        }} />
-    </div>
+    return (
+      <div className="row">
+        <input
+          className="pt-input .modifier"
+          type="text"
+          placeholder="Enter file name"
+          dir="auto"
+          onChange={(e) => this.setState({ fileName: e.target.value })} />
+        <Button
+          className="pt-intent-primary pt-popover-dismiss"
+          text="Add file"
+          onClick={() => {
+            this.state.fileName && this.state.fileName.length > 0 && this.props.addNewFileTab(this.state.fileName)
+          }} />
+      </div>
+    )
   }
 
   onTextUpdate() {
@@ -98,7 +100,8 @@ class CodeEditor extends Component {
         options={options}
         onChange={(value, e) => {
           this.props.changeCreateActionState(false, value, index);
-          this.onTextUpdate();
+          // disable hot compile
+          //this.onTextUpdate();
         }} />}>
         <span className="pt-icon-standard pt-icon-cross pt-align-right smd-pad-8"
           onClick={() => {
