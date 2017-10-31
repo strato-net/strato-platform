@@ -110,7 +110,7 @@ function cleanupLogs {
   while true
   do
     sleep 900 ;
-    find $PWD/logs/ -type f -size +10M -exec cp {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
+    find $PWD/logs/ -type f -size +10M -exec /bin/cp -rf {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
   done
 }
 
