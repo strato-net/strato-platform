@@ -48,7 +48,9 @@ class CreateContract extends Component {
   };
 
   handleContractNameChange = (e) => {
-    this.props.contractNameChange(
+    this.props.sourceFromEditor?
+    this.props.onChangeEditorContractName(e.target.value)
+    :this.props.contractNameChange(
       e.target.value
     );
   }
