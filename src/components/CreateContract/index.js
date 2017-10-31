@@ -17,6 +17,7 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
+import { toasts } from "../Toasts";
 
 // TODO: use solc instead of extabi for compile
 
@@ -48,9 +49,17 @@ class CreateContract extends Component {
   };
 
   handleContractNameChange = (e) => {
-    this.props.contractNameChange(
+    this.props.sourceFromEditor?
+    this.props.onChangeEditorContractName(e.target.value)
+    :this.props.contractNameChange(
       e.target.value
     );
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.isToasts) {
+      toasts.show({ message: nextProps.toastsMessage });
+    }
   }
 
   handleFileDrop = (files, dropZoneField) => {
@@ -429,6 +438,8 @@ function mapStateToProps(state) {
     contract: state.createContract.contract,
     accounts: state.accounts.accounts,
     username: state.createContract.username,
+    isToasts: state.createContract.isToasts,
+    toastsMessage: state.createContract.toastsMessage,
     searchable: selector(state, 'searchable')
   };
 }

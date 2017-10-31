@@ -15,7 +15,7 @@
     "react-addons-css-transition-group": "15.5.2",
     "react-dom": "15.5.4",
     "react-dropzone": "^3.13.3",
-    "react-monaco-editor": "0.10.0",
+    "react-monaco-editor": "0.11.0",
     "react-joyride": "^1.10.1",
     "react-redux": "5.0.5",
     "react-redux-loading-bar": "^2.9.3",
