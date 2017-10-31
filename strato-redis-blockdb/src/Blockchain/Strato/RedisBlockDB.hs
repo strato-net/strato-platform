@@ -29,7 +29,6 @@ import           Blockchain.Output
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.SHA
 import           Blockchain.Strato.RedisBlockDB.Models as Models
-import           Blockchain.Data.BlockHeader           as BH
 
 import           Control.Arrow                         (second)
 import           Control.Concurrent                    (threadDelay)
@@ -345,53 +344,31 @@ putBestBlockInfo newSha newNumber newTDiff = do
                 Right (updates, deletions) -> do
                     --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
-                    (validChain,chain) <- if null updates then return (True,[]) else do
-                      mchain <- getHeaders (map fst updates) --((fromIntegral . snd . head $ updates) - 1) (fromIntegral . snd . last $ updates)
-                      chain' <- mapM (\(sha, Just h) -> return (sha,h)) mchain
-                      let isValid = validateChain chain'
-                      --unless isValid (mapM_ printBlockHeader chain)
-                      return (isValid,chain')
-                    if validChain
-                      then do
-                        res <- multiExec $ do
-                            forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
-                            unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
-                            forceBestBlockInfo newSha newNumber newTDiff
-                        case res of
-                            TxSuccess _ -> return $ Right Ok
-                            TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
-                            TxError e   -> return . Left $ SingleLine (S8.pack e)
-                      else do
-                        --liftIO . putStrLn $ "!!!!!!INVALID BLOCKCHAIN!!!!!!"
-                        mapM_ printBlockHeader chain
-                        return . Left $ SingleLine (S8.pack "!!!!!!INVALID BLOCKCHAIN!!!!!!")
-  where
-    printBlockHeader (sha,RedisHeader h) = do
-      liftIO . putStrLn $
-        "(" ++
-        show (blockHeaderBlockNumber h) ++
-        "," ++
-        shaToHex (blockHeaderParentHash h) ++
-        "," ++
-        shaToHex (sha) ++
-        ")"
+                  res <- multiExec $ do
+                      forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
+                      unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
+                      forceBestBlockInfo newSha newNumber newTDiff
+                  case res of
+                      TxSuccess _ -> return $ Right Ok
+                      TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
+                      TxError e   -> return . Left $ SingleLine (S8.pack e)
 
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
                      -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
         where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
-              helper (_:(oldSha'':_)) (_:(newSha'':_)) _ | oldSha'' == newSha'' = return $ Right ([(newSha'', newNum)], [oldNum])
+              helper (_:(oldSha'':_)) (_:(newSha'':ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
               helper oldShaChain newShaChain seen = do
-                  let oldSha = head oldShaChain
-                      newSha = head newShaChain
-                  ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                  let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
-                  if newParent `Set.member` seen
-                  then complete newParent (mkParentChain newParent newShaChain)
-                  else if oldParent `Set.member` seen
-                       then complete oldParent (mkParentChain oldParent newShaChain)
-                       else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
+                let oldSha = head oldShaChain
+                    newSha = head newShaChain
+                ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
+                let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
+                if newParent `Set.member` seen
+                then complete newParent (mkParentChain newParent newShaChain)
+                else if oldParent `Set.member` seen
+                      then complete oldParent (mkParentChain oldParent newShaChain)
+                      else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
               -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
               -- deeper (i.e., we hit genesis block, and cant get any more parents for that chain)
@@ -422,16 +399,16 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- safeTail [] = []
               -- safeTail xs = tail xs
 
-validateLink :: (SHA,RedisHeader) -> (SHA, RedisHeader) -> Bool
-validateLink (psha,RedisHeader parentHeader) (_,RedisHeader childHeader) =
-  (psha == (parentHash childHeader))
-  &&
-  (((number parentHeader) + 1) == (number childHeader))
-
-validateChain :: [(SHA,RedisHeader)] -> Bool
-validateChain [] = True
-validateChain [_] = True
-validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
+--validateLink :: (SHA,RedisHeader) -> (SHA, RedisHeader) -> Bool
+--validateLink (psha,RedisHeader parentHeader) (_,RedisHeader childHeader) =
+--  (psha == (parentHash childHeader))
+--  &&
+--  (((number parentHeader) + 1) == (number childHeader))
+--
+--validateChain :: [(SHA,RedisHeader)] -> Bool
+--validateChain [] = True
+--validateChain [_] = True
+--validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
