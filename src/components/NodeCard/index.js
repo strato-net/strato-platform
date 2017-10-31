@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { env } from '../../env';
-import { Text, Collapse, Button } from '@blueprintjs/core';
+import { Text, Collapse } from '@blueprintjs/core';
 import {
   fetchNodeDetail,
   fetchNodePeers,

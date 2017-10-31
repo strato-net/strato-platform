@@ -1,11 +1,12 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import {Text} from '@blueprintjs/core';
+import { Text } from '@blueprintjs/core';
+import './peersCard.css';
 class PeersCard extends Component {
   
-  renderPeers(peers) {
-    return <div className="row pt-text-muted">
+  renderPeers(peers, index) {
+    return <div key={index} className="row node-peers">
       <div className="col-xs-3">
         <small>IP: </small>
       </div>
@@ -28,19 +29,25 @@ class PeersCard extends Component {
   render() {
     const node = this.props.nodes[this.props.nodeIndex];
     const serverPeers = node.peers && node.peers.serverPeers && node.peers.serverPeers.map(
-      (peers) => this.renderPeers(peers)
+      (peers, index) => this.renderPeers(peers, index)
     )
     const clientPeers = node.peers && node.peers.clientPeers && node.peers.clientPeers.map(
-      (peers) => this.renderPeers(peers)
+      (peers, index) => this.renderPeers(peers, index)
     )
     let className = 'pt-card pt-elevation-2';
     return (
       <div className={className}>
-        {node.peers && node.peers.clientPeers.length>0 && <h5>ClientPeer</h5>}
-       {clientPeers}
-       <hr/>
-       {node.peers && node.peers.serverPeers.length>0 && <h5>ServerPeer</h5>}        
-       {serverPeers}
+        <h5>Client Peer {`(${node.peers && node.peers.clientPeers.length})`}</h5>
+        {node.peers && node.peers.clientPeers.length > 0 ? clientPeers :
+          <Text ellipsize={true}>
+            <small>No client peers</small>
+          </Text>}
+        <hr />
+        <h5>Server Peer {`(${node.peers && node.peers.serverPeers.length})`}</h5>
+        {node.peers && node.peers.serverPeers.length > 0 ? serverPeers :
+          <Text ellipsize={true}>
+            <small>No server peers</small>
+          </Text>}
       </div>
     );
   }
