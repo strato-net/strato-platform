@@ -106,7 +106,6 @@ function doRegister {
 
 # Find all logs greater than 10M, then copy and truncate
 function cleanupLogs {
-  if
   while true
   do
     sleep 900 ;
