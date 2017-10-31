@@ -6,7 +6,7 @@ import MonacoEditor from 'react-monaco-editor';
 import { Button, Tab2, Tabs2, Popover } from '@blueprintjs/core';
 import { contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import CreateContract from '../CreateContract';
-import { getImportStatements, getFileAndReplaceWithImport } from '../../Helper/FileParser.js'
+import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/FileParser.js'
 
 class CodeEditor extends Component {
   constructor() {

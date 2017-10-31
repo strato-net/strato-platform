@@ -5,7 +5,8 @@ import {
   createContractFailure,
   COMPILE_CONTRACT_REQUEST,
   compileContractSuccess,
-  compileContractFailure
+  compileContractFailure,
+  updateToast
 } from './createContract.actions';
 import {fetchContracts} from '../Contracts/contracts.actions';
 import {stopSubmit} from 'redux-form'
@@ -82,8 +83,8 @@ function compileContractApiCall(contractName, source, s) {
 function * createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments);
-    console.log(response);
     yield put(createContractSuccess(response));
+    yield put(updateToast());
     yield put(fetchContracts());
     yield put(fetchCirrusInstances(action.payload.contract));
   } catch (err) {
