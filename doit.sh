@@ -9,7 +9,7 @@ function newnode {
        doInit
   fi
 
-  mkdir -p logs
+  mkdir -p logs/rotation
   echo "Starting Strato processes. All output is logged to $PWD/logs."
 
   if $mineBlocks
@@ -104,11 +104,13 @@ function doRegister {
   fi
 }
 
+# Find all logs greater than 10M, then copy and truncate
 function cleanupLogs {
+  if
   while true
   do
     sleep 900 ;
-    find /var/lib/strato/logs/ -type f -size +10M -exec truncate -s 10M {} \;
+    find $PWD/logs/ -type f -size +10M -exec cp {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
   done
 }
 
