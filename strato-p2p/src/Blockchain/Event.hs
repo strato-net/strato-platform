@@ -19,7 +19,6 @@ import           Control.Monad.Logger
 import           Control.Monad.State
 import           Data.Conduit
 import           Data.List
-import           Data.Maybe                             (listToMaybe)
 --import qualified Data.Set as S
 import qualified Data.ByteString                       as BS
 import qualified Data.ByteString.Base16                as BC16
@@ -180,12 +179,6 @@ handleEvents mode peer = awaitForever $ \case
             --     allNeeded = headerHashes `S.union` parentHashes
 
             -- check if blockheaders we recieved have parents.
-            bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-            let blockNumber = numFromRedis bestBlock
-                sha = shaFromRedis bestBlock
-                mchild = listToMaybe $ filter ((== blockNumber + 1) . number) headers
-                isParent = mchild >>= (return . (== sha) . parentHash)
-            $logInfoS "handleEvents/isParent" . T.pack $ show (blockNumber, isParent)
             parentsInDB :: [(SHA, Maybe BlockHeader)] <- RBDB.withRedisBlockDB . RBDB.getHeaders $ parentHash <$> headers
             let existingParents = [(sha, x) | (sha, Just x) <- parentsInDB]
             let missingParents  = [sha | (sha, Nothing) <- parentsInDB]
@@ -299,11 +292,6 @@ numFromRedis :: Maybe RedisBestBlock -> Integer
 numFromRedis = \case
     Nothing                     -> 0
     Just (RedisBestBlock _ n _) -> n
-
-shaFromRedis :: Maybe RedisBestBlock -> SHA
-shaFromRedis = \case
-    Nothing                       -> SHA 0
-    Just (RedisBestBlock sha _ _) -> sha
 
 -- todo: we should take blockNumber as argument here instead of just looking for
 -- bestBlock to prevent us from getting stuck
