@@ -3,14 +3,14 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
-  parameters { string(name: 'QUICK_BUILD_FLAG', defaultValue: '', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the silo test job). DEFAULT: full build') }
+  parameters { string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the silo test job). DEFAULT: "full"') }
 
   stages {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
           docker rm -f $(docker ps -aq) || true;
-          if [ "$QUICK_BUILD_FLAG" == "quick" ]; then
+          if [ "$BUILD_TYPE" == "quick" ]; then
             docker system prune -a
           else
             docker system prune -fa
@@ -27,7 +27,7 @@ pipeline {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             git config --global credential.helper store
-            if [ "$QUICK_BUILD_FLAG" == "quick" ]; then
+            if [ "$BUILD_TYPE" == "quick" ]; then
               cd silo
               basil clone
               # Checkout branches specified in Basilfile
