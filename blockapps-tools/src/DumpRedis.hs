@@ -1,5 +1,4 @@
 module DumpRedis where
-
 import           Database.Redis
 
 import           Blockchain.EthConf                    (lookupRedisBlockDBConfig)

@@ -8,7 +8,7 @@
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Blockchain.Strato.RedisBlockDB
-    ( getSHAsByNumber
+    ( inNamespace, getSHAsByNumber
     , getHeader, getHeaders, getHeadersByNumber, getHeadersByNumbers
     , getBlock,  getBlocks,  getBlocksByNumber,  getBlocksByNumbers
     , getTransactions, getUncles
@@ -278,7 +278,7 @@ putHeader :: (BlockHeaderLike h)
 putHeader h = do
     let sha       = blockHeaderHash h
         parent    = blockHeaderParentHash h
-        number    = blockHeaderBlockNumber h
+        number'    = blockHeaderBlockNumber h
         storeHead = morphBlockHeader h :: RedisHeader
         inNS'     = flip inNamespace sha
 
@@ -286,7 +286,7 @@ putHeader h = do
         void $ setnx (inNS' Headers) (toValue storeHead)
         void $ setnx (inNS' Parent) (toValue parent)
         void $ sadd (inNamespace Children parent) [toValue sha]
-        sadd (inNamespace Numbers number) [toValue sha]
+        sadd (inNamespace Numbers number') [toValue sha]
     case res of
         TxSuccess _ -> pure $ Right Ok
         TxAborted   -> pure . Left $ SingleLine (S8.pack $ "putHeader - Aborted")
@@ -303,7 +303,7 @@ putBlock :: (BlockLike h t b, BlockHeaderLike h, TransactionLike t)
 putBlock b = do
     let sha     = blockHash b
         header  = blockHeader b
-        number  = blockHeaderBlockNumber header
+        number'  = blockHeaderBlockNumber header
         parent  = blockHeaderParentHash header
         header' = morphBlockHeader header :: RedisHeader
         txs     = RedisTxs (morphTx <$> blockTransactions b :: [Models.RedisTx])
@@ -315,7 +315,7 @@ putBlock b = do
         void $ setnx (inNS' Uncles) (toValue uncles)
         void $ setnx (inNS' Parent) (toValue parent)
         void $ sadd (inNamespace Children parent) [toKey sha]
-        sadd (inNamespace Numbers number) [toKey sha]
+        sadd (inNamespace Numbers number') [toKey sha]
         --forM_ uncles -- todo index the uncles' headers/numbers/etc?
     case res of
         TxSuccess _ -> pure $ Right Ok
@@ -344,31 +344,31 @@ putBestBlockInfo newSha newNumber newTDiff = do
                 Right (updates, deletions) -> do
                     --liftIO . putStrLn $ "Updates: \n" ++ unlines ((\(x, y) -> show (shaToHex x, y)) <$> updates)
                     --liftIO . putStrLn $ "Deletions: \n" ++ show deletions
-                    res <- multiExec $ do
-                        forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
-                        unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
-                        forceBestBlockInfo newSha newNumber newTDiff
-                    case res of
-                        TxSuccess _ -> return $ Right Ok
-                        TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
-                        TxError e   -> return . Left $ SingleLine (S8.pack e)
+                  res <- multiExec $ do
+                      forM_ updates $ \(sha, num) -> set (inNamespace Canonical $ num) (toValue sha)
+                      unless (null deletions) . void . del $ inNamespace Canonical . toKey <$> deletions
+                      forceBestBlockInfo newSha newNumber newTDiff
+                  case res of
+                      TxSuccess _ -> return $ Right Ok
+                      TxAborted   -> return . Left $ SingleLine (S8.pack "Aborted")
+                      TxError e   -> return . Left $ SingleLine (S8.pack e)
 
 commonAncestorHelper :: Integer -> Integer
                      -> SHA     -> SHA
                      -> Redis (Either Reply ([(SHA, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (Set.fromList [oldSha', newSha'])
         where helper (oldSha:[]) (newSha:[]) _ | oldSha == newSha = return $ Right ([], [])
-              helper (_:(oldSha'':_)) (_:(newSha'':_)) _ | oldSha'' == newSha'' = return $ Right ([(newSha'', newNum)], [oldNum])
+              helper (_:(oldSha'':_)) (_:(newSha'':ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
               helper oldShaChain newShaChain seen = do
-                  let oldSha = head oldShaChain
-                      newSha = head newShaChain
-                  ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
-                  let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
-                  if newParent `Set.member` seen
-                  then complete newParent (mkParentChain newParent newShaChain)
-                  else if oldParent `Set.member` seen
-                       then complete oldParent (mkParentChain oldParent newShaChain)
-                       else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
+                let oldSha = head oldShaChain
+                    newSha = head newShaChain
+                ps@[newParent, oldParent] <- forM [newSha, oldSha] (\x -> fromMaybe x <$> getParent x)
+                let seen' = foldl (flip Set.insert) seen (filter (/= (SHA 0)) ps) -- todo double Set.insert is probably more optimal
+                if newParent `Set.member` seen
+                then complete newParent (mkParentChain newParent newShaChain)
+                else if oldParent `Set.member` seen
+                      then complete oldParent (mkParentChain oldParent newShaChain)
+                      else helper (mkParentChain oldParent oldShaChain) (mkParentChain newParent newShaChain) seen'
 
               -- earlier, we "cycle" the last block we were able to get if we cant traverse the parent chain any
               -- deeper (i.e., we hit genesis block, and cant get any more parents for that chain)
@@ -389,7 +389,7 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
                                               "Could not get ancestor header for SHA " ++ shaToHex lca
                                      else complete (head newShaChain) newShaChain
                       Just (ancestor :: RedisHeader) -> do
-                          -- liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
+                          --liftIO . putStrLn $ show (shaToHex lca, shaToHex <$> newShaChain)
                           let ancestorNumber = blockHeaderBlockNumber ancestor
                               deletions      = [newNum+1..oldNum]
                               updates        = flip zip [ancestorNumber..] $ dropWhile (/= lca) newShaChain
@@ -398,6 +398,17 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
               -- safeTail :: [a] -> [a]
               -- safeTail [] = []
               -- safeTail xs = tail xs
+
+--validateLink :: (SHA,RedisHeader) -> (SHA, RedisHeader) -> Bool
+--validateLink (psha,RedisHeader parentHeader) (_,RedisHeader childHeader) =
+--  (psha == (parentHash childHeader))
+--  &&
+--  (((number parentHeader) + 1) == (number childHeader))
+--
+--validateChain :: [(SHA,RedisHeader)] -> Bool
+--validateChain [] = True
+--validateChain [_] = True
+--validateChain (x:xs) = (validateLink x $ head xs) && (validateChain xs)
 
 -- | Used to seed the first bestBlock, e.g. genesis block in strato-setup
 forceBestBlockInfo :: (RedisCtx m f, MonadIO m) => SHA -> Integer -> Integer -> m (f Status)
