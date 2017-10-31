@@ -3,14 +3,20 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
+  parameters { string(name: 'QUICK_BUILD_FLAG', defaultValue: '', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the silo test job). DEFAULT: full build') }
 
   stages {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker rm -f $(docker ps -aq) || true; docker system prune -fa
+          docker rm -f $(docker ps -aq) || true;
+          if [ "$QUICK_BUILD_FLAG" == "quick" ]; then
+            docker system prune -a
+          else
+            docker system prune -fa
+            sudo rm -rf silo
+          fi
           docker ps
-          sudo rm -rf silo
         '''
        }
     }
@@ -21,9 +27,21 @@ pipeline {
           sh '''#!/bin/bash -le
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             git config --global credential.helper store
-            git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
-            cd silo
-            basil clone
+            if [ "$QUICK_BUILD_FLAG" == "quick" ]; then
+              cd silo
+              basil clone
+              # Checkout branches specified in Basilfile
+              basil checkout
+              # Git pull all the latest
+              dirs=($(find ./repos -mindepth 1 -maxdepth 1 -type d))
+              for dir in "${dirs[@]}"; do
+                (cd "$dir" && git pull)
+              done
+            else
+              git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+              cd silo
+              basil clone
+            fi
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
             basil build
