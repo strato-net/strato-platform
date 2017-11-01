@@ -90,7 +90,6 @@ const rootSaga = function * startForeman() {
     fork(watchCreateContract),
     fork(watchFetchContracts),
     fork(watchCompileContract),
-    fork(watchCompileSourceFromEditor),
     fork(watchFetchState),
     fork(watchFetchNodeData),
     fork(watchFetchArgs),

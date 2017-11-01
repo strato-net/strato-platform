@@ -2,7 +2,11 @@ import {
   CODE_EDITOR_COMPILE_REQUEST,
   CODE_EDITOR_COMPILE_SUCCESS,
   CODE_EDITOR_COMPILE_FAILURE,
-  CODE_EDITOR_CHANGE_CREATEACTION
+  CODE_EDITOR_CHANGE_CREATEACTION,
+  ADD_NEW_TAB,
+  REMOVE_TAB,
+  ON_TAB_CHANGE,
+  EDITOR_CONTRACT_NAME_CHANGE
 } from './codeEditor.actions';
 
 const initialState = {
@@ -13,8 +17,14 @@ const initialState = {
   enableCreateAction: false,
   sourceCode: undefined,
   contractName: undefined,
-}
-
+  tab: [{
+    text: '',
+    title: 'Main.sol'
+  }],
+  lastTabSelected:0,
+  currentTabSelected:0,
+  isRemoveTab: false
+};
 
 const formatCompilationErrors = function(error) {
   if(error.indexOf('\n') === -1) {
@@ -67,12 +77,59 @@ const reducer = function (state = initialState, action) {
         enableCreateAction: false
       };
 
+    case EDITOR_CONTRACT_NAME_CHANGE:
+    return {
+      ...state,
+      contractName: action.contractName
+    }
+
     case CODE_EDITOR_CHANGE_CREATEACTION:
+      const tabItems = [...state.tab];
+      tabItems[action.index].text = action.sourceCode;  //new value
       return {
         ...state,
         enableCreateAction: action.createActionEnable,
         sourceCode: action.sourceCode,
+        tab: tabItems
       };
+
+    case ADD_NEW_TAB:
+      const newTabs = [...state.tab, { title: `${action.fileName}.sol`, text: '' }]
+      return {
+        ...state,
+        tab: newTabs,
+        currentTabSelected: newTabs.length - 1 
+      };
+
+    case REMOVE_TAB:
+      const tabs = state.tab.slice();
+      tabs.splice(action.index, 1);
+      const selectedTab = action.index === state.currentTabSelected? (action.index>0 ? state.currentTabSelected-1:0):(action.index>state.currentTabSelected?state.currentTabSelected: state.currentTabSelected-1)      
+      return {
+        ...state,
+        tab: tabs,
+        isRemoveTab: true,
+        currentTabSelected: selectedTab,
+        lastTabSelected: selectedTab
+      };
+
+    case ON_TAB_CHANGE:
+      const changedTab = state.tab.slice();    
+      if (state.isRemoveTab){        
+        const tabCodeOnRemove = changedTab.length>0 && changedTab.splice(state.currentTabSelected,1)              
+        return {
+          ...state,
+          isRemoveTab:false,
+          sourceCode:tabCodeOnRemove.length>0 && tabCodeOnRemove[0].text,          
+        }
+      }
+      const tabCode = changedTab.splice(action.nextTab,1)
+      return {
+        ...state,
+        sourceCode:tabCode[0].text,
+        currentTabSelected: action.nextTab,
+        lastTabSelected: action.prevTab,
+      }
 
     default:
       return state;

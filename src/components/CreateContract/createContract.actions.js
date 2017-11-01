@@ -9,6 +9,7 @@ export const COMPILE_CONTRACT_FAILURE = "COMPILE_CONTRACT_FAILURE";
 export const USERNAME_FORM_CHANGE = "USERNAME_FORM_CHANGE";
 export const CONTRACT_FORM_CHANGE = "CONTRACT_UPLOAD_FORM_CHANGE";
 export const CONTRACT_NAME_CHANGE = "CONTRACT_NAME_CHANGE";
+export const UPDATE_TOAST = "UPDATE_TOAST";
 
 export const contractFormChange = function(contract) {
   return {
@@ -60,6 +61,16 @@ export const createContractSuccess = function(response) {
     response: response,
     spinning: false,
     isOpen: true,
+    toasts: true,
+    toastsMessage: response && response.status ? 'Contract Created' : response
+  }
+}
+
+export const updateToast = function(response) {
+  return {
+    type: 'UPDATE_TOAST',
+    toasts: false,
+    toastsMessage: ''
   }
 }
 
@@ -69,6 +80,8 @@ export const createContractFailure = function(error) {
     error: error,
     spinning: false,
     isOpen: false,
+    toasts: true,
+    toastsMessage: 'Contract creation failed'
   }
 }
 

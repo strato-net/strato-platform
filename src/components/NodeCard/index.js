@@ -1,16 +1,24 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { env } from '../../env';
-import {Text} from '@blueprintjs/core';
+import { Text, Collapse } from '@blueprintjs/core';
 import {
   fetchNodeDetail,
   fetchNodePeers,
   fetchNodeCoinbase
 } from './nodeCard.actions';
 import './nodeCard.css';
+import PeersCard from '../PeersCard';
 
 class NodeCard extends Component {
+
+  constructor() {
+    super()
+    this.state = {
+      isOpen: false
+    }
+  }
 
   componentDidMount() {
     //this.props.fetchNodeDetail(this.props.nodeIndex);
@@ -32,52 +40,65 @@ class NodeCard extends Component {
     }, env.POLLING_FREQUENCY);
   }
 
+  handleClick = () => {
+    this.setState({ isOpen: !this.state.isOpen });
+  };
+
   render() {
     const node = this.props.nodes[this.props.nodeIndex];
     const peers = node.peers && node.peers.serverPeers && node.peers.clientPeers ?
       (node.peers.serverPeers.length + node.peers.clientPeers.length).toString()
       : 'unknown';
-
     const blockNumber = this.props.blockData.length > 0 ?
       this.props.blockData[0].blockData.number.toString()
       : 'unknown';
-
     let className = 'pt-card pt-elevation-2 ';
-    className += node.apiFailure ? 'node-warning' : 'node-success';
+    className += node.apiFailure ? 'node-warning pt-interactive' : 'node-success pt-interactive';
+    let arrowIcon = 'col-xs-3 text-right pt-icon-standard '
+    arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
     return (
-      <div className={className}>
-        <h5>{node.name}</h5>
-        <div className="row pt-text-muted">
-          <div className="col-xs-3">
-            <small>Coinbase</small>
+      <div>
+        <div className={className} onClick={this.handleClick}>
+          <div className="row">
+            <div className="col-xs-9">
+              <h5>{node.name}</h5>
+            </div>
+            <span className={arrowIcon}></span>
           </div>
-          <div className="col-xs-9">
-            <Text ellipsize={true}>
-              <small>{node.coinbase}</small>
-            </Text>
+          <div className="row pt-text-muted">
+            <div className="col-xs-3">
+              <small>Coinbase</small>
+            </div>
+            <div className="col-xs-9 text-right">
+              <Text ellipsize={true}>
+                <small>{node.coinbase}</small>
+              </Text>
+            </div>
+          </div>
+          <div className="row pt-text-muted">
+            <div className="col-xs-3">
+              <small>Block</small>
+            </div>
+            <div className="col-xs-9">
+              <small>{blockNumber}</small>
+            </div>
+          </div>
+          <div className="row pt-text-muted">
+            <div className="col-xs-3">
+              <small>Peers</small>
+            </div>
+            <div className="col-xs-9">
+              <small>{peers}</small>
+            </div>
           </div>
         </div>
-        <div className="row pt-text-muted">
-          <div className="col-xs-3">
-            <small>Block</small>
-          </div>
-          <div className="col-xs-9">
-            <small>{blockNumber}</small>
-          </div>
-        </div>
-        <div className="row pt-text-muted">
-          <div className="col-xs-3">
-            <small>Peers</small>
-          </div>
-          <div className="col-xs-9">
-            <small>{peers}</small>
-          </div>
-        </div>
+        <Collapse isOpen={this.state.isOpen}>
+          <PeersCard nodeIndex={this.props.nodeIndex} />
+        </Collapse>
       </div>
     );
   }
-
 }
 
 function mapStateToProps(state) {

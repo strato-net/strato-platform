@@ -9,7 +9,8 @@ import {
   COMPILE_CONTRACT_SUCCESS,
   USERNAME_FORM_CHANGE,
   CONTRACT_FORM_CHANGE,
-  CONTRACT_NAME_CHANGE
+  CONTRACT_NAME_CHANGE,
+  UPDATE_TOAST
 } from './createContract.actions';
 
 const initialState = {
@@ -22,6 +23,8 @@ const initialState = {
   contractName: undefined,
   createDisabled: true,
   filename: undefined,
+  toster: false,
+  tosterMessage: ''
 };
 
 const reducer = function (state = initialState, action) {
@@ -76,12 +79,22 @@ const reducer = function (state = initialState, action) {
         isOpen: true,
         response: "Error Uploading Contract...: " + action.error,
         error: action.error,
+        isToasts: action.toasts,
+        toastsMessage: action.toastsMessage
+      };
+    case UPDATE_TOAST: 
+      return {
+        ...state,
+        isToasts: action.toasts,
+        toastsMessage: action.toastsMessage
       };
     case CREATE_CONTRACT_SUCCESS:
       return {
         ...state,
         isOpen: false,
         response: "Upload Success: " + action.response,
+        isToasts: action.toasts,
+        toastsMessage: action.response && action.response.status ? 'Contract Created' : action.response
       };
     case COMPILE_CONTRACT_REQUEST:
       return {
