@@ -54,7 +54,7 @@ class NodeCard extends Component {
       : 'unknown';
     let className = 'pt-card pt-elevation-2 ';
     className += node.apiFailure ? 'node-warning pt-interactive' : 'node-success pt-interactive';
-    let arrowIcon = 'col-xs-3 text-right pt-icon-large '
+    let arrowIcon = 'col-xs-3 text-right '
     arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
     return (
