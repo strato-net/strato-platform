@@ -6,7 +6,7 @@ import './TransactionList.css'
 import {Text, Tooltip, Position} from '@blueprintjs/core';
 import { env } from '../../env';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { getFormatedDate } from '../../lib/dateUtils'
+import { parseDateFromString } from '../../lib/dateUtils'
 
 class TransactionList extends Component {
 
@@ -48,7 +48,7 @@ class TransactionList extends Component {
             <td width="22%">
               <Text ellipsize={true}>
                 <small>
-                  {getFormatedDate(tx.timestamp)}
+                  {parseDateFromString(tx.timestamp)}
                 </small>
               </Text>
             </td>
