@@ -63,7 +63,7 @@ class NodeCard extends Component {
             <div className="col-xs-3">
               <small>Coinbase</small>
             </div>
-            <div className="col-xs-9">
+            <div className="col-xs-9 text-right">
               <Text ellipsize={true}>
                 <small>{node.coinbase}</small>
               </Text>
