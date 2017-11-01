@@ -57,18 +57,19 @@ describe("Send Transaction Test", function() {
       }
     }
     // block times
-    const blockTimes = yield getBlockTimes(count*nodes.length + 20);
-    // write timing to file
-    console.log(JSON.stringify(txTiming, null, 2));
-    const jsonToCSV1 = require('json-to-csv');
-    jsonToCSV1(txTiming, 'txTiming.csv');  //  FIXME thats a promise
-    const jsonToCSV2 = require('json-to-csv');
-    jsonToCSV2(blockTimes, 'blockTiming.csv');  //  FIXME thats a promise
+    //const blockTimes = yield getBlockTimes(count*nodes.length + 20);
+    //// write timing to file
+    //console.log(JSON.stringify(txTiming, null, 2));
+    //const jsonToCSV1 = require('json-to-csv');
+    //jsonToCSV1(txTiming, 'txTiming.csv');  //  FIXME thats a promise
+    //const jsonToCSV2 = require('json-to-csv');
+    //jsonToCSV2(blockTimes, 'blockTiming.csv');  //  FIXME thats a promise
 
 
-    // check balance for those accounts on each node
-    const pair = userPairs[0];
-    yield checkBalance(pair.alice, pair.bob, total);
+      // check balance for those accounts on each node
+    yield checkBalance(nodes[0].alice,nodes[0].bob,total);
+    //const pair = userPairs[0];
+      //yield checkBalance(pair.alice, pair.bob, total);
   });
 
   it.skip('should send correct amount of ether', function* () {
@@ -109,11 +110,11 @@ describe("Send Transaction Test", function() {
     for (let node of nodes) {
       // create
       const aliceName = `Alice_${node.id}_${uid}`;
-      const alice = yield rest.createUser(aliceName, password, node.id);
+      const alice = yield rest.createUser(aliceName, password, false, node.id);
       console.log('alice', alice);
       for(var i=0; i<1000000000; i++) {}; //about 3s delay. Done to allow p2p network to sync new faucet nonce and make it adjust for block time
       const bobName = `Bob_${node.id}_${uid}`;
-      const bob = yield rest.createUser(bobName, password, node.id);
+      const bob = yield rest.createUser(bobName, password, false, node.id);
       console.log('bob', bob);
       for(var i=0; i<1000000000; i++) {}; //about 3s delay. Done to allow p2p network to sync new faucet nonce and make it adjust for block time
       const pair = {alice: alice, bob:bob};
@@ -149,23 +150,24 @@ describe("Send Transaction Test", function() {
     // it is OK for nonce to be undefined!
     console.log('send', nodeId, alice.name, bob.name, value.toString(), nonce);
     const startTime = timerStart();
-    const receipt = yield rest.send(alice, bob, value, nonce, nodeId);
-    const txElapsed = timerStop(startTime);
-    const txResult = yield rest.transactionResult(receipt.hash, nodeId);
-    const blockElapsed = yield getLastBlockTime(nodeId);
-    const txTimingObject = {
-      node: nodeId,
-      txElapsed: txElapsed,
-      txResultTime: txResult[0].time,
-      blockElapsed: blockElapsed,
-      blockHash: txResult[0].blockHash,
-      //txResult: txResult,
-    };
-    txTiming.push(txTimingObject);
-    console.log('send tx: txElapsed', txElapsed, 'txResult.time', txResult[0].time);
-    assert.equal(txResult[0].status, 'success', 'tx status');
+      yield rest.send(alice, bob, value, false, nonce, nodeId);
 
-    return txResult[0];
+    //const txElapsed = timerStop(startTime);
+    ////const txResult = yield rest.transactionResult(receipt.hash, nodeId);
+    //const blockElapsed = yield getLastBlockTime(nodeId);
+    //const txTimingObject = {
+    //  node: nodeId,
+    //  txElapsed: txElapsed,
+    //  txResultTime: txResult[0].time,
+    //  blockElapsed: blockElapsed,
+    //  blockHash: txResult[0].blockHash,
+    //  //txResult: txResult,
+    //};
+    //txTiming.push(txTimingObject);
+    //console.log('send tx: txElapsed', txElapsed, 'txResult.time', txResult[0].time);
+    //assert.equal(txResult.status, 'success', 'tx status');
+
+    //return txResult;
   }
 
   function* checkBalance(alice, bob, value) {
@@ -176,8 +178,8 @@ describe("Send Transaction Test", function() {
       const pair = userPairs[node.id];
       console.log('checkBalance', node.id, pair.alice.name, pair.bob.name, value.toString());
       // check balances
-      const aliceBalance = yield rest.getBalance(alice.address, ACCOUNT_INDEX, node.id);
-      const bobBalance = yield rest.getBalance(bob.address, ACCOUNT_INDEX, node.id);
+      const aliceBalance = yield rest.getBalance(pair.alice.address, ACCOUNT_INDEX, node.id);
+      const bobBalance = yield rest.getBalance(pair.bob.address, ACCOUNT_INDEX, node.id);
       bobBalance.should.be.bignumber.eq(FAUCET_AWARD.plus(value));
     }
   }
