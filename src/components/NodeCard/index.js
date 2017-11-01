@@ -54,11 +54,20 @@ class NodeCard extends Component {
       : 'unknown';
     let className = 'pt-card pt-elevation-2 ';
     className += node.apiFailure ? 'node-warning pt-interactive' : 'node-success pt-interactive';
+    let arrowIcon = 'pt-icon-large smd-pad-8 '
+    arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
     return (
       <div>
         <div className={className} onClick={this.handleClick}>
-          <h5>{node.name}</h5>
+          <div className="row">
+            <div className="col-xs-9">
+              <h5>{node.name}</h5>
+            </div>
+            <div className="col-xs-3">
+              <span className={arrowIcon}></span>
+            </div>
+          </div>
           <div className="row pt-text-muted">
             <div className="col-xs-3">
               <small>Coinbase</small>
