@@ -5,8 +5,8 @@ import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
 import {Text, Tooltip, Position} from '@blueprintjs/core';
 import { env } from '../../env';
-import * as moment from 'moment';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { parseDateFromString } from '../../lib/dateUtils'
 
 class TransactionList extends Component {
 
@@ -29,7 +29,7 @@ class TransactionList extends Component {
   render() {
     const self = this;
     let txRows = this.props.tx.slice(0, 5).map(
-      function (tx, i) {
+      function (tx, i) {        
         return (
           <tr
             key={i}
@@ -48,7 +48,7 @@ class TransactionList extends Component {
             <td width="22%">
               <Text ellipsize={true}>
                 <small>
-                  {moment(new Date(tx.timestamp)).format('YYYY-MM-DD hh:mm:ss A')}
+                  {parseDateFromString(tx.timestamp)}
                 </small>
               </Text>
             </td>
