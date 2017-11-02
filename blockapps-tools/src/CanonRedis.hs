@@ -18,19 +18,24 @@ canonRedis :: String -> Int -> Int -> IO ()
 canonRedis ip start range = do
     conn <- connect defaultConnectInfo{connectHost=ip}
     runRedis conn $ do
-      Just bestBlockNumer <- getBestBlockNumber
-      let range' = min range (bestBlockNumer - start)
-          starts = [start,start+500..range']
-      forM_ starts $ \s -> do
-        hs <- getCanonicalHeaderChain (fromIntegral $ s) 500
-        let pHash = parentHash . snd . head $ hs
-            pNum  = (number . snd . head $ hs) - 1
-        parentIsCanon <- isCanonical pHash pNum
-        if parentIsCanon
-          then validateChainAndLogInvalid hs
-          else do
-            liftIO $ putStrLn "Parent of block not in Canonical"
-            liftIO $ printBlockHeader $ head hs
+      mbestBlockNumber <- getBestBlockNumber
+      case mbestBlockNumber of
+        Nothing -> liftIO $ putStrLn "Could not obtain best block number"
+        Just best -> do
+          liftIO . putStrLn $ "Got best block " ++ (show best)
+          let chunkSize = 5
+              range' = min range (best - start)
+              starts = [start,start+chunkSize..start+range'-1]
+          forM_ starts $ \s -> do
+            hs <- getCanonicalHeaderChain (fromIntegral $ s) chunkSize
+            let pHash = parentHash . snd . head $ hs
+                pNum  = (number . snd . head $ hs) - 1
+            parentIsCanon <- isCanonical pHash pNum
+            if parentIsCanon
+              then validateChainAndLogInvalid hs
+              else do
+                liftIO $ putStrLn "Parent of block not in Canonical"
+                liftIO $ printBlockHeader $ head hs
 
   where
     getBestBlockNumber :: Redis (Maybe Int)
