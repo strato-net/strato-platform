@@ -1,6 +1,6 @@
 {
   "name": "APEX",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "start": "# npm-run-all -p start-dev",
@@ -28,6 +28,7 @@
     "fs-extra": "^4.0.2",
     "is-reachable": "2.3.3",
     "jwt-simple": "0.5.1",
+    "md5-file": "^3.2.3",
     "mocha": "4.0.0",
     "moment": "2.18.1",
     "morgan": "1.9.0",
