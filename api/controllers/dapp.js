@@ -2,6 +2,7 @@ const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
 const fs = require('fs-extra');
+const md5File = require('md5-file/promise');
 const multer  = require('multer');
 const path = require('path');
 const rp = require('request-promise');
@@ -171,18 +172,31 @@ validatePackageMetadata = function(metadata) {
  * @param packageFolderPath String - the path of the unzipped package
  */
 validatePackageStructure = function*(packageFolderPath) {
-  const expectedRootPaths = [
-    'metadata.json',
-    'contracts',
-    'ui'
+  // Checking unexpected files
+  const unexpectedRootPaths = [
+    '_dapp.zip'
   ];
+  const unexpectedFullPaths = unexpectedRootPaths.map(p => path.join(packageFolderPath, p));
+  const unexpectedSemaphores = yield Promise.all(unexpectedFullPaths.map(path => fs.pathExists(path)));
+  unexpectedSemaphores.forEach((value, index) => {
+    if (value) {
+      let err = new Error(`the path should not exist in the root of archive: '${unexpectedRootPaths[index]}', please check the archive contents`);
+      err.status = 400;
+      throw err;
+    }
+  });
 
-  const expectedFullPaths = expectedRootPaths.map(p => path.join(packageFolderPath, p));
-
-  const semaphores = yield Promise.all(expectedFullPaths.map(path => fs.pathExists(path)));
-  semaphores.forEach((value, index) => {
+  // Checking required files
+  const requiredRootPaths = [
+    'metadata.json',
+    'index.html',
+    'contracts'
+  ];
+  const requiredFullPaths = requiredRootPaths.map(p => path.join(packageFolderPath, p));
+  const requiredSemaphores = yield Promise.all(requiredFullPaths.map(path => fs.pathExists(path)));
+  requiredSemaphores.forEach((value, index) => {
     if (!value) {
-      let err = new Error(`could not find the path in the root of archive: '${expectedRootPaths[index]}', please check the archive contents`);
+      let err = new Error(`could not find the path in the root of archive: '${requiredRootPaths[index]}', please check your archive root contents`);
       err.status = 400;
       throw err;
     }
@@ -206,7 +220,15 @@ removePathsIfExist = function(paths) {
         console.error(`could not remove path: ${path}`, err)
       })
   });
+};
 
+/**
+ * Get md5 hash of the file by file path (absolute or relative to apex/api folder)
+ * @param filePath
+ * @returns {Promise}
+ */
+getFileHash = function(filePath) {
+  return md5File(filePath);
 };
 
 /**
@@ -309,17 +331,19 @@ upload = function (req, res, next) {
           return next(err);
         }
         try {
+          const zipHash = yield getFileHash(file.path);
           const dappPathArray = [
             appConfig.apps.directory,
-            username,
-            packageMetadata['name'],
+            zipHash,
           ];
           const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
 
           // Register the dApp prior to moving the files (to prevent overriting the prev version of the user's app in same folder if register will fail)
           yield registerDapp(username, address, password, packageMetadata, dappUrl);
+          // Put _dapp.zip in package folder to be reachable to other nodes in network
+          yield fs.move(file.path, path.join(packageTmpFolder, '_dapp.zip'));
           // Making sure apps/username folder exists
-          yield fs.mkdirp(path.join(dappPathArray[0], dappPathArray[1]));
+          yield fs.mkdirp(dappPathArray[0]);
           // Replace the dapp folder with the new one (all older files will be removed)
           yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
           res.status(200).json({metadata: packageMetadata, url: dappUrl});

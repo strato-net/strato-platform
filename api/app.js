@@ -62,7 +62,7 @@ app.use(function(err, req, res, next) {
 
   res.status(err.status || 500);
 
-  if (res.status === 500) {
+  if (res.statusCode === 500) {
     console.error(err, err.stack);
     err.message = "unexpected server error occurred"
   }
