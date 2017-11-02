@@ -223,7 +223,7 @@ removePathsIfExist = function(paths) {
 };
 
 /**
- *
+ * Get md5 hash of the file by file path (absolute or relative to apex/api folder)
  * @param filePath
  * @returns {Promise}
  */
