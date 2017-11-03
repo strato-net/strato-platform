@@ -6,7 +6,7 @@
     "test": "node_modules/mocha/bin/mocha --config config.yaml e2e/ -b"
   },
   "dependencies": {
-    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git#get-bloc-result",
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git",
     "chai": "^4.0.2",
     "co": "^4.6.0",
     "co-mocha": "^1.2.0",
