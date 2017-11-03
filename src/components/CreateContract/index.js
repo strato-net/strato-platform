@@ -100,7 +100,7 @@ class CreateContract extends Component {
       this.props.compileContract(
         contractName,
         source,
-        this.props.searchable
+        e.target.checked
       );
     }
   };
@@ -301,7 +301,7 @@ class CreateContract extends Component {
                         component="input"
                         dir="auto"
                         title="Searchable"
-                        onClick={this.handleContractSearchabilityChange}
+                        onChange={this.handleContractSearchabilityChange}
                         required
                     />
                   <span className="pt-control-indicator"></span>
