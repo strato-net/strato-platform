@@ -37,7 +37,7 @@ deployments:
         - ./dapps:/usr/src/app/apps
       environment:
         NODE_HOST: "${NODE_HOST}"
-        lazyBlocks: "${lazyBlocks}"
+        SINGLE_NODE: "${SINGLE_NODE}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
