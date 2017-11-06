@@ -235,8 +235,6 @@ instance ToSchema PostSendParameters where
         { sendToAddress = Address 0xdeadbeef
         , sendValue = Strung 100000000
         , sendPassword = "securePassword"
-        , sendTxParams = Just $ TxParams
-            (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876))
         }
 
 --------------------------------------------------------------------------------
