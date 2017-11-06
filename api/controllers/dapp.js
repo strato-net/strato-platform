@@ -77,16 +77,18 @@ checkFileCompiles = function(directory, fileName) {
  * @param address String
  * @param password String
  * @param packageMetadata Object - parsed metadata
- * @param dappUrl - url of the hosted dapp
+ * @param hash - the md5 hash of the zip file
+ * @param host - the externally reachable host (IP or domain name) of current STRATO node machine
  * @returns contract state
  */
-registerDapp = function*(username, address, password, packageMetadata, dappUrl) {
+registerDapp = function*(username, address, password, packageMetadata, hash, host) {
   const args = {
     _appName: packageMetadata['name'],
     _version: packageMetadata['version'],
-    _url: dappUrl,
     _description: packageMetadata['description'],
     _maintainer: packageMetadata['maintainer'],
+    _hash: hash,
+    _host: host,
   };
   const userCredentials = {
     name: username,
@@ -232,6 +234,19 @@ getFileHash = function(filePath) {
 };
 
 /**
+ * Validate external host
+ * @param externalHost, string
+ */
+validateExternalHost = function(externalHost) {
+  if (process.env['SINGLE_NODE'] !== "true" && externalHost === 'localhost') {
+    let err = new Error(`cannot deploy the dApp from localhost when running multinode - please provide external node host when running your STRATO instance`);
+    err.status = 400;
+    throw err;
+  }
+  // TODO: some other validations to make sure IP is external or reachable over the local network somehow (for possible local network STRATO setup)
+};
+
+/**
  * ExpressJS route controller to upload the dApp
  * @param req
  * @param res
@@ -336,10 +351,13 @@ upload = function (req, res, next) {
             appConfig.apps.directory,
             zipHash,
           ];
-          const dappUrl = `http://${process.env['NODE_HOST']}/${dappPathArray.join('/')}`;
+          const currentHost = process.env['NODE_HOST'];
+          validateExternalHost(currentHost);
+
+          const dappUrl = `http://${currentHost}/${dappPathArray.join('/')}`;
 
           // Register the dApp prior to moving the files (to prevent overriting the prev version of the user's app in same folder if register will fail)
-          yield registerDapp(username, address, password, packageMetadata, dappUrl);
+          yield registerDapp(username, address, password, packageMetadata, zipHash, currentHost);
           // Put _dapp.zip in package folder to be reachable to other nodes in network
           yield fs.move(file.path, path.join(packageTmpFolder, '_dapp.zip'));
           // Making sure apps/username folder exists

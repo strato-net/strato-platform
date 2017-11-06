@@ -9,7 +9,7 @@
     "node-ping": "# DELAY=5000 RETENTION=1 node node-ping/index.js",
     "migrate": "# sequelize db:migrate",
     "test": "# NODE_ENV=test mocha",
-    "test:app-metadata:local": "mocha --config config-local.yaml  api/lib/appMetadata/test/appMetadata.test.js --api-debug -b"
+    "test:app-metadata:local": "mocha --config config-local.yaml lib/appMetadata/test/appMetadata.test.js --api-debug -b"
   },
   "dependencies": {
     "adm-zip": "^0.4.7",
