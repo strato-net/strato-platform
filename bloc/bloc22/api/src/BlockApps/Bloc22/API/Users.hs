@@ -235,6 +235,7 @@ instance ToSchema PostSendParameters where
         { sendToAddress = Address 0xdeadbeef
         , sendValue = Strung 100000000
         , sendPassword = "securePassword"
+        , sendTxParams = Nothing
         }
 
 --------------------------------------------------------------------------------
