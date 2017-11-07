@@ -470,7 +470,7 @@ instance ToSchema PostUsersContractMethodRequest where
             { postuserscontractmethodPassword = "securePassword"
             , postuserscontractmethodMethod = "get"
             , postuserscontractmethodArgs = Map.empty
-            , postuserscontractmethodValue = Just $ Strung 1000000
+            , postuserscontractmethodValue = Just $ Strung 0
             , postuserscontractmethodTxParams = Nothing
             }
       )
