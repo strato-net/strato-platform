@@ -1,6 +1,7 @@
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
+const download = require('download');
 const fs = require('fs-extra');
 const md5File = require('md5-file/promise');
 const multer  = require('multer');
@@ -120,6 +121,7 @@ registerDapp = function*(username, address, password, packageMetadata, hash, hos
           err.message += ': account does not have any ether';
           err.status = 400
         }
+        // TODO: check if user has not enough ether (e.g. just few wei)
         break;
     }
     throw(err)
@@ -216,7 +218,7 @@ removePathsIfExist = function(paths) {
   paths.forEach(path => {
     fs.remove(path)
       .then(() => {
-        console.log(`path ${path} is removed or did not exist`)
+        console.log(`path ${path} is successfully removed or did not exist`)
       })
       .catch(err => {
         console.error(`could not remove path: ${path}`, err)
@@ -360,7 +362,7 @@ upload = function (req, res, next) {
           yield registerDapp(username, address, password, packageMetadata, zipHash, currentHost);
           // Put _dapp.zip in package folder to be reachable to other nodes in network
           yield fs.move(file.path, path.join(packageTmpFolder, '_dapp.zip'));
-          // Making sure apps/username folder exists
+          // Making sure apps folder exists
           yield fs.mkdirp(dappPathArray[0]);
           // Replace the dapp folder with the new one (all older files will be removed)
           yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
@@ -375,6 +377,55 @@ upload = function (req, res, next) {
   })
 };
 
+/**
+ * Middleware to download dApp from other node when unavailable on the current
+ * @param req
+ * @param res
+ * @param next
+ */
+acquireDapp = function(req, res, next) {
+  const tellClientToTryAgainLater = () => res.status(102).send();
+  const urlArray = req.url.split('/').filter(value => value !== '');
+  const appHash = urlArray[0];
+  let acquiresInProgress = req.app.locals.acquiresInProgress;
+  if (acquiresInProgress[appHash]) {
+    return tellClientToTryAgainLater();
+  } else {
+    co(function* () {
+      const results = yield blockappsRest.query(`AppMetadata?hash=eq.${appHash}`);
+      if (!results || results.length < 1) {
+        let err = new Error('could not find the dApp in the network with the hash provided');
+        err.status = 404;
+        return next(err);
+      } else if (results.length > 1) {
+        // Should never happen
+        let err = new Error('more than one application with the same app hash found');
+        err.status = 500;
+        return next(err);
+      } else {
+        acquiresInProgress[appHash] = new Date().getTime();
+        tellClientToTryAgainLater();
+        const appMetadata = results[0];
+        try {
+          yield download(`${appMetadata.host}/${appConfig.apps.directory}/${appHash}/_dapp.zip`, 'uploads/cross-node/', {filename: appHash + '.zip'});
+          const zip = new admZip(`uploads/cross-node/${appHash}.zip`);
+          zip.extractAllToAsync(path.join(appConfig.apps.directory, appHash), true, function (error) {
+            delete acquiresInProgress[appHash];
+            if (error) {
+              throw error;
+            }
+          })
+        } catch (err) {
+          delete acquiresInProgress[appHash];
+          console.error(err);
+        }
+        removePathsIfExist([`uploads/cross-node/${appHash}.zip`]);
+      }
+    })
+  }
+};
+
 module.exports = {
-    upload: upload,
+  upload: upload,
+  acquireDapp: acquireDapp,
 };
