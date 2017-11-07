@@ -235,8 +235,7 @@ instance ToSchema PostSendParameters where
         { sendToAddress = Address 0xdeadbeef
         , sendValue = Strung 100000000
         , sendPassword = "securePassword"
-        , sendTxParams = Just $ TxParams
-            (Just (Gas 123)) (Just (Wei 345)) (Just (Nonce 9876))
+        , sendTxParams = Nothing
         }
 
 --------------------------------------------------------------------------------
@@ -310,7 +309,7 @@ instance ToSchema PostUsersContractRequest where
             , postuserscontractrequestContract = Just "SimpleStorage"
             , postuserscontractrequestArgs = Nothing
             , postuserscontractrequestTxParams = Nothing
-            , postuserscontractrequestValue = Just $ Strung 1000000
+            , postuserscontractrequestValue = Nothing
             }
       )
 
@@ -348,20 +347,13 @@ instance ToSchema UploadListRequest where
     where
       exContract1 :: UploadListContract
       exContract1 = UploadListContract
-        { uploadlistcontractContractName = "UserInfoContract"
-        , uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age",ArgInt 1)]
-        , uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing
-        , uploadlistcontractValue = Nothing
-        }
-      exContract2 :: UploadListContract
-      exContract2 = UploadListContract
         { uploadlistcontractContractName = "AccountsContract"
         , uploadlistcontractArgs = Map.fromList [("accountType", ArgString "Checking"), ("balance",ArgInt 10)]
         , uploadlistcontractTxParams = Nothing
         , uploadlistcontractValue = Nothing
         }
       ex :: UploadListRequest
-      ex = UploadListRequest "SecretPassword" [exContract1, exContract2] True
+      ex = UploadListRequest "SecretPassword" [exContract1] True
 
 data UploadListContract = UploadListContract
   { uploadlistcontractContractName :: Text
@@ -478,7 +470,7 @@ instance ToSchema PostUsersContractMethodRequest where
             { postuserscontractmethodPassword = "securePassword"
             , postuserscontractmethodMethod = "get"
             , postuserscontractmethodArgs = Map.empty
-            , postuserscontractmethodValue = Just $ Strung 1000000
+            , postuserscontractmethodValue = Just $ Strung 0
             , postuserscontractmethodTxParams = Nothing
             }
       )
