@@ -22,7 +22,7 @@ class ApplicationCard extends Component {
                 </div>
               </div>
               <div className="col-sm-2">
-                <a href={ app.url } target="_blank" rel="noopener noreferrer">
+                <a href={ `/apps/${app.hash}/` } target="_blank" rel="noopener noreferrer">
                   <button
                     className="pt-button pt-intent-primary pull-right"
                   >
