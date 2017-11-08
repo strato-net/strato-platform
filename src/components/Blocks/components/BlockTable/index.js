@@ -8,6 +8,7 @@ import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../Query
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
+import Address from '../../../Address';
 
 class BlockTable extends Component {
 
@@ -47,7 +48,7 @@ class BlockTable extends Component {
       mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
-    console.log(this.props.queryResult.length);
+
     let blockRows = this.props.queryResult.map(
       function (block) {
         return (
@@ -58,12 +59,7 @@ class BlockTable extends Component {
               <small>{block.blockData.number}</small>
             </td>
             <td width="22.5%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.parentHash}
-                         position={Position.TOP_LEFT}>
-                  <small>{block.blockData.parentHash}</small>
-                </Tooltip>
-              </Text>
+              <Address value={block.blockData.parentHash} classes="small smd-pad-4"/>
             </td>
             <td width="15%">
               <Text ellipsize={true}>

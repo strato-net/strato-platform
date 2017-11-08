@@ -5,6 +5,7 @@ import {Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
+import Address from '../../../Address';
 
 class TransactionView extends Component {
   componentDidMount() {
@@ -19,7 +20,9 @@ class TransactionView extends Component {
       <div className="container-fluid pt-dark">
         <div className="row">
           <div className="col-sm-9">
-            <div className="h3">{hash}</div>
+            <div className="h3">
+              <Address value={hash} />
+            </div>
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
@@ -46,11 +49,11 @@ class TransactionView extends Component {
                 </tr>
                 <tr>
                   <td><strong>From</strong></td>
-                  <td>{tx.from === undefined ? '' : tx.from}</td>
+                  <td>{tx.from === undefined ? '' : <Address value={tx.from} />}</td>
                 </tr>
                 <tr>
                   <td><strong>To</strong></td>
-                  <td>{tx.to === undefined ? '' : tx.to}</td>
+                  <td>{tx.to === undefined ? '' : <Address value={tx.to} />}</td>
                 </tr>
                 <tr>
                   <td><strong>Block Number</strong></td>

@@ -12,6 +12,7 @@ import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Link } from 'react-router-dom';
+import Address from '../../../Address';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -49,7 +50,7 @@ class ContractCard extends Component {
             key={'card-data-' + instance.address}
           >
             <td style={{border: 'none'}}>
-              <small>{instance.address}</small>
+              <Address value={instance.address} classes="small smd-pad-4"/>
             </td>
             <td style={{border: 'none'}}>
               { instance.fromBloc ?
