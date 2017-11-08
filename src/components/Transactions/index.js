@@ -2,9 +2,6 @@ import React, {Component} from 'react';
 import TransactionTable from './components/TransactionTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
-import { endTour } from '../Tour/tour.actions';
-import { callAfterTour } from '../Tour/tour.helpers';
-import { connect } from 'react-redux';
 
 const tourSteps = [
   {
@@ -31,9 +28,7 @@ class Transactions extends Component {
   render() {
     return (
       <div className="container-fluid pt-dark">
-        <Tour steps={tourSteps} name="transactions" callback={callAfterTour('#tour-bloc-api-button',() => {
-          this.props.endTour('transactions');
-        })}/>
+        <Tour steps={tourSteps} name="transactions" finalStepSelector='#tour-bloc-api-button' />
         <div className="row">
           <div className="col-sm-12">
             <h3>Transactions</h3>
@@ -45,4 +40,4 @@ class Transactions extends Component {
   }
 }
 
-export default connect(state => { return {} }, {endTour})(Transactions);
+export default Transactions;
