@@ -249,6 +249,35 @@ validateExternalHost = function(externalHost) {
 };
 
 /**
+ * Get App Metadata from blockchain by app hash
+ * @param hash
+ * @returns {Promise} array
+ */
+getAppMetadataByHash = function(hash) {
+  return blockappsRest.query(`AppMetadata?hash=eq.${hash}`);
+};
+
+/**
+ * Unzip the zip archive with a promise
+ * @param filePath
+ * @param destination
+ * @param overwrite boolean
+ * @returns {Promise}
+ */
+unzip = function(filePath, destination, overwrite) {
+  return new Promise(function(resolve, reject) {
+    const zip = new admZip(filePath);
+    zip.extractAllToAsync(destination, overwrite, function(error) {
+      if (error) {
+        return reject(error);
+      } else {
+        return resolve();
+      }
+    });
+  });
+};
+
+/**
  * ExpressJS route controller to upload the dApp
  * @param req
  * @param res
@@ -297,83 +326,81 @@ upload = function (req, res, next) {
 
     // TODO: check if there are any ways to validate username-address-password bunch for validity before processing the package and compiling contracts from it - currently we can only validate when we compile contracts with bloc
 
-    // unpack files to tmp folder
-    const zip = new admZip(file.path);
-    const packageTmpFolder = path.join(tmpFolder,file.filename);
-
-    zip.extractAllToAsync(packageTmpFolder, true, function(error) {
-      if (error) {
+    co(function* () {
+      const zipHash = yield getFileHash(file.path);
+      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
+      if (appsMetadataArray.length) {
+        removePathsIfExist(tempPaths);
+        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
+        err.status = 409;
+        return next(err);
+      }
+      // unpack files to tmp folder
+      const packageTmpFolder = path.join(tmpFolder,file.filename);
+      try {
+        yield unzip(file.path, packageTmpFolder, true);
+      } catch (error) {
         removePathsIfExist(tempPaths);
         let err = new Error('unable to unzip the package');
         err.status = 400;
         return next(err);
       }
+
       tempPaths.push(packageTmpFolder);
 
-      co(function* () {
-        let packageMetadata;
-        try {
-          yield validatePackageStructure(packageTmpFolder);
-          packageMetadata = yield parsePackageMetadata(packageTmpFolder);
-        } catch(error) {
-          removePathsIfExist(tempPaths);
-          return next(error);
-        }
+      yield validatePackageStructure(packageTmpFolder);
+      const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
 
-        // check if all contracts from tmp/contracts/ are compile
-        const contractsTmpFolder = path.join(packageTmpFolder, 'contracts');
-        let files;
-        try {
-          files = yield fs.readdir(contractsTmpFolder);
-        } catch(error) {
-          removePathsIfExist(tempPaths);
-          let err = new Error('could not read the contracts/ directory of the package');
-          err.status = 400;
-          return next(err);
-        }
+      // check if all contracts from tmp/contracts/ are compile
+      const contractsTmpFolder = path.join(packageTmpFolder, 'contracts');
+      let files;
+      try {
+        files = yield fs.readdir(contractsTmpFolder);
+      } catch(error) {
+        removePathsIfExist(tempPaths);
+        let err = new Error('could not read the contracts/ directory of the package');
+        err.status = 400;
+        return next(err);
+      }
 
-        let compilationPromises = [];
-        files.forEach(function (fileName, index) {
-          compilationPromises.push(checkFileCompiles(contractsTmpFolder, fileName));
-        });
+      let compilationPromises = [];
+      files.forEach(function (fileName, index) {
+        compilationPromises.push(checkFileCompiles(contractsTmpFolder, fileName));
+      });
 
-        // TODO: refactor: collect all contracts in single array with one bloc call instead
-        // files compilation order is random (no cross-file import statement support)
-        try {
-          yield Promise.all(compilationPromises) // returns [solFiles[contractsInFile{codeHash, contractName},],]
-        } catch(error) {
-          removePathsIfExist(tempPaths);
-          let err = new Error('unable to compile contract: ' + error);
-          err.status = 400;
-          return next(err);
-        }
-        try {
-          const zipHash = yield getFileHash(file.path);
-          const dappPathArray = [
-            appConfig.apps.directory,
-            zipHash,
-          ];
-          const currentHost = process.env['NODE_HOST'];
-          validateExternalHost(currentHost);
+      // TODO: refactor: collect all contracts in single array with one bloc call instead
+      // files compilation order is random (no cross-file import statement support)
+      try {
+        yield Promise.all(compilationPromises) // returns [solFiles[contractsInFile{codeHash, contractName},],]
+      } catch(error) {
+        removePathsIfExist(tempPaths);
+        let err = new Error('unable to compile contract: ' + error);
+        err.status = 400;
+        return next(err);
+      }
+      const dappPathArray = [
+        appConfig.apps.directory,
+        zipHash,
+      ];
+      const currentHost = process.env['NODE_HOST'];
+      validateExternalHost(currentHost);
 
-          const dappUrl = `http://${currentHost}/${dappPathArray.join('/')}`;
+      const dappUrl = `http://${currentHost}/${dappPathArray.join('/')}`;
 
-          // Register the dApp prior to moving the files (to prevent overriting the prev version of the user's app in same folder if register will fail)
-          yield registerDapp(username, address, password, packageMetadata, zipHash, currentHost);
-          // Put _dapp.zip in package folder to be reachable to other nodes in network
-          yield fs.move(file.path, path.join(packageTmpFolder, '_dapp.zip'));
-          // Making sure apps folder exists
-          yield fs.mkdirp(dappPathArray[0]);
-          // Replace the dapp folder with the new one (all older files will be removed)
-          yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
-          res.status(200).json({metadata: packageMetadata, url: dappUrl});
-          removePathsIfExist(tempPaths);
-        } catch(err) {
-          removePathsIfExist(tempPaths);
-          return next(err);
-        }
-      })
-    });
+      // Register the dApp prior to moving the files (to prevent overriting the prev version of the user's app in same folder if register will fail)
+      yield registerDapp(username, address, password, packageMetadata, zipHash, currentHost);
+      // Put _dapp.zip in package folder to be reachable to other nodes in network
+      yield fs.move(file.path, path.join(packageTmpFolder, '_dapp.zip'));
+      // Making sure apps folder exists
+      yield fs.mkdirp(dappPathArray[0]);
+      // Replace the dapp folder with the new one (all older files will be removed)
+      yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
+      res.status(200).json({metadata: packageMetadata, url: dappUrl});
+      removePathsIfExist(tempPaths);
+    }).catch(err => {
+        removePathsIfExist(tempPaths);
+        return next(err);
+    })
   })
 };
 
@@ -392,33 +419,28 @@ acquireDapp = function(req, res, next) {
     return tellClientToTryAgainLater();
   } else {
     co(function* () {
-      const results = yield blockappsRest.query(`AppMetadata?hash=eq.${appHash}`);
-      if (!results || results.length < 1) {
+      const appsMetadataArray = yield getAppMetadataByHash(appHash);
+      if (!appsMetadataArray || appsMetadataArray.length < 1) {
         let err = new Error('could not find the dApp in the network with the hash provided');
         err.status = 404;
         return next(err);
-      } else if (results.length > 1) {
-        // Should never happen
+      } else if (appsMetadataArray.length > 1) {
+        // Should never happen (only possible case is if dapp was deployed multiple times at the same moment) // TODO: prevent.
         let err = new Error('more than one application with the same app hash found');
         err.status = 500;
         return next(err);
       } else {
         acquiresInProgress[appHash] = new Date().getTime();
         tellClientToTryAgainLater();
-        const appMetadata = results[0];
+        const appMetadata = appsMetadataArray[0];
         try {
           yield download(`${appMetadata.host}/${appConfig.apps.directory}/${appHash}/_dapp.zip`, 'uploads/cross-node/', {filename: appHash + '.zip'});
-          const zip = new admZip(`uploads/cross-node/${appHash}.zip`);
-          zip.extractAllToAsync(path.join(appConfig.apps.directory, appHash), true, function (error) {
-            delete acquiresInProgress[appHash];
-            if (error) {
-              throw error;
-            }
-          })
+          yield unzip(`uploads/cross-node/${appHash}.zip`, path.join(appConfig.apps.directory, appHash), true);
         } catch (err) {
-          delete acquiresInProgress[appHash];
           console.error(err);
+          // no way to let client know deployment failed until websocket is used here
         }
+        delete acquiresInProgress[appHash];
         removePathsIfExist([`uploads/cross-node/${appHash}.zip`]);
       }
     })
