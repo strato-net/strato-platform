@@ -8,7 +8,7 @@ import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
 import {endTour} from '../Tour/tour.actions';
-import Address from '../Address';
+import HexText from '../HexText';
 // import { callAfterTour } from '../Tour/tour.helpers';
 
 // import Tour from '../Tour';
@@ -97,7 +97,7 @@ class Accounts extends Component {
                 </Text>
               </td>
               <td>
-                <Address value={address} classes="small smd-pad-4" />
+                <HexText value={address} classes="small smd-pad-4" />
               </td>
               <td>
                 <Text ellipsize={true}>

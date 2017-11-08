@@ -7,7 +7,7 @@ import { Text } from '@blueprintjs/core';
 import { env } from '../../env';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { parseDateFromString } from '../../lib/dateUtils';
-import Address from '../Address';
+import HexText from '../HexText';
 
 class TransactionList extends Component {
 
@@ -37,7 +37,7 @@ class TransactionList extends Component {
             onClick={e => {mixpanelWrapper.track("dashboard_transaction_click"); self.props.history.push('/transactions/' + tx.hash)}}
           >
             <td width="40%">
-              <Address value={tx.hash} classes="small smd-pad-4"/>
+              <HexText value={tx.hash} classes="small smd-pad-4"/>
             </td>
             <td width="23%" className="text-right">
               <small>{tx.value}</small>

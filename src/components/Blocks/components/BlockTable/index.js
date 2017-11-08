@@ -8,7 +8,7 @@ import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../Query
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
-import Address from '../../../Address';
+import HexText from '../../../HexText';
 
 class BlockTable extends Component {
 
@@ -59,7 +59,7 @@ class BlockTable extends Component {
               <small>{block.blockData.number}</small>
             </td>
             <td width="22.5%">
-              <Address value={block.blockData.parentHash} classes="small smd-pad-4"/>
+              <HexText value={block.blockData.parentHash} classes="small smd-pad-4"/>
             </td>
             <td width="15%">
               <Text ellipsize={true}>

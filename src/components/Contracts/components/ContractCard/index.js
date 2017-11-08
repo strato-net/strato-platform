@@ -12,7 +12,7 @@ import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Link } from 'react-router-dom';
-import Address from '../../../Address';
+import HexText from '../../../HexText';
 
 class ContractCard extends Component {
   constructor(props) {
@@ -50,7 +50,7 @@ class ContractCard extends Component {
             key={'card-data-' + instance.address}
           >
             <td style={{border: 'none'}}>
-              <Address value={instance.address} classes="small smd-pad-4"/>
+              <HexText value={instance.address} classes="small smd-pad-4"/>
             </td>
             <td style={{border: 'none'}}>
               { instance.fromBloc ?

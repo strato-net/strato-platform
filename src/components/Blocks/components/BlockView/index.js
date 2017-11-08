@@ -4,7 +4,7 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Text} from '@blueprintjs/core';
 import { fetchBlockData } from '../../../BlockData/block-data.actions';
-import Address from '../../../Address';
+import HexText from '../../../HexText';
 import * as moment from 'moment';
 
 class BlockView extends Component {
@@ -57,7 +57,7 @@ class BlockView extends Component {
                     <tr>
                       <td>Parent Hash</td>
                       <td>
-                        <Address value={block.blockData.parentHash} classes="small smd-pad-4"/>
+                        <HexText value={block.blockData.parentHash} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
