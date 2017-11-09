@@ -2,12 +2,17 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import './applications-card.css'
 import { withRouter} from 'react-router-dom';
+import { launchApp } from '../Applications/applications.actions';
 
 class ApplicationCard extends Component {
 
+  lauchApplication(hash) {
+    this.props.launchApp(hash);
+  }
+
   render() {
     const { app } = this.props;
-
+    console.log("application", app);
     return (
       <div className="pt-card app-card">
         <div className="row">
@@ -22,7 +27,7 @@ class ApplicationCard extends Component {
                 </div>
               </div>
               <div className="col-sm-2">
-                <a href={ `/apps/${app.hash}/` } target="_blank" rel="noopener noreferrer">
+                <a href="javascript::void(0)" onClick={() => this.lauchApplication(app.hash)} rel="noopener noreferrer">
                   <button
                     className="pt-button pt-intent-primary pull-right"
                   >
@@ -54,6 +59,7 @@ function mapStateToProps(state) {
 export default withRouter(
   connect( mapStateToProps,
     {
+      launchApp
     }
   )(ApplicationCard)
 );

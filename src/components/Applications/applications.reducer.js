@@ -1,11 +1,15 @@
 import {
   FETCH_APPLICATIONS_SUCCESSFUL,
-  FETCH_APPLICATIONS_FAILURE
+  FETCH_APPLICATIONS_FAILURE,
+  LAUNCH_APP_SUCCESSFUL,
+  LAUNCH_APP_FAILURE,
+  LAUNCH_APP
 } from './applications.actions';
 
 const initialState = {
   applcations: [],
   error: null,
+  isLoading: false
 };
 
 const reducer = function (state = initialState, action) {
@@ -38,6 +42,19 @@ const reducer = function (state = initialState, action) {
         applications: [],
         error: action.error,
       };
+    case LAUNCH_APP:
+      return {
+        isLoading: true
+      }
+    case LAUNCH_APP_SUCCESSFUL: 
+      return {
+        url: action.url
+      }
+    case LAUNCH_APP_FAILURE: 
+      return {
+        isLoading: false,
+        error: action.error
+      }
     default:
       return state;
 
