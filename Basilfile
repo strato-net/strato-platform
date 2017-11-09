@@ -27,6 +27,7 @@ deployments:
         CIRRUS_URL: "${CIRRUS_URL}"
         APEX_URL: "${APEX_URL}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
+        SINGLE_NODE: "${SINGLE_NODE}"
 
   - name: apex
     repo: https://github.com/blockapps/apex.git
