@@ -37,7 +37,7 @@ class HexText extends Component {
               className="smd-pointer" >
               <Icon
                 iconName="pt-icon-clipboard"
-                iconSize={16}
+                iconSize={24}
                 onMouseOut={(e) => { this.setState({ copied: false }); }} />
             </Tooltip>
           </div>
