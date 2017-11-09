@@ -2,9 +2,11 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { Position, Tooltip } from '@blueprintjs/core';
 
 import { fetchApplications } from '../Applications/applications.actions';
 import ApplicationCard from '../ApplicationCard';
+import { canDeployApps } from '../../lib/envChecks';
 
 import { env } from '../../env';
 
@@ -37,14 +39,22 @@ class Applications extends Component {
             <h3>Welcome to Launchpad</h3>
           </div>
           <div className="col-sm-2 text-right smd-pad-vertical-12">
-            <Link to="/launchpad">
-              <button
-                type="button"
-                className="pt-button pt-intent-primary"
-              >
-                Deploy
-              </button>
-            </Link>
+            <Tooltip
+              content={<span>Unable to deploy apps when running multinode on localhost</span>}
+              inline={true}
+              position={Position.LEFT}
+              isDisabled={canDeployApps}
+            >
+              <Link to="/launchpad">
+                <button
+                  type="button"
+                  className="pt-button pt-intent-primary"
+                  disabled={!canDeployApps}
+                >
+                  Deploy
+                </button>
+              </Link>
+            </Tooltip>
           </div>
         </div>
         <div>
