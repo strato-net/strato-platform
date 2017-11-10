@@ -411,7 +411,7 @@ upload = function (req, res, next) {
  * @param next
  */
 acquireDapp = function(req, res, next) {
-  const tellClientToTryAgainLater = () => res.status(102).send();
+  const tellClientToTryAgainLater = () => res.status(202).send();
   const urlArray = req.url.split('/').filter(value => value !== '');
   const appHash = urlArray[0];
   let acquiresInProgress = req.app.locals.acquiresInProgress;
