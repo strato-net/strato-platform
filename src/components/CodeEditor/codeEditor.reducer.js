@@ -94,7 +94,7 @@ const reducer = function (state = initialState, action) {
       };
 
     case ADD_NEW_TAB:
-      const newTabs = [...state.tab, { title: `${action.fileName}.sol`, text: '' }]
+      const newTabs = [...state.tab, { title: `${action.fileName}.sol`, text: action.fileContent }]
       return {
         ...state,
         tab: newTabs,

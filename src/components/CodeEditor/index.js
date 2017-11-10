@@ -3,10 +3,14 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
-import { Button, Tab2, Tabs2, Popover } from '@blueprintjs/core';
+import { Button, Tab2, Tabs2, Popover, Position } from '@blueprintjs/core';
 import { contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
+import { getSelectedTabContent } from './codeEditor.selector';
 import CreateContract from '../CreateContract';
-import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/FileParser.js'
+import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/FileParser.js';
+import { downloadFile } from '../../lib/fileHandler.js';
+import Dropzone from 'react-dropzone';
+import { toasts } from "../Toasts";
 
 class CodeEditor extends Component {
   constructor() {
@@ -35,10 +39,33 @@ class CodeEditor extends Component {
           className="pt-intent-primary pt-popover-dismiss"
           text="Add file"
           onClick={() => {
-            this.state.fileName && this.state.fileName.length > 0 && this.props.addNewFileTab(this.state.fileName)
+            this.state.fileName && this.state.fileName.length > 0 && this.props.addNewFileTab(this.state.fileName, '')
           }} />
       </div>
     )
+  }
+
+  handleFileDrop = (files) => {
+    if (files.length > 1) {
+      toasts.show({ message: 'Expected a .sol file, got multiple files' });
+      return;
+    }
+    const regex = new RegExp(/.sol$/, 'i');
+    if (!regex.test(files[0].name)) {
+      toasts.show({ message: 'Please upload a .sol file' });
+      return;
+    }
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const fileAsBinaryString = reader.result
+        const fileName = files[0].name.replace('.sol', '')
+        this.props.addNewFileTab(fileName, fileAsBinaryString)
+      };
+      reader.onabort = () => toasts.show({ message: 'file reading was aborted' })
+      reader.onerror = () => toasts.show({ message: 'file reading has failed' })
+      reader.readAsBinaryString(file);
+    });
   }
 
   onTextUpdate() {
@@ -68,6 +95,45 @@ class CodeEditor extends Component {
     } catch (e) {
       this.setState({ localCompileException: `${e}` })
     }
+  }
+
+  renderFileHandlerButtons() {
+    return (
+      <div className="row smd-pad-vertical-4">
+      <div className="pt-button-group">
+        <div className="smd-pad-4">
+          <Popover
+            position={Position.TOP}
+            content={this.renderPopUpContent()}
+            popoverClassName={"popoverClassName"}
+            popoverWillClose={() => this.setState({
+              fileName: undefined
+            })}
+          >
+            <Button className="pt-icon-add"
+              text="Add File"
+            />
+          </Popover>
+        </div>
+        <Dropzone
+          className="dropzone smd-pad-4"
+          onDrop={(files, e) => { this.handleFileDrop(files) }}
+        >
+          <Button className="pt-icon-add-to-folder"
+            text="Import File"
+          />
+        </Dropzone>
+        <div className="smd-pad-4">
+          <Button className="pt-icon-download"
+            text="Download File"
+            onClick={() => {
+              this.props.selectedTabContent && downloadFile(this.props.selectedTabContent.title, this.props.selectedTabContent.text)
+            }}
+          />
+        </div>
+      </div>
+    </div>
+    )
   }
 
   render() {
@@ -110,6 +176,7 @@ class CodeEditor extends Component {
         </span>
       </Tab2>
     })
+
     return (
       <div className="container-fluid pt-dark">
         <div className="row">
@@ -127,21 +194,7 @@ class CodeEditor extends Component {
               sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
           </div>
         </div>
-        <div className="row smd-pad-vertical-4">
-          <div className="col-md-4">
-            <Popover
-              content={this.renderPopUpContent()}
-              popoverClassName={"popoverClassName"}
-              popoverWillClose={() => this.setState({
-                fileName: undefined
-              })}
-            >
-              <Button className="pt-icon-add"
-                text="Add File"
-              />
-            </Popover>
-          </div>
-        </div>
+       {this.renderFileHandlerButtons()}
         <div className="row">
           <div className="col-md-12">
             <Tabs2
@@ -171,7 +224,10 @@ class CodeEditor extends Component {
 }
 
 function mapStateToProps(state) {
-  return { codeEditorData: state.codeEditor };
+  return {
+    selectedTabContent: getSelectedTabContent(state.codeEditor),
+    codeEditorData: state.codeEditor
+  };
 }
 
 export default withRouter(connect(mapStateToProps, { contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange })(CodeEditor));

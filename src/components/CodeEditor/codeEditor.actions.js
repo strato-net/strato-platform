@@ -5,7 +5,7 @@ export const CODE_EDITOR_CHANGE_CREATEACTION = "CODE_EDITOR_CHANGE_CREATEACTION"
 export const ADD_NEW_TAB = "ADD_NEW_TAB";
 export const REMOVE_TAB = "REMOVE_TAB";
 export const ON_TAB_CHANGE = "ON_TAB_CHANGE";
-export const EDITOR_CONTRACT_NAME_CHANGE = "EDITOR_CONTRACT_NAME_CHANGE"
+export const EDITOR_CONTRACT_NAME_CHANGE = "EDITOR_CONTRACT_NAME_CHANGE";
 
 export const changeCreateActionState = function(value, sourceCode, index){
   return {
@@ -39,10 +39,11 @@ export const compileCodeFromEditor = function(name, code, searchable) {
     }
   }
 
-  export const addNewFileTab = function (fileName) {
+  export const addNewFileTab = function (fileName, text) {
     return {
       type: ADD_NEW_TAB,
-      fileName: fileName
+      fileName: fileName,
+      fileContent: text
     }
   }
 
