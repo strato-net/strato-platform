@@ -19,10 +19,11 @@ const reducer = function (state = initialState, action) {
       const applications = action
         .applications
         .map((a) => {
+          console.log(a);
           return {
             ...a,
             isLoading: false,
-            url: a.url.replace('localhost', 'localhost:3001') + '/ui'
+            url: `/apps/${a.hash}/`
           };
         });
         // .filter((app,i,v) => {

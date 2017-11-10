@@ -46,7 +46,6 @@ function launchApp(url) {
       return response;
     })
     .catch(function (error) {
-      console.log('Yo! error', error);
       throw error;
     });
 }
