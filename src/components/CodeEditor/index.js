@@ -96,37 +96,37 @@ class CodeEditor extends Component {
   renderFileHandlerButtons() {
     return (
       <div className="row smd-pad-vertical-4">
-      <div className="pt-button-group">
-        <div className="smd-pad-4">
-          <Popover
-            position={Position.TOP}
-            content={this.renderPopUpContent()}
-            popoverClassName={"popoverClassName"}
-            popoverWillClose={() => this.props.onChangeFileName(undefined)}
+        <div className="pt-button-group">
+          <div className="smd-pad-4">
+            <Popover
+              position={Position.TOP}
+              content={this.renderPopUpContent()}
+              popoverClassName={"popoverClassName"}
+              popoverWillClose={() => this.props.onChangeFileName(undefined)}
+            >
+              <Button className="pt-icon-add"
+                text="Add File"
+              />
+            </Popover>
+          </div>
+          <Dropzone
+            className="dropzone smd-pad-4"
+            onDrop={(files, e) => { this.handleFileDrop(files) }}
           >
-            <Button className="pt-icon-add"
-              text="Add File"
+            <Button className="pt-icon-add-to-folder"
+              text="Import File"
             />
-          </Popover>
-        </div>
-        <Dropzone
-          className="dropzone smd-pad-4"
-          onDrop={(files, e) => { this.handleFileDrop(files) }}
-        >
-          <Button className="pt-icon-add-to-folder"
-            text="Import File"
-          />
-        </Dropzone>
-        <div className="smd-pad-4">
-          <Button className="pt-icon-download"
-            text="Download File"
-            onClick={() => {
-              this.props.selectedTabContent && downloadFile(this.props.selectedTabContent.title, this.props.selectedTabContent.text)
-            }}
-          />
+          </Dropzone>
+          <div className="smd-pad-4">
+            <Button className="pt-icon-download"
+              text="Download File"
+              onClick={() => {
+                this.props.selectedTabContent && downloadFile(this.props.selectedTabContent.title, this.props.selectedTabContent.text)
+              }}
+            />
+          </div>
         </div>
       </div>
-    </div>
     )
   }
 
@@ -188,7 +188,7 @@ class CodeEditor extends Component {
               sourceFromEditor={this.props.codeEditorData.response && this.props.codeEditorData.response.src} />
           </div>
         </div>
-       {this.renderFileHandlerButtons()}
+        {this.renderFileHandlerButtons()}
         <div className="row">
           <div className="col-md-12">
             <Tabs2
