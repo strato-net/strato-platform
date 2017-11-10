@@ -70,7 +70,7 @@ function* fetchApplications(action) {
 function* launchApps(action) {
   try {
     let response = yield call(launchApp, action.url);
-    while(response.statusCode) {
+    while(response.status != 200) {
       yield call(sleep, 1 * 1000);
       response = yield call(launchApp, action.url)
     }
