@@ -7,8 +7,8 @@ import ReactLoading from 'react-loading';
 
 class ApplicationCard extends Component {
 
-  lauchApplication(hash) {
-    this.props.launchApp(hash);
+  lauchApplication(url) {
+    this.props.launchApp(url);
   }
 
   render() {
@@ -29,7 +29,7 @@ class ApplicationCard extends Component {
               <div className="col-sm-2">
                 { this.props.isLoading && (app.url === this.props.url) ? 
                   <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> :
-                  <a href="javascript:void(0)" onClick={() => this.lauchApplication(app.url)} rel="noopener noreferrer">
+                  <a onClick={() => this.lauchApplication(app.url)} rel="noopener noreferrer">
                     <button
                       className="pt-button pt-intent-primary pull-right"
                       >

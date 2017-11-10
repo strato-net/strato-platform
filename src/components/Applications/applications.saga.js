@@ -22,14 +22,14 @@ function getApplications() {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
-    },
-  })
-  .then(function(response) {
-    return response.json()
-  })
-  .catch(function(error) {
-    throw error;
-  });
+      },
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 function launchApp(url) {
@@ -37,16 +37,17 @@ function launchApp(url) {
     url,
     {
       method: 'GET',
+      redirect: 'follow',
       headers: {
         'Accept': 'application/json'
-    },
-  })
-  .then(function(response) {
-    return response;
-  })
-  .catch(function(error) {
-    throw error;
-  });
+      },
+    })
+    .then(function (response) {
+      return response;
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 function* fetchApplications(action) {
@@ -60,35 +61,27 @@ function* fetchApplications(action) {
 }
 
 function* launchApps(action) {
+  let timer;
   try {
-    let response = callLaunchApp(action);
-    
-    if (response.status === 200) {
-      yield put (launchAppSuccess(response.json(), action.url));
-      window.open(action.url, "_blank")
-    } else {
-      wait(5000);
-      yield callLaunchApp(action)
-    }
+    timer = setInterval(function () {
+      function* gen() {
+        let response = yield call(launchApp, action.url);
+        if (response.status === 200) {
+          yield put(launchAppSuccess(response.json(), action.url));
+          window.open(action.url, "_blank")
+          clearTimeout(this);
+        }
+      }
+      gen();
+    }, 3000);
   }
   catch (err) {
-    yield put (launchAppFailure(err));
+    clearTimeout(timer);
+    yield put(launchAppFailure(err));
   }
 }
 
 export default function* watchFetchApplications() {
   yield takeEvery(FETCH_APPLICATIONS, fetchApplications);
   yield takeEvery(LAUNCH_APP, launchApps);
-}
-
-function wait(ms){
-  var start = new Date().getTime();
-  var end = start;
-  while(end < start + ms) {
-    end = new Date().getTime();
- }
-}
-
-function* callLaunchApp(action) {
-  return yield call(launchApp, action.url)
 }
