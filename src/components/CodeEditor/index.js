@@ -146,7 +146,7 @@ class CodeEditor extends Component {
       sourceCode = this.props.codeEditorData.sourceCode &&
         getFileAndReplaceWithImport(this.props.codeEditorData.sourceCode, this.props.codeEditorData.tab)
     } catch (e) {
-      console.log('Exception')
+      //console.log('Exception')
     }
     const tabData = this.props.codeEditorData.tab
     const tabMenus = tabData.map((item, index) => {

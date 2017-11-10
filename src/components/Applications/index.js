@@ -78,7 +78,7 @@ class Applications extends Component {
 
 function mapStateToProps(state) {
   return {
-    applications: state.applications.applications
+    applications: state.applications.applications,
   };
 }
 
