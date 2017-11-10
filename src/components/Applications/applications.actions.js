@@ -25,17 +25,18 @@ export const fetchApplicationsFailure = (error) => {
   }
 }
 
-export const launchApp = (url) => {
+export const launchApp = (address, url) => {
   return {
     type: LAUNCH_APP,
+    address,
     url
   }
 }
 
-export const launchAppSuccess = (response, url) => {
+export const launchAppSuccess = (response, address) => {
   return {
     type: LAUNCH_APP_SUCCESSFUL,
-    url
+    address: address
   }
 }
 

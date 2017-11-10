@@ -7,9 +7,8 @@ import {
 } from './applications.actions';
 
 const initialState = {
-  applcations: [],
+  applications: [],
   error: null,
-  isLoading: false,
   hash: null
 };
 
@@ -22,19 +21,18 @@ const reducer = function (state = initialState, action) {
         .map((a) => {
           return {
             ...a,
-            address: undefined,
-            url: a.url + '/ui'
+            isLoading: false,
+            url: a.url.replace('localhost', 'localhost:3001') + '/ui'
           };
-         })
-        .filter((app,i,v) => {
-          return v.findIndex((a) => {
-            return app.appName === a.appName
-            && app.description === a.description
-            && app.version === a.version
-          }) === i
         });
+        // .filter((app,i,v) => {
+        //   return v.findIndex((a) => {
+        //     return app.appName === a.appName
+        //     && app.description === a.description
+        //     && app.version === a.version
+        //   }) === i
+        // });
       return {
-
         applications: applications,
         error: null,
       };
@@ -44,21 +42,52 @@ const reducer = function (state = initialState, action) {
         error: action.error,
       };
     case LAUNCH_APP:
+      const newApplications = state.applications.map((app) => {
+        if(app.address === action.address) {
+          return {
+            ...app,
+            isLoading: true
+          }
+        }
+        return {
+          ...app
+        }
+      })
       return {
         ...state,
-        url: action.url,
-        isLoading: true
+        applications: newApplications
       }
-    case LAUNCH_APP_SUCCESSFUL: 
+    case LAUNCH_APP_SUCCESSFUL:
+      const updatedApplications = state.applications.map((app) => {
+        if(app.address === action.address) {
+          return {
+            ...app,
+            isLoading: false
+          }
+        }
+        return {
+          ...app
+        }
+      })
       return {
         ...state,
-        isLoading: false,
-        url: action.url
+        applications: updatedApplications
       }
-    case LAUNCH_APP_FAILURE: 
+    case LAUNCH_APP_FAILURE:
+      const updatedEApplications = state.applications.map((app) => {
+        if(app.address === action.address) {
+          return {
+            ...app,
+            isLoading: false
+          }
+        }
+        return {
+          ...app
+        }
+      })
       return {
         ...state,
-        isLoading: false,
+        applications: updatedEApplications,
         error: action.error
       }
     default:

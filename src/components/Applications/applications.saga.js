@@ -46,9 +46,17 @@ function launchApp(url) {
       return response;
     })
     .catch(function (error) {
+      console.log('Yo! error', error);
       throw error;
     });
 }
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  })
+}
+
 
 function* fetchApplications(action) {
   try {
@@ -61,22 +69,16 @@ function* fetchApplications(action) {
 }
 
 function* launchApps(action) {
-  let timer;
   try {
-    timer = setInterval(function () {
-      function* gen() {
-        let response = yield call(launchApp, action.url);
-        if (response.status === 200) {
-          yield put(launchAppSuccess(response.json(), action.url));
-          window.open(action.url, "_blank")
-          clearTimeout(this);
-        }
-      }
-      gen();
-    }, 3000);
+    let response = yield call(launchApp, action.url);
+    while(response.statusCode) {
+      yield call(sleep, 1 * 1000);
+      response = yield call(launchApp, action.url)
+    }
+    yield put(launchAppSuccess(action.address));
+    window.open(action.url, '_blank');
   }
   catch (err) {
-    clearTimeout(timer);
     yield put(launchAppFailure(err));
   }
 }
