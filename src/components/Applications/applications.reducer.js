@@ -9,7 +9,8 @@ import {
 const initialState = {
   applcations: [],
   error: null,
-  isLoading: false
+  isLoading: false,
+  hash: null
 };
 
 const reducer = function (state = initialState, action) {
@@ -44,14 +45,19 @@ const reducer = function (state = initialState, action) {
       };
     case LAUNCH_APP:
       return {
+        ...state,
+        url: action.url,
         isLoading: true
       }
     case LAUNCH_APP_SUCCESSFUL: 
       return {
+        ...state,
+        isLoading: false,
         url: action.url
       }
     case LAUNCH_APP_FAILURE: 
       return {
+        ...state,
         isLoading: false,
         error: action.error
       }

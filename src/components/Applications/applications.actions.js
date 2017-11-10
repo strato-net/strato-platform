@@ -25,10 +25,10 @@ export const fetchApplicationsFailure = (error) => {
   }
 }
 
-export const launchApp = (hash) => {
+export const launchApp = (url) => {
   return {
     type: LAUNCH_APP,
-    hash
+    url
   }
 }
 

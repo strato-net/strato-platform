@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 import './applications-card.css'
 import { withRouter} from 'react-router-dom';
 import { launchApp } from '../Applications/applications.actions';
+import ReactLoading from 'react-loading';
 
 class ApplicationCard extends Component {
 
@@ -12,7 +13,6 @@ class ApplicationCard extends Component {
 
   render() {
     const { app } = this.props;
-    console.log("application", app);
     return (
       <div className="pt-card app-card">
         <div className="row">
@@ -27,13 +27,16 @@ class ApplicationCard extends Component {
                 </div>
               </div>
               <div className="col-sm-2">
-                <a href="javascript::void(0)" onClick={() => this.lauchApplication(app.hash)} rel="noopener noreferrer">
-                  <button
-                    className="pt-button pt-intent-primary pull-right"
-                  >
-                    Launch
-                  </button>
-                </a>
+                { this.props.isLoading && (app.url === this.props.url) ? 
+                  <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> :
+                  <a href="javascript:void(0)" onClick={() => this.lauchApplication(app.url)} rel="noopener noreferrer">
+                    <button
+                      className="pt-button pt-intent-primary pull-right"
+                      >
+                      Launch
+                    </button> 
+                  </a>
+                }
               </div>
             </div>
             <div className="neutral-baseline"></div>
@@ -53,6 +56,8 @@ class ApplicationCard extends Component {
 
 function mapStateToProps(state) {
   return {
+    isLoading: state.applications.isLoading,
+    url: state.applications.url
   };
 }
 

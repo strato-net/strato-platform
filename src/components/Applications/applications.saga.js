@@ -14,7 +14,6 @@ import {
 import { env } from '../../env';
 
 const applicationsUrl = env.CIRRUS_URL + '/AppMetadata';
-const launchAppUrl = 'http://localhost:3001/apps/:hash';
 
 function getApplications() {
   return fetch(
@@ -33,22 +32,21 @@ function getApplications() {
   });
 }
 
-function launchApp(hash) {
+function launchApp(url) {
   return fetch(
-    launchAppUrl.replace(':hash', hash),
+    url,
     {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'  
-      }
-    })
-    .then(function(response) {
-      // console.log("response", response);
-      return response.json()
-    })
-    .catch(function(error) {
-      throw error;
-    });
+        'Accept': 'application/json'
+    },
+  })
+  .then(function(response) {
+    return response;
+  })
+  .catch(function(error) {
+    throw error;
+  });
 }
 
 function* fetchApplications(action) {
@@ -63,16 +61,34 @@ function* fetchApplications(action) {
 
 function* launchApps(action) {
   try {
-    let tempHash = '9ee1efe781ed3e4036d7110c2bf3dbb89f307307';
-    let response = yield call(launchApp(tempHash));
-    yield put (launchAppSuccess(response, launchAppUrl.replace(':hash', tempHash)));
+    let response = callLaunchApp(action);
+    
+    if (response.status === 200) {
+      yield put (launchAppSuccess(response.json(), action.url));
+      window.open(action.url, "_blank")
+    } else {
+      wait(5000);
+      yield callLaunchApp(action)
+    }
   }
   catch (err) {
-    yield put (launchAppFailure());
+    yield put (launchAppFailure(err));
   }
 }
 
 export default function* watchFetchApplications() {
   yield takeEvery(FETCH_APPLICATIONS, fetchApplications);
   yield takeEvery(LAUNCH_APP, launchApps);
+}
+
+function wait(ms){
+  var start = new Date().getTime();
+  var end = start;
+  while(end < start + ms) {
+    end = new Date().getTime();
+ }
+}
+
+function* callLaunchApp(action) {
+  return yield call(launchApp, action.url)
 }
