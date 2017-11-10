@@ -4,7 +4,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
 import { Button, Tab2, Tabs2, Popover, Position } from '@blueprintjs/core';
-import { contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
+import { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import { getSelectedTabContent } from './codeEditor.selector';
 import CreateContract from '../CreateContract';
 import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/FileParser.js';
@@ -15,10 +15,6 @@ import { toasts } from "../Toasts";
 class CodeEditor extends Component {
   constructor() {
     super()
-    this.state = {
-      fileName: undefined,
-      localCompileException: ''
-    }
     this.timeout = null;
   }
 
@@ -34,12 +30,12 @@ class CodeEditor extends Component {
           type="text"
           placeholder="Enter file name"
           dir="auto"
-          onChange={(e) => this.setState({ fileName: e.target.value })} />
+          onChange={(e) => this.props.onChangeFileName(e.target.value)} />
         <Button
           className="pt-intent-primary pt-popover-dismiss"
           text="Add file"
           onClick={() => {
-            this.state.fileName && this.state.fileName.length > 0 && this.props.addNewFileTab(this.state.fileName, '')
+            this.props.codeEditorData.fileName && this.props.codeEditorData.fileName.length > 0 && this.props.addNewFileTab(this.props.codeEditorData.fileName, '')
           }} />
       </div>
     )
@@ -76,7 +72,7 @@ class CodeEditor extends Component {
   }
 
   compileCode() {
-    this.setState({ localCompileException: '' })
+    this.props.onCompileFileLocally('')
     try {
       if (this.props.codeEditorData.sourceCode === undefined || this.props.codeEditorData.sourceCode.length === 0) {
         throw new Error("Can't compile. Source is undefined")
@@ -93,7 +89,7 @@ class CodeEditor extends Component {
         false
       );
     } catch (e) {
-      this.setState({ localCompileException: `${e}` })
+      this.props.onCompileFileLocally(`${e}`)
     }
   }
 
@@ -106,9 +102,7 @@ class CodeEditor extends Component {
             position={Position.TOP}
             content={this.renderPopUpContent()}
             popoverClassName={"popoverClassName"}
-            popoverWillClose={() => this.setState({
-              fileName: undefined
-            })}
+            popoverWillClose={() => this.props.onChangeFileName(undefined)}
           >
             <Button className="pt-icon-add"
               text="Add File"
@@ -209,7 +203,7 @@ class CodeEditor extends Component {
           <div className="col-md-12">
             <pre className="pt-text-muted" style={{ height: '110px', fontSize: '11px' }}>
               {
-                this.state.localCompileException.length > 0 ? this.state.localCompileException : (this.props.codeEditorData.codeCompileSuccess
+                this.props.codeEditorData.localCompileException.length > 0 ? this.props.codeEditorData.localCompileException : (this.props.codeEditorData.codeCompileSuccess
                   ? ' Contract compiled successfully'
                   : this.props.codeEditorData.response
                     ? ' ' + this.props.codeEditorData.response
@@ -230,4 +224,4 @@ function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, { contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange })(CodeEditor));
+export default withRouter(connect(mapStateToProps, { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange })(CodeEditor));
