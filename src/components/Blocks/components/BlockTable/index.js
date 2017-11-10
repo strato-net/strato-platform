@@ -47,7 +47,6 @@ class BlockTable extends Component {
       mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
-    console.log(this.props.queryResult.length);
     let blockRows = this.props.queryResult.map(
       function (block) {
         return (

@@ -19,7 +19,6 @@ const reducer = function (state = initialState, action) {
       const applications = action
         .applications
         .map((a) => {
-          console.log(a);
           return {
             ...a,
             isLoading: false,
