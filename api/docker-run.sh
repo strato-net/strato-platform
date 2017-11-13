@@ -2,24 +2,25 @@
 set -e
 set -x
 
-echo 'Waiting for postgres to be available'
+echo 'Waiting for postgres to be available...'
 while true; do
-    curl postgres:5432 > /dev/null 2>&1
-    if [ $? = 52 ]; then
+    curl postgres:5432 > /dev/null 2>&1 || EXIT_CODE=$? && true
+    if [ ${EXIT_CODE} = 52 ]; then
         break
     fi
     sleep 1
 done
+echo 'postgres is available'
 
-echo 'Waiting for postgres-cirrus to be available'
+echo 'Waiting for postgres-cirrus to be available...'
 while true; do
-    curl postgres-cirrus:5432 > /dev/null 2>&1
-    if [ $? = 52 ]; then
+    curl postgres-cirrus:5432 > /dev/null 2>&1 || EXIT_CODE=$? && true
+    if [ ${EXIT_CODE} = 52 ]; then
         break
     fi
     sleep 1
 done
-
+echo 'postgres-cirrus is available'
 
 STRATO_LOCAL_HOST=${STRATO_LOCAL_HOST:-nginx}
 
