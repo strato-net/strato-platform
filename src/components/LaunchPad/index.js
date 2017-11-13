@@ -14,6 +14,7 @@ import {
   appReset
 } from './launchPad.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
+import { canDeployApps } from '../../lib/envChecks';
 
 class LaunchPad extends Component {
 
@@ -116,6 +117,9 @@ class LaunchPad extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
+            {!canDeployApps
+              ? <div className="pt-card"><span>Unable to deploy apps when running multinode on localhost</span></div>
+              :
             <div className="pt-card">
               <div className="row">
                 <div className="col-sm-6">
@@ -243,6 +247,7 @@ class LaunchPad extends Component {
                 </div>
               </form>
             </div>
+            }
           </div>
         </div>
       </div>
