@@ -51,7 +51,19 @@ const formatCompilationErrors = function (error) {
   }
 }
 
-const reducer = function (state = initialState, action) {
+const loadState = () => {
+  try {
+    const serializedState = localStorage.getItem('code_editor_state');
+     if (serializedState === null) {
+       return initialState;
+     }
+    return JSON.parse(serializedState);
+  } catch (err) {
+    return undefined;
+  }
+};
+
+const reducer = function (state = loadState(), action) {
   switch (action.type) {
     case CODE_EDITOR_COMPILE_REQUEST:
       return {
