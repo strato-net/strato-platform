@@ -2,12 +2,14 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import './applications-card.css'
 import { withRouter} from 'react-router-dom';
+import { launchApp } from '../Applications/applications.actions';
+import ReactLoading from 'react-loading';
 
 class ApplicationCard extends Component {
 
+
   render() {
     const { app } = this.props;
-
     return (
       <div className="pt-card app-card">
         <div className="row">
@@ -22,13 +24,17 @@ class ApplicationCard extends Component {
                 </div>
               </div>
               <div className="col-sm-2">
-                <a href={ app.url } target="_blank" rel="noopener noreferrer">
-                  <button
-                    className="pt-button pt-intent-primary pull-right"
-                  >
-                    Launch
-                  </button>
-                </a>
+                { app.isLoading ?
+                  <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> :
+                  <a  rel="noopener noreferrer">
+                    <button
+                      className="pt-button pt-intent-primary pull-right"
+                      onClick={() => this.props.launchApp(app.address,app.url)}
+                    >
+                      Launch
+                    </button>
+                  </a>
+                }
               </div>
             </div>
             <div className="neutral-baseline"></div>
@@ -48,12 +54,15 @@ class ApplicationCard extends Component {
 
 function mapStateToProps(state) {
   return {
+    isLoading: state.applications.isLoading,
+    url: state.applications.url
   };
 }
 
 export default withRouter(
   connect( mapStateToProps,
     {
+      launchApp
     }
   )(ApplicationCard)
 );

@@ -6,13 +6,15 @@ import {
   ADD_NEW_TAB,
   REMOVE_TAB,
   ON_TAB_CHANGE,
-  EDITOR_CONTRACT_NAME_CHANGE
+  EDITOR_CONTRACT_NAME_CHANGE,
+  CHANGE_FILE_NAME,
+  ON_COMPILE_FILE_LOCALLY
 } from './codeEditor.actions';
 
 const initialState = {
   codeCompileSuccess: undefined,
   abi: undefined,
-  filename: undefined,
+  fileName: undefined,
   createDisabled: true,
   enableCreateAction: false,
   sourceCode: undefined,
@@ -21,34 +23,47 @@ const initialState = {
     text: '',
     title: 'Main.sol'
   }],
-  lastTabSelected:0,
-  currentTabSelected:0,
-  isRemoveTab: false
+  lastTabSelected: 0,
+  currentTabSelected: 0,
+  isRemoveTab: false,
+  localCompileException: ''
 };
 
-const formatCompilationErrors = function(error) {
-  if(error.indexOf('\n') === -1) {
+const formatCompilationErrors = function (error) {
+  if (error.indexOf('\n') === -1) {
     return error;
   }
   let text = error
     .split('\n')
-    .reduce((a,part,i)=>{
-      if(i===0 || part === '') {
+    .reduce((a, part, i) => {
+      if (i === 0 || part === '') {
         return a;
       }
       return a + ' ' + part;
-     },'');
+    }, '');
 
   try {
     const jErrors = JSON.parse(text);
     console.log(jErrors);
     return jErrors.error;
-  } catch(e) {
+  } catch (e) {
     return text;
   }
 }
 
-const reducer = function (state = initialState, action) {
+const loadState = () => {
+  try {
+    const serializedState = localStorage.getItem('code_editor_state');
+     if (serializedState === null) {
+       return initialState;
+     }
+    return JSON.parse(serializedState);
+  } catch (err) {
+    return undefined;
+  }
+};
+
+const reducer = function (state = loadState(), action) {
   switch (action.type) {
     case CODE_EDITOR_COMPILE_REQUEST:
       return {
@@ -78,10 +93,10 @@ const reducer = function (state = initialState, action) {
       };
 
     case EDITOR_CONTRACT_NAME_CHANGE:
-    return {
-      ...state,
-      contractName: action.contractName
-    }
+      return {
+        ...state,
+        contractName: action.contractName
+      }
 
     case CODE_EDITOR_CHANGE_CREATEACTION:
       const tabItems = [...state.tab];
@@ -94,17 +109,19 @@ const reducer = function (state = initialState, action) {
       };
 
     case ADD_NEW_TAB:
-      const newTabs = [...state.tab, { title: `${action.fileName}.sol`, text: '' }]
+      const newTabs = [...state.tab, { title: `${action.fileName}.sol`, text: action.fileContent }]
       return {
         ...state,
         tab: newTabs,
-        currentTabSelected: newTabs.length - 1 
+        sourceCode: action.fileContent,
+        currentTabSelected: newTabs.length - 1,
+        enableCreateAction: false
       };
 
     case REMOVE_TAB:
       const tabs = state.tab.slice();
       tabs.splice(action.index, 1);
-      const selectedTab = action.index === state.currentTabSelected? (action.index>0 ? state.currentTabSelected-1:0):(action.index>state.currentTabSelected?state.currentTabSelected: state.currentTabSelected-1)      
+      const selectedTab = action.index === state.currentTabSelected ? (action.index > 0 ? state.currentTabSelected - 1 : 0) : (action.index > state.currentTabSelected ? state.currentTabSelected : state.currentTabSelected - 1)
       return {
         ...state,
         tab: tabs,
@@ -114,21 +131,35 @@ const reducer = function (state = initialState, action) {
       };
 
     case ON_TAB_CHANGE:
-      const changedTab = state.tab.slice();    
-      if (state.isRemoveTab){        
-        const tabCodeOnRemove = changedTab.length>0 && changedTab.splice(state.currentTabSelected,1)              
+      const changedTab = state.tab.slice();
+      if (state.isRemoveTab) {
+        const tabCodeOnRemove = changedTab.length > 0 && changedTab.splice(state.currentTabSelected, 1)
         return {
           ...state,
-          isRemoveTab:false,
-          sourceCode:tabCodeOnRemove.length>0 && tabCodeOnRemove[0].text,          
+          isRemoveTab: false,
+          sourceCode: tabCodeOnRemove.length > 0 && tabCodeOnRemove[0].text,
+          enableCreateAction: false
         }
       }
-      const tabCode = changedTab.splice(action.nextTab,1)
+      const tabCode = changedTab.splice(action.nextTab, 1)
       return {
         ...state,
-        sourceCode:tabCode[0].text,
+        sourceCode: tabCode[0].text,
         currentTabSelected: action.nextTab,
         lastTabSelected: action.prevTab,
+        enableCreateAction: false
+      }
+
+    case CHANGE_FILE_NAME:
+      return {
+        ...state,
+        fileName: action.name
+      }
+
+    case ON_COMPILE_FILE_LOCALLY:
+      return {
+        ...state,
+        localCompileException: action.compileError
       }
 
     default:
