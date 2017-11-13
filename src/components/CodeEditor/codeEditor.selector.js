@@ -5,4 +5,4 @@ const getContent = (state) => {
 	return content
 }
 
-export const getSelectedTabContent = createSelector(getContent,(content)=> content)
+export const getSelectedTabContent = createSelector(getContent, (content) => content)

@@ -20,6 +20,23 @@ class CodeEditor extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track('code_editor_load');
+    window.onbeforeunload = (e) => {
+      //Called when page is refreshed
+      this.saveToLocalStorage()
+    };
+  }
+
+  componentWillUnmount() {
+    this.saveToLocalStorage()
+  }
+
+  saveToLocalStorage() {
+    try {
+      const serializedState = JSON.stringify(this.props.codeEditorData);
+      localStorage.setItem('code_editor_state', serializedState);
+    } catch (err) {
+      console.log('error:', err)
+    }
   }
 
   renderPopUpContent = () => {
