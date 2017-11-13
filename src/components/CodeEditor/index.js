@@ -11,23 +11,25 @@ import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/File
 import { downloadFile } from '../../lib/fileHandler.js';
 import Dropzone from 'react-dropzone';
 import { toasts } from "../Toasts";
+import debounce from 'lodash/debounce'
 
 class CodeEditor extends Component {
   constructor() {
     super()
     this.timeout = null;
+    this.saveLocalState = null
   }
 
   componentDidMount() {
     mixpanelWrapper.track('code_editor_load');
+    this.saveLocalState = debounce(this.saveToLocalStorage,500)
     window.onbeforeunload = (e) => {
-      //Called when page is refreshed
       this.saveToLocalStorage()
     };
   }
- 
+
   componentDidUpdate() {
-    this.saveToLocalStorage()    
+    this.saveLocalState && this.saveLocalState()
   }
 
   saveToLocalStorage() {
