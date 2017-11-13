@@ -2,7 +2,24 @@
 set -e
 set -x
 
-#sleep 3 # TODO: sleep until 'curl postgres:5432' exit code = 52
+echo 'Waiting for postgres to be available'
+while true; do
+    curl postgres:5432 > /dev/null 2>&1
+    if [ $? = 52 ]; then
+        break
+    fi
+    sleep 1
+done
+
+echo 'Waiting for postgres-cirrus to be available'
+while true; do
+    curl postgres-cirrus:5432 > /dev/null 2>&1
+    if [ $? = 52 ]; then
+        break
+    fi
+    sleep 1
+done
+
 
 STRATO_LOCAL_HOST=${STRATO_LOCAL_HOST:-nginx}
 
