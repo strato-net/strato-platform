@@ -40,12 +40,8 @@ $multipliers: 5;
   .smd-pad-right-#{$i*4} { padding-right: $i * 4px; }
 }
 
-.smd-pad-left-0 {
-  padding-left: 0px !important;
-}
-
-.smd-pad-right-0 {
-  padding-right: 0px !important;
+.smd-pad-left-2 {
+  padding-left: 2px !important;
 }
 
 .smd-pointer {

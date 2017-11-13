@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
-import { Icon } from '@blueprintjs/core';
 import { Tooltip, Position, Text } from '@blueprintjs/core';
+import './hex-text.css'
 
 class HexText extends Component {
   constructor() {
@@ -13,10 +13,10 @@ class HexText extends Component {
 
   render() {
     return (
-      <div className="row">
+      <span className="hex-text">
         <Tooltip
           content={this.props.value}
-          className={`col-sm-6 text-left smd-pad-right-0 ${this.props.classes || ''}`}
+          className={`text-tooltip text-left ${this.props.classes || ''}`}
           position={Position.TOP}>
           <Text ellipsize={true}>
             {this.props.value}
@@ -24,9 +24,9 @@ class HexText extends Component {
         </Tooltip>
         <CopyToClipboard
           text={this.props.value}
-          className='col-sm-1 smd-pad-left-0'
+          className='smd-pad-left-2'
           onCopy={() => { this.setState({ copied: true }); }}>
-          <div
+          <span
             onClick={(event) => {
               event.stopPropagation();
               event.preventDefault(); }}
@@ -35,14 +35,11 @@ class HexText extends Component {
               content={this.state.copied ? 'Copied!' : 'Copy to clipboard'}
               position={Position.TOP}
               className="smd-pointer" >
-              <Icon
-                iconName="pt-icon-clipboard"
-                iconSize={24}
-                onMouseOut={(e) => { this.setState({ copied: false }); }} />
+                <span className="pt-icon pt-icon-clipboard"></span>
             </Tooltip>
-          </div>
+          </span>
         </CopyToClipboard>
-      </div>
+      </span>
     );
   }
 }
