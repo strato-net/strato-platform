@@ -12,7 +12,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                   sh '''#!/bin/bash -le
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  rm -rf silo strato-getting-started || true
+                  sudo rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
                   git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                   git clone https://github.com/blockapps/strato-getting-started
@@ -31,7 +31,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                   sh '''#!/bin/bash -le
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  rm -rf silo strato-getting-started || true
+                  sudo rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
                   git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                   git clone https://github.com/blockapps/strato-getting-started
@@ -50,7 +50,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                   sh '''#!/bin/bash -le
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  rm -rf silo strato-getting-started || true
+                  sudo rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
                   git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                   git clone https://github.com/blockapps/strato-getting-started
