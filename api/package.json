@@ -1,6 +1,6 @@
 {
   "name": "APEX",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "start": "# npm-run-all -p start-dev",
@@ -9,7 +9,7 @@
     "node-ping": "# DELAY=5000 RETENTION=1 node node-ping/index.js",
     "migrate": "# sequelize db:migrate",
     "test": "# NODE_ENV=test mocha",
-    "test:app-metadata:local": "mocha --config config-local.yaml  api/lib/appMetadata/test/appMetadata.test.js --api-debug -b"
+    "test:app-metadata:local": "mocha --config config-local.yaml lib/appMetadata/test/appMetadata.test.js --api-debug -b"
   },
   "dependencies": {
     "adm-zip": "^0.4.7",
@@ -23,11 +23,13 @@
     "cookie-parser": "1.4.3",
     "cors": "2.8.4",
     "debug": "3.1.0",
+    "download": "^6.2.5",
     "expect": "latest",
     "express": "4.16.1",
     "fs-extra": "^4.0.2",
     "is-reachable": "2.3.3",
     "jwt-simple": "0.5.1",
+    "md5-file": "^3.2.3",
     "mocha": "4.0.0",
     "moment": "2.18.1",
     "morgan": "1.9.0",

@@ -6,6 +6,7 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 const cors = require('cors');
 const appConfig = require('./config/app.config');
+const acquireDapp = require('./controllers/dapp').acquireDapp;
 
 var index = require('./routes/index');
 // var users = require('./routes/users');
@@ -45,7 +46,8 @@ if (process.env.NODE_ENV !== 'production') {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve uploaded dApps
-app.use('/apps/', express.static('apps'));
+app.locals.acquiresInProgress = {};
+app.use('/apps/', express.static('apps'), acquireDapp);
 
 app.use('/', index);
 // app.use('/users', users);
@@ -62,7 +64,7 @@ app.use(function(err, req, res, next) {
 
   res.status(err.status || 500);
 
-  if (res.status === 500) {
+  if (res.statusCode === 500) {
     console.error(err, err.stack);
     err.message = "unexpected server error occurred"
   }
