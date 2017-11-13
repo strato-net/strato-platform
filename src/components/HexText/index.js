@@ -29,13 +29,17 @@ class HexText extends Component {
           <span
             onClick={(event) => {
               event.stopPropagation();
-              event.preventDefault(); }}
+              event.preventDefault();
+            }}
           >
             <Tooltip
               content={this.state.copied ? 'Copied!' : 'Copy to clipboard'}
               position={Position.TOP}
               className="smd-pointer" >
-                <span className="pt-icon pt-icon-clipboard"></span>
+              <span
+                className="pt-icon pt-icon-clipboard"
+                onMouseOut={(e) => { this.setState({ copied: false }); }}>
+              </span>
             </Tooltip>
           </span>
         </CopyToClipboard>
