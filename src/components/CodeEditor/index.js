@@ -25,9 +25,9 @@ class CodeEditor extends Component {
       this.saveToLocalStorage()
     };
   }
-
-  componentWillUnmount() {
-    this.saveToLocalStorage()
+ 
+  componentDidUpdate() {
+    this.saveToLocalStorage()    
   }
 
   saveToLocalStorage() {
