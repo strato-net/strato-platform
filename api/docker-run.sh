@@ -2,6 +2,20 @@
 set -e
 set -x
 
+echo 'Waiting for bloc to be available...'
+until curl --silent --output /dev/null --fail --location nginx/bloc/v2.2/users/
+do
+  sleep 1
+done
+echo 'bloc is available'
+
+echo 'Waiting for cirrus to be available...'
+until curl --silent --output /dev/null --fail --location nginx/cirrus/contract/
+do
+  sleep 1
+done
+echo 'cirrus is available'
+
 echo 'Waiting for postgres to be available...'
 while true; do
     curl postgres:5432 > /dev/null 2>&1 || EXIT_CODE=$? && true
@@ -11,16 +25,6 @@ while true; do
     sleep 1
 done
 echo 'postgres is available'
-
-echo 'Waiting for postgres-cirrus to be available...'
-while true; do
-    curl postgres-cirrus:5432 > /dev/null 2>&1 || EXIT_CODE=$? && true
-    if [ ${EXIT_CODE} = 52 ]; then
-        break
-    fi
-    sleep 1
-done
-echo 'postgres-cirrus is available'
 
 STRATO_LOCAL_HOST=${STRATO_LOCAL_HOST:-nginx}
 
