@@ -54,9 +54,8 @@ pipeline {
         sh '''#!/bin/bash -le
           cd silo
           basil compose > docker-compose.yml
-
-          NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com} \
-            NODE_NAME=${NODE_NAME:-$NODE_HOST} \
+          export NODE_HOST=${NODE_HOST:-cd10.eastus.cloudapp.azure.com}
+          NODE_NAME=${NODE_NAME:-$NODE_HOST} \
             BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
             BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
             STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2} \
@@ -69,9 +68,18 @@ pipeline {
             docker-compose up -d
           docker ps
           # Few quick tests
-          curl -f http://localhost/cirrus/contract/
-          curl -f http://localhost/strato-api/eth/v1.2/stats/difficulty
-          curl -f http://localhost/bloc/v2.2/users/
+          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+          do
+            echo "waiting for bloc to be available"
+            sleep 1
+          done
+          echo "bloc is available"
+          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
+          do
+            echo "waiting for cirrus to be available"
+            sleep 1
+          done
+          echo "cirrus is available"
         '''
       }
     }

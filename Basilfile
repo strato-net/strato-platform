@@ -34,6 +34,10 @@ deployments:
     ref: master
     compose:
       restart: always
+      depends_on:
+        - bloch
+        - cirrus
+        - postgres
       volumes:
         - ./dapps:/usr/src/app/apps
       environment:
