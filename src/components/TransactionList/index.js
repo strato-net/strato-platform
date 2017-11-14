@@ -3,10 +3,11 @@ import {connect} from 'react-redux';
 import {fetchTx} from './transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
-import {Text, Tooltip, Position} from '@blueprintjs/core';
+import { Text } from '@blueprintjs/core';
 import { env } from '../../env';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { parseDateFromString } from '../../lib/dateUtils'
+import { parseDateFromString } from '../../lib/dateUtils';
+import HexText from '../HexText';
 
 class TransactionList extends Component {
 
@@ -36,11 +37,7 @@ class TransactionList extends Component {
             onClick={e => {mixpanelWrapper.track("dashboard_transaction_click"); self.props.history.push('/transactions/' + tx.hash)}}
           >
             <td width="40%">
-              <Text ellipsize={true}>
-                <Tooltip content={tx.hash} position={Position.TOP_LEFT}>
-                  <small>{tx.hash}</small>
-                </Tooltip>
-              </Text>
+              <HexText value={tx.hash} classes="small smd-pad-4"/>
             </td>
             <td width="23%" className="text-right">
               <small>{tx.value}</small>

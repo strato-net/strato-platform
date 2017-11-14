@@ -6,8 +6,9 @@ import {BLOCK_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes
 import { fetchBlockData } from '../../../BlockData/block-data.actions';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
-import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
+import {Text, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
+import HexText from '../../../HexText';
 
 class BlockTable extends Component {
 
@@ -47,6 +48,7 @@ class BlockTable extends Component {
       mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
+    
     let blockRows = this.props.queryResult.map(
       function (block) {
         return (
@@ -57,12 +59,7 @@ class BlockTable extends Component {
               <small>{block.blockData.number}</small>
             </td>
             <td width="22.5%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.parentHash}
-                         position={Position.TOP_LEFT}>
-                  <small>{block.blockData.parentHash}</small>
-                </Tooltip>
-              </Text>
+              <HexText value={block.blockData.parentHash} classes="small smd-pad-4"/>
             </td>
             <td width="15%">
               <Text ellipsize={true}>
@@ -79,14 +76,7 @@ class BlockTable extends Component {
               </Text>
             </td>
             <td width="22.5%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.coinbase}
-                         position={Position.TOP_LEFT}>
-                  <small>
-                    {block.blockData.coinbase}
-                  </small>
-                </Tooltip>
-              </Text>
+              <HexText value={block.blockData.coinbase} classes="small smd-pad-4"/>
             </td>
             <td width="20%">
               <Text ellipsize={true}>

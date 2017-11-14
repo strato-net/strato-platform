@@ -3,6 +3,7 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import HexText from '../HexText';
 
 class Account extends Component {
   render() {
@@ -13,7 +14,9 @@ class Account extends Component {
         <div className="row">
           <div className="col-sm-9">
             <div className="h3">{name}</div>
-            <div className="h4">{account.address}</div>
+            <div className="h4">
+              <HexText value={account.address} classes="smd-pad-2"/>
+            </div>
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
@@ -36,7 +39,7 @@ class Account extends Component {
                 <tbody>
                   <tr>
                     <td><strong>Contract Root</strong></td>
-                    <td>{account.contractRoot}</td>
+                    <td><HexText value={account.contractRoot} classes="smd-pad-2"/></td>
                   </tr>
                   <tr>
                     <td><strong>Kind</strong></td>
@@ -52,7 +55,7 @@ class Account extends Component {
                   </tr>
                   <tr>
                     <td><strong>Code Hash</strong></td>
-                    <td>{account.codeHash}</td>
+                    <td><HexText value={account.codeHash} classes="smd-pad-2"/></td>
                   </tr>
                   <tr>
                     <td><strong>Nonce</strong></td>
