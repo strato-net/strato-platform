@@ -5,8 +5,8 @@ pipeline {
     stage('Prepare to deploy') {
       steps {
         parallel (
-          "hackathon-1": {
-            node('hackathon-1') {
+          "hackathon1": {
+            node('hackathon1') {
               step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
@@ -24,8 +24,8 @@ pipeline {
               }
             }
           },
-          "hackathon-2": {
-            node('hackathon-2') {
+          "hackathon2": {
+            node('hackathon2') {
               step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
@@ -43,8 +43,8 @@ pipeline {
               }
             }
           },
-          "hackathon-3": {
-            node('hackathon-3') {
+          "hackathon3": {
+            node('hackathon3') {
               step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
@@ -68,32 +68,32 @@ pipeline {
     stage('Deploy multinode') {
       steps {
         parallel (
-          "hackathon-1": {
-            node('hackathon-1') {
+          "hackathon1": {
+            node('hackathon1') {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              STRATO_GS_MODE="1" NODE_HOST=hackathon-1.southcentralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
+              STRATO_GS_MODE="1" NODE_HOST=hackathon1.southcentralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
               docker ps
               '''
             }
           },
-          "hackathon-2": {
-            node('hackathon-2') {
+          "hackathon2": {
+            node('hackathon2') {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              STRATO_GS_MODE="1" NODE_HOST=hackathon-2.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.84.167.234 ./strato-multinode-run.sh --stable
+              STRATO_GS_MODE="1" NODE_HOST=hackathon2.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.84.167.234 ./strato-multinode-run.sh --stable
               docker ps
               '''
             }
           },
-          "hackathon-3": {
-            node('hackathon-3') {
+          "hackathon3": {
+            node('hackathon3') {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              STRATO_GS_MODE="1" NODE_HOST=hackathon-3.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.84.167.234 ./strato-multinode-run.sh --stable
+              STRATO_GS_MODE="1" NODE_HOST=hackathon3.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.84.167.234 ./strato-multinode-run.sh --stable
               docker ps
               '''
             }
