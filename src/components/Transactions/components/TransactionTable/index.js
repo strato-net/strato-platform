@@ -8,6 +8,7 @@ import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
 import * as moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
+import HexText from '../../../HexText';
 
 class TransactionTable extends Component {
 
@@ -57,11 +58,7 @@ class TransactionTable extends Component {
             handleClick(tx.hash)
           }}>
             <td width="40%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={tx.hash} position={Position.TOP_LEFT}>
-                  <small>{tx.hash}</small>
-                </Tooltip>
-              </Text>
+              <HexText value={tx.hash} classes="small smd-pad-4"/>
             </td>
             <td width="10%">
               <Text ellipsize={true}>

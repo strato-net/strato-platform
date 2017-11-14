@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { env } from '../../env';
-import { Text, Collapse } from '@blueprintjs/core';
+import { Collapse } from '@blueprintjs/core';
 import {
   fetchNodeDetail,
   fetchNodePeers,
@@ -10,6 +10,7 @@ import {
 } from './nodeCard.actions';
 import './nodeCard.css';
 import PeersCard from '../PeersCard';
+import HexText from '../HexText';
 
 class NodeCard extends Component {
 
@@ -70,10 +71,8 @@ class NodeCard extends Component {
             <div className="col-xs-3">
               <small>Coinbase</small>
             </div>
-            <div className="col-xs-9 text-right">
-              <Text ellipsize={true}>
-                <small>{node.coinbase}</small>
-              </Text>
+            <div className="col-xs-9">
+              <small> <HexText value={node.coinbase} classes="smd-pad-2"/> </small>
             </div>
           </div>
           <div className="row pt-text-muted">
