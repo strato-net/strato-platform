@@ -15,7 +15,7 @@ class Account extends Component {
           <div className="col-sm-9">
             <div className="h3">{name}</div>
             <div className="h4">
-              <HexText value={account.address} />
+              <HexText value={account.address} classes="smd-pad-2"/>
             </div>
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
@@ -39,7 +39,7 @@ class Account extends Component {
                 <tbody>
                   <tr>
                     <td><strong>Contract Root</strong></td>
-                    <td>{account.contractRoot}</td>
+                    <td><HexText value={account.contractRoot} classes="smd-pad-2"/></td>
                   </tr>
                   <tr>
                     <td><strong>Kind</strong></td>
@@ -55,7 +55,7 @@ class Account extends Component {
                   </tr>
                   <tr>
                     <td><strong>Code Hash</strong></td>
-                    <td><HexText value={account.codeHash} /></td>
+                    <td><HexText value={account.codeHash} classes="smd-pad-2"/></td>
                   </tr>
                   <tr>
                     <td><strong>Nonce</strong></td>

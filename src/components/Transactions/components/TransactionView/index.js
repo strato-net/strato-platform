@@ -21,7 +21,7 @@ class TransactionView extends Component {
         <div className="row">
           <div className="col-sm-9">
             <div className="h3">
-              <HexText value={hash} />
+              <HexText value={hash} classes="smd-pad-2"/>
             </div>
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
@@ -49,11 +49,11 @@ class TransactionView extends Component {
                 </tr>
                 <tr>
                   <td><strong>From</strong></td>
-                  <td>{tx.from === undefined ? '' : <HexText value={tx.from} />}</td>
+                  <td>{tx.from === undefined ? '' : <HexText value={tx.from} classes="smd-pad-2" />}</td>
                 </tr>
                 <tr>
                   <td><strong>To</strong></td>
-                  <td>{tx.to === undefined ? '' : <HexText value={tx.to} />}</td>
+                  <td>{tx.to === undefined ? '' : <HexText value={tx.to} classes="smd-pad-2" />}</td>
                 </tr>
                 <tr>
                   <td><strong>Block Number</strong></td>
@@ -61,11 +61,11 @@ class TransactionView extends Component {
                 </tr>
                 <tr>
                   <td><strong>R</strong></td>
-                  <td>{tx.r}</td>
+                  <td><HexText value={tx.r} classes="smd-pad-2" /></td>
                 </tr>
                 <tr>
                   <td><strong>S</strong></td>
-                  <td>{tx.s}</td>
+                  <td><HexText value={tx.s} classes="smd-pad-2" /></td>
                 </tr>
                 <tr>
                   <td><strong>Timestamp</strong></td>

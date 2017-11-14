@@ -83,31 +83,19 @@ class BlockView extends Component {
                     <tr>
                       <td>Coinbase</td>
                       <td>
-                        <small>
-                          <Text ellipsize={true}>
-                            {block.blockData.coinbase}
-                          </Text>
-                        </small>
+                        <HexText value={block.blockData.coinbase} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
                       <td>State Root</td>
                       <td>
-                        <small>
-                          <Text ellipsize={true}>
-                            {block.blockData.stateRoot}
-                          </Text>
-                        </small>
+                        <HexText value={block.blockData.stateRoot} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
                       <td>Transactions Root</td>
                       <td>
-                        <small>
-                          <Text ellipsize={true}>
-                            {block.blockData.transactionsRoot}
-                          </Text>
-                        </small>
+                        <HexText value={block.blockData.transactionsRoot} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>

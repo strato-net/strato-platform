@@ -14,17 +14,8 @@ class HexText extends Component {
   render() {
     return (
       <span className="hex-text">
-        <Tooltip
-          content={this.props.value}
-          className={`text-tooltip text-left ${this.props.classes || ''}`}
-          position={Position.TOP}>
-          <Text ellipsize={true}>
-            {this.props.value}
-          </Text>
-        </Tooltip>
         <CopyToClipboard
           text={this.props.value}
-          className='smd-pad-left-2'
           onCopy={() => { this.setState({ copied: true }); }}>
           <span
             onClick={(event) => {
@@ -43,6 +34,14 @@ class HexText extends Component {
             </Tooltip>
           </span>
         </CopyToClipboard>
+        <Tooltip
+          content={this.props.value}
+          className={`text-tooltip text-left ${this.props.classes || ''}`}
+          position={Position.TOP}>
+          <Text ellipsize={true}>
+            {this.props.value}
+          </Text>
+        </Tooltip>
       </span>
     );
   }
