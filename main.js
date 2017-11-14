@@ -7,8 +7,8 @@ global.contractMap = {};
 var scope = {};
 
 init(scope)
-  .then(expressApp())
   .then(consumer.start())
+  .then(expressApp())
   .catch(err => {
     console.log('Failed to launch cirrus', err)
   })
