@@ -67,12 +67,11 @@ pipeline {
             stratoHost=nginx \
             ssl=false \
             docker-compose up -d
-          sleep 32 # wait for cirrus to restart (remove when container dependencies are fixed)
           docker ps
           # Few quick tests
-          curl -f http://localhost/cirrus/search/
+          curl -f http://localhost/cirrus/contract/
           curl -f http://localhost/strato-api/eth/v1.2/stats/difficulty
-          curl -f http://localhost/bloc/v2.2/users
+          curl -f http://localhost/bloc/v2.2/users/
         '''
       }
     }
