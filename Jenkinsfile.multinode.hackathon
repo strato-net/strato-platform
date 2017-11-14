@@ -5,14 +5,18 @@ pipeline {
     stage('Prepare to deploy') {
       steps {
         parallel (
-          "hackathon1": {
-            node('hackathon1') {
+          "hackathon-1": {
+            node('hackathon-1') {
               step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
-                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
                   sh '''#!/bin/bash -le
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  rm -rf silo strato-getting-started || true
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
                   git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                   git clone https://github.com/blockapps/strato-getting-started
@@ -24,14 +28,18 @@ pipeline {
               }
             }
           },
-          "hackathon2": {
-            node('hackathon2') {
+          "hackathon-2": {
+            node('hackathon-2') {
               step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
-                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
                   sh '''#!/bin/bash -le
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  rm -rf silo strato-getting-started || true
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
                   git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                   git clone https://github.com/blockapps/strato-getting-started
@@ -43,14 +51,18 @@ pipeline {
               }
             }
           },
-          "hackathon3": {
-            node('hackathon3') {
+          "hackathon-3": {
+            node('hackathon-3') {
               step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
-                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
                   sh '''#!/bin/bash -le
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
-                  rm -rf silo strato-getting-started || true
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
                   git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
                   git clone https://github.com/blockapps/strato-getting-started
@@ -68,8 +80,8 @@ pipeline {
     stage('Deploy multinode') {
       steps {
         parallel (
-          "hackathon1": {
-            node('hackathon1') {
+          "hackathon-1": {
+            node('hackathon-1') {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
@@ -78,8 +90,8 @@ pipeline {
               '''
             }
           },
-          "hackathon2": {
-            node('hackathon2') {
+          "hackathon-2": {
+            node('hackathon-2') {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
@@ -88,8 +100,8 @@ pipeline {
               '''
             }
           },
-          "hackathon3": {
-            node('hackathon3') {
+          "hackathon-3": {
+            node('hackathon-3') {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
