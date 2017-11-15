@@ -162,9 +162,6 @@ deployments:
     ref: master
     compose:
       restart: always
-      volumes:
-        - /etc/ssl/private:/etc/ssl/private
-        - /etc/ssl/certs:/etc/ssl/certs
       ports:
         - "443:443"
         - "80:80"
