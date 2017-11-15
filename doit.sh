@@ -81,9 +81,7 @@ function doInit {
   echo $cmd
   $cmd
 
-  if $noMinPeers
-  then sed -i 's/minAvailablePeers:.*/minAvailablePeers: 0/' .ethereumH/ethconf.yaml
-  fi
+  sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
 
   cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
 
@@ -161,7 +159,7 @@ setEnv lazyBlocks true
 setEnv serveBlocks true
 setEnv receiveBlocks true
 setEnv addBootnodes false
-setEnv noMinPeers false
+setEnv numMinPeers 0
 setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 20
