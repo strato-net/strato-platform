@@ -234,10 +234,10 @@ defaultPeers =
     --("13.66.55.198", 30303),    -- cd-multinode-2.southcentralus.cloudapp.azure.com
     --("40.74.251.127", 30303),   -- cd-multinode-3.southcentralus.cloudapp.azure.com
     ("40.69.163.183", 30303),     -- hackathon-1.centralus.cloudapp.azure.com
-    ("40.69.163.139", 30303),     -- hackathon-2.centralus.cloudapp.azure.com
+    --("40.69.163.139", 30303),     -- hackathon-2.centralus.cloudapp.azure.com
     ("40.69.166.194", 30303),     -- hackathon-3.centralus.cloudapp.azure.com
-    ("52.173.198.148", 30303),    -- hackathon-4.centralus.cloudapp.azure.com
-    ("52.173.83.186", 30303)      -- hackathon-5.centralus.cloudapp.azure.com
+    --("52.173.198.148", 30303),    -- hackathon-4.centralus.cloudapp.azure.com
+    --("52.173.83.186", 30303)      -- hackathon-5.centralus.cloudapp.azure.com
   ]
 
 createKafkaTopic  ::  TopicName -> IO ()
