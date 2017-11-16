@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BlockApps.Bloc22.Database.Solc (compileSolc) where
+module BlockApps.Bloc22.Database.Solc (compileSolc, addGetSourceFuncToSource) where
 
 import           Control.Monad              hiding (mapM_)
-import           Data.Aeson
+import           Data.Aeson hiding (String)
+import Data.Monoid ((<>))
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
@@ -27,7 +29,11 @@ import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
 
+
 import BlockApps.Bloc22.Monad
+import           BlockApps.Solidity.Xabi
+import BlockApps.Solidity.Parse.Parser
+import BlockApps.Solidity.Xabi.Type
 
 -- Query parameters allowed:
 --   src: solidity source code to be compiled, as a (url-encoded) string
@@ -189,3 +195,61 @@ getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 --  let mainFiles = maybe mainFiles0 (\s -> Map.insert "src" s mainFiles0) $
 --                  Map.lookup "src" postParams
 --  return (postParams, mainFiles, importFiles)
+
+
+addGetSourceFuncToSource :: Text -> Either String Text
+addGetSourceFuncToSource src = do
+  -- Supply empty string for parser as it's only used for error reporting
+  fileContents <- parseXabi "" (unpack src)
+  let singleLineSrc = Text.concat . Text.lines $ src
+      modifiedContents = List.map (fmap $ addFunction ("__getSource__", "return \"" <> unpack singleLineSrc <> "\";")) fileContents
+  return . pack . unparse $ modifiedContents
+
+
+unparse :: [(Text, Xabi)] -> String
+unparse contracts = List.concat $ List.map unparseContract contracts
+
+unparseContract :: (Text, Xabi) -> String
+unparseContract (name, contract) =
+     "contract "
+  <> Text.unpack name
+  <> "{"
+  <> List.concat (List.map ((" " <>) . unparseVar) (Map.toList $ xabiVars contract))
+  <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
+  <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
+  <> "}"
+  
+unparseVar :: (Text, VarType) -> String
+unparseVar (name, theType) =
+     unparseVarType theType
+  <> " "
+  <> Text.unpack name
+  <> ";"
+
+unparseVarType :: VarType -> String
+unparseVarType VarType{varTypeType = Int (Just True) _} = "int"
+unparseVarType VarType{varTypeType = Int (Just False) _} = "uint"
+unparseVarType VarType{varTypeType = String _} = "string"
+unparseVarType _ = "int"
+
+unparseFunc :: (Text, Func) -> String
+unparseFunc (name, Func{..}) = Text.unpack $
+     "function "
+  <> name
+  <> "("
+  <> intercalate ", " (List.map unparseArgs (Map.toList funcArgs)) <> ") {"
+  <> (Text.concat . Text.lines $ funcContents)
+  <> "}"
+
+unparseArgs :: (Text, IndexedType) -> Text
+unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
+
+unparseIndexedType :: IndexedType -> Text
+-- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
+unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
+unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
+unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
+unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
+
+addFunction :: (Text, String) -> Xabi -> Xabi
+addFunction (name, contents) c = c{xabiFuncs=Map.insert name (Func Map.empty Map.empty (pack contents)) $ xabiFuncs c}

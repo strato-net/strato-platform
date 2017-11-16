@@ -641,7 +641,36 @@ getXabiFunctionsQuery cmId = do
         | val <- valList
         ]
     vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
-    return $ Func args vals
+    return $ Func args vals ""
+    
+{- |
+SELECT
+  XF.id
+ ,XF.name
+ ,XF.selector
+FROM xabi_functions XF
+WHERE XF.is_constructor = false AND XF.contract_metadata_id = $1;
+-}
+getXabiConstrQuery :: HasCallStack =>
+                         Int32 -> Bloc (Map Text Func)
+getXabiConstrQuery cmId = do
+  funcsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+    (xfId,contractmetadataId,isConstr,name) <-
+      queryTable xabiFunctionsTable -< ()
+    restrict -< contractmetadataId .== constant cmId .&& isConstr
+    returnA -< (name,xfId)
+  if (length funcsWithIds /= 1)
+    then return Map.empty
+    else do
+      let (fname,xfId) = head . Map.toList $ funcsWithIds
+      args <- getXabiFunctionsArgsQuery xfId
+      let
+        valMap valList = Map.fromList
+          [ ( "#" <> Text.pack (show (Xabi.indexedTypeIndex val)), val)
+          | val <- valList
+          ]
+      vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
+      return $ Map.singleton fname (Func args vals "")
 
 getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
 getXabiFunctionNamesQuery metadataId = proc () -> do
@@ -650,17 +679,6 @@ getXabiFunctionNamesQuery metadataId = proc () -> do
   restrict -< cmid .== constant metadataId .&& Opaleye.not isc
   returnA -< name
 
-{- |
-SELECT XF.id
-FROM xabi_functions XF
-WHERE XF.is_constructor = true AND XF.contract_metadata_id = $1;
--}
-getXabiConstrQuery :: Int32 -> Query (Column PGInt4)
-getXabiConstrQuery cmId = proc () -> do
-  (xfId,contractmetadataId,isConstr,_) <-
-    queryTable xabiFunctionsTable -< ()
-  restrict -< contractmetadataId .== constant cmId .&& isConstr
-  returnA -< xfId
 
 {- |
 SELECT
@@ -691,7 +709,7 @@ getXabiFunctionsArgsQuery funcId = do
   for argsWithIds $ \ (index,tyid) -> do
     ty <- getXabiType tyid
     return $ Xabi.IndexedType index ty
-
+    
 {- |
 SELECT
   (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name
@@ -956,7 +974,7 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
 insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
-  insertXabiConstr metadataId contractName xabiConstr
+  insertXabiConstr metadataId contractName (funcArgs $ xabiConstr Map.! contractName)
   void $ insertXabiVariables metadataId xabiVars
   void $ insertXabiTypeDefs metadataId xabiTypes
 
@@ -1362,10 +1380,7 @@ insertXabiTypeDefs metadataId typeDefs = do
 getContractXabiByMetadataId :: HasCallStack => Int32 -> Bloc Xabi
 getContractXabiByMetadataId metadataId = do
   funcs <- getXabiFunctionsQuery metadataId
-  constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
-  constr <- case constrIdMaybe of
-    Nothing -> return Map.empty
-    Just constrId -> getXabiFunctionsArgsQuery constrId
+  constr <- getXabiConstrQuery metadataId
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId
   return $ Xabi funcs constr vars typeDefs
@@ -1377,14 +1392,7 @@ getContractXabi (ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-  funcs <- getXabiFunctionsQuery metadataId
-  constrIdMaybe <- blocQueryMaybe $ getXabiConstrQuery metadataId
-  constr <- case constrIdMaybe of
-    Nothing       -> return Map.empty
-    Just constrId -> getXabiFunctionsArgsQuery constrId
-  vars <- getXabiVariablesQuery metadataId
-  typeDefs <- getXabiTypeDefs metadataId
-  return $ Xabi funcs constr vars typeDefs
+  getContractXabiByMetadataId metadataId 
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = blocTransaction $ do

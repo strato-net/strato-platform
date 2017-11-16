@@ -30,7 +30,7 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
 data Xabi = Xabi
   { xabiFuncs  :: Map Text Func
-  , xabiConstr :: Map Text Xabi.IndexedType
+  , xabiConstr :: Map Text Func
   , xabiVars   :: Map Text Xabi.VarType
   , xabiTypes  :: Map Text Xabi.Def
   } deriving (Eq,Show,Generic)
@@ -57,8 +57,14 @@ instance ToSchema Xabi where
       sampleXabi :: Xabi
       sampleXabi = Xabi
         { xabiFuncs = Map.fromList
-          [ ("get", Func {funcArgs = Map.fromList [], funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]})
-          , ("set", Func {funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})], funcVals = Map.fromList []})
+          [ ("get", Func { funcArgs = Map.fromList []
+                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcContents = "return x; "
+                         })
+          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcVals = Map.fromList []
+                         , funcContents = "return; "
+                         })
           ]
         , xabiConstr = Map.fromList []
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
@@ -69,6 +75,7 @@ instance ToSchema Xabi where
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
   , funcVals :: Map Text Xabi.IndexedType
+  , funcContents :: Text
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Func where
@@ -89,6 +96,7 @@ instance ToSchema Func where
       ex = Func
         { funcArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , funcContents = "return userAddress;"
         }
 
 
@@ -156,8 +164,14 @@ instance ToSchema ContractDetails where
       sampleXabi :: Xabi
       sampleXabi = Xabi
         { xabiFuncs = Map.fromList
-          [ ("get", Func {funcArgs = Map.fromList [], funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]})
-          , ("set", Func {funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})], funcVals = Map.fromList []})
+          [ ("get", Func { funcArgs = Map.fromList []
+                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcContents = "return x; "
+                         })
+          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcVals = Map.fromList []
+                         , funcContents = "return; "
+                         })
           ]
         , xabiConstr = Map.fromList []
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]

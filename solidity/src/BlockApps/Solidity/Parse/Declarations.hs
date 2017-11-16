@@ -7,7 +7,7 @@ module BlockApps.Solidity.Parse.Declarations (solidityContract) where
 
 --import Data.Either
 import           Data.List
-import qualified Data.Map                             as Map
+import qualified Data.Map as Map
 --import Data.Map (Map)
 import           Data.Maybe
 import           Data.Text                            (Text)
@@ -52,9 +52,13 @@ solidityContract = do
     (
       Text.pack contractName',
       (
-        Xabi{
-           xabiFuncs = Map.delete (Text.pack contractName') allFunctions
-           , xabiConstr = maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
+        Xabi { xabiFuncs = Map.delete (Text.pack contractName') allFunctions
+             , xabiConstr = if Map.member (Text.pack contractName') allFunctions
+                            then Map.singleton
+                                 (Text.pack contractName')
+                                 (allFunctions Map.! (Text.pack contractName'))
+                            else Map.empty
+               -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
            , xabiVars =
                 Map.fromList $
                 zipWith (\(v, isPublic) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing)) v)
@@ -214,7 +218,7 @@ functionDeclaration = do
   -- TODO - deal with funcitonVisible
   (functionRet, _, _, _) <- functionModifiers
 --  functionBody <- bracedCode <|> (semi >> return "")
-  _ <- bracedCode <|> (semi >> return "")
+  contents <- bracedCode <|> (semi >> return "")
   --TODO - deal with contractName
 --  contractName' <- getContractName
   _ <- getContractName
@@ -235,6 +239,7 @@ functionDeclaration = do
       , Xabi.funcVals =
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
+      , Xabi.funcContents = Text.pack contents
 
 
 --    objName = functionName,
