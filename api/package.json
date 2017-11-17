@@ -43,6 +43,7 @@
     "sequelize": "4.13.5",
     "sequelize-cli": "3.0.0",
     "serve-favicon": "2.4.5",
+    "socket.io": "^2.0.4",
     "winston-color": "1.0.0"
   },
   "devDependencies": {

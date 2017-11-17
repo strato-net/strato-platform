@@ -8,6 +8,7 @@ var app = require('../app');
 var debug = require('debug')('auth-service:server');
 var http = require('http');
 const co = require('co');
+var sockets = require('../lib/sockets')
 
 // const models = require("../models");
 // const createInitialData = require("../migrations/init-script/init");
@@ -26,6 +27,11 @@ app.set('port', port);
  */
 
 var server = http.createServer(app);
+
+/**
+ * Create Socket server
+ */
+sockets.init(server);
 
 co(function*(){
   // TODO: uncomment the sync block when DB connection is needed
