@@ -223,6 +223,7 @@ defaultConfig =
 defaultPeers :: [(String,Int)]
 defaultPeers =
   [
+    --("127.0.0.1", 30303),
     --("52.87.251.111", 30303),   -- stratodev.blockapps.net
     --("40.71.168.16", 30303),    -- silo1a.eastus.cloudapp.azure.com
     --("40.121.204.153", 30303),  -- silo3.eastus.cloudapp.azure.com
@@ -236,8 +237,7 @@ defaultPeers =
     --("40.69.163.139", 30303),   -- hackathon-2.centralus.cloudapp.azure.com
     --("40.69.166.194", 30303),   -- hackathon-3.centralus.cloudapp.azure.com
     --("52.173.198.148", 30303),  -- hackathon-4.centralus.cloudapp.azure.com
-    --("52.173.83.186", 30303),   -- hackathon-5.centralus.cloudapp.azure.com
-    ("127.0.0.1", 30303)
+    --("52.173.83.186", 30303)   -- hackathon-5.centralus.cloudapp.azure.com
   ]
 
 createKafkaTopic  ::  TopicName -> IO ()
@@ -387,9 +387,6 @@ oneTimeSetup genesisBlockName = do
       currPath <- getCurrentDirectory
 
       _ <- insertBlockchain pgConnGlobal currPath uniqueString
-
-      encodeFile (".ethereumH" </> "ethconf.yaml") cfg'
-      encodeFile (".ethereumH" </> "peers.yaml") defaultPeers
 
       {- CONFIG: Create the local database -}
 
