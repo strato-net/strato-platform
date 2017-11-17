@@ -117,7 +117,7 @@ deployments:
         statsFlush: "${statsFlush}"
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
-        noMinPeers: "${noMinPeers:-false}"
+        numMinPeers: "${numMinPeers}"
         mineBlocks: "${mineBlocks:-true}"
       links:
         - zookeeper
@@ -133,6 +133,7 @@ deployments:
   - name: postgres-cirrus
     compose:
       image: postgres:9.6
+      restart: always
       environment:
         POSTGRES_DB: cirrus
         POSTGRES_USER: postgres
@@ -152,10 +153,13 @@ deployments:
         PG_PORT_5432_TCP_PORT: "5432"
 
   - name: postgres
-    repo: https://github.com/blockapps/postgres-packager.git
-    ref: master
     compose:
+      image: postgres:9.6
       restart: always
+      volumes:
+      - ./pgdata:/var/lib/postgresql/data
+      environment:
+        POSTGRES_PASSWORD: api
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
