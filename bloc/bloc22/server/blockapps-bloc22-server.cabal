@@ -70,6 +70,7 @@ library
                , QuickCheck
                , quickcheck-instances
                , relapse
+               , resource-pool
                , saltine
                , secp256k1
                , servant

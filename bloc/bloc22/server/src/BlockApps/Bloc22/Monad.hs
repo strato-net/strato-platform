@@ -11,6 +11,7 @@ module BlockApps.Bloc22.Monad where
 
 
 import           Control.Exception.Lifted           hiding (Handler, handle)
+import Data.Pool (Pool, withResource)
 import           Control.Monad.Base
 import           Control.Monad.Except
 import           Control.Monad.Log                  hiding (Handler)
@@ -53,6 +54,7 @@ newtype Bloc x = Bloc
   , MonadLog (WithSeverity (WithCallStack (WithTimestamp Text)))
   )
 
+
 instance MonadError BlocError Bloc where
   throwError err@(RuntimeError _) = do
     logWith logError (Text.pack $ formatError err ++ "\n  callstack missing for runtime errors")
@@ -94,7 +96,7 @@ data BlocEnv = BlocEnv
   { urlStrato    :: BaseUrl
   , urlCirrus    :: BaseUrl
   , httpManager  :: Manager
-  , dbConnection :: Connection
+  , dbPool       :: Pool Connection
   , logLevel     :: Severity
   }
 
@@ -270,8 +272,8 @@ blocQuery
   -> Bloc [y]
 blocQuery q = do
   traverse_ (logWithCallStack callStack logNotice . Text.pack) (showSql q)
-  conn <- asks dbConnection
-  liftIO $ runQuery conn q
+  pool <- asks dbPool
+  withResource pool $ (\conn -> liftIO $ runQuery conn q)
 
 blocQueryMaybe
   :: (HasCallStack, Default Unpackspec x x, Default QueryRunner x y)
@@ -294,14 +296,12 @@ blocQuery1 q = blocQuery q >>= \case
 blocModify :: HasCallStack => (Connection -> IO x) -> Bloc x
 blocModify modify = do
   logWithCallStack callStack logNotice "Updating the database"
-  conn <- asks dbConnection
-  liftIO $ modify conn
-
+  pool <- asks dbPool
+  withResource pool $ (\conn -> liftIO $ modify conn)
 blocModify1 :: HasCallStack => (Connection -> IO [x]) -> Bloc x
 blocModify1 modify = do
   logWithCallStack callStack logNotice "Updating the database"
-  conn <- asks dbConnection
-  results <- liftIO $ modify conn
+  results <- blocModify modify
   case results of
     []    -> throwError $ DBError "No result, expected one row"
     [y]   -> return y
@@ -309,8 +309,8 @@ blocModify1 modify = do
 
 blocTransaction :: Bloc x -> Bloc x
 blocTransaction bloc = do
-  conn <- asks dbConnection
-  liftBaseOp_ (withTransaction conn) bloc
+  pool <- asks dbPool
+  withResource pool $ (\conn -> liftBaseOp_ (withTransaction conn) bloc)
 
 blocStrato :: HasCallStack => ClientM x -> Bloc x
 blocStrato client' = do
