@@ -74,6 +74,7 @@ AddressStateRef
     code BS.ByteString
     codeHash SHA
     latestBlockDataRefNumber Integer
+    source String
     deriving Eq Read Show
 
 RawTransaction
