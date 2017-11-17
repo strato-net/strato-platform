@@ -224,20 +224,7 @@ defaultPeers :: [(String,Int)]
 defaultPeers =
   [
     --("127.0.0.1", 30303),
-    --("52.87.251.111", 30303),   -- stratodev.blockapps.net
-    --("40.71.168.16", 30303),    -- silo1a.eastus.cloudapp.azure.com
-    --("40.121.204.153", 30303),  -- silo3.eastus.cloudapp.azure.com
-    --("40.76.17.40", 30303),     -- p2p-n0.eastus.cloudapp.azure.com
-    --("13.72.79.3", 30303),      -- p2p-n1.eastus.cloudapp.azure.com
-    --("40.76.29.122", 30303),    -- p2p-n2.eastus.cloudapp.azure.com
-    --("13.84.167.234", 30303),   -- cd-multinode-1.southcentralus.cloudapp.azure.com
-    --("13.66.55.198", 30303),    -- cd-multinode-2.southcentralus.cloudapp.azure.com
-    --("40.74.251.127", 30303),   -- cd-multinode-3.southcentralus.cloudapp.azure.com
-    --("40.69.163.183", 30303),   -- hackathon-1.centralus.cloudapp.azure.com
-    --("40.69.163.139", 30303),   -- hackathon-2.centralus.cloudapp.azure.com
-    --("40.69.166.194", 30303),   -- hackathon-3.centralus.cloudapp.azure.com
-    --("52.173.198.148", 30303),  -- hackathon-4.centralus.cloudapp.azure.com
-    --("52.173.83.186", 30303)   -- hackathon-5.centralus.cloudapp.azure.com
+    --("52.87.251.111", 30303)   -- stratodev.blockapps.net
   ]
 
 createKafkaTopic  ::  TopicName -> IO ()
