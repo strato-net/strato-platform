@@ -32,11 +32,11 @@ import           Blockchain.Mining.Instant
 import           Blockchain.Mining.Normal
 import           Blockchain.Mining.Options
 import           Blockchain.Mining.SHA
-import           Blockchain.P2PRPC
 import           Blockchain.Sequencer.Event
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.Raw          (setDefaultKafkaState)
 import           Blockchain.Stream.UnminedBlock
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Executable.AditM
 
 lookupMiner :: MinerType -> Miner
@@ -90,14 +90,13 @@ doConsume :: Offset -> TMVar Block -> AditM ()
 doConsume offset c = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
-    numPeers <- liftIO $ getNumPeersIO "localhost" clientCommPort
+    numPeers <- liftIO $ getActivePeers >>= return . length
     forM_ blocks $ \b -> do
         if flags_useSyncMode
-          then case numPeers of
-            Left err -> $logInfoS "doConsume" . T.pack $ "Not mining because couldn't get # of client peers: " ++ show err
-            Right count -> if count < flags_minQuorumSize
-                             then $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ (show count) ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
-                             else doMineThingy b
+          then
+            if numPeers < flags_minQuorumSize
+              then $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ (show numPeers) ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
+              else doMineThingy b
           else doMineThingy b
     doConsume (offset + fromIntegral (length blocks)) c
     where doMineThingy b = do
