@@ -9,6 +9,12 @@ metadata:
   hooks:
     init: "#include basil_extensions.js"
 
+volumes:
+  dapps:
+    driver: local
+  pgdata:
+    driver: local
+
 deployments:
   - name: smd-ui
     repo: https://github.com/blockapps/smd-ui.git
@@ -39,7 +45,7 @@ deployments:
         - cirrus
         - postgres
       volumes:
-        - ./dapps:/usr/src/app/apps
+        - dapps:/usr/src/app/apps
       environment:
         NODE_HOST: "${NODE_HOST}"
         SINGLE_NODE: "${SINGLE_NODE}"
@@ -157,7 +163,7 @@ deployments:
       image: postgres:9.6
       restart: always
       volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
       environment:
         POSTGRES_PASSWORD: api
 
