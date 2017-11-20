@@ -52,9 +52,7 @@ function startCirrus() {
           .then(_ => {
             console.log("done creating new table for contract")
             console.log('Resetting the offset for kafka');
-            return consumer.resetOffset()(scope);
-          })
-          .then(scope => {
+            consumer.resetOffset(scope);
             res.send(schema)
             next();
           })

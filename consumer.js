@@ -71,16 +71,8 @@ function start() {
   }
 }
 
-function resetOffset() {
-  return function(scope) {
-    // look at source in kafka-node/lib/consumer.js
-    const topics = {
-      [scope.kafkaTopic]: [0]
-    }
-
-    scope.consumer.updateOffsets(topics);
-    return scope;
-  }
+function resetOffset(scope) {
+  scope.consumer.setOffset(scope.kafkaTopic, 0, 0);
 }
 
 function consumeMessage(m) {
