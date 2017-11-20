@@ -44,6 +44,7 @@ library
                        blockapps-milena,
                        lens,
                        ethereum-rlp,
+                       ethereum-discovery,
                        resourcet,
                        time,
                        base16-bytestring,

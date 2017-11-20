@@ -107,6 +107,7 @@ library
                  , entropy
                  , esqueleto                
                  , ethereum-rlp
+                 , ethereum-discovery 
                  , fast-logger                   >= 2.2        
                  , file-embed
                  , filepath

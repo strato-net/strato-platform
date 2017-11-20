@@ -34,11 +34,10 @@ import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer
 
 runEthServer :: (MonadResource m, MonadIO m, MonadBaseControl IO m, MonadLogger m)
-             => TVar (S.Set ConnectedPeer)
-             -> PrivateNumber
+             => PrivateNumber
              -> Int
              -> m ()
-runEthServer connectedPeers myPriv listenPort = do
+runEthServer myPriv listenPort = do
   ctx <- initContext
   let myPubkey = calculatePublic theCurve myPriv
   void . runContextM ctx . runGeneralTCPServer (serverSettings listenPort "*") $ \app -> do
@@ -48,24 +47,23 @@ runEthServer connectedPeers myPriv listenPort = do
         $logErrorS "runEthServer" . T.pack $ "Didn't see peer in discovery at IP " ++ show theSockAddr ++ ". rejecting violently."
         liftIO (appCloseConnection app)
       Just peer -> do
-        let unwrappedPeer  = SQL.entityVal peer
-            cp             = ConnectedPeer unwrappedPeer
-        case pPeerPubkey unwrappedPeer of
+        let p  = SQL.entityVal peer
+        case pPeerPubkey p of
           Nothing -> do
             $logErrorS "runEthServer" . T.pack $ "Didn't get pubkey during discovery for peer " ++ show theSockAddr  ++ ". rejecting violently."
             liftIO (appCloseConnection app)
           Just otherPubKey -> do
-            void $ modifyTVar connectedPeers (S.insert cp)
+            void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) 1
             (_, (outCtx, inCtx)) <- liftIO $ appSource app $$+ ethCryptAccept myPriv otherPubKey `fuseUpstream` appSink app
             !eventSource <- mkEthP2PEventSource app inCtx []
             let !eventSink = mkEthP2PEventConduit (show $ appSockAddr app) outCtx
             (attempt :: Either SomeException ()) <- try $
                         eventSource
-                          =$= handleMsgServerConduit myPubkey unwrappedPeer
+                          =$= handleMsgServerConduit myPubkey p
                           =$= eventSink
                            $$ appSink app
 
-            void $ modifyTVar connectedPeers (S.delete cp)
+            void . liftIO $ setPeerActiveState (pPeerIp p) (pPeerTcpPort p) 0
             case attempt of
               Right () -> $logDebugS "runEthServer" "Peer ran successfully!"
               Left err -> $logErrorS "runEthServer" . T.pack $ "Peer did not run successfully: " ++ show err
@@ -73,12 +71,8 @@ runEthServer connectedPeers myPriv listenPort = do
 stratoP2PServer :: LoggingT IO ()
 stratoP2PServer = do
   let PrivKey myPriv = privKey ethConf
-  connectedPeers <- newTVar S.empty
 
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ (flags_address)
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ (show flags_listen)
-  $logInfoS "stratoP2PClient" $ T.pack $ "serverCommPort: " ++ show serverCommPort
 
-  void . liftIO . forkIO $ runStratoP2PComm serverCommPort connectedPeers
-  void . runResourceT $ runEthServer connectedPeers myPriv flags_listen
-
+  void . runResourceT $ runEthServer myPriv flags_listen
