@@ -73,22 +73,13 @@ function start() {
 
 function resetOffset() {
   return function(scope) {
-    const topicsToRemove = [scope.kafkaTopic];
-    const topics = [{
-      topic:scope.kafkaTopic,
-      offset:0
-    }];
-    return scope.consumer.removeTopicsAsync(topicsToRemove)
-      .then( _ => {
-        return scope.consumer.addTopics(topics, function (err, removed) {}, true);
-      })
-      .then( _ => {
-        return scope;
-      })
-      .catch(err => {
-        throw new Error(err);
-      })
+    // look at source in kafka-node/lib/consumer.js
+    const topics = {
+      [scope.kafkaTopic]: [0]
+    }
 
+    scope.consumer.updateOffsets(topics);
+    return scope;
   }
 }
 
