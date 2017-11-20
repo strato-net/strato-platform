@@ -8,4 +8,6 @@ const Block = sequelize.define('block', {
   block_uncles: {
     type: Sequelize.CHAR
   }
-});
+},
+  { freezeTableName: true }
+);
