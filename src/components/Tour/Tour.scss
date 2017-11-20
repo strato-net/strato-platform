@@ -1,1 +1,11 @@
 @import "../../../node_modules/react-joyride/lib/react-joyride.scss";
+
+.joyride-tooltip {
+  background-color: #394b59 !important;
+  border-radius: 4px;
+  color: #fff;
+  }
+
+.joyride-tooltip__header {
+  color: #fff !important;
+  }

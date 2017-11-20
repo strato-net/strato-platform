@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {fetchAccounts, changeAccountFilter, faucetRequest} from './accounts.actions';
+import {fetchAccounts, changeAccountFilter} from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import {connect} from 'react-redux';
 import {Text, Tooltip, Position} from '@blueprintjs/core';
@@ -7,34 +7,31 @@ import {withRouter} from 'react-router-dom';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
-import {endTour} from '../Tour/tour.actions';
-import HexText from '../HexText';
-// import { callAfterTour } from '../Tour/tour.helpers';
 
-// import Tour from '../Tour';
+import Tour from '../Tour';
 
-// const tourSteps = [
-// /* {
-//     title: 'Create User',
-//     text: 'Create a user here',
-//     selector: '#accounts-create-user-button',
-//     position: 'bottom', type: 'hover',
-//     isFixed: true,
-//   }, ) */
-//   {
-//     title: 'Upload a Smart Contract',
-//     text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your Smart Contract from within the STRATO dashboard.',
-//    /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
-//     selector: '#contracts',
-//     position: 'bottom',
-//     isFixed: true,
-//   },
-// ];
+const tourSteps = [
+/* {
+    title: 'Create User',
+    text: 'Create a user here',
+    selector: '#accounts-create-user-button',
+    position: 'bottom', type: 'hover',
+    isFixed: true,
+  }, ) */
+  {
+    title: 'Upload a Smart Contract',
+    text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your Smart Contract from within the STRATO dashboard.',
+   /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
+    selector: '#contracts',
+    position: 'bottom',
+    isFixed: true,
+  },
+];
 
 class Accounts extends Component {
 
   componentDidMount() {
-    this.props.fetchAccounts(true, true);
+    this.props.fetchAccounts();
     mixpanelWrapper.track('accounts_page_load')
   }
 
@@ -49,7 +46,6 @@ class Accounts extends Component {
     const accounts = this.props.accounts;
     const filter = this.props.filter;
     const history = this.props.history;
-    const faucetRequest = this.props.faucetRequest;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
 
@@ -75,31 +71,21 @@ class Accounts extends Component {
           }
           rows.push(
             <tr key={address} onClick={(e) => handleClick(user, address)}>
-              <td>
-                <button
-                  className="pt-button pt-intent-primary pt-small"
-                  onClick={(e) =>
-                    {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      faucetRequest(user, address);
-                    }
-                  }
-                >
-                  Faucet
-                </button>
-              </td>
-              <td>
+              <td width="33%">
                 <Text ellipsize={true}>
                   <Tooltip tooltipClassName="smd-padding-8" content={user} position={Position.TOP_LEFT}>
                     <small>{user}</small>
                   </Tooltip>
                 </Text>
               </td>
-              <td>
-                <HexText value={address} classes="small smd-pad-4" />
+              <td width="33%">
+                <Text ellipsize={true}>
+                  <Tooltip tooltipClassName="smd-padding-8" content={address} position={Position.TOP_LEFT}>
+                    <small>{address}</small>
+                  </Tooltip>
+                </Text>
               </td>
-              <td>
+              <td width="33%">
                 <Text ellipsize={true}>
                   <Tooltip tooltipClassName="smd-padding-8" content={accounts[user][address].balance} position={Position.TOP_LEFT}>
                     <small>{accounts[user][address].balance} wei</small>
@@ -114,18 +100,12 @@ class Accounts extends Component {
 
     return (
       <div className="container-fluid pt-dark">
-        {/*
-        <Tour name="accounts" steps={tourSteps} callback={ callAfterTour('#contracts', () => {
-            this.props.history.push('contracts');
-            this.props.endTour('accounts');
-          })}
-        />
-        */}
+        <Tour name="accounts" steps={tourSteps}  finalStepSelector='#contracts' nextPage='contracts' />
         <div className="row">
-          <div className="col-sm-4 text-left">
+          <div className="col-sm-8 text-left">
             <h3>Accounts</h3>
           </div>
-          <div className="col-sm-8 text-right">
+          <div className="col-sm-4 text-right">
             <div className="pt-button-group">
               <SendEther/>
               <CreateUser />
@@ -154,15 +134,14 @@ class Accounts extends Component {
               <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed', width: '100%'}}>
                 <thead>
                 <tr>
-                  <th></th>
-                  <th><h4>Username</h4></th>
-                  <th><h4>Account</h4></th>
-                  <th><h4>Balance</h4></th>
+                  <th width="33%"><h4>Username</h4></th>
+                  <th width="33%"><h4>Account</h4></th>
+                  <th width="33%"><h4>Balance</h4></th>
                 </tr>
                 </thead>
 
                 <tbody>
-                  {rows.length === 0 ? <tr><td colSpan={3}>No Accounts</td></tr> : rows}
+                {rows.length === 0 ? <tr><td colSpan={3}>No Accounts</td></tr> : rows}
                 </tbody>
               </table>
             </div>
@@ -191,8 +170,6 @@ export default withRouter(
     {
       fetchAccounts,
       changeAccountFilter,
-      endTour,
-      faucetRequest
     }
   )(Accounts)
 );
