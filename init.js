@@ -68,11 +68,8 @@ function fetchABIs() {
       })
       .catch(function(error) {
         console.log('postgrest failed to obtain ABIs error ', error.message);
-        if(error.message.includes('ECONNREFUSED')) {
-          console.log("Restarting, awaiting ");
-          process.exit(1);
-        }
-        return scope;
+        console.log("Restarting, awaiting ");
+        process.exit(1);
       });
   }
 }
