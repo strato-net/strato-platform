@@ -22,7 +22,7 @@ const Peers = db.sequelize.define('p_peer', {
   last_msg_time: {
     //timestamp with time zone
     type: db.Sequelize.DATE
-  }, 
+  },
   enable_time: {
     //timestamp with time zone
     type: db.Sequelize.DATE
@@ -31,7 +31,7 @@ const Peers = db.sequelize.define('p_peer', {
     //timestamp with time zone
     type: db.Sequelize.DATE
   },
-  last_total_difficulty:{
+  last_total_difficulty: {
     // character varying
     type: db.Sequelize.CHAR
   },
@@ -39,7 +39,7 @@ const Peers = db.sequelize.define('p_peer', {
     // character varying
     type: db.Sequelize.CHAR
   },
-  bond_state:{
+  bond_state: {
     // bigint
     type: db.Sequelize.BIGINT
   },

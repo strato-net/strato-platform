@@ -13,7 +13,3 @@ const Block = db.sequelize.define('block', {
 }, { freezeTableName: true, timestamps: false });
 
 module.exports = Block;
-
-// Block.findAll({raw: true}).then(blocks => {
-//   console.log(blocks)
-// })

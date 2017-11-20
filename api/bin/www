@@ -9,8 +9,7 @@ var debug = require('debug')('auth-service:server');
 var http = require('http');
 const co = require('co');
 
-require('../sockets/initSocket')
-const sockets = require('../sockets/connect/sockets');
+const sockets = require('../sockets/init');
 
 // const models = require("../models");
 // const createInitialData = require("../migrations/init-script/init");
