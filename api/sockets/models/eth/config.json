@@ -2,7 +2,7 @@
   "development": {
     "username": "postgres",
     "password": "api",
-    "database": "eth_ddf654f225d406744c664bc536f6ad78e14886e8",
+    "database": "eth_8e3585cbe0e12910b0c51e8f87334d5b3bb11c70",
     "host": "localhost",
     "port": "5432",
     "dialect": "postgres"
