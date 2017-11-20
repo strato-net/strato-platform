@@ -19,6 +19,8 @@ import PieChart from '../PieChart';
 
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
+import io from 'socket.io-client'
+let socket = io(`http://localhost:3001`)
 
 /*const tourSteps = [
   {
@@ -40,6 +42,10 @@ import { hideLoading } from 'react-redux-loading-bar';
 class Dashboard extends Component {
 
   componentDidMount() {
+    socket.emit(`SUBSCRIBE/LAST_BLOCK_NUMBER`,'message')
+    socket.on(`EVENT_LAST_BLOCK_NUMBER`, data => {
+      console.log('Socket Data:',data)
+    })
     this.props.fetchBlockData();
     this.props.fetchAccounts(false, false);
     this.props.fetchContracts();
