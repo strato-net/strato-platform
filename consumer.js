@@ -75,17 +75,11 @@ function resetOffset() {
   return function(scope) {
     // look at source in kafka-node/lib/consumer.js
     const topics = {
-      [scope.kafkaTopic]: [-1]
+      [scope.kafkaTopic]: [0]
     }
 
-    return scope.consumer.updateOffsets(topics)
-      .then( _ => {
-        return scope;
-      })
-      .catch(err => {
-        throw new Error(err);
-      })
-
+    scope.consumer.updateOffsets(topics);
+    return scope;
   }
 }
 
