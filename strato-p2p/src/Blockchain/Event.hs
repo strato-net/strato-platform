@@ -144,31 +144,24 @@ handleEvents mode peer = awaitForever $ \case
         $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
 
-    MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> case dir of
-        Reverse -> do
-            maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader start
-            case maybeHeader of
-                Nothing    -> yield (BlockBodies [])
-                Just head' -> do
-                    let hash' = blockHeaderHash head'
-                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain hash' max'
-                    yield . BlockHeaders . skipEntries skip' $ snd <$> chain
-        Forward -> do
-            headers <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start max'
-            yield . BlockHeaders . skipEntries skip' $ snd <$> headers
+    MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
+      start' <- case dir of
+        Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
+        Forward -> return start
+      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+      yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
-    MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> case dir of
-        Reverse -> do
-            headers <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain start max'
-            yield . BlockHeaders . skipEntries skip' $ snd <$> headers
-        Forward -> do
-            maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
-            case maybeHeader of
-                Nothing    -> yield (BlockBodies [])
-                Just head' -> do
-                    let num = blockHeaderBlockNumber head'
-                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain num max'
-                    yield . BlockHeaders . skipEntries skip' $ snd <$> chain
+    MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
+      maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
+      case maybeHeader of
+        Nothing    -> yield (BlockBodies [])
+        Just head' -> do
+          let num = blockHeaderBlockNumber head'
+          start' <- case dir of
+            Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
+            Forward -> return num
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+          yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         clearActionTimestamp
