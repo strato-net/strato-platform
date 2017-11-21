@@ -126,9 +126,9 @@ handleEvents mode peer = awaitForever $ \case
         let parentHash' = blockHeaderParentHash header
         eResult <- RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff)
         case eResult of
-          Left _                -> $logInfoS "handleEvents/NewBlock" $ T.pack "Failed to update WorldBestBlockInfo"
-          Right False           -> $logInfoS "handleEvents/NewBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
-          Right True            -> do
+          Left  _     -> $logInfoS "handleEvents/NewBlock" $ T.pack "Failed to update WorldBestBlockInfo"
+          Right False -> $logInfoS "handleEvents/NewBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
+          Right True  -> do
             (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
             case redisParentHeader of
                 Nothing -> do
@@ -139,13 +139,13 @@ handleEvents mode peer = awaitForever $ \case
                     $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
                     syncFetch Forward fetchNumber
                 Just _  -> do
-                    void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
                     lift . void $ setTitleAndProduceBlocks [block']
                     void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        let fetchNumber = numFromRedis bestBlock -1
+        let bestBlockNum = numFromRedis bestBlock
+        let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
 
