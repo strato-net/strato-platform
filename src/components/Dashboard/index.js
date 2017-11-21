@@ -19,9 +19,12 @@ import PieChart from '../PieChart';
 
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
-import io from 'socket.io-client'
-let socket = io(`http://localhost:3001`)
-
+import { subscribeRoom, unSubscribeRoom} from '../../sockets/socket.actions'
+import {
+	LAST_BLOCK_NUMBER,
+	USERS_COUNT,
+	CONTRACTS_COUNT
+} from '../../sockets/rooms'
 /*const tourSteps = [
   {
     title: 'Welcome to STRATO!',
@@ -42,10 +45,9 @@ let socket = io(`http://localhost:3001`)
 class Dashboard extends Component {
 
   componentDidMount() {
-    socket.emit(`SUBSCRIBE/LAST_BLOCK_NUMBER`,'message')
-    socket.on(`EVENT_LAST_BLOCK_NUMBER`, data => {
-      console.log('Socket Data:',data)
-    })
+    this.props.subscribeRoom(LAST_BLOCK_NUMBER)
+    this.props.subscribeRoom(USERS_COUNT)
+    this.props.subscribeRoom(CONTRACTS_COUNT)    
     this.props.fetchBlockData();
     this.props.fetchAccounts(false, false);
     this.props.fetchContracts();
@@ -55,6 +57,9 @@ class Dashboard extends Component {
 
   componentWillUnmount() {
     clearTimeout(this.timeout)
+    this.props.unSubscribeRoom(LAST_BLOCK_NUMBER)
+    this.props.unSubscribeRoom(USERS_COUNT)
+    this.props.unSubscribeRoom(CONTRACTS_COUNT)
   }
 
   startPoll() {
@@ -133,8 +138,8 @@ class Dashboard extends Component {
 
     const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
     const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
-    const userCount = Object.getOwnPropertyNames(this.props.accounts).length;
-    const contractCount = Object.getOwnPropertyNames(this.props.contracts).length;
+    const userCount = this.props.dashboard.usersCount//Object.getOwnPropertyNames(this.props.accounts).length;
+    const contractCount = this.props.dashboard.contractsCount//Object.getOwnPropertyNames(this.props.contracts).length;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
@@ -161,7 +166,7 @@ class Dashboard extends Component {
           <div className="col-sm-3">
             <Link to="/blocks">
               <NumberCard
-                number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
+                number={ this.props.dashboard && this.props.dashboard.lastBlockNumber ? this.props.dashboard.lastBlockNumber : 'Unknown'}
                 description="Last Block"
                 iconClass="fa-link"
               />
@@ -228,6 +233,7 @@ function mapStateToProps(state) {
     nodes: state.nodes.nodes,
     accounts: state.accounts.accounts,
     contracts: state.contracts.contracts,
+    dashboard: state.dashboard
   };
 }
 
@@ -240,6 +246,8 @@ export default withRouter(
       fetchContracts,
       hideLoading,
       endTour,
+      subscribeRoom, 
+      unSubscribeRoom
     }
   )(Dashboard)
 );
