@@ -19,11 +19,11 @@ import PieChart from '../PieChart';
 
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
-import { subscribeRoom, unSubscribeRoom} from '../../sockets/socket.actions'
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
 import {
-	LAST_BLOCK_NUMBER,
-	USERS_COUNT,
-	CONTRACTS_COUNT
+  LAST_BLOCK_NUMBER,
+  USERS_COUNT,
+  CONTRACTS_COUNT
 } from '../../sockets/rooms'
 /*const tourSteps = [
   {
@@ -47,7 +47,7 @@ class Dashboard extends Component {
   componentDidMount() {
     this.props.subscribeRoom(LAST_BLOCK_NUMBER)
     this.props.subscribeRoom(USERS_COUNT)
-    this.props.subscribeRoom(CONTRACTS_COUNT)    
+    this.props.subscribeRoom(CONTRACTS_COUNT)
     this.props.fetchBlockData();
     this.props.fetchAccounts(false, false);
     this.props.fetchContracts();
@@ -75,7 +75,7 @@ class Dashboard extends Component {
 
   difficulty(blockData) {
     return Object.values(blockData).map(function (val, i) {
-      return {x: i, y: val.difficulty};
+      return { x: i, y: val.difficulty };
     })
   }
 
@@ -85,9 +85,9 @@ class Dashboard extends Component {
       return val.timestamp
     });
 
-    var i= 0;
-    for (; i < times.length-1; i++) {
-      let obj = {x: i, y: Math.abs((new Date(times[i+1]).getSeconds()) - (new Date(times[i]).getSeconds()))};
+    var i = 0;
+    for (; i < times.length - 1; i++) {
+      let obj = { x: i, y: Math.abs((new Date(times[i + 1]).getSeconds()) - (new Date(times[i]).getSeconds())) };
       timeData.push(obj);
     }
     return timeData;
@@ -104,16 +104,16 @@ class Dashboard extends Component {
 
   txFreq(blockData) {
     return blockData.map(function (val, i) {
-      return {x: i, y: val.length};
+      return { x: i, y: val.length };
     })
   }
 
   txType(blockData) {
-    let types = {"FunctionCall" : 0, "Transfer": 0, "Contract": 0};
+    let types = { "FunctionCall": 0, "Transfer": 0, "Contract": 0 };
     blockData.forEach(function (val) {
       val.forEach(v => { types[v.transactionType]++ });
     })
-    return Object.getOwnPropertyNames(types).map((type)=>{
+    return Object.getOwnPropertyNames(types).map((type) => {
       return {
         val: types[type],
         type: type
@@ -137,7 +137,7 @@ class Dashboard extends Component {
     const txTypeData = this.txType(receiptTransactions);
 
     const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
-    const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
+    const apiError = this.props.nodes.reduce((acc, node) => acc || node.apiFailure, false);
     const userCount = this.props.dashboard.usersCount//Object.getOwnPropertyNames(this.props.accounts).length;
     const contractCount = this.props.dashboard.contractsCount//Object.getOwnPropertyNames(this.props.contracts).length;
 
@@ -159,14 +159,14 @@ class Dashboard extends Component {
             <NumberCard
               number="HEALTH"
               description="Network"
-              mode={ apiError ? 'warning' : 'success' }
-              iconClass={ apiError ? 'fa-exclamation-circle' : 'fa-check-circle' }
+              mode={apiError ? 'warning' : 'success'}
+              iconClass={apiError ? 'fa-exclamation-circle' : 'fa-check-circle'}
             />
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">
               <NumberCard
-                number={ this.props.dashboard && this.props.dashboard.lastBlockNumber ? this.props.dashboard.lastBlockNumber : 'Unknown'}
+                number={this.props.dashboard && this.props.dashboard.lastBlockNumber ? this.props.dashboard.lastBlockNumber : 'Unknown'}
                 description="Last Block"
                 iconClass="fa-link"
               />
@@ -185,7 +185,7 @@ class Dashboard extends Component {
           <div className="col-sm-3">
             <Link to="/contracts">
               <NumberCard
-                number={ contractCount }
+                number={contractCount}
                 description="Contracts"
                 iconClass="fa-gavel"
                 className="smd-pointer"
@@ -195,21 +195,21 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
-            <br/>
+            <br />
           </div>
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"}/>
+            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
           </div>
           <div className="col-sm-3">
-            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"}/>
+            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
           </div>
           <div className="col-sm-3">
-            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"}/>
+            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
           </div>
           <div className="col-sm-3">
-            <PieChart data={txTypeData}/>
+            <PieChart data={txTypeData} />
           </div>
         </div>
         <div className="row">
@@ -246,7 +246,7 @@ export default withRouter(
       fetchContracts,
       hideLoading,
       endTour,
-      subscribeRoom, 
+      subscribeRoom,
       unSubscribeRoom
     }
   )(Dashboard)
