@@ -124,51 +124,49 @@ handleEvents mode peer = awaitForever $ \case
         let header      = blockHeader block'
         let num         = blockHeaderBlockNumber header
         let parentHash' = blockHeaderParentHash header
-        (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
-        void $ RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff) -- todo handle the result
-        case redisParentHeader of
-            Nothing -> do
-                bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-                let fetchNumber = numFromRedis bestBlock - 1
-                $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
-                $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
-                syncFetch Forward fetchNumber
-            Just _  -> do
-                void $  RBDB.withRedisBlockDB $ RBDB.updateWorldBestBlockInfo sha num tdiff
-                lift . void $ setTitleAndProduceBlocks [block']
-                void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
+        eResult <- RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo sha num tdiff)
+        case eResult of
+          Left  _     -> $logInfoS "handleEvents/NewBlock" $ T.pack "Failed to update WorldBestBlockInfo"
+          Right False -> $logInfoS "handleEvents/NewBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
+          Right True  -> do
+            (redisParentHeader :: Maybe BlockData) <- RBDB.withRedisBlockDB (RBDB.getHeader parentHash')
+            case redisParentHeader of
+                Nothing -> do
+                    bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
+                    let bestBlockNum = numFromRedis bestBlock
+                    let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
+                    $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock :: fetchNumber is " ++ show fetchNumber
+                    $logInfoS "handleEvents/NewBlock" $ T.pack $ "#### New block is missing its parent, I am resyncing"
+                    syncFetch Forward fetchNumber
+                Just _  -> do
+                    lift . void $ setTitleAndProduceBlocks [block']
+                    void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
-        let fetchNumber = numFromRedis bestBlock -1
+        let bestBlockNum = numFromRedis bestBlock
+        let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
         $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
         syncFetch Forward fetchNumber
 
-    MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> case dir of
-        Reverse -> do
-            maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader start
-            case maybeHeader of
-                Nothing    -> yield (BlockBodies [])
-                Just head' -> do
-                    let hash' = blockHeaderHash head'
-                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain hash' max'
-                    yield . BlockHeaders . skipEntries skip' $ snd <$> chain
-        Forward -> do
-            headers <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start max'
-            yield . BlockHeaders . skipEntries skip' $ snd <$> headers
+    MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
+      start' <- case dir of
+        Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
+        Forward -> return start
+      chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+      yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
-    MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> case dir of
-        Reverse -> do
-            headers <- RBDB.withRedisBlockDB $ RBDB.getHeaderChain start max'
-            yield . BlockHeaders . skipEntries skip' $ snd <$> headers
-        Forward -> do
-            maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
-            case maybeHeader of
-                Nothing    -> yield (BlockBodies [])
-                Just head' -> do
-                    let num = blockHeaderBlockNumber head'
-                    chain :: [(SHA, BlockHeader)] <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain num max'
-                    yield . BlockHeaders . skipEntries skip' $ snd <$> chain
+    MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
+      maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
+      case maybeHeader of
+        Nothing    -> yield (BlockBodies [])
+        Just head' -> do
+          let num = blockHeaderBlockNumber head'
+          start' <- case dir of
+            Reverse -> return $ if num > fromIntegral max' then num - (fromIntegral max') else 1
+            Forward -> return num
+          chain <- RBDB.withRedisBlockDB $ RBDB.getCanonicalHeaderChain start' max'
+          yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
         clearActionTimestamp
