@@ -138,8 +138,7 @@ class Dashboard extends Component {
 
     const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
     const apiError = this.props.nodes.reduce((acc, node) => acc || node.apiFailure, false);
-    const userCount = this.props.dashboard.usersCount//Object.getOwnPropertyNames(this.props.accounts).length;
-    const contractCount = this.props.dashboard.contractsCount//Object.getOwnPropertyNames(this.props.contracts).length;
+    const { userCount, contractCount, lastBlockNumber } = this.props.dashboard
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
@@ -166,7 +165,7 @@ class Dashboard extends Component {
           <div className="col-sm-3">
             <Link to="/blocks">
               <NumberCard
-                number={this.props.dashboard && this.props.dashboard.lastBlockNumber ? this.props.dashboard.lastBlockNumber : 'Unknown'}
+                number={lastBlockNumber}
                 description="Last Block"
                 iconClass="fa-link"
               />
