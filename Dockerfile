@@ -6,6 +6,7 @@ RUN echo 'http://dl-cdn.alpinelinux.org/alpine/v3.5/community/' >> /etc/apk/repo
 RUN apk upgrade --no-cache
 RUN mkdir -p /usr/lib/strato/cirrus/lib
 COPY *.js /usr/lib/strato/cirrus/
+COPY package.json /usr/lib/strato/cirrus/
 COPY nginx /usr/lib/strato/cirrus/.
 COPY lib/* /usr/lib/strato/cirrus/lib/
 RUN mkdir -p /var/run/strato/cirrus
