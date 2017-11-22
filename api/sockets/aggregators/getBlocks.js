@@ -54,7 +54,7 @@ function getBlocks() {
 
 function extractDifficulty(blockData) {
   return _.values(blockData).map(function (val, i) {
-    return { x: i, y: val };
+    return { x: i, y: parseInt(val) };
   })
 }
 
