@@ -23,7 +23,7 @@ const reducer = (state = initialState, action) => {
     }
     case STOP_ALL_TOUR_AUTOSTARTS: {
       localStorage.setItem('skip_tour','true');
-      return Object.assign({}, state, {all: Object.assign({}, state.all, {autoStart: false})});
+      return Object.assign({}, state, {all: Object.assign({}, state.all, {run: false, autoStart: false})});
     }
     default: {
       return state;
