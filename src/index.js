@@ -12,6 +12,7 @@ import {reducer as formReducer} from 'redux-form';
 import {loadingBarReducer, loadingBarMiddleware} from 'react-redux-loading-bar'
 import App from "./App/";
 
+import dashboardReducer from './components/Dashboard/dashboard.reducer';
 import accountsReducer from './components/Accounts/accounts.reducer';
 import blockDataReducer from './components/BlockData/block-data.reducer'
 import createUserReducer from './components/CreateUser/createUser.reducer';
@@ -28,6 +29,7 @@ import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
 import applicationsReducer from './components/Applications/applications.reducer';
 import launchPadReducer from './components/LaunchPad/launchPad.reducer';
 
+import {watchCommunicateOverSocket} from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
 import watchCreateUser from './components/CreateUser/createUser.saga';
@@ -76,7 +78,8 @@ const rootReducer = combineReducers({
   loadingBar: loadingBarReducer,
   tour: tourReducer,
   applications: applicationsReducer,
-  launchPad: launchPadReducer
+  launchPad: launchPadReducer,
+  dashboard: dashboardReducer
 });
 
 const rootSaga = function * startForeman() {
@@ -101,7 +104,8 @@ const rootSaga = function * startForeman() {
     fork(watchSendEther),
     fork(watchAccount),
     fork(watchFetchApplications),
-    fork(watchAppUpload)]
+    fork(watchAppUpload), 
+    fork(watchCommunicateOverSocket)]
 };
 
 // create the saga middleware

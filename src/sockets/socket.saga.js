@@ -1,0 +1,98 @@
+import io from 'socket.io-client';
+import {
+  put,
+  call,
+  take,
+  fork,
+  takeEvery
+} from 'redux-saga/effects';
+import { eventChannel } from 'redux-saga';
+import { SOCKET_SUBSCRIBE_ROOM, SOCKET_UNSUBSCRIBE_ROOM } from './socket.actions';
+import {
+  LAST_BLOCK_NUMBER,
+  USERS_COUNT,
+  CONTRACTS_COUNT,
+  GET_TRANSACTIONS,
+  BLOCKS_DIFFICULTY,
+  BLOCKS_PROPAGATION,
+  BLOCKS_FREQUENCY,
+  TRANSACTIONS_COUNT,
+  TRANSACTIONS_TYPE,
+  GET_PEERS
+} from './rooms';
+import {
+  updateBlockNumber,
+  preloadBlockNumber,
+  updateContractCount,
+  preloadContractCount,
+  updateUsersCount,
+  preloadUsersCount,
+  preloadTransactionsCount,
+  updateTransactionCount,
+  preloadBlockDifficulty,
+  updateBlockDifficulty,
+  preloadBlockFrequency,
+  updateBlockFrequency,
+  preloadBlockPropagation,
+  updateBlockPropagation,
+  preloadPeers,
+  updatePeers,
+  preloadTransactionType,
+  updateTransactionType
+} from '../components/Dashboard/dashboard.action';
+import {
+  updateTx,
+  preloadTx
+} from '../components/TransactionList/transactionList.actions'
+import { env } from '../env'
+
+const socket = io(env.SOCKET_SERVER);
+
+function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
+  socket.on(`PRELOAD_${room}`, data => {
+    eventChannelEmit(preloadAction(data));
+  })
+
+  socket.on(`EVENT_${room}`, data => {
+    eventChannelEmit(eventAction(data));
+  })
+}
+
+function subscribe() {
+  return eventChannel(emit => {
+    registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
+    registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
+    registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
+    registerActions(emit, GET_TRANSACTIONS, preloadTx, updateTx)
+    registerActions(emit, BLOCKS_DIFFICULTY, preloadBlockDifficulty, updateBlockDifficulty)
+    registerActions(emit, BLOCKS_FREQUENCY, preloadBlockFrequency, updateBlockFrequency)
+    registerActions(emit, BLOCKS_PROPAGATION, preloadBlockPropagation, updateBlockPropagation)
+    registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount)
+    registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)
+    registerActions(emit, GET_PEERS, preloadPeers, updatePeers)
+
+    socket.on('disconnect', e => {
+      // TODO: handle
+    });
+    return () => { };
+  });
+}
+
+function* readSocketEvents() {
+  const channel = yield call(subscribe);
+  while (true) {
+    let action = yield take(channel);
+    yield put(action);
+  }
+}
+
+function* socketSubscribeUnsubscribeRoom(action) {
+  yield socket.emit(action.name, '')
+}
+
+export function* watchCommunicateOverSocket() {
+  yield takeEvery(SOCKET_SUBSCRIBE_ROOM, socketSubscribeUnsubscribeRoom);
+  yield takeEvery(SOCKET_UNSUBSCRIBE_ROOM, socketSubscribeUnsubscribeRoom);
+  yield fork(readSocketEvents)
+}
+
