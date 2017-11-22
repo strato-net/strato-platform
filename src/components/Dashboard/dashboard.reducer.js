@@ -24,10 +24,10 @@ const initialState = {
   usersCount: 0,
   contractsCount: 0,
   transactionsCount: 0,
-  blockPropagation: undefined,
-  blockFrequency: undefined,
-  blockDifficulty: undefined,
-  transactionTypes: undefined,
+  blockPropagation: [],
+  blockFrequency: [],
+  blockDifficulty: [],
+  transactionTypes: [],
   peers: undefined
 };
 
