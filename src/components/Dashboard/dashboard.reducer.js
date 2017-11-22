@@ -1,9 +1,9 @@
 import {
-  UPDATE_PRELOAD_BLOCK_NUMBER,
+  PRELOAD_BLOCK_NUMBER,
   UPDATE_BLOCK_NUMBER,
-  UPDATE_PRELOAD_CONTRACT_COUNT,
+  PRELOAD_CONTRACT_COUNT,
   UPDATE_CONTRACT_COUNT,
-  UPDATE_PRELOAD_USERS_COUNT,
+  PRELOAD_USERS_COUNT,
   UPDATE_USERS_COUNT
 } from './dashboard.action'
 
@@ -15,7 +15,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case UPDATE_PRELOAD_BLOCK_NUMBER:
+    case PRELOAD_BLOCK_NUMBER:
       return {
         ...state,
         lastBlockNumber: action.data
@@ -27,7 +27,7 @@ const reducer = function (state = initialState, action) {
         lastBlockNumber: action.data
       };
 
-    case UPDATE_PRELOAD_CONTRACT_COUNT:
+    case PRELOAD_CONTRACT_COUNT:
       return {
         ...state,
         contractsCount: action.data
@@ -39,7 +39,7 @@ const reducer = function (state = initialState, action) {
         contractsCount: action.data
       };
 
-    case UPDATE_PRELOAD_USERS_COUNT:
+    case PRELOAD_USERS_COUNT:
       return {
         ...state,
         usersCount: action.data

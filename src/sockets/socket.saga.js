@@ -15,11 +15,11 @@ import {
 } from './rooms';
 import {
   updateBlockNumber,
-  updatePreloadBlockNumber,
+  preloadBlockNumber,
   updateContractCount,
-  updatePreloadContractCount,
+  preloadContractCount,
   updateUsersCount,
-  updatePreloadUsersCount
+  preloadUsersCount
 } from '../components/Dashboard/dashboard.action';
 import { env } from '../env'
 
@@ -37,9 +37,9 @@ function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
 
 function subscribe() {
   return eventChannel(emit => {
-    registerActions(emit, LAST_BLOCK_NUMBER, updatePreloadBlockNumber, updateBlockNumber)
-    registerActions(emit, USERS_COUNT, updatePreloadUsersCount, updateUsersCount)
-    registerActions(emit, CONTRACTS_COUNT, updatePreloadContractCount, updateContractCount)
+    registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
+    registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
+    registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
     socket.on('disconnect', e => {
       // TODO: handle
     });
