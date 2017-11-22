@@ -272,6 +272,7 @@ handleEvents mode peer = awaitForever $ \case
           case worldBestBlock of
             Nothing -> return ()
             Just (RedisBestBlock _ _ worldTDiff) -> do
+              $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
               when (obTotalDifficulty b >= worldTDiff) $ do
                 $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
