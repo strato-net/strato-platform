@@ -8,13 +8,9 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
-import { fetchBlockData } from '../BlockData/block-data.actions';
-import { fetchAccounts } from '../Accounts/accounts.actions';
-import { fetchContracts } from '../Contracts/contracts.actions';
 
 import Tour from '../Tour';
 
-import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
