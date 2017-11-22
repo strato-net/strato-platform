@@ -8,6 +8,13 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
+import { fetchBlockData } from '../BlockData/block-data.actions';
+import { fetchAccounts } from '../Accounts/accounts.actions';
+import { fetchContracts } from '../Contracts/contracts.actions';
+
+import Tour from '../Tour';
+
+import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
 import './dashboard.css';
@@ -24,7 +31,9 @@ import {
   TRANSACTIONS_TYPE,
   GET_PEERS
 } from '../../sockets/rooms'
-/*const tourSteps = [
+
+// TODO: these should be part of a reducer state. Do the same for other global variables.
+const tourSteps = [
   {
     title: 'Welcome to STRATO!',
     text: '<strong>STRATO</strong> makes it easy to create and manage your custom blockchains.<br><br><strong>Ready to get started?</strong>',
@@ -39,7 +48,7 @@ import {
     position: 'bottom', type: 'hover',
     isFixed: true,
   },
-];*/
+];
 
 class Dashboard extends Component {
 
@@ -83,12 +92,7 @@ class Dashboard extends Component {
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        {/*
-          <Tour name="dashboard" callback={callAfterTour('#accounts', () => {
-            this.props.history.push('accounts');
-            this.props.endTour('dashboard');
-          })} steps={ tourSteps }/>
-        */}
+        <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={ tourSteps }/>
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
@@ -178,8 +182,7 @@ function mapStateToProps(state) {
   };
 }
 
-export default withRouter(
-  connect(
+const connected = connect(
     mapStateToProps,
     {
       hideLoading,
@@ -188,4 +191,5 @@ export default withRouter(
       unSubscribeRoom
     }
   )(Dashboard)
-);
+
+export default withRouter(connected);
