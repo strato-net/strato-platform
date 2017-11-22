@@ -8,7 +8,7 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
 import { fetchContracts } from '../Contracts/contracts.actions';
-
+import { hideLoading } from 'react-redux-loading-bar';
 import Tour from '../Tour';
 
 import { env } from '../../env';
@@ -39,7 +39,7 @@ class Dashboard extends Component {
 
   componentDidMount() {
     this.props.fetchBlockData();
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(false,false);
     this.props.fetchContracts();
     mixpanelWrapper.track('dashboard_page_load');
     this.startPoll();
@@ -55,7 +55,7 @@ class Dashboard extends Component {
     const fetchContracts = this.props.fetchContracts;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
-      fetchAccounts();
+      fetchAccounts(false, false);
       fetchContracts();
     }, env.POLLING_FREQUENCY);
   }
@@ -224,6 +224,7 @@ const connected = connect(
       fetchBlockData,
       fetchAccounts,
       fetchContracts,
+      hideLoading
     }
   )(Dashboard)
 
