@@ -1,6 +1,23 @@
-const { LAST_BLOCK_NUMBER, TRANSACTIONS_COUNT, USERS_COUNT, PEERS, CONTRACTS_COUNT } = require('./rooms')
+const { 
+  LAST_BLOCK_NUMBER, 
+  TRANSACTIONS_COUNT, 
+  USERS_COUNT, 
+  GET_PEERS, 
+  CONTRACTS_COUNT, 
+  TRANSACTIONS_TYPE,
+  GET_TRANSACTIONS, 
+  BLOCKS_PROPOGATION, 
+  BLOCKS_FREQUENCY, 
+  BLOCKS_DIFFICULTY } = require('./rooms')
+
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroaker')
 const lastBlockNumberAggregator = require('./aggregators/lastBlockNumber')
+const userCountAggregator = require('./aggregators/userCount')
+const contractsCountAggregator = require('./aggregators/contractsCount')
+const getPeersAggregator = require('./aggregators/getPeers')
+const transactionsTypeAggregator = require('./aggregators/transactionsType')
+const getBlocksAggregator = require('./aggregators/getBlocks')
+const getTransactionsAggregator = require('./aggregators/getTransactions');
 
 const io = require('socket.io')()
 function init(server) {
@@ -8,22 +25,30 @@ function init(server) {
   io.on('connection', function (socket) {
     // register request to block number
     registerRoomAllocation(socket, LAST_BLOCK_NUMBER, lastBlockNumberAggregator.initialHydrate)
-    // // register request to transaction count
-    // registerRoomAllocation(socket, 'TRANSACTIONS_COUNT', () => {
-    //   socket.emit(`PRELOAD_${'TRANSACTIONS_COUNT'}`, data);
-    // })
-    // // register request to users count
-    // registerRoomAllocation(socket, 'USERS_COUNT', () => {
-    //   socket.emit(`PRELOAD_${'USERS_COUNT'}`, data);
-    // })
-    // // register request to peers
-    // registerRoomAllocation(socket, 'PEERS', () => {
-    //   socket.emit(`PRELOAD_${'PEERS'}`, data);
-    // })
-    // // register request to contracts count
-    // registerRoomAllocation(socket, 'CONTRACTS_COUNT', () => {
-    //   socket.emit(`PRELOAD_${'CONTRACTS_COUNT'}`, data);
-    // })
+
+    // register request to users count
+    registerRoomAllocation(socket, USERS_COUNT, userCountAggregator.initialHydrate)
+
+    // register request to get peers
+    registerRoomAllocation(socket, GET_PEERS, getPeersAggregator.initialHydrate)
+
+    // register request to contracts count
+    registerRoomAllocation(socket, CONTRACTS_COUNT, contractsCountAggregator.initialHydrate)
+
+    // register request for blocks data
+    registerRoomAllocation(socket, BLOCKS_DIFFICULTY, getBlocksAggregator.initialHydrateDifficulty)
+    
+    // register request for blocks data
+    registerRoomAllocation(socket, BLOCKS_FREQUENCY, getBlocksAggregator.initialHydrateBlockFrequency)
+    
+    // register request for blocks data
+    registerRoomAllocation(socket, BLOCKS_PROPOGATION, getBlocksAggregator.initalHydrateBlockPropagation)
+    
+    // register request for transaction data
+    registerRoomAllocation(socket, TRANSACTIONS_TYPE, transactionsTypeAggregator.initialHydrate)
+
+    // register request for transaction data
+    registerRoomAllocation(socket, GET_TRANSACTIONS, getTransactionsAggregator.initialHydrate)
   });
 }
 

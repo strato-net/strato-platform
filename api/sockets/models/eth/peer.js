@@ -1,11 +1,15 @@
 const db = require('./connection');
 
-const Peers = db.sequelize.define('p_peer', {
+const Peer = db.sequelize.define('p_peer', {
+  id: {
+    type: db.Sequelize.BIGINT,
+    primaryKey: true
+  },
   pubkey: {
-    type: db.Sequelize.CHAR
+    type: db.Sequelize.STRING
   },
   ip: {
-    type: db.Sequelize.CHAR
+    type: db.Sequelize.STRING
   },
   tcp_port: {
     type: db.Sequelize.BIGINT
@@ -17,7 +21,7 @@ const Peers = db.sequelize.define('p_peer', {
     type: db.Sequelize.BIGINT
   },
   last_msg: {
-    type: db.Sequelize.CHAR
+    type: db.Sequelize.STRING
   },
   last_msg_time: {
     //timestamp with time zone
@@ -33,11 +37,11 @@ const Peers = db.sequelize.define('p_peer', {
   },
   last_total_difficulty: {
     // character varying
-    type: db.Sequelize.CHAR
+    type: db.Sequelize.STRING
   },
   last_best_block_hash: {
     // character varying
-    type: db.Sequelize.CHAR
+    type: db.Sequelize.STRING(64)
   },
   bond_state: {
     // bigint
@@ -45,16 +49,8 @@ const Peers = db.sequelize.define('p_peer', {
   },
   version: {
     // character varying
-    type: db.Sequelize.CHAR
+    type: db.Sequelize.STRING
   }
 }, { freezeTableName: true, timestamps: false });
 
-module.exports = Peers;
-
-// Peer.findAll().then(users => {
-//   console.log("users.count", users.rows);
-// })
-
-// Peer.count().then( temp => {
-//   console.log("temp", temp);
-// })
+module.exports = Peer;
