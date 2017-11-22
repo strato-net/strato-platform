@@ -7,7 +7,7 @@ var rp = require('request-promise');
 let peers
 
 const options = {
-  uri: 'http://localhost/strato-api/eth/v1.2/peers',
+  uri: `http://${process.env['STRATO_LOCAL_HOST']}/strato-api/eth/v1.2/peers`,
   json: true
 }
 

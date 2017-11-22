@@ -4,7 +4,7 @@ function getNodeUUID() {
   let nodeUUID
   while (true) {
     if (!nodeUUID) {
-      const res =  request('GET','http://localhost/strato-api/eth/v1.2/uuid')
+      const res =  request('GET',`http://${process.env['STRATO_LOCAL_HOST']}/strato-api/eth/v1.2/uuid`)
       var user = JSON.parse(res.getBody('utf8'));
       nodeUUID = user && user.peerId
     }
@@ -18,7 +18,7 @@ const development = {
   username: "postgres",
   password: "api",
   database: 'eth_' + getNodeUUID(),
-  host: "localhost",
+  host: "postgres",
   port: "5432",
   dialect: "postgres"
 }

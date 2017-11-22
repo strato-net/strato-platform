@@ -3,7 +3,7 @@
     "username": "postgres",
     "password": "api",
     "database": "bloc22",
-    "host": "localhost",
+    "host": "postgres",
     "port": "5432",
     "dialect": "postgres"
   }
