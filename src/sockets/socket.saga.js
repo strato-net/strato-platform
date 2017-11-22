@@ -11,7 +11,12 @@ import { SOCKET_SUBSCRIBE_ROOM, SOCKET_UNSUBSCRIBE_ROOM } from './socket.actions
 import {
   LAST_BLOCK_NUMBER,
   USERS_COUNT,
-  CONTRACTS_COUNT
+	CONTRACTS_COUNT,
+  GET_TRANSACTIONS,
+  BLOCKS_DIFFICULTY,
+  BLOCKS_PROPOGATION,
+  BLOCKS_FREQUENCY,
+  TRANSACTIONS_COUNT
 } from './rooms';
 import {
   updateBlockNumber,
@@ -19,8 +24,20 @@ import {
   updateContractCount,
   preloadContractCount,
   updateUsersCount,
-  preloadUsersCount
+	preloadUsersCount,
+	preloadTransactionsCount,
+  updateTransactionCount,
+  preloadBlockDifficulty,
+  updateBlockDifficulty,
+  preloadBlockFrequency,
+  updateBlockFrequency,
+  preloadBlockPropagation,
+  updateBlockPropagation
 } from '../components/Dashboard/dashboard.action';
+import {
+  updateTx,
+  preloadTx
+} from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
 const socket = io(env.SOCKET_SERVER);
@@ -39,7 +56,12 @@ function subscribe() {
   return eventChannel(emit => {
     registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
     registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
-    registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
+		registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
+    registerActions(emit, GET_TRANSACTIONS, preloadTx, updateTx)  
+    registerActions(emit, BLOCKS_DIFFICULTY, preloadBlockDifficulty, updateBlockDifficulty)
+    registerActions(emit, BLOCKS_FREQUENCY, preloadBlockFrequency, updateBlockFrequency)
+    registerActions(emit, BLOCKS_PROPOGATION, preloadBlockPropagation, updateBlockPropagation)  
+    registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount)    
     socket.on('disconnect', e => {
       // TODO: handle
     });

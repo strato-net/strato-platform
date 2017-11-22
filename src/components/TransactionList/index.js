@@ -8,16 +8,21 @@ import { env } from '../../env';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { parseDateFromString } from '../../lib/dateUtils';
 import HexText from '../HexText';
+import { GET_TRANSACTIONS } from '../../sockets/rooms';
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
 
 class TransactionList extends Component {
 
   componentDidMount() {
-    this.props.fetchTx();
-    this.startPoll();
+    console.log('Transaction list', GET_TRANSACTIONS)
+    this.props.subscribeRoom(GET_TRANSACTIONS)
+    // this.props.fetchTx();
+    // this.startPoll();
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
+    this.props.unSubscribeRoom(GET_TRANSACTIONS)
+    // clearTimeout(this.timeout)
   }
 
   startPoll() {
@@ -29,7 +34,8 @@ class TransactionList extends Component {
 
   render() {
     const self = this;
-    let txRows = this.props.tx.slice(0, 5).map(
+    console.log('TX:', this.props.transactions)
+    let txRows = this.props.transactions !== undefined && this.props.transactions.slice(0, 5).map(
       function (tx, i) {        
         return (
           <tr
@@ -80,8 +86,8 @@ class TransactionList extends Component {
 
 function mapStateToProps(state) {
   return {
-    tx: state.transactions.tx
+    transactions: state.transactions.transactions
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchTx})(TransactionList));
+export default withRouter(connect(mapStateToProps, {subscribeRoom,unSubscribeRoom})(TransactionList));

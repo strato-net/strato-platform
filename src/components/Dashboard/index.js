@@ -7,7 +7,6 @@ import NumberCard from '../NumberCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { fetchBlockData } from '../BlockData/block-data.actions';
 import { fetchAccounts } from '../Accounts/accounts.actions';
-import { fetchContracts } from '../Contracts/contracts.actions';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
 
@@ -23,7 +22,11 @@ import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
 import {
   LAST_BLOCK_NUMBER,
   USERS_COUNT,
-  CONTRACTS_COUNT
+  CONTRACTS_COUNT,
+  TRANSACTIONS_COUNT,
+  BLOCKS_PROPOGATION,
+  BLOCKS_DIFFICULTY,
+  BLOCKS_FREQUENCY
 } from '../../sockets/rooms'
 /*const tourSteps = [
   {
@@ -48,9 +51,13 @@ class Dashboard extends Component {
     this.props.subscribeRoom(LAST_BLOCK_NUMBER)
     this.props.subscribeRoom(USERS_COUNT)
     this.props.subscribeRoom(CONTRACTS_COUNT)
+    this.props.subscribeRoom(BLOCKS_PROPOGATION)
+    this.props.subscribeRoom(BLOCKS_FREQUENCY)
+    this.props.subscribeRoom(BLOCKS_DIFFICULTY)
+    this.props.subscribeRoom(TRANSACTIONS_COUNT)
+    
     this.props.fetchBlockData();
     this.props.fetchAccounts(false, false);
-    this.props.fetchContracts();
     mixpanelWrapper.track('dashboard_page_load');
     this.startPoll();
   }
@@ -60,16 +67,18 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(LAST_BLOCK_NUMBER)
     this.props.unSubscribeRoom(USERS_COUNT)
     this.props.unSubscribeRoom(CONTRACTS_COUNT)
+    this.props.unSubscribeRoom(BLOCKS_PROPOGATION)
+    this.props.unSubscribeRoom(BLOCKS_FREQUENCY)
+    this.props.unSubscribeRoom(BLOCKS_DIFFICULTY) 
+    this.props.unSubscribeRoom(TRANSACTIONS_COUNT)  
   }
 
   startPoll() {
     const dashboardFetchStatus = this.props.fetchBlockData;
     const fetchAccounts = this.props.fetchAccounts;
-    const fetchContracts = this.props.fetchContracts;
     this.timeout = setInterval(function () {
       dashboardFetchStatus();
       fetchAccounts(false, false);
-      fetchContracts();
     }, env.POLLING_FREQUENCY);
   }
 
@@ -242,7 +251,6 @@ export default withRouter(
     {
       fetchBlockData,
       fetchAccounts,
-      fetchContracts,
       hideLoading,
       endTour,
       subscribeRoom,
