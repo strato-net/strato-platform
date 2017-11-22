@@ -90,17 +90,10 @@ class Accounts extends Component {
                   </button>
                 </td>
                 <td>
-                  <HexText value={address} classes="small smd-pad-4" />
+                  {user}
                 </td>
                 <td>
-                  <Text ellipsize={true}>
-                    <Tooltip
-                      tooltipClassName="smd-padding-8"
-                      content={address}
-                      position={Position.TOP_LEFT}>
-                      <small>{address}</small>
-                    </Tooltip>
-                  </Text>
+                  <HexText value={address} classes="small smd-pad-4" />
                 </td>
                 <td>
                   <Text ellipsize={true}>
