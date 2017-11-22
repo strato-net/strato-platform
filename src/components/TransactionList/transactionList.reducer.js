@@ -15,13 +15,10 @@ const initialState = {
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case UPDATE_TX:
-    console.log('Update TX Data:',action)
       return {
         transactions: action.data,
       }
-
     case PRELOAD_TX:
-    console.log('Preload TX Data:', action)
       return {
         transactions: action.data,
       }
