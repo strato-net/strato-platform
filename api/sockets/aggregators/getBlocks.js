@@ -22,7 +22,7 @@ function getBlocks() {
       blockData.push(parsedBlock);
       blockDifficulty.push(parsedBlock.difficulty.replace(/^s/, ""));
 
-      receiptTransactions.push(JSON.parse(parsedBlock.receipt_transactions));
+      receiptTransactions.push(JSON.parse(block.receipt_transactions));
     })
 
     const currentDifficulty = extractDifficulty(blockDifficulty)
