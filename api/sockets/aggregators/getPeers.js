@@ -13,15 +13,15 @@ const options = {
 
 function getPeers() {
   rp(options)
-  .then(function (data) {
-    let newPeers = data;
-    if (!_.isEqual(data, newPeers)) {
-      emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_PEERS, data)
-    }
-  })
-  .catch(function (err) {
-    console.log("err", err);
-  });
+    .then(function (currentPeers) {
+      if (!_.isEqual(peers, currentPeers)) {
+        peers = currentPeers
+        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_PEERS, currentPeers)
+      }
+    })
+    .catch(function (err) {
+      console.log("err", err);
+    });
 }
 
 getPeers()

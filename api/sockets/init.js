@@ -6,7 +6,7 @@ const {
   CONTRACTS_COUNT, 
   TRANSACTIONS_TYPE,
   GET_TRANSACTIONS, 
-  BLOCKS_PROPOGATION, 
+  BLOCKS_PROPAGATION, 
   BLOCKS_FREQUENCY, 
   BLOCKS_DIFFICULTY } = require('./rooms')
 
@@ -37,13 +37,13 @@ function init(server) {
 
     // register request for blocks data
     registerRoomAllocation(socket, BLOCKS_DIFFICULTY, getBlocksAggregator.initialHydrateDifficulty)
-    
+
     // register request for blocks data
     registerRoomAllocation(socket, BLOCKS_FREQUENCY, getBlocksAggregator.initialHydrateBlockFrequency)
     
     // register request for blocks data
-    registerRoomAllocation(socket, BLOCKS_PROPOGATION, getBlocksAggregator.initalHydrateBlockPropagation)
-    
+    registerRoomAllocation(socket, BLOCKS_PROPAGATION, getBlocksAggregator.initalHydrateBlockPropagation)
+
     // register request for transaction data
     registerRoomAllocation(socket, TRANSACTIONS_TYPE, transactionsTypeAggregator.initialHydrate)
 

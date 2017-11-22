@@ -8,12 +8,14 @@ const options = {
   json: true
 }
 
+let transactions
+
 function getTransactions() {
   rp(options)
-    .then(function (data) {
-      let transactions = data;
-      if (!_.isEqual(data, transactions)) {
-        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_TRANSACTIONS, transactions)
+    .then(function (currentTransactions) {
+      if (!_.isEqual(transactions, currentTransactions)) {
+        transactions = currentTransactions;
+        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_TRANSACTIONS, currentTransactions)
       }
     })
     .catch(function (err) {
