@@ -140,20 +140,20 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            {<BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
-            }
+            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
+
           </div>
           <div className="col-sm-3">
-            {<BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
-            }
+            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
+
           </div>
           <div className="col-sm-3">
-            {<BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
-            }
+            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
+
           </div>
           <div className="col-sm-3">
-            {<PieChart data={txTypeData} />
-            }
+            <PieChart data={txTypeData} />
+
           </div>
         </div>
         <div className="row">
