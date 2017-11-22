@@ -49,6 +49,8 @@ function init(server) {
 
     // register request for transaction data
     registerRoomAllocation(socket, GET_TRANSACTIONS, getTransactionsAggregator.initialHydrate)
+
+    registerRoomAllocation(socket, TRANSACTIONS_COUNT, getBlocksAggregator.initialHydrateTransactionCount)
   });
 }
 
