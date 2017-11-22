@@ -47,9 +47,7 @@ class NodeCard extends Component {
 
   render() {
     const node = this.props.nodes[this.props.nodeIndex];
-    const peers = node.peers && node.peers.serverPeers && node.peers.clientPeers ?
-      (node.peers.serverPeers.length + node.peers.clientPeers.length).toString()
-      : 'unknown';
+    const peers = node.peers ? Object.getOwnPropertyNames(node.peers):[];
     const blockNumber = this.props.blockData.length > 0 ?
       this.props.blockData[0].blockData.number.toString()
       : 'unknown';
@@ -88,7 +86,7 @@ class NodeCard extends Component {
               <small>Peers</small>
             </div>
             <div className="col-xs-9">
-              <small>{peers}</small>
+              <small>{peers.length}</small>
             </div>
           </div>
         </div>
