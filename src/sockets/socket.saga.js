@@ -11,10 +11,10 @@ import { SOCKET_SUBSCRIBE_ROOM, SOCKET_UNSUBSCRIBE_ROOM } from './socket.actions
 import {
   LAST_BLOCK_NUMBER,
   USERS_COUNT,
-	CONTRACTS_COUNT,
+  CONTRACTS_COUNT,
   GET_TRANSACTIONS,
   BLOCKS_DIFFICULTY,
-  BLOCKS_PROPOGATION,
+  BLOCKS_PROPAGATION,
   BLOCKS_FREQUENCY,
   TRANSACTIONS_COUNT,
   TRANSACTIONS_TYPE,
@@ -26,8 +26,8 @@ import {
   updateContractCount,
   preloadContractCount,
   updateUsersCount,
-	preloadUsersCount,
-	preloadTransactionsCount,
+  preloadUsersCount,
+  preloadTransactionsCount,
   updateTransactionCount,
   preloadBlockDifficulty,
   updateBlockDifficulty,
@@ -62,15 +62,15 @@ function subscribe() {
   return eventChannel(emit => {
     registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
     registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
-		registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
-    registerActions(emit, GET_TRANSACTIONS, preloadTx, updateTx)  
+    registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
+    registerActions(emit, GET_TRANSACTIONS, preloadTx, updateTx)
     registerActions(emit, BLOCKS_DIFFICULTY, preloadBlockDifficulty, updateBlockDifficulty)
     registerActions(emit, BLOCKS_FREQUENCY, preloadBlockFrequency, updateBlockFrequency)
-    registerActions(emit, BLOCKS_PROPOGATION, preloadBlockPropagation, updateBlockPropagation)  
-    registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount) 
-    registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)    
-    registerActions(emit, GET_PEERS, preloadPeers, updatePeers)    
-    
+    registerActions(emit, BLOCKS_PROPAGATION, preloadBlockPropagation, updateBlockPropagation)
+    registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount)
+    registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)
+    registerActions(emit, GET_PEERS, preloadPeers, updatePeers)
+
     socket.on('disconnect', e => {
       // TODO: handle
     });

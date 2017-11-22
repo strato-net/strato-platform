@@ -18,7 +18,7 @@ import {
   USERS_COUNT,
   CONTRACTS_COUNT,
   TRANSACTIONS_COUNT,
-  BLOCKS_PROPOGATION,
+  BLOCKS_PROPAGATION,
   BLOCKS_DIFFICULTY,
   BLOCKS_FREQUENCY,
   TRANSACTIONS_TYPE,
@@ -47,7 +47,7 @@ class Dashboard extends Component {
     this.props.subscribeRoom(LAST_BLOCK_NUMBER)
     this.props.subscribeRoom(USERS_COUNT)
     this.props.subscribeRoom(CONTRACTS_COUNT)
-    this.props.subscribeRoom(BLOCKS_PROPOGATION)
+    this.props.subscribeRoom(BLOCKS_PROPAGATION)
     this.props.subscribeRoom(BLOCKS_FREQUENCY)
     this.props.subscribeRoom(BLOCKS_DIFFICULTY)
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
@@ -61,7 +61,7 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(LAST_BLOCK_NUMBER)
     this.props.unSubscribeRoom(USERS_COUNT)
     this.props.unSubscribeRoom(CONTRACTS_COUNT)
-    this.props.unSubscribeRoom(BLOCKS_PROPOGATION)
+    this.props.unSubscribeRoom(BLOCKS_PROPAGATION)
     this.props.unSubscribeRoom(BLOCKS_FREQUENCY)
     this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
     this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
