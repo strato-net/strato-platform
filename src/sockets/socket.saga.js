@@ -46,7 +46,7 @@ import {
 } from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
-const socket = io(env.APEX_URL.replace('http','ws'));
+const socket = io(env.SOCKET_SERVER);
 
 function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   socket.on(`PRELOAD_${room}`, data => {
