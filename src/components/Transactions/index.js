@@ -25,7 +25,6 @@ import { connect } from 'react-redux';
 
 class Transactions extends Component {
   componentDidMount() {
-    console.log('Transactions')
     mixpanelWrapper.track("transactions_loaded");
   }
 
