@@ -12,17 +12,23 @@ const Tour = ({name, callback, run, steps, ref, autoStart, endTour, stopAllTours
       run={run}
       locale={{last: 'Continue', next: 'Continue', back: 'Back', skip: 'Skip', close: 'Close'}}
       type='continuous' // As opposed to 'single'
-      // debug={true}
+      debug={false}
       autoStart={autoStart}
       showBackButton={false}
       callback={event => {
-        if(event.isTourSkipped || event.action === 'close') {
+        if(event.action === 'close') {
           endTour(name);
-          stopAllToursFromAutostarting();
+          return;
         }
-        else if((event.type === 'step:after' && event.step.selector === finalStepSelector)) {
-          console.log("THERE");
-          if(nextPage) history.push(nextPage);
+        if(event.isTourSkipped) {
+          stopAllToursFromAutostarting();
+          return;
+        }
+        
+        if((event.type === 'step:after' && event.step.selector === finalStepSelector)) {
+          if(nextPage) {
+            history.push(nextPage);
+          }
           endTour(name);
         }
       }}

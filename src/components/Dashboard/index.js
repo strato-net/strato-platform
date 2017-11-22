@@ -17,6 +17,7 @@ import PieChart from '../PieChart';
 
 import './dashboard.css';
 
+// TODO: these should be part of a reducer state. Do the same for other global variables.
 const tourSteps = [
   {
     title: 'Welcome to STRATO!',
@@ -217,7 +218,7 @@ function mapStateToProps(state) {
   };
 }
 
-export default connect(
+const connected = connect(
     mapStateToProps,
     {
       fetchBlockData,
@@ -225,3 +226,5 @@ export default connect(
       fetchContracts,
     }
   )(Dashboard)
+
+export default withRouter(connected);

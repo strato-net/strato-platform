@@ -1,11 +1,13 @@
 import { END_TOUR, END_ALL_TOURS, STOP_TOUR_AUTOSTART, STOP_ALL_TOUR_AUTOSTARTS } from './tour.actions';
 
+const skipTour = localStorage.getItem('skip_tour') === 'true';
+
 const initialState = {
-  dashboard: {run: true, autoStart: true},
-  transactions: {run: true, autoStart: true},
-  accounts: {run: true, autoStart: true},
-  contracts: {run: true, autoStart: true},
-  all: {run: true, autoStart: true},
+  dashboard: {run: !skipTour, autoStart: !skipTour},
+  transactions: {run: !skipTour, autoStart: !skipTour},
+  accounts: {run: !skipTour, autoStart: !skipTour},
+  contracts: {run: !skipTour, autoStart: !skipTour},
+  all: {run: !skipTour, autoStart: !skipTour},
 };
 
 const reducer = (state = initialState, action) => {
@@ -20,6 +22,7 @@ const reducer = (state = initialState, action) => {
       return Object.assign({}, state, {[action.name]: Object.assign({}, state[action.name], {autoStart: false})});
     }
     case STOP_ALL_TOUR_AUTOSTARTS: {
+      localStorage.setItem('skip_tour','true');
       return Object.assign({}, state, {all: Object.assign({}, state.all, {autoStart: false})});
     }
     default: {
