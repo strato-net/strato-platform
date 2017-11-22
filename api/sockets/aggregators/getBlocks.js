@@ -17,12 +17,12 @@ function getBlocks() {
 
     _.map(blocks, function (block) {
       const data = JSON.parse(block.block_data)
-      let block = _.object(_.map(data, _.values));
+      let parsedBlock = _.object(_.map(data, _.values));
 
-      blockData.push(block);
-      blockDifficulty.push(block.difficulty.replace(/^s/, ""));
+      blockData.push(parsedBlock);
+      blockDifficulty.push(parsedBlock.difficulty.replace(/^s/, ""));
 
-      receiptTransactions.push(JSON.parse(block.receipt_transactions));
+      receiptTransactions.push(JSON.parse(parsedBlock.receipt_transactions));
     })
 
     const currentDifficulty = extractDifficulty(blockDifficulty)
