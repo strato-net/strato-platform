@@ -10,7 +10,8 @@ sequelize.authenticate()
     console.log('Connection has been established with ' + config.database);
   })
   .catch(err => {
-    console.log('Unable to connect to the database:', err);
+    console.error('Unable to connect to the database:', err);
+    throw err;
   });
 
 db.sequelize = sequelize;
