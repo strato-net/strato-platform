@@ -12,6 +12,11 @@ export const PRELOAD_BLOCK_DIFFICULTY = 'PRELOAD_BLOCK_DIFFICULTY'
 export const UPDATE_BLOCK_DIFFICULTY = 'UPDATE_BLOCK_DIFFICULTY'
 export const PRELOAD_BLOCK_FREQUENCY = 'PRELOAD_BLOCK_FREQUENCY'
 export const UPDATE_BLOCK_FREQUENCY = 'UPDATE_BLOCK_FREQUENCY'
+export const PRELOAD_TRANSACTION_TYPES = 'PRELOAD_TRANSACTION_TYPES'
+export const UPDATE_TRANSACTION_TYPES = 'UPDATE_TRANSACTION_TYPES'
+export const PRELOAD_PEERS = 'PRELOAD_PEERS'
+export const UPDATE_PEERS = 'UPDATE_PEERS'
+
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockNumber = function (data) {
   return {
@@ -62,60 +67,91 @@ export const updateUsersCount = function (data) {
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadTransactionsCount = function (data) {
-	return {
-		type: PRELOAD_TRANSACTION_COUNT,
-		data
-	}
+  return {
+    type: PRELOAD_TRANSACTION_COUNT,
+    data
+  }
 }
 
 export const updateTransactionCount = function (data) {
-	return {
-		type: UPDATE_TRANSACTION_COUNT,
-		data
-	}
-} 
+  return {
+    type: UPDATE_TRANSACTION_COUNT,
+    data
+  }
+}
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockPropagation = function (data) {
-	return {
-		type: PRELOAD_BLOCK_PROPAGATION,
-		data
-	}
+  return {
+    type: PRELOAD_BLOCK_PROPAGATION,
+    data
+  }
 }
 
 export const updateBlockPropagation = function (data) {
-	return {
-		type: UPDATE_BLOCK_PROPAGATION,
-		data
-	}
-} 
+  return {
+    type: UPDATE_BLOCK_PROPAGATION,
+    data
+  }
+}
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockDifficulty = function (data) {
-	return {
-		type: PRELOAD_BLOCK_DIFFICULTY,
-		data
-	}
+  return {
+    type: PRELOAD_BLOCK_DIFFICULTY,
+    data
+  }
 }
 
 export const updateBlockDifficulty = function (data) {
-	return {
-		type: UPDATE_BLOCK_DIFFICULTY,
-		data
-	}
-} 
+  return {
+    type: UPDATE_BLOCK_DIFFICULTY,
+    data
+  }
+}
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockFrequency = function (data) {
-	return {
-		type: PRELOAD_BLOCK_FREQUENCY,
-		data
-	}
+  return {
+    type: PRELOAD_BLOCK_FREQUENCY,
+    data
+  }
 }
 
 export const updateBlockFrequency = function (data) {
-	return {
-		type: UPDATE_BLOCK_FREQUENCY,
-		data
-	}
+  return {
+    type: UPDATE_BLOCK_FREQUENCY,
+    data
+  }
+}
+
+// will trigger from socket.saga and update the dashboard store
+export const preloadTransactionType = function (data) {
+  return {
+    type: PRELOAD_TRANSACTION_TYPES,
+    data
+  }
+}
+
+export const updateTransactionType = function (data) {
+  return {
+    type: UPDATE_TRANSACTION_TYPES,
+    data
+  }
+}
+
+
+// will trigger from socket.saga and update the dashboard store
+export const preloadPeers = function (data) {
+  return {
+    type: PRELOAD_PEERS,
+    data
+  }
+}
+
+export const updatePeers = function (data) {
+  return {
+    type: UPDATE_PEERS,
+    data
+  }
 } 

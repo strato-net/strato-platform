@@ -5,17 +5,11 @@ import NodeCard from '../NodeCard';
 import TransactionList from '../TransactionList';
 import NumberCard from '../NumberCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { fetchBlockData } from '../BlockData/block-data.actions';
-import { fetchAccounts } from '../Accounts/accounts.actions';
 import { endTour } from '../Tour/tour.actions';
 // import { callAfterTour } from '../Tour/tour.helpers';
-
 // import Tour from '../Tour';
-
-import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
-
 import './dashboard.css';
 import { hideLoading } from 'react-redux-loading-bar';
 import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
@@ -26,7 +20,9 @@ import {
   TRANSACTIONS_COUNT,
   BLOCKS_PROPOGATION,
   BLOCKS_DIFFICULTY,
-  BLOCKS_FREQUENCY
+  BLOCKS_FREQUENCY,
+  TRANSACTIONS_TYPE,
+  GET_PEERS
 } from '../../sockets/rooms'
 /*const tourSteps = [
   {
@@ -55,95 +51,31 @@ class Dashboard extends Component {
     this.props.subscribeRoom(BLOCKS_FREQUENCY)
     this.props.subscribeRoom(BLOCKS_DIFFICULTY)
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
-    
-    this.props.fetchBlockData();
-    this.props.fetchAccounts(false, false);
+    this.props.subscribeRoom(TRANSACTIONS_TYPE)
+    this.props.subscribeRoom(GET_PEERS)
+
     mixpanelWrapper.track('dashboard_page_load');
-    this.startPoll();
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
     this.props.unSubscribeRoom(LAST_BLOCK_NUMBER)
     this.props.unSubscribeRoom(USERS_COUNT)
     this.props.unSubscribeRoom(CONTRACTS_COUNT)
     this.props.unSubscribeRoom(BLOCKS_PROPOGATION)
     this.props.unSubscribeRoom(BLOCKS_FREQUENCY)
-    this.props.unSubscribeRoom(BLOCKS_DIFFICULTY) 
-    this.props.unSubscribeRoom(TRANSACTIONS_COUNT)  
-  }
-
-  startPoll() {
-    const dashboardFetchStatus = this.props.fetchBlockData;
-    const fetchAccounts = this.props.fetchAccounts;
-    this.timeout = setInterval(function () {
-      dashboardFetchStatus();
-      fetchAccounts(false, false);
-    }, env.POLLING_FREQUENCY);
-  }
-
-  difficulty(blockData) {
-    return Object.values(blockData).map(function (val, i) {
-      return { x: i, y: val.difficulty };
-    })
-  }
-
-  blockPropogation(blockData) {
-    let timeData = [];
-    let times = Object.values(blockData).map(function (val) {
-      return val.timestamp
-    });
-
-    var i = 0;
-    for (; i < times.length - 1; i++) {
-      let obj = { x: i, y: Math.abs((new Date(times[i + 1]).getSeconds()) - (new Date(times[i]).getSeconds())) };
-      timeData.push(obj);
-    }
-    return timeData;
-  }
-
-
-  txCount(blockData) {
-    return blockData.map(val => {
-      return val.length
-    }).reduce((x, y) => {
-      return x + y
-    }, 0);
-  }
-
-  txFreq(blockData) {
-    return blockData.map(function (val, i) {
-      return { x: i, y: val.length };
-    })
-  }
-
-  txType(blockData) {
-    let types = { "FunctionCall": 0, "Transfer": 0, "Contract": 0 };
-    blockData.forEach(function (val) {
-      val.forEach(v => { types[v.transactionType]++ });
-    })
-    return Object.getOwnPropertyNames(types).map((type) => {
-      return {
-        val: types[type],
-        type: type
-      }
-    });
+    this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
+    this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
+    this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
+    this.props.unSubscribeRoom(GET_PEERS)
   }
 
   render() {
-    const blockData = Object.values(this.props.blockData).map(val => {
-      return val.blockData
-    });
 
-    const receiptTransactions = Object.values(this.props.blockData).map(val => {
-      return val.receiptTransactions
-    });
-
-    const difficultyData = this.difficulty(blockData);
-    const txFreqData = this.txFreq(receiptTransactions);
-    const txCount = this.txCount(receiptTransactions);
-    const blockPropData = this.blockPropogation(blockData);
-    const txTypeData = this.txType(receiptTransactions);
+    const difficultyData = this.props.dashboard.blockDifficulty;
+    const txFreqData = this.props.dashboard.blockFrequency;
+    const txCount = this.props.dashboard.transactionsCount;
+    const blockPropData = this.props.dashboard.blockPropagation;
+    const txTypeData = this.props.dashboard.transactionTypes;
 
     const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
     const apiError = this.props.nodes.reduce((acc, node) => acc || node.apiFailure, false);
@@ -208,16 +140,20 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
+            {difficultyData && <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
+            }
           </div>
           <div className="col-sm-3">
-            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
+            {txFreqData && txCount && <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
+            }
           </div>
           <div className="col-sm-3">
-            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
+            {blockPropData && <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
+            }
           </div>
           <div className="col-sm-3">
-            <PieChart data={txTypeData} />
+            {txTypeData && <PieChart data={txTypeData} />
+            }
           </div>
         </div>
         <div className="row">
@@ -237,10 +173,7 @@ class Dashboard extends Component {
 
 function mapStateToProps(state) {
   return {
-    blockData: state.blockData.blockData,
     nodes: state.nodes.nodes,
-    accounts: state.accounts.accounts,
-    contracts: state.contracts.contracts,
     dashboard: state.dashboard
   };
 }
@@ -249,8 +182,6 @@ export default withRouter(
   connect(
     mapStateToProps,
     {
-      fetchBlockData,
-      fetchAccounts,
       hideLoading,
       endTour,
       subscribeRoom,

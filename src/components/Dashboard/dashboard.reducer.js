@@ -12,7 +12,11 @@ import {
   PRELOAD_BLOCK_DIFFICULTY,
   UPDATE_BLOCK_DIFFICULTY,
   PRELOAD_BLOCK_FREQUENCY,
-  UPDATE_BLOCK_FREQUENCY
+  UPDATE_BLOCK_FREQUENCY,
+  PRELOAD_PEERS,
+  UPDATE_PEERS,
+  PRELOAD_TRANSACTION_TYPES,
+  UPDATE_TRANSACTION_TYPES
 } from './dashboard.action'
 
 const initialState = {
@@ -22,7 +26,9 @@ const initialState = {
   transactionsCount: 0,
   blockPropagation: undefined,
   blockFrequency: undefined,
-  blockDifficulty: undefined
+  blockDifficulty: undefined,
+  transactionTypes: undefined,
+  peers: undefined
 };
 
 const reducer = function (state = initialState, action) {
@@ -64,59 +70,75 @@ const reducer = function (state = initialState, action) {
       };
 
     case PRELOAD_TRANSACTION_COUNT:
-    console.log('PRELOAD_TRANSACTION_COUNT',action.data)
       return {
         ...state,
         transactionsCount: action.data
       };
 
     case UPDATE_TRANSACTION_COUNT:
-    console.log('UPDATE_TRANSACTION_COUNT',action.data)    
       return {
         ...state,
         transactionsCount: action.data
       }
 
     case PRELOAD_BLOCK_DIFFICULTY:
-      console.log('PRELOAD_BLOCK_DIFFICULTY', action.data)
       return {
         ...state,
         blockDifficulty: action.data
       }
 
     case UPDATE_BLOCK_DIFFICULTY:
-      console.log('UPDATE_BLOCK_DIFFICULTY', action.data)
       return {
         ...state,
         blockDifficulty: action.data
       }
 
     case PRELOAD_BLOCK_FREQUENCY:
-      console.log('PRELOAD_BLOCK_FREQUENCY', action.data)
       return {
         ...state,
         blockFrequency: action.data
       }
 
     case UPDATE_BLOCK_FREQUENCY:
-      console.log('UPDATE_BLOCK_FREQUENCY', action.data)
       return {
         ...state,
         blockFrequency: action.data
       }
 
     case PRELOAD_BLOCK_PROPAGATION:
-      console.log('PRELOAD_BLOCK_PROPAGATION', action.data)
       return {
         ...state,
         blockPropagation: action.data
       }
 
     case UPDATE_BLOCK_PROPAGATION:
-      console.log('UPDATE_BLOCK_PROPAGATION', action.data)
       return {
         ...state,
         blockPropagation: action.data
+      }
+
+    case PRELOAD_PEERS:
+      return {
+        ...state,
+        peers: action.data
+      }
+
+    case UPDATE_PEERS:
+      return {
+        ...state,
+        peers: action.data
+      }
+
+    case PRELOAD_TRANSACTION_TYPES:
+      return {
+        ...state,
+        transactionTypes: action.data
+      }
+
+    case UPDATE_TRANSACTION_TYPES:
+      return {
+        ...state,
+        transactionTypes: action.data
       }
 
     default:

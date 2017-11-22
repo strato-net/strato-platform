@@ -1,10 +1,8 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
-import {fetchTx} from './transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
 import { Text } from '@blueprintjs/core';
-import { env } from '../../env';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { parseDateFromString } from '../../lib/dateUtils';
 import HexText from '../HexText';
@@ -14,27 +12,15 @@ import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
 class TransactionList extends Component {
 
   componentDidMount() {
-    console.log('Transaction list', GET_TRANSACTIONS)
     this.props.subscribeRoom(GET_TRANSACTIONS)
-    // this.props.fetchTx();
-    // this.startPoll();
   }
 
   componentWillUnmount() {
     this.props.unSubscribeRoom(GET_TRANSACTIONS)
-    // clearTimeout(this.timeout)
-  }
-
-  startPoll() {
-    const fetchTx = this.props.fetchTx;
-    this.timeout = setInterval(function () {
-      fetchTx();
-    }, env.POLLING_FREQUENCY);
   }
 
   render() {
     const self = this;
-    console.log('TX:', this.props.transactions)
     let txRows = this.props.transactions !== undefined && this.props.transactions.slice(0, 5).map(
       function (tx, i) {        
         return (
