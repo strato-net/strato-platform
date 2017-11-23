@@ -14,8 +14,6 @@ export const PRELOAD_BLOCK_FREQUENCY = 'PRELOAD_BLOCK_FREQUENCY'
 export const UPDATE_BLOCK_FREQUENCY = 'UPDATE_BLOCK_FREQUENCY'
 export const PRELOAD_TRANSACTION_TYPES = 'PRELOAD_TRANSACTION_TYPES'
 export const UPDATE_TRANSACTION_TYPES = 'UPDATE_TRANSACTION_TYPES'
-export const PRELOAD_PEERS = 'PRELOAD_PEERS'
-export const UPDATE_PEERS = 'UPDATE_PEERS'
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadBlockNumber = function (data) {
@@ -139,19 +137,3 @@ export const updateTransactionType = function (data) {
     data
   }
 }
-
-
-// will trigger from socket.saga and update the dashboard store
-export const preloadPeers = function (data) {
-  return {
-    type: PRELOAD_PEERS,
-    data
-  }
-}
-
-export const updatePeers = function (data) {
-  return {
-    type: UPDATE_PEERS,
-    data
-  }
-} 

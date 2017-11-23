@@ -1,16 +1,15 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { env } from '../../env';
 import { Collapse } from '@blueprintjs/core';
-import {
-  fetchNodeDetail,
-  fetchNodePeers,
-  fetchNodeCoinbase
-} from './nodeCard.actions';
 import './nodeCard.css';
 import PeersCard from '../PeersCard';
 import HexText from '../HexText';
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
+import {
+  GET_COINBASE,
+  GET_PEERS
+} from '../../sockets/rooms'
 
 class NodeCard extends Component {
 
@@ -22,23 +21,13 @@ class NodeCard extends Component {
   }
 
   componentDidMount() {
-    //this.props.fetchNodeDetail(this.props.nodeIndex);
-    this.props.fetchNodePeers(this.props.nodeIndex);
-    this.props.fetchNodeCoinbase(this.props.nodeIndex);
-    this.startPoll();
+    this.props.subscribeRoom(GET_COINBASE)
+    this.props.subscribeRoom(GET_PEERS)
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
-  }
-
-  startPoll() {
-    const fetchNodePeers = this.props.fetchNodePeers;
-    const nodeIndex = this.props.nodeIndex;
-
-    this.timeout = setInterval(function () {
-      fetchNodePeers(nodeIndex);
-    }, env.POLLING_FREQUENCY);
+    this.props.unSubscribeRoom(GET_COINBASE)
+    this.props.unSubscribeRoom(GET_PEERS)
   }
 
   handleClick = () => {
@@ -46,13 +35,11 @@ class NodeCard extends Component {
   };
 
   render() {
-    const node = this.props.nodes[this.props.nodeIndex];
-    const peers = node.peers ? Object.getOwnPropertyNames(node.peers):[];
-    const blockNumber = this.props.blockData.length > 0 ?
-      this.props.blockData[0].blockData.number.toString()
-      : 'unknown';
+    const node = this.props.node;
+    const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
+    const blockNumber = this.props.dashboard.lastBlockNumber > 0 ? this.props.dashboard.lastBlockNumber : 'unknown';
     let className = 'pt-card pt-elevation-2 ';
-    className += node.apiFailure ? 'node-warning pt-interactive' : 'node-success pt-interactive';
+    className += node.peers ? 'node-warning pt-interactive' : 'node-success pt-interactive';
     let arrowIcon = 'col-xs-3 text-right pt-icon-standard '
     arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
@@ -70,7 +57,7 @@ class NodeCard extends Component {
               <small>Coinbase</small>
             </div>
             <div className="col-xs-9">
-              <small> <HexText value={node.coinbase} classes="smd-pad-2"/> </small>
+              <small> <HexText value={node.coinbase.coinbase} classes="smd-pad-2" /> </small>
             </div>
           </div>
           <div className="row pt-text-muted">
@@ -91,7 +78,7 @@ class NodeCard extends Component {
           </div>
         </div>
         <Collapse isOpen={this.state.isOpen}>
-          <PeersCard nodeIndex={this.props.nodeIndex} />
+          <PeersCard />
         </Collapse>
       </div>
     );
@@ -100,8 +87,8 @@ class NodeCard extends Component {
 
 function mapStateToProps(state) {
   return {
-    blockData: state.blockData.blockData,
-    nodes: state.nodes.nodes
+    dashboard: state.dashboard,
+    node: state.nodes
   };
 }
 
@@ -109,9 +96,8 @@ export default withRouter(
   connect(
     mapStateToProps,
     {
-      fetchNodeDetail,
-      fetchNodePeers,
-      fetchNodeCoinbase
+      subscribeRoom,
+      unSubscribeRoom,
     }
   )(NodeCard)
 );

@@ -1,71 +1,39 @@
 import {
-  FETCH_NODE_DETAIL_SUCCESS,
-  FETCH_NODE_PEERS_SUCCESSFUL,
-  FETCH_NODE_PEERS_FAILED,
-  FETCH_NODE_COINBASE_SUCCESSFUL,
+  PRELOAD_PEERS,
+  UPDATE_PEERS,
+  PRELOAD_COINBASE,
+  UPDATE_COINBASE
 } from './nodeCard.actions';
 import { env } from '../../env';
 
 const initialState = {
-  nodes: [{
-    name: env.NODE_NAME
-  }]
+  name: env.NODE_NAME,
+  peers: {},
+  coinbase: '',
+  apiError: false
 };
 
 const reducer = function (state = initialState, action) {
-  switch(action.type) {
-    case FETCH_NODE_DETAIL_SUCCESS:
+  switch (action.type) {
+    case PRELOAD_PEERS:
       return {
-        nodes: state.nodes.map((node,index) => {
-          if(index !== action.nodeIndex) {
-            return node;
-          }
-
-          return {
-            ...state.nodes[action.nodeIndex],
-            detail: action.detail
-          }
-        })
+        ...state,
+        peers: action.peers
       }
-    case FETCH_NODE_PEERS_SUCCESSFUL:
+    case UPDATE_PEERS:
       return {
-        nodes: state.nodes.map((node,index) => {
-          if(index !== action.nodeIndex) {
-            return node;
-          }
-
-          return {
-            ...state.nodes[action.nodeIndex],
-            peers: action.peers,
-            apiFailure: false
-          }
-        })
+        ...state,
+        peers: action.peers
       }
-    case FETCH_NODE_PEERS_FAILED:
+    case PRELOAD_COINBASE:
       return {
-        nodes: state.nodes.map((node,index) => {
-          if(index !== action.nodeIndex) {
-            return node;
-          }
-
-          return {
-            ...state.nodes[action.nodeIndex],
-            apiFailure: true
-          }
-        })
+        ...state,
+        coinbase: action.coinbase
       }
-    case FETCH_NODE_COINBASE_SUCCESSFUL:
+    case UPDATE_COINBASE:
       return {
-        nodes: state.nodes.map((node,index) => {
-          if(index !== action.nodeIndex) {
-            return node;
-          }
-
-          return {
-            ...state.nodes[action.nodeIndex],
-            coinbase: action.coinbase
-          }
-        })
+        ...state,
+        coinbase: action.coinbase
       }
     default:
       return state;

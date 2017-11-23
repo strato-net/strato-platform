@@ -18,7 +18,8 @@ import {
   BLOCKS_FREQUENCY,
   TRANSACTIONS_COUNT,
   TRANSACTIONS_TYPE,
-  GET_PEERS
+  GET_PEERS,
+  GET_COINBASE
 } from './rooms';
 import {
   updateBlockNumber,
@@ -35,11 +36,15 @@ import {
   updateBlockFrequency,
   preloadBlockPropagation,
   updateBlockPropagation,
-  preloadPeers,
-  updatePeers,
   preloadTransactionType,
   updateTransactionType
 } from '../components/Dashboard/dashboard.action';
+import {
+  updateCoinbase,
+  preloadCoinbase,
+  updatePeers,
+  preloadPeers
+} from '../components/NodeCard/nodeCard.actions';
 import {
   updateTx,
   preloadTx
@@ -50,8 +55,8 @@ console.log('>>>> socket server url', env.SOCKET_SERVER);
 const socket = io(env.SOCKET_SERVER);
 
 function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
-  console.log('registering', room);
   socket.on(`PRELOAD_${room}`, data => {
+    console.log('registering', room, data);    
     eventChannelEmit(preloadAction(data));
   })
 
@@ -73,6 +78,7 @@ function subscribe() {
     registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount)
     registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)
     registerActions(emit, GET_PEERS, preloadPeers, updatePeers)
+    registerActions(emit, GET_COINBASE, preloadCoinbase, updateCoinbase)
 
     socket.on('disconnect', e => {
       // TODO: handle
