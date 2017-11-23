@@ -9,8 +9,7 @@ import { env } from '../../env';
 const initialState = {
   name: env.NODE_NAME,
   peers: {},
-  coinbase: '',
-  apiError: false
+  coinbase: ''
 };
 
 const reducer = function (state = initialState, action) {

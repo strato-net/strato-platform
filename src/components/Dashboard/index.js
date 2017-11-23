@@ -78,10 +78,7 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-    console.log('Nodes:', this.props.nodes)
-    // const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
-    // const apiError = this.props.nodes.reduce((acc, node) => acc || node.apiFailure, false);
-    const apiError = false
+    const apiError = this.props.node.peers.length > 0 || this.props.node.coinbase.length > 0
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard
 
     return (
@@ -171,7 +168,7 @@ class Dashboard extends Component {
 
 function mapStateToProps(state) {
   return {
-    nodes: state.nodes.nodes,
+    node: state.nodes,
     dashboard: state.dashboard
   };
 }
