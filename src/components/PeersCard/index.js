@@ -8,9 +8,7 @@ class PeersCard extends Component {
 
   render() {
     const node = this.props.node;
-    const peers = node.peers
-      ? Object.getOwnPropertyNames(node.peers)
-      : [];
+    const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
     let className = 'pt-card pt-elevation-2';
     return (
       <div className={className}>

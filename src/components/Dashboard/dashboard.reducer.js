@@ -118,14 +118,12 @@ const reducer = function (state = initialState, action) {
       }
 
     case PRELOAD_PEERS:
-      console.log('PRELOAD_PEERS', action.data)
       return {
         ...state,
         peers: action.data
       }
 
     case UPDATE_PEERS:
-      console.log('UPDATE_PEERS', action.data)
       return {
         ...state,
         peers: action.data

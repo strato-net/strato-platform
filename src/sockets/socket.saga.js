@@ -51,12 +51,10 @@ import {
 } from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
-console.log('>>>> socket server url', env.SOCKET_SERVER);
 const socket = io(env.SOCKET_SERVER);
 
 function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   socket.on(`PRELOAD_${room}`, data => {
-    console.log('registering', room, data);    
     eventChannelEmit(preloadAction(data));
   })
 
@@ -66,7 +64,6 @@ function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
 }
 
 function subscribe() {
-  console.log('subscribing');
   return eventChannel(emit => {
     registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
     registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
@@ -91,7 +88,6 @@ function* readSocketEvents() {
   const channel = yield call(subscribe);
   while (true) {
     let action = yield take(channel);
-    console.log('something happened...', action);
     yield put(action);
   }
 }
