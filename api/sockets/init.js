@@ -1,14 +1,16 @@
-const { 
-  LAST_BLOCK_NUMBER, 
-  TRANSACTIONS_COUNT, 
-  USERS_COUNT, 
-  GET_PEERS, 
-  CONTRACTS_COUNT, 
+const {
+  LAST_BLOCK_NUMBER,
+  TRANSACTIONS_COUNT,
+  USERS_COUNT,
+  GET_PEERS,
+  CONTRACTS_COUNT,
   TRANSACTIONS_TYPE,
-  GET_TRANSACTIONS, 
-  BLOCKS_PROPAGATION, 
-  BLOCKS_FREQUENCY, 
-  BLOCKS_DIFFICULTY } = require('./rooms')
+  GET_TRANSACTIONS,
+  BLOCKS_PROPAGATION,
+  BLOCKS_FREQUENCY,
+  BLOCKS_DIFFICULTY,
+  GET_COINBASE
+ } = require('./rooms')
 
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroaker')
 const lastBlockNumberAggregator = require('./aggregators/lastBlockNumber')
@@ -18,6 +20,7 @@ const getPeersAggregator = require('./aggregators/getPeers')
 const transactionsTypeAggregator = require('./aggregators/transactionsType')
 const getBlocksAggregator = require('./aggregators/getBlocks')
 const getTransactionsAggregator = require('./aggregators/getTransactions');
+const getCoinbaseAggregator = require('./aggregators/getCoinbase');
 
 const io = require('socket.io')()
 function init(server) {
@@ -40,7 +43,7 @@ function init(server) {
 
     // register request for blocks data
     registerRoomAllocation(socket, BLOCKS_FREQUENCY, getBlocksAggregator.initialHydrateBlockFrequency)
-    
+
     // register request for blocks data
     registerRoomAllocation(socket, BLOCKS_PROPAGATION, getBlocksAggregator.initalHydrateBlockPropagation)
 
@@ -50,7 +53,11 @@ function init(server) {
     // register request for transaction data
     registerRoomAllocation(socket, GET_TRANSACTIONS, getTransactionsAggregator.initialHydrate)
 
+    // register request for transaction data
     registerRoomAllocation(socket, TRANSACTIONS_COUNT, getBlocksAggregator.initialHydrateTransactionCount)
+
+    // register request for Coinbase
+    registerRoomAllocation(socket, GET_COINBASE, getCoinbaseAggregator.initialHydrate)
   });
 }
 

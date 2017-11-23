@@ -1,0 +1,37 @@
+const _ = require('underscore');
+const { GET_COINBASE } = require('../rooms')
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroaker')
+var rp = require('request-promise');
+
+let coinbase
+
+const options = {
+  uri: `http://${process.env['STRATO_LOCAL_HOST']}/strato-api/eth/v1.2/coinbase`,
+  json: true
+}
+
+function getCoinbase() {
+  rp(options)
+    .then(function (currentCoinbase) {
+      if (!_.isEqual(coinbase, currentCoinbase)) {
+        console.log("currentCoinbase", currentCoinbase);
+        coinbase = currentCoinbase
+        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_COINBASE, currentCoinbase)
+      }
+    })
+    .catch(function (err) {
+      console.error("Error: ", err);
+      throw err
+    });
+}
+
+getCoinbase()
+setInterval(getCoinbase, 3000)
+
+function initialHydrate(socket) {
+  socket.emit(`PRELOAD_${GET_COINBASE}`, coinbase);
+}
+
+module.exports = {
+  initialHydrate
+}
