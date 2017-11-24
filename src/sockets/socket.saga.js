@@ -51,7 +51,7 @@ import {
 } from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
-const socket = io(env.SOCKET_SERVER);
+const socket = io(env.SOCKET_SERVER, {transports: ['websocket']});
 
 function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   socket.on(`PRELOAD_${room}`, data => {
