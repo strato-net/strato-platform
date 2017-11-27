@@ -51,7 +51,7 @@ import {
 } from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
-const socket = io(env.SOCKET_SERVER, {path: '/apex-api', transports: ['websocket']});
+const socket = io(env.SOCKET_SERVER, {path: '/apex-ws', transports: ['websocket']});
 
 function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   socket.on(`PRELOAD_${room}`, data => {
