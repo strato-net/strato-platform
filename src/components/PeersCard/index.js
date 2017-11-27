@@ -39,7 +39,7 @@ class PeersCard extends Component {
             )
           })
           : <Text ellipsize={true}>
-            <small>No client peers</small>
+            <small>No peers</small>
           </Text>}
       </div>
     );

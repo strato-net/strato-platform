@@ -93,7 +93,7 @@ function* readSocketEvents() {
 }
 
 function* socketSubscribeUnsubscribeRoom(action) {
-  yield socket.emit(action.name, '')
+  yield socket.emit(action.name)
 }
 
 export function* watchCommunicateOverSocket() {
