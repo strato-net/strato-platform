@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
 until netcat -z ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT} >&/dev/null
