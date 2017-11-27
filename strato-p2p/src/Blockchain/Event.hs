@@ -46,7 +46,7 @@ import           Blockchain.Stream.VMEvent
 import           Blockchain.Verification
 
 import           Blockchain.Sequencer.Event            (IngestEvent (..), IngestTx (..), OutputEvent (..),
-                                                        OutputTx (..), blockToIngestBlock, obTotalDifficulty, otBaseTx,
+                                                        OutputTx (..), blockToIngestBlock, obOrigin, obTotalDifficulty, otBaseTx,
                                                         outputBlockToBlock)
 import           Blockchain.Sequencer.Kafka            (writeUnseqEvents)
 
@@ -112,12 +112,14 @@ handleEvents mode peer = awaitForever $ \case
     MsgEvt Ping     -> yield Pong
 
     MsgEvt (Transactions txs) -> do
+        stampActionTimestamp
         let txo = Origin.PeerString (peerString peer)
         _ <- lift $ insertTX mode txo Nothing txs
         emitKafkaTransactions txo txs
         return ()
 
     MsgEvt (NewBlock block' tdiff) -> do
+        stampActionTimestamp
         $logInfoS "handleEvents/NewBlock" $ T.pack $ "newBlock with tdiff " ++ show tdiff
         lift $ putNewBlk $ blockToNewBlk block' -- todo delete this?
         let sha         = blockHash block'
@@ -143,6 +145,7 @@ handleEvents mode peer = awaitForever $ \case
                     void $ emitKafkaBlock (Origin.PeerString $ peerString peer) block'
 
     MsgEvt (NewBlockHashes _) -> do
+        stampActionTimestamp
         bestBlock <- RBDB.withRedisBlockDB RBDB.getBestBlockInfo
         let bestBlockNum = numFromRedis bestBlock
         let fetchNumber = if bestBlockNum < 2 then 1 else bestBlockNum - 1
@@ -150,6 +153,7 @@ handleEvents mode peer = awaitForever $ \case
         syncFetch Forward fetchNumber
 
     MsgEvt (GetBlockHeaders (BlockNumber start) max' skip' dir) -> do
+      stampActionTimestamp
       start' <- case dir of
         Reverse -> return $ if start > fromIntegral max' then start - (fromIntegral max') else 1
         Forward -> return start
@@ -157,6 +161,7 @@ handleEvents mode peer = awaitForever $ \case
       yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (GetBlockHeaders (BlockHash start) max' skip' dir) -> do
+      stampActionTimestamp
       maybeHeader :: Maybe BlockHeader <- RBDB.withRedisBlockDB $ RBDB.getHeader start
       case maybeHeader of
         Nothing    -> yield (BlockBodies [])
@@ -169,7 +174,7 @@ handleEvents mode peer = awaitForever $ \case
           yield . BlockHeaders . skipEntries skip' $ snd <$> chain
 
     MsgEvt (BlockHeaders headers) -> do
-        clearActionTimestamp
+        stampActionTimestamp
         alreadyRequestedHeaders <- lift getBlockHeaders -- get already requested headers
         when (null alreadyRequestedHeaders) $ do        -- proceed if we are not already requesting headers
             -- let headerHashes = S.fromList $ map headerHash headers
@@ -219,8 +224,12 @@ handleEvents mode peer = awaitForever $ \case
     -- todo: but alas, the devs hate us.
     -- todo: instead, we'd just return [1, 2] in this case, and hope the peer re-requests the missing blocks from
     -- todo: someone else or us at a later time
-    MsgEvt (GetBlockBodies [])   -> yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
-    MsgEvt (GetBlockBodies shas) -> getUntilMissing shas [] >>=  yield . BlockBodies . Prelude.reverse . fmap toBody
+    MsgEvt (GetBlockBodies [])   -> do
+      stampActionTimestamp
+      yield (BlockBodies []) -- todo parity bans peers when they do this. should we?
+    MsgEvt (GetBlockBodies shas) -> do
+      stampActionTimestamp
+      getUntilMissing shas [] >>=  yield . BlockBodies . Prelude.reverse . fmap toBody
         where getUntilMissing :: (RBDB.HasRedisBlockDB m, MonadIO m) => [SHA] -> [Block] -> m [Block]
               getUntilMissing []     bodies = return bodies
               getUntilMissing (h:hs) bodies = RBDB.withRedisBlockDB (RBDB.getBlock h) >>= \case
@@ -232,9 +241,9 @@ handleEvents mode peer = awaitForever $ \case
 
     -- todo: support the "best effort" behavior that everyone uses for bodies they dont have (mentioned above
     -- todo:
-    MsgEvt (BlockBodies []) -> clearActionTimestamp
+    MsgEvt (BlockBodies []) -> return () --clearActionTimestamp
     MsgEvt (BlockBodies bodies) -> do
-        clearActionTimestamp
+        stampActionTimestamp
         headers <- lift getBlockHeaders
         let verified = and $ zipWith (\h b -> transactionsRoot h == transactionsVerificationValue (fst b)) headers bodies
         unless verified $ error "headers don't match bodies"
@@ -257,29 +266,37 @@ handleEvents mode peer = awaitForever $ \case
             throwIO PeerDisconnected
 
     NewSeqEvent oe -> case oe of
-            -- todo: use shouldSend here, to make sure we don't send back block
-            -- to peer we got it from
-            OEBlock b  -> do
+      OEBlock b  -> do
+        when (shouldSend peer $ obOrigin b) $ do
+          worldBestBlock <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
+          case worldBestBlock of
+            Nothing -> return ()
+            Just (RedisBestBlock _ _ worldTDiff) -> do
+              $logInfoS "NewSeqEvent.block" . T.pack $ "World TDiff: " ++ show worldTDiff
+              when (obTotalDifficulty b >= worldTDiff) $ do
                 $logInfoS "NewSeqEvent.block" . T.pack $ "yielding new block: " ++ show (blockDataNumber . blockBlockData . outputBlockToBlock $ b)
                 yield $ NewBlock (outputBlockToBlock b) (obTotalDifficulty b)
-            OETx ts tx -> do
-                $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ show (otHash tx) ++ " at " ++ show ts
-                $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
-                when (shouldSend peer tx) . yield $ Transactions [tx'] where
-                    tx' = otBaseTx $ tx
-            _          -> return () -- shouldn't happen but our types don't prohibit us
+      OETx ts tx -> do
+          $logInfoS "NewSeqEvent.tx" . T.pack $ "yielding new tx: " ++ show (otHash tx) ++ " at " ++ show ts
+          $logDebugS "NewSeqEvent.tx" . T.pack $ "the transaction was: " ++ format tx
+          when (shouldSend peer $ otOrigin tx) . yield $ Transactions [tx'] where
+              tx' = otBaseTx $ tx
+      _          -> return () -- shouldn't happen but our types don't prohibit us
 
     TimerEvt -> do
         maybeOldTS <- getActionTimestamp
         case maybeOldTS of
             Just oldTS -> do
                 ts <- liftIO getCurrentTime
-                liftIO $ setTitle $ "timer: " ++ show (60 - ts `diffUTCTime` oldTS)
-                when (ts `diffUTCTime` oldTS > 60) $ do
+                let diffTime = ts `diffUTCTime` oldTS
+                liftIO $ setTitle $ "timer: " ++ show (60 - diffTime)
+                when (diffTime > 60) $ do
                     yield $ Disconnect UselessPeer
                     liftIO $ setTitle "timer timed out!"
                     error "Peer did not respond"
-            Nothing -> return ()
+            Nothing -> do
+              $logInfoS "TimerEvt" $ T.pack "Timestamp is not set"
+              return ()
 
     AbortEvt reason -> do
       $logInfoS "handleEvents/AbortEvt" . T.pack $ "Received AbortEvt: " ++ reason
@@ -301,13 +318,13 @@ syncFetch d num = do
         yield $ GetBlockHeaders (BlockNumber num) maxReturnedHeaders 0 d
         stampActionTimestamp
 
-shouldSend :: PPeer -> OutputTx -> Bool
-shouldSend peer tx = case otOrigin tx of
+shouldSend :: PPeer -> Origin.TXOrigin -> Bool
+shouldSend peer tx = case tx of
     Origin.PeerString ps -> ps /= peerString peer
     Origin.API           -> True
     Origin.BlockHash _   -> False
     Origin.Direct        -> True
-    Origin.Quarry        -> False -- this should never reach this far anyway
+    Origin.Quarry        -> True -- this should never reach this far anyway
     Origin.Morphism      -> -- probably means it was converted, see if this is a problem
         trace "NewTx of type Morphism came in. Should this even happen?" True
 
