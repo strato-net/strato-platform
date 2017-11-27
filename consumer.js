@@ -73,7 +73,10 @@ function start() {
 
 
 function resetOffset(scope) {
-  scope.consumer.setOffset(scope.kafkaTopic,0,0);
+  const topics = {
+    [scope.kafkaTopic]: [0]
+  };
+  scope.consumer.updateOffsets(topics);
 }
 
 
