@@ -45,11 +45,11 @@ function getPostgres(pgConfig) {
 function fetchABIs() {
   return function(scope) {
     console.log('fetching abi data');
-    var postgrestRoot = (process.env["postgrestRoot"] || "http://postgrest:3001")
+    var postgresturl = (process.env["postgresturl"] || "http://postgrest:3001")
 
     var options = {
       method: 'GET',
-      url: postgrestRoot + '/contract',
+      url: postgresturl + '/contract',
       json: true,
     };
 
