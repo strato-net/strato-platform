@@ -37,11 +37,12 @@ function extractTxTypes(receiptTransactions) {
   receiptTransactions.forEach(function (val) {
     val.forEach(v => { types[v.transactionType]++ });
   })
-  return _.keys(types).map((type) => {
-    return {
-      val: types[type],
-      type: type
-    }
+  return _.keys(types).filter((type) => {
+    if (types[type] > 0)
+      return {
+        val: types[type],
+        type: type
+      }
   });
 }
 
