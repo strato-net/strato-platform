@@ -69,7 +69,7 @@ const rootReducer = combineReducers({
   createContract: createContractReducer,
   createUser: createUserReducer,
   methodCall: methodCallReducer,
-  nodes: nodeCardReducer,
+  node: nodeCardReducer,
   transactions: transactionsReducer,
   queryEngine: queryEngineReducer,
   sendEther: sendEtherReducer,

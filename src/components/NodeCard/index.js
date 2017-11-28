@@ -39,7 +39,7 @@ class NodeCard extends Component {
     const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
     const blockNumber = this.props.dashboard.lastBlockNumber > 0 ? this.props.dashboard.lastBlockNumber : 'unknown';
     let className = 'pt-card pt-elevation-2 ';
-    className += node.peers ? 'node-warning pt-interactive' : 'node-success pt-interactive';
+    className += node && node.peers !== undefined && blockNumber !== 'unknown' ?  'node-success pt-interactive' : 'node-warning pt-interactive';
     let arrowIcon = 'col-xs-3 text-right pt-icon-standard '
     arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
@@ -88,7 +88,7 @@ class NodeCard extends Component {
 function mapStateToProps(state) {
   return {
     dashboard: state.dashboard,
-    node: state.nodes
+    node: state.node
   };
 }
 

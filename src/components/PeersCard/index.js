@@ -47,7 +47,7 @@ class PeersCard extends Component {
 }
 
 function mapStateToProps(state) {
-  return { node: state.nodes };
+  return { node: state.node };
 }
 
 export default withRouter(connect(mapStateToProps, null)(PeersCard));

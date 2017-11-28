@@ -168,7 +168,7 @@ class Dashboard extends Component {
 
 function mapStateToProps(state) {
   return {
-    node: state.nodes,
+    node: state.node,
     dashboard: state.dashboard
   };
 }
