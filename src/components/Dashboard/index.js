@@ -78,7 +78,10 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
+    console.log(this.props.node.coinbase.length);
+    console.log(this.props.dashboard.lastBlockNumber);
     const nodeHealthy = this.props.node.coinbase.length > 0 && this.props.dashboard.lastBlockNumber > 0;
+    console.log(this.props.nodeHealthy);
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard
 
     return (
