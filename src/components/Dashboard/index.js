@@ -78,7 +78,6 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-    const nodeHealthy = this.props.node.coinbase.length > 0;
     const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard
 
     return (
@@ -94,8 +93,8 @@ class Dashboard extends Component {
             <NumberCard
               number="HEALTH"
               description="Network"
-              mode={!nodeHealthy ? 'warning' : 'success'}
-              iconClass={!nodeHealthy ? 'fa-exclamation-circle' : 'fa-check-circle'}
+              mode={this.props.node.coinbase.length === 0 ? 'warning' : 'success'}
+              iconClass={this.props.node.coinbase.length === 0 ? 'fa-exclamation-circle' : 'fa-check-circle'}
             />
           </div>
           <div className="col-sm-3">
