@@ -9,6 +9,8 @@ var debug = require('debug')('auth-service:server');
 var http = require('http');
 const co = require('co');
 
+const sockets = require('../sockets/init');
+
 // const models = require("../models");
 // const createInitialData = require("../migrations/init-script/init");
 const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');
@@ -27,6 +29,8 @@ app.set('port', port);
 
 var server = http.createServer(app);
 
+sockets.init(server);
+
 co(function*(){
   // TODO: uncomment the sync block when DB connection is needed
   // sync() will create all table if they doesn't exist in database
@@ -34,7 +38,6 @@ co(function*(){
   // yield createInitialData();
 
   yield registerAppMetadata();
-
   server.listen(port);
   server.on('error', onError);
   server.on('listening', onListening);
