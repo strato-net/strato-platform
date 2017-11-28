@@ -3,7 +3,6 @@
 set -e
 set -x
 
-PG_PORT_5432_TCP_PORT=${PG_PORT_5432_TCP_PORT:-5432}
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
 
 until psql -h "${PG_ENV_POSTGRES_HOST}" -p ${PG_PORT_5432_TCP_PORT} -U "postgres" -c '\q'; do
