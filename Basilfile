@@ -97,7 +97,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: master
+    ref: kafka-zk 
     compose:
       restart: always
       ports:
