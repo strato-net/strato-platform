@@ -86,13 +86,14 @@ deployments:
       environment:
         blocurl: "${blocurl}"
         stratourl: "${stratourl}"
+        postgresturl: "${postgresturl}"
         zookeeper_conn: "${cirrus_zookeeper_conn}"
         postgres_db: "${cirrus_pg_db:-cirrus}"
         postgres_user: "${cirrus_pg_user:-postgres}"
         postgres_password: "${cirrus_pg_password}"
         postgres_host: "${cirrus_pg_host:-postgres}"
         postgres_port: "${cirrus_pg_port:-5432}"
-        stateDiffTopic: "${stateDiffTopic}" 
+        stateDiffTopic: "${stateDiffTopic}"
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
@@ -157,7 +158,7 @@ deployments:
         PG_ENV_POSTGRES_DB: cirrus
         PG_ENV_POSTGRES_USER: postgres
         PG_ENV_POSTGRES_PASSWORD: ""
-        PG_ENV_POSTGRES_HOST: "postgres-cirrus"
+        PG_ENV_POSTGRES_HOST: postgres-cirrus
         PG_PORT_5432_TCP_PORT: "5432"
       depends_on:
         - postgres-cirrus
