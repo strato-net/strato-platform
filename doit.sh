@@ -137,7 +137,7 @@ setEnv pgPass api
 setEnv pgHost postgres
 
 setEnv kafkaHost kafka
-setEnv zkHost zookeeper
+setEnv zkHost kafka
 
 setEnv redisBDBHost redis
 setEnv redisBDBPort 6379
