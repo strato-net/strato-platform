@@ -13,8 +13,6 @@ import {
   UPDATE_BLOCK_DIFFICULTY,
   PRELOAD_BLOCK_FREQUENCY,
   UPDATE_BLOCK_FREQUENCY,
-  PRELOAD_PEERS,
-  UPDATE_PEERS,
   PRELOAD_TRANSACTION_TYPES,
   UPDATE_TRANSACTION_TYPES
 } from './dashboard.action'
@@ -27,8 +25,7 @@ const initialState = {
   blockPropagation: [],
   blockFrequency: [],
   blockDifficulty: [],
-  transactionTypes: [],
-  peers: undefined
+  transactionTypes: []
 };
 
 const reducer = function (state = initialState, action) {
@@ -115,18 +112,6 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         blockPropagation: action.data
-      }
-
-    case PRELOAD_PEERS:
-      return {
-        ...state,
-        peers: action.data
-      }
-
-    case UPDATE_PEERS:
-      return {
-        ...state,
-        peers: action.data
       }
 
     case PRELOAD_TRANSACTION_TYPES:

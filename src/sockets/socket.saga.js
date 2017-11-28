@@ -18,7 +18,8 @@ import {
   BLOCKS_FREQUENCY,
   TRANSACTIONS_COUNT,
   TRANSACTIONS_TYPE,
-  GET_PEERS
+  GET_PEERS,
+  GET_COINBASE
 } from './rooms';
 import {
   updateBlockNumber,
@@ -35,22 +36,24 @@ import {
   updateBlockFrequency,
   preloadBlockPropagation,
   updateBlockPropagation,
-  preloadPeers,
-  updatePeers,
   preloadTransactionType,
   updateTransactionType
 } from '../components/Dashboard/dashboard.action';
+import {
+  updateCoinbase,
+  preloadCoinbase,
+  updatePeers,
+  preloadPeers
+} from '../components/NodeCard/nodeCard.actions';
 import {
   updateTx,
   preloadTx
 } from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
-console.log('>>>> socket server url', env.SOCKET_SERVER);
-const socket = io(env.SOCKET_SERVER);
+const socket = io(env.SOCKET_SERVER, {path: '/apex-ws', transports: ['websocket']});
 
 function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
-  console.log('registering', room);
   socket.on(`PRELOAD_${room}`, data => {
     eventChannelEmit(preloadAction(data));
   })
@@ -61,7 +64,6 @@ function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
 }
 
 function subscribe() {
-  console.log('subscribing');
   return eventChannel(emit => {
     registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
     registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
@@ -73,6 +75,7 @@ function subscribe() {
     registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount)
     registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)
     registerActions(emit, GET_PEERS, preloadPeers, updatePeers)
+    registerActions(emit, GET_COINBASE, preloadCoinbase, updateCoinbase)
 
     socket.on('disconnect', e => {
       // TODO: handle
@@ -85,13 +88,12 @@ function* readSocketEvents() {
   const channel = yield call(subscribe);
   while (true) {
     let action = yield take(channel);
-    console.log('something happened...', action);
     yield put(action);
   }
 }
 
 function* socketSubscribeUnsubscribeRoom(action) {
-  yield socket.emit(action.name, '')
+  yield socket.emit(action.name)
 }
 
 export function* watchCommunicateOverSocket() {

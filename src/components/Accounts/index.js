@@ -1,5 +1,5 @@
 import React, {Component} from 'react';
-import {fetchAccounts, changeAccountFilter} from './accounts.actions';
+import {fetchAccounts, changeAccountFilter, faucetRequest} from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import {connect} from 'react-redux';
 import {Text, Tooltip, Position} from '@blueprintjs/core';
@@ -7,11 +7,10 @@ import {withRouter} from 'react-router-dom';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
-
+import HexText from '../HexText';
 import Tour from '../Tour';
 
-const tourSteps = [
-/* {
+const tourSteps = [/* {
     title: 'Create User',
     text: 'Create a user here',
     selector: '#accounts-create-user-button',
@@ -20,32 +19,37 @@ const tourSteps = [
   }, ) */
   {
     title: 'Upload a Smart Contract',
-    text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your Smart Contract from within the STRATO dashboard.',
-   /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
+    text: 'Drag and drop a <strong>.sol</strong> file, and you will be able to manage your ' +
+      'Smart Contract from within the STRATO dashboard.',
+    /* text: '<div class="inline-code-sample">contract RentSplit {<br>address <strong>Roommate 1</strong>;<br><strong>Roommate 2</strong>;<br><strong>Roommate 3</strong>;<br>mapping (address => uint) RentSplit;<br></div>', */
     selector: '#contracts',
     position: 'bottom',
-    isFixed: true,
-  },
+    isFixed: true
+  }
 ];
 
 class Accounts extends Component {
 
   componentDidMount() {
-    this.props.fetchAccounts();
+    this
+      .props
+      .fetchAccounts(true, true);
     mixpanelWrapper.track('accounts_page_load')
   }
 
-  componentWillUnmount() {
-  }
+  componentWillUnmount() {}
 
   updateFilter(filter) {
-    this.props.changeAccountFilter(filter);
+    this
+      .props
+      .changeAccountFilter(filter);
   };
 
   render() {
     const accounts = this.props.accounts;
     const filter = this.props.filter;
     const history = this.props.history;
+    const faucetRequest = this.props.faucetRequest;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
 
@@ -54,71 +58,80 @@ class Accounts extends Component {
       history.push('/accounts/' + user + '/' + address);
     }
 
-    users.forEach(function (user) {
-      const addresses = Object.getOwnPropertyNames(accounts[user]);
+    users
+      .forEach(function (user) {
+        const addresses = Object.getOwnPropertyNames(accounts[user]);
 
-      addresses
-        .filter(function (address) {
+        addresses.filter(function (address) {
           if (!filter) {
             return true;
           }
-          return user.toLowerCase().indexOf(filter) > -1
-            || address.toLowerCase().indexOf(filter) > -1;
+          return user
+            .toLowerCase()
+            .indexOf(filter) > -1 || address
+            .toLowerCase()
+            .indexOf(filter) > -1;
         })
-        .forEach(function (address) {
-          if (address === 'error') {
-            return;
-          }
-          rows.push(
-            <tr key={address} onClick={(e) => handleClick(user, address)}>
-              <td width="33%">
-                <Text ellipsize={true}>
-                  <Tooltip tooltipClassName="smd-padding-8" content={user} position={Position.TOP_LEFT}>
-                    <small>{user}</small>
-                  </Tooltip>
-                </Text>
-              </td>
-              <td width="33%">
-                <Text ellipsize={true}>
-                  <Tooltip tooltipClassName="smd-padding-8" content={address} position={Position.TOP_LEFT}>
-                    <small>{address}</small>
-                  </Tooltip>
-                </Text>
-              </td>
-              <td width="33%">
-                <Text ellipsize={true}>
-                  <Tooltip tooltipClassName="smd-padding-8" content={accounts[user][address].balance} position={Position.TOP_LEFT}>
-                    <small>{accounts[user][address].balance} wei</small>
-                  </Tooltip>
-                </Text>
-              </td>
-            </tr>
-          );
-        });
-    });
-
+          .forEach(function (address) {
+            if (address === 'error') {
+              return;
+            }
+            rows.push(
+              <tr key={address} onClick={(e) => handleClick(user, address)}>
+                <td>
+                  <button
+                    className="pt-button pt-intent-primary pt-small"
+                    onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    faucetRequest(user, address);
+                  }}>
+                    Faucet
+                  </button>
+                </td>
+                <td>
+                  {user}
+                </td>
+                <td>
+                  <HexText value={address} classes="small smd-pad-4" />
+                </td>
+                <td>
+                  <Text ellipsize={true}>
+                    <Tooltip
+                      tooltipClassName="smd-padding-8"
+                      content={accounts[user][address].balance}
+                      position={Position.TOP_LEFT}>
+                      <small>{accounts[user][address].balance}
+                        wei</small>
+                    </Tooltip>
+                  </Text>
+                </td>
+              </tr>
+            );
+          });
+      });
 
     return (
       <div className="container-fluid pt-dark">
-        <Tour name="accounts" steps={tourSteps}  finalStepSelector='#contracts' nextPage='contracts' />
+        <Tour
+          name="accounts"
+          steps={tourSteps}
+          finalStepSelector='#contracts'
+          nextPage='contracts'/>
         <div className="row">
-          <div className="col-sm-8 text-left">
+          <div className="col-sm-4 text-left">
             <h3>Accounts</h3>
           </div>
-          <div className="col-sm-4 text-right">
+          <div className="col-sm-8 text-right">
             <div className="pt-button-group">
               <SendEther/>
-              <CreateUser />
+              <CreateUser/>
             </div>
           </div>
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <NumberCard
-              number={users.length}
-              description="Users"
-              iconClass="fa-users"
-            />
+            <NumberCard number={users.length} description="Users" iconClass="fa-users"/>
           </div>
           <div className="col-sm-9">
             <div className="pt-card pt-elevation-2">
@@ -131,17 +144,33 @@ class Accounts extends Component {
                   onChange={e => this.updateFilter(e.target.value.toLowerCase())}
                   dir="auto"/>
               </div>
-              <table className="pt-table pt-interactive pt-condensed pt-striped" style={{tableLayout: 'fixed', width: '100%'}}>
+              <table
+                className="pt-table pt-interactive pt-condensed pt-striped"
+                style={{
+                tableLayout: 'fixed',
+                width: '100%'
+              }}>
                 <thead>
-                <tr>
-                  <th width="33%"><h4>Username</h4></th>
-                  <th width="33%"><h4>Account</h4></th>
-                  <th width="33%"><h4>Balance</h4></th>
-                </tr>
+                  <tr>
+                    <th></th>
+                    <th >
+                      <h4>Username</h4>
+                    </th>
+                    <th >
+                      <h4>Account</h4>
+                    </th>
+                    <th >
+                      <h4>Balance</h4>
+                    </th>
+                  </tr>
                 </thead>
 
                 <tbody>
-                {rows.length === 0 ? <tr><td colSpan={3}>No Accounts</td></tr> : rows}
+                  {rows.length === 0
+                    ? <tr>
+                        <td colSpan={4}>No Accounts</td>
+                      </tr>
+                    : rows}
                 </tbody>
               </table>
             </div>
@@ -158,18 +187,7 @@ class Accounts extends Component {
 }
 
 function mapStateToProps(state) {
-  return {
-    accounts: state.accounts.accounts,
-    filter: state.accounts.filter
-  };
+  return {accounts: state.accounts.accounts, filter: state.accounts.filter};
 }
 
-export default withRouter(
-  connect(
-    mapStateToProps,
-    {
-      fetchAccounts,
-      changeAccountFilter,
-    }
-  )(Accounts)
-);
+export default withRouter(connect(mapStateToProps, {fetchAccounts, changeAccountFilter, faucetRequest})(Accounts));

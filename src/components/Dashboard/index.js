@@ -24,8 +24,7 @@ import {
   BLOCKS_PROPAGATION,
   BLOCKS_DIFFICULTY,
   BLOCKS_FREQUENCY,
-  TRANSACTIONS_TYPE,
-  GET_PEERS
+  TRANSACTIONS_TYPE
 } from '../../sockets/rooms'
 
 // TODO: these should be part of a reducer state. Do the same for other global variables.
@@ -57,7 +56,6 @@ class Dashboard extends Component {
     this.props.subscribeRoom(BLOCKS_DIFFICULTY)
     this.props.subscribeRoom(TRANSACTIONS_COUNT)
     this.props.subscribeRoom(TRANSACTIONS_TYPE)
-    this.props.subscribeRoom(GET_PEERS)
 
     mixpanelWrapper.track('dashboard_page_load');
   }
@@ -71,7 +69,6 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
     this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
     this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
-    this.props.unSubscribeRoom(GET_PEERS)
   }
 
   render() {
@@ -81,14 +78,11 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-
-    const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
-    const apiError = this.props.nodes.reduce((acc, node) => acc || node.apiFailure, false);
-    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard
+    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={ tourSteps }/>
+        <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
@@ -99,8 +93,8 @@ class Dashboard extends Component {
             <NumberCard
               number="HEALTH"
               description="Network"
-              mode={apiError ? 'warning' : 'success'}
-              iconClass={apiError ? 'fa-exclamation-circle' : 'fa-check-circle'}
+              mode={this.props.node.coinbase.length === 0 ? 'warning' : 'success'}
+              iconClass={this.props.node.coinbase.length === 0 ? 'fa-exclamation-circle' : 'fa-check-circle'}
             />
           </div>
           <div className="col-sm-3">
@@ -159,7 +153,7 @@ class Dashboard extends Component {
         <div className="row">
           <div className="col-sm-3">
             <h3>Nodes</h3>
-            {nodes}
+            <NodeCard />
           </div>
           <div className="col-sm-9">
             <h3>Recent Transactions</h3>
@@ -173,19 +167,19 @@ class Dashboard extends Component {
 
 function mapStateToProps(state) {
   return {
-    nodes: state.nodes.nodes,
+    node: state.node,
     dashboard: state.dashboard
   };
 }
 
 const connected = connect(
-    mapStateToProps,
-    {
-      hideLoading,
-      endTour,
-      subscribeRoom,
-      unSubscribeRoom
-    }
-  )(Dashboard)
+  mapStateToProps,
+  {
+    hideLoading,
+    endTour,
+    subscribeRoom,
+    unSubscribeRoom
+  }
+)(Dashboard)
 
 export default withRouter(connected);
