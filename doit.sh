@@ -3,19 +3,12 @@
 set -e
 set -x
 
+PG_PORT_5432_TCP_PORT=${PG_PORT_5432_TCP_PORT:-5432}
 echo "the pg host and port are: ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT}"
-until netcat -z ${PG_ENV_POSTGRES_HOST} ${PG_PORT_5432_TCP_PORT} >&/dev/null
-do echo "Waiting for postgres to start"
-   sleep 1
+
+until psql -h "${PG_ENV_POSTGRES_HOST}" -p ${PG_PORT_5432_TCP_PORT} -U "postgres" -c '\q'; do
+  >&2 echo "Postgres is unavailable - sleeping"
+  sleep 1
 done
 
-while true
-do postgrest postgres://${PG_ENV_POSTGRES_USER}:${PG_ENV_POSTGRES_PASSWORD}@${PG_ENV_POSTGRES_HOST}:${PG_PORT_5432_TCP_PORT}/${PG_ENV_POSTGRES_DB} \
-              --port ${POSTGREST_LISTEN_PORT} \
-              --schema ${POSTGREST_SCHEMA} \
-              --anonymous ${POSTGREST_ANONYMOUS} \
-              --pool ${POSTGREST_POOL} \
-              --jwt-secret ${POSTGREST_JWT_SECRET} \
-              --max-rows ${POSTGREST_MAX_ROWS}
-done
-
+postgrest postgrest.conf
