@@ -97,7 +97,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: kafka-zk 
+    ref: master
     compose:
       restart: always
       ports:
@@ -128,10 +128,6 @@ deployments:
         statsSuffix: "${statsSuffix}"
         numMinPeers: "${numMinPeers}"
         mineBlocks: "${mineBlocks:-true}"
-      links:
-        - kafka
-        - postgres
-        - redis
       depends_on:
         - kafka
         - postgres
@@ -201,7 +197,7 @@ deployments:
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
-    ref: kafka-zk 
+    ref: master
     compose:
       restart: always
       environment:
