@@ -87,7 +87,7 @@ deployments:
         blocurl: "${blocurl}"
         stratourl: "${stratourl}"
         postgresturl: "${postgresturl}"
-        zookeeper_conn: "${cirrus_zookeeper_conn}"
+        zookeeper_conn: "kafka" 
         postgres_db: "${cirrus_pg_db:-cirrus}"
         postgres_user: "${cirrus_pg_user:-postgres}"
         postgres_password: "${cirrus_pg_password}"
@@ -129,12 +129,10 @@ deployments:
         numMinPeers: "${numMinPeers}"
         mineBlocks: "${mineBlocks:-true}"
       links:
-        - zookeeper
         - kafka
         - postgres
         - redis
       depends_on:
-        - zookeeper
         - kafka
         - postgres
         - redis
@@ -193,13 +191,6 @@ deployments:
         uiPassword: "${uiPassword}"
         blockTime: "${blockTime}"
 
-  - name: zookeeper
-    compose:
-      image: zookeeper:3.4.9
-      restart: always
-      environment:
-        ZOO_MY_ID: "1"
-
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
     ref: master
@@ -210,15 +201,11 @@ deployments:
 
   - name: kafka
     repo: https://github.com/blockapps/kafka-packager.git
-    ref: master
+    ref: kafka-zk 
     compose:
       restart: always
-      links:
-        - zookeeper
       environment:
-        KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-        KAFKA_ADVERTISED_HOST_NAME: "kafka"
-        KAFKA_ADVERTISED_PORT: "9092"
+        ADVERTISED_HOST_NAME: "kafka"
         KAFKA_DELETE_TOPIC_ENABLE: "true"
         KAFKA_LOG_CLEANER_ENABLE: "false"
         KAFKA_LOG_RETENTION_HOURS: "2147483647"
