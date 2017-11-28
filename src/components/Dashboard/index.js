@@ -78,8 +78,7 @@ class Dashboard extends Component {
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
-    console.log(txTypeData);
-    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard
+    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
