@@ -23,8 +23,8 @@ RUN apt-get update && \
     mv postgrest /usr/local/bin/postgrest && \
     rm $POSTGREST_FILE
 
-COPY doit.sh postgrest.conf /
+COPY doit.sh postgrest.conf.tpl /
 
 EXPOSE 3001
 
-ENTRYPOINT ["sh", "/doit.sh"]
+CMD ["sh", "/doit.sh"]

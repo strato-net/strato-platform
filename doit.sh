@@ -10,4 +10,10 @@ until psql -h "${PG_ENV_POSTGRES_HOST}" -p ${PG_PORT_5432_TCP_PORT} -U "postgres
   sleep 1
 done
 
-postgrest postgrest.conf
+render_template() {
+  eval "echo \"$(sed 's/\"/\\"/g' $1)\""
+}
+
+render_template postgrest.conf.tpl > postgrest.conf
+
+exec postgrest postgrest.conf
