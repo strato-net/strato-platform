@@ -1,6 +1,6 @@
 db-uri = "postgres://${PG_ENV_POSTGRES_USER}:${PG_ENV_POSTGRES_PASSWORD}@${PG_ENV_POSTGRES_HOST}:${PG_PORT_5432_TCP_PORT}/${PG_ENV_POSTGRES_DB}"
 db-schema = "${POSTGREST_SCHEMA}"
-db-anon-role = "${POSTGREST_ANONYMOUS:-postgres}"
+db-anon-role = "${POSTGREST_ANONYMOUS}"
 db-pool = ${POSTGREST_POOL}
 
 server-host = "*4"
