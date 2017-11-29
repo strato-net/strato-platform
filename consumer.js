@@ -58,10 +58,9 @@ function start() {
           console.log(`Unable to connect to kafka node '${zookeeperConn}'`);
           process.exit(1);
         }
-        console.log("Kafka consumer error: ", JSON.stringify(err,null,2));
+        console.log("Kafka consumer error: ", err);
       })
       resolve(scope);
-      return;
     })
   }
 }

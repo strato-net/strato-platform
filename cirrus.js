@@ -64,9 +64,10 @@ function startCirrus() {
 
       app.get('/', function (req, res, next) {
         res.send('Hello cirrus!');
-        pool
-          .query("select count(*) from information_schema.tables;")
-          .then(r => console.log(JSON.stringify(r)))
+        // Unnecessary since a response has already been sent
+        // pool
+        //   .query("select count(*) from information_schema.tables;")
+        //   .then(r => console.log(JSON.stringify(r)))
         next()
       });
 
