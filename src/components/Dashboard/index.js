@@ -5,17 +5,27 @@ import NodeCard from '../NodeCard';
 import TransactionList from '../TransactionList';
 import NumberCard from '../NumberCard';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { fetchBlockData } from '../BlockData/block-data.actions';
-import { fetchAccounts } from '../Accounts/accounts.actions';
-import { fetchContracts } from '../Contracts/contracts.actions';
-import { hideLoading } from 'react-redux-loading-bar';
+import { endTour } from '../Tour/tour.actions';
+// import { callAfterTour } from '../Tour/tour.helpers';
+// import Tour from '../Tour';
+
 import Tour from '../Tour';
 
-import { env } from '../../env';
 import BarGraph from '../BarGraph';
 import PieChart from '../PieChart';
-
 import './dashboard.css';
+import { hideLoading } from 'react-redux-loading-bar';
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
+import {
+  LAST_BLOCK_NUMBER,
+  USERS_COUNT,
+  CONTRACTS_COUNT,
+  TRANSACTIONS_COUNT,
+  BLOCKS_PROPAGATION,
+  BLOCKS_DIFFICULTY,
+  BLOCKS_FREQUENCY,
+  TRANSACTIONS_TYPE
+} from '../../sockets/rooms'
 
 // TODO: these should be part of a reducer state. Do the same for other global variables.
 const tourSteps = [
@@ -38,99 +48,41 @@ const tourSteps = [
 class Dashboard extends Component {
 
   componentDidMount() {
-    this.props.fetchBlockData();
-    this.props.fetchAccounts(false,false);
-    this.props.fetchContracts();
+    this.props.subscribeRoom(LAST_BLOCK_NUMBER)
+    this.props.subscribeRoom(USERS_COUNT)
+    this.props.subscribeRoom(CONTRACTS_COUNT)
+    this.props.subscribeRoom(BLOCKS_PROPAGATION)
+    this.props.subscribeRoom(BLOCKS_FREQUENCY)
+    this.props.subscribeRoom(BLOCKS_DIFFICULTY)
+    this.props.subscribeRoom(TRANSACTIONS_COUNT)
+    this.props.subscribeRoom(TRANSACTIONS_TYPE)
+
     mixpanelWrapper.track('dashboard_page_load');
-    this.startPoll();
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
-  }
-
-  startPoll() {
-    const dashboardFetchStatus = this.props.fetchBlockData;
-    const fetchAccounts = this.props.fetchAccounts;
-    const fetchContracts = this.props.fetchContracts;
-    this.timeout = setInterval(function () {
-      dashboardFetchStatus();
-      fetchAccounts(false, false);
-      fetchContracts();
-    }, env.POLLING_FREQUENCY);
-  }
-
-  difficulty(blockData) {
-    return Object.values(blockData).map(function (val, i) {
-      return {x: i, y: val.difficulty};
-    })
-  }
-
-  blockPropogation(blockData) {
-    let timeData = [];
-    let times = Object.values(blockData).map(function (val) {
-      return val.timestamp
-    });
-
-    var i= 0;
-    for (; i < times.length-1; i++) {
-      let obj = {x: i, y: Math.abs((new Date(times[i+1]).getSeconds()) - (new Date(times[i]).getSeconds()))};
-      timeData.push(obj);
-    }
-    return timeData;
-  }
-
-
-  txCount(blockData) {
-    return blockData.map(val => {
-      return val.length
-    }).reduce((x, y) => {
-      return x + y
-    }, 0);
-  }
-
-  txFreq(blockData) {
-    return blockData.map(function (val, i) {
-      return {x: i, y: val.length};
-    })
-  }
-
-  txType(blockData) {
-    let types = {"FunctionCall" : 0, "Transfer": 0, "Contract": 0};
-    blockData.forEach(function (val) {
-      val.forEach(v => { types[v.transactionType]++ });
-    })
-    return Object.getOwnPropertyNames(types).map((type)=>{
-      return {
-        val: types[type],
-        type: type
-      }
-    });
+    this.props.unSubscribeRoom(LAST_BLOCK_NUMBER)
+    this.props.unSubscribeRoom(USERS_COUNT)
+    this.props.unSubscribeRoom(CONTRACTS_COUNT)
+    this.props.unSubscribeRoom(BLOCKS_PROPAGATION)
+    this.props.unSubscribeRoom(BLOCKS_FREQUENCY)
+    this.props.unSubscribeRoom(BLOCKS_DIFFICULTY)
+    this.props.unSubscribeRoom(TRANSACTIONS_COUNT)
+    this.props.unSubscribeRoom(TRANSACTIONS_TYPE)
   }
 
   render() {
-    const blockData = Object.values(this.props.blockData).map(val => {
-      return val.blockData
-    });
 
-    const receiptTransactions = Object.values(this.props.blockData).map(val => {
-      return val.receiptTransactions
-    });
-
-    const difficultyData = this.difficulty(blockData);
-    const txFreqData = this.txFreq(receiptTransactions);
-    const txCount = this.txCount(receiptTransactions);
-    const blockPropData = this.blockPropogation(blockData);
-    const txTypeData = this.txType(receiptTransactions);
-
-    const nodes = this.props.nodes.map((node, i) => <NodeCard nodeIndex={i} key={'node-card' + i} />);
-    const apiError = this.props.nodes.reduce((acc,node) => acc || node.apiFailure, false);
-    const userCount = Object.getOwnPropertyNames(this.props.accounts).length;
-    const contractCount = Object.getOwnPropertyNames(this.props.contracts).length;
+    const difficultyData = this.props.dashboard.blockDifficulty;
+    const txFreqData = this.props.dashboard.blockFrequency;
+    const txCount = this.props.dashboard.transactionsCount;
+    const blockPropData = this.props.dashboard.blockPropagation;
+    const txTypeData = this.props.dashboard.transactionTypes;
+    const { usersCount, contractsCount, lastBlockNumber } = this.props.dashboard;
 
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
-        <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={ tourSteps }/>
+        <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
         <div className="row">
           <div className="col-sm-9 text-left">
             <h3>Dashboard</h3>
@@ -141,14 +93,14 @@ class Dashboard extends Component {
             <NumberCard
               number="HEALTH"
               description="Network"
-              mode={ apiError ? 'warning' : 'success' }
-              iconClass={ apiError ? 'fa-exclamation-circle' : 'fa-check-circle' }
+              mode={this.props.node.coinbase.length === 0 ? 'warning' : 'success'}
+              iconClass={this.props.node.coinbase.length === 0 ? 'fa-exclamation-circle' : 'fa-check-circle'}
             />
           </div>
           <div className="col-sm-3">
             <Link to="/blocks">
               <NumberCard
-                number={ blockData && blockData.length > 0 ? blockData[0].number.toString() : 'Unknown'}
+                number={lastBlockNumber}
                 description="Last Block"
                 iconClass="fa-link"
               />
@@ -157,7 +109,7 @@ class Dashboard extends Component {
           <div className="col-sm-3">
             <Link to="/accounts">
               <NumberCard
-                number={userCount}
+                number={usersCount}
                 description="Users"
                 iconClass="fa-users"
                 className="smd-pointer"
@@ -167,7 +119,7 @@ class Dashboard extends Component {
           <div className="col-sm-3">
             <Link to="/contracts">
               <NumberCard
-                number={ contractCount }
+                number={contractsCount}
                 description="Contracts"
                 iconClass="fa-gavel"
                 className="smd-pointer"
@@ -177,27 +129,31 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-12">
-            <br/>
+            <br />
           </div>
         </div>
         <div className="row">
           <div className="col-sm-3">
-            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"}/>
+            <BarGraph data={difficultyData} label={"Difficulty"} identifier={"Difficulty"} />
+
           </div>
           <div className="col-sm-3">
-            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"}/>
+            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
+
           </div>
           <div className="col-sm-3">
-            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"}/>
+            <BarGraph data={blockPropData} units="s" label={"Block Propagation"} identifier={"BlockProp"} />
+
           </div>
           <div className="col-sm-3">
-            <PieChart data={txTypeData}/>
+            <PieChart data={txTypeData} />
+
           </div>
         </div>
         <div className="row">
           <div className="col-sm-3">
             <h3>Nodes</h3>
-            {nodes}
+            <NodeCard />
           </div>
           <div className="col-sm-9">
             <h3>Recent Transactions</h3>
@@ -211,21 +167,19 @@ class Dashboard extends Component {
 
 function mapStateToProps(state) {
   return {
-    blockData: state.blockData.blockData,
-    nodes: state.nodes.nodes,
-    accounts: state.accounts.accounts,
-    contracts: state.contracts.contracts,
+    node: state.node,
+    dashboard: state.dashboard
   };
 }
 
 const connected = connect(
-    mapStateToProps,
-    {
-      fetchBlockData,
-      fetchAccounts,
-      fetchContracts,
-      hideLoading
-    }
-  )(Dashboard)
+  mapStateToProps,
+  {
+    hideLoading,
+    endTour,
+    subscribeRoom,
+    unSubscribeRoom
+  }
+)(Dashboard)
 
 export default withRouter(connected);

@@ -7,10 +7,8 @@ class PeersCard extends Component {
 
 
   render() {
-    const node = this.props.nodes[this.props.nodeIndex];
-    const peers = node.peers
-      ? Object.getOwnPropertyNames(node.peers)
-      : [];
+    const node = this.props.node;
+    const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
     let className = 'pt-card pt-elevation-2';
     return (
       <div className={className}>
@@ -41,7 +39,7 @@ class PeersCard extends Component {
             )
           })
           : <Text ellipsize={true}>
-            <small>No client peers</small>
+            <small>No peers</small>
           </Text>}
       </div>
     );
@@ -49,7 +47,7 @@ class PeersCard extends Component {
 }
 
 function mapStateToProps(state) {
-  return {nodes: state.nodes.nodes};
+  return { node: state.node };
 }
 
 export default withRouter(connect(mapStateToProps, null)(PeersCard));
