@@ -137,6 +137,11 @@ describe("Send Transaction Test", function() {
             i++;
         }
         console.log('Got', txResult.status, 'result for', txResult.hash, 'after', i, 'attempts');
+
+        if(txResult.status != 'Success') {
+          console.log(txResult);
+        }
+        
         return txResult;
     }
 
@@ -202,9 +207,7 @@ describe("Send Transaction Test", function() {
     //};
     //txTiming.push(txTimingObject);
     //console.log('send tx: txElapsed', txElapsed, 'txResult.time', txResult[0].time);
-    if(txResult.status != 'Success') {
-      console.log(txResult);
-    }
+
     assert.equal(txResult.status, 'Success', 'tx status');
 
     return txResult;
