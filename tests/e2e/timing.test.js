@@ -131,11 +131,12 @@ describe("Send Transaction Test", function() {
         var txResult = yield func();
         var i = 1;
         while(txResult.status == 'Pending') {
-            console.log('Got pending result', i);
+            console.log('Got pending result for', txResult.hash,':', i);
             i++;
             yield sleep(1000);
             txResult = yield rest.getBlocResult(txResult.hash, false, node.id);
         }
+        console.log('Got', txResult.status, 'result for', txResult.hash, 'after', i, 'attempts');
         return txResult;
     }
 
