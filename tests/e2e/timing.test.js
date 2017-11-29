@@ -131,7 +131,7 @@ describe("Send Transaction Test", function() {
         var txResult = yield func();
         var i = 1;
         while(txResult.status == 'Pending') {
-            console.log('Got pending result for', txResult.hash,':', i);
+            //console.log('Got pending result for', txResult.hash,':', i);
             i++;
             yield sleep(1000);
             txResult = yield rest.getBlocResult(txResult.hash, false, node.id);
@@ -170,7 +170,7 @@ describe("Send Transaction Test", function() {
 
 
   function sleep(milli) {
-    console.log('sleep', milli);
+    //console.log('sleep', milli);
     return new Promise(resolve => setTimeout(resolve, milli));
   }
 
