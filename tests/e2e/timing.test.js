@@ -129,7 +129,7 @@ describe("Send Transaction Test", function() {
 
     function* getResolved(func, node) {
         var txResult = yield func();
-        var i = 1;
+        var i = 0;
         while(txResult.status == 'Pending') {
             //console.log('Got pending result for', txResult.hash,':', i);]
             yield sleep(1000);
