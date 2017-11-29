@@ -147,7 +147,7 @@ describe("Send Transaction Test", function() {
       // create
       const aliceName = `Alice_${node.id}_${uid}`;
       const alice = yield rest.createUser(aliceName, password, true, node.id);
-        yield getResolved(function* (){return yield rest.fill(alice, false, node.id);}, node);
+      yield getResolved(function* (){return yield rest.fill(alice, false, node.id);}, node);
       console.log('alice', alice);
       //for(var i=0; i<1000000000; i++) {}; //about 3s delay. Done to allow p2p network to sync new faucet nonce and make it adjust for block time
       const bobName = `Bob_${node.id}_${uid}`;
@@ -188,7 +188,7 @@ describe("Send Transaction Test", function() {
     // it is OK for nonce to be undefined!
     console.log('send', nodeId, alice.name, bob.name, value.toString(), nonce);
     //const startTime = timerStart();
-      txResult = yield getResolved(function*(){hash = yield rest.send(alice,bob,value,true,nonce,nodeId); return {status: 'Pending', hash: hash};},nodeId);
+    txResult = yield getResolved(function*(){hash = yield rest.send(alice,bob,value,true,nonce,nodeId); return {status: 'Pending', hash: hash};},nodeId);
     //const txElapsed = timerStop(startTime);
     ////const txResult = yield rest.transactionResult(receipt.hash, nodeId);
     //const blockElapsed = yield getLastBlockTime(nodeId);
@@ -202,6 +202,9 @@ describe("Send Transaction Test", function() {
     //};
     //txTiming.push(txTimingObject);
     //console.log('send tx: txElapsed', txElapsed, 'txResult.time', txResult[0].time);
+    if(txResult.status != 'Success') {
+      console.log(txResult);
+    }
     assert.equal(txResult.status, 'Success', 'tx status');
 
     return txResult;
