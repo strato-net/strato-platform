@@ -52,21 +52,16 @@ function start() {
       scope.offset = startOffset;
       scope.isCirrusInserting = false;
 
-      const useNewConsume = true;
-      // const useNewConsume = false;
-      if(useNewConsume) {
-        scope.consumer.on('message', consume(scope));
-        scope.consumer.on('error', function (err) {
-          console.log("Caught error: " + err)
-        })
-        resolve(scope);
-        return;
-      }
-      scope.consumer.on('message', consumeMessage);
+      scope.consumer.on('message', consume(scope));
       scope.consumer.on('error', function (err) {
-        console.log("Caught error: " + err)
+        if(err.name == "NO_NODE") {
+          console.log(`Unable to connect to kafka node '${zookeeperConn}'`);
+          process.exit(1);
+        }
+        console.log("Kafka consumer error: ", JSON.stringify(err,null,2));
       })
       resolve(scope);
+      return;
     })
   }
 }
@@ -77,94 +72,6 @@ function resetOffset(scope) {
     [scope.kafkaTopic]: [0]
   };
   scope.consumer.updateOffsets(topics);
-}
-
-
-function consumeMessage(m) {
-  console.log(chalk.yellow("Incoming state update at offset: " + m.offset));
-  var state = JSON.parse(m.value);
-  var createdAccounts = [];
-  var updatedAccounts = [];
-  var deletedAccounts = [];
-
-  if(state.createdAccounts) {
-    // for now, remove accounts that have no code
-    state.createdAccounts = _.omitBy(v => v.codeHash == emptyStringHash || v.codeHash == "0x" + emptyStringHash)(state.createdAccounts)
-    createdAccounts = Object.keys(state.createdAccounts);
-  }
-  if(state.updatedAccounts) {
-    state.updatedAccounts = _.omitBy(v => v.codeHash == emptyStringHash || v.codeHash == "0x" + emptyStringHash)(state.UpdatedAccounts)
-    updatedAccounts = Object.keys(state.updatedAccounts);
-  }
-  if(state.deletedAccounts) {
-    deletedAccounts = Object.keys(state.deletedAccounts);
-  }
-
-  console.log(chalk.green("|\tCreated accounts: " + createdAccounts));
-  console.log(chalk.blue("|\tUpdated accounts: " + updatedAccounts));
-  console.log(chalk.red("|\tDeleted accounts: " + deletedAccounts));
-
-  var toUpload = _.flatten(
-    [
-      createdAccounts.map(a => {
-         addressToState(state.createdAccounts, a)
-          .then(JSON.stringify)
-          .then(JSON.parse)
-          .then(cleanState)
-          .then(x => {
-            x.address = a;
-            codeHash = removeHexPrefix(state.createdAccounts[a].codeHash)
-            var options = { method: 'POST',
-              url: postgrestRoot + '/' + global.contractMap[state.createdAccounts[a].codeHash].name,
-              headers:
-               { 'cache-control': 'no-cache',
-                 'content-type': 'application/json' },
-              body: x,
-              json: true };
-              return rp(options).promise()
-                .catch(err => {
-                  console.log('Failed updating contract: ', x);
-                  throw new Error(err);
-                });
-            })
-          .catch(err => console.log("Warn: " + err))
-      }),
-      updatedAccounts.map(a => {
-        addressToState(state.updatedAccounts, a)
-          .then(JSON.stringify)
-          .then(JSON.parse)
-          .then(cleanState)
-          .then(x => {
-            x.address = a;
-            var options = { method: 'PATCH',
-              url: postgrestRoot + '/' + global.contractMap[state.updatedAccounts[a].codeHash].name+ '?address=eq.' + a,
-              headers:
-               { 'cache-control': 'no-cache',
-                 'content-type': 'application/json' },
-              body: x,
-              json: true };
-              return rp(options).promise()
-                .catch(err => {
-                  console.log('Failed updating contract: ', x);
-                  throw new Error(err);
-                });
-          })
-        .catch(err => {
-          console.log('Warn: ' + err,
-                      'Failed on offset: ' + m.offset);
-        });
-      }),
-      deletedAccounts.map(a => {})
-    ]
-  )
-
-  Promise.all(toUpload)
-  .catch(function (error){
-    console.log("Caught an error: " + error);
-  })
-  .then(function (error, response, body) {
-    console.log(chalk.yellow("... done updating accounts"));
-  });
 }
 
 function consume(scope) {
