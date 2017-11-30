@@ -15,7 +15,6 @@ import {
   GET_TRANSACTIONS,
   BLOCKS_DIFFICULTY,
   BLOCKS_PROPAGATION,
-  BLOCKS_FREQUENCY,
   TRANSACTIONS_COUNT,
   TRANSACTIONS_TYPE,
   GET_PEERS,
@@ -32,8 +31,6 @@ import {
   updateTransactionCount,
   preloadBlockDifficulty,
   updateBlockDifficulty,
-  preloadBlockFrequency,
-  updateBlockFrequency,
   preloadBlockPropagation,
   updateBlockPropagation,
   preloadTransactionType,
@@ -70,7 +67,6 @@ function subscribe() {
     registerActions(emit, CONTRACTS_COUNT, preloadContractCount, updateContractCount)
     registerActions(emit, GET_TRANSACTIONS, preloadTx, updateTx)
     registerActions(emit, BLOCKS_DIFFICULTY, preloadBlockDifficulty, updateBlockDifficulty)
-    registerActions(emit, BLOCKS_FREQUENCY, preloadBlockFrequency, updateBlockFrequency)
     registerActions(emit, BLOCKS_PROPAGATION, preloadBlockPropagation, updateBlockPropagation)
     registerActions(emit, TRANSACTIONS_COUNT, preloadTransactionsCount, updateTransactionCount)
     registerActions(emit, TRANSACTIONS_TYPE, preloadTransactionType, updateTransactionType)

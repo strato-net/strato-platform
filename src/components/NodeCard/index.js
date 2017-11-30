@@ -37,9 +37,9 @@ class NodeCard extends Component {
   render() {
     const node = this.props.node;
     const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
-    const blockNumber = this.props.dashboard.lastBlockNumber > 0 ? this.props.dashboard.lastBlockNumber : 'unknown';
+    const blockNumber = this.props.dashboard.lastBlockNumber;
     let className = 'pt-card pt-elevation-2 ';
-    className += node && node.peers !== undefined && blockNumber !== 'unknown' ?  'node-success pt-interactive' : 'node-warning pt-interactive';
+    className += node && node.coinbase ?  'node-success pt-interactive' : 'node-warning pt-interactive';
     let arrowIcon = 'col-xs-3 text-right pt-icon-standard '
     arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 

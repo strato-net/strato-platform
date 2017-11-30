@@ -11,8 +11,6 @@ import {
   UPDATE_BLOCK_PROPAGATION,
   PRELOAD_BLOCK_DIFFICULTY,
   UPDATE_BLOCK_DIFFICULTY,
-  PRELOAD_BLOCK_FREQUENCY,
-  UPDATE_BLOCK_FREQUENCY,
   PRELOAD_TRANSACTION_TYPES,
   UPDATE_TRANSACTION_TYPES
 } from './dashboard.action'
@@ -21,9 +19,8 @@ const initialState = {
   lastBlockNumber: 0,
   usersCount: 0,
   contractsCount: 0,
-  transactionsCount: 0,
+  transactionsCount: [],
   blockPropagation: [],
-  blockFrequency: [],
   blockDifficulty: [],
   transactionTypes: []
 };
@@ -88,18 +85,6 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         blockDifficulty: action.data
-      }
-
-    case PRELOAD_BLOCK_FREQUENCY:
-      return {
-        ...state,
-        blockFrequency: action.data
-      }
-
-    case UPDATE_BLOCK_FREQUENCY:
-      return {
-        ...state,
-        blockFrequency: action.data
       }
 
     case PRELOAD_BLOCK_PROPAGATION:

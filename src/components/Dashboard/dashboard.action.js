@@ -10,8 +10,6 @@ export const PRELOAD_BLOCK_PROPAGATION = 'PRELOAD_BLOCK_PROPAGATION'
 export const UPDATE_BLOCK_PROPAGATION = 'UPDATE_BLOCK_PROPAGATION'
 export const PRELOAD_BLOCK_DIFFICULTY = 'PRELOAD_BLOCK_DIFFICULTY'
 export const UPDATE_BLOCK_DIFFICULTY = 'UPDATE_BLOCK_DIFFICULTY'
-export const PRELOAD_BLOCK_FREQUENCY = 'PRELOAD_BLOCK_FREQUENCY'
-export const UPDATE_BLOCK_FREQUENCY = 'UPDATE_BLOCK_FREQUENCY'
 export const PRELOAD_TRANSACTION_TYPES = 'PRELOAD_TRANSACTION_TYPES'
 export const UPDATE_TRANSACTION_TYPES = 'UPDATE_TRANSACTION_TYPES'
 
@@ -108,20 +106,6 @@ export const updateBlockDifficulty = function (data) {
   }
 }
 
-// will trigger from socket.saga and update the dashboard store
-export const preloadBlockFrequency = function (data) {
-  return {
-    type: PRELOAD_BLOCK_FREQUENCY,
-    data
-  }
-}
-
-export const updateBlockFrequency = function (data) {
-  return {
-    type: UPDATE_BLOCK_FREQUENCY,
-    data
-  }
-}
 
 // will trigger from socket.saga and update the dashboard store
 export const preloadTransactionType = function (data) {
