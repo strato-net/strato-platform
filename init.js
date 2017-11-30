@@ -134,7 +134,7 @@ function generateContractTables() {
     return Promise
       .each(schemas, function(schema){
         scope.pool.query(schema)
-          .then(_ => console.log("done creating table for contract"));
+          .then(_ => console.log("done generating data for 'contract' table"));
       })
       .then(function(){
         return scope;
