@@ -126,17 +126,21 @@ function createContractABITable() {
 
 function generateContractTables() {
   return function(scope) {
-    var schemas = []
+    let schemas = [];
+    console.log('creating tables for hashes ', Object.keys(global.contractMap).join(', '));
     for(codeHash in global.contractMap) {
-      console.log('rebuilding DB', codeHash);
       schemas.push(toSchemaString(global.contractMap[codeHash]));
     }
     return Promise
       .each(schemas, function(schema){
-        scope.pool.query(schema)
-          .then(_ => console.log("done generating data for 'contract' table"));
+        scope.pool.query(schema).catch(
+          err => {
+            console.error('could not create table by schema: ', schema, err);
+          }
+        );
       })
       .then(function(){
+        console.log('done generating the tables for contract ABIs');
         return scope;
       })
   };
