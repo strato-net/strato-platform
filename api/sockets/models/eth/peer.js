@@ -47,6 +47,9 @@ const Peer = db.sequelize.define('p_peer', {
     // bigint
     type: db.Sequelize.BIGINT
   },
+  active_state: {
+    type: db.Sequelize.BIGINT
+  },
   version: {
     // character varying
     type: db.Sequelize.STRING

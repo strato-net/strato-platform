@@ -2,7 +2,7 @@ const db = require('./connection');
 
 const Block = db.sequelize.define('block', {
   id: {
-    type: db.Sequelize.INTEGER,
+    type: db.Sequelize.BIGINT,
     primaryKey: true
   },
   block_data: {

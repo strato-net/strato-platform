@@ -1,7 +1,8 @@
 const _ = require('underscore');
 const { TRANSACTIONS_TYPE } = require('../rooms')
-const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroaker')
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 var rp = require('request-promise');
+const config = require('../../config/app.config')
 
 let transactionsTypes
 
@@ -37,17 +38,27 @@ function extractTxTypes(receiptTransactions) {
   receiptTransactions.forEach(function (val) {
     val.forEach(v => { types[v.transactionType]++ });
   })
-  return _.keys(types)
+  const filtered = _.keys(types)
+    .filter((type)=>{
+      return types[type] > 0
+    })
     .map((type) => {
       return {
         val: types[type],
         type: type
       }
     });
+  if(filtered.length === 0) {
+    return [{
+      val: 0,
+      type: "No Transactions"
+    }]
+  }
+  return filtered;
 }
 
 getTransactionsType()
-setInterval(getTransactionsType, 3000)
+setInterval(getTransactionsType, config.webSockets.dbPollFrequency)
 
 function initialHydrate(socket) {
   socket.emit(`PRELOAD_${TRANSACTIONS_TYPE}`, transactionsTypes);
