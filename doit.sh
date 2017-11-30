@@ -2,11 +2,13 @@
 
 stratourl=${stratourl:-http://strato:3000}
 blocurl=${blocurl:-http://bloch:8000/bloc/v2.2}
+postgresturl=${postgresturl:-http://postgrest:3001}
 postgres_host=${postgres_host:-postgres}
 postgres_port=${postgres_port:-5432}
 
 echo "stratourl is: ${stratourl}"
 echo "blocurl is: ${blocurl}"
+echo postgresturl is: ${postgresturl}
 echo "postgres_host, postgres_port are: ${postgres_host}" ${postgres_port}
 
 echo "Waiting for STRATO to be available..."
@@ -20,6 +22,12 @@ until curl ${blocurl} >& /dev/null; do
     sleep 0.5
 done
 echo "bloc is available"
+
+echo "Waiting for postgrest to be available..."
+until curl ${postgresturl} >& /dev/null; do
+    sleep 0.5
+done
+echo "postgrest is available"
 
 echo 'Waiting for postgres to be available...'
 while true; do
