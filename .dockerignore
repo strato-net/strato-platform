@@ -4,3 +4,4 @@ pkg/
 .gitattributes
 Basilbuild
 Dockerfile
+node_modules/

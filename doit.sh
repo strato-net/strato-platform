@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 stratourl=${stratourl:-http://strato:3000}
 blocurl=${blocurl:-http://bloch:8000/bloc/v2.2}
@@ -29,4 +29,4 @@ echo 'postgres is available'
 
 # todo: check zookeeper connection explicitly
 
-node /usr/lib/strato/cirrus/main.js
+node /usr/lib/cirrus/main.js
