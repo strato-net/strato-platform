@@ -14,7 +14,7 @@ var Promise = require('bluebird'),
 const stratoRoot    = (process.env["stratourl"] || "http://strato:3000");
 const postgrestRoot = (process.env["postgresturl"] || "http://postgrest:3001");
 const blocRoot       = (process.env["blocurl"]) || "http://bloch:8000/bloc/v2.2";
-const zookeeperConn = (process.env["zookeeper_conn"] || "zookeeper:2181/");
+const zookeeperConn = (process.env["zookeeper_conn"] || "kafka");
 
 const delay         = (process.env.DELAY || 200);
 const totalAttempts = (process.env.ATTEMPTS || 5);
