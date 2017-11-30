@@ -6,7 +6,9 @@ RUN echo 'http://dl-cdn.alpinelinux.org/alpine/v3.5/main/' > /etc/apk/repositori
     apk upgrade --no-cache && \
     apk add --no-cache curl
 
-COPY *.js package.json lib /usr/lib/cirrus/
+COPY *.js package.json /usr/lib/cirrus/
+
+COPY lib/* /usr/lib/cirrus/lib/
 
 RUN cd /usr/lib/cirrus && \
     npm install
