@@ -54,12 +54,12 @@ function start() {
 
       scope.consumer.on('message', consume(scope));
       scope.consumer.on('error', function (err) {
+        console.log("Kafka consumer error: ", err);
         if(err.name == "NO_NODE") {
           console.log(`Unable to connect to kafka node '${zookeeperConn}'`);
           process.exit(1);
         }
-        console.log("Kafka consumer error: ", err);
-      })
+      });
       resolve(scope);
     })
   }
