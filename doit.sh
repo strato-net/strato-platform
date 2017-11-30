@@ -65,7 +65,7 @@ function cleanupDB {
   db_conn_params="-U $pgUser -h $pgHost"
   PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
     echo "dropping the old db: $line"
-    dropdb ${db_conn_params} -i "$line"
+    PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"
   done
 }
 
