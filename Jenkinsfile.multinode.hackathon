@@ -141,7 +141,6 @@ pipeline {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 10
               STRATO_GS_MODE="1" NODE_HOST=hackathon-2.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
               docker ps
               '''
@@ -152,7 +151,6 @@ pipeline {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 15
               STRATO_GS_MODE="1" NODE_HOST=hackathon-3.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
               docker ps
               '''
@@ -163,7 +161,6 @@ pipeline {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 20
               STRATO_GS_MODE="1" NODE_HOST=hackathon-4.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
               docker ps
               '''
@@ -174,7 +171,6 @@ pipeline {
               sh '''#!/bin/bash -le
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 25
               STRATO_GS_MODE="1" NODE_HOST=hackathon-5.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
               docker ps
               '''

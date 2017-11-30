@@ -77,7 +77,6 @@ pipeline {
               set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 5
               STRATO_GS_MODE="1" NODE_HOST=cd-multinode-1.southcentralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
               docker ps
               '''
@@ -89,7 +88,6 @@ pipeline {
               set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 10
               STRATO_GS_MODE="1" NODE_HOST=cd-multinode-2.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.84.167.234 ./strato-multinode-run.sh --stable
               docker ps
               '''
@@ -101,7 +99,6 @@ pipeline {
               set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
-              sleep 15
               STRATO_GS_MODE="1" NODE_HOST=cd-multinode-3.southcentralus.cloudapp.azure.com BOOT_NODE_HOST=13.84.167.234 ./strato-multinode-run.sh --stable
               docker ps
               '''
