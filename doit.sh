@@ -2,8 +2,12 @@
 
 stratourl=${stratourl:-http://strato:3000}
 blocurl=${blocurl:-http://bloch:8000/bloc/v2.2}
+postgres_host=${postgres_host:-postgres}
+postgres_port=${postgres_port:-5432}
+
 echo "stratourl is: ${stratourl}"
 echo "blocurl is: ${blocurl}"
+echo "postgres_host, postgres_port are: ${postgres_host}" ${postgres_port}
 
 echo "Waiting for STRATO to be available..."
 until curl ${stratourl} >& /dev/null; do
@@ -19,7 +23,7 @@ echo "bloc is available"
 
 echo 'Waiting for postgres to be available...'
 while true; do
-    curl ${postgres_host:-postgres}:${postgres_port:-5432} > /dev/null 2>&1 || EXIT_CODE=$? && true
+    curl ${postgres_host}:${postgres_port} > /dev/null 2>&1 || EXIT_CODE=$? && true
     if [ ${EXIT_CODE} = 52 ]; then
         break
     fi
