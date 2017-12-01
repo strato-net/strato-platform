@@ -129,9 +129,10 @@ pipeline {
           "hackathon-1": {
             node('hackathon-1') {
               sh '''#!/bin/bash -le
-              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
-              cd strato-getting-started
-              STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
+              ### TEMPORARY DISABLED TO KEEP THE CHAIN DATA
+              #docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              #cd strato-getting-started
+              #STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
               docker ps
               '''
             }
