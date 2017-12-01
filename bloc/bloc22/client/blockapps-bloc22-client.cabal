@@ -37,7 +37,6 @@ test-suite blockapps-bloc22-client-test
     BlockApps.Bloc22.API.AddressesSpec
     BlockApps.Bloc22.API.ContractsSpec
     BlockApps.Bloc22.API.E2ESpec
-    BlockApps.Bloc22.API.PragmaSpec
     BlockApps.Bloc22.API.SearchSpec
     BlockApps.Bloc22.API.UsersSpec
     BlockApps.Bloc22.API.SpecUtils

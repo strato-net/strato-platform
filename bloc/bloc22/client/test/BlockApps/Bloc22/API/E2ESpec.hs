@@ -87,7 +87,7 @@ spec =
         balance2AS = unStrung (accountBalance account2AS)
       balance2AS `shouldBe` initialWei + weiToSend
 
-    it "should create SimpleStorage contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
+    it "should create SimpleStorage contract, call methods and check state E2ESimpleStorage" $ \ testConfig@TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)

@@ -13,7 +13,6 @@ import qualified BlockApps.Bloc22.API.AddressesSpec as Addresses
 import           BlockApps.Bloc22.API.Contracts
 import qualified BlockApps.Bloc22.API.ContractsSpec as Contracts
 import           BlockApps.Bloc22.API.E2ESpec       as E2E
-import           BlockApps.Bloc22.API.PragmaSpec    as Pragma
 import qualified BlockApps.Bloc22.API.SearchSpec    as Search
 import           BlockApps.Bloc22.API.SpecUtils
 import           BlockApps.Bloc22.API.Users
@@ -32,7 +31,6 @@ main = hspec $ do
   -- API.spec
   beforeAll setup $ do
     Addresses.spec
-    Pragma.spec
     Contracts.spec
     Search.spec
     Users.spec
