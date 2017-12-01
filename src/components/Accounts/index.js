@@ -2,7 +2,6 @@ import React, {Component} from 'react';
 import {fetchAccounts, changeAccountFilter, faucetRequest} from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import {connect} from 'react-redux';
-import {Text, Tooltip, Position} from '@blueprintjs/core';
 import {withRouter} from 'react-router-dom';
 import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
@@ -95,17 +94,6 @@ class Accounts extends Component {
                 <td>
                   <HexText value={address} classes="small smd-pad-4" />
                 </td>
-                <td>
-                  <Text ellipsize={true}>
-                    <Tooltip
-                      tooltipClassName="smd-padding-8"
-                      content={accounts[user][address].balance}
-                      position={Position.TOP_LEFT}>
-                      <small>{accounts[user][address].balance}
-                        wei</small>
-                    </Tooltip>
-                  </Text>
-                </td>
               </tr>
             );
           });
@@ -159,16 +147,14 @@ class Accounts extends Component {
                     <th >
                       <h4>Account</h4>
                     </th>
-                    <th >
-                      <h4>Balance</h4>
-                    </th>
+        
                   </tr>
                 </thead>
 
                 <tbody>
                   {rows.length === 0
                     ? <tr>
-                        <td colSpan={4}>No Accounts</td>
+                        <td colSpan={3}>No Accounts</td>
                       </tr>
                     : rows}
                 </tbody>

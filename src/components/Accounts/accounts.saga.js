@@ -123,9 +123,9 @@ function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
     yield put(fetchUserAddressesSuccess(action.name, response));
-    if(action.loadBalances) {
-      yield response.map(address => put(fetchAccountDetail(action.name,address)));
-    }
+    // if(action.loadBalances) {
+    //   yield response.map(address => put(fetchAccountDetail(action.name,address)));
+    // }
   }
   catch(err) {
     yield put(fetchUserAddressesFailure(action.name,err));

@@ -74,7 +74,6 @@ class Dashboard extends Component {
   render() {
 
     const difficultyData = this.props.dashboard.blockDifficulty;
-    const txFreqData = this.props.dashboard.blockFrequency;
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
     const txTypeData = this.props.dashboard.transactionTypes;
@@ -138,7 +137,7 @@ class Dashboard extends Component {
 
           </div>
           <div className="col-sm-3">
-            <BarGraph data={txFreqData} number={txCount} label={"Transaction Count"} identifier={"TxCount"} />
+            <BarGraph data={txCount} number={txCount[0]} label={"Transaction Count"} identifier={"TxCount"} />
 
           </div>
           <div className="col-sm-3">
