@@ -29,34 +29,43 @@ function getBlocks() {
         }, 
         raw: true, 
         limit: 15, 
-        order: [['number', 'ASC']] 
+        order: [['number', 'DESC']] 
       }
     ).then(blocks => {
       // New block. Emit some information
-      globalBlocks = blocks; 
-      if(blocks.length > 0 && lastBlockNumber.compare(bigInt(blocks[blocks.length-1].number)) < 0) {
-        lastBlockNumber = bigInt(blocks[blocks.length-1].number);
+      if(globalBlocks.length === 0) {
+        globalBlocks = blocks;         
+      }
+
+      if(blocks.length > 0 && lastBlockNumber.compare(bigInt(blocks[0].number)) < 0) {
+        lastBlockNumber = bigInt(blocks[0].number);
 
         let blockDifficulty = []
         let blockPropagation = []
         let blockIds = [];
 
-        blocks.forEach((block, i) => {
-          // aaargh!!! Just doing this.. but need a better way to handle BigInts
+        // reverse the blocks (so the graphs are L2R instead of R2L)
+        for(var i = blocks.length-1; i >=0 ; i--) {
+          
+          let rIndex = blocks.length - i - 1 //do not use this as an index
+          let block = blocks[i]
+
           blockDifficulty.push({
-            x: i,
+            x: rIndex,
+            // aaargh!!! Just doing this.. but need a better way to handle BigInts
             y: parseInt(block.difficulty)
           })
 
-          let propagation = i === 0 ? calculatePropagation(null, block) : calculatePropagation(blocks[i-1], block)
+          let propagation = rIndex === 0 ? calculatePropagation(null, block) : calculatePropagation(blocks[i+1], block)
           blockPropagation.push({
-            x: i,
+            x: rIndex,
             y: propagation
           })
 
           blockIds.push(block.block_id)
+          
+        }
 
-        })
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, LAST_BLOCK_NUMBER, lastBlockNumber.toString())
       
         difficulty = blockDifficulty
@@ -65,14 +74,17 @@ function getBlocks() {
         propagationDelay = blockPropagation
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, BLOCKS_PROPAGATION, propagationDelay)
 
-        getBlockTransactionCount(blockIds);
+        getBlockTransactionCount(blockIds)
+          .then(() => {
+            globalBlocks = blocks
+          });
       }
       
     })
 }
 
 function getBlockTransactionCount(blockIds) {
-  BlockTransaction
+  return BlockTransaction
     .findAll({
       attributes: [
         'block_id',
@@ -100,6 +112,7 @@ function getBlockTransactionCount(blockIds) {
         }
       })
       emitter.emit(ON_SOCKET_PUBLISH_EVENTS, TRANSACTIONS_COUNT, txCount)
+      return
     })
 }
 
@@ -116,7 +129,7 @@ function calculatePropagation(prevBlock, currentBlock) {
     }  
     previous = filtered[0]
   }
-
+  console.log(previous.number, currentBlock.number, moment(currentBlock.timestamp).diff(moment(previous.timestamp),'seconds'))
   return moment(currentBlock.timestamp).diff(moment(previous.timestamp),'seconds')
   
 }
