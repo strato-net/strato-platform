@@ -1,5 +1,6 @@
 pipeline {
   agent none
+  parameters {string(name: 'FOOL_PROOF', defaultValue: '', description: 'Type "footgun" to confirm you know what you are doing and what are the consequences to which this may lead')}
   stages {
     stage('Prepare to deploy') {
       steps {
@@ -10,6 +11,7 @@ pipeline {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                   sh '''#!/bin/bash -le
                   set -x
+                  if [ "$FOOL_PROOF" -ne "footgun" ]; then exit 1; fi
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   sudo rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
