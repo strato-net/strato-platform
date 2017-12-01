@@ -1,0 +1,52 @@
+pipeline {
+  agent none
+  parameters {string(name: 'FOOL_PROOF', defaultValue: '', description: 'Type "footgun" to confirm you know what you are doing and what are the consequences to which this may lead')}
+  stages {
+    stage('Prepare to deploy') {
+      steps {
+        parallel (
+          "silo1a": {
+            node('silo1a') {
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  if [ "$FOOL_PROOF" -ne "footgun" ]; then exit 1; fi
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  sudo rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  curl -s -L https://github.com/blockapps/strato-getting-started/releases/latest | egrep -o '/blockapps/strato-getting-started/releases/download/build-[0-9]*/docker-compose.release.yml' | wget --base=http://github.com/ -i - -O docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          }
+        )
+      }
+    }
+    stage('Deploy multinode') {
+      steps {
+        parallel (
+          "silo1a": {
+            node('silo1a') {
+              sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true
+              # UPGRADE DOCKER TO HAVE --volumes IN docker system prune BEFORE UNCOMMENTING THIS!
+              # docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
+              BOOT_NODE_HOST=52.87.251.111 NODE_HOST=silo1a.eastus.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              docker ps
+              '''
+            }
+          }
+        )
+      }
+    }
+  }
+}
