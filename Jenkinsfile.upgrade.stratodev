@@ -70,7 +70,7 @@ pipeline {
             node('testnet3') {
               sh '''#!/bin/bash -le
               set -x
-              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
+              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh || true
               docker rm -f $(docker ps -aq) || true
               # UPGRADE DOCKER TO HAVE --volumes IN docker system prune BEFORE UNCOMMENTING THIS!
               # docker system prune -f --volumes; docker system prune -f
