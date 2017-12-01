@@ -89,7 +89,7 @@ describe("Send Transaction Test", function() {
       for (let pend of txPending) {
         console.log('~~~~~~~~~~ Resolving transaction', pend.hash, '~~~~~~~~~~');
         for (let node of nodes)
-          console.log('########## Resolving node', pend.node, '##########');
+          console.log('########## Resolving node', node, '##########');
           txResult = yield getResolved(function*(){return yield pend;},node);
           assert.equal(txResult.status,'Success', 'batch tx status');
       }
