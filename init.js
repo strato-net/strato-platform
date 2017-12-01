@@ -2,7 +2,6 @@ var Pool = require('pg-pool'),
  rp = require('request-promise'),
  util = require('./lib/util'),
  Promise = require('bluebird'),
- consumer = require('./consumer')
  toSchemaString = util.toSchemaString;
 
 function initCirrus(scope) {
@@ -17,6 +16,7 @@ function initCirrus(scope) {
     port: parseInt(process.env["postgres_port"] || "5432")
   };
   return getPostgres(pgConfig)(scope)
+    .then(cleanDatabase())
     .then(createContractABITable())
     .then(fetchABIs())
     .then(generateContractTables())
@@ -42,9 +42,44 @@ function getPostgres(pgConfig) {
   }
 }
 
+function cleanDatabase() {
+  return function(scope) {
+    let tableListQuery;
+    let logMessage;
+    if (process.env['SINGLE_NODE'] === "true") {
+      logMessage = "Running single node - removing all the cirrus tables";
+      tableListQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema='public';";
+    } else {
+      logMessage = "Running multi-node - removing all the cirrus tables except 'contract'";
+      tableListQuery = "SELECT table_name FROM information_schema.tables WHERE table_schema='public' and table_name <> 'contract';";
+    }
+    console.log(logMessage);
+    return scope.pool.query(tableListQuery)
+      .then(result => {
+        const tableList = result.rows.map(row => `"${row['table_name']}"`);
+        if (!tableList.length) {
+          console.log("Nothing to clean in db");
+          return scope;
+        }
+        console.log('Dropping db tables: ' + tableList.join(', '));
+        // Generating query like: 'DROP TABLE "table1", "table2", "table3";'
+        const dropTablesQuery = `DROP TABLE ${tableList.join(', ')};`;
+        return scope.pool.query(dropTablesQuery)
+          .then(_ => {
+            console.log("Successfully cleaned the cirrus db from old data");
+            return scope;
+          })
+      })
+      .catch((err) => {
+        console.error("Couldn't clean the cirrus db: " + err);
+        process.exit(1);
+      });
+  }
+}
+
 function fetchABIs() {
   return function(scope) {
-    console.log('fetching abi data');
+    console.log('Fetching abi data');
     var postgresturl = (process.env["postgresturl"] || "http://postgrest:3001")
 
     var options = {
@@ -79,7 +114,7 @@ function createContractABITable() {
     var contractTable = 'BEGIN; CREATE TABLE IF NOT EXISTS "contract" (id serial, "codeHash" text PRIMARY KEY, "name" text, "abi" text); CREATE INDEX IF NOT EXISTS idx ON "contract" ("codeHash"); COMMIT;'
     return scope.pool.query(contractTable)
       .then(r => {
-        console.log("Created contract table")
+        console.log("Created contract table (if did not exist)");
         return scope;
       })
       .catch((err) => {
@@ -91,17 +126,21 @@ function createContractABITable() {
 
 function generateContractTables() {
   return function(scope) {
-    var schemas = []
+    let schemas = [];
+    console.log('creating tables for hashes ', Object.keys(global.contractMap).join(', '));
     for(codeHash in global.contractMap) {
-      console.log('rebuilding DB', codeHash);
       schemas.push(toSchemaString(global.contractMap[codeHash]));
     }
     return Promise
       .each(schemas, function(schema){
-        scope.pool.query(schema)
-          .then(_ => console.log("done creating table for contract"));
+        scope.pool.query(schema).catch(
+          err => {
+            console.error('could not create table by schema: ', schema, err);
+          }
+        );
       })
       .then(function(){
+        console.log('done generating the tables for contract ABIs');
         return scope;
       })
   };

@@ -3,3 +3,4 @@ client/bower_components
 dist/
 npm-debug.log
 node_modules/
+.idea

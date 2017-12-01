@@ -14,7 +14,7 @@ var Promise = require('bluebird'),
 const stratoRoot    = (process.env["stratourl"] || "http://strato:3000");
 const postgrestRoot = (process.env["postgresturl"] || "http://postgrest:3001");
 const blocRoot       = (process.env["blocurl"]) || "http://bloch:8000/bloc/v2.2";
-const zookeeperConn = (process.env["zookeeper_conn"] || "zookeeper:2181/");
+const zookeeperConn = (process.env["zookeeper_conn"] || "kafka");
 
 const delay         = (process.env.DELAY || 200);
 const totalAttempts = (process.env.ATTEMPTS || 5);
@@ -54,12 +54,12 @@ function start() {
 
       scope.consumer.on('message', consume(scope));
       scope.consumer.on('error', function (err) {
+        console.log("Kafka consumer error: ", err);
         if(err.name == "NO_NODE") {
           console.log(`Unable to connect to kafka node '${zookeeperConn}'`);
           process.exit(1);
         }
-        console.log("Kafka consumer error: ", err);
-      })
+      });
       resolve(scope);
     })
   }
