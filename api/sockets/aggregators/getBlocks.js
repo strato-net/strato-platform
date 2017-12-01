@@ -129,7 +129,6 @@ function calculatePropagation(prevBlock, currentBlock) {
     }  
     previous = filtered[0]
   }
-  console.log(previous.number, currentBlock.number, moment(currentBlock.timestamp).diff(moment(previous.timestamp),'seconds'))
   return moment(currentBlock.timestamp).diff(moment(previous.timestamp),'seconds')
   
 }
