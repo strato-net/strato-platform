@@ -1,11 +1,13 @@
 #!/bin/bash
 
 set -e
+set -x
 
 function newnode {
   initialize=false
   if [[ ! -d .ethereumH ]]
   then initialize=true
+       cleanupDB
        doInit
   fi
 
@@ -57,6 +59,14 @@ function newnode {
 
   echo "Becoming strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
+}
+
+function cleanupDB {
+  db_conn_params="-U $pgUser -h $pgHost"
+  PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
+    echo "dropping the old db: $line"
+    PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"
+  done
 }
 
 function doInit {
