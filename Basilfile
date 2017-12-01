@@ -78,22 +78,23 @@ deployments:
     ref: master
     compose:
       restart: always
-      links:
-        - strato:strato
-        - postgres-cirrus:postgres
       depends_on:
+        - strato
+        - postgres
         - postgrest
+        - kafka
       environment:
         blocurl: "${blocurl}"
         stratourl: "${stratourl}"
         postgresturl: "${postgresturl}"
         zookeeper_conn: "kafka" 
         postgres_db: "${cirrus_pg_db:-cirrus}"
-        postgres_user: "${cirrus_pg_user:-postgres}"
-        postgres_password: "${cirrus_pg_password}"
-        postgres_host: "${cirrus_pg_host:-postgres}"
-        postgres_port: "${cirrus_pg_port:-5432}"
+        postgres_user: "${postgres_user:-postgres}"
+        postgres_password: ${postgres_password:-api}
+        postgres_host: "${postgres_host:-postgres}"
+        postgres_port: "${postgres_port:-5432}"
         stateDiffTopic: "${stateDiffTopic}"
+        SINGLE_NODE: "${SINGLE_NODE}"
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
@@ -133,29 +134,19 @@ deployments:
         - postgres
         - redis
 
-  - name: postgres-cirrus
-    compose:
-      image: postgres:9.6
-      restart: always
-      environment:
-        POSTGRES_DB: cirrus
-        POSTGRES_USER: postgres
-        PG_ENV_POSTGRES_DB: cirrus
-        PG_ENV_POSTGRES_USER: postgres
-
   - name: postgrest
     repo: https://github.com/blockapps/postgrest-packager.git
     ref: master
     compose:
       restart: always
       environment:
-        PG_ENV_POSTGRES_DB: cirrus
-        PG_ENV_POSTGRES_USER: postgres
-        PG_ENV_POSTGRES_PASSWORD: ""
-        PG_ENV_POSTGRES_HOST: postgres-cirrus
-        PG_PORT_5432_TCP_PORT: "5432"
+        PG_ENV_POSTGRES_DB: "${cirrus_pg_db:-cirrus}"
+        PG_ENV_POSTGRES_USER: "${postgres_user:-postgres}"
+        PG_ENV_POSTGRES_PASSWORD: ${postgres_password:-api}
+        PG_ENV_POSTGRES_HOST: "${postgres_host:-postgres}"
+        PG_PORT_5432_TCP_PORT: "${postgres_port:-5432}"
       depends_on:
-        - postgres-cirrus
+        - postgres
 
   - name: postgres
     compose:
@@ -164,7 +155,8 @@ deployments:
       volumes:
       - pgdata:/var/lib/postgresql/data
       environment:
-        POSTGRES_PASSWORD: api
+        POSTGRES_PASSWORD: ${postgres_password:-api}
+        POSTGRES_DB: cirrus
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
