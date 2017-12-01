@@ -7,13 +7,11 @@ const {
   TRANSACTIONS_TYPE,
   GET_TRANSACTIONS,
   BLOCKS_PROPAGATION,
-  BLOCKS_FREQUENCY,
   BLOCKS_DIFFICULTY,
   GET_COINBASE
  } = require('./rooms')
 
-const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroaker')
-const lastBlockNumberAggregator = require('./aggregators/lastBlockNumber')
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('./eventBroker')
 const userCountAggregator = require('./aggregators/userCount')
 const contractsCountAggregator = require('./aggregators/contractsCount')
 const getPeersAggregator = require('./aggregators/getPeers')
@@ -24,10 +22,11 @@ const getCoinbaseAggregator = require('./aggregators/getCoinbase');
 
 const io = require('socket.io')()
 function init(server) {
-  io.listen(server);
+  let socketOptions = process.env.NODE_ENV != 'production' ? { path: '/apex-ws' } : {};
+  io.listen(server, socketOptions);
   io.on('connection', function (socket) {
     // register request to block number
-    registerRoomAllocation(socket, LAST_BLOCK_NUMBER, lastBlockNumberAggregator.initialHydrate)
+    registerRoomAllocation(socket, LAST_BLOCK_NUMBER, getBlocksAggregator.initialHydrateLastBlock)
 
     // register request to users count
     registerRoomAllocation(socket, USERS_COUNT, userCountAggregator.initialHydrate)
@@ -40,9 +39,6 @@ function init(server) {
 
     // register request for blocks data
     registerRoomAllocation(socket, BLOCKS_DIFFICULTY, getBlocksAggregator.initialHydrateDifficulty)
-
-    // register request for blocks data
-    registerRoomAllocation(socket, BLOCKS_FREQUENCY, getBlocksAggregator.initialHydrateBlockFrequency)
 
     // register request for blocks data
     registerRoomAllocation(socket, BLOCKS_PROPAGATION, getBlocksAggregator.initalHydrateBlockPropagation)

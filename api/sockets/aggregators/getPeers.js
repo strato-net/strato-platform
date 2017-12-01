@@ -1,31 +1,38 @@
-const _ = require('underscore');
 const { GET_PEERS } = require('../rooms')
-const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroaker')
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 const Peer = require('../models/eth/peer')
-var rp = require('request-promise');
+const config = require('../../config/app.config')
+const _ = require('underscore');
 
 let peers
 
-const options = {
-  uri: `http://${process.env['STRATO_LOCAL_HOST']}/strato-api/eth/v1.2/peers`,
-  json: true
-}
-
 function getPeers() {
-  rp(options)
-    .then(function (currentPeers) {
+  Peer
+    .findAll({
+      attributes: [
+        'ip',
+        'tcp_port'
+      ],
+      where: {
+        active_state: 1
+      }
+    })
+    .then((newPeers)=> {
+      currentPeers = newPeers.reduce((obj, peer, i)=> {
+        obj[peer.ip] = peer.tcp_port
+        return obj;
+      }, {})
+
       if (!_.isEqual(peers, currentPeers)) {
         peers = currentPeers
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_PEERS, currentPeers)
       }
+
     })
-    .catch(function (err) {
-      console.log("err", err);
-    });
 }
 
 getPeers()
-setInterval(getPeers, 3000)
+setInterval(getPeers, config.webSockets.dbPollFrequency)
 
 function initialHydrate(socket) {
   socket.emit(`PRELOAD_${GET_PEERS}`, peers);

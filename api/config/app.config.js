@@ -15,5 +15,8 @@ module.exports = {
   },
   apps: {
     directory: 'apps'
+  },
+  webSockets: {
+    dbPollFrequency: 1 * 1000
   }
 };

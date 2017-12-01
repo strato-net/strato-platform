@@ -1,6 +1,6 @@
 const _ = require('underscore');
 const { GET_COINBASE } = require('../rooms')
-const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroaker')
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 var rp = require('request-promise');
 
 let coinbase
@@ -26,7 +26,10 @@ function getCoinbase() {
 }
 
 getCoinbase()
-setInterval(getCoinbase, 3000)
+// coinbase shouldnt (or cant as of now) change without restarting strato
+// No need to poll for this right now.
+// setInterval(getCoinbase, 3000)
+
 
 function initialHydrate(socket) {
   socket.emit(`PRELOAD_${GET_COINBASE}`, coinbase);

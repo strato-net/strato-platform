@@ -1,6 +1,7 @@
 const { USERS_COUNT } = require('../rooms')
-const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroaker')
+const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 const User = require('../models/block22/user')
+const config = require('../../config/app.config')
 
 let userCount
 
@@ -15,7 +16,7 @@ function getUserCount() {
 }
 
 getUserCount()
-setInterval(getUserCount, 3000)
+setInterval(getUserCount, config.webSockets.dbPollFrequency)
 
 function initialHydrate(socket) {
   socket.emit(`PRELOAD_${USERS_COUNT}`, userCount);
