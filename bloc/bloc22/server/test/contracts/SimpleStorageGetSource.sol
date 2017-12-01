@@ -1,4 +1,4 @@
-contract SimpleStorage{
+contract SimpleStorage {
   uint storedData;
 
   function SimpleStorage() {
@@ -6,14 +6,14 @@ contract SimpleStorage{
   }
 
   function __getSource__() constant returns (string) {
-    return "contract SimpleStorage { uint storedData; function SimpleStorage() { storedData = 1; } function set(uint x) { storedData = x; } function get() constant returns (uint) { return storedData; } }";
-  }
-
-  function set(uint x) {
-    storedData = x;
+    return "contract SimpleStorage {  uint storedData;  function SimpleStorage() {    storedData = 1;  }  function set(uint x) {    storedData = x;  }  function get() constant returns (uint) {    return storedData;  }}";
   }
 
   function get() constant returns (uint) {
     return storedData;
+  }
+
+  function set(uint x) {
+    storedData = x;
   }
 }

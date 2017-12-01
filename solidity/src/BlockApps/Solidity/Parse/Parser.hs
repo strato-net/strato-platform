@@ -2,7 +2,7 @@
 -- Module: Parser
 -- Description: The Solidity source parser function
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
-module BlockApps.Solidity.Parse.Parser (parseXabi) where
+module BlockApps.Solidity.Parse.Parser where
 
 import           Text.Parsec                          hiding (parse)
 

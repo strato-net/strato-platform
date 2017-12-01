@@ -2,8 +2,9 @@
 -- Module: Declarations
 -- Description: Parsers for top-level Solidity declarations
 -- Maintainer: Ryan Reich <ryan@blockapps.net
+-- Maintainer: Charles Crain <charles@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-module BlockApps.Solidity.Parse.Declarations (solidityContract) where
+module BlockApps.Solidity.Parse.Declarations where
 
 --import Data.Either
 import           Data.List
@@ -15,7 +16,7 @@ import qualified Data.Text                            as Text
 --import           Data.Char
 
 import           Text.Parsec
-import           Text.Parsec.Perm
+-- import           Text.Parsec.Perm
 --import           Text.Parsec.Number
 
 import           BlockApps.Solidity.Parse.Lexer
@@ -216,7 +217,7 @@ functionDeclaration = do
   functionArgs <- tupleDeclaration
 --  (functionRet, functionVisible, _, _) <- functionModifiers
   -- TODO - deal with funcitonVisible
-  (functionRet, _, _, _) <- functionModifiers
+  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
 --  functionBody <- bracedCode <|> (semi >> return "")
   contents <- bracedCode <|> (semi >> return "")
   --TODO - deal with contractName
@@ -240,6 +241,12 @@ functionDeclaration = do
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
       , Xabi.funcContents = Text.pack contents
+
+      -- TODO: Get these values from parser
+      , Xabi.funcMutable  = Just mutable
+      , Xabi.funcPayable  = Just payable
+      , Xabi.funcVisibility = Just visibility
+      , Xabi.funcModifiers = modifiers
 
 
 --    objName = functionName,
@@ -323,28 +330,43 @@ tupleDeclaration = parens $ commaSep $ do
 -- | Parses all the things that can modify a function declaration,
 -- including return value, explicit function modifiers, visibility and
 -- constant specifiers, and possibly base construtor arguments, in the case
--- of a constructor.  These can appear in any order, so we have to use
--- a special permutation parser for this.
-functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Bool, Bool, String)
-functionModifiers =
-  permute $
-  (\a b c d1 d2 d3 d4 -> (a, b, c, unwords [d1, d2, d3, d4])) <$?>
-  ([], returnModifier) <|?>
-  (True, visibilityModifier) <|?>
-  (True, mutabilityModifier) <|?>
-  ("", otherModifiers) <|?>
-  ("", otherModifiers) <|?>
-  ("", otherModifiers) <|?>
-  ("", otherModifiers) -- Fenceposts for the explicit modifiers
+-- of a constructor.  
+
+data FuncModifiers = ReturnsMod [(Text, Xabitype.Type)]
+                   | VisibilityMod Xabi.Visibility
+                   | MutableMod Bool
+                   | PayableMod Bool
+                   | OtherMod String
+
+functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Xabi.Visibility, Bool, Bool, [String])
+functionModifiers = do
+  vals <- many $ (ReturnsMod <$> returnModifier)
+             <|>  (VisibilityMod <$> visibilityModifier)
+             <|>  (MutableMod <$> mutabilityModifier)
+             <|>  (PayableMod <$> payableModifier)
+             <|>  (OtherMod <$> otherModifiers)
+  return $ formatVals vals
   where
+    formatVals vals = 
+      let returns = catMaybes [(listToMaybe v) | ReturnsMod v <- vals]
+          visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
+          mutable = fromMaybe True $ listToMaybe [v | MutableMod v <- vals]
+          payable = fromMaybe True $ listToMaybe [v | PayableMod v <- vals]
+          otherMods = [v | OtherMod v <- vals]
+      in (returns, visibility, mutable, payable, otherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
-      ((reserved "public" <|> reserved "external") >> return True) <|>
-      ((reserved "internal" <|> reserved "private") >> return False)
+      (   (reserved "public"   >> return Xabi.Public)
+      <|> (reserved "private"  >> return Xabi.Private)
+      <|> (reserved "external" >> return Xabi.External)
+      <|> (reserved "internal" >> return Xabi.Internal)
+      )
     mutabilityModifier =
       reserved "constant" >> return False
-    otherModifiers = fmap unwords $ many $ do
+    payableModifier =
+      reserved "payable" >> return True
+    otherModifiers = do
       name <- identifier
       args <- optionMaybe parensCode
       return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args

@@ -641,8 +641,15 @@ getXabiFunctionsQuery cmId = do
         | val <- valList
         ]
     vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
-    return $ Func args vals ""
-    
+    return  Func { funcArgs = args
+                 , funcVals = vals
+                 , funcContents = ""
+                 , funcMutable = Nothing
+                 , funcPayable = Nothing
+                 , funcVisibility = Nothing
+                 , funcModifiers = []
+                 }
+
 {- |
 SELECT
   XF.id
@@ -670,7 +677,15 @@ getXabiConstrQuery cmId = do
           | val <- valList
           ]
       vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
-      return $ Map.singleton fname (Func args vals "")
+      let func = Func { funcArgs = args
+                      , funcVals = vals
+                      , funcContents = ""
+                      , funcMutable = Nothing
+                      , funcPayable = Nothing
+                      , funcVisibility = Nothing
+                      , funcModifiers = []
+                      }
+      return $ Map.singleton fname func
 
 getXabiFunctionNamesQuery :: Int32 -> Query ( Column PGText)
 getXabiFunctionNamesQuery metadataId = proc () -> do

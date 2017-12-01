@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BlockApps.Bloc22.Database.Solc (compileSolc, addGetSourceFuncToSource) where
+module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
 import           Data.Aeson hiding (String)
@@ -28,12 +28,10 @@ import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
-
-
 import BlockApps.Bloc22.Monad
-import           BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Parse.Parser
-import BlockApps.Solidity.Xabi.Type
+import BlockApps.Solidity.Parse.UnParser
+
 
 -- Query parameters allowed:
 --   src: solidity source code to be compiled, as a (url-encoded) string
@@ -50,14 +48,33 @@ import BlockApps.Solidity.Xabi.Type
 -- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
 -- this if it is something we want to maintain.
 compileSolc :: Text -> Bloc Aeson.Value
-compileSolc mainSrc = do
+compileSolc mainSrc' = do
+  mainSrc <- addGetSourceFuncToSource' mainSrc'
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   case eRes of
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
     Left (err,_) -> blocError . AnError . Text.pack $ err
     Right res ->
-      maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact") return $ Map.lookup "src" res
+      maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact")
+            return $ Map.lookup "src" res
+  where
+    addGetSourceFuncToSource' src =
+      case addGetSourceFuncToSource src of
+        Left err -> blocError . UserError .Text.pack $ err
+        Right msg -> return msg
+
+
+-- For solc compiling during testing, outside of Bloc monad
+compileSolcIO :: Text -> IO (Either String Aeson.Value)
+compileSolcIO mainSrc = do
+  (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
+  eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
+  return $ case eRes of
+    Left (err, ExitFailure 1) -> Left err
+    Left (err,_) -> Left err
+    Right res ->
+      maybe (Left $ "SolcError : No \"src\" field in json artifact") Right $ Map.lookup "src" res
 
 runSolc :: Map String String
         -> Map String String
@@ -201,55 +218,9 @@ addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
   fileContents <- parseXabi "" (unpack src)
-  let singleLineSrc = Text.concat . Text.lines $ src
-      modifiedContents = List.map (fmap $ addFunction ("__getSource__", "return \"" <> unpack singleLineSrc <> "\";")) fileContents
+  let singleLineSrc = stripLines src
+      modifiedContents = List.map (fmap $ addFunction ("__getSource__", "return \"" <> unpack singleLineSrc <> "\";  ")) fileContents
   return . pack . unparse $ modifiedContents
 
-
-unparse :: [(Text, Xabi)] -> String
-unparse contracts = List.concat $ List.map unparseContract contracts
-
-unparseContract :: (Text, Xabi) -> String
-unparseContract (name, contract) =
-     "contract "
-  <> Text.unpack name
-  <> "{"
-  <> List.concat (List.map ((" " <>) . unparseVar) (Map.toList $ xabiVars contract))
-  <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
-  <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
-  <> "}"
-  
-unparseVar :: (Text, VarType) -> String
-unparseVar (name, theType) =
-     unparseVarType theType
-  <> " "
-  <> Text.unpack name
-  <> ";"
-
-unparseVarType :: VarType -> String
-unparseVarType VarType{varTypeType = Int (Just True) _} = "int"
-unparseVarType VarType{varTypeType = Int (Just False) _} = "uint"
-unparseVarType VarType{varTypeType = String _} = "string"
-unparseVarType _ = "int"
-
-unparseFunc :: (Text, Func) -> String
-unparseFunc (name, Func{..}) = Text.unpack $
-     "function "
-  <> name
-  <> "("
-  <> intercalate ", " (List.map unparseArgs (Map.toList funcArgs)) <> ") {"
-  <> (Text.concat . Text.lines $ funcContents)
-  <> "}"
-
-unparseArgs :: (Text, IndexedType) -> Text
-unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
-
-unparseIndexedType :: IndexedType -> Text
--- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
-unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
-unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
-unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
-unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
-
-addFunction :: (Text, String) -> Xabi -> Xabi
-addFunction (name, contents) c = c{xabiFuncs=Map.insert name (Func Map.empty Map.empty (pack contents)) $ xabiFuncs c}
+stripLines :: Text -> Text
+stripLines = Text.concat . Text.lines
