@@ -84,13 +84,15 @@ describe("Send Transaction Test", function() {
         // send alice->bob on that node
         const pair = userPairs[node.id];
           console.log('Sending', nodeValue.toString(), 'on node', node.id);
-          txPending.push({node:node.id, status:'Pending', hash: yield rest.send(pair.alice,pair.bob,nodeValue,true,undefined,node.id)});
+          txPending.push({status:'Pending', hash: yield rest.send(pair.alice,pair.bob,nodeValue,true,undefined,node.id)});
       }
-        for (let pend of txPending) {
-            console.log('########## Resolving node', pend.node, '##########');
-            txResult = yield getResolved(function*(){return yield pend;},pend.node);
-            assert.equal(txResult.status,'Success', 'batch tx status');
-        }
+      for (let pend of txPending) {
+        console.log('~~~~~~~~~~ Resolving transaction', pend.hash, '~~~~~~~~~~');
+        for (let node of nodes)
+          console.log('########## Resolving node', pend.node, '##########');
+          txResult = yield getResolved(function*(){return yield pend;},node);
+          assert.equal(txResult.status,'Success', 'batch tx status');
+      }
     }
     yield checkBalance(nodes[0].alice,nodes[0].bob,total);
   });
