@@ -88,10 +88,11 @@ describe("Send Transaction Test", function() {
       }
       for (let pend of txPending) {
         console.log('~~~~~~~~~~ Resolving transaction', pend.hash, '~~~~~~~~~~');
-        for (let node of nodes)
-          console.log('########## Resolving node', node, '##########');
+        for (let node of nodes) {
+          console.log('########## Resolving node', node.id, '##########');
           txResult = yield getResolved(function*(){return yield pend;},node);
           assert.equal(txResult.status,'Success', 'batch tx status');
+        }
       }
     }
     yield checkBalance(nodes[0].alice,nodes[0].bob,total);
