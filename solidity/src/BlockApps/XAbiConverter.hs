@@ -238,11 +238,11 @@ contractToXabi Contract{..} =
       Map.fromList
         [ ( name , Func { funcArgs = (Map.fromList $ zipWith (argToIndexedTypes typeDefs) [0..] args)
                         , funcVals = (Map.fromList $ zipWith (varToIndexedTypes typeDefs) [0..] rets)
-                        , funcContents = "Contract type does not store function contents."
+                        , funcContents = Nothing
                         , funcMutable = Nothing
                         , funcPayable = Nothing
                         , funcVisibility = Nothing
-                        , funcModifiers = []
+                        , funcModifiers = Nothing
                         }
                         
           )

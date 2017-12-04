@@ -240,13 +240,13 @@ functionDeclaration = do
       , Xabi.funcVals =
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
-      , Xabi.funcContents = Text.pack contents
+      , Xabi.funcContents = Just $ Text.pack contents
 
       -- TODO: Get these values from parser
       , Xabi.funcMutable  = Just mutable
       , Xabi.funcPayable  = Just payable
       , Xabi.funcVisibility = Just visibility
-      , Xabi.funcModifiers = modifiers
+      , Xabi.funcModifiers = Just modifiers
 
 
 --    objName = functionName,

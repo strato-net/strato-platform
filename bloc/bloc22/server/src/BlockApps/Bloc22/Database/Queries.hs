@@ -643,11 +643,11 @@ getXabiFunctionsQuery cmId = do
     vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
     return  Func { funcArgs = args
                  , funcVals = vals
-                 , funcContents = ""
+                 , funcContents = Nothing
                  , funcMutable = Nothing
                  , funcPayable = Nothing
                  , funcVisibility = Nothing
-                 , funcModifiers = []
+                 , funcModifiers = Nothing
                  }
 
 {- |
@@ -679,11 +679,11 @@ getXabiConstrQuery cmId = do
       vals <- valMap <$> getXabiFunctionsReturnValuesQuery xfId
       let func = Func { funcArgs = args
                       , funcVals = vals
-                      , funcContents = ""
+                      , funcContents = Nothing
                       , funcMutable = Nothing
                       , funcPayable = Nothing
                       , funcVisibility = Nothing
-                      , funcModifiers = []
+                      , funcModifiers = Nothing
                       }
       return $ Map.singleton fname func
 

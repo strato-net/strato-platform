@@ -62,8 +62,9 @@ unparseFunc (name, Func{..}) = Text.unpack $
          <> intercalate ", " (List.map unparseVals vals)
          <> ") "
   <> "{ "
-  <> (Text.concat . Text.lines $ funcContents)
-  <> "}"
+  <> case funcContents of
+       Just contents -> (Text.concat . Text.lines $ contents)
+       Nothing -> ""
 
 unparseArgs :: (Text, IndexedType) -> Text
 unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
@@ -88,11 +89,10 @@ addFunction (name, contents) c =
                   , funcVals = Map.singleton "#0" IndexedType{ indexedTypeType=String (Just True)
                                                              , indexedTypeIndex=0
                                                              }
-                  , funcContents = pack contents
-                  -- TODO: Put in appropriate values
+                  , funcContents = Just $ pack contents
                   , funcMutable = Just False
                   , funcPayable = Just False
                   , funcVisibility = Nothing
-                  , funcModifiers = []
+                  , funcModifiers = Nothing
                   }
   in c{xabiFuncs=Map.insert name (func) $ xabiFuncs c}
