@@ -964,7 +964,18 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       purgeStorageMap newAddress
       deleteAddressState newAddress
       return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
-    _ -> return ret
+    _ -> do
+--      eSrc <- runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas getSource'
+--
+--      when (isRight eSrc) $ do
+--        let Right (code', vmState'') = eSrc
+--        when (isJust $ returnVal vmState'') $ do
+--          let Just returnVal'' = returnVal vmState''
+--              code''' = T.pack $ B.unpack returnVal''
+--              input = BS.pack [0xec, 0x63, 0x06, 0x43]
+--          res <- runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env{envCode=code''', envInputData=input} availableGas
+
+      return ret
 
 
 
