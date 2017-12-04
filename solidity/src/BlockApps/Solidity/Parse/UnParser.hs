@@ -65,6 +65,7 @@ unparseFunc (name, Func{..}) = Text.unpack $
   <> case funcContents of
        Just contents -> (Text.concat . Text.lines $ contents)
        Nothing -> ""
+  <> "}"
 
 unparseArgs :: (Text, IndexedType) -> Text
 unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name
