@@ -11,6 +11,7 @@
 
 module BlockApps.Bloc22.Database.Queries where
 
+
 import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Except
@@ -989,7 +990,9 @@ insertXabiConstr metadataId contractName constrArgs = unless (Map.null constrArg
 insertXabi :: Int32 -> Text -> Xabi -> Bloc ()
 insertXabi metadataId contractName Xabi{..} = do
   traverse_ (insertXabiFunction metadataId) (Map.toList xabiFuncs)
-  insertXabiConstr metadataId contractName (funcArgs $ xabiConstr Map.! contractName)
+  case Map.lookup contractName xabiConstr of
+    Just constr -> insertXabiConstr metadataId contractName (funcArgs constr)
+    Nothing -> return ()
   void $ insertXabiVariables metadataId xabiVars
   void $ insertXabiTypeDefs metadataId xabiTypes
 

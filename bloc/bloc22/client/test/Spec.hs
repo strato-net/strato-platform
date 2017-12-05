@@ -73,8 +73,8 @@ setup = do
       }
 
     postCompileRequest1 = PostCompileRequest (Just []) (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
-    postCompileRequest2 = PostCompileRequest (Just []) (Just $ testContractName testConfig) (testSrc testConfig)
-    postCompileRequest3 = PostCompileRequest (Just []) (Just $ simpleMappingContractName testConfig) (simpleMappingSrc testConfig)
+    -- postCompileRequest2 = PostCompileRequest (Just []) (Just $ testContractName testConfig) (testSrc testConfig)
+    -- postCompileRequest3 = PostCompileRequest (Just []) (Just $ simpleMappingContractName testConfig) (simpleMappingSrc testConfig)
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
@@ -82,21 +82,21 @@ setup = do
       , uploadlistcontractTxParams = txParams testConfig
       , uploadlistcontractValue = Nothing
       }
-    uploadListContract2 = UploadListContract
-      { uploadlistcontractContractName = testContractName testConfig
-      , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = txParams testConfig
-      , uploadlistcontractValue = Nothing
-      }
-    uploadListContract3 = UploadListContract
-      { uploadlistcontractContractName = simpleMappingContractName testConfig
-      , uploadlistcontractArgs = Map.empty
-      , uploadlistcontractTxParams = txParams testConfig
-      , uploadlistcontractValue = Nothing
-      }
+   --  uploadListContract2 = UploadListContract
+   --    { uploadlistcontractContractName = testContractName testConfig
+   --    , uploadlistcontractArgs = Map.empty
+   --    , uploadlistcontractTxParams = txParams testConfig
+   --    , uploadlistcontractValue = Nothing
+   --    }
+   --  uploadListContract3 = UploadListContract
+   --    { uploadlistcontractContractName = simpleMappingContractName testConfig
+   --    , uploadlistcontractArgs = Map.empty
+   --    , uploadlistcontractTxParams = txParams testConfig
+   --    , uploadlistcontractValue = Nothing
+   --    }
     uploadListRequest = UploadListRequest
       { uploadlistPassword = pw testConfig
-      , uploadlistContracts = [uploadListContract1,uploadListContract2,uploadListContract3]
+      , uploadlistContracts = [uploadListContract1]
       , uploadlistResolve = True
       }
     clients = do
@@ -104,25 +104,27 @@ setup = do
       addr2 <- postUsersUser (toUserName testConfig) (pw testConfig)
       _ <- postUsersFill (userName testConfig) addr1 True
       _ <- postUsersFill (userName testConfig) addr2 True
-      _ <- postContractsCompile [postCompileRequest1,postCompileRequest2,postCompileRequest3]
+      _ <- postContractsCompile [postCompileRequest1]
       unresolvedResults <- postUsersUploadList (userName testConfig) addr1 True uploadListRequest
       simpleStorageResult
-        : testResult
-        : simpleMappingResult
+      --   : testResult
+      --   : simpleMappingResult
         : _ <- sequence $ map resolveBlocTx unresolvedResults
       let
         Just (Upload simpleStorageDetails) = blocTransactionData simpleStorageResult
-        Just (Upload testDetails) = blocTransactionData testResult
-        Just (Upload simpleMappingDetails) = blocTransactionData simpleMappingResult
+        -- Just (Upload testDetails) = blocTransactionData testResult
+        -- Just (Upload simpleMappingDetails) = blocTransactionData simpleMappingResult
         Just (Unnamed sscAddr) = contractdetailsAddress simpleStorageDetails
-        Just (Unnamed tcAddr) = contractdetailsAddress testDetails
-        Just (Unnamed smcAddr) = contractdetailsAddress simpleMappingDetails
+        -- Just (Unnamed tcAddr) = contractdetailsAddress testDetails
+        -- Just (Unnamed smcAddr) = contractdetailsAddress simpleMappingDetails
         config = testConfig
           { userAddress = addr1
           , toUserAddress = addr2
           , simpleStorageContractAddress = sscAddr
-          , testContractAddress = tcAddr
-          , simpleMappingContractAddress = smcAddr
+          -- , testContractAddress = tcAddr
+          -- , simpleMappingContractAddress = smcAddr
+          , testContractAddress = undefined
+          , simpleMappingContractAddress = undefined
           }
       return config
   cfgEither <- runClientM clients (ClientEnv mgr' bloc)
