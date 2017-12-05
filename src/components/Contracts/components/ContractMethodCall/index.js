@@ -102,7 +102,6 @@ class ContractMethodCall extends Component {
         <Button
           className="pt-minimal pt-small pt-intent-primary"
           onClick={this.handleOpenModal}
-          disabled={!this.props.fromBloc}
         >
           Call Method
         </Button>
