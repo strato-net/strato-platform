@@ -971,8 +971,9 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       (eRes, vmState'') <- call isRunningTests' isHomestead True S.empty b 0 newAddress newAddress sender 0 1 (fst $ B16.decode "ec630643") 10000000 sender
       when ((isRight eRes) && (isJust $ returnVal vmState'')) $ do
         let Just returnVal'' = returnVal vmState''
-        putAddressState newAddress addressState{addressStateSource=BC.unpack returnVal''}
-        $logInfoS "create" . T.pack $ "The source of the contract: " ++ show returnVal''
+            returnSrc = BC.takeWhile (/= '\0') . BC.drop 64 $ returnVal''
+        putAddressState newAddress addressState{addressStateSource=BC.unpack returnSrc}
+        $logInfoS "create" . T.pack $ "The source of the contract: " ++ show returnSrc
 
       return ret
 
