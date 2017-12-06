@@ -1,5 +1,5 @@
 import React from 'react';
-const {
+import {
   fetchContracts,
   FETCH_CONTRACTS,
   fetchContractsSuccess,
@@ -7,7 +7,7 @@ const {
   fetchContractsFailure,
   FETCH_CONTRACTS_FAILED,
   changeContractFilter,
-  CHANGE_CONTRACT_FILTER } = require('../../components/Contracts/contracts.actions');
+  CHANGE_CONTRACT_FILTER } from '../../components/Contracts/contracts.actions';
 
 test('Should create an action to fetch contracts', () => {
   const expectedAction = {
