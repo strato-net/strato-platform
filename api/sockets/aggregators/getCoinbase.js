@@ -6,7 +6,7 @@ var rp = require('request-promise');
 let coinbase
 
 const options = {
-  uri: `http://${process.env['STRATO_LOCAL_HOST']}/strato-api/eth/v1.2/coinbase`,
+  uri: `http://${process.env['stratourl']}/eth/v1.2/coinbase`,
   json: true
 }
 
