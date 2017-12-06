@@ -22,6 +22,8 @@ data TestConfig = TestConfig
   { mgr                          :: Manager
   , blocUrl                      :: BaseUrl
   , stratoUrl                    :: BaseUrl
+  , blocUrlMulti                 :: Maybe BaseUrl
+  , stratoUrlMulti               :: Maybe BaseUrl
   , userName                     :: UserName
   , userAddress                  :: Address
   , toUserName                   :: UserName
@@ -29,10 +31,6 @@ data TestConfig = TestConfig
   , pw                           :: Password
   , simpleStorageContractName    :: Text
   , simpleStorageContractAddress :: Address
-  , testContractName             :: Text
-  , testContractAddress          :: Address
-  , simpleMappingContractName    :: Text
-  , simpleMappingContractAddress :: Address
   , txParams                     :: Maybe TxParams
   , txParamsLowNonce             :: Maybe TxParams
   , simpleStorageSrc             :: Text
@@ -76,5 +74,14 @@ resolveBlocTx bloc = do
     Pending -> resolveBlocTx result
     _ -> return result
 
+fromEither :: (Show b) => Either b a -> IO a
+fromEither x = do
+  logleft x
+  let Right r = x
+  return r
 
+logleft :: (Show b) => Either b a -> IO ()
+logleft x = case x of
+  Left err -> print err
+  Right _ -> return ()
 

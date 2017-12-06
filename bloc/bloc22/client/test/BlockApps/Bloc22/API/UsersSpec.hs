@@ -120,12 +120,6 @@ spec = do
             , uploadlistcontractTxParams = txParams
             , uploadlistcontractValue = Nothing
             }
-          , UploadListContract
-            { uploadlistcontractContractName = testContractName
-            , uploadlistcontractArgs = Map.empty
-            , uploadlistcontractTxParams = txParams
-            , uploadlistcontractValue = Nothing
-            }
           ]
         uploadListRequest = UploadListRequest
           { uploadlistPassword = pw

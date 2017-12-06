@@ -188,6 +188,7 @@ spec =
       storedData' `shouldBe` SolidityValueAsString "3"
 
     it "should create SimpleStorageAddress contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps999"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
@@ -289,6 +290,7 @@ spec =
       storedData' `shouldBe` SolidityValueAsString "00000000000000000000000000000000deadbeef"
 
     it "should create SimpleStorageBytes32Array contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps444"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
@@ -405,6 +407,7 @@ spec =
         ]
 
     it "should create BytesComboTest contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps444"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
@@ -457,6 +460,7 @@ spec =
 
 
     it "should disambiguate contracts with the same name using latest and address" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       sameName1Src <- readSolFile "SameName1.sol"
       sameName2Src <- readSolFile "SameName2.sol"
       let
@@ -496,6 +500,7 @@ spec =
       sameNameLatestSymbols `shouldBe` [SymbolName "myInt"]
 
     it "should create SimpleConstructor contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps1"
 
@@ -549,6 +554,7 @@ spec =
       storedData `shouldBe` SolidityValueAsString "3"
 
     it "should create TestArrayStatCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps1"
 
@@ -584,6 +590,7 @@ spec =
 
 
     it "should create TestArrayDynCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps1"
 
@@ -618,6 +625,7 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestBytesDynCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps1"
 
@@ -690,6 +698,7 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestLessComplexCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps1"
 
@@ -733,6 +742,7 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create SimpleTuple contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps455"
 
@@ -845,6 +855,7 @@ spec =
       storedData2' `shouldBe` SolidityValueAsString "4"
 
     it "should create Bytes32Test contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps2"
           -- postUsersUserRequest1 = PostUsersUserRequest "1" pw
@@ -931,6 +942,7 @@ spec =
       values `shouldBe` [SolidityValueAsString "\129\167ePH\SOn=\154M\241{\159\&6\131\182l\237\169\136\&9\ns\193DlBqs\191j\137"]
 
     it "should create StorageBlob contract, call methods " $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps2"
           -- postUsersUserRequest1 = PostUsersUserRequest "1" pw
@@ -1097,6 +1109,7 @@ spec =
       storeEither `shouldSatisfy` isRight
 
     it "should create ReturnTuple contract, call methods " $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps2"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)

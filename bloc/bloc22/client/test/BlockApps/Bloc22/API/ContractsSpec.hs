@@ -32,14 +32,8 @@ spec = do
     it "gets a list of contracts" $ \ TestConfig {..} -> do
       Right (GetContractsResponse contracts) <- runClientM getContracts (ClientEnv mgr blocUrl)
       let Just addressesCreatedAt1 = Map.lookup simpleStorageContractName contracts
-      let Just addressesCreatedAt2 = Map.lookup testContractName contracts
-      let Just addressesCreatedAt3 = Map.lookup simpleMappingContractName contracts
       addressesCreatedAt1 `shouldSatisfy` any
         (\ (AddressCreatedAt _ addr) -> addr == Unnamed simpleStorageContractAddress)
-      addressesCreatedAt2 `shouldSatisfy` any
-        (\ (AddressCreatedAt _ addr) -> addr == Unnamed testContractAddress)
-      addressesCreatedAt3 `shouldSatisfy` any
-        (\ (AddressCreatedAt _ addr) -> addr == Unnamed simpleMappingContractAddress)
   describe "getContractsData" $
     it "gets a list of addresses created under the contract name" $ \ TestConfig {..} -> do
       Right addrs <- runClientM (getContractsData $ ContractName simpleStorageContractName) (ClientEnv mgr blocUrl)
@@ -53,14 +47,14 @@ spec = do
         )
         (ClientEnv mgr blocUrl)
       contractsEither `shouldSatisfy` isRight
-    it "should also work when mappings are involved" $ \ TestConfig {..} -> do
-      contractsEither <- runClientM
-        (getContractsContract
-          (ContractName testContractName)
-          (Unnamed testContractAddress)
-        )
-        (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
+    -- it "should also work when mappings are involved" $ \ TestConfig {..} -> do
+    --   contractsEither <- runClientM
+    --     (getContractsContract
+    --       (ContractName testContractName)
+    --       (Unnamed testContractAddress)
+    --     )
+    --     (ClientEnv mgr blocUrl)
+    --   contractsEither `shouldSatisfy` isRight
   describe "getContractsFunctions" $
     it "get a list of contract functions for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       Right functionNames <- runClientM
@@ -95,39 +89,6 @@ spec = do
   describe "getContractsStateMapping" $
     it "get contract state for a mapping within an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       pendingWith "state mapping endpoint not yet implemented"
-      contractsEitherSimple <- runClientM
-        (getContractsStateMapping
-          (ContractName simpleMappingContractName)
-          (Unnamed simpleMappingContractAddress)
-          "m"
-          "1"
-        )
-        (ClientEnv mgr blocUrl)
-      contractsEitherSimple `shouldSatisfy` isRight
-      contractsEitherTest <- runClientM
-        (getContractsStateMapping
-          (ContractName testContractName)
-          (Unnamed testContractAddress)
-          "tMapping3"
-          "1"
-        )
-        (ClientEnv mgr blocUrl)
-      contractsEitherTest `shouldSatisfy` isRight
-      contractsEitherBool <- runClientM
-        (getContractsStateMapping
-          (ContractName simpleMappingContractName)
-          (Unnamed simpleMappingContractAddress)
-          "m2"
-          "1"
-        )
-        (ClientEnv mgr blocUrl)
-      contractsEitherBool `shouldSatisfy` isRight
   describe "getContractsStates" $
     it "get contract states all uploaded contracts at a specific name" $ \ TestConfig {..} -> do
       pendingWith "contract multiple states endpoint not yet implemented"
-      contractsEither <- runClientM
-        (getContractsStates
-          (ContractName simpleMappingContractName)
-        )
-        (ClientEnv mgr blocUrl)
-      contractsEither `shouldSatisfy` isRight
