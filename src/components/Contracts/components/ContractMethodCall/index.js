@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import { Button, Dialog } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
@@ -22,9 +22,10 @@ class ContractMethodCall extends Component {
     e.preventDefault();
     mixpanelWrapper.track("method_call_button_click");
     this.props.methodCallOpenModal(this.props.lookup);
+    const address = this.props.fromCirrus && this.props.fromBloc === undefined ? this.props.contractName : this.props.contractAddress
     this.props.methodCallFetchArgs(
       this.props.contractName,
-      this.props.contractAddress,
+      address,
       this.props.symbolName,
       this.props.lookup
     );
@@ -69,13 +70,13 @@ class ContractMethodCall extends Component {
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
       : null;
 
-    if(this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
+    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
       const self = this;
-      args.forEach(function(arg,i){
+      args.forEach(function (arg, i) {
         params.push(
           <tr key={self.props.symbolName + '-args-' + i}>
-            <td style={{paddingTop: '10px'}}>{arg}</td>
+            <td style={{ paddingTop: '10px' }}>{arg}</td>
             <td>
               <Field
                 name={arg}
@@ -121,7 +122,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '5px'}}>
+                  <label className="pt-label" style={{ marginTop: '5px' }}>
                     Username
                   </label>
                 </div>
@@ -135,9 +136,11 @@ class ContractMethodCall extends Component {
                     >
                       <option />
                       {
-                        users.map((user,i) => { return (
-                          <option key={'user' + i} value={user}>{user}</option>
-                        )})
+                        users.map((user, i) => {
+                          return (
+                            <option key={'user' + i} value={user}>{user}</option>
+                          )
+                        })
                       }
                     </Field>
                   </div>
@@ -145,7 +148,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '9px'}}>
+                  <label className="pt-label" style={{ marginTop: '9px' }}>
                     Address
                   </label>
                 </div>
@@ -160,9 +163,11 @@ class ContractMethodCall extends Component {
                       <option />
                       {
                         userAddresses ?
-                          userAddresses.map((address,i) => { return (
-                            <option key={address} value={address}>{address}</option>
-                          )})
+                          userAddresses.map((address, i) => {
+                            return (
+                              <option key={address} value={address}>{address}</option>
+                            )
+                          })
                           : ''
                       }
                     </Field>
@@ -171,7 +176,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '9px'}}>
+                  <label className="pt-label" style={{ marginTop: '9px' }}>
                     Password
                   </label>
                 </div>
@@ -188,7 +193,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '9px'}}>
+                  <label className="pt-label" style={{ marginTop: '9px' }}>
                     Value
                   </label>
                 </div>
@@ -225,7 +230,7 @@ class ContractMethodCall extends Component {
                   <hr />
                   <h5>Results</h5>
                   <pre className="smd-scrollable">
-                    {this.props.modal.result} <br/>
+                    {this.props.modal.result} <br />
                   </pre>
                 </div>
               </div>
