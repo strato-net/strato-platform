@@ -1,0 +1,19 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`renders correctly 1`] = `
+<div
+  className="container-fluid pt-dark"
+>
+  <div
+    className="row"
+  >
+    <div
+      className="col-sm-3"
+    >
+      <h3>
+        Nodes
+      </h3>
+    </div>
+  </div>
+</div>
+`;
