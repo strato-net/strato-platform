@@ -186,6 +186,7 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
                          ,  pPeerUdpEnableTime = curTime
                          ,  pPeerLastBestBlockHash = SHA 0
                          ,  pPeerBondState = 0
+                         ,  pPeerActiveState = 0
                          ,  pPeerVersion = T.pack "61" -- fix
                          }
         void $ addPeer peer
@@ -222,6 +223,7 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
                          , pPeerUdpEnableTime = curTime
                          , pPeerLastBestBlockHash = SHA 0
                          , pPeerBondState = 0
+                         , pPeerActiveState = 0
                          , pPeerVersion = T.pack "61" -- fix
                          }
         void $ addPeer peer

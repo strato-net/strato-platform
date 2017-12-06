@@ -39,6 +39,7 @@ PPeer
     lastTotalDifficulty Integer
     lastBestBlockHash SHA
     bondState Int
+    activeState Int
     version T.Text
     deriving Show Read Eq
 |]
@@ -67,6 +68,7 @@ buildPeer (pubKeyMaybe, ip, port') =
         pPeerUdpEnableTime = jamshidBirth,
         pPeerLastBestBlockHash = SHA 0,
         pPeerBondState=0,
+        pPeerActiveState = 0,
         pPeerVersion = T.pack "61" -- fix
         }
 
@@ -99,6 +101,18 @@ getAvailablePeers = withGlobalSQLPool $ \sqldb -> do
   currentTime <- getCurrentTime
   fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
     SQL.selectList [PPeerEnableTime SQL.<. currentTime] []
+
+setPeerActiveState::T.Text->Int->Int->IO ()
+setPeerActiveState ip port' state = withGlobalSQLPool $ \sqldb -> do
+  flip SQL.runSqlPool sqldb $
+    SQL.updateWhere [PPeerIp SQL.==. ip, PPeerTcpPort SQL.==. port'] [PPeerActiveState SQL.=. state]
+  return ()
+
+getActivePeers::IO [PPeer]
+getActivePeers = withGlobalSQLPool $ \sqldb -> do
+  currentTime <- getCurrentTime
+  fmap (map SQL.entityVal) $ flip SQL.runSqlPool sqldb $
+    SQL.selectList [PPeerActiveState SQL.==. 1, PPeerEnableTime SQL.<. currentTime] []
 
 setPeerBondingState::String->Int->Int->IO ()
 setPeerBondingState ip port' state = withGlobalSQLPool $ \sqldb -> do
@@ -138,6 +152,7 @@ defaultPeer = PPeer{
   pPeerLastTotalDifficulty=0,
   pPeerLastBestBlockHash=SHA 0,
   pPeerBondState=0,
+  pPeerActiveState=0,
   pPeerVersion=""
   }
 

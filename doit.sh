@@ -1,11 +1,13 @@
 #!/bin/bash
 
 set -e
+set -x
 
 function newnode {
   initialize=false
   if [[ ! -d .ethereumH ]]
   then initialize=true
+       cleanupDB
        doInit
   fi
 
@@ -59,6 +61,14 @@ function newnode {
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
 }
 
+function cleanupDB {
+  db_conn_params="-U $pgUser -h $pgHost"
+  PGPASSWORD=$pgPass psql ${db_conn_params} -c "copy (select datname from pg_database where datname like '%eth_%') to stdout" | while read line; do
+    echo "dropping the old db: $line"
+    PGPASSWORD=$pgPass dropdb ${db_conn_params} "$line"
+  done
+}
+
 function doInit {
   cp -r /var/lib/node_modules /var/lib/strato/.
   cp  /var/lib/mkCoinbase  /var/lib/strato/.
@@ -81,9 +91,7 @@ function doInit {
   echo $cmd
   $cmd
 
-  if $noMinPeers
-  then sed -i 's/minAvailablePeers:.*/minAvailablePeers: 0/' .ethereumH/ethconf.yaml
-  fi
+  sed -i 's/minAvailablePeers:.*/minAvailablePeers: '"$numMinPeers"'/' .ethereumH/ethconf.yaml
 
   cp node_modules/blockapps-js/dist/blockapps{,-min}.js static/js
 
@@ -139,7 +147,7 @@ setEnv pgPass api
 setEnv pgHost postgres
 
 setEnv kafkaHost kafka
-setEnv zkHost zookeeper
+setEnv zkHost kafka
 
 setEnv redisBDBHost redis
 setEnv redisBDBPort 6379
@@ -161,7 +169,7 @@ setEnv lazyBlocks true
 setEnv serveBlocks true
 setEnv receiveBlocks true
 setEnv addBootnodes false
-setEnv noMinPeers false
+setEnv numMinPeers 0
 setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 20
