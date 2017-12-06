@@ -59,7 +59,7 @@ createAccount blockNumber address diff = do
       addressStateRefCode = getField (theError "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefSource = Nothing
+      addressStateRefSource = ""
       }
     makeIncremental (Value x) = Create{newValue = x}
     theError :: String -> a
@@ -86,15 +86,20 @@ updateAccount blockNumber address diff = do
   addrID <- getAddressStateSQL address "update"
   SQL.update addrID $
     setField nonce AddressStateRefNonce $
-    setField balance AddressStateRefBalance
+    setField balance AddressStateRefBalance $
+    setShowField source AddressStateRefSource $
         [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
 
   where
     setField field sqlField = maybe id (\v -> ((sqlField =. takeIncremental v) :)) $ field diff
+    setShowField field sqlField = maybe id (\v -> ((sqlField =. takeShow v) :)) $ field diff
     takeIncremental Create{newValue} = newValue
     takeIncremental Delete{}         = 0
     takeIncremental Update{newValue} = newValue
+    takeShow        Create{newValue} = show newValue
+    takeShow        Delete{}         = ""
+    takeShow        Update{newValue} = show newValue
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()

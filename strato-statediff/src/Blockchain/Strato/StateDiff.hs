@@ -81,6 +81,8 @@ data AccountDiff (v :: Detail) =
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot v),
     -- | Only the storage keys that change are present in this map.
+    source       :: Maybe (Diff String v),
+
     storage      :: Map Word256 (Diff Word256 v)
     }
     deriving (Generic)
@@ -123,18 +125,23 @@ class Detailed (t :: Detail -> *) where
   incrementalToEventual :: t 'Incremental -> t 'Eventual
 
 instance Detailed AccountDiff where
-  incrementalToEventual AccountDiff{nonce, balance, code, codeHash, contractRoot, storage} =
+  incrementalToEventual AccountDiff{nonce, balance, code, codeHash, contractRoot, source, storage} =
     AccountDiff{
       nonce = fmap incrementalToEventual nonce,
       balance = fmap incrementalToEventual balance,
       code = fmap incrementalToEventual code,
       codeHash = codeHash,
       contractRoot = fmap incrementalToEventual contractRoot,
+      source = fmap incrementalToEventual source,
       storage = Map.map incrementalToEventual storage
       }
 
 instance {-# OVERLAPPABLE #-} (Num a) => Detailed (Diff a) where
   incrementalToEventual Delete{} = Value 0 -- ^ Ethereum-specific default value
+  incrementalToEventual x        = Value $ newValue x
+
+instance Detailed (Diff String) where
+  incrementalToEventual Delete{} = Value ""
   incrementalToEventual x        = Value $ newValue x
 
 instance Detailed (Diff StateRoot) where
@@ -203,7 +210,8 @@ eventualAccountState
     addressStateNonce,
     addressStateBalance,
     addressStateContractRoot,
-    addressStateCodeHash
+    addressStateCodeHash,
+    addressStateSource
     }
   = do
     code <- lookupCode addressStateCodeHash
@@ -214,6 +222,7 @@ eventualAccountState
       contractRoot = Just (Value addressStateContractRoot),
       code = Just (Value code),
       codeHash = addressStateCodeHash,
+      source = Just (Value addressStateSource),
       storage
       }
 
@@ -228,6 +237,7 @@ incrementalAccountState oldState newState = do
     contractRoot = (diff `on` addressStateContractRoot) oldState newState,
     code = Nothing,
     codeHash = addressStateCodeHash newState,
+    source = (diff `on` addressStateSource) oldState newState,
     storage
     }
 

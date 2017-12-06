@@ -80,6 +80,7 @@ populateAndConvertAddressState owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (hash $ codeBytes $ contractCode' addressState')
+      (addressStateSource addressState)
 
 showHexInt::Integer->String
 showHexInt x

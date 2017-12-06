@@ -138,6 +138,7 @@ test-suite ethereum-vm-test
                          base,
                          base16-bytestring,
                          blockapps-data,
+                         blockapps-util,
                          bytestring,
                          containers,
                          data-default,

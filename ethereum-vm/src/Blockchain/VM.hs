@@ -20,7 +20,9 @@ import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
+import qualified Data.ByteString.Base16             as B16
 import           Data.Char
+import           Data.Either
 import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
@@ -965,15 +967,12 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       deleteAddressState newAddress
       return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
     _ -> do
---      eSrc <- runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availableGas getSource'
---
---      when (isRight eSrc) $ do
---        let Right (code', vmState'') = eSrc
---        when (isJust $ returnVal vmState'') $ do
---          let Just returnVal'' = returnVal vmState''
---              code''' = T.pack $ B.unpack returnVal''
---              input = BS.pack [0xec, 0x63, 0x06, 0x43]
---          res <- runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env{envCode=code''', envInputData=input} availableGas
+      addressState <- getAddressState newAddress
+      (eRes, vmState'') <- call isRunningTests' isHomestead True S.empty b 0 newAddress newAddress sender 0 1 (fst $ B16.decode "ec630643") 10000000 sender
+      when ((isRight eRes) && (isJust $ returnVal vmState'')) $ do
+        let Just returnVal'' = returnVal vmState''
+        putAddressState newAddress addressState{addressStateSource=BC.unpack returnVal''}
+        $logInfoS "create" . T.pack $ "The source of the contract: " ++ show returnVal''
 
       return ret
 
