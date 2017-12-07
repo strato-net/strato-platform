@@ -660,6 +660,7 @@ spec =
       postUsersContractEither `shouldSatisfy` isRight
 
     it "should create TestAddressBytesCons contract and check state after constructor" $ \ testConfig@TestConfig {..} -> do
+      pendingWith "Not yet supported for metadata compile"
       let
           userName1 = UserName "blockapps1"
 
