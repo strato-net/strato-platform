@@ -9,7 +9,7 @@ export const EDITOR_CONTRACT_NAME_CHANGE = "EDITOR_CONTRACT_NAME_CHANGE";
 export const CHANGE_FILE_NAME = "CHANGE_FILE_NAME";
 export const ON_COMPILE_FILE_LOCALLY = "ON_COMPILE_FILE_LOCALLY"
 
-export const changeCreateActionState = function(value, sourceCode, index) {
+export const changeCreateActionState = function (value, sourceCode, index) {
   return {
     type: CODE_EDITOR_CHANGE_CREATEACTION,
     createActionEnable: value,
@@ -18,23 +18,21 @@ export const changeCreateActionState = function(value, sourceCode, index) {
   }
 }
 
-export const compileCodeFromEditor = function(name, code, searchable) {
+export const compileCodeFromEditor = function (code) {
   return {
     type: CODE_EDITOR_COMPILE_REQUEST,
-    name: name,
-    code: code,
-    searchable: searchable
+    code: code
   }
 }
 
-export const compileCodeFromEditorSuccess = function(response) {
+export const compileCodeFromEditorSuccess = function (response) {
   return {
     type: CODE_EDITOR_COMPILE_SUCCESS,
     response: response,
   }
 }
 
-export const compileCodeFromEditorFailure = function(error) {
+export const compileCodeFromEditorFailure = function (error) {
   return {
     type: CODE_EDITOR_COMPILE_FAILURE,
     error: error,
@@ -64,21 +62,21 @@ export const onTabChange = function (prevTab, nextTab) {
   }
 }
 
-export const contractNameChange = function(contractName) {
+export const contractNameChange = function (contractName) {
   return {
     type: EDITOR_CONTRACT_NAME_CHANGE,
     contractName: contractName
   }
 }
 
-export const onChangeFileName = function(fileName) {
+export const onChangeFileName = function (fileName) {
   return {
     type: CHANGE_FILE_NAME,
     name: fileName
   }
 }
 
-export const onCompileFileLocally = function(compileError) {
+export const onCompileFileLocally = function (compileError) {
   return {
     type: ON_COMPILE_FILE_LOCALLY,
     compileError: compileError

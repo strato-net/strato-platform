@@ -31,7 +31,8 @@ const initialState = {
 
 const formatCompilationErrors = function (error) {
   if (error.indexOf('\n') === -1) {
-    return error;
+    const jsonErr = JSON.parse(error);
+    return jsonErr.replace(/\n/g, "\n");
   }
   let text = error
     .split('\n')
@@ -54,9 +55,9 @@ const formatCompilationErrors = function (error) {
 const loadState = () => {
   try {
     const serializedState = localStorage.getItem('code_editor_state');
-     if (serializedState === null) {
-       return initialState;
-     }
+    if (serializedState === null) {
+      return initialState;
+    }
     return JSON.parse(serializedState);
   } catch (err) {
     return undefined;
