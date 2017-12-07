@@ -52,6 +52,7 @@ import           BlockApps.Solidity.Xabi
 import qualified BlockApps.Solidity.Xabi.Def     as Xabi.Def
 import qualified BlockApps.Solidity.Xabi.Type    as Xabi
 import           BlockApps.Strato.Types
+import           BlockApps.Strato.Client
 
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
@@ -348,12 +349,27 @@ getContractsMetaDataIdExhaustive contractName contractAddr = do
   let cmIds = cmIdsByAddress ++ cmIdsByLatest ++ cmIdsBySameName
   -- cmIds <- catchError byAddress (\ _ -> (catchError byLatest (\ _ -> bySameName)))
   case cmIds of
-    [] -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+    [] -> do
+      mcmId <- addContractMetaDatafromStrato
+      case mcmId of
+        Nothing -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+        Just (cmId,_) -> return cmId
     cmId:_ -> return cmId
   where
     byAddress = blocQuery $ getContractsMetaDataIdByAddressQuery contractName contractAddr
     byLatest = blocQuery $ getContractsMetaDataIdByLatestQuery contractName
     bySameName = blocQuery $ getContractsMetaDataIdBySameNameQuery contractName
+    addContractMetaDatafromStrato = do
+      msrc <- getSourceFromStrato contractAddr
+      case msrc of
+        Nothing -> return Nothing
+        Just src -> do
+          cmIds <- compileContract src
+          return (Map.lookup contractName cmIds)
+    getSourceFromStrato addr = do
+      let afp = accountsFilterParams{qaAddress=Just addr}
+      mAcc <- listToMaybe <$> blocStrato (getAccountsFilter afp)
+      return (accountSource <$> mAcc)
 
 insertXabiFunctionArg
   :: Int32
