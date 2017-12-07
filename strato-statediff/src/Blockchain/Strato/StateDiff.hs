@@ -137,6 +137,10 @@ instance {-# OVERLAPPABLE #-} (Num a) => Detailed (Diff a) where
   incrementalToEventual Delete{} = Value 0 -- ^ Ethereum-specific default value
   incrementalToEventual x        = Value $ newValue x
 
+instance Detailed (Diff String) where
+  incrementalToEventual Delete{} = Value ""
+  incrementalToEventual x        = Value $ newValue x
+
 instance Detailed (Diff StateRoot) where
   incrementalToEventual Delete{} = Value $ fromString ""
   incrementalToEventual x        = Value $ newValue x

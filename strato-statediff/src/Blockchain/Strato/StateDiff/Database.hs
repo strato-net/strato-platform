@@ -6,6 +6,7 @@
 module Blockchain.Strato.StateDiff.Database
     ( sqlDiff
     , commitSqlDiffs
+    , updateSource
     ) where
 
 import           Database.Persist                            hiding (Update, get)
@@ -58,7 +59,8 @@ createAccount blockNumber address diff = do
       addressStateRefContractRoot = getField (theError "contractRoot") $ contractRoot diff,
       addressStateRefCode = getField (theError "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
-      addressStateRefLatestBlockDataRefNumber = blockNumber
+      addressStateRefLatestBlockDataRefNumber = blockNumber,
+      addressStateRefSource = ""
       }
     makeIncremental (Value x) = Create{newValue = x}
     theError :: String -> a
@@ -85,8 +87,8 @@ updateAccount blockNumber address diff = do
   addrID <- getAddressStateSQL address "update"
   SQL.update addrID $
     setField nonce AddressStateRefNonce $
-    setField balance AddressStateRefBalance
-        [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
+    setField balance AddressStateRefBalance $
+      [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ storage diff
 
   where
@@ -94,6 +96,14 @@ updateAccount blockNumber address diff = do
     takeIncremental Create{newValue} = newValue
     takeIncremental Delete{}         = 0
     takeIncremental Update{newValue} = newValue
+
+updateSource :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m) =>
+                Address -> String -> m ()
+updateSource address source = do
+  pool <- getSQLDB
+  flip SQL.runSqlPool pool $ do
+    addrID <- getAddressStateSQL address "update"
+    SQL.update addrID [AddressStateRefSource =. source]
 
 commitStorage :: (HasStateDB m, HasHashDB m, MonadResource m) =>
                  SQL.Key AddressStateRef -> Word256 -> Diff Word256 'Incremental -> SqlDbM m ()

@@ -5,6 +5,7 @@ module Blockchain.VM
     ( runCodeFromStart
     , call
     , create
+    , getSource
     ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
@@ -20,7 +21,9 @@ import           Control.Monad.Trans.State
 import           Data.Bits
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
+import qualified Data.ByteString.Base16             as B16
 import           Data.Char
+import           Data.Either
 import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
@@ -903,6 +906,16 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
+getSource :: Bool
+          -> Bool
+          -> BlockData
+          -> Address
+          -> Address
+          -> ContextM (Either VMException String)
+getSource isRunningTests' isHomestead b sender contractAddress = do
+  (eRes, vmState'') <- call isRunningTests' isHomestead True S.empty b 0 contractAddress contractAddress sender 0 1 (fst $ B16.decode "ec630643") 1000000000000000000 sender
+  return $ eRes >>= \_ -> return $ fromMaybe "" (returnVal vmState'' >>= return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64)
+
 create :: Bool
        -> Bool
        -> S.Set Address
@@ -964,7 +977,9 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       purgeStorageMap newAddress
       deleteAddressState newAddress
       return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
-    _ -> return ret
+    _ -> do
+
+      return ret
 
 
 
