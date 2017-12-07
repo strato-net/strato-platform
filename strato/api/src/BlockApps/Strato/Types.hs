@@ -395,6 +395,7 @@ data Account = Account
   , accountCodeHash       :: Keccak256
   , accountSource         :: Text
   , accountLatestBlockNum :: Natural
+  , accountLatestBlockNum :: Natural
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Account where
