@@ -21,7 +21,7 @@ import           Numeric
 import           Text.PrettyPrint.ANSI.Leijen       hiding ((<$>))
 
 blankAddressState:: AddressState
-blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "", addressStateSource="" }
+blankAddressState = AddressState { addressStateNonce=0, addressStateBalance=0, addressStateContractRoot=MP.emptyTriePtr, addressStateCodeHash=hash "" }
 
 
 instance Format AddressState where
@@ -30,8 +30,7 @@ instance Format AddressState where
     tab("\nnonce: " ++ showHex (addressStateNonce a) "" ++
         "\nbalance: " ++ show (toInteger $ addressStateBalance a) ++
         "\ncontractRoot: " ++ format (addressStateContractRoot a) ++
-        "\ncodeHash: " ++ format (addressStateCodeHash a) ++
-        "\nsource: " ++ (addressStateSource a))
+        "\ncodeHash: " ++ format (addressStateCodeHash a))
 
 instance RLPSerializable AddressState where
   rlpEncode a | addressStateBalance a < 0 = error $ "Error in cal to rlpEncode for AddressState: AddressState has negative balance: " ++ format a
@@ -39,17 +38,15 @@ instance RLPSerializable AddressState where
     rlpEncode $ toInteger $ addressStateNonce a,
     rlpEncode $ toInteger $ addressStateBalance a,
     rlpEncode $ addressStateContractRoot a,
-    rlpEncode $ addressStateCodeHash a,
-    rlpEncode $ addressStateSource a
+    rlpEncode $ addressStateCodeHash a
                 ]
 
-  rlpDecode (RLPArray [n, b, cr, ch, s]) =
+  rlpDecode (RLPArray [n, b, cr, ch]) =
     AddressState {
       addressStateNonce=fromInteger $ rlpDecode n,
       addressStateBalance=fromInteger $ rlpDecode b,
       addressStateContractRoot=rlpDecode cr,
-      addressStateCodeHash=rlpDecode ch,
-      addressStateSource=rlpDecode s
+      addressStateCodeHash=rlpDecode ch
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ show (pretty x)
 

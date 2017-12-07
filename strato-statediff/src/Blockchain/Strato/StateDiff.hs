@@ -81,8 +81,6 @@ data AccountDiff (v :: Detail) =
     -- It changes if and only if the storage changes at all
     contractRoot :: Maybe (Diff StateRoot v),
     -- | Only the storage keys that change are present in this map.
-    source       :: Maybe (Diff String v),
-
     storage      :: Map Word256 (Diff Word256 v)
     }
     deriving (Generic)
@@ -125,14 +123,13 @@ class Detailed (t :: Detail -> *) where
   incrementalToEventual :: t 'Incremental -> t 'Eventual
 
 instance Detailed AccountDiff where
-  incrementalToEventual AccountDiff{nonce, balance, code, codeHash, contractRoot, source, storage} =
+  incrementalToEventual AccountDiff{nonce, balance, code, codeHash, contractRoot, storage} =
     AccountDiff{
       nonce = fmap incrementalToEventual nonce,
       balance = fmap incrementalToEventual balance,
       code = fmap incrementalToEventual code,
       codeHash = codeHash,
       contractRoot = fmap incrementalToEventual contractRoot,
-      source = fmap incrementalToEventual source,
       storage = Map.map incrementalToEventual storage
       }
 
@@ -210,8 +207,7 @@ eventualAccountState
     addressStateNonce,
     addressStateBalance,
     addressStateContractRoot,
-    addressStateCodeHash,
-    addressStateSource
+    addressStateCodeHash
     }
   = do
     code <- lookupCode addressStateCodeHash
@@ -222,7 +218,6 @@ eventualAccountState
       contractRoot = Just (Value addressStateContractRoot),
       code = Just (Value code),
       codeHash = addressStateCodeHash,
-      source = Just (Value addressStateSource),
       storage
       }
 
@@ -237,7 +232,6 @@ incrementalAccountState oldState newState = do
     contractRoot = (diff `on` addressStateContractRoot) oldState newState,
     code = Nothing,
     codeHash = addressStateCodeHash newState,
-    source = (diff `on` addressStateSource) oldState newState,
     storage
     }
 

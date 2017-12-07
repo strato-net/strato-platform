@@ -23,6 +23,7 @@ import qualified Data.Map                as M
 import           Data.Maybe
 import qualified Data.Set                as S
 import           Data.Either
+import qualified Data.Text.Encoding      as Text
 import qualified Database.LevelDB        as DB
 
 import           Blockchain.Data.RLP
@@ -115,4 +116,5 @@ spec = do
         Just code -> do
           liftIO . putStrLn $ show code
           liftIO . putStrLn . show . fst $ B16.decode code
+          liftIO . putStrLn . show $ Text.decodeUtf8 code
           liftIO . putStrLn . show . C8.takeWhile (/= '\0') . C8.drop 64 $ code

@@ -80,7 +80,6 @@ populateAndConvertAddressState owner addressState' = do
       (balance' addressState')
       (addressStateContractRoot addressState)
       (hash $ codeBytes $ contractCode' addressState')
-      (addressStateSource addressState)
 
 showHexInt::Integer->String
 showHexInt x
@@ -254,7 +253,7 @@ runTest test = do
         flushMemAddressStateDB
 
         case result of
-            Right (ExecResults remGas retVal _ rLogs _) -> do
+            Right (ExecResults _ _ remGas retVal _ rLogs _ _) -> do
               return ( Right (), retVal, remGas, rLogs, Just [], Nothing)
             Left _ -> do
               return (Right (), Nothing, 0, [], Just [], Nothing)

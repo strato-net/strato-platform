@@ -29,6 +29,7 @@ import           Control.Monad.Trans.Either
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
+import           Data.Either                             (isRight)
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
@@ -236,13 +237,14 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               let oldStateRoot = blockDataStateRoot oldHeader
               didReplaceBest <- liftIO (newIORef False)
               replacedBest   <- liftIO (newIORef undefined)
-              forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
-                  addBlock isUnmined block
+              ess <- forM blocks' $ \block -> timeit "Block insertion" timerToUse $ do
+                  es <- addBlock isUnmined block
                   unless isUnmined $ do
                       (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
                       when didReplaceThisTime . liftIO $ do
                           writeIORef didReplaceBest True
                           writeIORef replacedBest (block, replacedBits)
+                  return es
               didReplaceBest' <- liftIO (readIORef didReplaceBest)
               unless isUnmined $ do
                   void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
@@ -251,13 +253,22 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
                       (theBlock, nbb) <- liftIO (readIORef replacedBest)
                       void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
                       calculateAndEmitStateDiffs theBlock oldStateRoot
+                      forM_ (join ess) $ \er -> do
+                        when (erSuccess er && (isJust $ erNewContractAddress er)) $ do
+                          let isHomestead = blockIsHomestead . blockDataNumber $ erBlockData er
+                              Just contractAddress = erNewContractAddress er
+                          eRes <- getSource False isHomestead (erBlockData er) (erSender er) contractAddress
+                          when (isRight eRes) $ do
+                            let Right src = eRes
+                            updateSource contractAddress src
+
 
           timerToUse = Just $ if isUnmined then time_vm_block_insertion_unmined else time_vm_block_insertion_mined
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
 
-addBlock::Bool->OutputBlock->ContextM () -- change Block to OutputBlock
+addBlock::Bool->OutputBlock->ContextM [ExecResults] -- change Block to OutputBlock
 addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obBlockUncles=uncles} = do
     bSum <- BSDB.getBSum (blockDataParentHash bd)
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber bd)
@@ -275,7 +286,7 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
               (blockDataCoinbase uncle)
             ((rewardBase flags_testnet * (8+blockDataNumber uncle - blockDataNumber bd )) `quot` 8)
         unless s3 $ error "addToBalance failed even after a check in addBlock"
-    _ <- addTransactions isUnmined bd (blockDataGasLimit $ obBlockData b) transactions
+    (_,es) <- addTransactions isUnmined bd (blockDataGasLimit $ obBlockData b) transactions
       --when flags_debug $ liftIO $ putStrLn $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList fullSuicideList)
       --forM_ (S.toList fullSuicideList) deleteAddressState
 
@@ -307,10 +318,10 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
            else ctr_vm_blocks_mined
     tick ctr_vm_blocks_processed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
-    return ()
+    return es
 
-addTransactions :: Bool -> BlockData -> Integer -> [OutputTx] -> ContextM Integer
-addTransactions _ _ remGas [] = return remGas
+addTransactions :: Bool -> BlockData -> Integer -> [OutputTx] -> ContextM (Integer, [ExecResults])
+addTransactions _ _ remGas [] = return (remGas,[])
 addTransactions isUnmined b blockGas (t:rest) = do
   beforeMap <- getAddressStateDBMap
   !(deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
@@ -327,7 +338,12 @@ addTransactions isUnmined b blockGas (t:rest) = do
          Left _           -> blockGas
          Right execResult -> erRemainingBlockGas execResult
 
-  addTransactions isUnmined b remainingBlockGas rest
+  if isRight result
+    then do
+      let Right x = result
+      (i,xs) <- addTransactions isUnmined b remainingBlockGas rest
+      return (i,x:xs)
+    else addTransactions isUnmined b remainingBlockGas rest
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [OutputTx]
@@ -390,10 +406,13 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                 Left e -> do
                     when flags_debug . lift . $logDebugS "addTx" . T.pack . CL.red $ show e
                     lift $ tick ctr_vm_txs_unsuccessful
-                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
+                    return ExecResults { erSuccess            = False
+                                       , erBlockData          = b
+                                       , erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
+                                       , erSender             = tAddr
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
                                        }
                 Right _ -> do
@@ -406,10 +425,13 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                         lift $ purgeStorageMap address'
                         lift $ deleteAddressState address'
                     lift $ tick ctr_vm_txs_successful
-                    return ExecResults { erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
+                    return ExecResults { erSuccess            = True
+                                       , erBlockData          = b
+                                       , erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
+                                       , erSender             = tAddr
                                        , erNewContractAddress = if isContractCreationTX bt then Just theAddress else Nothing
                                        }
         else do
@@ -417,10 +439,13 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             unless s1 $ error "addToBalance failed even after a check in addTransaction"
             addressState' <- lift $ getAddressState tAddr
             lift . $logInfoS "addTransaction/success=false" . T.pack $ "Insufficient funds to run the VM: need " ++ show (availableGas*transactionGasPrice bt) ++ ", have " ++ show (addressStateBalance addressState')
-            return ExecResults { erRemainingBlockGas=remainingBlockGas
+            return ExecResults { erSuccess=False
+                               , erBlockData=b
+                               , erRemainingBlockGas=remainingBlockGas
                                , erReturnVal=Nothing
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
+                               , erSender=tAddr
                                , erNewContractAddress=Nothing
                                }
 

@@ -5,6 +5,7 @@ module Blockchain.VM
     ( runCodeFromStart
     , call
     , create
+    , getSource
     ) where
 
 import           Prelude                            hiding (EQ, GT, LT)
@@ -905,6 +906,16 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
           when flags_debug . lift .lift $ $logInfoS "runVMM/Right" "VM has finished running"
           return result
 
+getSource :: Bool
+          -> Bool
+          -> BlockData
+          -> Address
+          -> Address
+          -> ContextM (Either VMException String)
+getSource isRunningTests' isHomestead b sender contractAddress = do
+  (eRes, vmState'') <- call isRunningTests' isHomestead True S.empty b 0 contractAddress contractAddress sender 0 1 (fst $ B16.decode "ec630643") 1000000000000000000 sender
+  return $ eRes >>= \_ -> return $ fromMaybe "" (returnVal vmState'' >>= return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64)
+
 create :: Bool
        -> Bool
        -> S.Set Address
@@ -967,13 +978,6 @@ create isRunningTests' isHomestead preExistingSuicideList b callDepth' sender or
       deleteAddressState newAddress
       return (Left e, vmState'{vmGasRemaining=0}) --need to zero gas in the case of an exception
     _ -> do
-      addressState <- getAddressState newAddress
-      (eRes, vmState'') <- call isRunningTests' isHomestead True S.empty b 0 newAddress newAddress sender 0 1 (fst $ B16.decode "ec630643") 10000000 sender
-      when ((isRight eRes) && (isJust $ returnVal vmState'')) $ do
-        let Just returnVal'' = returnVal vmState''
-            returnSrc = BC.takeWhile (/= '\0') . BC.drop 64 $ returnVal''
-        putAddressState newAddress addressState{addressStateSource=BC.unpack returnSrc}
-        $logInfoS "create" . T.pack $ "The source of the contract: " ++ show returnSrc
 
       return ret
 

@@ -64,7 +64,6 @@ AddressState
     balance Integer sqltype=numeric(1000,0)
     contractRoot StateRoot 
     codeHash SHA 
-    source String
     deriving Eq Generic Read Show
 
 AddressStateRef
