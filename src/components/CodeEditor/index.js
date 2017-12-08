@@ -22,7 +22,7 @@ class CodeEditor extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track('code_editor_load');
-    this.saveLocalState = debounce(this.saveToLocalStorage,500)
+    this.saveLocalState = debounce(this.saveToLocalStorage, 500)
     window.onbeforeunload = (e) => {
       this.saveToLocalStorage()
     };
@@ -103,9 +103,7 @@ class CodeEditor extends Component {
       }
       mixpanelWrapper.track("compile_contract_code_click");
       this.props.compileCodeFromEditor(
-        'Greeter',
-        code,
-        false
+        code
       );
     } catch (e) {
       this.props.onCompileFileLocally(`${e}`)

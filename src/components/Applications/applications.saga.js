@@ -70,12 +70,20 @@ function* fetchApplications(action) {
 function* launchApps(action) {
   try {
     let response = yield call(launchApp, action.url);
+    const retriesTotal = 7;
+    let retriesLeft = retriesTotal;
     while(response.status !== 200) {
-      yield call(sleep, 1 * 1000);
-      response = yield call(launchApp, action.url)
+      yield call(sleep, retriesTotal/retriesLeft * 1000);
+      response = yield call(launchApp, action.url);
+      retriesLeft -= 1;
+      if (retriesLeft === 0) break;
     }
-    yield put(launchAppSuccess(action.address));
-    window.open(action.url, '_blank');
+    if (response.status && response.status === 200) {
+      yield put(launchAppSuccess(action.address));
+      window.open(action.url, '_blank');
+    } else {
+      throw Error('Timeout on app fetching');
+    }
   }
   catch (err) {
     yield put(launchAppFailure(err));
