@@ -47,10 +47,11 @@ spec =
       describe "getContractsState" $
         it "should pull data from strato and get contract state for an uploaded SimpleStorage" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config
-          let contractName = "SimpleStorage"
+          let contractName' = "SimpleStorage"
           src' <- readSolFile "SimpleStorage.sol"
-          randNum <- (pack . show) <$> (generate arbitrary :: IO Int)
-          let src = replace contractName ( contractName <> "_" <> randNum) src'
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
               expectation = Map.fromList [("storedData",SolidityValueAsString "0")] :: Map Text SolidityValue
           cAddr <- createContractOnMulti src contractName Nothing config
           state <- getStateMulti cAddr contractName config
@@ -62,6 +63,9 @@ createContractOnMulti :: Text
                       -> TestConfig
                       -> IO Address
 createContractOnMulti src cn args config@TestConfig{..} = do
+  let blocclient = (ClientEnv mgr $ fromJust blocUrlMulti)
+  addr <- fromEither =<< runClientM (postUsersUser userName pw) blocclient
+  _ <- fromEither =<< runClientM (postUsersFill userName addr True) blocclient
   let
     postUsersContractRequest = PostUsersContractRequest
       { postuserscontractrequestSrc = src
@@ -71,13 +75,13 @@ createContractOnMulti src cn args config@TestConfig{..} = do
       , postuserscontractrequestTxParams = txParams
       , postuserscontractrequestValue = Just $ Strung 0
       }
-  Right result <- getResolvedTx config $ runClientM (postUsersContract userName userAddress False postUsersContractRequest) (ClientEnv mgr $ fromJust blocUrlMulti)
+  result <- fromEither =<< (getResolvedTx config $ runClientM (postUsersContract userName addr False postUsersContractRequest) blocclient)
   result `shouldSatisfy` (== Success) . blocTransactionStatus
   result `shouldSatisfy` isJust . blocTransactionTxResult
   result `shouldSatisfy` isJust . blocTransactionData
   let (Upload details) = fromJust $ blocTransactionData result
-      (Unnamed addr) = fromJust $ contractdetailsAddress details
-  return addr
+      (Unnamed caddr) = fromJust $ contractdetailsAddress details
+  return caddr
 
 getStateMulti :: Address -> Text -> TestConfig -> IO (Map Text SolidityValue)
 getStateMulti addr cn TestConfig{..} = do

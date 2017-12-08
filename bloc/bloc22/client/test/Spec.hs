@@ -53,7 +53,8 @@ setup = do
         b' <- parseBaseUrl b
         return (Just str',Just b')
 
-  mgr' <- newManager defaultManagerSettings
+  mgr' <- newManager defaultManagerSettings{managerResponseTimeout=responseTimeoutMicro 60000000}
+ 
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"

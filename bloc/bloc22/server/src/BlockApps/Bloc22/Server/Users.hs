@@ -99,7 +99,7 @@ postUsersContract userName addr resolve
            _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
        Just contract ->
          blocMaybe "Could not find global contract metadataId" $
-         Map.lookup contract idsAndDetails
+           Map.lookup contract idsAndDetails
     let
       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
