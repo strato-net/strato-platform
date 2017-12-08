@@ -13,7 +13,7 @@ import { env } from '../../env';
 
 const contractsUrl = env.BLOC_URL + "/contracts";
 
-function getContracts() {
+export function getContracts() {
   return fetch(
     contractsUrl,
     {
@@ -30,7 +30,7 @@ function getContracts() {
     });
 }
 
-function* fetchContracts(action) {
+export function* fetchContracts(action) {
   try {
     let response = yield call(getContracts);
     yield put(fetchContractsSuccess(response));
