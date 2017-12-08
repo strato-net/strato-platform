@@ -166,4 +166,35 @@ describe('Test contracts reducer', () => {
 
     expect(reducer({ contracts: contract, filter: filter }, action)).toEqual(stateAfter)
   })
+
+  // FETCH_CIRRUS_INSTANCES_SUCCESS
+  test('Should fetch cirrus instances', () => {
+    const action = {
+      instances: [
+        {
+          address: "b7b986bf23faebd8d745c65fa42a8c2f0fc2ebb9",
+          greetingB: ""
+        }],
+      name: "GreeterB",
+      type: "FETCH_CIRRUS_INSTANCES_SUCCESS"
+    }
+
+    let expectedContract = deepClone(contractState);
+    expectedContract['GreeterB']['instances'][0]['fromCirrus'] = false;
+    expectedContract['GreeterB']['instances']
+      .push({
+        address: "b7b986bf23faebd8d745c65fa42a8c2f0fc2ebb9",
+        greetingB: "",
+        fromCirrus: true
+      });
+
+    const stateAfter = {
+      contracts: expectedContract,
+      filter: filter,
+      error: 'error'
+    }
+
+    expect(reducer({ contracts: contractState, filter: filter, error: 'error' }, action)).toEqual(stateAfter)
+  })
+
 })
