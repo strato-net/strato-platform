@@ -93,7 +93,7 @@ class ContractCard extends Component {
                 }}>
                 <Tooltip
                   content={symbol}
-                  position={Position.TOP}>
+                  position={Position.TOP_LEFT}>
                   {symbol}
                 </Tooltip>
               </td>
