@@ -257,8 +257,7 @@ type PostContractsCompile = "contracts"
   :> Post '[JSON] [PostCompileResponse]
 
 data PostCompileRequest = PostCompileRequest
-  { postcompilerequestSearchable   :: Maybe [Text]
-  , postcompilerequestContractName :: Maybe Text
+  { postcompilerequestContractName :: Maybe Text
   , postcompilerequestSource       :: Text
   } deriving (Eq,Show,Generic)
 
@@ -280,8 +279,7 @@ instance ToSchema PostCompileRequest where
     where
       ex :: PostCompileRequest
       ex = PostCompileRequest
-        { postcompilerequestSearchable = Just ["searchable", "tags"]
-        , postcompilerequestContractName = Just "MySampleContract"
+        { postcompilerequestContractName = Just "MySampleContract"
         , postcompilerequestSource = "contract MySampleContract { ...} "
         }
 

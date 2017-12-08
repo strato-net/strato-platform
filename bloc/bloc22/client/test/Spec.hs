@@ -46,6 +46,7 @@ setup = do
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"
+  twoContractsSource <- readSolFile "TwoContracts.sol"
   putStrLn $ "Using Strato URL: " ++ showBaseUrl strato
   putStrLn $ "Using Bloc URL: " ++ showBaseUrl bloc
   let
@@ -64,19 +65,22 @@ setup = do
       , testContractAddress  = Address 0x0
       , simpleMappingContractName = "SimpleMapping"
       , simpleMappingContractAddress = Address 0x0
+      , twoContractsContractName = "C1"
+      , twoContractsContractAddress = Address 0x0
       , txParams = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) Nothing
       , txParamsLowNonce = Just $ TxParams (Just (Gas 10000000000)) (Just (Wei 1)) (Just $ Nonce 0)
       , simpleStorageSrc = simpleStorageSource
       , testSrc = testSource
       , simpleMappingSrc = simpleMappingSource
+      , twoContractsSrc = twoContractsSource
       , delay =
           let second = 1000000
           in 6 * second
       }
 
-    postCompileRequest1 = PostCompileRequest (Just []) (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
-    postCompileRequest2 = PostCompileRequest (Just []) (Just $ testContractName testConfig) (testSrc testConfig)
-    postCompileRequest3 = PostCompileRequest (Just []) (Just $ simpleMappingContractName testConfig) (simpleMappingSrc testConfig)
+    postCompileRequest1 = PostCompileRequest (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
+    postCompileRequest2 = PostCompileRequest (Just $ testContractName testConfig) (testSrc testConfig)
+    postCompileRequest3 = PostCompileRequest (Just $ simpleMappingContractName testConfig) (simpleMappingSrc testConfig)
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
