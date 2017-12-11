@@ -67,6 +67,24 @@ getResolvedTx testConfig io = do
     Left _ -> return eResult
     Right result -> resolveTx testConfig $ blocTransactionHash result
 
+resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
+resolveTxMulti testConfig@TestConfig{..} hash = do
+  let Just blocclient = blocUrlMulti
+  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocclient)
+  case eResult of
+    Left _ -> return eResult
+    Right result -> 
+      case blocTransactionStatus result of
+        Pending -> resolveTxMulti testConfig hash
+        _ -> return eResult
+
+getResolvedTxMulti :: TestConfig -> IO (Either ServantError BlocTransactionResult) -> IO (Either ServantError BlocTransactionResult)
+getResolvedTxMulti testConfig io = do
+  eResult <- io
+  case eResult of
+    Left _ -> return eResult
+    Right result -> resolveTxMulti testConfig $ blocTransactionHash result
+
 resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
 resolveBlocTx bloc = do
   result <- flip getBlocTransactionResult True $ blocTransactionHash bloc
