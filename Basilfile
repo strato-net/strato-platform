@@ -37,7 +37,7 @@ deployments:
 
   - name: apex
     repo: https://github.com/blockapps/apex.git
-    ref: master
+    ref: track_api
     compose:
       restart: always
       depends_on:
@@ -160,7 +160,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: master
+    ref: track_api
     compose:
       restart: always
       ports:
