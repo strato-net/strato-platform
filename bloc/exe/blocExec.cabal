@@ -14,7 +14,7 @@ cabal-version:       >=1.10
 executable blockapps-bloc
   hs-source-dirs: app
   main-is: Main.hs
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror -fsimpl-tick-factor=20000
   build-depends: base
                , blockapps-bloc22-api
                , blockapps-bloc22-server
