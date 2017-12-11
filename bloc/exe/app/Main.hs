@@ -9,8 +9,8 @@
 module Main where
 
 import           Control.Monad
-import           Data.String
 import           Database.PostgreSQL.Simple
+import Data.Pool
 import           HFlags
 import           Network.HTTP.Client hiding (Proxy)
 import           Network.Wai.Handler.Warp
@@ -54,8 +54,13 @@ main = do
     , "╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝"
     ]
   _ <- $initHFlags "Setup EthereumH DBs"
-  dbCreateConn <- connectPostgreSQL $ fromString $
-    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=postgres password=" ++ flags_password
+  let dbConnectInfo = ConnectInfo { connectHost = flags_pghost
+                                 , connectPort = read flags_pgport
+                                 , connectUser = flags_pguser
+                                 , connectPassword = flags_password
+                                 , connectDatabase = "postgres"
+                                 }
+  dbCreateConn <- connect dbConnectInfo
 
   doesNotExist22 <- null <$>
     (query_ dbCreateConn dbExistsQuery22 :: IO [Only Int])
@@ -69,21 +74,20 @@ main = do
 
   close dbCreateConn
 
+  conn22 <- connect dbConnectInfo{connectDatabase="bloc22"}
+  conn21 <- connect dbConnectInfo{connectDatabase="bloc21"}
 
-
-  conn22 <- connectPostgreSQL $ fromString $
-    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc22 password=" ++ flags_password
-
-  conn21 <- connectPostgreSQL $ fromString $
-    "host=" ++ flags_pghost ++ " port=" ++ flags_pgport ++ " user=" ++ flags_pguser ++ " dbname=bloc21 password=" ++ flags_password
-
-  -- TODO: database connection resource management
   void $ execute_ conn22 Bloc22.createTables
+  close conn22
+
+  -- Not creating pool for bloc21 as it's being deprecated
   void $ execute_ conn21 Bloc21.createTables
+
+  pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
   cirrusUrl <- parseBaseUrl flags_cirrusurl
-  let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr conn22 $ toEnum flags_loglevel
+  let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 $ toEnum flags_loglevel
   let bloc21Env = Bloc21.BlocEnv stratoUrl cirrusUrl mgr conn21 $ toEnum flags_loglevel
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
   putStrLn $ "Using Cirrus URL: " ++ showBaseUrl cirrusUrl
