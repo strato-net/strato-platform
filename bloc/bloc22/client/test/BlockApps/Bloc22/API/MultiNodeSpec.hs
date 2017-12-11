@@ -9,8 +9,9 @@ module BlockApps.Bloc22.API.MultiNodeSpec where
 
 
 import           Servant.Client
-import Data.Text
+import Data.Text hiding (replicate)
 import Data.Maybe
+import Data.Either (isRight)
 import Data.Monoid ((<>))
 import           Test.Hspec
 import Data.Map.Strict (Map)
@@ -39,11 +40,53 @@ spec =
       describe "postUsersContractMethod" $ do
         it "should pull data from strato and call methods on SimpleStorage" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config
-          pendingWith "Not Implemented"
+          let contractName' = "SimpleStorage"
+          src' <- readSolFile "SimpleStorage.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              expectation = Call [SolidityValueAsString "0"]
+          cAddr <- createContractOnMulti src contractName Nothing config
+          let postUsersContractMethodRequest = PostUsersContractMethodRequest
+                { postuserscontractmethodPassword = pw
+                , postuserscontractmethodMethod = "get"
+                , postuserscontractmethodArgs = Map.empty
+                , postuserscontractmethodValue = Just $ Strung 0
+                , postuserscontractmethodTxParams = txParams
+                }
+          Right result <- getResolvedTx config $ runClientM
+            (postUsersContractMethod userName userAddress (ContractName contractName) cAddr False postUsersContractMethodRequest)
+            (ClientEnv mgr blocUrl)
+          fromJust (blocTransactionData result) `shouldBe` expectation
       describe "postUsersContractMethodList" $ do
         it "should pull data from strato and call methods on SimpleStorage" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config
-          pendingWith "Not Implemented"
+          let contractName' = "SimpleStorage"
+          src' <- readSolFile "SimpleStorage.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              -- expectation = Call [SolidityValueAsString "0"]
+          cAddr <- createContractOnMulti src contractName Nothing config
+          let
+            postMethodListRequest = PostMethodListRequest
+              { postmethodlistrequestPassword = pw
+              , postmethodlistrequestResolve = False
+              , postmethodlistrequestTxs = replicate 3
+                  MethodCall
+                  { methodcallContractName = simpleStorageContractName
+                  , methodcallContractAddress = cAddr
+                  , methodcallMethodName = "get"
+                  , methodcallArgs = Map.empty
+                  , methodcallValue = Strung 0
+                  , methodcallTxParams = txParams
+                  }
+              }
+          results <- getResolvedBatchTx config $ runClientM
+            (postUsersContractMethodList userName userAddress False postMethodListRequest)
+            (ClientEnv mgr blocUrl)
+          let eResults = sequence results
+          eResults `shouldSatisfy` isRight
       describe "getContractsState" $
         it "should pull data from strato and get contract state for an uploaded SimpleStorage" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config

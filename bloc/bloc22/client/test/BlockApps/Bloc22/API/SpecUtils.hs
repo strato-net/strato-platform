@@ -67,6 +67,13 @@ getResolvedTx testConfig io = do
     Left _ -> return eResult
     Right result -> resolveTx testConfig $ blocTransactionHash result
 
+getResolvedBatchTx :: TestConfig -> IO (Either ServantError [BlocTransactionResult]) -> IO [Either ServantError BlocTransactionResult]
+getResolvedBatchTx testConfig io = do
+  eResult <- io
+  case eResult of
+    Left err -> return [Left err]
+    Right results -> mapM (resolveTx testConfig . blocTransactionHash) results
+
 resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
 resolveTxMulti testConfig@TestConfig{..} hash = do
   let Just blocclient = blocUrlMulti
