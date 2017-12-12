@@ -29,5 +29,12 @@ if [ "$authBasic" != true ] ; then
 	sed -i '/auth_basic/d' /etc/nginx/nginx.conf
 fi
 
+echo 'Waiting for apex to be available...'
+until curl --silent --output /dev/null --fail --location http://apex:3001/health-check
+do
+  sleep 0.5
+done
+echo 'apex is available'
+
 service nginx start || (tail -n 5 /var/log/nginx/error.log && exit 1) # Restart container if nginx failed to start (wait for all upstreams to become available)
 tail -n0 -F /var/log/nginx/*.log
