@@ -64,6 +64,7 @@ deployments:
       depends_on:
         - strato
         - postgres
+        # - cirrus # circuit dependency
       environment:
         ssl: "${ssl:-false}"
         stratoHost: "strato:3000"
@@ -89,6 +90,7 @@ deployments:
         - postgres
         - postgrest
         - kafka
+        - bloch
       environment:
         blocHost: "bloch:8000"
         stratoHost: "strato:3000"
