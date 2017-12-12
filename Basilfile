@@ -49,6 +49,12 @@ deployments:
       environment:
         NODE_HOST: "${NODE_HOST}"
         SINGLE_NODE: "${SINGLE_NODE}"
+        blocHost: "bloch:8000"
+        cirrusHost: "cirrus:3333"
+        stratoHost: "strato:3000"
+        postgres_host: "postgres"
+        postgres_port: "5432"
+
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
@@ -60,12 +66,12 @@ deployments:
         - postgres
       environment:
         ssl: "${ssl}"
-        stratoHost: "${stratoHost}"
-        stratourl: "${stratourl}"
-        cirrusurl: "${cirrusurl}"
-        pguser: "${pguser}"
-        pgpasswd: "${pgpasswd}"
-        pghost: "${pghost}"
+        stratoHost: "strato:3000"
+        cirrusHost: "cirrus:3333"
+        postgres_host: "postgres"
+        postgres_port: "5432"
+        postgres_user: "postgres"
+        postgres_password: "${postgres_password:-api}"
 
   - name: redis
     compose:
@@ -84,15 +90,15 @@ deployments:
         - postgrest
         - kafka
       environment:
-        blocurl: "${blocurl}"
-        stratourl: "${stratourl}"
-        postgresturl: "${postgresturl}"
-        zookeeper_conn: "kafka" 
-        postgres_db: "${cirrus_pg_db:-cirrus}"
-        postgres_user: "${postgres_user:-postgres}"
-        postgres_password: ${postgres_password:-api}
-        postgres_host: "${postgres_host:-postgres}"
-        postgres_port: "${postgres_port:-5432}"
+        blocHost: "bloch:8000"
+        stratoHost: "strato:3000"
+        postgrestHost: "postgrest:3001"
+        zookeeper_conn: "kafka"
+        postgres_host: "postgres"
+        postgres_port: "5432"
+        postgres_db: "cirrus"
+        postgres_user: "postgres"
+        postgres_password: "${postgres_password:-api}"
         stateDiffTopic: "${stateDiffTopic}"
         SINGLE_NODE: "${SINGLE_NODE}"
 
@@ -129,6 +135,14 @@ deployments:
         statsSuffix: "${statsSuffix}"
         numMinPeers: "${numMinPeers}"
         mineBlocks: "${mineBlocks:-true}"
+        kafkaHost: "kafka"
+        zkHost: "kafka"
+        redisHost: "redis"
+        redisPort: "6379"
+        postgres_user: "postgres"
+        postgres_password: "${postgres_password:-api}"
+        postgres_host: "postgres"
+        #postgres_port: "5432" (not used)
       depends_on:
         - kafka
         - postgres
@@ -140,11 +154,11 @@ deployments:
     compose:
       restart: always
       environment:
-        PG_ENV_POSTGRES_DB: "${cirrus_pg_db:-cirrus}"
-        PG_ENV_POSTGRES_USER: "${postgres_user:-postgres}"
-        PG_ENV_POSTGRES_PASSWORD: ${postgres_password:-api}
-        PG_ENV_POSTGRES_HOST: "${postgres_host:-postgres}"
-        PG_PORT_5432_TCP_PORT: "${postgres_port:-5432}"
+        PG_ENV_POSTGRES_DB: "cirrus"
+        PG_ENV_POSTGRES_USER: "postgres"
+        PG_ENV_POSTGRES_PASSWORD: "${postgres_password:-api}"
+        PG_ENV_POSTGRES_HOST: "postgres"
+        PG_PORT_5432_TCP_PORT: "5432"
       depends_on:
         - postgres
 
@@ -155,8 +169,8 @@ deployments:
       volumes:
       - pgdata:/var/lib/postgresql/data
       environment:
-        POSTGRES_PASSWORD: ${postgres_password:-api}
-        POSTGRES_DB: cirrus
+        POSTGRES_PASSWORD: "${postgres_password:-api}"
+        POSTGRES_DB: "cirrus"
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
