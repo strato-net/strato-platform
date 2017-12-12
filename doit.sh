@@ -8,13 +8,13 @@ cirrusRoot=http://${cirrusHost}
 
 echo "Environment variables:
 stratoHost=${stratoHost}
-stratoRoot=${stratoRoot}
+stratourl=stratoRoot=${stratoRoot}
 cirrusHost=${cirrusHost}
-cirrusRoot=${cirrusRoot}
-postgres_host=${postgres_host}
-postgres_port=${postgres_port}
-postgres_user=${postgres_user}
-postgres_password=${postgres_password}
+cirrusurl=cirrusRoot=${cirrusRoot}
+pghost=postgres_host=${postgres_host}
+pgport=postgres_port=${postgres_port}
+pguser=postgres_user=${postgres_user}
+password=postgres_password=${postgres_password}
 "
 
 blocserver="/usr/bin/blockapps-bloc"
