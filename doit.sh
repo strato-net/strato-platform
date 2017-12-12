@@ -53,10 +53,6 @@ function newnode {
   echo "Configuring log maintenance"
   runForever cleanupLogs
 
-  if $initialize
-  then doRegister
-  fi
-
   echo "Becoming strato-api"
   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
 }
@@ -99,19 +95,6 @@ function doInit {
   ./mkCoinbase
 }
 
-function doRegister {
-  if [[ -z ${explorerAdvertise} ]]; then
-    echo "explorerAdvertise is empty or not set, not registering with the blockchain explorer"
-  else
-    if [[ -z ${explorerHost} ]]; then
-      echo "explorerHost not set, don't know how to register with the blockchain explorer"
-    else
-      echo "Registering with the blockchain explorer"
-      until [[ $(curl -s -d "url=$explorerAdvertise/" $explorerHost/api/nodes) == "SUCCESS" ]] ; do : ; done
-    fi
-  fi
-}
-
 # Find all logs greater than 10M, then copy and truncate
 function cleanupLogs {
   while true
@@ -142,18 +125,16 @@ function setEnv {
 
 echo "Environment variables:"
 
-setEnv pgUser postgres
-setEnv pgPass api
-setEnv pgHost postgres
+setEnv pgUser ${postgres_user}
+setEnv pgPass ${postgres_password}
+setEnv pgHost ${postgres_host}
 
-setEnv kafkaHost kafka
-setEnv zkHost kafka
+setEnv kafkaHost ${kafkaHost}
+setEnv zkHost ${zkHost}
 
-setEnv redisBDBHost redis
-setEnv redisBDBPort 6379
+setEnv redisBDBHost ${redisHost}
+setEnv redisBDBPort ${redisPort}
 setEnv redisBDBNumber 0
-
-setEnv explorerHost explorer
 
 setEnv genesis gettingStarted
 setEnv miningAlgorithm Instant
