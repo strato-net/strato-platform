@@ -65,7 +65,7 @@ deployments:
         - strato
         - postgres
       environment:
-        ssl: "${ssl}"
+        ssl: "${ssl:-false}"
         stratoHost: "strato:3000"
         cirrusHost: "cirrus:3333"
         postgres_host: "postgres"
@@ -188,7 +188,7 @@ deployments:
         - strato
         - apex
       environment:
-        ssl: "${ssl}"
+        ssl: "${ssl:-false}"
         authBasic: "${authBasic}"
         uiPassword: "${uiPassword}"
         blockTime: "${blockTime}"
