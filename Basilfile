@@ -58,7 +58,7 @@ deployments:
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: master
+    ref: track_api
     compose:
       restart: always
       depends_on:
@@ -81,7 +81,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: master
+    ref: track_api
     compose:
       restart: always
       depends_on:
@@ -104,7 +104,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: master
+    ref: track_api
     compose:
       restart: always
       ports:
