@@ -8,8 +8,8 @@ var Promise = require('bluebird'),
  delayPromise = util.delayPromise,
  Consumer = kafka.Consumer;
 
-const postgrestRoot = (process.env["postgrestRoot"] || "http://postgrest:3001");
-const blocRoot       = (process.env["blocRoot"]) || "http://bloch:8000/bloc/v2.2";
+const postgrestRoot = (process.env["postgrestRoot"] || "http://localhost/cirrus/search");
+const blocRoot       = (process.env["blocRoot"]) || "http://localhost/bloc/v2.2";
 const zookeeperConn = (process.env["zookeeper_conn"] || "kafka");
 
 const delay         = (process.env.DELAY || 200);
