@@ -102,7 +102,7 @@ function fetchABIs() {
         return scope;
       })
       .catch(function(error) {
-        console.log(`Failed to obtain ABIs from postgrest (request options: ${options})`, error.message);
+        console.log(`Failed to obtain ABIs from postgrest (request options: ${JSON.stringify(options)})`, error.message);
         console.log("Restarting, awaiting ");
         process.exit(1);
       });
