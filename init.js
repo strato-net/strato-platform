@@ -109,10 +109,10 @@ function generateContractTables() {
 
 function getKafkaTopic() {
   return function(scope) {
-    var stratoRoot = (process.env["stratourl"] || 'http://strato:3000');
-    var options = {
+    const stratoRoot = process.env["stratoRoot"];
+    const options = {
       method: 'GET',
-      url: stratoRoot + '/eth/v1.2/uuid',
+      url: stratoRoot + '/uuid',
       json: true
     };
     if(process.env["stateDiffTopic"]){

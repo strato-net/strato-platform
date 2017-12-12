@@ -1,20 +1,16 @@
 var Promise = require('bluebird'),
  kafka = require('kafka-node'),
  rp = require('request-promise'),
- yaml = require('yaml-parser'),
- child_process = require("child_process"),
  util = require('./lib/util'),
- traverse = require('traverse'),
  chalk = require('chalk'),
  _ = require('lodash/fp'),
  __ = require('lodash'),
  delayPromise = util.delayPromise,
  Consumer = kafka.Consumer;
 
-const stratoRoot    = (process.env["stratourl"] || "http://strato:3000");
-const postgrestRoot = (process.env["postgresturl"] || "http://postgrest:3001");
-const blocRoot       = (process.env["blocurl"]) || "http://bloch:8000/bloc/v2.2";
-const zookeeperConn = (process.env["zookeeper_conn"] || "zookeeper:2181/");
+const postgrestRoot = (process.env["postgrestRoot"] || "http://postgrest:3001");
+const blocRoot       = (process.env["blocRoot"]) || "http://bloch:8000/bloc/v2.2";
+const zookeeperConn = (process.env["zookeeper_conn"] || "kafka");
 
 const delay         = (process.env.DELAY || 200);
 const totalAttempts = (process.env.ATTEMPTS || 5);
@@ -28,9 +24,7 @@ var count =  0;
 function start() {
   return function(scope) {
     return new Promise((resolve, reject) => {
-      console.log("Connections are:\n\tstrato: "
-        + stratoRoot
-        + "\n\tpostgrest: "
+      console.log("Connections are:\n\tpostgrest: "
         + postgrestRoot
         + "\n\tzookeeper: "
         + zookeeperConn
@@ -59,7 +53,7 @@ function start() {
           process.exit(1);
         }
         console.log("Kafka consumer error: ", err);
-      })
+      });
       resolve(scope);
     })
   }
