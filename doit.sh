@@ -3,14 +3,17 @@
 set -e
 set -x
 
-export stratoRoot=http://${stratoHost}/eth/v1.2
-export cirrusRoot=http://${cirrusHost}
+stratoRoot=http://${stratoHost}/eth/v1.2
+cirrusRoot=http://${cirrusHost}
+
+# TODO: bloc is using cirrusurl for both - cirrus and postgrest, fix!
+cirrusurl=http://nginx/cirrus
 
 echo "Environment variables:
 stratoHost=${stratoHost}
 stratourl=stratoRoot=${stratoRoot}
 cirrusHost=${cirrusHost}
-cirrusurl=cirrusRoot=${cirrusRoot}
+cirrusurl=cirrusRoot=${cirrusRoot} - temporary hardcoded to http://nginx/cirrus, see TODO in doit.sh !!
 pghost=postgres_host=${postgres_host}
 pgport=postgres_port=${postgres_port}
 pguser=postgres_user=${postgres_user}
@@ -48,4 +51,4 @@ done
 $stratoserver &
 
 $blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --cirrusurl="${cirrusRoot}" 2>&1
+            --stratourl="$stratoRoot" --cirrusurl="${cirrusurl}" 2>&1
