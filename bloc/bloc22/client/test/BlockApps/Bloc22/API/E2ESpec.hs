@@ -87,7 +87,7 @@ spec =
         balance2AS = unStrung (accountBalance account2AS)
       balance2AS `shouldBe` initialWei + weiToSend
 
-    it "should create SimpleStorage contract, call methods and check state E2ESimpleStorage" $ \ testConfig@TestConfig {..} -> do
+    it "should create SimpleStorage contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
       let
           userName1 = UserName "blockapps1"
       postUsersEither1 <- runClientM (postUsersUser userName1 pw) (ClientEnv mgr blocUrl)
@@ -186,6 +186,88 @@ spec =
       let
         Just storedData' = mStoredData'
       storedData' `shouldBe` SolidityValueAsString "3"
+
+    it "should create AppMetadata contract and check state" $ \ testConfig@TestConfig {..} -> do
+      -- Util Fuctions --
+      let createUser un = do
+            addr <- fromEither =<<
+                    runClientM
+                    (postUsersUser un pw)
+                    (ClientEnv mgr blocUrl)
+            _ <- fromEither =<<
+                 runClientM
+                 (postUsersFill un addr True)
+                 (ClientEnv mgr blocUrl)
+            threadDelay 4000000
+            return addr
+      let checkAccount addr = do
+            let params = accountsFilterParams {qaAddress = Just addr}
+            eAccts <- runClientM
+                      (getAccountsFilter params)
+                      (ClientEnv mgr stratoUrl)
+            eAccts `shouldSatisfy` isRight
+      let createContract fName ctName args un addr = do
+            src <- readSolFile fName
+            let postUsersContractRequest = PostUsersContractRequest
+                  { postuserscontractrequestSrc = src
+                  , postuserscontractrequestPassword = pw
+                  , postuserscontractrequestContract = Just $ Text.pack ctName
+                  , postuserscontractrequestArgs = args
+                  , postuserscontractrequestTxParams = txParams
+                  , postuserscontractrequestValue = Just $ Strung 0
+                  }
+            let clientMethod = postUsersContract
+                               un
+                               addr
+                               True
+                               postUsersContractRequest
+            result <- fromEither =<<
+                      ( getResolvedTx testConfig $
+                        runClientM
+                        clientMethod
+                        (ClientEnv mgr blocUrl)
+                      )
+            let Just (Upload contractDetails) = blocTransactionData result
+                Just (Unnamed contractAddr) = contractdetailsAddress contractDetails
+            return contractAddr
+      let contractState ctName addr = fromEither =<<
+                                      runClientM
+                                      ( getContractsState
+                                        (ContractName ctName)
+                                        (Unnamed addr)
+                                      )
+                                      (ClientEnv mgr blocUrl)
+      -- Test --
+      let userName1 = UserName "blockapps1"
+          ctName  = "AppMetadata"
+          fName  = "AppMetadata.sol"
+          args  = Just $ Map.fromList
+                         [ ("_appName", ArgString "TestApp")
+                         , ("_version", ArgString "TestVersion")
+                         , ("_url", ArgString "TestUrl")
+                         , ("_description", ArgString "TestDescription")
+                         ]
+      addr1 <- createUser userName1
+      checkAccount addr1
+      contractAddr <- createContract fName ctName args userName1 addr1
+      contractStateMap <- contractState (Text.pack ctName) contractAddr
+      let mAppName = Map.lookup "appName" contractStateMap
+          mVersion = Map.lookup "version" contractStateMap
+          mUrl = Map.lookup "url" contractStateMap
+          mDescription = Map.lookup "description" contractStateMap
+      mAppName `shouldSatisfy` isJust
+      mVersion `shouldSatisfy` isJust
+      mUrl `shouldSatisfy` isJust
+      mDescription `shouldSatisfy` isJust
+      let
+        Just appName = mAppName
+        Just version = mVersion
+        Just url = mUrl
+        Just description = mDescription
+      appName `shouldBe` SolidityValueAsString "TestApp"
+      version `shouldBe` SolidityValueAsString "TestVersion"
+      url `shouldBe` SolidityValueAsString "TestUrl"
+      description `shouldBe` SolidityValueAsString "TestDescription"
 
     it "should create SimpleStorageAddress contract, call methods and check state" $ \ testConfig@TestConfig {..} -> do
       pendingWith "Not yet supported for metadata compile"
