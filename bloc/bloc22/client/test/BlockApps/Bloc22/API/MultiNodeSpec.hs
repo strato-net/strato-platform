@@ -9,6 +9,7 @@ module BlockApps.Bloc22.API.MultiNodeSpec where
 
 
 import           Servant.Client
+import Control.Monad (void)
 import Data.Text hiding (replicate)
 import Data.Maybe
 import Data.Either (isRight)
@@ -45,19 +46,36 @@ spec =
           randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
           let contractName = contractName' <> "_" <> randNum
               src = replace contractName' contractName src'
+              constArgs = Nothing
+              args = Map.empty
+              method = "get"
               expectation = Call [SolidityValueAsString "0"]
-          cAddr <- createContractOnMulti src contractName Nothing config
-          let postUsersContractMethodRequest = PostUsersContractMethodRequest
-                { postuserscontractmethodPassword = pw
-                , postuserscontractmethodMethod = "get"
-                , postuserscontractmethodArgs = Map.empty
-                , postuserscontractmethodValue = Just $ Strung 0
-                , postuserscontractmethodTxParams = txParams
-                }
-          Right result <- getResolvedTx config $ runClientM
-            (postUsersContractMethod userName userAddress (ContractName contractName) cAddr False postUsersContractMethodRequest)
-            (ClientEnv mgr blocUrl)
+          cAddr <- createContractOnMulti src contractName constArgs config
+          result <- callMethodLocal method cAddr contractName args config
           fromJust (blocTransactionData result) `shouldBe` expectation
+        it "should pull data from strato and call methods on AppMetadata" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "AppMetadata"
+          src' <- readSolFile "AppMetadata.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Just $ Map.fromList
+                          [ ("_appName", ArgString "TestApp")
+                          , ("_version", ArgString "TestVersion")
+                          , ("_url", ArgString "TestUrl")
+                          , ("_description", ArgString "TestDescription")
+                          ]
+              args = Map.fromList
+                     [ ("_appName", ArgString "TestAppUpdate")
+                     , ("_version", ArgString "TestVersionUpdate")
+                     , ("_url", ArgString "TestUrlUpdate")
+                     , ("_description", ArgString "TestDescriptionUpdate")
+                     ]
+              method = "update"
+          cAddr <- createContractOnMulti src contractName constArgs config
+          result <- callMethodLocal method cAddr contractName args config
+          blocTransactionData result `shouldSatisfy` isJust
       describe "postUsersContractMethodList" $ do
         it "should pull data from strato and call methods on SimpleStorage" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config
@@ -66,28 +84,37 @@ spec =
           randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
           let contractName = contractName' <> "_" <> randNum
               src = replace contractName' contractName src'
-              -- expectation = Call [SolidityValueAsString "0"]
+              method = "get"
+              args = Map.empty
           cAddr <- createContractOnMulti src contractName Nothing config
-          let
-            postMethodListRequest = PostMethodListRequest
-              { postmethodlistrequestPassword = pw
-              , postmethodlistrequestResolve = False
-              , postmethodlistrequestTxs = replicate 3
-                  MethodCall
-                  { methodcallContractName = simpleStorageContractName
-                  , methodcallContractAddress = cAddr
-                  , methodcallMethodName = "get"
-                  , methodcallArgs = Map.empty
-                  , methodcallValue = Strung 0
-                  , methodcallTxParams = txParams
-                  }
-              }
-          results <- getResolvedBatchTx config $ runClientM
-            (postUsersContractMethodList userName userAddress False postMethodListRequest)
-            (ClientEnv mgr blocUrl)
+          results <- callMethodListLocal method cAddr contractName args config
           let eResults = sequence results
           eResults `shouldSatisfy` isRight
-      describe "getContractsState" $
+        it "should pull data from strato and call methods on AppMetadata" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "AppMetadata"
+          src' <- readSolFile "AppMetadata.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Just $ Map.fromList
+                          [ ("_appName", ArgString "TestApp")
+                          , ("_version", ArgString "TestVersion")
+                          , ("_url", ArgString "TestUrl")
+                          , ("_description", ArgString "TestDescription")
+                          ]
+              args = Map.fromList
+                     [ ("_appName", ArgString "TestAppUpdate")
+                     , ("_version", ArgString "TestVersionUpdate")
+                     , ("_url", ArgString "TestUrlUpdate")
+                     , ("_description", ArgString "TestDescriptionUpdate")
+                     ]
+              method = "update"
+          cAddr <- createContractOnMulti src contractName constArgs config
+          results <- callMethodListLocal method cAddr contractName args config
+          let eResults = sequence results
+          eResults `shouldSatisfy` isRight
+      describe "getContractsState" $ do
         it "should pull data from strato and get contract state for an uploaded SimpleStorage" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config
           let contractName' = "SimpleStorage"
@@ -99,6 +126,21 @@ spec =
           cAddr <- createContractOnMulti src contractName Nothing config
           state <- getStateMulti cAddr contractName config
           (state Map.! ("storedData")) `shouldBe` (expectation Map.! "storedData")
+        it "should pull data from strato and get contract state for an uploaded AppMetadata" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "AppMetadata"
+          src' <- readSolFile "AppMetadata.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Just $ Map.fromList
+                          [ ("_appName", ArgString "TestApp")
+                          , ("_version", ArgString "TestVersion")
+                          , ("_url", ArgString "TestUrl")
+                          , ("_description", ArgString "TestDescription")
+                          ]
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateMulti cAddr contractName config
 
 createContractOnMulti :: Text
                       -> Text
@@ -126,15 +168,76 @@ createContractOnMulti src cn args config@TestConfig{..} = do
       (Unnamed caddr) = fromJust $ contractdetailsAddress details
   return caddr
 
+callMethodLocal :: Text
+                -> Address
+                -> Text
+                -> Map Text ArgValue
+                -> TestConfig
+                -> IO BlocTransactionResult
+callMethodLocal method cAddr contractName methodArgs config@TestConfig{..} =
+  let postUsersContractMethodRequest =
+        PostUsersContractMethodRequest
+        { postuserscontractmethodPassword = pw
+        , postuserscontractmethodMethod = method
+        , postuserscontractmethodArgs = methodArgs
+        , postuserscontractmethodValue = Just $ Strung 0
+        , postuserscontractmethodTxParams = txParams
+        }
+  in fromEither =<<
+     ( getResolvedTx config $
+       runClientM
+       ( postUsersContractMethod
+         userName
+         userAddress
+         (ContractName contractName)
+         cAddr
+         False
+         postUsersContractMethodRequest
+       )
+       (ClientEnv mgr blocUrl)
+     )
+
+callMethodListLocal :: Text
+                    -> Address
+                    -> Text
+                    -> Map Text ArgValue
+                    -> TestConfig
+                    -> IO [Either ServantError BlocTransactionResult]
+callMethodListLocal method cAddr contractName args config@TestConfig{..} =
+  let postMethodListRequest =
+        PostMethodListRequest
+        { postmethodlistrequestPassword = pw
+        , postmethodlistrequestResolve = False
+        , postmethodlistrequestTxs =
+            replicate 3
+            MethodCall
+            { methodcallContractName = contractName
+            , methodcallContractAddress = cAddr
+            , methodcallMethodName = method
+            , methodcallArgs = args
+            , methodcallValue = Strung 0
+            , methodcallTxParams = txParams
+            }
+        }
+  in getResolvedBatchTx config $
+     runClientM
+     ( postUsersContractMethodList
+       userName
+       userAddress
+       False
+       postMethodListRequest
+     )
+     (ClientEnv mgr blocUrl)
+
 getStateMulti :: Address -> Text -> TestConfig -> IO (Map Text SolidityValue)
-getStateMulti addr cn TestConfig{..} = do
-  Right contracts <- runClientM
-    (getContractsState
-      (ContractName cn)
-      (Unnamed addr)
-    )
-    (ClientEnv mgr $ fromJust blocUrlMulti)
-  return contracts
+getStateMulti addr cn TestConfig{..} =
+  fromEither =<<
+  runClientM
+  ( getContractsState
+    (ContractName cn)
+    (Unnamed addr)
+  )
+  (ClientEnv mgr $ fromJust blocUrlMulti)
 
 
 skipIfNotMultinode :: TestConfig -> IO ()
