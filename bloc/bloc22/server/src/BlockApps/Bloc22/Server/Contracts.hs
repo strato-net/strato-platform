@@ -67,7 +67,7 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
-  eitherErrorOrContract' <- xAbiToContract <$> getContractXabi contract contractId
+  eitherErrorOrContract' <- toUserError (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId) $ xAbiToContract <$> getContractXabi contract contractId
 
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'

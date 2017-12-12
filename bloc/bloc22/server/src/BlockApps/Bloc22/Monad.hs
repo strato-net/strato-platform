@@ -66,6 +66,14 @@ instance MonadError BlocError Bloc where
     logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
 
+dbErrorToUserError :: MonadError BlocError m => m a -> m a
+dbErrorToUserError = flip catchError $ \case
+                       DBError msg -> throwError (UserError msg)
+                       err         -> throwError err
+
+toUserError :: MonadError BlocError m => Text -> m a -> m a
+toUserError msg = flip catchError (\_ -> throwError $ UserError msg)
+
 -- I am not sure if the logs should just print out the raw errors, or if we should pretty them up a bit.  I'll add this function for now, we can toy with it both ways.
 formatError::BlocError->String
 formatError (StratoError FailureResponse{responseBody=e}) = "StratoError:\n" ++ compensateForTheOddStratoApiFormattingAndPullOutTheMessage e
