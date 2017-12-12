@@ -11,6 +11,7 @@ module.exports = {
     domainWhiteList: [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost',
     ]
   },
   apps: {

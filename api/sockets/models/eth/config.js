@@ -2,7 +2,7 @@ const request = require('sync-request');
 
 // TODO: Clean the UUID retrieval. Should happen at apex initialization.
 
-const res =  request('GET',`http://${process.env['stratourl']}/eth/v1.2/uuid`);
+const res =  request('GET',`${process.env['stratoRoot']}/uuid`);
 const user = JSON.parse(res.getBody('utf8'));
 const nodeUUID = user && user.peerId;
 

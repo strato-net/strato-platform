@@ -7,7 +7,7 @@ const router = express.Router();
 const dappController = require('../controllers/dapp');
 // const tokenController = require('../controllers/token');
 const trackHandler = require('../controllers/track');
-
+const healthHandler = require('../controllers/health');
 
 router.post('/dapps', dappController.upload);
 
@@ -32,5 +32,7 @@ router.post('/dapps', dappController.upload);
 // app.get('/_auth', authController.checkAuthenticated); // see https://github.com/nikitamendelbaum/blockapps-task/blob/strato-auth-poc/
 
 router.get('/_track', trackHandler._track);
+
+router.get('/health-check', healthHandler.healthCheck);
 
 module.exports = router;

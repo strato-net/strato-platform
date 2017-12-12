@@ -7,7 +7,7 @@ const config = require('../../config/app.config')
 let transactionsTypes
 
 const options = {
-  uri: `http://${process.env['stratourl']}/eth/v1.2/block/last/15`,
+  uri: `${process.env['stratoRoot']}/block/last/15`,
   json: true
 }
 

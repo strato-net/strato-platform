@@ -22,7 +22,10 @@ module.exports = {
     // req.headers['x-real-ip'] should have end-user's IP (but has 172.18.0.1 because of a known docker issue https://github.com/moby/moby/issues/15086)
 
     // Not using mixpanel node library since it has ip=0 hardcoded and there's no way to track the ip.
-    request(generateMixpanelUrl(`${req.headers['x-original-method']} ${req.headers['x-original-uri']}`), function(err, r, b) {
+    const eventName = (req.headers['x-original-method'] || req.headers['x-original-uri'])
+      ? `${req.headers['x-original-method']} ${req.headers['x-original-uri']}`
+      : 'no endpoint data';
+    request(generateMixpanelUrl(eventName), function(err, r, b) {
       if (err) console.warn('error while trying to send track request to mixpanel: ', err)
     })
   }

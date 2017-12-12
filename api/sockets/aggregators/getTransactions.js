@@ -5,7 +5,7 @@ var rp = require('request-promise');
 const config = require('../../config/app.config')
 
 const options = {
-  uri: `http://${process.env['stratourl']}/eth/v1.2/transaction/last/15`,
+  uri: `${process.env['stratoRoot']}/transaction/last/15`,
   json: true
 }
 
