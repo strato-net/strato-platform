@@ -1,8 +1,8 @@
 #!/bin/sh
 
-stratoRoot=http://${stratoHost}/eth/v1.2
-blocRoot=http://${blocHost}/bloc/v2.2
-postgrestRoot=http://${postgrestHost}
+export stratoRoot=http://${stratoHost}/eth/v1.2
+export blocRoot=http://${blocHost}/bloc/v2.2
+export postgrestRoot=http://${postgrestHost}
 
 echo "stratoRoot is: ${stratoRoot}"
 echo "blocRoot is: ${blocRoot}"
