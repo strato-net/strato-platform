@@ -50,7 +50,8 @@ xabiMerge x y =
     xabiFuncs=xabiFuncs x `Map.union` xabiFuncs y,
     xabiConstr=xabiConstr x,
     xabiVars= fmap (bumpAtBytes bumper) (xabiVars x) `Map.union` xabiVars y,
-    xabiTypes=xabiTypes x `Map.union` xabiTypes y
+    xabiTypes=xabiTypes x `Map.union` xabiTypes y,
+    xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
     }
   where
     bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 1

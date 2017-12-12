@@ -69,6 +69,7 @@ solidityContract = do
              Map.fromList $
              [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
              ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
+           , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
 
 --    contractName = contractName',
 --    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
@@ -90,6 +91,7 @@ data Declaration =
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
   | VariableDeclaration Xabitype.Type Bool
+  deriving Show
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
@@ -289,14 +291,18 @@ modifierDeclaration = do
   name <- identifier
   args <- option [] tupleDeclaration
 --  defn <- bracedCode
-  _ <- bracedCode
+  contents <- bracedCode
+  let nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
   return
     (
       name,
       ModifierDeclaration Xabi.Modifier{
-        Xabi.modifierArgs = undefined args -- :: Map Text Xabi.IndexedType
-      , Xabi.modifierSelector = undefined -- :: Text
-      , Xabi.modifierVals = undefined -- :: Map Text Xabi.IndexedType
+        Xabi.modifierArgs = -- undefined args -- :: Map Text Xabi.IndexedType
+           Map.fromList $
+             zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) args [0..]
+      , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text Xabi.IndexedType
+      , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
 --        objName = name,
 --        objValueType = NoValue,
 --        objArgType = args,

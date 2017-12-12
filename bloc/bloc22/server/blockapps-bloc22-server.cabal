@@ -116,6 +116,7 @@ test-suite blockapps-bloc22-server-test
     , generic-random
     , hspec
     , http-client
+    , parsec
     , QuickCheck
     , quickcheck-instances
     -- , servant-aeson-specs

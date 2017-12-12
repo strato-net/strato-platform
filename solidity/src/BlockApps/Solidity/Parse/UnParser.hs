@@ -28,6 +28,7 @@ unparseContract (name, contract) =
   <> Text.unpack name
   <> "{"
   <> List.concat (List.map ((" " <>) . unparseVar) (Map.toList $ xabiVars contract))
+  <> List.concat (List.map ((" " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
   <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
   <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
   <> "}"
@@ -63,6 +64,18 @@ unparseFunc (name, Func{..}) = Text.unpack $
          <> ") "
   <> "{ "
   <> case funcContents of
+       Just contents -> (Text.concat . Text.lines $ contents)
+       Nothing -> ""
+  <> "}"
+
+unparseModifier :: (Text, Modifier) -> String
+unparseModifier (name, Modifier{..}) = Text.unpack $
+     "modifier "
+  <> name
+  <> "("
+  <> intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
+  <> ") {"
+  <> case modifierContents of
        Just contents -> (Text.concat . Text.lines $ contents)
        Nothing -> ""
   <> "}"

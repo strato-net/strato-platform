@@ -1417,7 +1417,7 @@ getContractXabiByMetadataId metadataId = do
   constr <- getXabiConstrQuery metadataId
   vars <- getXabiVariablesQuery metadataId
   typeDefs <- getXabiTypeDefs metadataId
-  return $ Xabi funcs constr vars typeDefs
+  return $ Xabi funcs constr vars typeDefs (Map.fromList []) -- TODO: Add modifiers table and pull modifiers from there
 
 getContractXabi :: HasCallStack =>
                    ContractName -> MaybeNamed Address -> Bloc Xabi

@@ -29,10 +29,11 @@ import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
 data Xabi = Xabi
-  { xabiFuncs  :: Map Text Func
-  , xabiConstr :: Map Text Func
-  , xabiVars   :: Map Text Xabi.VarType
-  , xabiTypes  :: Map Text Xabi.Def
+  { xabiFuncs     :: Map Text Func
+  , xabiConstr    :: Map Text Func
+  , xabiVars      :: Map Text Xabi.VarType
+  , xabiTypes     :: Map Text Xabi.Def
+  , xabiModifiers :: Map Text Modifier
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -45,6 +46,7 @@ instance FromJSON Xabi where
          <*> v .:? "constr" .!= Map.empty
          <*> v .:? "vars" .!= Map.empty
          <*> v .:? "types" .!= Map.empty
+         <*> v .:? "mods" .!= Map.empty
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
@@ -77,6 +79,7 @@ instance ToSchema Xabi where
         , xabiConstr = Map.fromList []
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         }
 --------------------------------------------------------------------------------
 
@@ -141,6 +144,7 @@ data Modifier = Modifier
   { modifierArgs     :: Map Text Xabi.IndexedType
   , modifierSelector :: Text
   , modifierVals     :: Map Text Xabi.IndexedType
+  , modifierContents :: Maybe Text
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Modifier where
@@ -162,6 +166,7 @@ instance ToSchema Modifier where
         { modifierArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , modifierSelector = "0adfe412"
         , modifierVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , modifierContents = Nothing
         }
 
 newtype Event = Event { eventLogs :: Map Text Xabi.IndexedType }
@@ -242,6 +247,7 @@ instance ToSchema ContractDetails where
         , xabiConstr = Map.fromList []
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         }
 
 --------------------------------------------------------------------------------
