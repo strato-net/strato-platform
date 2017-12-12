@@ -3,8 +3,8 @@
 set -e
 set -x
 
-stratoRoot=http://${stratoHost}/eth/v1.2
-cirrusRoot=http://${cirrusHost}
+export stratoRoot=http://${stratoHost}/eth/v1.2
+export cirrusRoot=http://${cirrusHost}
 
 echo "Environment variables:
 stratoHost=${stratoHost}
