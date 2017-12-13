@@ -1,26 +1,23 @@
-var http = require('http'),
- Pool = require('pg-pool'),
- Queue = require('promise-queue'),
- express = require('express'),
- path = require('path'),
- bodyParser = require('body-parser'),
- logger = require('morgan'),
- debug = require('debug')('myapp:server'),
- cors = require('cors'),
- bodyParser = require('body-parser'),
- express = require('express'),
- util = require('./lib/util'),
- consumer = require('./consumer.js'),
- _ = require('lodash/fp'),
- __ = require('lodash'),
- toSchemaString = util.toSchemaString,
- router = express.Router();
+const Queue = require('promise-queue');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const express = require('express');
+const util = require('./lib/util');
+const consumer = require('./consumer.js');
+const toSchemaString = util.toSchemaString;
+const proxy = require('express-http-proxy');
+const logger  = require('morgan');
+
 
 function startCirrus() {
   return function(scope) {
     return new Promise(function(resolve, reject) {
 
-      var app = express();
+      let app = express();
+      app.use(logger('dev'));
+      // TODO: remove this temporary solution when bloc and blockapps-rest know the difference between cirrus and postgrest calls, also see `/contract` in app.post below
+      app.use('/search', proxy(process.env['postgrestRoot'])); // e.g. cirrus:3333/search/abc -> postgrest:3000/abc
+
       app.use(bodyParser.json({limit: '500mb'}));
       app.use(bodyParser.urlencoded({limit: '500mb', extended: true }));
 
@@ -35,7 +32,7 @@ function startCirrus() {
                          the cirrus server.`)
       }
 
-      app.post('/', function (req, res, next) {
+      app.post(['/', '/contract'], function (req, res, next) {
         var contractMetaData = req.body;
 
         // incase the binaries are attached, remove them so we don't store

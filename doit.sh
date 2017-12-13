@@ -1,30 +1,28 @@
 #!/bin/sh
 
-stratourl=${stratourl:-http://strato:3000}
-blocurl=${blocurl:-http://bloch:8000/bloc/v2.2}
-postgresturl=${postgresturl:-http://postgrest:3001}
-postgres_host=${postgres_host:-postgres}
-postgres_port=${postgres_port:-5432}
+export stratoRoot=http://${stratoHost}/eth/v1.2
+export blocRoot=http://${blocHost}/bloc/v2.2
+export postgrestRoot=http://${postgrestHost}
 
-echo "stratourl is: ${stratourl}"
-echo "blocurl is: ${blocurl}"
-echo postgresturl is: ${postgresturl}
-echo "postgres_host, postgres_port are: ${postgres_host}" ${postgres_port}
+echo "stratoRoot is: ${stratoRoot}"
+echo "blocRoot is: ${blocRoot}"
+echo "postgrestRoot is: ${postgrestRoot}"
+echo "postgres_host, postgres_port are: ${postgres_host} ${postgres_port}"
 
 echo "Waiting for STRATO to be available..."
-until curl ${stratourl} >& /dev/null; do
+until curl ${stratoRoot} >& /dev/null; do
     sleep 0.5
 done
 echo "STRATO is available"
 
 echo "Waiting for bloc to be available..."
-until curl ${blocurl} >& /dev/null; do
+until curl ${blocRoot} >& /dev/null; do
     sleep 0.5
 done
 echo "bloc is available"
 
 echo "Waiting for postgrest to be available..."
-until curl ${postgresturl} >& /dev/null; do
+until curl ${postgrestRoot} >& /dev/null; do
     sleep 0.5
 done
 echo "postgrest is available"

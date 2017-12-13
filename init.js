@@ -9,7 +9,7 @@ function initCirrus(scope) {
   scope.pool = {};
 
   var pgConfig = {
-    host: (process.env["postgres_host"] || 'postgres'),
+    host: (process.env["postgres_host"] || 'localhost'),
     user: (process.env["postgres_user"] || 'postgres'),
     password: (process.env["postgres_password"]),
     database: (process.env["postgres_db"] || 'cirrus'),
@@ -80,11 +80,11 @@ function cleanDatabase() {
 function fetchABIs() {
   return function(scope) {
     console.log('Fetching abi data');
-    var postgresturl = (process.env["postgresturl"] || "http://postgrest:3001")
+    var postgrestRoot = (process.env["postgrestRoot"] || "http://localhost/cirrus/search")
 
     var options = {
       method: 'GET',
-      url: postgresturl + '/contract',
+      url: postgrestRoot + '/contract',
       json: true,
     };
 
@@ -102,7 +102,7 @@ function fetchABIs() {
         return scope;
       })
       .catch(function(error) {
-        console.log('postgrest failed to obtain ABIs error ', error.message);
+        console.log(`Failed to obtain ABIs from postgrest (request options: ${JSON.stringify(options)})`, error.message);
         console.log("Restarting, awaiting ");
         process.exit(1);
       });
@@ -148,10 +148,10 @@ function generateContractTables() {
 
 function getKafkaTopic() {
   return function(scope) {
-    var stratoRoot = (process.env["stratourl"] || 'http://strato:3000');
-    var options = {
+    const stratoRoot = (process.env["stratoRoot"] || 'http://localhost/strato-api/eth/v1.2');
+    const options = {
       method: 'GET',
-      url: stratoRoot + '/eth/v1.2/uuid',
+      url: stratoRoot + '/uuid',
       json: true
     };
     if(process.env["stateDiffTopic"]){
