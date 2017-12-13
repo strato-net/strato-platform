@@ -41,6 +41,7 @@
     "rand-token": "0.3.0",
     "request": "2.83.0",
     "request-promise": "4.2.2",
+    "route-parser": "^0.0.5",
     "sequelize": "4.13.5",
     "sequelize-cli": "3.0.0",
     "serve-favicon": "2.4.5",
