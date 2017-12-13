@@ -4,7 +4,7 @@ MAINTAINER Ilya Ostrovskiy <ilya@blockapps.net>
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get install -y nginx apache2-utils && \
+    apt-get install -y nginx apache2-utils curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     mkdir -p /etc/nginx
