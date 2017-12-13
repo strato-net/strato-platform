@@ -8,7 +8,9 @@
 module BlockApps.Bloc22.API.SpecUtils where
 
 import           Data.Text                 (Text, pack)
+import           Test.Hspec
 import           GHC.Generics
+import Data.Either
 import           Servant.Client
 import           Test.QuickCheck.Instances ()
 
@@ -99,7 +101,7 @@ resolveBlocTx bloc = do
     Pending -> resolveBlocTx result
     _ -> return result
 
-fromEither :: (Show b) => Either b a -> IO a
+fromEither :: (Show b, Show a) => Either b a -> IO a
 fromEither x = do
   logleft x
   x `shouldSatisfy` isRight
