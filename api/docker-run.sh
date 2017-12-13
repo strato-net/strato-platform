@@ -8,6 +8,8 @@ export postgresHost=${postgres_host}:${postgres_port} # see config/config.json
 export stratoRoot=http://${stratoHost}/eth/v1.2 # ALSO see config-prod.yaml
 # TODO: add sed command to change strings in config-prod.yaml using these vars
 
+export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
+
 echo 'Waiting for bloc to be available...'
 until curl --silent --output /dev/null --fail --location ${blocRoot}
 do

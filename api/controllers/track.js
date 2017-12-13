@@ -19,6 +19,9 @@ const generateMixpanelUrl = function(event) {
 module.exports = {
   _track: function (req, res) {
     res.status(200).send();
+
+    if (process.env['STRATO_GS_MODE'] === "1") return;
+
     // req.headers['x-original-method'] has "GET" or "POST";
     // req.headers['x-original-uri'] has "/bloc/v2.2/users" or whatever else is possible;
     // req.headers['x-real-ip'] should have end-user's IP (but has 172.18.0.1 because of a known docker issue https://github.com/moby/moby/issues/15086)
