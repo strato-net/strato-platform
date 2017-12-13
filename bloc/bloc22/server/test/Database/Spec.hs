@@ -54,7 +54,7 @@ solcSpec =
         let modifier = snd . (!! 0) . toList . xabiModifiers . snd $ augmentedXabi !! 0
         modifier `shouldSatisfy` null . toList . modifierArgs
 
-fromEither :: Either String a -> IO a
+fromEither :: (Show a) => Either String a -> IO a
 fromEither x = do
   logleft x
   x `shouldSatisfy` isRight
