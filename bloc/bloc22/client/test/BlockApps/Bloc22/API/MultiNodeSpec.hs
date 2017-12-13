@@ -124,7 +124,7 @@ spec =
               src = replace contractName' contractName src'
               expectation = Map.fromList [("storedData",SolidityValueAsString "0")] :: Map Text SolidityValue
           cAddr <- createContractOnMulti src contractName Nothing config
-          state <- getStateMulti cAddr contractName config
+          state <- getStateLocal cAddr contractName config
           (state Map.! ("storedData")) `shouldBe` (expectation Map.! "storedData")
         it "should pull data from strato and get contract state for an uploaded AppMetadata" $ \ config@TestConfig {..} -> do
           skipIfNotMultinode config
@@ -140,7 +140,7 @@ spec =
                           , ("_description", ArgString "TestDescription")
                           ]
           cAddr <- createContractOnMulti src contractName constArgs config
-          void $ getStateMulti cAddr contractName config
+          void $ getStateLocal cAddr contractName config
 
 createContractOnMulti :: Text
                       -> Text
@@ -229,15 +229,15 @@ callMethodListLocal method cAddr contractName args config@TestConfig{..} =
      )
      (ClientEnv mgr blocUrl)
 
-getStateMulti :: Address -> Text -> TestConfig -> IO (Map Text SolidityValue)
-getStateMulti addr cn TestConfig{..} =
+getStateLocal :: Address -> Text -> TestConfig -> IO (Map Text SolidityValue)
+getStateLocal addr cn TestConfig{..} =
   fromEither =<<
   runClientM
   ( getContractsState
     (ContractName cn)
     (Unnamed addr)
   )
-  (ClientEnv mgr $ fromJust blocUrlMulti)
+  (ClientEnv mgr blocUrl)
 
 
 skipIfNotMultinode :: TestConfig -> IO ()
