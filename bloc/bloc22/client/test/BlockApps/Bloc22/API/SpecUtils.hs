@@ -102,6 +102,7 @@ resolveBlocTx bloc = do
 fromEither :: (Show b) => Either b a -> IO a
 fromEither x = do
   logleft x
+  x `shouldSatisfy` isRight
   let Right r = x
   return r
 
