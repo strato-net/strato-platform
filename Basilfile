@@ -37,7 +37,7 @@ deployments:
 
   - name: apex
     repo: https://github.com/blockapps/apex.git
-    ref: track_api
+    ref: master
     compose:
       restart: always
       depends_on:
@@ -59,7 +59,7 @@ deployments:
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: track_api
+    ref: master
     compose:
       restart: always
       depends_on:
@@ -83,7 +83,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: track_api
+    ref: master
     compose:
       restart: always
       depends_on:
@@ -107,7 +107,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: track_api
+    ref: master
     compose:
       restart: always
       ports:
@@ -177,7 +177,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: track_api
+    ref: master
     compose:
       restart: always
       ports:
