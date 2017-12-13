@@ -6,6 +6,7 @@ const util = require('./lib/util');
 const consumer = require('./consumer.js');
 const toSchemaString = util.toSchemaString;
 const proxy = require('express-http-proxy');
+const logger  = require('morgan');
 
 
 function startCirrus() {
@@ -13,6 +14,7 @@ function startCirrus() {
     return new Promise(function(resolve, reject) {
 
       let app = express();
+      app.use(logger('dev'));
       // TODO: remove this temporary solution when bloc and blockapps-rest know the difference between cirrus and postgrest calls
       app.use('/search', proxy(process.env['postgrestRoot'])); // e.g. cirrus:3333/search/abc -> postgrest:3000/abc
 
