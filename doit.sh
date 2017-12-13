@@ -8,8 +8,8 @@ cirrusRoot=http://${cirrusHost}
 
 echo "Environment variables:
 stratoHost=${stratoHost}
---stratourl=stratoRoot=${stratoRoot}
 cirrusHost=${cirrusHost}
+--stratourl=stratoRoot=${stratoRoot}
 --cirrusurl=cirrusRoot=${cirrusRoot}
 --pghost=postgres_host=${postgres_host}
 --pgport=postgres_port=${postgres_port}
@@ -48,4 +48,4 @@ done
 $stratoserver &
 
 $blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --cirrusurl="${cirrusRoot}" 2>&1
+            --stratourl="$stratoRoot" --cirrusurl="$cirrusRoot" 2>&1
