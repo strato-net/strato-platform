@@ -44,6 +44,7 @@ unparseVarType :: VarType -> String
 unparseVarType VarType{varTypeType = Int (Just True) _} = "int"
 unparseVarType VarType{varTypeType = Int (Just False) _} = "uint"
 unparseVarType VarType{varTypeType = String _} = "string"
+unparseVarType VarType{varTypeType = Address} = "address"
 unparseVarType _ = "int"
 
 unparseFunc :: (Text, Func) -> String
@@ -95,6 +96,7 @@ unparseIndexedType :: IndexedType -> Text
 unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
 unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
 unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
+unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
 addFunction :: (Text, String) -> Xabi -> Xabi
