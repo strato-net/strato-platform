@@ -44,8 +44,8 @@ co(function*(){
   server.on('error', onError);
   server.on('listening', onListening);
 }).catch(error => {
-  console.error('init script failed');
-  throw error;
+  console.error('init script failed', error);
+  process.exit(1);
 });
 
 /**

@@ -10,7 +10,8 @@ module.exports = {
     // Development use only
     domainWhiteList: [
       'http://localhost:3000',
-      'http://localhost:3001'
+      'http://localhost:3001',
+      'http://localhost',
     ]
   },
   apps: {
@@ -18,5 +19,8 @@ module.exports = {
   },
   webSockets: {
     dbPollFrequency: 1 * 1000
+  },
+  mixpanel: {
+    token: '9d61d93e85894a8f8a78f19059b21286'
   }
 };

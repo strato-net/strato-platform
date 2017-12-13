@@ -2,15 +2,30 @@
 set -e
 set -x
 
+export blocRoot=http://${blocHost}/bloc/v2.2 # see config-prod.yaml
+export cirrusRoot=http://${cirrusHost} # see config-prod.yaml
+export postgresHost=${postgres_host}:${postgres_port} # see config/config.json
+export stratoRoot=http://${stratoHost}/eth/v1.2 # ALSO see config-prod.yaml
+# TODO: add sed command to change strings in config-prod.yaml using these vars
+
+export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
+
 echo 'Waiting for bloc to be available...'
-until curl --silent --output /dev/null --fail --location nginx/bloc/v2.2/users/
+until curl --silent --output /dev/null --fail --location ${blocRoot}
 do
   sleep 1
 done
 echo 'bloc is available'
 
+echo 'Waiting for strato to be available...'
+until curl --silent --output /dev/null --fail --location ${stratoRoot}/uuid
+do
+  sleep 1
+done
+echo 'strato is available'
+
 echo 'Waiting for cirrus to be available...'
-until curl --silent --output /dev/null --fail --location nginx/cirrus/contract/
+until curl --silent --output /dev/null --fail --location ${cirrusRoot}
 do
   sleep 1
 done
@@ -18,7 +33,7 @@ echo 'cirrus is available'
 
 echo 'Waiting for postgres to be available...'
 while true; do
-    curl postgres:5432 > /dev/null 2>&1 || EXIT_CODE=$? && true
+    curl ${postgresHost} > /dev/null 2>&1 || EXIT_CODE=$? && true
     if [ ${EXIT_CODE} = 52 ]; then
         break
     fi
@@ -26,8 +41,4 @@ while true; do
 done
 echo 'postgres is available'
 
-STRATO_LOCAL_HOST=${STRATO_LOCAL_HOST:-nginx}
-
-sed -i 's/__STRATO_LOCAL_HOST__/'"${STRATO_LOCAL_HOST}"'/g' config-prod.yaml
-
-STRATO_LOCAL_HOST=${STRATO_LOCAL_HOST} NODE_HOST=${NODE_HOST} npm run start:prod
+NODE_HOST=${NODE_HOST} npm run start:prod

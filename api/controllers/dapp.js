@@ -23,7 +23,7 @@ parseContractData = function*(data) {
   // todo: find another way (using solc.js) or change bloc endpoint to have an option to make ALL contracts searchable instead of listing by one
   const options = {
     method: 'POST',
-    uri: 'http://' + process.env['STRATO_LOCAL_HOST']+'/strato-api/eth/v1.2/extabi',
+    uri: `${process.env['stratoRoot']}/extabi`,
     headers: {
       'content-type': 'application/x-www-form-urlencoded'
     },
