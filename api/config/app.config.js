@@ -21,6 +21,6 @@ module.exports = {
     dbPollFrequency: 1 * 1000
   },
   mixpanel: {
-    token: '9d61d93e85894a8f8a78f19059b21286'
+    token: 'd78b8eeb10b9fdb8fb0abca5cdb73639'
   }
 };
