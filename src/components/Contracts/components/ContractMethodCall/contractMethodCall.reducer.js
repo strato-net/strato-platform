@@ -19,18 +19,18 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] : {
-              ...state.modals[action.key],
-              isOpen: true,
-              result: 'Waiting for method to be called...'
-            }
+          [action.key]: {
+            ...state.modals[action.key],
+            isOpen: true,
+            result: 'Waiting for method to be called...'
+          }
         }
       }
     case METHOD_CALL_CLOSE_MODAL:
       return {
         modals: {
           ...state.modals,
-          [action.key] : {
+          [action.key]: {
             ...state.modals[action.key],
             isOpen: false
           }
@@ -40,7 +40,7 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] :  {
+          [action.key]: {
             ...state.modals[action.key],
             args: action.args
           }
@@ -50,7 +50,7 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] :  {
+          [action.key]: {
             ...state.modals[action.key],
             error: action.error
           }
@@ -60,7 +60,7 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] :  {
+          [action.key]: {
             ...state.modals[action.key],
             result: 'Sending transaction...'
           }
@@ -70,7 +70,7 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] :  {
+          [action.key]: {
             ...state.modals[action.key],
             result: action.result
           }
@@ -80,9 +80,9 @@ const reducer = function (state = initialState, action) {
       return {
         modals: {
           ...state.modals,
-          [action.key] :  {
+          [action.key]: {
             ...state.modals[action.key],
-            result: action.error
+            result: action.result
           }
         }
       }

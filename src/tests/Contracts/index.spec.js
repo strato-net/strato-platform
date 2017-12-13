@@ -2,7 +2,7 @@ import React from 'react';
 import Contracts from '../../components/Contracts/index';
 import ReactTestUtils from 'react-dom/test-utils';
 import renderer from "react-test-renderer";
-import { contracts } from './Mock';
+import { contracts } from './contractsMock';
 
 describe('Test contracts index', () => {
 

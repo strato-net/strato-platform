@@ -23,7 +23,7 @@ export const contracts = {
   ]
 };
 
-export const contractState = {
+export const contractsState = {
   "GreeterA": {
     "instances": [
       {
@@ -59,3 +59,15 @@ export const contractState = {
 }
 
 export const filter = "Just to test filter";
+
+export const error = "ERROR";
+
+export const reducerContract = {
+  account: [{ balance: 0 }],
+  address: "0293f9b10a4453667db7fcfe74728c9d821add4b",
+  name: "GreeterA",
+  state: {
+    "greetA": "function () returns (Address)",
+    "greetingA": "Aaaaaaaaa"
+  }
+}
