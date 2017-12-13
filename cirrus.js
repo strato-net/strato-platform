@@ -15,7 +15,7 @@ function startCirrus() {
 
       let app = express();
       app.use(logger('dev'));
-      // TODO: remove this temporary solution when bloc and blockapps-rest know the difference between cirrus and postgrest calls
+      // TODO: remove this temporary solution when bloc and blockapps-rest know the difference between cirrus and postgrest calls, also see `/contract` in app.post below
       app.use('/search', proxy(process.env['postgrestRoot'])); // e.g. cirrus:3333/search/abc -> postgrest:3000/abc
 
       app.use(bodyParser.json({limit: '500mb'}));
@@ -32,7 +32,7 @@ function startCirrus() {
                          the cirrus server.`)
       }
 
-      app.post('/', function (req, res, next) {
+      app.post(['/', '/contract'], function (req, res, next) {
         var contractMetaData = req.body;
 
         // incase the binaries are attached, remove them so we don't store
