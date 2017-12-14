@@ -54,7 +54,7 @@ pipeline {
         sh '''#!/bin/bash -le
           cd silo
           basil compose > docker-compose.yml
-          export NODE_HOST=${NODE_HOST:-cd10.eastus.cloudapp.azure.com}
+          export NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com}
           NODE_NAME=${NODE_NAME:-$NODE_HOST} \
             BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
             BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
