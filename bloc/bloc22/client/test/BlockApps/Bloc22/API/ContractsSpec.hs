@@ -63,7 +63,7 @@ spec = do
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
-      functionNames `shouldBe` [FunctionName "get", FunctionName "set"]
+      functionNames `shouldBe` [FunctionName "__getSource__", FunctionName "get", FunctionName "set"]
   describe "getContractsSymbols" $
     it "get a list of contract symbols for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       Right symbols <- runClientM
@@ -82,7 +82,8 @@ spec = do
         )
         (ClientEnv mgr blocUrl)
       contracts `shouldBe` Map.fromList
-          [ ("get",SolidityValueAsString "function () returns (UInt256)")
+          [ ("__getSource__",SolidityValueAsString "function () returns (String)")
+          , ("get",SolidityValueAsString "function () returns (UInt256)")
           , ("set",SolidityValueAsString "function (UInt256) returns ()")
           , ("storedData",SolidityValueAsString "0")
           ]
