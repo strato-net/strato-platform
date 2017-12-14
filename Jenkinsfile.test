@@ -19,6 +19,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
+            set -x
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             # Make sure all repos are cloned
             basil clone
@@ -39,6 +40,7 @@ pipeline {
     stage('Deploy') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           basil compose > docker-compose.yml
           export NODE_HOST=${NODE_HOST:-cd10.eastus.cloudapp.azure.com}
           NODE_NAME=${NODE_NAME:-$NODE_HOST} \
@@ -70,6 +72,7 @@ pipeline {
     stage('E2E-Test') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
           git clone https://github.com/blockapps/blockapps-ba.git -b master
@@ -88,6 +91,7 @@ pipeline {
                 usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
               ]) {
                 sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   basil build --release
                   basil push

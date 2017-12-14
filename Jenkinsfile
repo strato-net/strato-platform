@@ -9,6 +9,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           docker rm -f $(docker ps -aq) || true;
           if [ "$BUILD_TYPE" == "quick" ]; then
             docker system prune -a
@@ -25,6 +26,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
+            set -x
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             git config --global credential.helper store
             if [ "$BUILD_TYPE" == "quick" ]; then
@@ -52,6 +54,7 @@ pipeline {
     stage('Deploy') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           cd silo
           basil compose > docker-compose.yml
           export NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com}
@@ -84,6 +87,7 @@ pipeline {
     stage('E2E-Test') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
           git clone https://github.com/blockapps/blockapps-ba.git
@@ -103,6 +107,7 @@ pipeline {
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
           ]) {
             sh '''#!/bin/bash -le
+              set -x
               cd silo
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               basil build --release

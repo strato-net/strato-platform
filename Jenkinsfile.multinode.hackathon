@@ -15,6 +15,7 @@ pipeline {
                   usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
                 ]) {
                   sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
@@ -38,6 +39,7 @@ pipeline {
                   usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
                 ]) {
                   sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
@@ -61,6 +63,7 @@ pipeline {
                   usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
                 ]) {
                   sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
@@ -84,6 +87,7 @@ pipeline {
                   usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
                 ]) {
                   sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
@@ -107,6 +111,7 @@ pipeline {
                   usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
                 ]) {
                   sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
                   git config --global credential.helper store
@@ -130,6 +135,7 @@ pipeline {
             node('hackathon-1') {
               sh '''#!/bin/bash -le
               ### TEMPORARY DISABLED TO KEEP THE CHAIN DATA
+              #set -x
               #docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               #cd strato-getting-started
               #STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
@@ -140,6 +146,7 @@ pipeline {
           "hackathon-2": {
             node('hackathon-2') {
               sh '''#!/bin/bash -le
+              set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-2.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
@@ -150,6 +157,7 @@ pipeline {
           "hackathon-3": {
             node('hackathon-3') {
               sh '''#!/bin/bash -le
+              set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-3.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
@@ -160,6 +168,7 @@ pipeline {
           "hackathon-4": {
             node('hackathon-4') {
               sh '''#!/bin/bash -le
+              set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-4.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
@@ -170,6 +179,7 @@ pipeline {
           "hackathon-5": {
             node('hackathon-5') {
               sh '''#!/bin/bash -le
+              set -x
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-5.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
