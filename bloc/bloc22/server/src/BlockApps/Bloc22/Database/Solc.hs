@@ -48,8 +48,7 @@ import BlockApps.Solidity.Parse.UnParser
 -- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
 -- this if it is something we want to maintain.
 compileSolc :: Text -> Bloc Aeson.Value
-compileSolc mainSrc' = do
-  mainSrc <- addGetSourceFuncToSource' mainSrc'
+compileSolc mainSrc = do
   (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   case eRes of
@@ -58,11 +57,6 @@ compileSolc mainSrc' = do
     Right res ->
       maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact")
             return $ Map.lookup "src" res
-  where
-    addGetSourceFuncToSource' src =
-      case addGetSourceFuncToSource src of
-        Left err -> blocError . UserError .Text.pack $ err
-        Right msg -> return msg
 
 
 -- For solc compiling during testing, outside of Bloc monad
