@@ -65,6 +65,7 @@ pipeline {
             STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json} \
             CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
             APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
+            STRATO_GS_MODE=1 \
             docker-compose up -d
           docker ps
           # Few quick tests
