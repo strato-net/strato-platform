@@ -67,13 +67,13 @@ pipeline {
           # Few quick tests
           until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
           do
-            echo "waiting for bloc to be available"
+            echo "waiting for bloc to be available through nginx"
             sleep 1
           done
           echo "bloc is available"
           until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
           do
-            echo "waiting for cirrus to be available"
+            echo "waiting for cirrus to be available through nginx"
             sleep 1
           done
           echo "cirrus is available"
