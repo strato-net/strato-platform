@@ -1030,10 +1030,10 @@ insertContract parentContr contr bin binRuntime xabi = do
   return metadataId
 
 compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
-compileContract source = do
+compileContract source' = do
 --  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
 --     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
-
+  source <- addGetSourceFuncToSource' source'
   eabiBins <- fromJSON <$> compileSolc source
   abiBins <- case eabiBins of
     Error err -> blocError . AnError . Text.pack $ err
@@ -1072,6 +1072,11 @@ compileContract source = do
       insertContractLookup leftmetadataId rightmetadataId
 
   return metadataIds
+  where
+    addGetSourceFuncToSource' src =
+      case addGetSourceFuncToSource src of
+        Left err -> blocError . UserError .Text.pack $ err
+        Right msg' -> return msg'
 
 insertXabiType :: Xabi.Type -> Bloc Int32
 insertXabiType = \case
