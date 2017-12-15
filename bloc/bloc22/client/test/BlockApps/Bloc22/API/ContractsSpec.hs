@@ -63,7 +63,11 @@ spec = do
           (Unnamed simpleStorageContractAddress)
         )
         (ClientEnv mgr blocUrl)
-      functionNames `shouldBe` [FunctionName "__getSource__", FunctionName "get", FunctionName "set"]
+      mapM_ (\v -> elem v functionNames `shouldBe` True)
+            [ FunctionName "__getSource__"
+            , FunctionName "get"
+            , FunctionName "set"
+            ]
   describe "getContractsSymbols" $
     it "get a list of contract symbols for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       Right symbols <- runClientM
