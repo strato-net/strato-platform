@@ -1,25 +1,25 @@
 import {
-	watchMethodCall,
-	watchFetchArgs,
-	fetchArgs,
-	methodCall,
-	getArgs,
-	postMethodCall
+  watchMethodCall,
+  watchFetchArgs,
+  fetchArgs,
+  methodCall,
+  getArgs,
+  postMethodCall
 } from '../../../../components/Contracts/components/ContractMethodCall/contractMethodCall.saga';
 import { fetchState } from '../../../../components/Contracts/components/ContractCard/contractCard.actions'
 import {
-	takeEvery,
-	call,
-	put
+  takeEvery,
+  call,
+  put
 } from 'redux-saga/effects';
 import {
-	methodCallSuccess,
-	METHOD_CALL_FETCH_ARGS_REQUEST,
-	METHOD_CALL_REQUEST,
-	METHOD_CALL_FETCH_ARGS_SUCCESS,
-	METHOD_CALL_FETCH_ARGS_FAILURE,
-	methodCallFetchArgsSuccess,
-	METHOD_CALL_SUCCESS
+  methodCallSuccess,
+  METHOD_CALL_FETCH_ARGS_REQUEST,
+  METHOD_CALL_REQUEST,
+  METHOD_CALL_FETCH_ARGS_SUCCESS,
+  METHOD_CALL_FETCH_ARGS_FAILURE,
+  methodCallFetchArgsSuccess,
+  METHOD_CALL_SUCCESS
 
 } from '../../../../components/Contracts/components/ContractMethodCall/contractMethodCall.actions';
 import { expectSaga } from 'redux-saga-test-plan';
@@ -27,84 +27,84 @@ import { methodCallArgs } from './contractMethodCallMock'
 
 describe('Test contract card saga', () => {
 
-	// fetch args test 
-	test('should watch contract args', () => {
-		const gen = watchFetchArgs();
-		expect(gen.next().value).toEqual(takeEvery(METHOD_CALL_FETCH_ARGS_REQUEST, fetchArgs))
-	})
+  // fetch args test 
+  test('should watch contract args', () => {
+    const gen = watchFetchArgs();
+    expect(gen.next().value).toEqual(takeEvery(METHOD_CALL_FETCH_ARGS_REQUEST, fetchArgs))
+  })
 
-	test('should call fetch contract args', () => {
-		fetch.mockResponse(JSON.stringify(methodCallArgs))
-		expectSaga(fetchArgs, {
-			name: 'abc',
-			address: 'xyz',
-			symbol: 'geneticallyModify',
-			key: 'key'
-		})
-			.call.fn(getArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_SUCCESS' } })
-			.run()
-	});
+  test('should call fetch contract args', () => {
+    fetch.mockResponse(JSON.stringify(methodCallArgs))
+    expectSaga(fetchArgs, {
+      name: 'abc',
+      address: 'xyz',
+      symbol: 'geneticallyModify',
+      key: 'key'
+    })
+      .call.fn(getArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_SUCCESS' } })
+      .run()
+  });
 
-	test('should call fetch args failure', () => {
-		fetch.mockReject(JSON.stringify(methodCallArgs))
-		expectSaga(fetchArgs, {
-			name: 'abc',
-			address: 'xyz',
-			symbol: 'geneticallyModify',
-			key: 'key'
-		})
-			.call.fn(getArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_FAILURE' } })
-			.run()
-	});
+  test('should call fetch args failure', () => {
+    fetch.mockReject(JSON.stringify(methodCallArgs))
+    expectSaga(fetchArgs, {
+      name: 'abc',
+      address: 'xyz',
+      symbol: 'geneticallyModify',
+      key: 'key'
+    })
+      .call.fn(getArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'geneticallyModify').put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_FAILURE' } })
+      .run()
+  });
 
-	test('should fail on exception contract args', () => {
-		expectSaga(fetchArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'cloneSheep')
-			.provide({
-				call() {
-					throw new Error('Not Found');
-				},
-			})
-			.put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_FAILURE' } })
-			.run();
-	});
+  test('should fail on exception contract args', () => {
+    expectSaga(fetchArgs, 'Cloner', 'eb58f377c7d419e9945b5096cd478b6a7eef9831', 'cloneSheep')
+      .provide({
+        call() {
+          throw new Error('Not Found');
+        },
+      })
+      .put.like({ action: { type: 'METHOD_CALL_FETCH_ARGS_FAILURE' } })
+      .run();
+  });
 
-	// fetch state tests
-	test('should watch states', () => {
-		const gen = watchMethodCall();
-		expect(gen.next().value).toEqual(takeEvery(METHOD_CALL_REQUEST, methodCall))
-	})
+  // fetch state tests
+  test('should watch states', () => {
+    const gen = watchMethodCall();
+    expect(gen.next().value).toEqual(takeEvery(METHOD_CALL_REQUEST, methodCall))
+  })
 
-	test('should check the state api', () => {
-		const gen = methodCall({ payload: { contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }, key: 'key' });
-		expect(gen.next().value).toEqual(call(postMethodCall, { contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }));
-		expect(gen.next().value).toEqual(put(fetchState('Greeter', '3771b31420eda628bf03cd5b119249da0fb4aa6d')))
-		expect(gen.next().value).toEqual(put(methodCallSuccess('key')))
-	})
+  test('should check the state api', () => {
+    const gen = methodCall({ payload: { contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }, key: 'key' });
+    expect(gen.next().value).toEqual(call(postMethodCall, { contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }));
+    expect(gen.next().value).toEqual(put(fetchState('Greeter', '3771b31420eda628bf03cd5b119249da0fb4aa6d')))
+    expect(gen.next().value).toEqual(put(methodCallSuccess('key')))
+  })
 
-	test('should call fetch states', () => {
-		fetch.mockResponse(JSON.stringify(methodCallArgs))
-		expectSaga(methodCall, { payload: { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' } })
-			.call.fn(postMethodCall, { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }).put.like({ action: { type: 'METHOD_CALL_SUCCESS' } })
-			.run()
-	});
+  test('should call fetch states', () => {
+    fetch.mockResponse(JSON.stringify(methodCallArgs))
+    expectSaga(methodCall, { payload: { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' } })
+      .call.fn(postMethodCall, { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }).put.like({ action: { type: 'METHOD_CALL_SUCCESS' } })
+      .run()
+  });
 
-	test('should call fetch states failure', () => {
-		fetch.mockReject(JSON.stringify(methodCallArgs))
-		expectSaga(methodCall, { payload: { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' } })
-			.call.fn(postMethodCall, { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }).put.like({ action: { type: 'METHOD_CALL_FAILURE' } })
-			.run()
-	});
+  test('should call fetch states failure', () => {
+    fetch.mockReject(JSON.stringify(methodCallArgs))
+    expectSaga(methodCall, { payload: { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' } })
+      .call.fn(postMethodCall, { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }).put.like({ action: { type: 'METHOD_CALL_FAILURE' } })
+      .run()
+  });
 
-	test('should fail state on exception', () => {
-		expectSaga(methodCall, { contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }, 'key')
-			.provide({
-				call() {
-					throw new Error('Not Found');
-				},
-			})
-			.put.like({ action: { type: 'METHOD_CALL_FAILURE' } })
-			.run();
-	});
+  test('should fail state on exception', () => {
+    expectSaga(methodCall, { contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }, 'key')
+      .provide({
+        call() {
+          throw new Error('Not Found');
+        },
+      })
+      .put.like({ action: { type: 'METHOD_CALL_FAILURE' } })
+      .run();
+  });
 
 })
 
