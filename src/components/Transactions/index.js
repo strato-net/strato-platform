@@ -2,7 +2,6 @@ import React, {Component} from 'react';
 import TransactionTable from './components/TransactionTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
-import { connect } from 'react-redux';
 
 const tourSteps = [
   {

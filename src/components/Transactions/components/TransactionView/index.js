@@ -2,7 +2,7 @@ import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
-import * as moment from 'moment';
+import moment from 'moment';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
 import HexText from '../../../HexText';
@@ -106,7 +106,7 @@ class TransactionView extends Component {
   }
 }
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   const hash = ownProps.match.params.hash;
   return {
     tx: state.transactions.tx.filter((val) => {return val.hash === hash})[0] || state.queryEngine.queryResult.filter((val) => {return val.hash === hash})[0]
