@@ -1,12 +1,12 @@
 import React from 'react';
-import Contracts from '../../components/Contracts/index';
+import Contracts, { mapStateToProps } from '../../components/Contracts/index';
 import ReactTestUtils from 'react-dom/test-utils';
 import renderer from "react-test-renderer";
 import { contracts } from './contractsMock';
 
 describe('Test contracts index', () => {
 
-  test('should contracts render with empty values', () => {
+  test('should render contracts with empty values', () => {
     const props = {
       filter: '',
       contracts: {},
@@ -21,7 +21,7 @@ describe('Test contracts index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  test('should contracts renders correctly', () => {
+  test('should render contract with mocked values', () => {
     const props = {
       filter: 'Greeter',
       contracts: contracts,
@@ -36,20 +36,23 @@ describe('Test contracts index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  test('should test functions', () => {
+  test('should test component functions', () => {
     const props = {
       filter: '',
       contracts: {},
-      fetchContracts: jest.fn(() => Promise.resolve(0)),
-      changeContractFilter: jest.fn(() => Promise.resolve(0))
+      fetchContracts: jest.fn().mockReturnValue('fetchContracts'),
+      changeContractFilter: jest.fn().mockReturnValue('changeContractFilter')
     }
 
     const wrapper = shallow(
       <Contracts.WrappedComponent {...props} />
     );
 
-    expect(props.fetchContracts).toHaveBeenCalled();
-    expect(props.changeContractFilter).toHaveBeenCalled();
+    wrapper.instance().updateFilter = jest.fn().mockReturnValue('updateFilter');
+
+    expect(wrapper.instance().updateFilter()).toBe('updateFilter');
+    expect(wrapper.instance().props.fetchContracts()).toBe('fetchContracts')
+    expect(wrapper.instance().props.changeContractFilter()).toBe('changeContractFilter');
   });
 
   test('should test filter with value', () => {
@@ -80,6 +83,17 @@ describe('Test contracts index', () => {
     );
 
     expect(wrapper).toMatchSnapshot();
+  });
+
+  test('test mapStateToProps function', () => {
+    const state = {
+      contracts: {
+        contracts: contracts,
+        filter: 'Time'
+      }
+    }
+
+    expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
 })

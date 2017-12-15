@@ -12,6 +12,7 @@ import {
   fetchContractsSuccess
 } from '../../components/Contracts/contracts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
+import { contracts } from './contractsMock'
 
 describe('Test contracts saga', () => {
 
@@ -27,12 +28,20 @@ describe('Test contracts saga', () => {
   })
 
   test('should call fetch contracts', () => {
+    fetch.mockResponse(JSON.stringify(contracts))
     expectSaga(fetchContracts)
-      .call.fn(getContracts)
+      .call.fn(getContracts).put.like({ action: { type: 'FETCH_CONTRACTS_SUCCESSFUL' } })
       .run()
   });
 
-  test('should failed after contracts fetch', () => {
+  test('should call fetch contracts failure', () => {
+    fetch.mockReject(JSON.stringify(contracts))
+    expectSaga(fetchContracts)
+      .call.fn(getContracts).put.like({ action: { type: 'FETCH_CONTRACTS_FAILED' } })
+      .run()
+  });
+
+  test('should fail contracts on exception', () => {
     expectSaga(fetchContracts)
       .provide({
         call() {

@@ -28,3 +28,19 @@ export const initialState = {
     }
   }
 };
+
+export const methodCallArgs = {
+  xabi: {
+    funcs: {
+      geneticallyModify: {
+        args: {
+          _dna: {
+            dynamic: true,
+            type: "String",
+            index: 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -10,3 +10,29 @@ export const contract = {
       greeting: ""
     }],
 }
+
+export const accounts = [
+  {
+    "contractRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    "next": "/eth/v1.2/account?address=3771b31420eda628bf03cd5b119249da0fb4aa6d&index=5",
+    "kind": "AddressStateRef",
+    "balance": "0",
+    "address": "3771b31420eda628bf03cd5b119249da0fb4aa6d",
+    "latestBlockNum": 3,
+    "codeHash": "21a8ff8729ddb7e677cb21b5950d30c2a4f0fd4586ad8ddd801e130c1492f771",
+    "code": "60606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680632a1afcd914603c575b6000565b346000576046605c565b6040518082815260200191505060405180910390f35b6000548156",
+    "nonce": 0
+  }
+]
+
+export const cirrus = [{
+  "address": "1f457d150e6fababa0164ac12cec00c2bc61de90",
+  "dna": "trewt",
+  "name": ""
+}]
+
+export const state = {
+  "dna": "",
+  "geneticallyModify": "function (String) returns ()",
+  "name": ""
+}
