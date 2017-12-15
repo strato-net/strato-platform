@@ -1,4 +1,4 @@
-import * as moment from 'moment';
+import moment from 'moment'
 
 export function parseDateFromString(timeAsString) {
     const utcDate = timeAsString.replace(' UTC', 'Z')

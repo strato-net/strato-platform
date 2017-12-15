@@ -1,7 +1,5 @@
 import React from 'react';
 import Contracts, { mapStateToProps } from '../../components/Contracts/index';
-import ReactTestUtils from 'react-dom/test-utils';
-import renderer from "react-test-renderer";
 import { contracts } from './contractsMock';
 
 describe('Test contracts index', () => {

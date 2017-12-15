@@ -1,5 +1,5 @@
 import reducer from '../../components/TransactionList/transactionList.reducer';
-import { data, updatedData } from "./transactionListMock";
+import { data, updatedData, last, error } from "./transactionListMock";
 import {
   updateTx,
   preloadTx,
