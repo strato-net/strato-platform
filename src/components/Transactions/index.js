@@ -41,4 +41,4 @@ class Transactions extends Component {
   }
 }
 
-export default connect(state => { return {} }, {})(Transactions);
+export default Transactions;
