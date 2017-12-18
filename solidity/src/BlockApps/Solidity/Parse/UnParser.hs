@@ -16,6 +16,7 @@ import Data.Monoid ((<>))
 
 import           BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Xabi.Type
+import qualified BlockApps.Solidity.Xabi.Def as Xabi
 
 
 
@@ -28,6 +29,7 @@ unparseContract (name, contract) =
   <> Text.unpack name
   <> "{"
   <> List.concat (List.map ((" " <>) . unparseVar) (Map.toList $ xabiVars contract))
+  <> List.concat (List.map ((" " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
   <> List.concat (List.map ((" " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
   <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
   <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
@@ -80,6 +82,11 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
        Just contents -> (Text.concat . Text.lines $ contents)
        Nothing -> ""
   <> "}"
+
+unparseTypes :: (Text, Xabi.Def) -> String
+unparseTypes (name, Xabi.Enum {names=names'}) = 
+  Text.unpack $ "enum " <> name <>  " {" <> Text.intercalate ", " names' <> " }"
+unparseTypes (_name, _def) = ""
 
 unparseArgs :: (Text, IndexedType) -> Text
 unparseArgs (name, theType) = unparseIndexedType theType <> " " <>  name

@@ -141,6 +141,16 @@ spec =
                           ]
           cAddr <- createContractOnMulti src contractName constArgs config
           void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded ErrorCodes" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "ErrorCodes"
+          src' <- readSolFile "ErrorCodes.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
 
 createContractOnMulti :: Text
                       -> Text
