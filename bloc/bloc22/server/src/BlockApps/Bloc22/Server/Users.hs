@@ -304,7 +304,8 @@ getBlocTransactionResult hash resolve = do
       case addressMaybe of
         Nothing -> case transactionresultMessage txResult of
           "Success!" -> do
-            let mDelAddr = stringAddress . Text.unpack =<< (listToMaybe . Text.splitOn "," $ transactionresultContractsDeleted txResult)
+            let mDelAddr = stringAddress . Text.unpack =<<
+                  (listToMaybe . Text.splitOn "," $ transactionresultContractsDeleted txResult)
             case mDelAddr of
               Just _ -> throwError $ UserError "Contract failed to upload, likely because the constructor threw"
               Nothing -> throwError $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"

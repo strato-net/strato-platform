@@ -67,7 +67,9 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
-  eitherErrorOrContract' <- toUserError (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId) $ xAbiToContract <$> getContractXabi contract contractId
+  eitherErrorOrContract' <- toUserError
+    (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
+      $ xAbiToContract <$> getContractXabi contract contractId
 
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
@@ -123,7 +125,12 @@ getContractsEnum (ContractName contractName) contractId (EnumName enumName) =
       Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
     map (EnumValue . fst) <$> getEnumValues metadataId enumName
 
-getContractsStateMapping :: ContractName -> MaybeNamed Address -> SymbolName -> Text -> Bloc GetContractsStateMappingResponse -- state-translation
+getContractsStateMapping :: ContractName
+                         -> MaybeNamed Address
+                         -> SymbolName
+                         -> Text
+                         -> Bloc GetContractsStateMappingResponse
+                         -- state-translation
 getContractsStateMapping contract@(ContractName contractName) contractId (SymbolName mappingName) keyName = do
   eitherErrorOrContract <- xAbiToContract <$> getContractXabi contract contractId
 
