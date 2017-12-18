@@ -5,7 +5,7 @@ import {TRANSACTION_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/quer
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
-import * as moment from 'moment';
+import { parseDateFromString } from '../../../../lib/dateUtils';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
 import HexText from '../../../HexText';
@@ -77,7 +77,7 @@ class TransactionTable extends Component {
             <td width="20%">
               <Text ellipsize={true}>
                 <small>
-                  {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
+                  {parseDateFromString(tx.timestamp)}
                 </small>
               </Text>
             </td>
