@@ -104,6 +104,9 @@ unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
 unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
 unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
 unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
+unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
+unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
+  "bytes" <> (pack . show $ bytes)
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
 addFunction :: (Text, String) -> Xabi -> Xabi
