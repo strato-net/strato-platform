@@ -1,6 +1,5 @@
 import React from 'react';
 import HexText from '../../components/HexText';
-import TestRenderer from 'react-test-renderer';
 
 describe('Test Hextext index', () => {
 
@@ -37,8 +36,8 @@ describe('Test Hextext index', () => {
       <HexText {...props} />
     );
 
-    wrapper.find('span').at(1).simulate('click', { stopPropagation() {}, preventDefault() {} }, wrapper.setState({ copied: true }))
-    expect(wrapper.state('copied')).toBe(true);    
+    wrapper.find('span').at(1).simulate('click', { stopPropagation() { }, preventDefault() { } }, wrapper.setState({ copied: true }))
+    expect(wrapper.state('copied')).toBe(true);
   })
 
   it('should reset copied on mouse out', () => {

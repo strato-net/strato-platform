@@ -56,6 +56,22 @@ describe('Test NodeCard index', () => {
     expect(wrapper.state('isOpen')).toBe(false);
   })
 
+  test('should test component functions', () => {
+    const props = {
+      dashboard,
+      node,
+      subscribeRoom: jest.fn().mockReturnValue('subscribeRoom'),
+      unSubscribeRoom: jest.fn().mockReturnValue('unSubscribeRoom')
+    }
+
+    const wrapper = shallow(
+      <NodeCard.WrappedComponent {...props} />
+    );
+
+    expect(wrapper.instance().props.subscribeRoom()).toBe('subscribeRoom');
+    expect(wrapper.instance().props.unSubscribeRoom()).toBe('unSubscribeRoom');
+  });
+
   it('should invoke subscribeRoom on componentDidMount', () => {
     const props = {
       dashboard,

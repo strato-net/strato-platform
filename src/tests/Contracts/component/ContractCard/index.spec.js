@@ -92,15 +92,20 @@ describe('Test ContractCard index', () => {
           ]
         }
       },
-      fetchCirrusInstances: () => { },
-      fetchAccount: () => { },
-      fetchState: () => { },
-      selectContractInstance: () => { }
+      fetchCirrusInstances: jest.fn(),
+      fetchAccount: jest.fn(),
+      fetchState: jest.fn(),
+      selectContractInstance: jest.fn()
     }
 
     let wrapper = shallow(
       <ContractCard.WrappedComponent {...props} />
     );
+
+    wrapper.find('tr').at(1).simulate('click');
+    expect(props.fetchAccount).toHaveBeenCalled();
+    expect(props.fetchState).toHaveBeenCalled();
+    expect(props.selectContractInstance).toHaveBeenCalled();
 
     expect(wrapper).toMatchSnapshot();
   });

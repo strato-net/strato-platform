@@ -48,6 +48,22 @@ describe('Test Dashboard index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
+  test('should test component functions', () => {
+    const props = {
+      dashboard,
+      node,
+      subscribeRoom: jest.fn().mockReturnValue('subscribeRoom'),
+      unSubscribeRoom: jest.fn().mockReturnValue('unSubscribeRoom')
+    }
+
+    const wrapper = shallow(
+      <Dashboard.WrappedComponent {...props} />
+    );
+
+    expect(wrapper.instance().props.subscribeRoom()).toBe('subscribeRoom');
+    expect(wrapper.instance().props.unSubscribeRoom()).toBe('unSubscribeRoom');
+  });
+
   test('should invoke componentWillUnmount', () => {
     const props = {
       dashboard,
