@@ -107,6 +107,7 @@ unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
 unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
 unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
   "bytes" <> (pack . show $ bytes)
+unparseIndexedType IndexedType{indexedTypeType = Contract contractName} = contractName
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
 addFunction :: (Text, String) -> Xabi -> Xabi

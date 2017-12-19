@@ -70,6 +70,18 @@ solcSpec =
         void . fromEither =<< compileSolcIO (pack augmentedSrc)
         augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
         augmentedXabi `shouldBe` expectedXabi
+      it "should augment Bid code" $ do
+        let solPath = "./test/contracts/Bid.sol"
+            expectedPath = "./test/contracts/BidGetSource.sol"
+        soliditySrc <- pack <$> readFile solPath
+        printUnlinedSource soliditySrc
+        void . fromEither =<< compileSolcIO soliditySrc
+        expected <- (pack . concat . lines) <$> readFile expectedPath
+        expectedXabi <- fromEither $ parseXabi "" (unpack expected)
+        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+        void . fromEither =<< compileSolcIO (pack augmentedSrc)
+        augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
+        augmentedXabi `shouldBe` expectedXabi
 
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
