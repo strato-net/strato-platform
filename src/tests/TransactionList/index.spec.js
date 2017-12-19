@@ -1,12 +1,12 @@
 import React from 'react';
 import TransactionList, { mapStateToProps } from '../../components/TransactionList/index';
-import { data } from './transactionListMock';
+import { transactions, unSubscribeRoomMock, subscribeMock, subscribeRoomMock } from './transactionListMock';
 
 describe('Test TransactionList index', () => {
 
   test('should render transactions with empty values', () => {
     const props = {
-      transactions: undefined,
+      transactions: [],
       subscribeRoom: () => { }
     }
 
@@ -19,7 +19,7 @@ describe('Test TransactionList index', () => {
 
   test('should render transactions with mocked values', () => {
     const props = {
-      transactions: data,
+      transactions,
       subscribeRoom: () => { },
       unSubscribeRoom: () => { }
     }
@@ -33,7 +33,7 @@ describe('Test TransactionList index', () => {
 
   test('should redirect to transaction detail page', () => {
     const props = {
-      transactions: data,
+      transactions,
       history: [],
       subscribeRoom: () => { },
       unSubscribeRoom: () => { }
@@ -49,10 +49,10 @@ describe('Test TransactionList index', () => {
 
   test('should invoke componentWillUnmount', () => {
     const props = {
-      transactions: data,
+      transactions,
       history: [],
       subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
+      unSubscribeRoom: jest.fn()
     }
 
     const wrapper = shallow(
@@ -60,12 +60,28 @@ describe('Test TransactionList index', () => {
     );
 
     wrapper.instance().componentWillUnmount();
-    expect(wrapper).toMatchSnapshot();
+    expect(props.unSubscribeRoom).toHaveBeenCalled();
+    expect(props.unSubscribeRoom.mock.calls).toEqual(unSubscribeRoomMock);
+  });
+
+  test('should invoke subscribeRoom on componentDidMount', () => {
+    const props = {
+      transactions,
+      history: [],
+      subscribeRoom: jest.fn()
+    }
+
+    const wrapper = shallow(
+      <TransactionList.WrappedComponent {...props} />
+    );
+
+    expect(props.subscribeRoom).toHaveBeenCalled();
+    expect(props.subscribeRoom.mock.calls).toEqual(subscribeRoomMock);
   });
 
   test('should test component functions', () => {
     const props = {
-      transactions: data,
+      transactions,
       subscribeRoom: jest.fn().mockReturnValue('subscribeRoom'),
       unSubscribeRoom: jest.fn().mockReturnValue('unSubscribeRoom')
     }

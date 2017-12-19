@@ -1,5 +1,5 @@
 import reducer from '../../components/TransactionList/transactionList.reducer';
-import { data, updatedData, last, error } from "./transactionListMock";
+import { transactions, updatedTransactions, last, error } from "./transactionListMock";
 import {
   updateTx,
   preloadTx,
@@ -20,7 +20,7 @@ describe('Test transaction list reducer', () => {
 
   // UPDATE_TX
   test('should store initial transactions', () => {
-    const action = preloadTx(data);
+    const action = preloadTx(transactions);
     const initialState = {
       tx: [],
       transactions: [],
@@ -31,10 +31,10 @@ describe('Test transaction list reducer', () => {
 
   // PRELOAD_TX
   test('should store updated transactions', () => {
-    const action = updateTx(updatedData);
+    const action = updateTx(updatedTransactions);
     const initialState = {
       tx: [],
-      transactions: data,
+      transactions: transactions,
       error: null,
     }
     expect(reducer(initialState, action)).toMatchSnapshot();
@@ -53,7 +53,7 @@ describe('Test transaction list reducer', () => {
 
   // FETCH_TX_SUCCESSFUL
   test('should store transactions on FETCH_TX', () => {
-    const action = fetchTxSuccess(data);
+    const action = fetchTxSuccess(transactions);
     const initialState = {
       tx: [],
       transactions: [],

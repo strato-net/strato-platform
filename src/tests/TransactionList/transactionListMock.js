@@ -1,4 +1,4 @@
-export const data = [
+export const transactions = [
   {
     "transactionType": "FunctionCall",
     "origin": "API",
@@ -35,9 +35,9 @@ export const data = [
     "v": "1c",
     "nonce": 17
   }
-]
+];
 
-export const updatedData = [
+export const updatedTransactions = [
   {
     "transactionType": "FunctionCall",
     "origin": "API",
@@ -91,8 +91,16 @@ export const updatedData = [
     "v": "1b",
     "nonce": 16
   }
-]
+];
 
-export const last = 15
+export const last = 15;
 
-export const error = 'error'
+export const error = 'error';
+
+export const unSubscribeRoomMock = [
+  ["GET_TRANSACTIONS"]
+];
+
+export const subscribeRoomMock = [
+  ["GET_TRANSACTIONS"]
+];
