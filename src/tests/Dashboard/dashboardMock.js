@@ -152,6 +152,17 @@ export const node = {
   }
 };
 
+export const nodeWithPeers = {
+  "name": "LOCALHOST",
+  "peers": {
+    '192.168.10.36': '3004',
+    '192.168.10.33': '3005'
+  },
+  "coinbase": {
+    "coinbase": "82069cc441c42b2706fa5d3129deeb677812e5a5"
+  }
+};
+
 export const initialState = {
   lastBlockNumber: 0,
   usersCount: 0,
