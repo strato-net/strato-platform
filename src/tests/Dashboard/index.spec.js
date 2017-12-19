@@ -1,6 +1,11 @@
 import React from 'react';
 import Dashboard, { mapStateToProps } from '../../components/Dashboard/index';
-import { dashboard, node } from './dashboardMock';
+import {
+  dashboard,
+  node,
+  unSubscribeRoomMock,
+  subscribeRoomMock
+} from './dashboardMock';
 
 describe('Test Dashboard index', () => {
 
@@ -48,7 +53,7 @@ describe('Test Dashboard index', () => {
       dashboard,
       node,
       subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
+      unSubscribeRoom: jest.fn()
     }
 
     const wrapper = shallow(
@@ -56,7 +61,24 @@ describe('Test Dashboard index', () => {
     );
 
     wrapper.instance().componentWillUnmount();
+    expect(props.unSubscribeRoom).toHaveBeenCalled();
+    expect(props.unSubscribeRoom.mock.calls).toEqual(unSubscribeRoomMock);
     expect(wrapper).toMatchSnapshot();
+  });
+
+  test('should invoke subscribeRoom on componentDidMount', () => {
+    const props = {
+      dashboard,
+      node,
+      subscribeRoom: jest.fn()
+    }
+
+    const wrapper = shallow(
+      <Dashboard.WrappedComponent {...props} />
+    );
+
+    expect(props.subscribeRoom).toHaveBeenCalled();
+    expect(props.subscribeRoom.mock.calls).toEqual(subscribeRoomMock);
   });
 
   test('test mapStateToProps function', () => {

@@ -172,3 +172,25 @@ export const initialState = {
   blockDifficulty: [],
   transactionTypes: []
 };
+
+export const unSubscribeRoomMock = [
+  ['LAST_BLOCK_NUMBER'],
+  ['USERS_COUNT'],
+  ['CONTRACTS_COUNT'],
+  ['BLOCKS_PROPAGATION'],
+  ['BLOCKS_FREQUENCY'],
+  ['BLOCKS_DIFFICULTY'],
+  ['TRANSACTIONS_COUNT'],
+  ['TRANSACTIONS_TYPE']
+]
+
+export const subscribeRoomMock = [
+  ['LAST_BLOCK_NUMBER'],
+  ['USERS_COUNT'],
+  ['CONTRACTS_COUNT'],
+  ['BLOCKS_PROPAGATION'],
+  ['BLOCKS_FREQUENCY'],
+  ['BLOCKS_DIFFICULTY'],
+  ['TRANSACTIONS_COUNT'],
+  ['TRANSACTIONS_TYPE']
+]
