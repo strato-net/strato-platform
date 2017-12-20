@@ -99,6 +99,15 @@ solcSpec =
         let solPath = "./test/contracts/UserManager.sol"
             expectedPath = "./test/contracts/UserManagerGetSource.sol"
         testAugment solPath expectedPath
+      it "should augment AdminInterface code without compiling" $ do
+        let solPath = "./test/contracts/AdminInterface.sol"
+            expectedPath = "./test/contracts/AdminInterfaceGetSource.sol"
+        testAugmentNoCompile solPath expectedPath
+      it "should augment and compile AdminInterface code" $ do
+        pendingWith "Solc has problem passing enums between contracts"
+        let solPath = "./test/contracts/AdminInterface.sol"
+            expectedPath = "./test/contracts/AdminInterfaceGetSource.sol"
+        testAugment solPath expectedPath
 
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
