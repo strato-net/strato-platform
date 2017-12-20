@@ -161,6 +161,37 @@ spec =
               constArgs = Nothing
           cAddr <- createContractOnMulti src contractName constArgs config
           void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded Version" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "Version"
+          src' <- readSolFile "Version.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded BidState" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "BidState"
+          src' <- readSolFile "BidState.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded Bid" $ \ config@TestConfig {..} -> do
+          pendingWith "Solc has problem passing enums between contracts"
+          skipIfNotMultinode config
+          let contractName' = "Bid"
+          src' <- readSolFile "Bid.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
 
 createContractOnMulti :: Text
                       -> Text
