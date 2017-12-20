@@ -2,20 +2,29 @@ import {
   watchCommunicateOverSocket,
   socketSubscribeUnsubscribeRoom,
   readSocketEvents,
-  subscribe
+  subscribe,
+  registerActions
 } from '../../sockets/socket.saga';
 import {
   takeEvery,
   call,
   put,
-  fork
+  fork,
+  take
 } from 'redux-saga/effects';
+import { eventChannel } from 'redux-saga';
+
 import {
   subscribeRoom,
   unSubscribeRoom,
   SOCKET_SUBSCRIBE_ROOM,
   SOCKET_UNSUBSCRIBE_ROOM
 } from '../../sockets/socket.actions';
+
+import {
+  updateBlockNumber,
+  preloadBlockNumber
+} from '../../components/Dashboard/dashboard.action';
 
 import { env } from '../../env'
 
@@ -27,7 +36,7 @@ jest.mock('socket.io-client', () => {
 
 jest.setTimeout(10000); // 10 second timeout
 
-const mockServer = new Server(env.SOCKET_SERVER);
+var mockServer = new Server(env.SOCKET_SERVER);
 
 const socket = SocketIO(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] })
 
@@ -100,13 +109,38 @@ mockServer.on('connection', server => {
 
 });
 
+const channel = () => { }
+const action = {}
 describe('Test sockets saga', () => {
+
+  afterAll(() => {
+    mockServer.close()
+  });
 
   test('should watch socket', () => {
     const gen = watchCommunicateOverSocket();
     expect(gen.next().value).toEqual(takeEvery(SOCKET_SUBSCRIBE_ROOM, socketSubscribeUnsubscribeRoom))
     expect(gen.next().value).toEqual(takeEvery(SOCKET_UNSUBSCRIBE_ROOM, socketSubscribeUnsubscribeRoom))
     expect(gen.next().value).toEqual(fork(readSocketEvents))
+  })
+
+  test('should test readsocket events', () => {
+    const gen = readSocketEvents()
+    expect(gen.next().value).toEqual(call(subscribe))
+    expect(gen.next(channel).value).toEqual(take(channel))
+    expect(gen.next(action).value).toEqual(put(action))
+  })
+
+  test('should test subscribe events', () => {
+    expect(subscribe()).toMatchSnapshot()
+  })
+
+  test('should test suscribeUnsubscribe room', (done) => {
+    const gen = socketSubscribeUnsubscribeRoom('test')
+    setTimeout(() => {
+      done()
+      expect(gen.next().value).toBeCalled()
+    }, 1000);
   })
 
   test('should subscribe and receive block number', (done) => {
