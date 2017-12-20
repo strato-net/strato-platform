@@ -1,11 +1,10 @@
-import React, {Component} from 'react';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
-import {Text} from '@blueprintjs/core';
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
+import { Text } from '@blueprintjs/core';
 import './peersCard.css';
+
 class PeersCard extends Component {
-
-
   render() {
     const node = this.props.node;
     const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
@@ -46,7 +45,7 @@ class PeersCard extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return { node: state.node };
 }
 
