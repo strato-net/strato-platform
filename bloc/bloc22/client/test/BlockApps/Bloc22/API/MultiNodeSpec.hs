@@ -182,10 +182,89 @@ spec =
           cAddr <- createContractOnMulti src contractName constArgs config
           void $ getStateLocal cAddr contractName config
         it "should pull data from strato and get contract state for an uploaded Bid" $ \ config@TestConfig {..} -> do
-          pendingWith "Solc has problem passing enums between contracts"
           skipIfNotMultinode config
           let contractName' = "Bid"
           src' <- readSolFile "Bid.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded ProjectState" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "ProjectState"
+          src' <- readSolFile "ProjectState.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded Project" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "Project"
+          src' <- readSolFile "Project.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded ProjectEvent" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "ProjectEvent"
+          src' <- readSolFile "ProjectEvent.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded ProjectManager" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "ProjectManager"
+          src' <- readSolFile "ProjectManager.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded UserRole" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "UserRole"
+          src' <- readSolFile "UserRole.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded User" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "User"
+          src' <- readSolFile "User.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded UserManager" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "UserManager"
+          src' <- readSolFile "UserManager.sol"
+          randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
+          let contractName = contractName' <> "_" <> randNum
+              src = replace contractName' contractName src'
+              constArgs = Nothing
+          cAddr <- createContractOnMulti src contractName constArgs config
+          void $ getStateLocal cAddr contractName config
+        it "should pull data from strato and get contract state for an uploaded AdminInterface" $ \ config@TestConfig {..} -> do
+          skipIfNotMultinode config
+          let contractName' = "AdminInterface"
+          src' <- readSolFile "AdminInterface.sol"
           randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
           let contractName = contractName' <> "_" <> randNum
               src = replace contractName' contractName src'
