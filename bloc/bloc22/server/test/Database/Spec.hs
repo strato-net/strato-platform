@@ -29,14 +29,7 @@ solcSpec =
       it "should augment SimpleStorage code" $ do
         let solPath = "./test/contracts/SimpleStorage.sol"
             expectedPath = "./test/contracts/SimpleStorageGetSource.sol"
-        soliditySrc <- pack <$> readFile solPath
-        void . fromEither =<< compileSolcIO soliditySrc
-        expected <- (pack . concat . lines) <$> readFile expectedPath
-        expectedXabi <- fromEither $ parseXabi "" (unpack expected)
-        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
-        void . fromEither =<< compileSolcIO (pack augmentedSrc)
-        augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
-        augmentedXabi `shouldBe` expectedXabi
+        testAugment solPath expectedPath
       it "should augment AppMetadata code" $ do
         let solPath = "./test/contracts/AppMetadata.sol"
         soliditySrc <- pack <$> readFile solPath
@@ -51,37 +44,61 @@ solcSpec =
       it "should augment ErrorCodes code" $ do
         let solPath = "./test/contracts/ErrorCodes.sol"
             expectedPath = "./test/contracts/ErrorCodesGetSource.sol"
-        soliditySrc <- pack <$> readFile solPath
-        void . fromEither =<< compileSolcIO soliditySrc
-        expected <- (pack . concat . lines) <$> readFile expectedPath
-        expectedXabi <- fromEither $ parseXabi "" (unpack expected)
-        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
-        void . fromEither =<< compileSolcIO (pack augmentedSrc)
-        augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
-        augmentedXabi `shouldBe` expectedXabi
+        testAugment solPath expectedPath
       it "should augment Util code" $ do
         let solPath = "./test/contracts/Util.sol"
             expectedPath = "./test/contracts/UtilGetSource.sol"
-        soliditySrc <- pack <$> readFile solPath
-        void . fromEither =<< compileSolcIO soliditySrc
-        expected <- (pack . concat . lines) <$> readFile expectedPath
-        expectedXabi <- fromEither $ parseXabi "" (unpack expected)
-        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
-        void . fromEither =<< compileSolcIO (pack augmentedSrc)
-        augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
-        augmentedXabi `shouldBe` expectedXabi
+        testAugment solPath expectedPath
+      it "should augment Version code" $ do
+        let solPath = "./test/contracts/Version.sol"
+            expectedPath = "./test/contracts/VersionGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment BidState code" $ do
+        let solPath = "./test/contracts/BidState.sol"
+            expectedPath = "./test/contracts/BidStateGetSource.sol"
+        testAugment solPath expectedPath
       it "should augment Bid code" $ do
         let solPath = "./test/contracts/Bid.sol"
             expectedPath = "./test/contracts/BidGetSource.sol"
-        soliditySrc <- pack <$> readFile solPath
-        printUnlinedSource soliditySrc
-        void . fromEither =<< compileSolcIO soliditySrc
-        expected <- (pack . concat . lines) <$> readFile expectedPath
-        expectedXabi <- fromEither $ parseXabi "" (unpack expected)
-        augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
-        void . fromEither =<< compileSolcIO (pack augmentedSrc)
-        augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
-        augmentedXabi `shouldBe` expectedXabi
+        testAugment solPath expectedPath
+      it "should augment ProjectState code" $ do
+        let solPath = "./test/contracts/ProjectState.sol"
+            expectedPath = "./test/contracts/ProjectStateGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment Project code" $ do
+        let solPath = "./test/contracts/Project.sol"
+            expectedPath = "./test/contracts/ProjectGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment ProjectEvent code" $ do
+        let solPath = "./test/contracts/ProjectEvent.sol"
+            expectedPath = "./test/contracts/ProjectEventGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment ProjectManager code without compiling" $ do
+        let solPath = "./test/contracts/ProjectManager.sol"
+            expectedPath = "./test/contracts/ProjectManagerGetSource.sol"
+        testAugmentNoCompile solPath expectedPath
+      it "should compile and augment ProjectManager code" $ do
+        pendingWith "Solc has problem passing enums between contracts"
+        let solPath = "./test/contracts/ProjectManager.sol"
+            expectedPath = "./test/contracts/ProjectManagerGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment UserRole code" $ do
+        let solPath = "./test/contracts/UserRole.sol"
+            expectedPath = "./test/contracts/UserRoleGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment User code" $ do
+        let solPath = "./test/contracts/User.sol"
+            expectedPath = "./test/contracts/UserGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment UserManager code without compiling" $ do
+        let solPath = "./test/contracts/UserManager.sol"
+            expectedPath = "./test/contracts/UserManagerGetSource.sol"
+        testAugmentNoCompile solPath expectedPath
+      it "should augment and compile UserManager code" $ do
+        pendingWith "Solc has problem passing enums between contracts"
+        let solPath = "./test/contracts/UserManager.sol"
+            expectedPath = "./test/contracts/UserManagerGetSource.sol"
+        testAugment solPath expectedPath
 
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
@@ -103,7 +120,27 @@ logleft x = case x of
 printUnlinedSource :: Text -> IO ()
 printUnlinedSource = print . stripLines
 
+testAugment :: String -> String -> IO ()
+testAugment solPath expectedPath = do
+  soliditySrc <- pack <$> readFile solPath
+  void . fromEither =<< compileSolcIO soliditySrc
+  expected <- (pack . concat . lines) <$> readFile expectedPath
+  expectedXabi <- fromEither $ parseXabi "" (unpack expected)
+  augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+  void . fromEither =<< compileSolcIO (pack augmentedSrc)
+  augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
+  augmentedXabi `shouldBe` expectedXabi
 
+testAugmentNoCompile :: String -> String -> IO ()
+testAugmentNoCompile solPath expectedPath = do
+  soliditySrc <- pack <$> readFile solPath
+  --void . fromEither =<< compileSolcIO soliditySrc
+  expected <- (pack . concat . lines) <$> readFile expectedPath
+  expectedXabi <- fromEither $ parseXabi "" (unpack expected)
+  augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
+  --void . fromEither =<< compileSolcIO (pack augmentedSrc)
+  augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
+  augmentedXabi `shouldBe` expectedXabi
 
 -- newtype BinaryCode = BinaryCode Text
 --   deriving(Eq, Show)

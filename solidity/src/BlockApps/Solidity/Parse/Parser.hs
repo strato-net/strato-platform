@@ -43,7 +43,6 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
   parentXabi <- parentXabiOrError
   addInheritedDeclarations xabisWithInheritedDeclarations (xabiMerge xabi parentXabi, rest)
 
-
 xabiMerge::Xabi->Xabi->Xabi
 xabiMerge x y =
   Xabi{
@@ -54,7 +53,7 @@ xabiMerge x y =
     xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
     }
   where
-    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 1
+    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
     bumpAtBytes n varType =
       varType {varTypeAtBytes = varTypeAtBytes varType + n}
 

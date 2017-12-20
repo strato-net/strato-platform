@@ -20,6 +20,9 @@ import qualified BlockApps.Solidity.Xabi.Def as Xabi
 
 
 
+sortWith :: Ord b => (a -> b) -> [a] -> [a]
+sortWith f = List.sortBy (\x y -> f x `compare` f y)
+
 unparse :: [(Text, Xabi)] -> String
 unparse contracts = List.concat $ List.map unparseContract contracts
 
@@ -28,7 +31,7 @@ unparseContract (name, contract) =
      "contract "
   <> Text.unpack name
   <> "{"
-  <> List.concat (List.map ((" " <>) . unparseVar) (Map.toList $ xabiVars contract))
+  <> List.concat (List.map ((" " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
   <> List.concat (List.map ((" " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
   <> List.concat (List.map ((" " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
   <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
@@ -37,16 +40,27 @@ unparseContract (name, contract) =
 
 unparseVar :: (Text, VarType) -> String
 unparseVar (name, theType) =
-     unparseVarType theType
+     unparseVarType (varTypeType theType)
   <> " "
+  <> (case varTypePublic theType of
+        Nothing -> ""
+        Just True -> "public "
+        Just False -> "private "
+     )
   <> Text.unpack name
   <> ";"
 
-unparseVarType :: VarType -> String
-unparseVarType VarType{varTypeType = Int (Just True) _} = "int"
-unparseVarType VarType{varTypeType = Int (Just False) _} = "uint"
-unparseVarType VarType{varTypeType = String _} = "string"
-unparseVarType VarType{varTypeType = Address} = "address"
+unparseVarType :: Type -> String
+unparseVarType (Int (Just True) _) = "int"
+unparseVarType (Int (Just False) _) = "uint"
+unparseVarType (String _) = "string"
+unparseVarType Address = "address"
+unparseVarType (Label str) = str
+unparseVarType (Bytes _ (Just n)) = "bytes" <> (show n)
+unparseVarType (Bytes _ Nothing)  = "bytes"
+unparseVarType (Array _ (Just len) entry) = (unparseVarType entry) <> "[" <> (show len) <> "]"
+unparseVarType (Array _ Nothing    entry) = (unparseVarType entry) <> "[]"
+unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " => " <> (unparseVarType val) <> ")"
 unparseVarType _ = "int"
 
 unparseFunc :: (Text, Func) -> String
@@ -54,7 +68,7 @@ unparseFunc (name, Func{..}) = Text.unpack $
      "function "
   <> name
   <> "("
-  <> intercalate ", " (List.map unparseArgs (Map.toList funcArgs))
+  <> intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
   <> ") "
   <> case funcMutable of
        Just False -> "constant "
@@ -102,12 +116,13 @@ unparseIndexedType :: IndexedType -> Text
 -- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
 unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
 unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
+unparseIndexedType IndexedType{indexedTypeType = Bool} = "bool"
 unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
 unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
 unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
 unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
   "bytes" <> (pack . show $ bytes)
-unparseIndexedType IndexedType{indexedTypeType = Contract contractName} = contractName
+unparseIndexedType IndexedType{indexedTypeType = Label str} = pack str
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
 addFunction :: (Text, String) -> Xabi -> Xabi
