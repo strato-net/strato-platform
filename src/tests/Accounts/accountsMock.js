@@ -72,3 +72,5 @@ export const accountDetail = {
   "source": "",
   "nonce": 8
 };
+
+export const userAddresses = ["60122a032bebcb89e228899b60c4d190b5a17aa3", "45b53a8b688c3a3faca30e5842800922f80fdb8d"];
