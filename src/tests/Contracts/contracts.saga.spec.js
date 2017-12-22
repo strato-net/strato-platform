@@ -9,10 +9,13 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_CONTRACTS,
-  fetchContractsSuccess
+  fetchContractsSuccess,
+  FETCH_CONTRACTS_SUCCESSFUL,
+  fetchContractsFailure,
+  FETCH_CONTRACTS_FAILED
 } from '../../components/Contracts/contracts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
-import { contracts } from './contractsMock'
+import { contracts, error } from './contractsMock';
 
 describe('Test contracts saga', () => {
 
@@ -21,35 +24,44 @@ describe('Test contracts saga', () => {
     expect(gen.next().value).toEqual(takeEvery(FETCH_CONTRACTS, fetchContracts))
   })
 
-  test('should check the saga api', () => {
-    const gen = fetchContracts({ type: "FETCH_CONTRACTS" });
-    expect(gen.next().value).toEqual(call(getContracts));
-    expect(gen.next().value).toEqual(put(fetchContractsSuccess()))
-  })
+  describe('fetchContracts generator', () => {
 
-  test('should call fetch contracts', () => {
-    fetch.mockResponse(JSON.stringify(contracts))
-    expectSaga(fetchContracts)
-      .call.fn(getContracts).put.like({ action: { type: 'FETCH_CONTRACTS_SUCCESSFUL' } })
-      .run()
-  });
+    test('inspection', () => {
+      const gen = fetchContracts({ type: "FETCH_CONTRACTS" });
 
-  test('should call fetch contracts failure', () => {
-    fetch.mockReject(JSON.stringify(contracts))
-    expectSaga(fetchContracts)
-      .call.fn(getContracts).put.like({ action: { type: 'FETCH_CONTRACTS_FAILED' } })
-      .run()
-  });
+      expect(gen.next().value).toEqual(call(getContracts));
+      expect(gen.next(contracts).value).toEqual(put(fetchContractsSuccess(contracts)));
+      expect(gen.throw(error).value).toEqual(put(fetchContractsFailure(error)));
+      expect(gen.next().done).toBe(true);
+    })
 
-  test('should fail contracts on exception', () => {
-    expectSaga(fetchContracts)
-      .provide({
-        call() {
-          throw new Error('Not Found');
-        },
-      })
-      .put.like({ action: { type: 'FETCH_CONTRACTS_FAILED' } })
-      .run();
+    test('should call fetch contracts with success', (done) => {
+      fetch.mockResponse(JSON.stringify(contracts));
+
+      expectSaga(fetchContracts)
+        .call.fn(getContracts).put.like({ action: { type: FETCH_CONTRACTS_SUCCESSFUL } })
+        .run().then((result) => { done() });
+    });
+
+    test('should call fetch contracts with failure', (done) => {
+      fetch.mockReject(JSON.stringify(contracts));
+
+      expectSaga(fetchContracts)
+        .call.fn(getContracts).put.like({ action: { type: FETCH_CONTRACTS_FAILED } })
+        .run().then((result) => { done() });
+    });
+
+    test('should fail contracts on exception', () => {
+      expectSaga(fetchContracts)
+        .provide({
+          call() {
+            throw new Error('Not Found');
+          },
+        })
+        .put.like({ action: { type: FETCH_CONTRACTS_FAILED } })
+        .run();
+    });
+
   });
 
 })
