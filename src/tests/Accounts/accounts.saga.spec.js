@@ -40,7 +40,7 @@ import {
   FAUCET_SUCCESS,
   FAUCET_FAILURE
 } from '../../components/Accounts/accounts.actions';
-import { expectSaga, testSaga } from 'redux-saga-test-plan';
+import { expectSaga } from 'redux-saga-test-plan';
 import { accountsMock, userAddresses, error, accountDetail } from './accountsMock';
 import { hideLoading } from 'react-redux-loading-bar';
 import { deepClone } from '../helper/testHelper';
