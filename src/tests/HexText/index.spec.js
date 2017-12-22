@@ -3,7 +3,7 @@ import HexText from '../../components/HexText';
 
 describe('Test Hextext index', () => {
 
-  it('should render with empty values', () => {
+  test('should render with empty values', () => {
     const props = {};
 
     const wrapper = shallow(
@@ -13,7 +13,7 @@ describe('Test Hextext index', () => {
     expect(wrapper).toMatchSnapshot();
   })
 
-  it('should render with mocked values', () => {
+  test('should render with mocked values', () => {
     const props = {
       value: 'Hextext Name',
       classes: 'class'
@@ -26,7 +26,7 @@ describe('Test Hextext index', () => {
     expect(wrapper).toMatchSnapshot();
   })
 
-  it('should copy value', () => {
+  test('should copy value', () => {
     const props = {
       value: 'Hextext Name',
       classes: 'class'
@@ -40,7 +40,7 @@ describe('Test Hextext index', () => {
     expect(wrapper.state('copied')).toBe(true);
   })
 
-  it('should reset copied on mouse out', () => {
+  test('should reset copied on mouse out', () => {
     const props = {
       value: 'Hextext Name',
       classes: 'class'

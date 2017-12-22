@@ -9,19 +9,19 @@ import { node, nodeWithPeers } from '../Dashboard/dashboardMock';
 
 describe('Test nodeCard actions', () => {
 
-  it('should load peers', () => {
+  test('should load peers', () => {
     expect(preloadPeers(node.peers)).toMatchSnapshot();
   });
 
-  it('should update peers', () => {
+  test('should update peers', () => {
     expect(updatePeers(nodeWithPeers.peers)).toMatchSnapshot();
   });
 
-  it('should load coinbase', () => {
+  test('should load coinbase', () => {
     expect(preloadCoinbase(node.coinbase)).toMatchSnapshot();
   });
 
-  it('should update coinbase', () => {
+  test('should update coinbase', () => {
     let coinbase = { coinbase: null }
     expect(updateCoinbase(coinbase)).toMatchSnapshot();
   });

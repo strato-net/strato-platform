@@ -4,7 +4,7 @@ import { dashboard, node, initialState } from '../Dashboard/dashboardMock';
 
 describe('Test NodeCard index', () => {
 
-  it('should render with empty values', () => {
+  test('should render with empty values', () => {
     const props = {
       node: {
         "name": "LOCALHOST",
@@ -22,7 +22,7 @@ describe('Test NodeCard index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  it('should render with mocked values', () => {
+  test('should render with mocked values', () => {
     const props = {
       dashboard,
       node,
@@ -37,7 +37,7 @@ describe('Test NodeCard index', () => {
     expect(wrapper).toMatchSnapshot();
   })
 
-  it('should change state on handleClick', () => {
+  test('should change state on handleClick', () => {
     const props = {
       dashboard,
       node,
@@ -72,7 +72,7 @@ describe('Test NodeCard index', () => {
     expect(wrapper.instance().props.unSubscribeRoom()).toBe('unSubscribeRoom');
   });
 
-  it('should invoke subscribeRoom on componentDidMount', () => {
+  test('should invoke subscribeRoom on componentDidMount', () => {
     const props = {
       dashboard,
       node,
@@ -88,7 +88,7 @@ describe('Test NodeCard index', () => {
     expect(props.subscribeRoom.mock.calls).toEqual([["GET_COINBASE"], ["GET_PEERS"]]);
   })
 
-  it('should invoke componentWillUnmount', () => {
+  test('should invoke componentWillUnmount', () => {
     const props = {
       dashboard,
       node,
@@ -105,7 +105,7 @@ describe('Test NodeCard index', () => {
     expect(props.unSubscribeRoom.mock.calls).toEqual([["GET_COINBASE"], ["GET_PEERS"]]);
   })
 
-  it('test mapStateToProps function', () => {
+  test('test mapStateToProps function', () => {
     const state = {
       dashboard,
       node

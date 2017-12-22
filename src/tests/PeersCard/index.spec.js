@@ -4,7 +4,7 @@ import { nodeWithPeers } from '../Dashboard/dashboardMock';
 
 describe('Test PeerCard index', () => {
 
-  it('should render with empty values', () => {
+  test('should render with empty values', () => {
     const props = {
       node: {}
     };
@@ -16,7 +16,7 @@ describe('Test PeerCard index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  it('should render with mocked values', () => {
+  test('should render with mocked values', () => {
     const props = {
       node: nodeWithPeers
     };
@@ -28,7 +28,7 @@ describe('Test PeerCard index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  it('test mapStateToProps function', () => {
+  test('test mapStateToProps function', () => {
     const state = {
       node: nodeWithPeers
     };

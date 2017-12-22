@@ -3,7 +3,7 @@ import NumberCard from '../../components/NumberCard/index';
 
 describe('Test NumberCard index', () => {
 
-  it('should render with mocked values', () => {
+  test('should render with mocked values', () => {
     const props = {
       number: "HEALTH",
       description: "Network",
@@ -18,7 +18,7 @@ describe('Test NumberCard index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  it('should render with empty values', () => {
+  test('should render with empty values', () => {
     const props = {};
 
     const wrapper = shallow(

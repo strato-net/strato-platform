@@ -6,30 +6,30 @@ import { nodeCardInitialState } from './nodeCardMock';
 describe('Test nodeCard reducer', () => {
 
   // INITIAL_STATE
-  it('should set initial state', () => {
+  test('should set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
   // PRELOAD_PEERS
-  it('should store peers', () => {
+  test('should store peers', () => {
     const action = preloadPeers(node.peers);
     expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
   });
 
   // PRELOAD_PEERS
-  it('should update peers', () => {
+  test('should update peers', () => {
     const action = updatePeers(nodeWithPeers.peers);
     expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
   });
 
   // PRELOAD_COINBASE
-  it('should store coinbase', () => {
+  test('should store coinbase', () => {
     const action = preloadCoinbase(node.coinbase);
     expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
   });
 
   // PRELOAD_COINBASE
-  it('should update coinbase', () => {
+  test('should update coinbase', () => {
     const action = updateCoinbase({ coinbase: null });
     expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
   });

@@ -4,7 +4,7 @@ import { dashboard } from '../Dashboard/dashboardMock';
 
 describe('Test PieChart index', () => {
 
-  it('should render component properly', () => {
+  test('should render component properly', () => {
     const props = {
       data: dashboard.transactionTypes
     };

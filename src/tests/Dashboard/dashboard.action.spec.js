@@ -18,47 +18,47 @@ import { dashboard } from './dashboardMock';
 
 describe('Test dashboard actions', () => {
 
-  it('should load block number', () => {
+  test('should load block number', () => {
     expect(preloadBlockNumber(dashboard.lastBlockNumber)).toMatchSnapshot();
   })
 
-  it('should update block number', () => {
+  test('should update block number', () => {
     let lastBlockNumber = 5;
     expect(updateBlockNumber(lastBlockNumber)).toMatchSnapshot();
   })
 
-  it('should load contracts count', () => {
+  test('should load contracts count', () => {
     expect(preloadContractCount(dashboard.contractsCount)).toMatchSnapshot();
   })
 
-  it('should update contracts count', () => {
+  test('should update contracts count', () => {
     let contractsCount = 2;
     expect(updateContractCount(contractsCount)).toMatchSnapshot();
   })
 
-  it('should load users count', () => {
+  test('should load users count', () => {
     expect(preloadUsersCount(dashboard.usersCount)).toMatchSnapshot();
   })
 
-  it('should update users count', () => {
+  test('should update users count', () => {
     let usersCount = 2;
     expect(updateUsersCount(usersCount)).toMatchSnapshot();
   })
 
-  it('should load transactions count', () => {
+  test('should load transactions count', () => {
     expect(preloadTransactionsCount(dashboard.transactionsCount)).toMatchSnapshot();
   })
 
-  it('should update transactions count', () => {
+  test('should update transactions count', () => {
     let transactionsCount = 2;
     expect(updateTransactionCount(transactionsCount)).toMatchSnapshot();
   })
 
-  it('should load block propagation', () => {
+  test('should load block propagation', () => {
     expect(preloadBlockPropagation(dashboard.blockPropagation)).toMatchSnapshot();
   })
 
-  it('should update block propagation', () => {
+  test('should update block propagation', () => {
     let blockPropagation = [
       {
         "x": 0,
@@ -72,11 +72,11 @@ describe('Test dashboard actions', () => {
     expect(updateBlockPropagation(blockPropagation)).toMatchSnapshot();
   })
 
-  it('should load block difficulty', () => {
+  test('should load block difficulty', () => {
     expect(preloadBlockDifficulty(dashboard.blockDifficulty)).toMatchSnapshot();
   })
 
-  it('should update block difficulty', () => {
+  test('should update block difficulty', () => {
     let blockDifficulty = [
       {
         "x": 0,
@@ -86,11 +86,11 @@ describe('Test dashboard actions', () => {
     expect(updateBlockDifficulty(blockDifficulty)).toMatchSnapshot();
   })
 
-  it('should load transaction type', () => {
+  test('should load transaction type', () => {
     expect(preloadTransactionType(dashboard.transactionTypes)).toMatchSnapshot();
   })
 
-  it('should update transaction type', () => {
+  test('should update transaction type', () => {
     let transactionTypes = [
       {
         "val": 3,

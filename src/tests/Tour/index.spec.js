@@ -4,7 +4,7 @@ import { tourSteps } from './tourMock';
 
 describe('Test Tour index', () => {
 
-  it('should render with empty values', () => {
+  test('should render with empty values', () => {
     const props = {};
 
     const wrapper = shallow(
@@ -14,7 +14,7 @@ describe('Test Tour index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  it('should render with mocked values', () => {
+  test('should render with mocked values', () => {
     const props = {
       name: 'dashboard',
       callback: () => { },
@@ -35,7 +35,7 @@ describe('Test Tour index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  it('test mapStateToProps function', () => {
+  test('test mapStateToProps function', () => {
     const state = {
       tour:
         {
