@@ -207,7 +207,7 @@ class TransactionTable extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     query: state.queryEngine.query,
     queryResults: state.queryEngine.queryResult,
