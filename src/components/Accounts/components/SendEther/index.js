@@ -17,7 +17,7 @@ import validate from './validate';
 
 // TODO: use solc instead of extabi for compile
 
-class CreateContract extends Component {
+class SendEther extends Component {
 
   // handleFromUsernameChange = (e) => {
   //   this.props.fromUsernameChange(e.target.value);
@@ -331,7 +331,7 @@ class CreateContract extends Component {
 
 const selector = formValueSelector('send-ether');
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isOpen: state.sendEther.isOpen,
     result: state.sendEther.result,
@@ -341,7 +341,7 @@ function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({ form: 'send-ether', validate })(CreateContract);
+const formed = reduxForm({ form: 'send-ether', validate })(SendEther);
 const connected = connect(mapStateToProps, {
   sendEtherOpenModal,
   sendEtherCloseModal,

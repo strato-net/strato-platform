@@ -41,6 +41,32 @@ describe("Test Transaction table", () => {
 
   });
 
+  test('should invoke function on form submit', () => {
+
+    const props = {
+      query: {},
+      queryResults: transactions,
+      fetchTx: jest.fn(),
+      executeQuery: jest.fn(),
+      updateQuery: jest.fn(),
+      removeQuery: jest.fn(),
+      clearQuery: jest.fn(),
+      handleSubmit: jest.fn(),
+      history: { push: jest.fn() }
+    }
+    let wrapper = mount(
+      <Provider store={store}>
+        <TransactionTable.WrappedComponent {...props} />
+      </Provider>
+    )
+
+    const t = wrapper.find('Field').last().simulate('keyPress', { target: { key: 'Enter', value: 'temp' } });
+    const test = wrapper.find('Button').last().simulate('click');
+    const r = wrapper.find('Form').simulate('submit');
+    expect(props.handleSubmit).toHaveBeenCalled();
+
+  });
+
   test('should test component functions', () => {
     const props = {
       query: { last: 15 },
