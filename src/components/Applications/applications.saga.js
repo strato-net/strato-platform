@@ -15,7 +15,7 @@ import { env } from '../../env';
 
 const applicationsUrl = env.CIRRUS_URL + '/AppMetadata';
 
-function getApplications() {
+export function getApplications() {
   return fetch(
     applicationsUrl,
     {
@@ -32,7 +32,7 @@ function getApplications() {
     });
 }
 
-function launchApp(url) {
+export function launchApp(url) {
   return fetch(
     url,
     {
@@ -57,7 +57,7 @@ function sleep(ms) {
 }
 
 
-function* fetchApplications(action) {
+export function* fetchApplications(action) {
   try {
     let response = yield call(getApplications);
     yield put(fetchApplicationsSuccess(response));
@@ -67,7 +67,7 @@ function* fetchApplications(action) {
   }
 }
 
-function* launchApps(action) {
+export function* launchApps(action) {
   try {
     let response = yield call(launchApp, action.url);
     const retriesTotal = 7;
