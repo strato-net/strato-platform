@@ -1,7 +1,7 @@
 import React from 'react';
 import SendEther, { mapStateToProps } from '../../../../components/Accounts/components/SendEther/index';
 import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store'
+import configureStore from 'redux-mock-store';
 import { reducerAccounts } from '../../accountsMock';
 
 const mockStore = configureStore([]);
