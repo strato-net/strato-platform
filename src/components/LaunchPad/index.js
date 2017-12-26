@@ -273,7 +273,7 @@ function validate (values) {
   return errors;
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     accounts: state.accounts.accounts,
     launchPad: state.launchPad

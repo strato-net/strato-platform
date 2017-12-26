@@ -13,7 +13,7 @@ import { env } from '../../env';
 
 const url = env.APEX_URL + '/dapps';
 
-function uploadAppCall(username, userAddress, password, files) {
+export function uploadAppCall(username, userAddress, password, files) {
   const body = new FormData();
   body.append('username', username);
   body.append('address', userAddress);
@@ -27,16 +27,16 @@ function uploadAppCall(username, userAddress, password, files) {
       body: body
     }
   )
-  .then((res) => {
-    return res.json();
-  })
-  .then(handleApiError)
-  .catch((err) => {
-    throw err;
-  })
+    .then((res) => {
+      return res.json();
+    })
+    .then(handleApiError)
+    .catch((err) => {
+      throw err;
+    })
 }
 
-function* uploadApp(action) {
+export function* uploadApp(action) {
   try {
     yield call(
       uploadAppCall,
@@ -46,7 +46,7 @@ function* uploadApp(action) {
       action.formData.appPackage
     );
     yield put(appUploadSuccess());
-  } catch(err) {
+  } catch (err) {
     yield put(appUploadFailure(err.message));
   }
 }
