@@ -5,7 +5,7 @@ import {withRouter} from 'react-router-dom';
 import {Button, Text} from '@blueprintjs/core';
 import { fetchBlockData } from '../../../BlockData/block-data.actions';
 import HexText from '../../../HexText';
-import * as moment from 'moment';
+import moment from 'moment';
 
 class BlockView extends Component {
 
@@ -120,7 +120,7 @@ class BlockView extends Component {
   }
 }
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   const blockNumber = Number(ownProps.match.params.block);
   return {
     block: state.blockData.blockData.filter((val) => {
