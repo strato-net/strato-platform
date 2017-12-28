@@ -4,20 +4,27 @@ import { extAbi, error, selectedTabContent, codeEditor, sourceCodeUndefinedImpor
 
 describe('Test CodeEditor index', () => {
   let files
+  const readAsBinaryString = jest.fn();
+
   beforeAll(() => {
+    localStorage.clear();
+    localStorage.__STORE__ = {};
     files = [
       {
-        lastModified: 1510307249786,
-        name: "abc.sol",
-        preview: "blob:http://localhost:3000/20bcc325-c169-484f-8739-4f888fe68295",
-        size: 7,
-        type: "",
-        webkitRelativePath: ""
+        name: 'file1.sol',
+        size: 1111,
+        type: ''
       }
     ]
+    const fileContents = 'file contents';
+    const expectedFinalState = { fileContents: fileContents };
+    const file = new Blob([fileContents], { type: 'text/plain' });
+    const addEventListener = jest.fn((_, evtHandler) => { evtHandler(); });
+    const dummyFileReader = { addEventListener, readAsBinaryString, result: fileContents };
+    window.FileReader = jest.fn(() => dummyFileReader);
   });
 
-  test('should render codeeditor with default values', () => {
+  test('should render codeEditor with default values', () => {
     const props = {
       selectedTabContent: selectedTabContent,
       codeEditorData: codeEditor
@@ -37,7 +44,7 @@ describe('Test CodeEditor index', () => {
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
-  test('should test events', () => {
+  test('should simulate events', () => {
     const props = {
       selectedTabContent: selectedTabContent,
       codeEditorData: codeEditor,
@@ -88,7 +95,7 @@ describe('Test CodeEditor index', () => {
 
   });
 
-  test('should test file drop', () => {
+  test('should test .sol file drop', () => {
     const props = {
       selectedTabContent: selectedTabContent,
       codeEditorData: codeEditor,
@@ -103,7 +110,106 @@ describe('Test CodeEditor index', () => {
     const wrapper = shallow(
       <CodeEditor.WrappedComponent {...props} />
     );
+
     const dropzone = wrapper.find('Dropzone')
+    dropzone.simulate('drop', files)
+    expect(readAsBinaryString).toHaveBeenCalled()
+
+  });
+
+  test('should test other file eg. text file drop', () => {
+    const props = {
+      selectedTabContent: selectedTabContent,
+      codeEditorData: codeEditor,
+      onCompileFileLocally: jest.fn(),
+      removeTab: jest.fn(),
+      changeCreateActionState: jest.fn(),
+      onTabChange: jest.fn(),
+      onChangeFileName: jest.fn(),
+      addNewFileTab: jest.fn()
+    }
+
+    const wrapper = shallow(
+      <CodeEditor.WrappedComponent {...props} />
+    );
+
+    files[0]['name'] = 'pqr.txt'
+    const dropzone = wrapper.find('Dropzone')
+    dropzone.simulate('drop', files)
+    expect(readAsBinaryString).toHaveBeenCalled()
+  });
+
+  test('should test multiple file drop', () => {
+    const props = {
+      selectedTabContent: selectedTabContent,
+      codeEditorData: codeEditor,
+      onCompileFileLocally: jest.fn(),
+      removeTab: jest.fn(),
+      changeCreateActionState: jest.fn(),
+      onTabChange: jest.fn(),
+      onChangeFileName: jest.fn(),
+      addNewFileTab: jest.fn()
+    }
+
+    const wrapper = shallow(
+      <CodeEditor.WrappedComponent {...props} />
+    );
+
+    files.push({
+      name: 'file2.sol',
+      size: 1111,
+      type: ''
+    })
+    const dropzone = wrapper.find('Dropzone')
+    dropzone.simulate('drop', files)
+    expect(readAsBinaryString).toHaveBeenCalled()
+  });
+
+  it('should test local storage', () => {
+    const props = {
+      selectedTabContent: selectedTabContent,
+      codeEditorData: codeEditor,
+      onCompileFileLocally: jest.fn(),
+      removeTab: jest.fn(),
+      changeCreateActionState: jest.fn(),
+      onTabChange: jest.fn(),
+      onChangeFileName: jest.fn(),
+      addNewFileTab: jest.fn()
+    }
+
+    var wrapper = shallow(
+      <CodeEditor.WrappedComponent {...props} />, { lifecycleExperimental: true }
+    );
+
+    window.onbeforeunload()
+    expect(Object.keys(localStorage.__STORE__).length).toBe(1)
+  });
+
+
+  it('tests test save local state have been called', () => {
+    const props = {
+      selectedTabContent: selectedTabContent,
+      codeEditorData: codeEditor,
+      onCompileFileLocally: jest.fn(),
+      removeTab: jest.fn(),
+      changeCreateActionState: jest.fn(),
+      onTabChange: jest.fn(),
+      onChangeFileName: jest.fn(),
+      addNewFileTab: jest.fn()
+    }
+
+    const options = {
+      lifecycleExperimental: true,
+      disableLifecycleMethods: false
+    };
+
+    var wrapper = shallow(
+      <CodeEditor.WrappedComponent {...props} />, options
+    );
+
+    wrapper.instance().saveLocalState = jest.fn()
+    wrapper.instance().componentDidUpdate()
+    expect(wrapper.instance().saveLocalState).toHaveBeenCalled()
   });
 
 })

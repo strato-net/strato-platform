@@ -1,6 +1,8 @@
 import Adapter from 'enzyme-adapter-react-15';
 import Enzyme, { shallow, render, mount, configure } from 'enzyme';
-require('isomorphic-fetch')
+require('isomorphic-fetch');
+require('jest-localstorage-mock');
+
 var expect = require('expect');
 global.fetch = require('jest-fetch-mock');
 
