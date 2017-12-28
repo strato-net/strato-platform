@@ -8,34 +8,34 @@ export const QUERY_CIRRUS_VARS_REQUEST = 'QUERY_CIRRUS_VARS_REQUEST';
 export const QUERY_CIRRUS_VARS_SUCCESS = 'QUERY_CIRRUS_VARS_SUCCESS';
 export const QUERY_CIRRUS_VARS_FAILURE = 'QUERY_CIRRUS_VARS_FAILURE';
 
-export const queryCirrusVars = function(contractName) {
+export const queryCirrusVars = function (contractName) {
   return {
     type: QUERY_CIRRUS_VARS_REQUEST,
     contractName
   }
 }
 
-export const queryCirrusVarsSuccess = function(vars) {
+export const queryCirrusVarsSuccess = function (vars) {
   return {
     type: QUERY_CIRRUS_VARS_SUCCESS,
     vars: vars
   }
 }
 
-export const queryCirrusVarsFailure = function(error) {
+export const queryCirrusVarsFailure = function (error) {
   return {
     type: QUERY_CIRRUS_VARS_FAILURE,
     error: error
   }
 }
 
-export const clearQueryString = function() {
+export const clearQueryString = function () {
   return {
     type: CLEAR_QUERY_STRING
   }
 }
 
-export const queryCirrus = function(name, queryString) {
+export const queryCirrus = function (name, queryString) {
   return {
     type: QUERY_CIRRUS_REQUEST,
     contractName: name,
@@ -43,21 +43,21 @@ export const queryCirrus = function(name, queryString) {
   };
 }
 
-export const queryCirrusSuccess = function(queryResults) {
+export const queryCirrusSuccess = function (queryResults) {
   return {
     type: QUERY_CIRRUS_SUCCESS,
     queryResults: queryResults,
   }
 }
 
-export const queryCirrusFailure = function(error) {
+export const queryCirrusFailure = function (error) {
   return {
     type: QUERY_CIRRUS_FAILURE,
     error: error,
   }
 }
 
-export const addQueryFilter = function(field,operator,value) {
+export const addQueryFilter = function (field, operator, value) {
   return {
     type: ADD_QUERY_FILTER,
     field,
@@ -66,7 +66,7 @@ export const addQueryFilter = function(field,operator,value) {
   }
 }
 
-export const removeQueryFilter = function(tagIndex) {
+export const removeQueryFilter = function (tagIndex) {
   return {
     type: REMOVE_QUERY_FILTER,
     index: tagIndex
