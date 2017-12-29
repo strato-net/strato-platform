@@ -7,7 +7,7 @@ import {
   appUploadFailure,
   appSetError
 } from '../../components/LaunchPad/launchPad.actions';
-import { appError, appUploadError } from './launchpadMock';
+import { appError, appUploadError, uploadData } from './launchpadMock';
 
 describe('Test launchpad actions', () => {
 
@@ -24,7 +24,7 @@ describe('Test launchpad actions', () => {
   });
 
   test('should request to upload the app', () => {
-    expect(appUploadRequest(null)).toMatchSnapshot();
+    expect(appUploadRequest(uploadData)).toMatchSnapshot();
   });
 
   test('should call on app upload success', () => {
