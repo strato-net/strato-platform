@@ -238,4 +238,13 @@ export const queryCirrusVarsMock = {
   }
 };
 
+export const matchMock = {
+  match: {
+    isExact: true,
+    params: { name: "Bid" },
+    path: "/contracts/:name/query",
+    url: "/contracts/Bid/query"
+  }
+};
+
 export const error = "ERROR";
