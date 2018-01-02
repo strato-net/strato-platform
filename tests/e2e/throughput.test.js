@@ -22,34 +22,39 @@ describe('Throughput', function () {
   });
 
   it('should calculate throughput for network', function * () {
-    const count = 20; // number of faucets for each account
+    
     const startTime = moment();
-    let numberOfFaucets = 0;
-    for (let i = 0; i < count; i++) {
-      for (let node of nodes) {
-        yield rest.fill(userPairs[node.id].alice, false, node.id);
-        yield rest.fill(userPairs[node.id].bob, false, node.id);        
-        numberOfFaucets+=2;
-      }
-    }
+    let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
 
+    for(let node of nodes) {
+      const txs = createBatchTx(userPairs[node.id].bob);
+      console.log(`Submitting txs for node ${node.id}`);
+      const blocRequestStart = moment();
+      const receipts = yield rest.sendList(userPairs[node.id].alice, txs, true, node.id);
+      const blocRequestStop = moment();
+      secondsToRemove += blocRequestStop.diff(blocRequestStart, 'seconds');
+      console.log(`Submitted txs for node ${node.id}`);
+      console.log(receipts);
+    }
     let balancesMatch = false;
     let balanceCheck = 1;
     while (!balancesMatch) {
       console.log(`Checking balances ${balanceCheck++}`);
-      balancesMatch = yield checkBalances(userPairs, count);
+      balancesMatch = yield checkBalances(userPairs);
+      yield promiseTimeout(100);
     }
 
     const endTime = moment();
     assert.isOk(balancesMatch, "All balances should match");
-    const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Approx TPS: ${numberOfFaucets / seconds} tx/sec`);
+    const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
+    console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
+    console.log(`Approx TPS: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
   })
 
   // HELPER FUNCTIONS FOR TESTS
 
   /**
-   * Create Alice and Bob aynschronously for each node
+   * Create Alice and Bob aynschronously for each node. Faucet Alice.
    */
   function * createUserPairs() {
     const userPairs = [];
@@ -57,30 +62,50 @@ describe('Throughput', function () {
     const password = '1234';
     for (let node of nodes) {
       const aliceName = `Alice_${node.id}_${uid}`;
-      const alice = yield rest.createUser(aliceName, password, true, node.id);
-      console.log(alice);
+      console.log(`Creating user ${aliceName} on node ${node.id}`);
+      const alice = yield rest.createUser(aliceName, password, false, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
+      console.log(`Creating user ${bobName} on node ${node.id}`);      
       const bob = yield rest.createUser(bobName, password, true, node.id);
-      console.log(bob);
       userPairs.push({alice: alice, bob: bob});
     }
     console.log('DONE creating users');
     return userPairs;
   }
 
-  function * checkBalances(userPairs, count) {
-    const expectedBalance = new BigNumber(1000).times(constants.ETHER * count);
+  function promiseTimeout(timeout) {
+    return new Promise(function(resolve, reject) {
+      setTimeout(function() {
+        resolve();
+      }, timeout);
+    });
+  }
+
+  function * checkBalances(userPairs) {
+    const expectedBalance = new BigNumber(config.batchValue * config.batchSize)
+      .times(constants.ETHER);
     const promises = [];
     for (let node of nodes) {
       const alice = userPairs[node.id].alice;
       const bob = userPairs[node.id].bob;
-
-      promises.push(co(rest.getBalance(alice.address, 0, node.id)));
+      promises.push(co(rest.getBalance(bob.address, 0, node.id)));
     }
     responses = yield Promise.all(promises);
     return responses.reduce((check, response) => {
       return check && response.comparedTo(expectedBalance) == 0
     }, true);
+  }
+
+  function createBatchTx(toUser) {
+    var txs = [];
+    weiValue = new BigNumber(config.batchValue).times(constants.ETHER).toNumber();
+    for (var i = 0; i < config.batchSize; i++) {
+      txs.push({
+        value: weiValue,
+        toAddress: toUser.address
+      });
+    }
+    return txs;
   }
 
 });
