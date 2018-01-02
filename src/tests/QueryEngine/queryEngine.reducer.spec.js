@@ -1,25 +1,37 @@
 import reducer from '../../components/QueryEngine/queryEngine.reducer';
 import { updateQuery, clearQuery, removeQuery, executeQueryFailure, executeQuerySuccess } from '../../components/QueryEngine/queryEngine.actions';
 import { blocksMock, error } from './queryEngineMock';
+import { TRANSACTION_QUERY_TYPES } from '../../components/QueryEngine/queryTypes';
 
 describe('Test queryEngine reducer', () => {
 
-  const payload = {
-    queryType: 'gaslim',
-    queryTerm: 144,
-    resourceType: '/block',
-    query: { last: 15 }
-  };
+  let payload
+  let initialState
 
-  const initialState = {
-    query: { last: 15 },
-    queryResult: [],
-    error: null,
-  };
+  beforeEach(() => {
+    payload = {
+      queryType: 'gaslim',
+      queryTerm: 144,
+      resourceType: '/block',
+      query: { last: 15 }
+    };
+
+    initialState = {
+      query: { last: 15 },
+      queryResult: [],
+      error: null,
+    };
+  })
 
   // INITIAL_STATE
   test('should set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
+  });
+
+  // UPDATE_QUERY with default values
+  test('should update query store with default values', () => {
+    const action = updateQuery(TRANSACTION_QUERY_TYPES.default.key, payload.queryTerm);
+    expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
   // UPDATE_QUERY
