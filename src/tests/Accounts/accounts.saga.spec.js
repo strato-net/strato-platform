@@ -67,15 +67,30 @@ describe('Test accounts sagas', () => {
       type: FETCH_ACCOUNTS
     };
 
-    test('inspection', () => {
+    test('inspection with loadAddress true', () => {
       const gen = getAccounts(action);
 
       expect(gen.next().value).toEqual(call(getAccountsApi));
       expect(gen.next(accountsMock).value).toEqual(put(fetchAccountsSuccess(accountsMock)));
-      expect(gen.next().value).toEqual(accountsMock.map(account => put(fetchUserAddresses(account, action.loadBalances))));
+      expect(gen.next(true).value).toEqual(accountsMock.map(account => put(fetchUserAddresses(account, action.loadBalances))));
       expect(gen.throw(error).value).toEqual(put(fetchAccountsFailure(error)));
       expect(gen.next().value).toEqual(cancelled());
       expect(gen.next(true).value).toEqual(put(hideLoading()));
+      expect(gen.next().done).toBe(true);
+    });
+
+    test('inspection with loadAddress false', () => {
+      const action = {
+        loadAddresses: false,
+        loadBalances: true,
+        type: FETCH_ACCOUNTS
+      };
+
+      const gen = getAccounts(action);
+
+      expect(gen.next().value).toEqual(call(getAccountsApi));
+      expect(gen.next(accountsMock).value).toEqual(put(fetchAccountsSuccess(accountsMock)));
+      expect(gen.next().value).toEqual({ "@@redux-saga/IO": true, "CANCELLED": {} });
       expect(gen.next().done).toBe(true);
     });
 
