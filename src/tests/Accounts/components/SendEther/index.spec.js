@@ -1,49 +1,75 @@
 import React from 'react';
 import SendEther, { mapStateToProps } from '../../../../components/Accounts/components/SendEther/index';
 import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store';
-import { reducerAccounts } from '../../accountsMock';
-
-const mockStore = configureStore([]);
+import { reducer as formReducer } from 'redux-form';
+import { createStore, combineReducers } from 'redux';
+import { indexAccountsMock } from '../../accountsMock';
 
 describe('Test SendEther index', () => {
+
+  let store
+
+  beforeEach(() => {
+    store = createStore(combineReducers({ form: formReducer }))
+  });
 
   test('should render component without values', () => {
     const props = {
       isOpen: false,
       result: null,
-      accounts: reducerAccounts,
-      sendEtherOpenModal: () => { },
-      sendEtherCloseModal: () => { },
-      sendEther: () => { },
-      fetchAccounts: () => { }
+      accounts: [],
+      fromUsername: '',
+      toUsername: '',
+      createDisabled: true,
+      sendEtherOpenModal: jest.fn(),
+      sendEtherCloseModal: jest.fn(),
+      sendEther: jest.fn(),
+      fetchAccounts: jest.fn(),
+      store: store
     };
 
-    const store = mockStore({});
-    const wrapper = render(
-      <Provider store={store}>
-        <SendEther.WrappedComponent {...props} />
-      </Provider>
-    );
+    const wrapper = shallow(
+      <SendEther.WrappedComponent {...props} />
+    ).dive().dive().dive();
 
     expect(wrapper).toMatchSnapshot();
+  });
 
+  test('should render component with values', () => {
+    const props = {
+      isOpen: true,
+      result: null,
+      accounts: indexAccountsMock,
+      fromUsername: 'Admin_1177_49507',
+      toUsername: 'User_1177_26292',
+      createDisabled: false,
+      sendEtherOpenModal: jest.fn(),
+      sendEtherCloseModal: jest.fn(),
+      sendEther: jest.fn(),
+      fetchAccounts: jest.fn(),
+      store: store
+    };
+
+    const wrapper = shallow(
+      <SendEther.WrappedComponent {...props} />
+    ).dive().dive().dive();
+
+    expect(wrapper).toMatchSnapshot();
   });
 
   test('should open modal on click', () => {
     const props = {
       isOpen: true,
       result: null,
-      accounts: reducerAccounts,
+      accounts: indexAccountsMock,
       fromUsername: 'Admin_1177_49507',
       toUsername: 'User_1177_26292',
+      createDisabled: false,
       sendEtherOpenModal: jest.fn(),
-      sendEtherCloseModal: () => { },
-      sendEther: () => { },
-      fetchAccounts: () => { }
+      sendEtherCloseModal: jest.fn(),
+      sendEther: jest.fn(),
+      fetchAccounts: jest.fn()
     };
-
-    const store = mockStore({});
 
     const wrapper = mount(
       <Provider store={store}>
@@ -59,26 +85,67 @@ describe('Test SendEther index', () => {
     const props = {
       isOpen: true,
       result: null,
-      accounts: reducerAccounts,
+      accounts: indexAccountsMock,
       fromUsername: 'Admin_1177_49507',
       toUsername: 'User_1177_26292',
+      createDisabled: false,
       sendEtherOpenModal: jest.fn(),
       sendEtherCloseModal: jest.fn(),
-      sendEther: () => { },
-      fetchAccounts: jest.fn()
+      sendEther: jest.fn(),
+      fetchAccounts: jest.fn(),
+      store: store
     };
 
-    const store = mockStore({});
-
-    const wrapper = mount(
-      <Provider store={store}>
-        <SendEther.WrappedComponent {...props} />
-      </Provider>
+    const wrapper = shallow(
+      <SendEther.WrappedComponent {...props} />
     );
 
-    wrapper.find('Dialog').get(0).props.onClose();
+    const dialog = wrapper.dive().dive().dive().find('Dialog');
+    dialog.find('Button').first().simulate('click');
     expect(props.sendEtherCloseModal).toHaveBeenCalled();
     expect(props.fetchAccounts).toHaveBeenCalled();
+  });
+
+  test('should test on submit form', () => {
+    const props = {
+      isOpen: true,
+      result: null,
+      accounts: indexAccountsMock,
+      fromUsername: 'Admin_1177_49507',
+      toUsername: 'User_1177_26292',
+      createDisabled: false,
+      sendEtherOpenModal: jest.fn(),
+      sendEtherCloseModal: jest.fn(),
+      sendEther: jest.fn(),
+      fetchAccounts: jest.fn(),
+      handleSubmit: jest.fn(),
+      reset: jest.fn(),
+      store: store
+    };
+
+    const values = {
+      "from": "tanuj77",
+      "fromAddress": "562a277d3b5ace17d92348c36f412622aaffafdb",
+      "password": "pass",
+      "to": "Buyer1",
+      "toAddress": "044eda43ba9c76fc36b9183c96f7a8fad8d21fe6",
+      "value": 1
+    };
+
+    const wrapper = shallow(
+      <SendEther.WrappedComponent {...props} />
+    );
+
+    const dialog = wrapper.dive().dive().dive().find('Dialog').dive();
+    dialog.find('Field').at(3).simulate('click');
+    dialog.find('Field').at(4).simulate('click');
+    expect(dialog.find('Field').at(3).props().checked).toBeTruthy();
+    expect(dialog.find('Field').at(4).props().checked).toBeFalsy();
+
+    dialog.find('Button').last().simulate('click');
+    expect(props.handleSubmit).toHaveBeenCalled();
+    wrapper.dive().dive().dive().instance().submit(values);
+    expect(props.sendEther).toHaveBeenCalled();
   });
 
   test('test mapStateToProps function', () => {
@@ -88,7 +155,7 @@ describe('Test SendEther index', () => {
         result: 'On success we get result'
       },
       accounts: {
-        accounts: reducerAccounts
+        accounts: indexAccountsMock
       }
     };
 

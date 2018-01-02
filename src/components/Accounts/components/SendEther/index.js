@@ -102,7 +102,6 @@ class SendEther extends Component {
                       className="pt-input"
                       component="select"
                       name="from"
-                      // onChange={this.handleFromUsernameChange}
                       required
                     >
                       <option />
@@ -133,7 +132,7 @@ class SendEther extends Component {
                     >
                       <option />
                       {
-                        fromUserAddresses ?
+                        fromUserAddresses.length ?
                           fromUserAddresses.map((address, i) => {
                             return (
                               <option key={address} value={address}>{address}</option>
@@ -267,7 +266,7 @@ class SendEther extends Component {
                     >
                       <option />
                       {
-                        toUserAddresses ?
+                        toUserAddresses.length ?
                           toUserAddresses.map((address, i) => {
                             return (
                               <option key={address} value={address}>{address}</option>
