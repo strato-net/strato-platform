@@ -3,11 +3,16 @@ import CreateUser, { mapStateToProps, validate } from '../../components/CreateUs
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import { Dialog } from '@blueprintjs/core';
-
-
-const mockStore = configureStore([]);
+import { reducer as formReducer } from 'redux-form'
+import { createStore, combineReducers } from 'redux'
+import ReactDOM from 'react-dom';
 
 describe('Test createUser index', () => {
+  let store
+
+  beforeEach(() => {
+    store = createStore(combineReducers({ form: formReducer }))
+  })
 
   test('should render contracts without values', () => {
     const props = {
@@ -19,7 +24,6 @@ describe('Test createUser index', () => {
       createUser: jest.fn()
     }
 
-    const store = mockStore({});
     const wrapper = render(
       <Provider store={store}>
         <CreateUser.WrappedComponent {...props} />
@@ -39,7 +43,6 @@ describe('Test createUser index', () => {
       createUser: jest.fn()
     }
 
-    const store = mockStore({});
     const wrapper = mount(
       <Provider store={store}>
         <CreateUser.WrappedComponent {...props} />
@@ -61,7 +64,6 @@ describe('Test createUser index', () => {
       createUser: jest.fn()
     }
 
-    const store = mockStore({});
     const wrapper = mount(
       <Provider store={store}>
         <CreateUser.WrappedComponent {...props} />
@@ -70,6 +72,42 @@ describe('Test createUser index', () => {
 
     wrapper.find(Dialog).get(0).props.onClose();
     expect(props.closeOverlay).toHaveBeenCalled();
+  });
+
+  test('should onClose work correctly on button click', () => {
+    const props = {
+      filter: '',
+      contracts: {},
+      errors: {},
+      isOpen: true,
+      openOverlay: jest.fn(),
+      closeOverlay: jest.fn(),
+      createUser: jest.fn(),
+      store: store
+    }
+    const wrapper = shallow(
+      <CreateUser.WrappedComponent {...props} />
+    ).dive().dive().dive();
+    wrapper.find('Button').at(1).simulate('click')
+    expect(props.closeOverlay).toHaveBeenCalled();
+  });
+
+  test('should submit the form', () => {
+    const props = {
+      filter: '',
+      contracts: {},
+      errors: {},
+      isOpen: true,
+      openOverlay: jest.fn(),
+      closeOverlay: jest.fn(),
+      createUser: jest.fn(),
+      store: store
+    }
+    const wrapper = shallow(
+      <CreateUser.WrappedComponent {...props} />
+    ).dive().dive().dive();
+    wrapper.find('Button').at(2).simulate('click')
+    expect(props.createUser).toHaveBeenCalled()
   });
 
   test('should test component functions', () => {
@@ -86,7 +124,6 @@ describe('Test createUser index', () => {
       createUser: jest.fn().mockReturnValue('Create')
     }
 
-    const store = mockStore({});
     const wrapper = shallow(
       <Provider store={store}>
         <CreateUser.WrappedComponent {...props} />

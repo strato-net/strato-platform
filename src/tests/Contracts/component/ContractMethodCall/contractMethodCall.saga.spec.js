@@ -83,8 +83,8 @@ describe('Test contract card saga', () => {
 
   test('should call fetch states', () => {
     fetch.mockResponse(JSON.stringify(methodCallArgs))
-    expectSaga(methodCall, { payload: { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' } })
-      .call.fn(postMethodCall, { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }).put.like({ action: { type: 'METHOD_CALL_SUCCESS' } })
+    expectSaga(methodCall, { payload: { username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d', value:'22.3' } })
+      .call.fn(postMethodCall, { value:'22.0', username: 'abc', userAddress: 'xyz', contractName: 'Greeter', contractAddress: '3771b31420eda628bf03cd5b119249da0fb4aa6d' }).put.like({ action: { type: 'METHOD_CALL_SUCCESS' } })
       .run()
   });
 
