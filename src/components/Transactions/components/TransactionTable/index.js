@@ -33,9 +33,9 @@ class TransactionTable extends Component {
     }
   }
 
-  dispatchSubmit = () => {
-    this.props.dispatch(submit('transaction-query'));
-  }
+  // dispatchSubmit = () => {
+  //   this.props.dispatch(submit('transaction-query'));
+  // }
 
   refresh = () => {
     this.props.clearQuery();
