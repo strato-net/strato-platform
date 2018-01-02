@@ -41,7 +41,6 @@ class ContractMethodCall extends Component {
   }
 
   submit = (values) => {
-
     const payload = {
       contractName: this.props.contractName,
       contractAddress: this.props.contractAddress,
@@ -257,7 +256,7 @@ class ContractMethodCall extends Component {
 
 const selector = formValueSelector('contract-method-call');
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   return {
     modal: state.methodCall.modals
       && state.methodCall.modals[ownProps.lookup] ?

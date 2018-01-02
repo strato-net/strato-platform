@@ -1,5 +1,11 @@
 export const modals = {
-  args: {},
+  args: {
+    _greeting: {
+      dynamic: true,
+      type: "String",
+      index: 0
+    }
+  },
   error: 'ERROR',
   name: 'Greeter',
   address: '8070db2390462e2b5748085bde1350590e08bb17',
