@@ -2,41 +2,43 @@ import React from 'react';
 import TransactionList, { mapStateToProps } from '../../components/TransactionList/index';
 import { transactions, unSubscribeRoomMock, subscribeMock, subscribeRoomMock } from './transactionListMock';
 
-describe('Test TransactionList index', () => {
+describe('TransactionList: index', () => {
 
-  test('should render transactions with empty values', () => {
-    const props = {
-      transactions: [],
-      subscribeRoom: () => { }
-    }
+  describe('render component', () => {
+    test('without value', () => {
+      const props = {
+        transactions: [],
+        subscribeRoom: jest.fn()
+      };
 
-    const wrapper = shallow(
-      <TransactionList.WrappedComponent {...props} />
-    );
+      const wrapper = shallow(
+        <TransactionList.WrappedComponent {...props} />
+      );
 
-    expect(wrapper).toMatchSnapshot();
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        transactions,
+        subscribeRoom: jest.fn(),
+        unSubscribeRoom: jest.fn()
+      };
+
+      const wrapper = shallow(
+        <TransactionList.WrappedComponent {...props} />
+      );
+
+      expect(wrapper).toMatchSnapshot();
+    });
   });
 
-  test('should render transactions with mocked values', () => {
-    const props = {
-      transactions,
-      subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
-    }
-
-    const wrapper = shallow(
-      <TransactionList.WrappedComponent {...props} />
-    );
-
-    expect(wrapper).toMatchSnapshot();
-  });
-
-  test('should redirect to transaction detail page', () => {
+  test('redirect to transaction detail page', () => {
     const props = {
       transactions,
       history: [],
-      subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
+      subscribeRoom: jest.fn(),
+      unSubscribeRoom: jest.fn()
     }
 
     const wrapper = shallow(
@@ -47,29 +49,29 @@ describe('Test TransactionList index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  test('should invoke componentWillUnmount', () => {
+  test('componentWillUnmount', () => {
     const props = {
       transactions,
       history: [],
-      subscribeRoom: () => { },
+      subscribeRoom: jest.fn(),
       unSubscribeRoom: jest.fn()
-    }
+    };
 
     const wrapper = shallow(
       <TransactionList.WrappedComponent {...props} />
     );
 
-    wrapper.instance().componentWillUnmount();
+    wrapper.unmount();
     expect(props.unSubscribeRoom).toHaveBeenCalled();
     expect(props.unSubscribeRoom.mock.calls).toEqual(unSubscribeRoomMock);
   });
 
-  test('should invoke subscribeRoom on componentDidMount', () => {
+  test('componentDidMount', () => {
     const props = {
       transactions,
       history: [],
       subscribeRoom: jest.fn()
-    }
+    };
 
     const wrapper = shallow(
       <TransactionList.WrappedComponent {...props} />
@@ -79,12 +81,12 @@ describe('Test TransactionList index', () => {
     expect(props.subscribeRoom.mock.calls).toEqual(subscribeRoomMock);
   });
 
-  test('should test component functions', () => {
+  test('component functions', () => {
     const props = {
       transactions,
       subscribeRoom: jest.fn().mockReturnValue('subscribeRoom'),
       unSubscribeRoom: jest.fn().mockReturnValue('unSubscribeRoom')
-    }
+    };
 
     const wrapper = shallow(
       <TransactionList.WrappedComponent {...props} />
@@ -94,14 +96,14 @@ describe('Test TransactionList index', () => {
     expect(wrapper.instance().props.unSubscribeRoom()).toBe('unSubscribeRoom');
   });
 
-  test('test mapStateToProps function', () => {
+  test('mapStateToProps', () => {
     const state = {
       transactions: {
         transactions: ''
       }
-    }
+    };
 
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
-})
+});

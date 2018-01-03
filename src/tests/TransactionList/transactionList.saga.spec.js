@@ -17,9 +17,9 @@ import {
 import { expectSaga } from 'redux-saga-test-plan';
 import { transactions, last, error } from './transactionListMock'
 
-describe('Test transactions saga', () => {
+describe('TransactionList: sagas', () => {
 
-  test('should watch transactions', () => {
+  test('watch transactions', () => {
     const gen = watchFetchTx();
     expect(gen.next().value).toEqual(takeEvery(FETCH_TX, fetchTx))
   })
@@ -40,7 +40,7 @@ describe('Test transactions saga', () => {
       expect(gen.next().done).toBe(true);
     });
 
-    test('should call fetch transactions with success', (done) => {
+    test('call fetch transactions with success', (done) => {
       fetch.mockResponse(JSON.stringify(transactions));
 
       expectSaga(fetchTx, action.last)
@@ -48,7 +48,7 @@ describe('Test transactions saga', () => {
         .run().then((result) => { done() });
     });
 
-    test('should call fetch transactions failure', (done) => {
+    test('call fetch transactions failure', (done) => {
       fetch.mockReject(JSON.stringify(transactions))
 
       expectSaga(fetchTx, action.last)
@@ -56,7 +56,7 @@ describe('Test transactions saga', () => {
         .run().then((result) => { done() });
     });
 
-    test('should fail transactions on exception', () => {
+    test('fail transactions on exception', () => {
       expectSaga(fetchTx, action.last)
         .provide({
           call() {

@@ -11,66 +11,68 @@ import {
 } from '../../components/TransactionList/transactionList.actions';
 import { deepClone } from '../helper/testHelper';
 
-describe('Test transaction list reducer', () => {
+describe('TransactionList: reducer', () => {
 
   // INITIAL_STATE
-  test('should set initial state', () => {
+  test('set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  // UPDATE_TX
-  test('should store initial transactions', () => {
-    const action = preloadTx(transactions);
-    const initialState = {
-      tx: [],
-      transactions: [],
-      error: null,
-    }
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+  describe('transactions', () => {
 
-  // PRELOAD_TX
-  test('should store updated transactions', () => {
-    const action = updateTx(updatedTransactions);
-    const initialState = {
-      tx: [],
-      transactions: transactions,
-      error: null,
-    }
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+    // UPDATE_TX
+    test('update', () => {
+      const action = preloadTx(transactions);
+      const initialState = {
+        tx: [],
+        transactions: [],
+        error: null,
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-  // FETCH_TX
-  test('should fetch transactions', () => {
-    const action = fetchTx(last);
-    const initialState = {
-      tx: [],
-      transactions: [],
-      error: null
-    }
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+    // PRELOAD_TX
+    test('load', () => {
+      const action = updateTx(updatedTransactions);
+      const initialState = {
+        tx: [],
+        transactions: transactions,
+        error: null,
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-  // FETCH_TX_SUCCESSFUL
-  test('should store transactions on FETCH_TX', () => {
-    const action = fetchTxSuccess(transactions);
-    const initialState = {
-      tx: [],
-      transactions: [],
-      error: null
-    }
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+    // FETCH_TX
+    test('request', () => {
+      const action = fetchTx(last);
+      const initialState = {
+        tx: [],
+        transactions: [],
+        error: null
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-  // FETCH_TX_FAILED
-  test('should store error on FETCH_TX failure', () => {
-    const action = fetchTxFailure(error);
-    const initialState = {
-      tx: [],
-      transactions: [],
-      error: null
-    }
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+    // FETCH_TX_SUCCESSFUL
+    test('success', () => {
+      const action = fetchTxSuccess(transactions);
+      const initialState = {
+        tx: [],
+        transactions: [],
+        error: null
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-})
+    // FETCH_TX_FAILED
+    test('failure', () => {
+      const action = fetchTxFailure(error);
+      const initialState = {
+        tx: [],
+        transactions: [],
+        error: null
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+  });
+});
