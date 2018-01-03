@@ -2,40 +2,43 @@ import React from 'react';
 import Tour, { Tour as tour, mapStateToProps } from "../../components/Tour/index";
 import { tourSteps } from './tourMock';
 
-describe('Test Tour index', () => {
+describe('Tour: index', () => {
 
-  test('should render with empty values', () => {
-    const props = {};
+  describe('render component', () => {
 
-    const wrapper = shallow(
-      <Tour.WrappedComponent {...props} />
-    );
+    test('without values', () => {
+      const props = {};
 
-    expect(wrapper).toMatchSnapshot();
+      const wrapper = shallow(
+        <Tour.WrappedComponent {...props} />
+      );
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        name: 'dashboard',
+        callback: () => { },
+        run: true,
+        steps: tourSteps,
+        autostart: true,
+        endtour: () => { },
+        stopAllToursFromAutostarting: () => { },
+        finalStepSelector: '#accounts',
+        nextPage: 'accounts',
+        history: {}
+      };
+
+      const wrapper = shallow(
+        <Tour.WrappedComponent {...props} />
+      ).dive();
+
+      expect(wrapper).toMatchSnapshot();
+    });
   });
 
-  test('should render with mocked values', () => {
-    const props = {
-      name: 'dashboard',
-      callback: () => { },
-      run: true,
-      steps: tourSteps,
-      autostart: true,
-      endtour: () => { },
-      stopAllToursFromAutostarting: () => { },
-      finalStepSelector: '#accounts',
-      nextPage: 'accounts',
-      history: {}
-    };
-
-    const wrapper = shallow(
-      <Tour.WrappedComponent {...props} />
-    ).dive();
-
-    expect(wrapper).toMatchSnapshot();
-  });
-
-  test('test mapStateToProps function', () => {
+  test('mapStateToProps', () => {
     const state = {
       tour:
         {

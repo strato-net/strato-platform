@@ -5,21 +5,21 @@ import {
   stopTourAutostart
 } from '../../components/Tour/tour.actions';
 
-describe('Test Tour actions', () => {
+describe('Tour: actions', () => {
 
-  test('should load end tour', () => {
+  test('end tour', () => {
     expect(endTour('dashboard')).toMatchSnapshot();
   });
 
-  test('should end all tours', () => {
+  test('end all tours', () => {
     expect(endAllTours()).toMatchSnapshot();
   });
 
-  test('should stop all tours from autostarting', () => {
+  test('stop all tours from autostarting', () => {
     expect(stopAllToursFromAutostarting()).toMatchSnapshot();
   });
 
-  test('should stop auto tour start', () => {
+  test('stop auto tour start', () => {
     expect(stopTourAutostart('dashboard')).toMatchSnapshot();
   });
 
