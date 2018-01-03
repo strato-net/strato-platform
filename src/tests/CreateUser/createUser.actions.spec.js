@@ -7,26 +7,30 @@ import {
 } from '../../components/CreateUser/createUser.actions';
 import { formData, mockResponse, error } from './createUserMock';
 
-describe('Test createUser actions', () => {
+describe('CreateUser: action', () => {
 
-  test('should create an action to open overlay', () => {
+  test('open overlay', () => {
     expect(openOverlay()).toMatchSnapshot();
   });
 
-  test('should create an action to close overlay', () => {
+  test('close overlay', () => {
     expect(closeOverlay()).toMatchSnapshot();
   });
 
-  test('should create an action to create user', () => {
-    expect(createUser(formData.username, formData.password)).toMatchSnapshot();
-  });
+  describe('create user', () => {
 
-  test('should return error after createUser response', () => {
-    expect(createUserSuccess(mockResponse)).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(createUser(formData.username, formData.password)).toMatchSnapshot();
+    });
 
-  test('should return error after createUser failure', () => {
-    expect(createUserFailure(error)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(createUserSuccess(mockResponse)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(createUserFailure(error)).toMatchSnapshot();
+    });
+
+  })
 
 });

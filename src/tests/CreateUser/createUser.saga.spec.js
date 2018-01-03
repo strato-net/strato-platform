@@ -18,9 +18,9 @@ import { expectSaga } from 'redux-saga-test-plan';
 import { fetchAccounts } from '../../components/Accounts/accounts.actions';
 import { formData, mockResponse, error } from './createUserMock';
 
-describe('Test createUser saga', () => {
+describe('CreateUser: saga', () => {
 
-  test('should watch create user', () => {
+  test('watch create user', () => {
     const gen = watchFetchContracts();
     expect(gen.next().value).toEqual(takeLatest(CREATE_USER_REQUEST, createUser));
     expect(gen.next().done).toBe(true);
@@ -30,7 +30,6 @@ describe('Test createUser saga', () => {
 
     test('inspection', () => {
       const gen = createUser({ type: CREATE_USER_REQUEST, ...formData });
-
       expect(gen.next().value).toEqual(call(createUserApiCall, formData.username, formData.password));
       expect(gen.next(mockResponse).value).toEqual(put(createUserSuccess(mockResponse)));
       expect(gen.next().value).toEqual(put(fetchAccounts(true, true)));
@@ -38,21 +37,23 @@ describe('Test createUser saga', () => {
       expect(gen.next().done).toBe(true);
     })
 
-    test('should call create user with success', (done) => {
-      fetch.mockResponse(JSON.stringify(mockResponse));
+    describe('create user', ()=> {
 
-      expectSaga(createUser, formData)
-        .call.fn(createUserApiCall).put.like({ action: { type: CREATE_USER_SUCCESS } })
-        .run().then((result) => { done() });
-    });
+      test('success', (done) => {
+        fetch.mockResponse(JSON.stringify(mockResponse));
+        expectSaga(createUser, formData)
+          .call.fn(createUserApiCall).put.like({ action: { type: CREATE_USER_SUCCESS } })
+          .run().then((result) => { done() });
+      });
+  
+      test('failure', (done) => {
+        fetch.mockReject(JSON.stringify(error));
+        expectSaga(createUser, formData)
+          .call.fn(createUserApiCall).put.like({ action: { type: CREATE_USER_FAILURE } })
+          .run().then((result) => { done() });
+      });
 
-    test('should call create user with failure', (done) => {
-      fetch.mockReject(JSON.stringify(error));
-
-      expectSaga(createUser, formData)
-        .call.fn(createUserApiCall).put.like({ action: { type: CREATE_USER_FAILURE } })
-        .run().then((result) => { done() });
-    });
+    })
 
   });
 
