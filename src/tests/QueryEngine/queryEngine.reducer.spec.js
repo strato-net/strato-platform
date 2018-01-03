@@ -3,10 +3,10 @@ import { updateQuery, clearQuery, removeQuery, executeQueryFailure, executeQuery
 import { blocksMock, error } from './queryEngineMock';
 import { TRANSACTION_QUERY_TYPES } from '../../components/QueryEngine/queryTypes';
 
-describe('Test queryEngine reducer', () => {
+describe('QueryEngine: reducer', () => {
 
-  let payload
-  let initialState
+  let payload;
+  let initialState;
 
   beforeEach(() => {
     payload = {
@@ -21,67 +21,71 @@ describe('Test queryEngine reducer', () => {
       queryResult: [],
       error: null,
     };
-  })
+  });
 
   // INITIAL_STATE
-  test('should set initial state', () => {
+  test('set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  // UPDATE_QUERY with default values
-  test('should update query store with default values', () => {
-    const action = updateQuery(TRANSACTION_QUERY_TYPES.default.key, payload.queryTerm);
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  });
+  describe('QUERY', () => {
 
-  // UPDATE_QUERY
-  test('should update query store', () => {
-    const action = updateQuery(payload.queryType, payload.queryTerm);
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  });
+    // UPDATE_QUERY with default values
+    test('update with default values', () => {
+      const action = updateQuery(TRANSACTION_QUERY_TYPES.default.key, payload.queryTerm);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
 
-  // EXECUTE_QUERY_SUCCESS
-  test('should update query after execute query success', () => {
-    const action = executeQuerySuccess(blocksMock);
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  });
+    // UPDATE_QUERY
+    test('update', () => {
+      const action = updateQuery(payload.queryType, payload.queryTerm);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
 
-  // EXECUTE_QUERY_FAILURE
-  test('should update query after execute query success', () => {
-    const action = executeQueryFailure(error);
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  });
+    // EXECUTE_QUERY_SUCCESS
+    test('success', () => {
+      const action = executeQuerySuccess(blocksMock);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
 
-  // CLEAR_QUERY
-  test('should clear query', () => {
-    const action = clearQuery();
+    // EXECUTE_QUERY_FAILURE
+    test('failure', () => {
+      const action = executeQueryFailure(error);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
 
-    const initState = {
-      query: {
-        gaslim: 144,
-        last: 15
-      },
-      queryResult: [],
-      error: null,
-    };
+    // CLEAR_QUERY
+    test('clear', () => {
+      const action = clearQuery();
 
-    expect(reducer(initState, action)).toMatchSnapshot();
-  });
+      const initState = {
+        query: {
+          gaslim: 144,
+          last: 15
+        },
+        queryResult: [],
+        error: null,
+      };
 
-  // REMOVE_QUERY
-  test('should remove query', () => {
-    const action = removeQuery(payload.queryType);
+      expect(reducer(initState, action)).toMatchSnapshot();
+    });
 
-    const initState = {
-      query: {
-        gaslim: 144,
-        last: 15
-      },
-      queryResult: [],
-      error: null,
-    };
+    // REMOVE_QUERY
+    test('remove', () => {
+      const action = removeQuery(payload.queryType);
 
-    expect(reducer(initState, action)).toMatchSnapshot();
+      const initState = {
+        query: {
+          gaslim: 144,
+          last: 15
+        },
+        queryResult: [],
+        error: null,
+      };
+
+      expect(reducer(initState, action)).toMatchSnapshot();
+    });
+
   });
 
 });

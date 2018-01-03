@@ -4,17 +4,17 @@ import {
   RESOURCE_TYPES
 } from '../../components/QueryEngine/queryTypes';
 
-describe('Query Types', () => {
+describe('QueryTypes', () => {
 
-  test('should have transaction query types', () => {
+  test('transaction query types', () => {
     expect(TRANSACTION_QUERY_TYPES).toMatchSnapshot();
   });
 
-  test('should have block query types', () => {
+  test('block query types', () => {
     expect(BLOCK_QUERY_TYPES).toMatchSnapshot();
   });
 
-  test('should have resource types', () => {
+  test('resource types', () => {
     expect(RESOURCE_TYPES).toMatchSnapshot();
   });
 

@@ -17,9 +17,9 @@ import {
 } from '../../components/QueryEngine/queryEngine.actions';
 import { transactionsMock, error, blocksMock } from './queryEngineMock';
 
-describe('Test QueryEngine saga', () => {
+describe('QueryEngine: saga', () => {
 
-  test('should watch execute query', () => {
+  test('watch execute query', () => {
     const gen = watchExecuteQuery();
     expect(gen.next().value).toEqual(takeEvery(EXECUTE_QUERY_REQUEST, executeQuery));
     expect(gen.next().done).toBe(true);
@@ -42,7 +42,7 @@ describe('Test QueryEngine saga', () => {
       expect(gen.next().done).toBe(true);
     });
 
-    test('should call query with success', (done) => {
+    test('call query with success', (done) => {
       fetch.mockResponse(JSON.stringify(transactionsMock));
 
       expectSaga(executeQuery, action)
@@ -50,7 +50,7 @@ describe('Test QueryEngine saga', () => {
         .run().then((result) => { done() });
     });
 
-    test('should call query with failure', (done) => {
+    test('call query with failure', (done) => {
       fetch.mockReject(JSON.stringify(error));
 
       expectSaga(executeQuery, action)
@@ -77,7 +77,7 @@ describe('Test QueryEngine saga', () => {
       expect(gen.next().done).toBe(true);
     });
 
-    test('should call query with success', (done) => {
+    test('call query with success', (done) => {
       fetch.mockResponse(JSON.stringify(blocksMock));
 
       expectSaga(executeQuery, action)
