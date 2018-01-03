@@ -2,33 +2,35 @@ import React from 'react';
 import PeersCard, { mapStateToProps } from '../../components/PeersCard';
 import { nodeWithPeers } from '../Dashboard/dashboardMock';
 
-describe('Test PeerCard index', () => {
+describe('PeersCard: index', () => {
 
-  test('should render with empty values', () => {
-    const props = {
-      node: {}
-    };
+  describe('render component', () => {
+    test('without values', () => {
+      const props = {
+        node: {}
+      };
 
-    const wrapper = shallow(
-      <PeersCard.WrappedComponent {...props} />
-    );
+      const wrapper = shallow(
+        <PeersCard.WrappedComponent {...props} />
+      );
 
-    expect(wrapper).toMatchSnapshot();
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        node: nodeWithPeers
+      };
+
+      const wrapper = shallow(
+        <PeersCard.WrappedComponent {...props} />
+      );
+
+      expect(wrapper).toMatchSnapshot();
+    });
   });
 
-  test('should render with mocked values', () => {
-    const props = {
-      node: nodeWithPeers
-    };
-
-    const wrapper = shallow(
-      <PeersCard.WrappedComponent {...props} />
-    );
-
-    expect(wrapper).toMatchSnapshot();
-  });
-
-  test('test mapStateToProps function', () => {
+  test('mapStateToProps', () => {
     const state = {
       node: nodeWithPeers
     };
