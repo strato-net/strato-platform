@@ -5,7 +5,7 @@ import { reducer as formReducer } from 'redux-form';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 
-describe('Test MenuCard index', () => {
+describe('MenuBar: index', () => {
   let wrapper;
 
   beforeEach(() => {
@@ -19,22 +19,24 @@ describe('Test MenuCard index', () => {
     ).dive().dive().dive();
   })
 
-  test('should renders correctly', () => {
+
+  test('render component', () => {
     expect(wrapper.debug()).toMatchSnapshot();
   });
 
-  test('should execute block api link', () => {
-    wrapper.find('button').first().simulate('click');
-    expect(wrapper.find('button').get(0)).toMatchSnapshot();
+  describe('button', () => {
+    test('execute block api', () => {
+      wrapper.find('button').first().simulate('click');
+      expect(wrapper.find('button').get(0)).toMatchSnapshot();
+    });
+
+    test('execute stato api', () => {
+      wrapper.find('button').last().simulate('click');
+      expect(wrapper.find('button').get(1)).toMatchSnapshot();
+    });
   });
 
-  test('should execute stato api link', () => {
-    wrapper.find('button').last().simulate('click');
-    expect(wrapper.find('button').get(1)).toMatchSnapshot();
-  });
-
-  test('should test mapStateToProps', () => {
+  test('mapStateToProps', () => {
     expect(mapStateToProps({})).toMatchSnapshot();
   });
-
 });
