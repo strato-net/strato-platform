@@ -354,7 +354,7 @@ functionModifiers = do
   return $ formatVals vals
   where
     formatVals vals = 
-      let returns = catMaybes [(listToMaybe v) | ReturnsMod v <- vals]
+      let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutable = fromMaybe True $ listToMaybe [v | MutableMod v <- vals]
           payable = fromMaybe True $ listToMaybe [v | PayableMod v <- vals]

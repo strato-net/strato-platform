@@ -23,8 +23,54 @@ spec = do
                       Nothing
                       Nothing
                       Nothing
-      putStrLn $ unparseFunc ("test", func)
-      pending
+      let ret = unparseFunc ("test", func)
+          expected = "function test() returns (int, uint) { }"
+      ret `shouldBe` expected
+    it "should unparse a function that returns a pair 'returns (ErrorCodes, uint)'" $ do
+      let func = Func Map.empty
+                      (Map.fromList [("#0", errorIndexedType), ("#1", uintIndexedType)])
+                      (Just "")
+                      Nothing
+                      Nothing
+                      Nothing
+                      Nothing
+      let ret = unparseFunc ("test2", func)
+          expected = "function test2() returns (ErrorCodes, uint) { }"
+      ret `shouldBe` expected
+    it "should unparse a function that returns a pair 'returns (ErrorCodes, ProjectState)'" $ do
+      let func = Func Map.empty
+                      (Map.fromList [("#0", errorIndexedType), ("#1", stateIndexedType)])
+                      (Just "")
+                      Nothing
+                      Nothing
+                      Nothing
+                      Nothing
+      let ret = unparseFunc ("fsm", func)
+          expected = "function fsm() returns (ErrorCodes, ProjectState) { }"
+      ret `shouldBe` expected
+
+
+
+expectedFunc :: String
+expectedFunc = unlines
+    [ "function fsm(ProjectState state, ProjectEvent projectEvent) returns (ErrorCodes, ProjectState) { }"
+    , "  if (state == ProjectState.NULL)"
+    , "   return (ErrorCodes.ERROR, state);"
+    , " if (state == ProjectState.OPEN) {"
+    , "   if (projectEvent == ProjectEvent.ACCEPT)"
+    , "     return (ErrorCodes.SUCCESS, ProjectState.PRODUCTION);"
+    , "  }"
+    , "  if (state == ProjectState.PRODUCTION) {"
+    , "    if (projectEvent == ProjectEvent.DELIVER)"
+    , "      return (ErrorCodes.SUCCESS, ProjectState.INTRANSIT);"
+    , "  }"
+    , "  if (state == ProjectState.INTRANSIT) {"
+    , "    if (projectEvent == ProjectEvent.RECEIVE)"
+    , "      return (ErrorCodes.SUCCESS, ProjectState.RECEIVED);"
+    , "  }"
+    , "  return (ErrorCodes.ERROR, state);"
+    , "}"
+    ]
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
@@ -35,3 +81,27 @@ intIndexedType = IndexedType 0 (Int (Just True) Nothing)
 
 uintIndexedType :: IndexedType
 uintIndexedType = IndexedType 0 (Int Nothing Nothing)
+
+errorIndexedType :: IndexedType
+errorIndexedType = IndexedType 0 (Enum
+                                   (Just 8)
+                                   "ErrorCodes"
+                                   (Just [ "NULL"
+                                         , "SUCCESS"
+                                         , "ERROR"
+                                         , "NOT_FOUND"
+                                         , "EXISTS"
+                                         , "RECURSIVE"
+                                         , "INSUFFICIENT_BALANCE"
+                                         ]))
+
+stateIndexedType :: IndexedType
+stateIndexedType = IndexedType 0 (Enum
+                                   (Just 8)
+                                   "ProjectState"
+                                   (Just [ "NULL"
+                                         , "OPEN"
+                                         , "PRODUCTION"
+                                         , "INTRANSIT"
+                                         , "RECEIVED"
+                                         ]))

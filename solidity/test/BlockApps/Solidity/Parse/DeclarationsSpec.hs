@@ -7,6 +7,7 @@ import           Text.Parsec                          hiding (parse)
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Parse.Declarations
+import BlockApps.Solidity.Xabi.Type
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
 {-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
@@ -91,6 +92,12 @@ spec = do
       mutable `shouldBe` False
       payable `shouldBe` True
       modifiers `shouldBe` ["Base(string a)", "onlyOwner"]
+    it "should parse function that returns two values" $ do
+      let eRes = showError $ runParser functionModifiers "" "" "returns (ErrorCodes, ProjectState) {}"
+      printLeft eRes
+      let Right (rets, _, _, _, _) = eRes
+          expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
+      rets `shouldBe` expected
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg

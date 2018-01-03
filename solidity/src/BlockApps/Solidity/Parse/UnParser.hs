@@ -53,7 +53,9 @@ unparseVar (name, theType) =
 unparseVarType :: Type -> String
 unparseVarType (Int (Just True) _) = "int"
 unparseVarType (Int (Just False) _) = "uint"
+unparseVarType (Int Nothing _) = "uint"
 unparseVarType (String _) = "string"
+unparseVarType Bool    = "bool"
 unparseVarType Address = "address"
 unparseVarType (Label str) = str
 unparseVarType (Bytes _ (Just n)) = "bytes" <> (show n)
@@ -64,26 +66,27 @@ unparseVarType (Mapping _ key val) = "mapping (" <> (unparseVarType key) <> " =>
 unparseVarType _ = "int"
 
 unparseFunc :: (Text, Func) -> String
-unparseFunc (name, Func{..}) = Text.unpack $
-     "function "
-  <> name
-  <> "("
-  <> intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
-  <> ") "
-  <> case funcMutable of
-       Just False -> "constant "
-       _ -> ""
-  <> case Map.toList funcVals of
-       [] -> ""
-       vals ->
-            "returns ("
-         <> intercalate ", " (List.map unparseVals vals)
-         <> ") "
-  <> "{ "
-  <> case funcContents of
-       Just contents -> (Text.concat . Text.lines $ contents)
-       Nothing -> ""
-  <> "}"
+unparseFunc (name, Func{..}) =
+  Text.unpack $
+    "function "
+    <> name
+    <> "("
+    <> intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
+    <> ") "
+    <> case funcMutable of
+        Just False -> "constant "
+        _ -> ""
+    <> case Map.toList funcVals of
+        [] -> ""
+        vals ->
+              "returns ("
+          <> intercalate ", " (List.map unparseVals vals)
+          <> ") "
+    <> "{ "
+    <> case funcContents of
+        Just contents -> (Text.concat . Text.lines $ contents)
+        Nothing -> ""
+    <> "}"
 
 unparseModifier :: (Text, Modifier) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
@@ -116,6 +119,7 @@ unparseIndexedType :: IndexedType -> Text
 -- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
 unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
 unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
+unparseIndexedType IndexedType{indexedTypeType = Int Nothing _} = "uint"
 unparseIndexedType IndexedType{indexedTypeType = Bool} = "bool"
 unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
 unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
@@ -123,6 +127,7 @@ unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
 unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
   "bytes" <> (pack . show $ bytes)
 unparseIndexedType IndexedType{indexedTypeType = Label str} = pack str
+unparseIndexedType IndexedType{indexedTypeType = Enum _ name _} = name
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
 addFunction :: (Text, String) -> Xabi -> Xabi
