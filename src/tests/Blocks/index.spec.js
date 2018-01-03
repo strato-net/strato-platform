@@ -1,13 +1,12 @@
 import React from 'react';
 import Blocks from '../../components/Blocks/index';
 
-describe('Test Blocks index', () => {
+describe('Blocks: index', () => {
 
-  test('should render component properly', () => {
+  test('render stateless component', () => {
     const wrapper = shallow(
       <Blocks />
     );
-
     expect(wrapper).toMatchSnapshot();
   });
 

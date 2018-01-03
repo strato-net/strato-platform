@@ -7,92 +7,65 @@ import { Provider } from 'react-redux';
 import { createStore, combineReducers } from 'redux';
 import { reducer as formReducer } from 'redux-form';
 
-describe('Test Blocks index', () => {
+describe('BlockTable: index', () => {
 
   let store;
+  let mockFunction;
 
   beforeEach(() => {
-    store = createStore(combineReducers({ form: formReducer }))
-  })
-
-  test('should render component with mocked values', () => {
-    const props = {
-      history: {},
-      query: { last: 15 },
-      queryResult: blocksMock,
+    store = createStore(combineReducers({ form: formReducer }));
+    mockFunction = {
       fetchBlockData: jest.fn(),
       executeQuery: jest.fn(),
       clearQuery: jest.fn(),
       updateQuery: jest.fn(),
       dispatch: jest.fn(),
       removeQuery: jest.fn(),
-      store: store
-    }
-
-    const wrapper = shallow(
-      <BlockTable.WrappedComponent {...props} />
-    ).dive().dive().dive();
-
-    expect(wrapper).toMatchSnapshot();
+    };
   });
 
-  test('should render component without mock', () => {
-    const props = {
-      history: {},
-      query: {},
-      queryResult: [],
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
-      store: store
-    }
+  describe('render component', () => {
 
-    const wrapper = shallow(
-      <BlockTable.WrappedComponent {...props} />
-    ).dive().dive().dive();
+    test('with values', () => {
+      const props = {
+        history: {},
+        query: { last: 15 },
+        queryResult: blocksMock,
+        store: store,
+        ...mockFunction
+      }
 
-    expect(wrapper).toMatchSnapshot();
-  });
-
-  test('should render component with componentDidMount', () => {
-    const props = {
-      history: {},
-      query: { last: 15 },
-      queryResult: blocksMock,
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
-    }
-
-    const wrapper = mount(
-      <Provider store={store}>
+      const wrapper = shallow(
         <BlockTable.WrappedComponent {...props} />
-      </Provider>
-    );
+      ).dive().dive().dive();
 
-    expect(props.fetchBlockData).toHaveBeenCalled();
-    expect(props.fetchBlockData.mock.calls.length).toBe(1);
-    expect(props.executeQuery).toHaveBeenCalled();
-    expect(props.executeQuery.mock.calls.length).toBe(1);
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('without values', () => {
+      const props = {
+        history: {},
+        query: {},
+        queryResult: [],
+        store: store,
+        ...mockFunction
+      }
+
+      const wrapper = shallow(
+        <BlockTable.WrappedComponent {...props} />
+      ).dive().dive().dive();
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
   });
 
-  test('should remove query on click', () => {
+  test('remove query on cancel', () => {
     const props = {
       history: {},
       query: { last: 15 },
       queryResult: blocksMock,
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
+      ...mockFunction
     }
 
     const wrapper = mount(
@@ -106,17 +79,12 @@ describe('Test Blocks index', () => {
     expect(props.removeQuery.mock.calls.length).toBe(1);
   });
 
-  test('should refresh on button click', () => {
+  test('refresh blocks', () => {
     const props = {
       history: {},
       query: { last: 15 },
       queryResult: blocksMock,
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
+      ...mockFunction
     }
 
     const wrapper = mount(
@@ -132,19 +100,14 @@ describe('Test Blocks index', () => {
     expect(props.executeQuery.mock.calls.length).toBe(2);
   });
 
-  test('should view block detail on click', () => {
+  test('view block detail on click', () => {
     const props = {
       history: {
         push: jest.fn()
       },
       query: { last: 15 },
       queryResult: blocksMock,
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
+      ...mockFunction
     }
 
     const wrapper = mount(
@@ -159,18 +122,33 @@ describe('Test Blocks index', () => {
     expect(props.history.push.mock.calls).toEqual([["/blocks/206"]]);
   });
 
-  test('should invoke componentWillUnmount', () => {
+  test('componentDidMount', () => {
     const props = {
       history: {},
       query: { last: 15 },
       queryResult: blocksMock,
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
-      store: store
+      ...mockFunction
+    }
+
+    const wrapper = mount(
+      <Provider store={store}>
+        <BlockTable.WrappedComponent {...props} />
+      </Provider>
+    );
+
+    expect(props.fetchBlockData).toHaveBeenCalled();
+    expect(props.fetchBlockData.mock.calls.length).toBe(1);
+    expect(props.executeQuery).toHaveBeenCalled();
+    expect(props.executeQuery.mock.calls.length).toBe(1);
+  });
+
+  test('componentWillUnmount', () => {
+    const props = {
+      history: {},
+      query: { last: 15 },
+      queryResult: blocksMock,
+      store: store,
+      ...mockFunction
     }
 
     const wrapper = shallow(
@@ -182,18 +160,13 @@ describe('Test Blocks index', () => {
     expect(props.clearQuery.mock.calls.length).toBe(1);
   });
 
-  test('should invoke componentWillReceiveProps', () => {
+  test('componentWillReceiveProps', () => {
     const props = {
       history: {},
       query: { last: 15 },
       queryResult: blocksMock,
-      fetchBlockData: jest.fn(),
-      executeQuery: jest.fn(),
-      clearQuery: jest.fn(),
-      updateQuery: jest.fn(),
-      dispatch: jest.fn(),
-      removeQuery: jest.fn(),
-      store: store
+      store: store,
+      ...mockFunction
     }
 
     const newProps = {
@@ -210,7 +183,7 @@ describe('Test Blocks index', () => {
     expect(newProps.executeQuery.mock.calls.length).toBe(1);
   });
 
-  test('should test mapStateToProps function properly', () => {
+  test('mapStateToProps', () => {
     const state = {
       queryEngine: {
         query: { last: 15 },

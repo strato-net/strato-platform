@@ -2,7 +2,6 @@ import React, {Component} from 'react';
 import BlockTable from './components/BlockTable';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
-
 class Blocks extends Component {
   componentDidMount() {
     mixpanelWrapper.track('blocks_loaded');
