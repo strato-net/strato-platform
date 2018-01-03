@@ -17,15 +17,15 @@ import {
 import { blocksMock, error } from './blockDataMock';
 import { expectSaga } from 'redux-saga-test-plan';
 
-describe('Test BlockData saga', () => {
+describe('BlockData: sagas', () => {
 
-  test('should watch applications', () => {
+  test('watch applications', () => {
     const gen = watchFetchBlockData();
     expect(gen.next().value).toEqual(takeEvery(FETCH_BLOCK_DATA, fetchBlockData))
     expect(gen.next().done).toBe(true);
   });
 
-  describe('fetchBlockData generator', () => {
+  describe('fetchBlockData generator:', () => {
 
     const action = {
       type: FETCH_BLOCK_DATA
@@ -40,7 +40,7 @@ describe('Test BlockData saga', () => {
       expect(gen.next().done).toBe(true);
     });
 
-    test('should get block data with success', (done) => {
+    test('get block data on success', (done) => {
       fetch.mockResponse(JSON.stringify(blocksMock));
 
       expectSaga(fetchBlockData, action)
@@ -48,7 +48,7 @@ describe('Test BlockData saga', () => {
         .run().then((result) => { done() });
     });
 
-    test('should get block data with failure', (done) => {
+    test('get error on failure', (done) => {
       fetch.mockReject(JSON.stringify(error));
 
       expectSaga(fetchBlockData, action)

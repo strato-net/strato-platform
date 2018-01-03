@@ -4,47 +4,51 @@ import {
 } from '../../components/BlockData/block-data.actions';
 import { blocksMock, error } from './blockDataMock';
 
-describe('Test applications reducer', () => {
+describe('BlockData: reducer', () => {
 
   // INITIAL_STATE
-  test('should set initial state', () => {
+  test('set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  // FETCH_BLOCK_DATA
-  test('should fetch block data', () => {
-    const action = fetchBlockData();
+  describe('FETCH_BLOCK_DATA:', () => {
 
-    const initialState = {
-      blockData: [],
-      error: null,
-    }
+    // FETCH_BLOCK_DATA
+    test('on request', () => {
+      const action = fetchBlockData();
 
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  });
+      const initialState = {
+        blockData: [],
+        error: null,
+      };
 
-  // FETCH_BLOCK_DATA_SUCCESSFUL
-  test('should fetch block data', () => {
-    const action = fetchBlockDataSuccess(blocksMock);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
 
-    const initialState = {
-      blockData: [],
-      error: null,
-    }
+    // FETCH_BLOCK_DATA_SUCCESSFUL
+    test('on success', () => {
+      const action = fetchBlockDataSuccess(blocksMock);
 
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  });
+      const initialState = {
+        blockData: [],
+        error: null,
+      };
 
-  // FETCH_BLOCK_DATA_FAILED
-  test('should fetch block data with error', () => {
-    const action = fetchBlockDataFailure(error);
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
 
-    const initialState = {
-      blockData: [],
-      error: null,
-    }
+    // FETCH_BLOCK_DATA_FAILED
+    test('on failure', () => {
+      const action = fetchBlockDataFailure(error);
 
-    expect(reducer(initialState, action)).toMatchSnapshot();
+      const initialState = {
+        blockData: [],
+        error: null,
+      };
+
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
   });
 
 });
