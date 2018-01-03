@@ -1,21 +1,25 @@
 import { handleApiError } from '../../lib/apiErrorHandler';
 
-test('should handleApiError error', () => {
-  const response = {
-    error: 'error'
-  }
+describe('Lib: apiErrorHandler', () => {
 
-  handleApiError(response).then((result) => {
-    expect(result).toMatchSnapshot();
-  })
-});
+  test('with error', () => {
+    const response = {
+      error: 'error'
+    };
 
-test('should handleApiError error', () => {
-  const response = {
-    data: 'Here is response data'
-  }
-
-  handleApiError(response).then((result) => {
-    expect(result).toMatchSnapshot();
+    handleApiError(response).then((result) => {
+      expect(result).toMatchSnapshot();
+    });
   });
+
+  test('with response', () => {
+    const response = {
+      data: 'Here is response data'
+    };
+
+    handleApiError(response).then((result) => {
+      expect(result).toMatchSnapshot();
+    });
+  });
+
 });

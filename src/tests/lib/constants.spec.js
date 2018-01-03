@@ -1,5 +1,9 @@
 import constants from "../../lib/constants";
 
-test('should renders correctly', () => {
-  expect(constants).toMatchSnapshot();
+describe('Lib: constants', () => {
+
+  test('have proper structure', () => {
+    expect(constants).toMatchSnapshot();
+  });
+
 });

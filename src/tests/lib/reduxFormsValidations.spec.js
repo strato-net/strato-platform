@@ -1,13 +1,17 @@
 import { required } from '../../lib/reduxFormsValidations';
 
-describe('Form vaidation', () => {
+describe('Lib: reduxFormsValidations', () => {
 
-  test('should return required when form field is empty', () => {
-    expect(required(undefined)).toMatchSnapshot();
-  });
+  describe('returns', () => {
 
-  test('should return undefined when form field contain value', () => {
-    expect(required('value')).toMatchSnapshot();
+    test('required field', () => {
+      expect(required(undefined)).toMatchSnapshot();
+    });
+
+    test('undefined', () => {
+      expect(required('value')).toMatchSnapshot();
+    });
+
   });
 
 });
