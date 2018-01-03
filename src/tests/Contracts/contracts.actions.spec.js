@@ -6,22 +6,26 @@ import {
 } from '../../components/Contracts/contracts.actions';
 import { contracts, filter, error } from './contractsMock';
 
-describe('Test contracts actions', () => {
+describe('Contracts: action', () => {
 
-  test('should create an action to fetch contracts', () => {
-    expect(fetchContracts()).toMatchSnapshot();
-  });
-
-  test('should return contracts after successfull response', () => {
-    expect(fetchContractsSuccess(contracts)).toMatchSnapshot();
-  });
-
-  test('should return error after failure response', () => {
-    expect(fetchContractsFailure(error)).toMatchSnapshot();
-  });
-
-  test('should change contract filter', () => {
+  test('change contract filter', () => {
     expect(changeContractFilter(filter)).toMatchSnapshot();
   });
+
+  describe('fetch contracts', () => {
+
+    test('request', () => {
+      expect(fetchContracts()).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      expect(fetchContractsSuccess(contracts)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(fetchContractsFailure(error)).toMatchSnapshot();
+    });
+
+  })
 
 });

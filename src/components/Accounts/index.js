@@ -47,7 +47,6 @@ class Accounts extends Component {
     const rows = [];
 
     function handleClick(user, address) {
-      console.log("aksjdhkasdhksadjksa");
       mixpanelWrapper.track('accounts_row_click');
       history.push('/accounts/' + user + '/' + address);
     }

@@ -9,33 +9,37 @@ import {
 } from '../../components/LaunchPad/launchPad.actions';
 import { appError, appUploadError, uploadData } from './launchpadMock';
 
-describe('Test launchpad actions', () => {
+describe('launchpad: action', () => {
 
-  test('should create an action to reset app', () => {
+  test('reset app', () => {
     expect(appReset()).toMatchSnapshot();
   });
 
-  test('should start loading app', () => {
+  test('start loading app', () => {
     expect(loadLaunchPad()).toMatchSnapshot();
   });
 
-  test('should change user name', () => {
+  test('change user name', () => {
     expect(usernameChange()).toMatchSnapshot();
   });
 
-  test('should request to upload the app', () => {
-    expect(appUploadRequest(uploadData)).toMatchSnapshot();
-  });
+  describe('upload app', () => {
 
-  test('should call on app upload success', () => {
-    expect(appUploadSuccess()).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(appUploadRequest(uploadData)).toMatchSnapshot();
+    });
 
-  test('should call on app upload failure', () => {
-    expect(appUploadFailure(appUploadError)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(appUploadSuccess()).toMatchSnapshot();
+    });
 
-  test('should set error on app set', () => {
+    test('failure', () => {
+      expect(appUploadFailure(appUploadError)).toMatchSnapshot();
+    });
+
+  })
+
+  test('set error on app set', () => {
     expect(appSetError(appError)).toMatchSnapshot();
   });
 

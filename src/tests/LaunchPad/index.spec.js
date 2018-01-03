@@ -8,7 +8,7 @@ import { Router, Switch, Redirect, Link, MemoryRouter } from 'react-router-dom'
 import { accountsMock, indexAccountsMock } from '../Accounts/accountsMock'
 import { uploadData } from './launchpadMock'
 
-describe("Test Launchpad", () => {
+describe("Launchpad: index", () => {
 
   let store
   let files
@@ -30,7 +30,7 @@ describe("Test Launchpad", () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('should test component', () => {
+  test('render component with initial', () => {
     const props = {
       history: { push: '/apps' },
       accounts: {},
@@ -49,15 +49,13 @@ describe("Test Launchpad", () => {
       appReset: jest.fn(),
       store: store
     }
-
     const wrapper = shallow(
       <LaunchPad.WrappedComponent {...props} />
     ).dive().dive().dive();
-
     expect(wrapper).toMatchSnapshot();
   });
 
-  test('should test mapStateToProps function', () => {
+  test('mapStateToProps with default state', () => {
     const state = {
       accounts: accountsMock,
       launchPad: {
@@ -71,7 +69,7 @@ describe("Test Launchpad", () => {
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
-  test('should test component will mount', () => {
+  test('component will mount', () => {
     const props = {
       accounts: {},
       launchPad: {
@@ -96,7 +94,7 @@ describe("Test Launchpad", () => {
     expect(props.loadLaunchPad).toHaveBeenCalled()
   });
 
-  test('should simulate events', () => {
+  test('simulate events', () => {
     const props = {
       accounts: indexAccountsMock,
       launchPad: {
@@ -145,14 +143,13 @@ describe("Test Launchpad", () => {
       webkitRelativePath: ""
     }]
     dropZone.simulate('drop', { dataTransfer: { files: testFile } })
-
     expect(wrapper.find('button').at(2).props().disabled).toBeFalsy()
     wrapper.find('button').at(2).simulate('click')
     expect(props.appUploadRequest).toHaveBeenCalledWith(uploadData)
 
   });
 
-  test('should test multiple file upload', () => {
+  test('multiple file upload', () => {
     const props = {
       accounts: indexAccountsMock,
       launchPad: {
@@ -176,7 +173,6 @@ describe("Test Launchpad", () => {
           <LaunchPad.WrappedComponent {...props} />
         </MemoryRouter>
       </Provider>)
-
     const fields = wrapper.find('Field')
     const dropZone = fields.at(3).find('Dropzone')
     files.push({
@@ -191,7 +187,7 @@ describe("Test Launchpad", () => {
     expect(props.appSetError).toHaveBeenCalledWith('Expected a zip archive, got multiple files')
   });
 
-  test('should test file other than zip upload', () => {
+  test('file other than zip upload', () => {
     const props = {
       accounts: indexAccountsMock,
       launchPad: {
@@ -208,14 +204,12 @@ describe("Test Launchpad", () => {
       appSetError: jest.fn(),
       appReset: jest.fn(),
     }
-
     let wrapper = mount(
       <Provider store={store}>
         <MemoryRouter >
           <LaunchPad.WrappedComponent {...props} />
         </MemoryRouter>
       </Provider>)
-
     const fields = wrapper.find('Field')
     const dropZone = fields.at(3).find('Dropzone')
     const testFile = [{
@@ -229,7 +223,7 @@ describe("Test Launchpad", () => {
     expect(props.appSetError).toHaveBeenCalledWith('Please upload a zip archive')
   });
 
-  test('should test dropzone drag', () => {
+  test('dropzone drag', () => {
     const props = {
       accounts: indexAccountsMock,
       launchPad: {
@@ -246,14 +240,12 @@ describe("Test Launchpad", () => {
       appSetError: jest.fn(),
       appReset: jest.fn(),
     }
-
     let wrapper = mount(
       <Provider store={store}>
         <MemoryRouter >
           <LaunchPad.WrappedComponent {...props} />
         </MemoryRouter>
       </Provider>)
-
     const fields = wrapper.find('Field')
     const dropZone = fields.at(3).find('Dropzone')
     const testFile = [{
@@ -264,10 +256,9 @@ describe("Test Launchpad", () => {
       webkitRelativePath: ""
     }]
     dropZone.simulate('dragEnter', { dataTransfer: { files: testFile } })
-
   });
 
-  test('should test component will unmount', () => {
+  test('component will unmount', () => {
     const props = {
       accounts: indexAccountsMock,
       launchPad: {
@@ -284,19 +275,17 @@ describe("Test Launchpad", () => {
       appSetError: jest.fn(),
       appReset: jest.fn(),
     }
-
     let wrapper = mount(
       <Provider store={store}>
         <MemoryRouter >
           <LaunchPad.WrappedComponent {...props} />
         </MemoryRouter>
       </Provider>)
-
     wrapper.unmount()
     expect(props.appReset).toHaveBeenCalled()
   });
 
-  test('should test component did update', () => {
+  test('component did update', () => {
     const props = {
       history: { push: jest.fn() },
       accounts: indexAccountsMock,
@@ -314,7 +303,6 @@ describe("Test Launchpad", () => {
       appSetError: jest.fn(),
       appReset: jest.fn(),
     }
-
     let wrapper = mount(
       <Provider store={store}>
         <MemoryRouter >

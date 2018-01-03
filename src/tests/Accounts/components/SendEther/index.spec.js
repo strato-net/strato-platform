@@ -5,7 +5,7 @@ import { reducer as formReducer } from 'redux-form';
 import { createStore, combineReducers } from 'redux';
 import { indexAccountsMock } from '../../accountsMock';
 
-describe('Test SendEther index', () => {
+describe('SendEther: index', () => {
 
   let store
 
@@ -13,51 +13,56 @@ describe('Test SendEther index', () => {
     store = createStore(combineReducers({ form: formReducer }))
   });
 
-  test('should render component without values', () => {
-    const props = {
-      isOpen: false,
-      result: null,
-      accounts: [],
-      fromUsername: '',
-      toUsername: '',
-      createDisabled: true,
-      sendEtherOpenModal: jest.fn(),
-      sendEtherCloseModal: jest.fn(),
-      sendEther: jest.fn(),
-      fetchAccounts: jest.fn(),
-      store: store
-    };
+  describe('render component', () => {
 
-    const wrapper = shallow(
-      <SendEther.WrappedComponent {...props} />
-    ).dive().dive().dive();
+    test('without values', () => {
+      const props = {
+        isOpen: false,
+        result: null,
+        accounts: [],
+        fromUsername: '',
+        toUsername: '',
+        createDisabled: true,
+        sendEtherOpenModal: jest.fn(),
+        sendEtherCloseModal: jest.fn(),
+        sendEther: jest.fn(),
+        fetchAccounts: jest.fn(),
+        store: store
+      };
 
-    expect(wrapper).toMatchSnapshot();
-  });
+      const wrapper = shallow(
+        <SendEther.WrappedComponent {...props} />
+      ).dive().dive().dive();
 
-  test('should render component with values', () => {
-    const props = {
-      isOpen: true,
-      result: null,
-      accounts: indexAccountsMock,
-      fromUsername: 'Admin_1177_49507',
-      toUsername: 'User_1177_26292',
-      createDisabled: false,
-      sendEtherOpenModal: jest.fn(),
-      sendEtherCloseModal: jest.fn(),
-      sendEther: jest.fn(),
-      fetchAccounts: jest.fn(),
-      store: store
-    };
+      expect(wrapper).toMatchSnapshot();
+    });
 
-    const wrapper = shallow(
-      <SendEther.WrappedComponent {...props} />
-    ).dive().dive().dive();
+    test('with values', () => {
+      const props = {
+        isOpen: true,
+        result: null,
+        accounts: indexAccountsMock,
+        fromUsername: 'Admin_1177_49507',
+        toUsername: 'User_1177_26292',
+        createDisabled: false,
+        sendEtherOpenModal: jest.fn(),
+        sendEtherCloseModal: jest.fn(),
+        sendEther: jest.fn(),
+        fetchAccounts: jest.fn(),
+        store: store
+      };
 
-    expect(wrapper).toMatchSnapshot();
-  });
+      const wrapper = shallow(
+        <SendEther.WrappedComponent {...props} />
+      ).dive().dive().dive();
 
-  test('should open modal on click', () => {
+      expect(wrapper).toMatchSnapshot();
+    });
+
+  })
+
+
+  test('open modal on click', () => {
     const props = {
       isOpen: true,
       result: null,
@@ -81,7 +86,7 @@ describe('Test SendEther index', () => {
     expect(props.sendEtherOpenModal).toHaveBeenCalled();
   });
 
-  test('should close modal on click', () => {
+  test('close modal on click', () => {
     const props = {
       isOpen: true,
       result: null,
@@ -106,7 +111,7 @@ describe('Test SendEther index', () => {
     expect(props.fetchAccounts).toHaveBeenCalled();
   });
 
-  test('should test on submit form', () => {
+  test('simulate form fields and buttons', () => {
     const props = {
       isOpen: true,
       result: null,
@@ -148,7 +153,7 @@ describe('Test SendEther index', () => {
     expect(props.sendEther).toHaveBeenCalled();
   });
 
-  test('test mapStateToProps function', () => {
+  test('mapStateToProps with default state', () => {
     const state = {
       sendEther: {
         isOpen: true,

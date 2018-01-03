@@ -10,54 +10,56 @@ import {
 } from '../../../../components/Accounts/components/SendEther/sendEther.actions';
 import { sendEtherForm, sendEtherResponse, error } from './sendEtherMock';
 
-describe('Test sendEther reducer', () => {
+describe('SendEther: reducer', () => {
 
-  const initialState = {
-    isOpen: false,
-    result: 'Waiting to send...'
-  }
+  let initialState
 
-  test('should set initial state', () => {
+  beforeEach(() => {
+    initialState = {
+      isOpen: false,
+      result: 'Waiting to send...'
+    }
+  });
+
+  test('set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  test('should initiate sendEtherRequest', () => {
+  test('initiate sendEtherRequest', () => {
     const action = sendEther(sendEtherForm);
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('should store ether after sendEtherRequest success', () => {
+  test('update ether on sendEtherRequest success', () => {
     const action = sendEtherSuccess(sendEtherResponse);
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('should update error after sendEtherRequest failure', () => {
+  test('update error on sendEtherRequest failure', () => {
     const action = sendEtherFailure(error);
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('should change isOpen state on sendEther modal open', () => {
+  test('modal open', () => {
     const action = sendEtherOpenModal();
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('should change isOpen state on sendEther modal close', () => {
+  test('modal close', () => {
     const action = sendEtherCloseModal();
-
     const state = {
       isOpen: true,
       result: 'Waiting to send...'
     }
-
     expect(reducer(state, action)).toMatchSnapshot();
   });
 
-  test('should store toUserName', () => {
+  test('update toUserName', () => {
     const action = toUsernameChange('admin_01555');
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('should store fromUserName', () => {
+  test('update fromUserName', () => {
     const action = fromUsernameChange('admin_01555');
     expect(reducer(initialState, action)).toMatchSnapshot();
   });

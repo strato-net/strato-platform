@@ -12,45 +12,49 @@ import {
 } from '../../components/CodeEditor/codeEditor.actions';
 import { extAbi, error } from './codeEditorMock';
 
-describe('Test code editor actions', () => {
+describe('CodeEditor: action', () => {
 
-  test('should create an action to check code and decide to enable/disable create contract', () => {
+  test('change create action state', () => {
     expect(changeCreateActionState(false, 'abc', 0)).toMatchSnapshot();
   });
 
-  test('should create an action to compile code', () => {
-    expect(compileCodeFromEditor('code')).toMatchSnapshot();
-  });
+  describe('compile code', () => {
 
-  test('should create an action on code compile success', () => {
-    expect(compileCodeFromEditorSuccess(extAbi)).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(compileCodeFromEditor('code')).toMatchSnapshot();
+    });
 
-  test('should create an action on code compile failure', () => {
-    expect(compileCodeFromEditorFailure(error)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(compileCodeFromEditorSuccess(extAbi)).toMatchSnapshot();
+    });
 
-  test('should create an action to add a new file tab', () => {
+    test('failure', () => {
+      expect(compileCodeFromEditorFailure(error)).toMatchSnapshot();
+    });
+
+  })
+
+  test('add new tab', () => {
     expect(addNewFileTab('New file', 'content')).toMatchSnapshot();
   });
 
-  test('should remove tab on close filename', () => {
+  test('remove tab', () => {
     expect(removeTab(0)).toMatchSnapshot();
   });
 
-  test('should change tab', () => {
+  test('change tab', () => {
     expect(onTabChange(0, 1)).toMatchSnapshot();
   });
 
-  test('should change contract name', () => {
+  test('change contract name', () => {
     expect(contractNameChange('Abc')).toMatchSnapshot();
   });
 
-  test('should create an action on file name change', () => {
+  test('on file name change', () => {
     expect(onChangeFileName('New modified file name')).toMatchSnapshot();
   });
 
-  test('should compile file locally', () => {
+  test('compile file locally', () => {
     expect(onCompileFileLocally(error)).toMatchSnapshot();
   });
 

@@ -1,9 +1,9 @@
 import React from 'react';
 import Transactions, { mapStateToProps } from '../../components/Transactions/index';
 
-describe('Test contracts index', () => {
+describe('Transactions: index', () => {
 
-  test('should render transactions with empty values', () => {
+  test('render with empty values', () => {
     const wrapper = shallow(
       <Transactions />
     );

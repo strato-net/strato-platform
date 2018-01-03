@@ -6,7 +6,7 @@ import { createStore, combineReducers } from 'redux'
 import { Provider } from 'react-redux'
 import { transactions } from '../../../TransactionList/transactionListMock'
 
-describe("Test Transaction table", () => {
+describe("TransactionTable: index", () => {
 
   let store
 
@@ -14,7 +14,7 @@ describe("Test Transaction table", () => {
     store = createStore(combineReducers({ form: formReducer }))
   })
 
-  test('should invoke onClick when click on buttons', () => {
+  test('simulate buttons click', () => {
     const props = {
       query: { last: 15 },
       queryResults: transactions,
@@ -41,8 +41,7 @@ describe("Test Transaction table", () => {
 
   });
 
-  test('should invoke function on form submit', () => {
-
+  test('simulate form submit', () => {
     const props = {
       query: {},
       queryResults: transactions,
@@ -59,7 +58,6 @@ describe("Test Transaction table", () => {
         <TransactionTable.WrappedComponent {...props} />
       </Provider>
     )
-
     const t = wrapper.find('Field').last().simulate('keyPress', { target: { key: 'Enter', value: 'temp' } });
     const test = wrapper.find('Button').last().simulate('click');
     const r = wrapper.find('Form').simulate('submit');
@@ -67,7 +65,7 @@ describe("Test Transaction table", () => {
 
   });
 
-  test('should test component functions', () => {
+  test('component methods', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -77,7 +75,6 @@ describe("Test Transaction table", () => {
       removeQuery: jest.fn().mockReturnValue('removeQuery'),
       clearQuery: jest.fn().mockReturnValue('clearQuery')
     }
-
     let wrapper = shallow(
       <Provider store={store}>
         <TransactionTable.WrappedComponent {...props} />
@@ -89,7 +86,7 @@ describe("Test Transaction table", () => {
     expect(wrapper.instance().props.clearQuery()).toBe('clearQuery');
   });
 
-  test('should test component did mount', () => {
+  test('component did mount', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -99,7 +96,6 @@ describe("Test Transaction table", () => {
       removeQuery: jest.fn(),
       clearQuery: jest.fn()
     }
-
     let wrapper = mount(
       <Provider store={store}>
         <TransactionTable.WrappedComponent {...props} />
@@ -108,7 +104,7 @@ describe("Test Transaction table", () => {
     expect(props.fetchTx).toHaveBeenCalled();
   });
 
-  test('should test component will unmount', () => {
+  test('component will unmount', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -118,7 +114,6 @@ describe("Test Transaction table", () => {
       removeQuery: jest.fn(),
       clearQuery: jest.fn()
     }
-
     let wrapper = mount(
       <Provider store={store}>
         <TransactionTable.WrappedComponent {...props} />
@@ -128,7 +123,7 @@ describe("Test Transaction table", () => {
     expect(props.clearQuery).toHaveBeenCalled()
   });
 
-  test('should test mapStateToProps function only with queryengine as a state', () => {
+  test('mapStateToProps with default state', () => {
     const state = {
       queryEngine: {
         query: { last: 15 },
@@ -138,7 +133,7 @@ describe("Test Transaction table", () => {
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
-  test('should test redux form', () => {
+  test('redux form', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -171,7 +166,7 @@ describe("Test Transaction table", () => {
 
   });
 
-  test('should test update query method', () => {
+  test('update query method', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -191,7 +186,7 @@ describe("Test Transaction table", () => {
     expect(props.updateQuery).toHaveBeenCalledWith('BlockNumber', '15')
   });
 
-  test('should test update query method without any values', () => {
+  test('update query method without any values', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -211,7 +206,7 @@ describe("Test Transaction table", () => {
     expect(props.updateQuery).not.toHaveBeenCalledWith('BlockNumber', '15')
   });
 
-  test('should test componentWillReceiveProps', () => {
+  test('componentWillReceiveProps', () => {
     const props = {
       query: { last: 15 },
       queryResults: [],
@@ -223,19 +218,15 @@ describe("Test Transaction table", () => {
       handleSubmit: jest.fn(),
       store: store
     }
-
     let wrapper = shallow(
       <TransactionTable.WrappedComponent {...props} />
     ).dive().dive().dive()
-
     const props2 = {
       query: { last: 10 },
       executeQuery: jest.fn()
     }
-
     wrapper.instance().componentWillReceiveProps(props2)
     expect(props2.executeQuery).toHaveBeenCalled()
-
   });
 
 })

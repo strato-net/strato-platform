@@ -12,46 +12,58 @@ import {
 } from '../../../../components/Contracts/components/ContractCard/contractCard.actions';
 import { contract } from './contractCardMock';
 
-describe('Test ContractCard actions', () => {
+describe('ContractCard: action', () => {
 
-  test('should create an action to fetch state', () => {
-    expect(fetchState(contract.name, contract.address)).toMatchSnapshot();
-  });
+  describe('fetch state', () => {
 
-  test('should return state after FETCH_STATE_REQUEST success', () => {
-    expect(fetchStateSuccess(contract.name, contract.address, contract.state)).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(fetchState(contract.name, contract.address)).toMatchSnapshot();
+    });
 
-  test('should return error after FETCH_STATE_REQUEST failure', () => {
-    expect(fetchStateFailure(contract.error)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(fetchStateSuccess(contract.name, contract.address, contract.state)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(fetchStateFailure(contract.error)).toMatchSnapshot();
+    });
+
+  })
 
   test('select contract instance', () => {
     expect(selectContractInstance(contract.name, contract.address)).toMatchSnapshot();
   });
 
-  test('should create an action to fetch instance', () => {
-    expect(fetchCirrusInstances(contract.name)).toMatchSnapshot();
-  });
+  describe('fetch instance', () => {
 
-  test('should return instance after FETCH_CIRRUS_INSTANCES_REQUEST success', () => {
-    expect(fetchCirrusInstancesSuccess(contract.name, contract.instances)).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(fetchCirrusInstances(contract.name)).toMatchSnapshot();
+    });
 
-  test('should return error after FETCH_CIRRUS_INSTANCES_REQUEST with failure', () => {
-    expect(fetchCirrusInstancesFailure(contract.name, contract.error)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(fetchCirrusInstancesSuccess(contract.name, contract.instances)).toMatchSnapshot();
+    });
 
-  test('should create an action to fetch account', () => {
-    expect(fetchAccount(contract.name, contract.address)).toMatchSnapshot();
-  });
+    test('failure', () => {
+      expect(fetchCirrusInstancesFailure(contract.name, contract.error)).toMatchSnapshot();
+    });
 
-  test('should return account after FETCH_ACCOUNT_REQUEST success', () => {
-    expect(fetchAccountSuccess(contract.name, contract.address, contract.account)).toMatchSnapshot();
-  });
+  })
 
-  test('should return error after FETCH_ACCOUNT_REQUEST failure', () => {
-    expect(fetchAccountFailure(contract.name, contract.address, contract.error)).toMatchSnapshot();
-  });
+  describe('fetch account', () => {
+
+    test('request', () => {
+      expect(fetchAccount(contract.name, contract.address)).toMatchSnapshot();
+    });
+
+    test('success', () => {
+      expect(fetchAccountSuccess(contract.name, contract.address, contract.account)).toMatchSnapshot();
+    });
+
+    test('failure', () => {
+      expect(fetchAccountFailure(contract.name, contract.address, contract.error)).toMatchSnapshot();
+    });
+
+  })
 
 });

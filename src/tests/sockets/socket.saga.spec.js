@@ -13,22 +13,19 @@ import {
   take
 } from 'redux-saga/effects';
 import { eventChannel } from 'redux-saga';
-
 import {
   subscribeRoom,
   unSubscribeRoom,
   SOCKET_SUBSCRIBE_ROOM,
   SOCKET_UNSUBSCRIBE_ROOM
 } from '../../sockets/socket.actions';
-
 import {
   updateBlockNumber,
   preloadBlockNumber
 } from '../../components/Dashboard/dashboard.action';
-
 import { env } from '../../env'
-
 import { Server, SocketIO } from 'mock-socket';
+
 jest.mock('socket.io-client', () => {
   const { SocketIO } = require('mock-socket');
   return SocketIO;
@@ -111,31 +108,31 @@ mockServer.on('connection', server => {
 
 const channel = () => { }
 const action = {}
-describe('Test sockets saga', () => {
+describe('Socket: saga', () => {
 
   afterAll(() => {
     mockServer.close()
   });
 
-  test('should watch socket', () => {
+  test('watch socket', () => {
     const gen = watchCommunicateOverSocket();
     expect(gen.next().value).toEqual(takeEvery(SOCKET_SUBSCRIBE_ROOM, socketSubscribeUnsubscribeRoom))
     expect(gen.next().value).toEqual(takeEvery(SOCKET_UNSUBSCRIBE_ROOM, socketSubscribeUnsubscribeRoom))
     expect(gen.next().value).toEqual(fork(readSocketEvents))
   })
 
-  test('should test readsocket events', () => {
+  test('readsocket events', () => {
     const gen = readSocketEvents()
     expect(gen.next().value).toEqual(call(subscribe))
     expect(gen.next(channel).value).toEqual(take(channel))
     expect(gen.next(action).value).toEqual(put(action))
   })
 
-  test('should test subscribe events', () => {
+  test('subscribe events', () => {
     expect(subscribe()).toMatchSnapshot()
   })
 
-  test('should test suscribeUnsubscribe room', (done) => {
+  test('suscribeUnsubscribe room', (done) => {
     const gen = socketSubscribeUnsubscribeRoom('test')
     setTimeout(() => {
       done()
@@ -143,105 +140,109 @@ describe('Test sockets saga', () => {
     }, 1000);
   })
 
-  test('should subscribe and receive block number', (done) => {
+  describe('subscribe and receive', () => {
 
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/LAST_BLOCK_NUMBER')
-      socket.on('PRELOAD_LAST_BLOCK_NUMBER', (lastblockNumber) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('block number', (done) => {
 
-  test('should subscribe and receive userCount', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/USERS_COUNT')
-      socket.on('PRELOAD_USERS_COUNT', (usersCount) => {
-        done()
-      })
-    }, 1000);
-  });
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/LAST_BLOCK_NUMBER')
+        socket.on('PRELOAD_LAST_BLOCK_NUMBER', (lastblockNumber) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive contracts count', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/CONTRACTS_COUNT')
-      socket.on('PRELOAD_CONTRACTS_COUNT', (contractsCount) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('userCount', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/USERS_COUNT')
+        socket.on('PRELOAD_USERS_COUNT', (usersCount) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive transactions', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/GET_TRANSACTIONS')
-      socket.on('PRELOAD_GET_TRANSACTIONS', (transactions) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('contracts count', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/CONTRACTS_COUNT')
+        socket.on('PRELOAD_CONTRACTS_COUNT', (contractsCount) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive blocks difficulty', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/BLOCKS_DIFFICULTY')
-      socket.on('PRELOAD_BLOCKS_DIFFICULTY', (blocksDifficulty) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('transactions', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/GET_TRANSACTIONS')
+        socket.on('PRELOAD_GET_TRANSACTIONS', (transactions) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive blocks propagation', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/BLOCKS_PROPAGATION')
-      socket.on('PRELOAD_BLOCKS_PROPAGATION', (blocksPropagation) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('blocks difficulty', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/BLOCKS_DIFFICULTY')
+        socket.on('PRELOAD_BLOCKS_DIFFICULTY', (blocksDifficulty) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive transaction count', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/TRANSACTIONS_COUNT')
-      socket.on('PRELOAD_TRANSACTIONS_COUNT', (transactionCount) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('blocks propagation', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/BLOCKS_PROPAGATION')
+        socket.on('PRELOAD_BLOCKS_PROPAGATION', (blocksPropagation) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive transaction type', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/TRANSACTIONS_TYPE')
-      socket.on('PRELOAD_TRANSACTIONS_TYPE', (transactionType) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('transaction count', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/TRANSACTIONS_COUNT')
+        socket.on('PRELOAD_TRANSACTIONS_COUNT', (transactionCount) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive peers', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/GET_PEERS')
-      socket.on('PRELOAD_GET_PEERS', (peers) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('transaction type', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/TRANSACTIONS_TYPE')
+        socket.on('PRELOAD_TRANSACTIONS_TYPE', (transactionType) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive coinbase', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/GET_COINBASE')
-      socket.on('PRELOAD_GET_COINBASE', (coinbase) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('peers', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/GET_PEERS')
+        socket.on('PRELOAD_GET_PEERS', (peers) => {
+          done()
+        })
+      }, 1000);
+    });
 
-  test('should subscribe and receive blocks frequency', (done) => {
-    setTimeout(() => {
-      socket.emit('SUBSCRIBE/BLOCKS_FREQUENCY')
-      socket.on('PRELOAD_BLOCKS_FREQUENCY', (blocksFrequency) => {
-        done()
-      })
-    }, 1000);
-  });
+    test('coinbase', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/GET_COINBASE')
+        socket.on('PRELOAD_GET_COINBASE', (coinbase) => {
+          done()
+        })
+      }, 1000);
+    });
+
+    test('blocks frequency', (done) => {
+      setTimeout(() => {
+        socket.emit('SUBSCRIBE/BLOCKS_FREQUENCY')
+        socket.on('PRELOAD_BLOCKS_FREQUENCY', (blocksFrequency) => {
+          done()
+        })
+      }, 1000);
+    });
+
+  })
 
 })
 

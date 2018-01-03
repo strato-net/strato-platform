@@ -1,32 +1,37 @@
 import React from 'react'
 import Applications, { mapStateToProps } from '../../components/Applications/index'
 
-describe('Test applications', () => {
-  test('should test applications component with initial values', () => {
-    const props = {
-      applications: [],
-      fetchApplications: jest.fn()
-    }
-    const wrapper = shallow(<Applications.WrappedComponent {...props} />)
-    expect(wrapper).toMatchSnapshot()
+describe('Applications: index', () => {
+
+  describe('component with', () => {
+
+    test('initial values', () => {
+      const props = {
+        applications: [],
+        fetchApplications: jest.fn()
+      }
+      const wrapper = shallow(<Applications.WrappedComponent {...props} />)
+      expect(wrapper).toMatchSnapshot()
+    })
+
+    test('application data', () => {
+      const props = {
+        applications: [{
+          appName: 'dAPP',
+          version: '1.0',
+          address: 'e80b681c42f831ea3c4b8db531f5e165',
+          url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/',
+          isLoading: true
+        }],
+        fetchApplications: jest.fn()
+      }
+      const wrapper = shallow(<Applications.WrappedComponent {...props} />)
+      expect(wrapper).toMatchSnapshot()
+    })
+
   })
 
-  test('should test applications component with application values', () => {
-    const props = {
-      applications: [{
-        appName: 'dAPP',
-        version: '1.0',
-        address: 'e80b681c42f831ea3c4b8db531f5e165',
-        url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/',
-        isLoading: true
-      }],
-      fetchApplications: jest.fn()
-    }
-    const wrapper = shallow(<Applications.WrappedComponent {...props} />)
-    expect(wrapper).toMatchSnapshot()
-  })
-
-  test('should test mapStateToProps function only with applications as a state', () => {
+  test('mapStateToProps with default state', () => {
     const state = {
       applications: {
         applications: []
@@ -35,7 +40,7 @@ describe('Test applications', () => {
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
 
-  test('should invoke componentWillUnmount', () => {
+  test('componentWillUnmount', () => {
     const props = {
       applications: [{
         appName: 'dAPP',
@@ -46,11 +51,9 @@ describe('Test applications', () => {
       }],
       fetchApplications: jest.fn()
     }
-
     const wrapper = shallow(<Applications.WrappedComponent {...props} />
     );
-
-    wrapper.instance().componentWillUnmount();
+    wrapper.unmount();
     expect(props.fetchApplications).toHaveBeenCalled();
     expect(wrapper).toMatchSnapshot();
   });

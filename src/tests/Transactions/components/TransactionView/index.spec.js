@@ -7,104 +7,108 @@ import renderer from 'react-test-renderer';
 
 const mockStore = configureStore([]);
 
-describe('Test contracts index', () => {
+describe('TransactionView', () => {
 
-  test('should render transactionView with mocked values & store', () => {
-    const props = {
-      match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
-      tx: transactionDetail,
-      fetchTx: () => { }
-    }
+  describe('render', () => {
 
-    const store = mockStore({ state: { Transactions: { tx: updatedData } } });
-    const wrapper = render(
-      <Provider store={store}>
-        <TransactionView.WrappedComponent {...props} />
-      </Provider>
-    );
-
-    expect(wrapper).toMatchSnapshot();
-  });
-
-  test('should render when no transaction mock is passed', () => {
-    const props = {
-      match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
-      tx: null,
-      fetchTx: () => { }
-    }
-
-    const wrapper = render(
-      <Provider store={mockStore({})}>
-        <TransactionView.WrappedComponent {...props} />
-      </Provider>
-    );
-
-    expect(wrapper).toMatchSnapshot();
-  });
-
-  test('should invoke onClick when transaction is empty', () => {
-    const props = {
-      match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
-      tx: null,
-      fetchTx: () => { },
-      history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
-    }
-
-    const wrapper = mount(
-      <Provider store={mockStore({})}>
-        <TransactionView.WrappedComponent {...props} />
-      </Provider>
-    );
-
-    wrapper.find('Button').simulate('click');
-    expect(props.history.goBack()).toBe('historyUpdated');
-  });
-
-  test('should invoke onClick when transaction have mocked value', () => {
-    const props = {
-      match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
-      tx: transactionDetail,
-      fetchTx: () => { },
-      history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
-    }
-
-    const wrapper = mount(
-      <Provider store={mockStore({})}>
-        <TransactionView.WrappedComponent {...props} />
-      </Provider>
-    );
-
-    wrapper.find('Button').simulate('click');
-    expect(props.history.goBack()).toBe('historyUpdated');
-  });
-
-  test('test mapStateToProps function only with transaction as a state', () => {
-    const state = {
-      transactions: {
-        tx: updatedData
+    test('mocked values & store', () => {
+      const props = {
+        match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
+        tx: transactionDetail,
+        fetchTx: jest.fn()
       }
-    }
-    const ownProps = { match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } } };
-    expect(mapStateToProps(state, ownProps)).toMatchSnapshot();
-  });
+      const store = mockStore({ state: { Transactions: { tx: updatedData } } });
+      const wrapper = render(
+        <Provider store={store}>
+          <TransactionView.WrappedComponent {...props} />
+        </Provider>
+      );
+      expect(wrapper).toMatchSnapshot();
+    });
 
-  test('test mapStateToProps function only with queryEngine as a state', () => {
-    const state = {
-      transactions: {
-        tx: []
-      },
-      queryEngine: {
-        "query": {
-          "last": 15
+    test('no transaction mock is passed', () => {
+      const props = {
+        match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
+        tx: null,
+        fetchTx: jest.fn()
+      }
+      const wrapper = render(
+        <Provider store={mockStore({})}>
+          <TransactionView.WrappedComponent {...props} />
+        </Provider>
+      );
+      expect(wrapper).toMatchSnapshot();
+    });
+
+  })
+
+  describe('simulate', () => {
+
+    test('when transaction is empty', () => {
+      const props = {
+        match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
+        tx: null,
+        fetchTx: jest.fn(),
+        history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
+      }
+      const wrapper = mount(
+        <Provider store={mockStore({})}>
+          <TransactionView.WrappedComponent {...props} />
+        </Provider>
+      );
+      wrapper.find('Button').simulate('click');
+      expect(props.history.goBack()).toBe('historyUpdated');
+    });
+
+    test('when transaction has mocked value', () => {
+      const props = {
+        match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
+        tx: transactionDetail,
+        fetchTx: jest.fn(),
+        history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
+      }
+      const wrapper = mount(
+        <Provider store={mockStore({})}>
+          <TransactionView.WrappedComponent {...props} />
+        </Provider>
+      );
+      wrapper.find('Button').simulate('click');
+      expect(props.history.goBack()).toBe('historyUpdated');
+    });
+
+  })
+
+  describe('mapStateToProps with', () => {
+
+    test('transaction as a state', () => {
+      const state = {
+        transactions: {
+          tx: updatedData
+        }
+      }
+      const ownProps = { match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } } };
+      expect(mapStateToProps(state, ownProps)).toMatchSnapshot();
+    });
+
+    test('queryEngine as a state', () => {
+      const state = {
+        transactions: {
+          tx: []
         },
-        "queryResult": [
-          "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
-        ],
-        "error": null
+        queryEngine: {
+          "query": {
+            "last": 15
+          },
+          "queryResult": [
+            "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81"
+          ],
+          "error": null
+        }
       }
-    }
-    const ownProps = { match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } } };
-    expect(mapStateToProps(state, ownProps)).toMatchSnapshot();
-  });
+      const ownProps = { match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } } };
+      expect(mapStateToProps(state, ownProps)).toMatchSnapshot();
+    });
+
+  })
 
 })

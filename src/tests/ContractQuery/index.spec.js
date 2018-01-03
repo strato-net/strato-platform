@@ -2,7 +2,7 @@ import React from 'react';
 import ContractQuery, { mapStateToProps } from "../../components/ContractQuery";
 import { queryCirrusMock, queryCirrusVarsMock, matchMock } from './contractQueryMock';
 
-describe('Test contractQuery index', () => {
+describe('ContractQuery: index', () => {
   let mockFunc;
 
   beforeEach(() => {
@@ -33,11 +33,9 @@ describe('Test contractQuery index', () => {
         },
         ...mockFunc
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       expect(wrapper).toMatchSnapshot();
     });
 
@@ -72,11 +70,9 @@ describe('Test contractQuery index', () => {
           error: null
         },
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       expect(props.queryCirrus).toHaveBeenCalled();
       expect(props.queryCirrus.mock.calls.length).toBe(1);
       expect(wrapper).toMatchSnapshot();
@@ -117,11 +113,9 @@ describe('Test contractQuery index', () => {
           error: null
         },
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.find('select').at(0).simulate('change', { target: { value: 'state' } });
       wrapper.find('select').at(1).simulate('change', { target: { value: '=' } });
       wrapper.find('input').simulate('change', { target: { value: 2 } });
@@ -163,11 +157,9 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.find('button').at(1).simulate('click');
       expect(props.removeQueryFilter).toHaveBeenCalled();
       expect(props.removeQueryFilter.mock.calls.length).toBe(1);
@@ -192,18 +184,16 @@ describe('Test contractQuery index', () => {
           goBack: jest.fn()
         }
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.find('Button').simulate('click');
       expect(props.history.goBack).toHaveBeenCalled();
       expect(props.history.goBack.mock.calls.length).toBe(1);
       expect(wrapper).toMatchSnapshot();
     });
 
-    test('form submit button should be disable', () => {
+    test('form submit button be disabled', () => {
       const props = {
         ...matchMock,
         ...mockFunc,
@@ -215,11 +205,9 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.find('input').simulate('keyup', { target: { value: 2 }, key: 'Enter' });
       expect(props.addQueryFilter).not.toHaveBeenCalled();
     });
@@ -228,7 +216,7 @@ describe('Test contractQuery index', () => {
 
   describe('Table: ', () => {
 
-    test('should render with TruncatedFormat column', () => {
+    test('render with TruncatedFormat column', () => {
       const props = {
         ...matchMock,
         ...mockFunc,
@@ -259,11 +247,9 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       expect(wrapper.find('Column').get(0).key).toBe('column-address');
       expect(wrapper.find('Column').get(0).props.renderCell(2)).toMatchSnapshot();
       expect(wrapper.find('Column').get(1).key).toBe('column-amount');
@@ -271,7 +257,7 @@ describe('Test contractQuery index', () => {
       expect(wrapper.find('Column').debug()).toMatchSnapshot();
     });
 
-    test('should render with JSON format column', () => {
+    test('render with JSON format column', () => {
       const props = {
         ...matchMock,
         ...mockFunc,
@@ -310,11 +296,9 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       expect(wrapper.find('Column').debug()).toMatchSnapshot();
     });
 
@@ -347,18 +331,15 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const newProps = {
         contractQuery: {
           queryString: 'state=eq.1&amount=eq.5678&name=eq.P',
         },
         ...matchMock
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.instance().componentWillReceiveProps(newProps);
       expect(props.queryCirrus).toHaveBeenCalled();
       expect(props.queryCirrus.mock.calls.length).toBe(2);
@@ -390,18 +371,15 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const newProps = {
         contractQuery: {
           queryString: 'state=eq.1&amount=eq.5678',
         },
         ...matchMock
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.instance().componentWillReceiveProps(newProps);
       expect(props.queryCirrus).toHaveBeenCalled();
       expect(props.queryCirrus.mock.calls.length).toBe(1);
@@ -421,7 +399,6 @@ describe('Test contractQuery index', () => {
           error: null
         }
       }
-
       expect(mapStateToProps(state)).toMatchSnapshot();
     });
 
@@ -454,13 +431,10 @@ describe('Test contractQuery index', () => {
           error: null
         }
       };
-
       const wrapper = shallow(
         <ContractQuery.WrappedComponent {...props} />
       );
-
       wrapper.instance().componentWillMount();
-
       expect(props.clearQueryString).toHaveBeenCalled();
       expect(props.clearQueryString.mock.calls.length).toBe(2);
       expect(props.queryCirrusVars).toHaveBeenCalled();

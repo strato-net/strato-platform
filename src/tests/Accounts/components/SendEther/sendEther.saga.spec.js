@@ -16,9 +16,9 @@ import {
 import { sendEtherResponse, error, sendEtherForm } from './sendEtherMock';
 import { expectSaga } from 'redux-saga-test-plan';
 
-describe('Test SendEther sagas', () => {
+describe('SendEther: saga', () => {
 
-  test('should watch send ether', () => {
+  test('watch send ether', () => {
     const gen = watchSendEther();
     expect(gen.next().value).toEqual(takeLatest(SEND_ETHER_REQUEST, sendEther));
     expect(gen.next().done).toBe(true);
@@ -33,25 +33,22 @@ describe('Test SendEther sagas', () => {
 
     test('inspection', () => {
       const gen = sendEther(action);
-
       expect(gen.next().value).toEqual(call(sendEtherAPICall, action.from, action.fromAddress, action.toAddress, action.value, action.password));
       expect(gen.next(sendEtherResponse).value).toEqual(put(sendEtherSuccess(sendEtherResponse)));
       expect(gen.throw(error).value).toEqual(put(sendEtherFailure(error)));
       expect(gen.next().done).toBe(true);
     });
 
-    test('should call sendEtherAPICall with success', (done) => {
+    test('sendEtherAPICall with success', (done) => {
       fetch.mockResponse(JSON.stringify(sendEtherResponse));
-
       expectSaga(sendEther, action)
         .call.fn(sendEtherAPICall)
         .put.like({ action: { type: SEND_ETHER_SUCCESS } })
         .run().then((result) => { done() });
     });
 
-    test('should call getAccountApi with failure', (done) => {
+    test('getAccountApi with failure', (done) => {
       fetch.mockReject(JSON.stringify(error));
-
       expectSaga(sendEther, action)
         .call.fn(sendEtherAPICall)
         .put.like({ action: { type: SEND_ETHER_FAILURE } })

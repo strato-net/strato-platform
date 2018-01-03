@@ -9,33 +9,33 @@ import {
 } from '../../../../components/Accounts/components/SendEther/sendEther.actions';
 import { sendEtherResponse, error, sendEtherForm } from './sendEtherMock';
 
-describe('Test sendEther sagas', () => {
+describe('SendEther: action', () => {
 
-  test('should create an action to send ether', () => {
+  test('send ether', () => {
     expect(sendEther({ ...sendEtherForm })).toMatchSnapshot();
   });
 
-  test('should create an action to change fromusername', () => {
+  test('change fromUsername', () => {
     expect(fromUsernameChange(sendEtherForm.from)).toMatchSnapshot();
   });
 
-  test('should create an action to change tousername', () => {
+  test('change toUsername', () => {
     expect(toUsernameChange(sendEtherForm.from)).toMatchSnapshot();
   });
 
-  test('should return ether after sendEther success', () => {
+  test('sendEther success', () => {
     expect(sendEtherSuccess(sendEtherResponse)).toMatchSnapshot();
   });
 
-  test('should return error after sendEther failure', () => {
+  test('sendEther failure', () => {
     expect(sendEtherFailure(error)).toMatchSnapshot();
   });
 
-  test('should create an action to open sendEther modal', () => {
+  test('open sendEther modal', () => {
     expect(sendEtherOpenModal()).toMatchSnapshot();
   });
 
-  test('should create an action to close sendEther modal', () => {
+  test('close sendEther modal', () => {
     expect(sendEtherCloseModal()).toMatchSnapshot();
   });
 

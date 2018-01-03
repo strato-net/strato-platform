@@ -24,7 +24,7 @@ export const codeEditor = {
   sourceCode: "contract Cloner {↵Sheep[] public clones;↵string public sheepDNA = \"ccc\";↵↵function cloneSheep(string name) returns (address)↵{ Sheep sheep = new Sheep(name, sheepDNA); clones.push(sheep); return sheep }↵↵}↵↵contract Sheep {↵string public name;↵string public dna;↵↵function Sheep(string _name, string _dna)↵{ name = _name; dna = _dna; }↵↵function geneticallyModify(string _dna)↵{ dna = _dna; }↵↵}",
   timer: 87,
   tab: [selectedTabContent, tab2],
-  fileName:'SampleStorage'
+  fileName: 'SampleStorage'
 }
 
 // source code undefined import

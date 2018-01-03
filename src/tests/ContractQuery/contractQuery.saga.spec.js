@@ -26,17 +26,15 @@ import {
 import { expectSaga } from 'redux-saga-test-plan';
 import { queryCirrusMock, error, queryCirrusVarsMock } from "./contractQueryMock";
 
-describe('Test contractQuery saga', () => {
+describe('ContractQuery: saga', () => {
 
-  test('should watch query cirrus request', () => {
+  test('watch query cirrus', () => {
     const gen = watchQueryCirrus();
-
     expect(gen.next().value).toEqual(takeEvery(QUERY_CIRRUS_REQUEST, queryCirrus));
     expect(gen.next().done).toBe(true);
   });
 
   describe('queryCirrus generator', () => {
-
     const action = {
       contractName: "Bid",
       queryString: "",
@@ -45,34 +43,34 @@ describe('Test contractQuery saga', () => {
 
     test('inspection', () => {
       const gen = queryCirrus(action);
-
       expect(gen.next().value).toEqual(call(queryCirrusRequest, action.contractName, action.queryString));
       expect(gen.next(queryCirrusMock).value).toEqual(put(queryCirrusSuccess(queryCirrusMock)));
       expect(gen.throw(error).value).toEqual(put(queryCirrusFailure(error)));
       expect(gen.next().done).toBe(true);
     });
 
-    test('should get query data with success', (done) => {
-      fetch.mockResponse(JSON.stringify(queryCirrusMock));
+    describe('fetch querycirrus', () => {
 
-      expectSaga(queryCirrus, action)
-        .call.fn(queryCirrusRequest).put.like({ action: { type: QUERY_CIRRUS_SUCCESS } })
-        .run().then((result) => { done() });
-    });
+      test('success', (done) => {
+        fetch.mockResponse(JSON.stringify(queryCirrusMock));
+        expectSaga(queryCirrus, action)
+          .call.fn(queryCirrusRequest).put.like({ action: { type: QUERY_CIRRUS_SUCCESS } })
+          .run().then((result) => { done() });
+      });
 
-    test('should get error message with failure', (done) => {
-      fetch.mockReject(JSON.stringify(error));
+      test('failure', (done) => {
+        fetch.mockReject(JSON.stringify(error));
+        expectSaga(queryCirrus, action)
+          .call.fn(queryCirrusRequest).put.like({ action: { type: QUERY_CIRRUS_FAILURE } })
+          .run().then((result) => { done() });
+      });
 
-      expectSaga(queryCirrus, action)
-        .call.fn(queryCirrusRequest).put.like({ action: { type: QUERY_CIRRUS_FAILURE } })
-        .run().then((result) => { done() });
-    });
+    })
 
   });
 
-  test('should watch query cirrus vars request', () => {
+  test('watch query cirrus vars', () => {
     const gen = watchQueryCirrusVars();
-
     expect(gen.next().value).toEqual(takeEvery(QUERY_CIRRUS_VARS_REQUEST, queryCirrusVars));
     expect(gen.next().done).toBe(true);
   });
@@ -86,28 +84,29 @@ describe('Test contractQuery saga', () => {
 
     test('inspection', () => {
       const gen = queryCirrusVars(action);
-
       expect(gen.next().value).toEqual(call(queryCirrusVarsRequest, action.contractName));
       expect(gen.next(queryCirrusVarsMock).value).toEqual(put(queryCirrusVarsSuccess(queryCirrusVarsMock.xabi.vars)));
       expect(gen.throw(error).value).toEqual(put(queryCirrusVarsFailure(error)));
       expect(gen.next().done).toBe(true);
     });
 
-    test('should get variables with success', (done) => {
-      fetch.mockResponse(JSON.stringify(queryCirrusVarsMock));
+    describe('fetch queryCirrusVars', () => {
 
-      expectSaga(queryCirrusVars, action)
-        .call.fn(queryCirrusVarsRequest).put.like({ action: { type: QUERY_CIRRUS_VARS_SUCCESS } })
-        .run().then((result) => { done() });
-    });
+      test('success', (done) => {
+        fetch.mockResponse(JSON.stringify(queryCirrusVarsMock));
+        expectSaga(queryCirrusVars, action)
+          .call.fn(queryCirrusVarsRequest).put.like({ action: { type: QUERY_CIRRUS_VARS_SUCCESS } })
+          .run().then((result) => { done() });
+      });
 
-    test('should get error message with failure', (done) => {
-      fetch.mockReject(JSON.stringify(error));
+      test('failure', (done) => {
+        fetch.mockReject(JSON.stringify(error));
+        expectSaga(queryCirrusVars, action)
+          .call.fn(queryCirrusVarsRequest).put.like({ action: { type: QUERY_CIRRUS_VARS_FAILURE } })
+          .run().then((result) => { done() });
+      });
 
-      expectSaga(queryCirrusVars, action)
-        .call.fn(queryCirrusVarsRequest).put.like({ action: { type: QUERY_CIRRUS_VARS_FAILURE } })
-        .run().then((result) => { done() });
-    });
+    })
 
   });
 

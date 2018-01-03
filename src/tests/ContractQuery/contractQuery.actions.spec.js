@@ -11,47 +11,54 @@ import {
 } from '../../components/ContractQuery/contractQuery.actions';
 import { error, queryCirrusVarsMock, queryCirrusMock } from './contractQueryMock';
 
-describe('Test contractQuery actions', () => {
+describe('ContractQuery: action', () => {
 
-  test('should create action to query with contract name', () => {
-    expect(queryCirrusVars('Bid')).toMatchSnapshot();
-  });
+  describe('fetch queryCirrusVars', () => {
 
-  test('should return vars after queryCirrusVars success', () => {
-    expect(queryCirrusVarsSuccess(queryCirrusVarsMock.xabi.vars)).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(queryCirrusVars('Bid')).toMatchSnapshot();
+    });
 
-  test('should return error after queryCirrusVars failure', () => {
-    expect(queryCirrusVarsFailure(error)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(queryCirrusVarsSuccess(queryCirrusVarsMock.xabi.vars)).toMatchSnapshot();
+    });
 
-  test('should create action to clear query string', () => {
+    test('failure', () => {
+      expect(queryCirrusVarsFailure(error)).toMatchSnapshot();
+    });
+
+  })
+
+  test('clear query', () => {
     expect(clearQueryString()).toMatchSnapshot();
   });
 
-  test('should create action for cirrus query', () => {
-    expect(queryCirrus('Bid', undefined)).toMatchSnapshot();
-  });
+  describe('fetch queryCirrus', () => {
 
-  test('should return vars after queryCirrusVars success', () => {
-    expect(queryCirrusSuccess(queryCirrusMock)).toMatchSnapshot();
-  });
+    test('request', () => {
+      expect(queryCirrus('Bid', undefined)).toMatchSnapshot();
+    });
 
-  test('should return error after queryCirrusVars failure', () => {
-    expect(queryCirrusFailure(error)).toMatchSnapshot();
-  });
+    test('success', () => {
+      expect(queryCirrusSuccess(queryCirrusMock)).toMatchSnapshot();
+    });
 
-  test('should add query filter', () => {
+    test('failure', () => {
+      expect(queryCirrusFailure(error)).toMatchSnapshot();
+    });
+
+  })
+
+  test('add query filter', () => {
     const payload = {
       field: 'state',
       operator: 'eq',
       value: 1
     };
-
     expect(addQueryFilter(payload.field, payload.operator, payload.value)).toMatchSnapshot();
   });
 
-  test('should remove query filter', () => {
+  test('remove query filter', () => {
     expect(removeQueryFilter(1)).toMatchSnapshot();
   });
 

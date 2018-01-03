@@ -20,9 +20,9 @@ import {
 import { expectSaga } from 'redux-saga-test-plan';
 import { applicationData, errorFetchApp, errorLaunchApp } from './applicationsMock';
 
-describe('Test Applications saga', () => {
+describe('Applications: saga', () => {
 
-  test('should watch applications', () => {
+  test('watch applications', () => {
     const gen = watchFetchApplications();
     expect(gen.next().value).toEqual(takeEvery(FETCH_APPLICATIONS, fetchApplications))
     expect(gen.next().value).toEqual(takeEvery(LAUNCH_APP, launchApps))
@@ -37,44 +37,48 @@ describe('Test Applications saga', () => {
       expect(gen.next().done).toBe(true);
     })
 
-    test('should call fetch apps with success', (done) => {
-      fetch.mockResponse(JSON.stringify(applicationData));
-      expectSaga(fetchApplications)
-        .call.fn(getApplications).put.like({ action: { type: 'FETCH_APPLICATIONS_SUCCESSFUL' } })
-        .run().then((result) => { done() });
-    });
+    describe('fetch applications', () => {
 
-    test('should call fetch apps with failure', (done) => {
-      fetch.mockReject(JSON.stringify(errorFetchApp));
+      test('success', (done) => {
+        fetch.mockResponse(JSON.stringify(applicationData));
+        expectSaga(fetchApplications)
+          .call.fn(getApplications).put.like({ action: { type: 'FETCH_APPLICATIONS_SUCCESSFUL' } })
+          .run().then((result) => { done() });
+      });
 
-      expectSaga(fetchApplications)
-        .call.fn(getApplications).put.like({ action: { type: 'FETCH_APPLICATIONS_FAILURE' } })
-        .run().then((result) => { done() });
-    });
+      test('failure', (done) => {
+        fetch.mockReject(JSON.stringify(errorFetchApp));
 
-    test('should fail apps on exception', () => {
-      expectSaga(fetchApplications)
-        .provide({
-          call() {
-            throw new Error('Not Found');
-          },
-        })
-        .put.like({ action: { type: 'FETCH_APPLICATIONS_FAILURE' } })
-        .run();
-    });
+        expectSaga(fetchApplications)
+          .call.fn(getApplications).put.like({ action: { type: 'FETCH_APPLICATIONS_FAILURE' } })
+          .run().then((result) => { done() });
+      });
+
+      test('exception', () => {
+        expectSaga(fetchApplications)
+          .provide({
+            call() {
+              throw new Error('Not Found');
+            },
+          })
+          .put.like({ action: { type: 'FETCH_APPLICATIONS_FAILURE' } })
+          .run();
+      });
+
+    })
 
   });
 
   describe('launch apps generator', () => {
 
-    test('should call launch application with success', (done) => {
+    test('success 200', (done) => {
       fetch.mockResponse(JSON.stringify({ status: 200 }));
       expectSaga(launchApps, { type: "LAUNCH_APP", url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/' })
         .call.fn(launchApp).put.like({ action: { type: 'LAUNCH_APP_SUCCESSFUL' } })
         .run().then((result) => { done() });
     });
 
-    test('should call launch apps with success', (done) => {
+    test('success 301', (done) => {
       fetch.mockResponse(JSON.stringify({}), { status: 301 });
       expectSaga(launchApps, { type: "LAUNCH_APP", url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/' })
         .call.fn(launchApp)
@@ -83,15 +87,14 @@ describe('Test Applications saga', () => {
         });
     });
 
-    test('should call launch apps with status code other than 200', (done) => {
+    test('launch apps with status code other than 200', (done) => {
       fetch.mockReject(JSON.stringify({ error: errorLaunchApp, status: 400 }));
-
       expectSaga(launchApps, { type: "LAUNCH_APP", url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/' })
         .call.fn(launchApp).put.like({ action: { type: 'LAUNCH_APP_FAILURE' } })
         .run().then((result) => { done() });
     });
 
-    test('should fail launch apps on exception', () => {
+    test('exception', () => {
       expectSaga(launchApps, { type: "LAUNCH_APP", url: 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/' })
         .provide({
           call() {
@@ -102,7 +105,7 @@ describe('Test Applications saga', () => {
         .run();
     });
 
-  });
+  })
 
 })
 

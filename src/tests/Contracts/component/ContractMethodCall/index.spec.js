@@ -7,7 +7,7 @@ import { modals, initialState } from './contractMethodCallMock';
 import { indexAccountsMock } from '../../../Accounts/accountsMock'
 import { Dialog } from '@blueprintjs/core';
 
-describe('Test ContractMethodCall index', () => {
+describe('ContractMethodCall: index', () => {
   let store
 
   beforeEach(() => {
@@ -30,22 +30,20 @@ describe('Test ContractMethodCall index', () => {
         <ContractMethodCall.WrappedComponent {...props} />
       </Provider>
     );
-
     expect(wrapper).toMatchSnapshot();
   });
 
-  test('should test mapStateToProps function', () => {
+  test('mapStateToProps with default values', () => {
     const state = {
       methodCall: {
         modals: undefined
       },
       accounts: indexAccountsMock
     }
-
     expect(mapStateToProps(state, 'methodCallgreetf62c8965f2129d178aa28c043f9b3d0cd52f9e2e')).toMatchSnapshot();
   });
 
-  test('should open model on button click', () => {
+  test('open modal', () => {
     const props = {
       modal: modals,
       accounts: indexAccountsMock,
@@ -56,18 +54,16 @@ describe('Test ContractMethodCall index', () => {
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
     }
-
     const wrapper = mount(
       <Provider store={store}>
         <ContractMethodCall.WrappedComponent {...props} />
       </Provider>
     );
-
     wrapper.find('Button').simulate('click');
     expect(props.methodCallOpenModal).toHaveBeenCalled();
   });
 
-  test('should onClose work correctly on outside click', () => { 
+  test('modal close', () => {
     const props = {
       modal: modals,
       accounts: indexAccountsMock,
@@ -77,19 +73,18 @@ describe('Test ContractMethodCall index', () => {
       methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
-      store:store
+      store: store
     }
     const wrapper = shallow(
       <Provider store={store}>
         <ContractMethodCall.WrappedComponent {...props} />
       </Provider>
     ).dive().dive().dive().dive();
-
-    wrapper.find('Button').at(1).simulate('click', { preventDefault() {}, stopPropagation() {} })
+    wrapper.find('Button').at(1).simulate('click', { preventDefault() { }, stopPropagation() { } })
     expect(props.methodCallCloseModal).toHaveBeenCalled();
   });
 
-  test('should submit form', () => {
+  test('simulate submit form', () => {
     const props = {
       modal: modals,
       accounts: indexAccountsMock,
@@ -99,17 +94,13 @@ describe('Test ContractMethodCall index', () => {
       methodCallCloseModal: jest.fn(),
       fetchAccounts: jest.fn(),
       methodCall: jest.fn(),
-      store:store
+      store: store
     }
-    console.log('Lets see here', modals)
-    
     const wrapper = shallow(
       <Provider store={store}>
         <ContractMethodCall.WrappedComponent {...props} />
       </Provider>
     ).dive().dive().dive().dive();
-
-    console.log('OLolo',wrapper.find('button').debug())
     wrapper.find('button').simulate('click')
     expect(props.methodCall).toHaveBeenCalled();
   });

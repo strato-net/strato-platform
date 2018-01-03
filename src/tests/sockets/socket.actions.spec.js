@@ -16,94 +16,102 @@ import {
   BLOCKS_FREQUENCY
 } from '../../sockets/rooms';
 
-describe('Test socket actions', () => {
+describe('Socket: action', () => {
 
-  test('should create an action to subscribe last block number', () => {
-    expect(subscribeRoom(LAST_BLOCK_NUMBER)).toMatchSnapshot();
-  });
+  describe('subscribe', () => {
 
-  test('should create an action to subscribe users count', () => {
-    expect(subscribeRoom(USERS_COUNT)).toMatchSnapshot();
-  });
+    test('last block number', () => {
+      expect(subscribeRoom(LAST_BLOCK_NUMBER)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe contracts count', () => {
-    expect(subscribeRoom(CONTRACTS_COUNT)).toMatchSnapshot();
-  });
+    test('users count', () => {
+      expect(subscribeRoom(USERS_COUNT)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe block propagation', () => {
-    expect(subscribeRoom(BLOCKS_PROPAGATION)).toMatchSnapshot();
-  });
+    test('contracts count', () => {
+      expect(subscribeRoom(CONTRACTS_COUNT)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe block frequency', () => {
-    expect(subscribeRoom(BLOCKS_FREQUENCY)).toMatchSnapshot();
-  });
+    test('block propagation', () => {
+      expect(subscribeRoom(BLOCKS_PROPAGATION)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe block difficulty', () => {
-    expect(subscribeRoom(BLOCKS_DIFFICULTY)).toMatchSnapshot();
-  });
+    test('block frequency', () => {
+      expect(subscribeRoom(BLOCKS_FREQUENCY)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe transactions count', () => {
-    expect(subscribeRoom(TRANSACTIONS_COUNT)).toMatchSnapshot();
-  });
+    test('block difficulty', () => {
+      expect(subscribeRoom(BLOCKS_DIFFICULTY)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe transactions type', () => {
-    expect(subscribeRoom(TRANSACTIONS_TYPE)).toMatchSnapshot();
-  });
+    test('transactions count', () => {
+      expect(subscribeRoom(TRANSACTIONS_COUNT)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe peers', () => {
-    expect(subscribeRoom(GET_PEERS)).toMatchSnapshot();
-  });
+    test('transactions type', () => {
+      expect(subscribeRoom(TRANSACTIONS_TYPE)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe coinbase', () => {
-    expect(subscribeRoom(GET_COINBASE)).toMatchSnapshot();
-  });
+    test('peers', () => {
+      expect(subscribeRoom(GET_PEERS)).toMatchSnapshot();
+    });
 
-  test('should create an action to subscribe last block number', () => {
-    expect(subscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
-  });
+    test('coinbase', () => {
+      expect(subscribeRoom(GET_COINBASE)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe last block number', () => {
-    expect(unSubscribeRoom(LAST_BLOCK_NUMBER)).toMatchSnapshot();
-  });
+    test('transactions', () => {
+      expect(subscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe users count', () => {
-    expect(unSubscribeRoom(USERS_COUNT)).toMatchSnapshot();
-  });
+  })
 
-  test('should create an action to unsubscribe contracts count', () => {
-    expect(unSubscribeRoom(CONTRACTS_COUNT)).toMatchSnapshot();
-  });
+  describe('unsubscribe', () => {
 
-  test('should create an action to unsubscribe block propagation', () => {
-    expect(unSubscribeRoom(BLOCKS_PROPAGATION)).toMatchSnapshot();
-  });
+    test('last block number', () => {
+      expect(unSubscribeRoom(LAST_BLOCK_NUMBER)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe block frequency', () => {
-    expect(unSubscribeRoom(BLOCKS_FREQUENCY)).toMatchSnapshot();
-  });
+    test('users count', () => {
+      expect(unSubscribeRoom(USERS_COUNT)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe blocks difficulty', () => {
-    expect(unSubscribeRoom(BLOCKS_DIFFICULTY)).toMatchSnapshot();
-  });
+    test('contracts count', () => {
+      expect(unSubscribeRoom(CONTRACTS_COUNT)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe transactions count', () => {
-    expect(unSubscribeRoom(TRANSACTIONS_COUNT)).toMatchSnapshot();
-  });
+    test('block propagation', () => {
+      expect(unSubscribeRoom(BLOCKS_PROPAGATION)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe transactions type', () => {
-    expect(unSubscribeRoom(TRANSACTIONS_TYPE)).toMatchSnapshot();
-  });
+    test('block frequency', () => {
+      expect(unSubscribeRoom(BLOCKS_FREQUENCY)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe coinbase', () => {
-    expect(unSubscribeRoom(GET_COINBASE)).toMatchSnapshot();
-  });
+    test('blocks difficulty', () => {
+      expect(unSubscribeRoom(BLOCKS_DIFFICULTY)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe peers', () => {
-    expect(unSubscribeRoom(GET_PEERS)).toMatchSnapshot();
-  });
+    test('transactions count', () => {
+      expect(unSubscribeRoom(TRANSACTIONS_COUNT)).toMatchSnapshot();
+    });
 
-  test('should create an action to unsubscribe peers', () => {
-    expect(unSubscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
-  });
+    test('transactions type', () => {
+      expect(unSubscribeRoom(TRANSACTIONS_TYPE)).toMatchSnapshot();
+    });
+
+    test('coinbase', () => {
+      expect(unSubscribeRoom(GET_COINBASE)).toMatchSnapshot();
+    });
+
+    test('peers', () => {
+      expect(unSubscribeRoom(GET_PEERS)).toMatchSnapshot();
+    });
+
+    test('transactions', () => {
+      expect(unSubscribeRoom(GET_TRANSACTIONS)).toMatchSnapshot();
+    });
+
+  })
 
 });

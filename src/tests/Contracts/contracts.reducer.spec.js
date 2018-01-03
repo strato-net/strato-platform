@@ -11,110 +11,97 @@ import {
 } from '../../components/Contracts/components/ContractCard/contractCard.actions';
 import { deepClone } from '../helper/testHelper';
 
-
-describe('Test contracts reducer', () => {
+describe('Contracts: reducer', () => {
 
   // INITIAL_STATE
-  test('should set initial state', () => {
+  test('set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  // FETCH_CONTRACTS
-  test('should fetch contracts', () => {
-    const action = fetchContracts();
+  describe('fetch contracts', () => {
 
-    const initialState = {
-      contracts: contractsState,
-      filter
-    }
+    // FETCH_CONTRACTS
+    test('request', () => {
+      const action = fetchContracts();
+      const initialState = {
+        contracts: contractsState,
+        filter
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+    // FETCH_CONTRACTS_SUCCESSFUL
+    test('on success', () => {
+      const action = fetchContractsSuccess(contracts);
+      const initialState = {
+        contracts: {},
+        filter: '',
+        error: null
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-  // FETCH_CONTRACTS_SUCCESSFUL
-  test('should store contracts after success', () => {
-    const action = fetchContractsSuccess(contracts);
+    // FETCH_CONTRACTS_FAILED
+    test('on failure', () => {
+      const action = fetchContractsFailure(error);
+      const initialState = {
+        contracts: {},
+        filter: '',
+        error
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    })
 
-    const initialState = {
-      contracts: {},
-      filter: '',
-      error: null
-    }
-
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
-
-  // FETCH_CONTRACTS_FAILED
-  test('should update error if fetch contracts failed', () => {
-    const action = fetchContractsFailure(error);
-
-    const initialState = {
-      contracts: {},
-      filter: '',
-      error
-    };
-
-    expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
   // CHANGE_CONTRACT_FILTER
-  test('should update filter while searching contract', () => {
+  test('on change contract filter', () => {
     const action = changeContractFilter(filter);
-
     const initialState = {
       contracts: contractsState,
       error: null
     }
-
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
   // FETCH_STATE_SUCCESS
-  test('should fetch state and append it to contract', () => {
+  test('fetch state success', () => {
     const action = fetchStateSuccess(reducerContract.name, reducerContract.address, reducerContract.state);
-
     let initialContracts = deepClone(contractsState);
     initialContracts['GreeterA']['instances'][0]['selected'] = true;
-
     const initialState = {
       contracts: initialContracts,
       filter: filter,
       error: 'ERROR'
     }
-
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
   // SELECT_CONTRACT_INSTANCE
-  test('should select contract instance', () => {
+  test('select contract instance', () => {
     const action = selectContractInstance(reducerContract.name, reducerContract.address);
-
     const initialState = {
       contracts: contractsState,
       filter,
       error
     }
-
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
   // FETCH_ACCOUNT_SUCCESS
-  test('should fetch account', () => {
+  test('fetch account success', () => {
     const action = fetchAccountSuccess(reducerContract.name, reducerContract.address, reducerContract.account);
-
     let initialContracts = deepClone(contractsState);
     initialContracts['GreeterA']['instances'][0]['selected'] = true;
-
     const initialState = {
       contracts: initialContracts,
       filter
     }
-
     expect(reducer(initialState, action)).toMatchSnapshot();
   })
 
   // FETCH_CIRRUS_INSTANCES_SUCCESS
-  test('Should fetch cirrus instances', () => {
+  test('fetch cirrus instances success', () => {
     const data = {
       instances: [
         {
@@ -123,15 +110,12 @@ describe('Test contracts reducer', () => {
         }],
       name: "GreeterB"
     }
-
     const action = fetchCirrusInstancesSuccess(data.name, data.instances);
-
     const initialState = {
       contracts: contractsState,
       filter,
       error
     }
-
     expect((initialState, action)).toMatchSnapshot();
   })
 

@@ -41,6 +41,7 @@ class ContractMethodCall extends Component {
   }
 
   submit = (values) => {
+    
     const payload = {
       contractName: this.props.contractName,
       contractAddress: this.props.contractAddress,
