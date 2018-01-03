@@ -78,7 +78,6 @@ solcSpec =
             expectedPath = "./test/contracts/ProjectManagerGetSource.sol"
         testAugmentNoCompile solPath expectedPath
       it "should compile and augment ProjectManager code" $ do
-        pendingWith "Solc has problem passing enums between contracts"
         let solPath = "./test/contracts/ProjectManager.sol"
             expectedPath = "./test/contracts/ProjectManagerGetSource.sol"
         testAugment solPath expectedPath
@@ -95,7 +94,6 @@ solcSpec =
             expectedPath = "./test/contracts/UserManagerGetSource.sol"
         testAugmentNoCompile solPath expectedPath
       it "should augment and compile UserManager code" $ do
-        pendingWith "Solc has problem passing enums between contracts"
         let solPath = "./test/contracts/UserManager.sol"
             expectedPath = "./test/contracts/UserManagerGetSource.sol"
         testAugment solPath expectedPath
@@ -104,7 +102,6 @@ solcSpec =
             expectedPath = "./test/contracts/AdminInterfaceGetSource.sol"
         testAugmentNoCompile solPath expectedPath
       it "should augment and compile AdminInterface code" $ do
-        pendingWith "Solc has problem passing enums between contracts"
         let solPath = "./test/contracts/AdminInterface.sol"
             expectedPath = "./test/contracts/AdminInterfaceGetSource.sol"
         testAugment solPath expectedPath
