@@ -1,58 +1,63 @@
 import React from 'react';
 import HexText from '../../components/HexText';
 
-describe('Test Hextext index', () => {
+describe('Hextext: index', () => {
 
-  test('should render with empty values', () => {
-    const props = {};
+  describe('render component', () => {
+    test('without values', () => {
+      const props = {};
 
-    const wrapper = shallow(
-      <HexText {...props} />
-    );
+      const wrapper = shallow(
+        <HexText {...props} />
+      );
 
-    expect(wrapper).toMatchSnapshot();
-  })
+      expect(wrapper).toMatchSnapshot();
+    });
 
-  test('should render with mocked values', () => {
-    const props = {
-      value: 'Hextext Name',
-      classes: 'class'
-    };
+    test('with values', () => {
+      const props = {
+        value: 'Hextext Name',
+        classes: 'class'
+      };
 
-    const wrapper = shallow(
-      <HexText {...props} />
-    );
+      const wrapper = shallow(
+        <HexText {...props} />
+      );
 
-    expect(wrapper).toMatchSnapshot();
-  })
+      expect(wrapper).toMatchSnapshot();
+    });
+  });
 
-  test('should copy value', () => {
-    const props = {
-      value: 'Hextext Name',
-      classes: 'class'
-    };
+  describe('clipboard', () => {
+    test('copy text', () => {
+      const props = {
+        value: 'Hextext Name',
+        classes: 'class'
+      };
 
-    const wrapper = shallow(
-      <HexText {...props} />
-    );
+      const wrapper = shallow(
+        <HexText {...props} />
+      );
 
-    wrapper.find('span').at(1).simulate('click', { stopPropagation() { }, preventDefault() { } }, wrapper.setState({ copied: true }))
-    expect(wrapper.state('copied')).toBe(true);
-  })
+      wrapper.find('span').at(1).simulate('click', { stopPropagation() { }, preventDefault() { } });
+      wrapper.find('CopyToClipboard').get(0).props.onCopy();
+      expect(wrapper.state('copied')).toBe(true);
+    })
 
-  test('should reset copied on mouse out', () => {
-    const props = {
-      value: 'Hextext Name',
-      classes: 'class'
-    };
+    test('reset copied', () => {
+      const props = {
+        value: 'Hextext Name',
+        classes: 'class'
+      };
 
-    const wrapper = mount(
-      <HexText {...props} />
-    );
+      const wrapper = mount(
+        <HexText {...props} />
+      );
 
-    wrapper.setState({ copied: true })
-    wrapper.find('span').at(3).simulate('mouseOut');
-    expect(wrapper.state('copied')).toBe(false);
-  })
+      wrapper.setState({ copied: true });
+      wrapper.find('span').at(3).simulate('mouseOut');
+      expect(wrapper.state('copied')).toBe(false);
+    })
+  });
 
-})
+});
