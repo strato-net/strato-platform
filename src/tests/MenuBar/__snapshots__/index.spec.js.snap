@@ -1,0 +1,55 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`MenuBar: index button execute block api 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  Bloc API
+</button>
+`;
+
+exports[`MenuBar: index button execute stato api 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  STRATO API
+</button>
+`;
+
+exports[`MenuBar: index mapStateToProps 1`] = `Object {}`;
+
+exports[`MenuBar: index render component 1`] = `
+"<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div>
+      <Link to=\\"/home\\" replace={false}>
+        <img src={{...}} alt=\\"Blockapps Logo\\" height=\\"32\\" className=\\"smd-menu-logo\\" />
+      </Link>
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-left\\">
+    <div className=\\"pt-navbar-heading\\">
+      STRATO Management Dashboard
+    </div>
+  </div>
+  <div className=\\"pt-navbar-group pt-align-right\\">
+    <small className=\\"pt-text-muted\\">
+      v
+       
+    </small>
+    <span className=\\"pt-navbar-divider\\" />
+    <a href=\\"http://localhost/docs/?url=/bloc/v2.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\" id=\\"tour-bloc-api-button\\">
+      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function]}>
+        Bloc API
+      </button>
+    </a>
+    <a href=\\"http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+      <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function]}>
+        STRATO API
+      </button>
+    </a>
+  </div>
+</nav>"
+`;

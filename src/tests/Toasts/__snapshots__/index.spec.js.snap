@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Toasts: index render component 1`] = `
+Object {
+  "autoFocus": false,
+  "canEscapeKeyClear": true,
+  "className": "pt-dark",
+  "inline": true,
+  "position": 1,
+}
+`;
