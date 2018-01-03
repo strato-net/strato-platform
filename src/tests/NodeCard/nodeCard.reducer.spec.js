@@ -3,35 +3,39 @@ import { preloadPeers, updatePeers, preloadCoinbase, updateCoinbase } from '../.
 import { node, nodeWithPeers } from '../Dashboard/dashboardMock';
 import { nodeCardInitialState } from './nodeCardMock';
 
-describe('Test nodeCard reducer', () => {
+describe('NodeCard: reducer', () => {
 
   // INITIAL_STATE
   test('should set initial state', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  // PRELOAD_PEERS
-  test('should store peers', () => {
-    const action = preloadPeers(node.peers);
-    expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
+  describe('PEERS', () => {
+    // PRELOAD_PEERS
+    test('store', () => {
+      const action = preloadPeers(node.peers);
+      expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
+    });
+
+    // PRELOAD_PEERS
+    test('update', () => {
+      const action = updatePeers(nodeWithPeers.peers);
+      expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
+    });
   });
 
-  // PRELOAD_PEERS
-  test('should update peers', () => {
-    const action = updatePeers(nodeWithPeers.peers);
-    expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
-  });
+  describe('COINBASE', () => {
+    // PRELOAD_COINBASE
+    test('store', () => {
+      const action = preloadCoinbase(node.coinbase);
+      expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
+    });
 
-  // PRELOAD_COINBASE
-  test('should store coinbase', () => {
-    const action = preloadCoinbase(node.coinbase);
-    expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
-  });
-
-  // PRELOAD_COINBASE
-  test('should update coinbase', () => {
-    const action = updateCoinbase({ coinbase: null });
-    expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
+    // PRELOAD_COINBASE
+    test('update', () => {
+      const action = updateCoinbase({ coinbase: null });
+      expect(reducer(nodeCardInitialState, action)).toMatchSnapshot();
+    });
   });
 
 });

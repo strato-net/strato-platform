@@ -6,24 +6,31 @@ import {
 } from '../../components/NodeCard/nodeCard.actions';
 import { node, nodeWithPeers } from '../Dashboard/dashboardMock';
 
+describe('NodeCard: actions', () => {
 
-describe('Test nodeCard actions', () => {
+  describe('peers', () => {
 
-  test('should load peers', () => {
-    expect(preloadPeers(node.peers)).toMatchSnapshot();
+    test('load', () => {
+      expect(preloadPeers(node.peers)).toMatchSnapshot();
+    });
+
+    test('update', () => {
+      expect(updatePeers(nodeWithPeers.peers)).toMatchSnapshot();
+    });
+
   });
 
-  test('should update peers', () => {
-    expect(updatePeers(nodeWithPeers.peers)).toMatchSnapshot();
-  });
+  describe('coinbase ', () => {
 
-  test('should load coinbase', () => {
-    expect(preloadCoinbase(node.coinbase)).toMatchSnapshot();
-  });
+    test('load', () => {
+      expect(preloadCoinbase(node.coinbase)).toMatchSnapshot();
+    });
 
-  test('should update coinbase', () => {
-    let coinbase = { coinbase: null }
-    expect(updateCoinbase(coinbase)).toMatchSnapshot();
+    test('update', () => {
+      let coinbase = { coinbase: null }
+      expect(updateCoinbase(coinbase)).toMatchSnapshot();
+    });
+
   });
 
 });

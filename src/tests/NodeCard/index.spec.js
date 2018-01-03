@@ -2,47 +2,51 @@ import React from 'react';
 import NodeCard, { mapStateToProps } from "../../components/NodeCard/index";
 import { dashboard, node, initialState } from '../Dashboard/dashboardMock';
 
-describe('Test NodeCard index', () => {
+describe('NodeCard: index', () => {
 
-  test('should render with empty values', () => {
-    const props = {
-      node: {
-        "name": "LOCALHOST",
-        "peers": null,
-        "coinbase": null
-      },
-      dashboard: initialState,
-      subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
-    };
-    const wrapper = shallow(
-      <NodeCard.WrappedComponent {...props} />
-    );
+  describe('render component', () => {
 
-    expect(wrapper).toMatchSnapshot();
+    test('without values', () => {
+      const props = {
+        node: {
+          "name": "LOCALHOST",
+          "peers": null,
+          "coinbase": null
+        },
+        dashboard: initialState,
+        subscribeRoom: jest.fn(),
+        unSubscribeRoom: jest.fn()
+      };
+      const wrapper = shallow(
+        <NodeCard.WrappedComponent {...props} />
+      );
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        dashboard,
+        node,
+        subscribeRoom: jest.fn(),
+        unSubscribeRoom: jest.fn()
+      };
+
+      const wrapper = shallow(
+        <NodeCard.WrappedComponent {...props} />
+      );
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
   });
 
-  test('should render with mocked values', () => {
+  test('expand card on click', () => {
     const props = {
       dashboard,
       node,
-      subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
-    };
-
-    const wrapper = shallow(
-      <NodeCard.WrappedComponent {...props} />
-    );
-
-    expect(wrapper).toMatchSnapshot();
-  })
-
-  test('should change state on handleClick', () => {
-    const props = {
-      dashboard,
-      node,
-      subscribeRoom: () => { },
-      unSubscribeRoom: () => { }
+      subscribeRoom: jest.fn(),
+      unSubscribeRoom: jest.fn()
     };
 
     const wrapper = shallow(
@@ -54,15 +58,15 @@ describe('Test NodeCard index', () => {
     expect(wrapper.state('isOpen')).toBe(true);
     wrapper.find('div').at(1).simulate('click');
     expect(wrapper.state('isOpen')).toBe(false);
-  })
+  });
 
-  test('should test component functions', () => {
+  test('valid functions as a props', () => {
     const props = {
       dashboard,
       node,
       subscribeRoom: jest.fn().mockReturnValue('subscribeRoom'),
       unSubscribeRoom: jest.fn().mockReturnValue('unSubscribeRoom')
-    }
+    };
 
     const wrapper = shallow(
       <NodeCard.WrappedComponent {...props} />
@@ -72,12 +76,12 @@ describe('Test NodeCard index', () => {
     expect(wrapper.instance().props.unSubscribeRoom()).toBe('unSubscribeRoom');
   });
 
-  test('should invoke subscribeRoom on componentDidMount', () => {
+  test('componentDidMount', () => {
     const props = {
       dashboard,
       node,
       subscribeRoom: jest.fn(),
-      unSubscribeRoom: () => { }
+      unSubscribeRoom: jest.fn()
     };
 
     const wrapper = shallow(
@@ -86,13 +90,13 @@ describe('Test NodeCard index', () => {
 
     expect(props.subscribeRoom).toHaveBeenCalled();
     expect(props.subscribeRoom.mock.calls).toEqual([["GET_COINBASE"], ["GET_PEERS"]]);
-  })
+  });
 
-  test('should invoke componentWillUnmount', () => {
+  test('componentWillUnmount', () => {
     const props = {
       dashboard,
       node,
-      subscribeRoom: () => { },
+      subscribeRoom: jest.fn(),
       unSubscribeRoom: jest.fn(),
     };
 
@@ -100,18 +104,18 @@ describe('Test NodeCard index', () => {
       <NodeCard.WrappedComponent {...props} />
     );
 
-    wrapper.instance().componentWillUnmount();
+    wrapper.unmount();
     expect(props.unSubscribeRoom).toHaveBeenCalled();
     expect(props.unSubscribeRoom.mock.calls).toEqual([["GET_COINBASE"], ["GET_PEERS"]]);
-  })
+  });
 
-  test('test mapStateToProps function', () => {
+  test('mapStateToProps', () => {
     const state = {
       dashboard,
       node
     };
 
     expect(mapStateToProps(state)).toMatchSnapshot();
-  })
+  });
 
-})
+});
