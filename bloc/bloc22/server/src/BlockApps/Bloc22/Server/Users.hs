@@ -73,7 +73,7 @@ postUsersFill :: UserName  -> Address -> Bool-> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
   hash <- blocStrato $ postFaucet addr
-  getBlocTransactionResult hash resolve
+  getBlocTransactionResult' hash resolve
 
 postUsersSend :: UserName -> Address -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr resolve
@@ -82,7 +82,7 @@ postUsersSend userName addr resolve
       userName password addr (Just toAddr) (fromMaybe emptyTxParams txParams)
       (Wei (fromIntegral $ unStrung value)) ByteString.empty 0
     hash <- blocStrato $ postTx tx
-    getBlocTransactionResult hash resolve
+    getBlocTransactionResult' hash resolve
 
 postUsersContract :: UserName -> Address -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr resolve
@@ -116,7 +116,7 @@ postUsersContract userName addr resolve
       , constant cmId
       , constant contractdetailsName
       )
-    getBlocTransactionResult hash resolve
+    getBlocTransactionResult' hash resolve
 
 postUsersUploadList :: UserName -> Address -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resolve) = do
@@ -143,7 +143,7 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
       , constant cmId
       , constant name
       )
-    getBlocTransactionResult hash (resolve || _resolve)
+    getBlocTransactionResult' hash (resolve || _resolve)
 
 postUsersSendList :: UserName -> Address -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
 postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = do
@@ -151,7 +151,7 @@ postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = 
     userName pw addr (Just toAddr) (fromMaybe emptyTxParams txParams)
     (Wei (fromIntegral $ unStrung value)) ByteString.empty nonceIncr
   hashes <- blocStrato $ postTxList txs'
-  forM hashes $ flip getBlocTransactionResult (resolve || resolve')
+  forM hashes $ flip getBlocTransactionResult' (resolve || resolve')
 
 ensureMostRecentSuccessfulTx
   :: [TransactionResult]
@@ -211,7 +211,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
       , constant cmId
       , constant funcName
       )
-    getBlocTransactionResult hash (resolve || postmethodlistrequestResolve)
+    getBlocTransactionResult' hash (resolve || postmethodlistrequestResolve)
 
 postUsersContractMethod
   :: UserName
@@ -261,11 +261,14 @@ postUsersContractMethod
       , constant cmId
       , constant funcName
       )
-    getBlocTransactionResult hash resolve
+    getBlocTransactionResult' hash resolve
 
 getBatchBlocTransactionResult :: [Keccak256] -> Bool -> Bloc [BlocTransactionResult]
 getBatchBlocTransactionResult hashes resolve = do
-  forM hashes $ \h -> getBlocTransactionResult h resolve
+  forM hashes $ \h -> getBlocTransactionResult' h resolve
+
+getBlocTransactionResult' :: Keccak256 -> Bool -> Bloc BlocTransactionResult
+getBlocTransactionResult' hash resolve = if resolve then (getBlocTransactionResult hash True) else return (BlocTransactionResult Pending hash Nothing Nothing)
 
 getBlocTransactionResult :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult hash resolve = do
