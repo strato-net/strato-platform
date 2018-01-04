@@ -211,10 +211,12 @@ getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
-  fileContents <- parseXabi "" (unpack src)
+  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
   let singleLineSrc = stripLines src
-      modifiedContents = List.map (fmap $ addFunction ("__getSource__", "return \"" <> unpack singleLineSrc <> "\";  ")) fileContents
+      modifiedContents = List.map (\(t,(x,i)) -> (t, (addF singleLineSrc x, i))) fileContents -- :: [(Text, (Xabi, [Text]))]
   return . pack . unparse $ modifiedContents
+  where
+    addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines

@@ -73,11 +73,7 @@ solcSpec =
         let solPath = "./test/contracts/ProjectEvent.sol"
             expectedPath = "./test/contracts/ProjectEventGetSource.sol"
         testAugment solPath expectedPath
-      it "should augment ProjectManager code without compiling" $ do
-        let solPath = "./test/contracts/ProjectManager.sol"
-            expectedPath = "./test/contracts/ProjectManagerGetSource.sol"
-        testAugmentNoCompile solPath expectedPath
-      it "should compile and augment ProjectManager code" $ do
+      it "should augment ProjectManager code" $ do
         let solPath = "./test/contracts/ProjectManager.sol"
             expectedPath = "./test/contracts/ProjectManagerGetSource.sol"
         testAugment solPath expectedPath
@@ -89,19 +85,11 @@ solcSpec =
         let solPath = "./test/contracts/User.sol"
             expectedPath = "./test/contracts/UserGetSource.sol"
         testAugment solPath expectedPath
-      it "should augment UserManager code without compiling" $ do
-        let solPath = "./test/contracts/UserManager.sol"
-            expectedPath = "./test/contracts/UserManagerGetSource.sol"
-        testAugmentNoCompile solPath expectedPath
-      it "should augment and compile UserManager code" $ do
+      it "should augment UserManager code" $ do
         let solPath = "./test/contracts/UserManager.sol"
             expectedPath = "./test/contracts/UserManagerGetSource.sol"
         testAugment solPath expectedPath
-      it "should augment AdminInterface code without compiling" $ do
-        let solPath = "./test/contracts/AdminInterface.sol"
-            expectedPath = "./test/contracts/AdminInterfaceGetSource.sol"
-        testAugmentNoCompile solPath expectedPath
-      it "should augment and compile AdminInterface code" $ do
+      it "should augment AdminInterface code" $ do
         let solPath = "./test/contracts/AdminInterface.sol"
             expectedPath = "./test/contracts/AdminInterfaceGetSource.sol"
         testAugment solPath expectedPath
@@ -134,17 +122,6 @@ testAugment solPath expectedPath = do
   expectedXabi <- fromEither $ parseXabi "" (unpack expected)
   augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
   void . fromEither =<< compileSolcIO (pack augmentedSrc)
-  augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
-  augmentedXabi `shouldBe` expectedXabi
-
-testAugmentNoCompile :: String -> String -> IO ()
-testAugmentNoCompile solPath expectedPath = do
-  soliditySrc <- pack <$> readFile solPath
-  --void . fromEither =<< compileSolcIO soliditySrc
-  expected <- (pack . concat . lines) <$> readFile expectedPath
-  expectedXabi <- fromEither $ parseXabi "" (unpack expected)
-  augmentedSrc <- unpack <$> (fromEither $ addGetSourceFuncToSource soliditySrc)
-  --void . fromEither =<< compileSolcIO (pack augmentedSrc)
   augmentedXabi <- fromEither $ parseXabi "" augmentedSrc
   augmentedXabi `shouldBe` expectedXabi
 

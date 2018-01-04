@@ -23,13 +23,17 @@ import qualified BlockApps.Solidity.Xabi.Def as Xabi
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
-unparse :: [(Text, Xabi)] -> String
+unparse :: [(Text, (Xabi, [Text]))] -> String
 unparse contracts = List.concat $ List.map unparseContract contracts
 
-unparseContract :: (Text, Xabi) -> String
-unparseContract (name, contract) =
+unparseContract :: (Text, (Xabi, [Text])) -> String
+unparseContract (name, (contract,inherited)) =
      "contract "
   <> Text.unpack name
+  <> (case inherited of
+        [] -> ""
+        xs -> " is " <> Text.unpack (intercalate ", " xs)
+     )
   <> "{"
   <> List.concat (List.map ((" " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
   <> List.concat (List.map ((" " <>) . unparseTypes) (Map.toList $ xabiTypes contract))

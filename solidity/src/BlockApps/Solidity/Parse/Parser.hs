@@ -29,6 +29,11 @@ parseXabi filename input = do
 
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
+parseXabiNoInheritanceMerge :: FileName -> String -> Either String [(Text, (Xabi, [Text]))]
+parseXabiNoInheritanceMerge filename input = do
+  showError $ runParser solidityFile "" filename input
+
+
 addContractNames::[String]->Xabi->Xabi
 addContractNames contracts xabi =
   xabi{xabiTypes=xabiTypes xabi `Map.union` Map.fromList (map ((\x -> (x, Contract 0)) . Text.pack) contracts)}
