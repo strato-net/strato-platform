@@ -188,7 +188,12 @@ spec =
           randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
           let contractName = contractName' <> "_" <> randNum
               src = replace contractName' contractName src'
-              constArgs = Nothing
+              constArgs = Just $ Map.fromList
+                          [ ("_id", ArgInt 321)
+                          , ("_name", ArgString "TestName")
+                          , ("_supplier", ArgString "TestSupp")
+                          , ("_amount", ArgInt 123)
+                          ]
           cAddr <- createContractOnMulti src contractName constArgs config
           void $ getStateLocal cAddr contractName config
         it "should pull data from strato and get contract state for an uploaded ProjectState" $ \ config@TestConfig {..} -> do
@@ -208,7 +213,15 @@ spec =
           randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
           let contractName = contractName' <> "_" <> randNum
               src = replace contractName' contractName src'
-              constArgs = Nothing
+              constArgs = Just $ Map.fromList
+                          [ ("_name", ArgString "TestName")
+                          , ("_buyer", ArgString "TestBuyer")
+                          , ("_description", ArgString "TestDesc")
+                          , ("_spec", ArgString "TestSpec")
+                          , ("_price", ArgInt 1)
+                          , ("_created", ArgInt 2)
+                          , ("_targetDelivery", ArgInt 3)
+                          ]
           cAddr <- createContractOnMulti src contractName constArgs config
           void $ getStateLocal cAddr contractName config
         it "should pull data from strato and get contract state for an uploaded ProjectEvent" $ \ config@TestConfig {..} -> do
@@ -248,7 +261,13 @@ spec =
           randNum <- (pack . show . abs) <$> (generate arbitrary :: IO Int)
           let contractName = contractName' <> "_" <> randNum
               src = replace contractName' contractName src'
-              constArgs = Nothing
+              constArgs = Just $ Map.fromList
+                          [ ("_account", ArgString "deadbeef")
+                          , ("_username", ArgString "username")
+                          , ("_pwHash", ArgString "00000000000000000000000000000000000000000000000000000000beefdead")
+                          , ("_id", ArgInt 1)
+                          , ("_role", ArgInt 1)
+                          ]
           cAddr <- createContractOnMulti src contractName constArgs config
           void $ getStateLocal cAddr contractName config
         it "should pull data from strato and get contract state for an uploaded UserManager" $ \ config@TestConfig {..} -> do
