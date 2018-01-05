@@ -213,12 +213,13 @@ addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
   fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
-  let
-      src' = replace "\n" "\\n" src
+  let src' = formatSrc src
       modifiedContents = List.map (fmap (first (addF src'))) fileContents
   return . pack . unparse $ modifiedContents
   where
     addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
+    formatSrc = replace "\"" "\\\""
+              . replace "\n" "\\n" 
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines

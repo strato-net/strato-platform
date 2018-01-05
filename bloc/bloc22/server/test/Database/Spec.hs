@@ -98,7 +98,15 @@ solcSpec =
       it "should augment SimpleComment code" $ do
         let solPath = "./test/contracts/SimpleComment.sol"
             expectedPath = "./test/contracts/SimpleCommentGetSource.sol"
-        writeAugment solPath expectedPath
+        testAugment solPath expectedPath
+      it "should augment SimpleString code" $ do
+        let solPath = "./test/contracts/SimpleString.sol"
+            expectedPath = "./test/contracts/SimpleStringGetSource.sol"
+        testAugment solPath expectedPath
+      it "should augment BlockAppsBABlob code" $ do
+        let solPath = "./test/contracts/BlockAppsBABlob.sol"
+            expectedPath = "./test/contracts/BlockAppsBABlobGetSource.sol"
+        testAugment solPath expectedPath
 
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do

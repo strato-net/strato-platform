@@ -40,6 +40,7 @@ import           GHC.Stack
 import           Opaleye                         hiding (not, null)
 import qualified Opaleye                         (not, null)
 
+
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Crypto
 import           BlockApps.Bloc22.Database.Tables
