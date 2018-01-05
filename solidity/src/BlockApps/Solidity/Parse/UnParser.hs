@@ -88,7 +88,7 @@ unparseFunc (name, Func{..}) =
           <> ") "
     <> "{ "
     <> case funcContents of
-        Just contents -> (Text.concat . Text.lines $ contents)
+        Just contents -> contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
     <> "}"
 
@@ -100,7 +100,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
   <> ") {"
   <> case modifierContents of
-       Just contents -> (Text.concat . Text.lines $ contents)
+       Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
   <> "}"
 

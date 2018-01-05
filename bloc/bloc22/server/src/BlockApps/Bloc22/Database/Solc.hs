@@ -5,6 +5,7 @@
 module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
+import           Control.Arrow              (first)
 import           Data.Aeson hiding (String)
 import Data.Monoid ((<>))
 import qualified Data.List                  as List
@@ -212,8 +213,9 @@ addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
   fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
-  let singleLineSrc = stripLines src
-      modifiedContents = List.map (\(t,(x,i)) -> (t, (addF singleLineSrc x, i))) fileContents -- :: [(Text, (Xabi, [Text]))]
+  let
+      src' = replace "\n" "\\n" src
+      modifiedContents = List.map (fmap (first (addF src'))) fileContents
   return . pack . unparse $ modifiedContents
   where
     addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
