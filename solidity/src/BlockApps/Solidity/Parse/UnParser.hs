@@ -34,13 +34,13 @@ unparseContract (name, (contract,inherited)) =
         [] -> ""
         xs -> " is " <> Text.unpack (intercalate ", " xs)
      )
-  <> "{"
-  <> List.concat (List.map ((" " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
-  <> List.concat (List.map ((" " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
-  <> List.concat (List.map ((" " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
-  <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
-  <> List.concat (List.map ((" " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
-  <> "}"
+  <> " {\n"
+  <> List.concat (List.map (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
+  <> List.concat (List.map (("\n    " <>) . unparseTypes) (Map.toList $ xabiTypes contract))
+  <> List.concat (List.map (("\n    " <>) . unparseModifier) (Map.toList $ xabiModifiers contract))
+  <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiConstr contract))
+  <> List.concat (List.map (("\n    " <>) . unparseFunc) (Map.toList $ xabiFuncs contract))
+  <> "\n}"
 
 unparseVar :: (Text, VarType) -> String
 unparseVar (name, theType) =
@@ -86,11 +86,11 @@ unparseFunc (name, Func{..}) =
               "returns ("
           <> intercalate ", " (List.map unparseVals vals)
           <> ") "
-    <> "{ "
+    <> "{\n        "
     <> case funcContents of
         Just contents -> contents --(Text.concat . Text.lines $ contents)
         Nothing -> ""
-    <> "}"
+    <> "\n    }"
 
 unparseModifier :: (Text, Modifier) -> String
 unparseModifier (name, Modifier{..}) = Text.unpack $
@@ -98,15 +98,19 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> name
   <> "("
   <> intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
-  <> ") {"
+  <> ") {\n        "
   <> case modifierContents of
        Just contents -> contents --(Text.concat . Text.lines $ contents)
        Nothing -> ""
-  <> "}"
+  <> "\n    }"
 
 unparseTypes :: (Text, Xabi.Def) -> String
 unparseTypes (name, Xabi.Enum {names=names'}) = 
-  Text.unpack $ "enum " <> name <>  " {" <> Text.intercalate ", " names' <> " }"
+  Text.unpack $ "enum "
+             <> name
+             <> " {\n      "
+             <> Text.intercalate ",\n      " names'
+             <> "\n    }"
 unparseTypes (_name, _def) = ""
 
 unparseArgs :: (Text, IndexedType) -> Text
