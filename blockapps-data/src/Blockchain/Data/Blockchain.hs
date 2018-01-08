@@ -14,7 +14,7 @@
 
 module Blockchain.Data.Blockchain
     (
-      createDB, migrateDB, insertBlockchain
+      createDB, migrateDB, insertBlockchain, migrateAll
     ) where
 
 import qualified Blockchain.Colors           as CL
