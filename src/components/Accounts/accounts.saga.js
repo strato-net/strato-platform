@@ -29,7 +29,7 @@ const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
 const faucetUrl = env.STRATO_URL + "/faucet"
 
-function getAccountsApi() {
+export function getAccountsApi() {
   return fetch(
     usernameUrl,
     {
@@ -46,7 +46,7 @@ function getAccountsApi() {
   })
 }
 
-function getUserAddressesApi(username) {
+export function getUserAddressesApi(username) {
   return fetch(
     addressUrl.replace(':user', username),
     {
@@ -64,7 +64,7 @@ function getUserAddressesApi(username) {
   });
 }
 
-function getAccountDetailApi(address) {
+export function getAccountDetailApi(address) {
   return fetch(
     accountDataUrl.replace(":address", address),
     {
@@ -82,7 +82,7 @@ function getAccountDetailApi(address) {
   });
 }
 
-function postFaucet(address) {
+export function postFaucet(address) {
   return fetch(
     faucetUrl,
     {
@@ -101,7 +101,7 @@ function postFaucet(address) {
   })
 }
 
-function* getAccounts(action) {
+export function* getAccounts(action) {
   try {
     const response = yield call(getAccountsApi);
     yield put(fetchAccountsSuccess(response));
@@ -119,7 +119,7 @@ function* getAccounts(action) {
   }
 }
 
-function* getUserAddresses(action) {
+export function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
     yield put(fetchUserAddressesSuccess(action.name, response));
@@ -132,7 +132,7 @@ function* getUserAddresses(action) {
   }
 }
 
-function* getAccountDetail(action) {
+export function* getAccountDetail(action) {
   try {
     const response = yield call(getAccountDetailApi, action.address);
     // don't ask about response['0'].
@@ -143,7 +143,7 @@ function* getAccountDetail(action) {
   }
 }
 
-function* faucetAccount(action) {
+export function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.address);
     yield put(faucetSuccess());

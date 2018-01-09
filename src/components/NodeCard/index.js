@@ -57,7 +57,7 @@ class NodeCard extends Component {
               <small>Coinbase</small>
             </div>
             <div className="col-xs-9">
-              <small> <HexText value={node.coinbase.coinbase} classes="smd-pad-2" /> </small>
+              <small> <HexText value={node && node.coinbase && node.coinbase.coinbase} classes="smd-pad-2" /> </small>
             </div>
           </div>
           <div className="row pt-text-muted">
@@ -85,7 +85,7 @@ class NodeCard extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     dashboard: state.dashboard,
     node: state.node

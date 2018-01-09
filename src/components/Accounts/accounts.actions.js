@@ -91,7 +91,6 @@ export const fetchAccountDetailFailure = function(name, address, error) {
   }
 };
 
-
 export const faucetRequest = function(name, address) {
   return {
     type: FAUCET_REQUEST,

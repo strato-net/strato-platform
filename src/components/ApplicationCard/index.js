@@ -52,7 +52,7 @@ class ApplicationCard extends Component {
 }
 
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isLoading: state.applications.isLoading,
     url: state.applications.url

@@ -1,0 +1,43 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CreateUser: reducer close overlay 1`] = `
+Object {
+  "isOpen": false,
+}
+`;
+
+exports[`CreateUser: reducer create user on failure 1`] = `
+Object {
+  "error": "ERROR",
+  "isOpen": false,
+  "spinning": false,
+}
+`;
+
+exports[`CreateUser: reducer create user on request 1`] = `
+Object {
+  "isOpen": true,
+  "spinning": true,
+}
+`;
+
+exports[`CreateUser: reducer create user on success 1`] = `
+Object {
+  "isOpen": false,
+  "response": undefined,
+  "spinning": false,
+}
+`;
+
+exports[`CreateUser: reducer open overlay 1`] = `
+Object {
+  "isOpen": true,
+}
+`;
+
+exports[`CreateUser: reducer set initial state 1`] = `
+Object {
+  "compileSuccess": false,
+  "isOpen": false,
+}
+`;

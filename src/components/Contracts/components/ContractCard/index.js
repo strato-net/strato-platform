@@ -213,7 +213,7 @@ class ContractCard extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
   };
 }

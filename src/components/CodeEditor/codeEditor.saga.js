@@ -14,7 +14,7 @@ import { env } from '../../env';
 const compileUrl = env.STRATO_URL + "/extabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
-function tokenizeSource(source) {
+export function tokenizeSource(source) {
   return fetch(
     compileUrl,
     {
@@ -39,7 +39,8 @@ function tokenizeSource(source) {
     });
 }
 
-function compileSource(contractName, source) {
+export function compileSource(contractName, source) {
+  
   const searchable = [];
   return fetch(blocCompileUrl, {
     method: 'POST',
@@ -67,7 +68,7 @@ function compileSource(contractName, source) {
   });
 }
 
-function* compileCodeFromEditor(action) {
+export function* compileCodeFromEditor(action) {
   try {
     let response
     response = yield call(tokenizeSource, action.code);
