@@ -2,7 +2,7 @@ import React, {Component} from 'react';
 import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button} from '@blueprintjs/core';
-import * as moment from 'moment';
+import { parseDateFromString } from '../../../../lib/dateUtils';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
 import HexText from '../../../HexText';
@@ -69,7 +69,7 @@ class TransactionView extends Component {
                 </tr>
                 <tr>
                   <td><strong>Timestamp</strong></td>
-                  <td>{moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}</td>
+                  <td>{parseDateFromString(tx.timestamp)}</td>
                 </tr>
                 <tr>
                   <td><strong>V</strong></td>
