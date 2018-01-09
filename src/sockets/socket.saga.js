@@ -48,9 +48,9 @@ import {
 } from '../components/TransactionList/transactionList.actions'
 import { env } from '../env'
 
-const socket = io(env.SOCKET_SERVER, {path: '/apex-ws', transports: ['websocket']});
+const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket'] });
 
-function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
+export function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   socket.on(`PRELOAD_${room}`, data => {
     eventChannelEmit(preloadAction(data));
   })
@@ -60,7 +60,7 @@ function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   })
 }
 
-function subscribe() {
+export function subscribe() {
   return eventChannel(emit => {
     registerActions(emit, LAST_BLOCK_NUMBER, preloadBlockNumber, updateBlockNumber)
     registerActions(emit, USERS_COUNT, preloadUsersCount, updateUsersCount)
@@ -80,7 +80,7 @@ function subscribe() {
   });
 }
 
-function* readSocketEvents() {
+export function* readSocketEvents() {
   const channel = yield call(subscribe);
   while (true) {
     let action = yield take(channel);
@@ -88,7 +88,7 @@ function* readSocketEvents() {
   }
 }
 
-function* socketSubscribeUnsubscribeRoom(action) {
+export function* socketSubscribeUnsubscribeRoom(action) {
   yield socket.emit(action.name)
 }
 

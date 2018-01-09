@@ -20,7 +20,7 @@ const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress/s
 const cirrusUrl = env.CIRRUS_URL + '/:contractName'
 const accountUrl = env.STRATO_URL + '/account?address=:address'
 
-function getState(contractName, contractAddress) {
+export function getState(contractName, contractAddress) {
   return fetch(
     contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress),
     {
@@ -29,15 +29,15 @@ function getState(contractName, contractAddress) {
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json()
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
-function getCirrusInstances(contractName){
+export function getCirrusInstances(contractName) {
   return fetch(
     cirrusUrl.replace(':contractName', contractName),
     {
@@ -46,18 +46,18 @@ function getCirrusInstances(contractName){
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
-      if(response.status === 404) {
+    .then(function (response) {
+      if (response.status === 404) {
         throw new Error('No dice!')
       }
       return response.json()
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
-function getAccount(address) {
+export function getAccount(address) {
   return fetch(
     accountUrl.replace(":address", address),
     {
@@ -66,14 +66,14 @@ function getAccount(address) {
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json();
-    }).catch(function(error){
+    }).catch(function (error) {
       throw error;
     });
 }
 
-function* fetchState(action) {
+export function* fetchState(action) {
   try {
     let response = yield call(getState, action.name, action.address);
     yield put(fetchStateSuccess(action.name, action.address, response));
@@ -83,22 +83,22 @@ function* fetchState(action) {
   }
 }
 
-function* fetchCirrusInstances(action) {
+export function* fetchCirrusInstances(action) {
   try {
     let response = yield call(getCirrusInstances, action.name);
     yield put(fetchCirrusInstancesSuccess(action.name, response));
   }
-  catch(err) {
-    yield put(fetchCirrusInstancesFailure(action.name,err));
+  catch (err) {
+    yield put(fetchCirrusInstancesFailure(action.name, err));
   }
 }
 
-function* fetchAccount(action) {
+export function* fetchAccount(action) {
   try {
     let response = yield call(getAccount, action.address);
     yield put(fetchAccountSuccess(action.name, action.address, response));
   }
-  catch(err) {
+  catch (err) {
     yield put(fetchAccountFailure(action.name, action.address, err));
   }
 }

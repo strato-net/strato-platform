@@ -1,0 +1,284 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Contracts: reducer fetch account success 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "balance": 0,
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+          "selected": true,
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": null,
+  "filter": "Just to test filter",
+}
+`;
+
+exports[`Contracts: reducer fetch cirrus instances success 1`] = `
+Object {
+  "instances": Array [
+    Object {
+      "address": "b7b986bf23faebd8d745c65fa42a8c2f0fc2ebb9",
+      "greetingB": "",
+    },
+  ],
+  "name": "GreeterB",
+  "type": "FETCH_CIRRUS_INSTANCES_SUCCESS",
+}
+`;
+
+exports[`Contracts: reducer fetch contracts on failure 1`] = `
+Object {
+  "contracts": Object {},
+  "error": "ERROR",
+  "filter": "",
+}
+`;
+
+exports[`Contracts: reducer fetch contracts on success 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Contracts: reducer fetch contracts request 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": null,
+  "filter": "Just to test filter",
+}
+`;
+
+exports[`Contracts: reducer fetch state success 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+          "selected": true,
+          "state": Object {
+            "greetA": "function () returns (Address)",
+            "greetingA": "Aaaaaaaaa",
+          },
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": "ERROR",
+  "filter": "Just to test filter",
+}
+`;
+
+exports[`Contracts: reducer on change contract filter 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": null,
+  "filter": "Just to test filter",
+}
+`;
+
+exports[`Contracts: reducer select contract instance 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+          "selected": true,
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": "ERROR",
+  "filter": "Just to test filter",
+}
+`;
+
+exports[`Contracts: reducer set initial state 1`] = `
+Object {
+  "contracts": Object {},
+  "error": null,
+  "filter": "",
+}
+`;

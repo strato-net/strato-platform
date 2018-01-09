@@ -70,7 +70,7 @@ class TransactionList extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     transactions: state.transactions.transactions
   };

@@ -20,7 +20,7 @@ class CreateUser extends Component {
   }
 
   render() {
-
+    
     return (
       <div className="smd-pad-16">
         <Button onClick={() => {
@@ -122,7 +122,7 @@ class CreateUser extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   let errors = {errors: undefined};
   if (state.form && state.form["create-user"]) {
     errors = {errors: state.form["create-user"].syncErrors}
@@ -133,7 +133,7 @@ function mapStateToProps(state) {
   };
 }
 
-function validate (values) {
+export function validate (values) {
   const errors = {};
   if (!values.username) {
     errors.username = "Username Required";

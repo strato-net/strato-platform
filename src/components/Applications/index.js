@@ -15,7 +15,6 @@ class Applications extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track('launchpad_load');
-
     this.props.fetchApplications();
     this.startPoll();
   }
@@ -76,7 +75,7 @@ class Applications extends Component {
 
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     applications: state.applications.applications,
   };

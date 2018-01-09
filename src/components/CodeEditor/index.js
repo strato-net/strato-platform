@@ -83,12 +83,12 @@ class CodeEditor extends Component {
     });
   }
 
-  onTextUpdate() {
-    clearTimeout(this.timeout);
-    this.timeout = setTimeout(() => {
-      this.compileCode();
-    }, 3000);
-  }
+  // onTextUpdate() {
+  //   clearTimeout(this.timeout);
+  //   this.timeout = setTimeout(() => {
+  //     this.compileCode();
+  //   }, 3000);
+  // }
 
   compileCode() {
     this.props.onCompileFileLocally('')
@@ -234,7 +234,7 @@ class CodeEditor extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     selectedTabContent: getSelectedTabContent(state.codeEditor),
     codeEditorData: state.codeEditor

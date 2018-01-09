@@ -72,7 +72,6 @@ class Dashboard extends Component {
   }
 
   render() {
-
     const difficultyData = this.props.dashboard.blockDifficulty;
     const txCount = this.props.dashboard.transactionsCount;
     const blockPropData = this.props.dashboard.blockPropagation;
@@ -164,7 +163,7 @@ class Dashboard extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     node: state.node,
     dashboard: state.dashboard
