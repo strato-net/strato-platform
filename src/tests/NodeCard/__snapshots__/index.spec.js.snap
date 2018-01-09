@@ -415,6 +415,7 @@ ShallowWrapper {
         <Blueprint.Collapse
           component="div"
           isOpen={false}
+          keepChildrenMounted={false}
           transitionDuration={200}
         >
           <withRouter(Connect(PeersCard)) />
@@ -838,6 +839,7 @@ ShallowWrapper {
           "children": <withRouter(Connect(PeersCard)) />,
           "component": "div",
           "isOpen": false,
+          "keepChildrenMounted": false,
           "transitionDuration": 200,
         },
         "ref": null,
@@ -943,6 +945,7 @@ ShallowWrapper {
           <Blueprint.Collapse
             component="div"
             isOpen={false}
+            keepChildrenMounted={false}
             transitionDuration={200}
           >
             <withRouter(Connect(PeersCard)) />
@@ -1366,6 +1369,7 @@ ShallowWrapper {
             "children": <withRouter(Connect(PeersCard)) />,
             "component": "div",
             "isOpen": false,
+            "keepChildrenMounted": false,
             "transitionDuration": 200,
           },
           "ref": null,
@@ -1514,6 +1518,7 @@ ShallowWrapper {
         <Blueprint.Collapse
           component="div"
           isOpen={false}
+          keepChildrenMounted={false}
           transitionDuration={200}
         >
           <withRouter(Connect(PeersCard)) />
@@ -1937,6 +1942,7 @@ ShallowWrapper {
           "children": <withRouter(Connect(PeersCard)) />,
           "component": "div",
           "isOpen": false,
+          "keepChildrenMounted": false,
           "transitionDuration": 200,
         },
         "ref": null,
@@ -2042,6 +2048,7 @@ ShallowWrapper {
           <Blueprint.Collapse
             component="div"
             isOpen={false}
+            keepChildrenMounted={false}
             transitionDuration={200}
           >
             <withRouter(Connect(PeersCard)) />
@@ -2465,6 +2472,7 @@ ShallowWrapper {
             "children": <withRouter(Connect(PeersCard)) />,
             "component": "div",
             "isOpen": false,
+            "keepChildrenMounted": false,
             "transitionDuration": 200,
           },
           "ref": null,

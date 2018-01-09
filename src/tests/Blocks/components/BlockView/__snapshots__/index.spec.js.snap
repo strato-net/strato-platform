@@ -277,7 +277,7 @@ ShallowWrapper {
                         <Text
                           ellipsize={true}
                         >
-                          2017-12-26 12:02:44 PM
+                          2017-12-26 01:32:44 AM
                         </Text>
                       </small>
                     </td>
@@ -493,7 +493,7 @@ ShallowWrapper {
                         <Text
                           ellipsize={true}
                         >
-                          2017-12-26 12:02:44 PM
+                          2017-12-26 01:32:44 AM
                         </Text>
                       </small>
                     </td>
@@ -608,7 +608,7 @@ ShallowWrapper {
                         <Text
                           ellipsize={true}
                         >
-                          2017-12-26 12:02:44 PM
+                          2017-12-26 01:32:44 AM
                         </Text>
                       </small>
                     </td>
@@ -719,7 +719,7 @@ ShallowWrapper {
                         <Text
                           ellipsize={true}
                         >
-                          2017-12-26 12:02:44 PM
+                          2017-12-26 01:32:44 AM
                         </Text>
                       </small>
                     </td>
@@ -827,7 +827,7 @@ ShallowWrapper {
                           <Text
                             ellipsize={true}
                           >
-                            2017-12-26 12:02:44 PM
+                            2017-12-26 01:32:44 AM
                           </Text>
                         </small>
                       </td>
@@ -983,7 +983,7 @@ ShallowWrapper {
                             <Text
                               ellipsize={true}
                             >
-                              2017-12-26 12:02:44 PM
+                              2017-12-26 01:32:44 AM
                             </Text>
                           </small>
                         </td>
@@ -1394,7 +1394,7 @@ ShallowWrapper {
                               <Text
                                 ellipsize={true}
                               >
-                                2017-12-26 12:02:44 PM
+                                2017-12-26 01:32:44 AM
                               </Text>
                             </small>
                           </td>,
@@ -1422,7 +1422,7 @@ ShallowWrapper {
                               <Text
                                 ellipsize={true}
                               >
-                                2017-12-26 12:02:44 PM
+                                2017-12-26 01:32:44 AM
                               </Text>
                             </small>,
                           },
@@ -1435,7 +1435,7 @@ ShallowWrapper {
                               "children": <Text
                                 ellipsize={true}
                               >
-                                2017-12-26 12:02:44 PM
+                                2017-12-26 01:32:44 AM
                               </Text>,
                             },
                             "ref": null,
@@ -1444,11 +1444,11 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "class",
                               "props": Object {
-                                "children": "2017-12-26 12:02:44 PM",
+                                "children": "2017-12-26 01:32:44 AM",
                                 "ellipsize": true,
                               },
                               "ref": null,
-                              "rendered": "2017-12-26 12:02:44 PM",
+                              "rendered": "2017-12-26 01:32:44 AM",
                               "type": [Function],
                             },
                             "type": "small",
@@ -1607,7 +1607,7 @@ ShallowWrapper {
                           <Text
                             ellipsize={true}
                           >
-                            2017-12-26 12:02:44 PM
+                            2017-12-26 01:32:44 AM
                           </Text>
                         </small>
                       </td>
@@ -1823,7 +1823,7 @@ ShallowWrapper {
                           <Text
                             ellipsize={true}
                           >
-                            2017-12-26 12:02:44 PM
+                            2017-12-26 01:32:44 AM
                           </Text>
                         </small>
                       </td>
@@ -1938,7 +1938,7 @@ ShallowWrapper {
                           <Text
                             ellipsize={true}
                           >
-                            2017-12-26 12:02:44 PM
+                            2017-12-26 01:32:44 AM
                           </Text>
                         </small>
                       </td>
@@ -2049,7 +2049,7 @@ ShallowWrapper {
                           <Text
                             ellipsize={true}
                           >
-                            2017-12-26 12:02:44 PM
+                            2017-12-26 01:32:44 AM
                           </Text>
                         </small>
                       </td>
@@ -2157,7 +2157,7 @@ ShallowWrapper {
                             <Text
                               ellipsize={true}
                             >
-                              2017-12-26 12:02:44 PM
+                              2017-12-26 01:32:44 AM
                             </Text>
                           </small>
                         </td>
@@ -2313,7 +2313,7 @@ ShallowWrapper {
                               <Text
                                 ellipsize={true}
                               >
-                                2017-12-26 12:02:44 PM
+                                2017-12-26 01:32:44 AM
                               </Text>
                             </small>
                           </td>
@@ -2724,7 +2724,7 @@ ShallowWrapper {
                                 <Text
                                   ellipsize={true}
                                 >
-                                  2017-12-26 12:02:44 PM
+                                  2017-12-26 01:32:44 AM
                                 </Text>
                               </small>
                             </td>,
@@ -2752,7 +2752,7 @@ ShallowWrapper {
                                 <Text
                                   ellipsize={true}
                                 >
-                                  2017-12-26 12:02:44 PM
+                                  2017-12-26 01:32:44 AM
                                 </Text>
                               </small>,
                             },
@@ -2765,7 +2765,7 @@ ShallowWrapper {
                                 "children": <Text
                                   ellipsize={true}
                                 >
-                                  2017-12-26 12:02:44 PM
+                                  2017-12-26 01:32:44 AM
                                 </Text>,
                               },
                               "ref": null,
@@ -2774,11 +2774,11 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "class",
                                 "props": Object {
-                                  "children": "2017-12-26 12:02:44 PM",
+                                  "children": "2017-12-26 01:32:44 AM",
                                   "ellipsize": true,
                                 },
                                 "ref": null,
-                                "rendered": "2017-12-26 12:02:44 PM",
+                                "rendered": "2017-12-26 01:32:44 AM",
                                 "type": [Function],
                               },
                               "type": "small",

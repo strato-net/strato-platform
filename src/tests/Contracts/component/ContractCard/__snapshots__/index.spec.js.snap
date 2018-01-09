@@ -83,6 +83,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -184,6 +185,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -277,6 +279,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -467,6 +470,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -524,6 +528,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -620,6 +625,7 @@ ShallowWrapper {
                     "className": "col-sm-12",
                     "component": "table",
                     "isOpen": false,
+                    "keepChildrenMounted": false,
                     "transitionDuration": 100,
                   },
                   "ref": null,
@@ -927,6 +933,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -1028,6 +1035,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -1121,6 +1129,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -1311,6 +1320,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -1368,6 +1378,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -1464,6 +1475,7 @@ ShallowWrapper {
                       "className": "col-sm-12",
                       "component": "table",
                       "isOpen": false,
+                      "keepChildrenMounted": false,
                       "transitionDuration": 100,
                     },
                     "ref": null,
@@ -1819,6 +1831,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -2073,6 +2086,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -2166,6 +2180,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -2356,6 +2371,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -2413,6 +2429,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -2509,6 +2526,7 @@ ShallowWrapper {
                     "className": "col-sm-12",
                     "component": "table",
                     "isOpen": false,
+                    "keepChildrenMounted": false,
                     "transitionDuration": 100,
                   },
                   "ref": null,
@@ -4123,6 +4141,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -4377,6 +4396,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -4470,6 +4490,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -4660,6 +4681,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -4717,6 +4739,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -4813,6 +4836,7 @@ ShallowWrapper {
                       "className": "col-sm-12",
                       "component": "table",
                       "isOpen": false,
+                      "keepChildrenMounted": false,
                       "transitionDuration": 100,
                     },
                     "ref": null,
@@ -6453,6 +6477,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -6533,6 +6558,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -6605,6 +6631,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -6772,6 +6799,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -6810,6 +6838,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -6868,6 +6897,7 @@ ShallowWrapper {
                     "className": "col-sm-12",
                     "component": "table",
                     "isOpen": false,
+                    "keepChildrenMounted": false,
                     "transitionDuration": 100,
                   },
                   "ref": null,
@@ -7078,6 +7108,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -7158,6 +7189,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -7230,6 +7262,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -7397,6 +7430,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -7435,6 +7469,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -7493,6 +7528,7 @@ ShallowWrapper {
                       "className": "col-sm-12",
                       "component": "table",
                       "isOpen": false,
+                      "keepChildrenMounted": false,
                       "transitionDuration": 100,
                     },
                     "ref": null,
@@ -7758,6 +7794,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -7878,6 +7915,7 @@ ShallowWrapper {
                   className="col-sm-12"
                   component="table"
                   isOpen={false}
+                  keepChildrenMounted={false}
                   transitionDuration={100}
                 >
                   <table
@@ -7990,6 +8028,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -8249,6 +8288,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -8314,6 +8354,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -8426,6 +8467,7 @@ ShallowWrapper {
                     "className": "col-sm-12",
                     "component": "table",
                     "isOpen": false,
+                    "keepChildrenMounted": false,
                     "transitionDuration": 100,
                   },
                   "ref": null,
@@ -8798,6 +8840,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -8918,6 +8961,7 @@ ShallowWrapper {
                     className="col-sm-12"
                     component="table"
                     isOpen={false}
+                    keepChildrenMounted={false}
                     transitionDuration={100}
                   >
                     <table
@@ -9030,6 +9074,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -9289,6 +9334,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -9354,6 +9400,7 @@ ShallowWrapper {
                       className="col-sm-12"
                       component="table"
                       isOpen={false}
+                      keepChildrenMounted={false}
                       transitionDuration={100}
                     >
                       <table
@@ -9466,6 +9513,7 @@ ShallowWrapper {
                       "className": "col-sm-12",
                       "component": "table",
                       "isOpen": false,
+                      "keepChildrenMounted": false,
                       "transitionDuration": 100,
                     },
                     "ref": null,

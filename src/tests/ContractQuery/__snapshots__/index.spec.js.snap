@@ -3071,25 +3071,25 @@ ShallowWrapper {
 `;
 
 exports[`ContractQuery: index Table:  render with JSON format column 1`] = `
-"<Column name=\\"address\\" renderCell={[Function]} />
+"<Column name=\\"address\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"amount\\" renderCell={[Function]} />
+<Column name=\\"amount\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"state\\" renderCell={[Function]} />
+<Column name=\\"state\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"supplier\\" renderCell={[Function]} />
+<Column name=\\"supplier\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"name\\" renderCell={[Function]} />
+<Column name=\\"name\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"id\\" renderCell={[Function]} />
+<Column name=\\"id\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"newColumn\\" renderCell={[Function]} />"
+<Column name=\\"newColumn\\" renderCell={[Function: renderCell]} />"
 `;
 
 exports[`ContractQuery: index Table:  render with TruncatedFormat column 1`] = `
@@ -3099,6 +3099,14 @@ exports[`ContractQuery: index Table:  render with TruncatedFormat column 1`] = `
 >
   <TruncatedFormat
     detectTruncation={false}
+    measureByApproxOptions={
+      Object {
+        "approximateCharWidth": 8,
+        "approximateLineHeight": 18,
+        "cellHorizontalPadding": 20,
+        "numBufferLines": 0,
+      }
+    }
     preformatted={false}
     showPopover={2}
     truncateLength={2000}
@@ -3116,6 +3124,14 @@ exports[`ContractQuery: index Table:  render with TruncatedFormat column 2`] = `
 >
   <TruncatedFormat
     detectTruncation={false}
+    measureByApproxOptions={
+      Object {
+        "approximateCharWidth": 8,
+        "approximateLineHeight": 18,
+        "cellHorizontalPadding": 20,
+        "numBufferLines": 0,
+      }
+    }
     preformatted={false}
     showPopover={2}
     truncateLength={2000}
@@ -3127,22 +3143,22 @@ exports[`ContractQuery: index Table:  render with TruncatedFormat column 2`] = `
 `;
 
 exports[`ContractQuery: index Table:  render with TruncatedFormat column 3`] = `
-"<Column name=\\"address\\" renderCell={[Function]} />
+"<Column name=\\"address\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"amount\\" renderCell={[Function]} />
+<Column name=\\"amount\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"state\\" renderCell={[Function]} />
+<Column name=\\"state\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"supplier\\" renderCell={[Function]} />
+<Column name=\\"supplier\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"name\\" renderCell={[Function]} />
+<Column name=\\"name\\" renderCell={[Function: renderCell]} />
 
 
-<Column name=\\"id\\" renderCell={[Function]} />"
+<Column name=\\"id\\" renderCell={[Function: renderCell]} />"
 `;
 
 exports[`ContractQuery: index componentWillReceiveProps:  invoke with falsy statement 1`] = `
