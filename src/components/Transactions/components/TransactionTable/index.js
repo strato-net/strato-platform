@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
-import {Field, reduxForm, reset, submit} from 'redux-form';
+import {Field, reduxForm, reset} from 'redux-form';
 import {TRANSACTION_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
