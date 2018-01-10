@@ -25,17 +25,21 @@ describe('Throughput', function () {
     
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
+    const generators = [];
 
     for(let node of nodes) {
-      const txs = createBatchTx(userPairs[node.id].bob);
-      console.log(`Submitting txs for node ${node.id}`);
-      const blocRequestStart = moment();
-      const receipts = yield rest.sendList(userPairs[node.id].alice, txs, true, node.id);
-      const blocRequestStop = moment();
-      //secondsToRemove += blocRequestStop.diff(blocRequestStart, 'seconds');
-      console.log(`Submitted txs for node ${node.id}`);
-      console.log(receipts);
+      const txs = createBatchTx(userPairs[node.id].bob);      
+      generators.push(rest.sendList(userPairs[node.id].alice, txs, true, node.id));
     }
+
+    console.log('Submitting txs');
+    const bStartTime = moment();
+    yield generators;
+    const bEndTime = moment();
+    console.log('Submitted txs');
+
+    // secondsToRemove = bEndTime.diff(bStartTime, 'seconds');
+
     let balancesMatch = false;
     let balanceCheck = 1;
     while (!balancesMatch) {
@@ -48,6 +52,7 @@ describe('Throughput', function () {
     assert.isOk(balancesMatch, "All balances should match");
     const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
     console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
+    console.log(`Total Seconds: ${seconds}`);
     console.log(`Approx TPS: ${(config.batchSize * nodes.length) / seconds} tx/sec`);
   })
 
@@ -66,7 +71,7 @@ describe('Throughput', function () {
       const alice = yield rest.createUser(aliceName, password, false, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
       console.log(`Creating user ${bobName} on node ${node.id}`);      
-      const bob = yield rest.createUser(bobName, password, false, node.id);
+      const bob = yield rest.createUser(bobName, password, true, node.id);
       userPairs.push({alice: alice, bob: bob});
     }
     console.log('DONE creating users');
@@ -82,7 +87,7 @@ describe('Throughput', function () {
   }
 
   function * checkBalances(userPairs) {
-    const expectedBalance = new BigNumber(1000 + config.batchValue * config.batchSize)
+    const expectedBalance = new BigNumber(config.batchValue * config.batchSize)
       .times(constants.ETHER);
     const promises = [];
     for (let node of nodes) {
