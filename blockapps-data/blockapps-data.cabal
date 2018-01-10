@@ -68,6 +68,8 @@ library
                  , process
                  , hflags
                  , monad-control
+                 , utf8-string
+                 , scientific
 
     exposed-modules:
                    Blockchain.Constants
@@ -132,12 +134,14 @@ test-suite blockapps-data-test
     hs-source-dirs:      test
     main-is:             Spec.hs
     build-depends:       aeson,
+                         aeson-diff,
                          base,
                          base16-bytestring,
                          blockapps-data,
                          bytestring,
                          hspec,
                          strato-model,
-                         text
+                         text,
+                         time
     ghc-options:         -Wall -Werror -threaded -rtsopts -with-rtsopts=-N
     default-language:    Haskell2010

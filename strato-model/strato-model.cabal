@@ -16,7 +16,8 @@ library
                       , Blockchain.Strato.Model.Util 
                       , Blockchain.Strato.Model.BlockchainClass
   other-modules:
-  build-depends:        base
+  build-depends:      aeson 
+                      , base
                       , base16-bytestring
                       , ethereum-rlp
                       , binary
@@ -25,6 +26,9 @@ library
                       , cryptohash
                       , blockapps-haskoin
                       , time
+                      , text
+                      , scientific
+                      , utf8-string
   hs-source-dirs:       src
   default-language:     Haskell2010
   default-extensions:   MultiParamTypeClasses
