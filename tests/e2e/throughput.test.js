@@ -32,7 +32,7 @@ describe('Throughput', function () {
       const blocRequestStart = moment();
       const receipts = yield rest.sendList(userPairs[node.id].alice, txs, true, node.id);
       const blocRequestStop = moment();
-      secondsToRemove += blocRequestStop.diff(blocRequestStart, 'seconds');
+      //secondsToRemove += blocRequestStop.diff(blocRequestStart, 'seconds');
       console.log(`Submitted txs for node ${node.id}`);
       console.log(receipts);
     }
@@ -66,7 +66,7 @@ describe('Throughput', function () {
       const alice = yield rest.createUser(aliceName, password, false, node.id);
       const bobName = `Bob_${node.id}_${uid}`;
       console.log(`Creating user ${bobName} on node ${node.id}`);      
-      const bob = yield rest.createUser(bobName, password, true, node.id);
+      const bob = yield rest.createUser(bobName, password, false, node.id);
       userPairs.push({alice: alice, bob: bob});
     }
     console.log('DONE creating users');
@@ -82,7 +82,7 @@ describe('Throughput', function () {
   }
 
   function * checkBalances(userPairs) {
-    const expectedBalance = new BigNumber(config.batchValue * config.batchSize)
+    const expectedBalance = new BigNumber(1000 + config.batchValue * config.batchSize)
       .times(constants.ETHER);
     const promises = [];
     for (let node of nodes) {
