@@ -61,6 +61,8 @@ extra-deps:
 - tasty-hunit-adapter-1.1
 - dequeue-0.1.12
 - directory-1.2.7.1
+- aeson-diff-1.1.0.4
+- edit-distance-vector-1.0.0.4
 
 resolver: lts-7.18
 compiler: ghc-8.0.2

@@ -12,10 +12,10 @@ import           Blockchain.Data.Address
 import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
-import           Blockchain.Data.TXOrigin
 import           Blockchain.Format
 
 import           Data.Aeson
+import           Data.Aeson.Types            (Parser)
 import qualified Data.ByteString             as B
 import qualified Data.ByteString.Base16      as B16
 import           Data.Maybe
@@ -25,6 +25,7 @@ import           Data.Time.Clock
 import           Data.Word
 import           GHC.Generics
 import           Numeric
+import           Text.Read
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk = return . toJSON
@@ -32,8 +33,8 @@ jsonBlk = return . toJSON
 data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show, Generic)
 
 {- fix these later -}
-instance FromJSON Code
-instance ToJSON Code
+-- instance FromJSON Code
+-- instance ToJSON Code
 
 {- note we keep the file MiscJSON around for the instances we don't want to export - ByteString, Point -}
 
@@ -63,36 +64,49 @@ instance ToJSON RawTransaction' where
         "origin" .= format o
                ]
 
+parseHexStr :: (Integral a) => Parser String -> Parser a
+parseHexStr = fmap (fst . head . readHex)
+
 instance FromJSON RawTransaction' where
     parseJSON (Object t) = do
-      fa <- fmap (fst . head . readHex) (t .: "from")
-      tnon  <- fmap read (t .: "nonce")
-      tgp <- fmap read (t .: "gasPrice")
-      tgl <- fmap read (t .: "gasLimit")
+      fa <- parseHexStr (t .: "from")
+      tnon  <- t .: "nonce"
+      tgp <- t .: "gasPrice"
+      tgl <- t .: "gasLimit"
       tto <- fmap (fmap $ Address . fst . head . readHex) (t .:? "to")
       tval <- fmap read (t .: "value")
       tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .: "codeOrData")
-      (tr :: Integer) <- fmap (fst . head . readHex) (t .: "r")
-      (ts :: Integer) <- fmap (fst . head . readHex) (t .: "s")
-      (tv :: Word8) <- fmap (fst . head . readHex) (t .: "v")
+      (tr :: Integer) <- parseHexStr (t .: "r")
+      (ts :: Integer) <- parseHexStr (t .: "s")
+      (tv :: Word8) <- parseHexStr (t .: "v")
       bn <- t .:? "blockNumber" .!= (-1)
       h <- (t .: "hash")
-      time <- t .:? "timestamp" .!= UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
-      o <- t .:? "origin" .!= API
+      -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction' 
+      -- instead of using the ToJSON instance for UTCTime, and so it fails
+      -- to parse in FromJSON for UTCTime.
+      let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
+      (rawTime :: String) <- t .:? "timestamp" .!= ""
+      let (time :: UTCTime) = fromMaybe defaultTime . readMaybe $ rawTime
+      o <- fmap read $ t .:? "origin" .!= "API"
+      next <- t .:? "next" .!= ""
 
-      return (RawTransaction' (RawTransaction time (Address fa)
-                                              (tnon :: Integer)
-                                              (tgp :: Integer)
-                                              (tgl :: Integer)
-                                              (tto :: Maybe Address)
-                                              (tval :: Integer)
-                                              (tcd :: B.ByteString)
-                                              (tr :: Integer)
-                                              (ts :: Integer)
-                                              (tv :: Word8)
-                                              bn
-                                              h
-                                              o) "")
+      return (RawTransaction' 
+               (RawTransaction 
+                 time 
+                 (Address fa)
+                 (tnon :: Integer)
+                 (tgp :: Integer)
+                 (tgl :: Integer)
+                 (tto :: Maybe Address)
+                 (tval :: Integer)
+                 (tcd :: B.ByteString)
+                 (tr :: Integer)
+                 (ts :: Integer)
+                 (tv :: Word8)
+                 bn
+                 h
+                 o)
+               next)
     parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
 
 instance ToJSON RawTransaction where
@@ -123,7 +137,7 @@ instance ToJSON RawTransaction where
 
 instance FromJSON RawTransaction where
     parseJSON (Object t) = do
-      fa <- fmap (fst . head . readHex) (t .: "from")
+      fa <- parseHexStr (t .: "from")
       (tnon :: Int)  <- (t .: "nonce")
       (tgp :: Int) <- (t .: "gasPrice")
       (tgl :: Int) <- (t .: "gasLimit")
@@ -133,9 +147,9 @@ instance FromJSON RawTransaction where
             Nothing    -> Nothing
       tval <- fmap read (t .: "value")
       tcd <- fmap (fst .  B16.decode . T.encodeUtf8 ) (t .: "codeOrData")
-      (tr :: Integer) <- fmap (fst . head . readHex) (t .: "r")
-      (ts :: Integer) <- fmap (fst . head . readHex) (t .: "s")
-      (tv :: Word8) <- fmap (fst . head . readHex) (t .: "v")
+      (tr :: Integer) <- parseHexStr (t .: "r")
+      (ts :: Integer) <- parseHexStr (t .: "s")
+      (tv :: Word8) <- parseHexStr (t .: "v")
       mbn <- (t .:? "blockNumber")
       h <- (t .: "hash")
       time <- t .:? "timestamp" .!= UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
@@ -198,6 +212,7 @@ instance ToJSON Transaction' where
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
 {-- needs to be updated --}
+-- Needs "from", "hash", and "init" for Contract transactions
 instance FromJSON Transaction' where
     parseJSON (Object t) = do
       tto <- (t .:? "to")
@@ -205,9 +220,9 @@ instance FromJSON Transaction' where
       tgp <- (t .: "gasPrice")
       tgl <- (t .: "gasLimit")
       tval <- (t .: "value")
-      tr <- (t .: "r")
-      ts <- (t .: "s")
-      tv <- (t .: "v")
+      tr <- parseHexStr (t .: "r")
+      ts <- parseHexStr (t .: "s")
+      tv <- parseHexStr (t .: "v")
 
       case tto of
         Nothing -> do
@@ -252,6 +267,9 @@ instance ToJSON Transaction where
 tToTPrime :: Transaction -> Transaction'
 tToTPrime = Transaction'
 
+tPrimeToT :: Transaction' -> Transaction
+tPrimeToT (Transaction' tx) = tx
+
 data Block' = Block' Block String deriving (Eq, Show)
 
 instance ToJSON Block' where
@@ -272,6 +290,8 @@ instance ToJSON Block where
       --TODO- check if this next case is needed
       --toJSON _ = object ["malformed Block" .= True]
 
+   
+
 bToBPrime :: (String , Block) -> Block'
 bToBPrime (s, x) = Block' x s
 
@@ -290,8 +310,39 @@ instance ToJSON BlockData' where
       --TODO- check if this next case is needed
       --toJSON _ = object ["malformed BlockData" .= True]
 
+instance FromJSON BlockData' where
+    parseJSON = withObject "BlockData'" $ \v -> BlockData' <$> (BlockData
+      <$> v .: "parentHash"
+      <*> v .: "unclesHash"
+      <*> v .: "coinbase"
+      <*> v .: "stateRoot"
+      <*> v .: "transactionsRoot"
+      <*> v .: "receiptsRoot"
+      <*> v .:? "logBloom" .!= ""
+      <*> v .: "difficulty"
+      <*> v .: "number"
+      <*> v .: "gasLimit"
+      <*> v .: "gasUsed"
+      <*> v .: "timestamp"
+      <*> v .: "extraData"
+      <*> v .: "nonce"
+      <*> v .: "mixHash"
+      )
+      
+instance FromJSON Block' where
+    parseJSON = withObject "Block'" $ \v -> (Block'
+      <$> (Block 
+        <$> (bdPrimeToBd <$> (v .: "blockData"))
+        <*> (map tPrimeToT <$> (v .: "receiptTransactions"))
+        <*> (map bdPrimeToBd <$> (v .: "blockUncles")))
+      <*> (v .: "next")
+      )
+
 bdToBdPrime :: BlockData -> BlockData'
 bdToBdPrime = BlockData'
+
+bdPrimeToBd :: BlockData' -> BlockData
+bdPrimeToBd (BlockData' bd) = bd
 
 data BlockDataRef' = BlockDataRef' BlockDataRef deriving (Eq, Show)
 

@@ -31,80 +31,10 @@ import           Numeric
 import           Data.Maybe
 
 import           Prelude                      as P
+import           Prelude                      ((.), head)
 
 jsonBlk :: (ToJSON a, Monad m) => a -> m Value
 jsonBlk a = returnJson a
-
-data RawTransaction' = RawTransaction' RawTransaction String deriving (Eq, Show)
-
-
-instance ToJSON RawTransaction' where
-    toJSON (RawTransaction' rt@(RawTransaction (Address fa) non gp gl (Just (Address ta)) val cod r s v bid bn h) next) =
-        object ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
-        "to" .= showHex ta "" , "value" .= show val, "codeOrData" .= cod,
-        "r" .= showHex r "",
-        "s" .= showHex s "",
-        "v" .= showHex v "",
-        "blockNumber" .= bn,
-        "hash" .= h,
-        "transactionType" .= (show $ rawTransactionSemantics rt)
-               ]
-    toJSON (RawTransaction' rt@(RawTransaction (Address fa) non gp gl Nothing val cod r s v bid bn h) next) =
-        object ["next" .= next, "from" .= showHex fa "", "nonce" .= non, "gasPrice" .= gp, "gasLimit" .= gl,
-        "value" .= show val, "codeOrData" .= cod,
-        "r" .= showHex r "",
-        "s" .= showHex s "",
-        "v" .= showHex v "",
-        "blockNumber" .= bn,
-        "hash" .= h,
-        "transactionType" .= (show $ rawTransactionSemantics rt)
-               ]
-
-instance FromJSON RawTransaction' where
-    parseJSON (Object t) = do
-      fa <- fmap (fst P.. P.head P.. readHex) (t .: "from")       --- ugly ! stupid Prelude qualified import
-      (tnon :: Int)  <- (t .: "nonce")
-      (tgp :: Int) <- (t .: "gasPrice")
-      (tgl :: Int) <- (t .: "gasLimit")
-      tto <- (t .:? "to")
-      let toFld = case tto of
-            (Just str) -> fmap (Address P.. fst P.. P.head P.. readHex) str
-            Nothing    -> Nothing
-      tval <- fmap read (t .: "value")
-      tcd <- fmap (fst P..  B16.decode P.. T.encodeUtf8 ) (t .: "codeOrData")
-      (tr :: Integer) <- fmap (fst P.. P.head P.. readHex) (t .: "r")
-      (ts :: Integer) <- fmap (fst P.. P.head P.. readHex) (t .: "s")
-      (tv :: Word8) <- fmap (fst P.. P.head P.. readHex) (t .: "v")
-      mbid <- (t .:? "blockId")
-      mbn <- (t .:? "blockNumber")
-      h <- (t .: "hash")
-      let bid = case mbid of
-            Just bd -> bd
-            Nothing -> 1 -- annoying, needs to be reset on update
-          bn = case mbn of
-            Just b  -> b
-            Nothing -> -1
-
-      return (RawTransaction' (RawTransaction (Address fa)
-                                              (fromIntegral tnon :: Integer)
-                                              (fromIntegral $ tgp :: Integer)
-                                              (fromIntegral $ tgl :: Integer)
-                                              (toFld :: Maybe Address)
-                                              (tval :: Integer)
-                                              (tcd :: B.ByteString)
-                                              (tr :: Integer)
-                                              (ts :: Integer)
-                                              (tv :: Word8)
-                                              (toSqlKey bid)
-                                              bn
-                                              h) "")
-
-
-rtToRtPrime :: (String , RawTransaction) -> RawTransaction'
-rtToRtPrime (s, x) = RawTransaction' x s
-
-rtToRtPrime' :: RawTransaction -> RawTransaction'
-rtToRtPrime' x = RawTransaction' x ""
 
 data Transaction' = Transaction' Transaction deriving (Eq, Show)
 
@@ -222,7 +152,7 @@ instance FromJSON AddressStateRef' where
         then fail "JSON is not AddressStateRef"
         else asrToAsrPrime' <$>
               (AddressStateRef
-                <$> Address P.. fst P.. P.head P.. readHex <$> s .: "address"
+                <$> Address . fst . head . readHex <$> s .: "address"
                 <*> s .: "nonce"
                 <*> (read <$> (s .: "balance"))
                 <*> s .: "contractRoot"
@@ -264,12 +194,4 @@ transactionSemantics t@(ContractCreationTX tnon tgp tgl tval (Code ti) tr ts tv)
      | otherwise = Contract
 
 isAddr :: Maybe Address -> Bool
-isAddr a = case a of
-      Just x  -> True
-      Nothing -> False
-
-rawTransactionSemantics :: RawTransaction -> TransactionType
-rawTransactionSemantics t@(RawTransaction fa non gp gl ta val cod v r s bid bn h) = work
-     where work | (not (isAddr ta))  = Contract
-                | (isAddr ta) &&  ((Data.ByteString.length cod) > 0)        = FunctionCall
-                | otherwise = Transfer
+isAddr = isJust
