@@ -122,6 +122,77 @@ describe('BlockTable: index', () => {
     expect(props.history.push.mock.calls).toEqual([["/blocks/206"]]);
   });
 
+  describe('form', () => {
+
+    test('required', () => {
+      const props = {
+        history: {
+          push: jest.fn()
+        },
+        query: { last: 15 },
+        queryResult: blocksMock,
+        ...mockFunction
+      }
+
+      const wrapper = mount(
+        <Provider store={store}>
+          <BlockTable.WrappedComponent {...props} />
+        </Provider>
+      );
+
+      wrapper.find('Field').at(1).simulate('keypress', { key: '' });
+      expect(store.getState().form['block-query']).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        history: {
+          push: jest.fn()
+        },
+        query: { last: 15 },
+        queryResult: blocksMock,
+        ...mockFunction
+      }
+
+      const wrapper = mount(
+        <Provider store={store}>
+          <BlockTable.WrappedComponent {...props} />
+        </Provider>
+      );
+
+      wrapper.find('Field').at(1).simulate('keypress', { key: 'Enter' });
+      wrapper.find('Field').at(0).simulate('change', { target: { value: 'maxnumber' } });
+      wrapper.find('Field').at(1).simulate('change', { target: { value: 1522 } });
+      wrapper.find('Button').at(1).simulate('click');
+      expect(store.getState().form['block-query']).toMatchSnapshot();
+    });
+
+    test('submit method', () => {
+      const props = {
+        history: {
+          push: jest.fn()
+        },
+        query: { last: 15 },
+        queryResult: blocksMock,
+        store: store,
+        ...mockFunction
+      }
+
+      const wrapper = shallow(
+        <BlockTable.WrappedComponent {...props} />
+      ).dive().dive().dive();
+
+      const values = {
+        query: { last: 15 },
+        value: 'text'
+      };
+
+      wrapper.instance().submit(values);
+      expect(props.updateQuery).toHaveBeenCalled();
+    });
+
+  });
+
   test('componentDidMount', () => {
     const props = {
       history: {},
