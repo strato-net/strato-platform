@@ -34,7 +34,23 @@ At the time of writing this it seems like we're able to use the latest postgres 
 ```
 > sudo apt-get install postgresql-9.6 
 ```
-Make sure there is a postgres superuser named `postgres` (should exist by default) with password `api` (by hand). On Ubuntu, you might also need to change some configuration in `/etc/postgresql/9.6/main`-- namely where it says "Allow replication connections from localhost, by a user with the replication privelage.", change the `METHOD` for the `postgres` user of type `host` to `md5`.
+Make sure there is a postgres superuser named `postgres` (should exist by default) with password `api` (by hand): 
+```
+> sudo -u postgres psql
+postgres=# ALTER USER postgres WITH PASSWORD 'api';
+postgres=# \q
+>
+```
+Note that when connecting as a (system) user other than `postgres`, you may need to specify an address:
+```
+> psql -U postgres
+psql: FATAL: Peer authentication failed for user "postgres"
+> psql -U postgres -h localhost
+Password for user postgres:
+postgres=#
+```
+
+On Ubuntu, you might also need to change some configuration in `/etc/postgresql/9.6/main`-- namely where it says "Allow replication connections from localhost, by a user with the replication privelage.", change the `METHOD` for the `postgres` user of type `host` to `md5`.
 
 ## LevelDB
 At the time of writing this the latest version is 1.19.
@@ -47,10 +63,7 @@ At the time of writing this the latest version is 1.19.
 ```
 ### Ubuntu 
 ```
-> sudo apt-get install snappy-dev
-> git clone https://github.com/google/leveldb.git
-> git leveldb
-> make
+> sudo apt install libleveldb-dev
 ```
 
 ## Kafka
@@ -64,14 +77,12 @@ Again, you can use `brew search *` to figure out if the version you're looking f
 > brew install kafka
 ```
 ### Ubuntu
+Consult the https://github.com/blockapps/kafka-packager for a rough approximation of how to install kafka.
+To build the docker image for it:
 ```
-> sudo apt-get install openjdk-8-jre 
-> sudo apt-get install zookeeperd=3.4.8-1
-> cd <path-to-monstrato-repo>/deployments/dpkg/kafka
-> ./setupKafka
-> sudo dpkg -i kafka.deb
-> sudo dpkg -i kafka.deb
+> sudo BASIL_BUILD_TAG=your_tag make -f Basilbuild
 ```
+If instead you want a system installation, the `Dockerfile.build` has references to the appropriate package versions and where to acquire them. 
 This does it for dependencies. At the top level of the `monstrato` repo you should be able to run `stack install`.
 
 #Setting Up a Client Node
