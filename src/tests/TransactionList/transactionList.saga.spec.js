@@ -22,6 +22,7 @@ describe('TransactionList: sagas', () => {
   test('watch transactions', () => {
     const gen = watchFetchTx();
     expect(gen.next().value).toEqual(takeEvery(FETCH_TX, fetchTx))
+    expect(gen.next().done).toBe(true);
   })
 
   describe('fetchTx generator', () => {
@@ -40,12 +41,23 @@ describe('TransactionList: sagas', () => {
       expect(gen.next().done).toBe(true);
     });
 
-    test('call fetch transactions with success', (done) => {
-      fetch.mockResponse(JSON.stringify(transactions));
+    describe('call fetch transactions (success)', () => {
 
-      expectSaga(fetchTx, action.last)
-        .call.fn(getTx).put.like({ action: { type: FETCH_TX_SUCCESSFUL } })
-        .run().then((result) => { done() });
+      test('argument last:undefined', (done) => {
+        fetch.mockResponse(JSON.stringify(transactions));
+
+        expectSaga(fetchTx, { last: undefined })
+          .call.fn(getTx).put.like({ action: { type: FETCH_TX_SUCCESSFUL } })
+          .run().then((result) => { done() });
+      });
+
+      test('argument last:18', (done) => {
+        fetch.mockResponse(JSON.stringify(transactions));
+
+        expectSaga(fetchTx, { last: 18 })
+          .call.fn(getTx).put.like({ action: { type: FETCH_TX_SUCCESSFUL } })
+          .run().then((result) => { done() });
+      });
     });
 
     test('call fetch transactions failure', (done) => {
