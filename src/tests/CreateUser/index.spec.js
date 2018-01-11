@@ -11,24 +11,49 @@ describe('Test createUser index', () => {
   let store
 
   beforeEach(() => {
-    store = createStore(combineReducers({ form: formReducer }))
-  })
+    store = createStore(combineReducers({ form: formReducer }));
+  });
 
-  test('render contracts without values', () => {
-    const props = {
-      filter: '',
-      contracts: {},
-      errors: {},
-      openOverlay: jest.fn(),
-      closeOverlay: jest.fn(),
-      createUser: jest.fn()
-    }
-    const wrapper = render(
-      <Provider store={store}>
+  describe('render component', () => {
+
+    test('without values', () => {
+      const props = {
+        filter: '',
+        contracts: {},
+        errors: {},
+        openOverlay: jest.fn(),
+        closeOverlay: jest.fn(),
+        createUser: jest.fn(),
+        store: store
+      }
+      const wrapper = shallow(
         <CreateUser.WrappedComponent {...props} />
-      </Provider>
-    );
-    expect(wrapper).toMatchSnapshot();
+      ).dive().dive().dive();
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('with values', () => {
+      const props = {
+        filter: '',
+        contracts: {},
+        errors: {
+          confirm_password: "Must Confirm Password",
+          password: "Password Required",
+          username: "Username Required"
+        },
+        openOverlay: jest.fn(),
+        closeOverlay: jest.fn(),
+        createUser: jest.fn(),
+        store: store
+      }
+      const wrapper = shallow(
+        <CreateUser.WrappedComponent {...props} />
+      ).dive().dive().dive();
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
   });
 
   describe('simulate', () => {
@@ -37,7 +62,6 @@ describe('Test createUser index', () => {
       const props = {
         filter: '',
         contracts: {},
-        errors: {},
         openOverlay: jest.fn(),
         closeOverlay: jest.fn(),
         createUser: jest.fn()
@@ -55,7 +79,6 @@ describe('Test createUser index', () => {
       const props = {
         filter: '',
         contracts: {},
-        errors: {},
         isOpen: true,
         openOverlay: jest.fn(),
         closeOverlay: jest.fn(),
@@ -74,7 +97,6 @@ describe('Test createUser index', () => {
       const props = {
         filter: '',
         contracts: {},
-        errors: {},
         isOpen: true,
         openOverlay: jest.fn(),
         closeOverlay: jest.fn(),
@@ -92,7 +114,6 @@ describe('Test createUser index', () => {
       const props = {
         filter: '',
         contracts: {},
-        errors: {},
         isOpen: true,
         openOverlay: jest.fn(),
         closeOverlay: jest.fn(),
@@ -112,11 +133,6 @@ describe('Test createUser index', () => {
     const props = {
       filter: '',
       contracts: {},
-      errors: {
-        confirm_password: "Must Confirm Password",
-        password: "Password Required",
-        username: "Username Required"
-      },
       openOverlay: jest.fn().mockReturnValue('Open'),
       closeOverlay: jest.fn().mockReturnValue('Close'),
       createUser: jest.fn().mockReturnValue('Create')
@@ -126,27 +142,42 @@ describe('Test createUser index', () => {
         <CreateUser.WrappedComponent {...props} />
       </Provider>
     ).dive();
+
     expect(wrapper.instance().props.openOverlay()).toBe('Open');
     expect(wrapper.instance().props.closeOverlay()).toBe('Close');
     expect(wrapper.instance().props.createUser()).toBe('Create');
   });
 
-  test('mapStateToProps with default states', () => {
-    const state = {
-      "form": {
-        "create-user": {
-          "syncErrors": {
-            confirm_password: "Must Confirm Password",
-            password: "Password Required",
-            username: "Username Required"
+  describe('mapStateToProps', () => {
+
+    test('with errors', () => {
+      const state = {
+        "form": {
+          "create-user": {
+            "syncErrors": {
+              confirm_password: "Must Confirm Password",
+              password: "Password Required",
+              username: "Username Required"
+            }
           }
+        },
+        "createUser": {
+          isOpen: true
         }
-      },
-      "createUser": {
-        isOpen: true
       }
-    }
-    expect(mapStateToProps(state)).toMatchSnapshot();
+      expect(mapStateToProps(state)).toMatchSnapshot();
+    });
+
+    test('without errors', () => {
+      const state = {
+        "form": {},
+        "createUser": {
+          isOpen: true
+        }
+      }
+      expect(mapStateToProps(state)).toMatchSnapshot();
+    });
+
   });
 
   describe('validate', () => {
@@ -178,6 +209,6 @@ describe('Test createUser index', () => {
       expect(validate(values)).toMatchSnapshot();
     });
 
-  })
+  });
 
 });
