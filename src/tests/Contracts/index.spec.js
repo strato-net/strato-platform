@@ -10,8 +10,8 @@ describe('Contracts: index', () => {
       const props = {
         filter: '',
         contracts: {},
-        fetchContracts: jest.fn(() => Promise.resolve(0)),
-        changeContractFilter: jest.fn(() => Promise.resolve(0))
+        fetchContracts: jest.fn(),
+        changeContractFilter: jest.fn()
       }
       const wrapper = shallow(
         <Contracts.WrappedComponent {...props} />
@@ -23,8 +23,8 @@ describe('Contracts: index', () => {
       const props = {
         filter: 'Greeter',
         contracts: contracts,
-        fetchContracts: () => { },
-        changeContractFilter: () => { }
+        fetchContracts: jest.fn(),
+        changeContractFilter: jest.fn()
       }
       const wrapper = shallow(
         <Contracts.WrappedComponent {...props} />
@@ -54,8 +54,8 @@ describe('Contracts: index', () => {
     const props = {
       filter: 'Greeter',
       contracts: {},
-      fetchContracts: () => { },
-      changeContractFilter: () => { }
+      fetchContracts: jest.fn(),
+      changeContractFilter: jest.fn()
     }
     const wrapper = shallow(
       <Contracts.WrappedComponent {...props} />
@@ -67,8 +67,8 @@ describe('Contracts: index', () => {
     const props = {
       filter: '',
       contracts: contracts,
-      fetchContracts: () => { },
-      changeContractFilter: () => { }
+      fetchContracts: jest.fn(),
+      changeContractFilter: jest.fn()
     }
     const wrapper = shallow(
       <Contracts.WrappedComponent {...props} />
