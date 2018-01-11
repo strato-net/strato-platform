@@ -3379,3 +3379,14 @@ ShallowWrapper {
   },
 }
 `;
+
+exports[`Contracts: index search contract input 1`] = `
+Array [
+  Array [
+    "",
+  ],
+  Array [
+    "update",
+  ],
+]
+`;

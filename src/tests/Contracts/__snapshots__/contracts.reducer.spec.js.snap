@@ -45,14 +45,48 @@ Object {
 
 exports[`Contracts: reducer fetch cirrus instances success 1`] = `
 Object {
-  "instances": Array [
-    Object {
-      "address": "b7b986bf23faebd8d745c65fa42a8c2f0fc2ebb9",
-      "greetingB": "",
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
     },
-  ],
-  "name": "GreeterB",
-  "type": "FETCH_CIRRUS_INSTANCES_SUCCESS",
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+          "fromCirrus": false,
+        },
+        Object {
+          "address": "b7b986bf23faebd8d745c65fa42a8c2f0fc2ebb9",
+          "fromCirrus": true,
+          "greetingB": "",
+        },
+      ],
+    },
+  },
+  "error": "ERROR",
+  "filter": "Just to test filter",
 }
 `;
 
@@ -64,7 +98,7 @@ Object {
 }
 `;
 
-exports[`Contracts: reducer fetch contracts on success 1`] = `
+exports[`Contracts: reducer fetch contracts on success with initialstate of contract do not have values 1`] = `
 Object {
   "contracts": Object {
     "Cloner": Object {
@@ -95,6 +129,43 @@ Object {
         Object {
           "address": "GreeterA",
           "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Contracts: reducer fetch contracts on success with initialstate of contract has values 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "Diff": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f121b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f121e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
           "fromBloc": true,
         },
       ],
@@ -146,7 +217,7 @@ Object {
 }
 `;
 
-exports[`Contracts: reducer fetch state success 1`] = `
+exports[`Contracts: reducer fetch state update with appending state in contracts 1`] = `
 Object {
   "contracts": Object {
     "Cloner": Object {
@@ -174,6 +245,48 @@ Object {
             "greetA": "function () returns (Address)",
             "greetingA": "Aaaaaaaaa",
           },
+        },
+      ],
+    },
+    "GreeterB": Object {
+      "instances": Array [
+        Object {
+          "address": "GreeterA",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+        },
+      ],
+    },
+  },
+  "error": "ERROR",
+  "filter": "Just to test filter",
+}
+`;
+
+exports[`Contracts: reducer fetch state update without appending state in contracts 1`] = `
+Object {
+  "contracts": Object {
+    "Cloner": Object {
+      "instances": Array [
+        Object {
+          "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d",
+          "createdAt": 1512480630000,
+          "fromBloc": true,
+        },
+        Object {
+          "address": "2c6619f0418c2f191e2225091f7692363a91c336",
+          "createdAt": 1512480770000,
+          "fromBloc": true,
+        },
+      ],
+    },
+    "GreeterA": Object {
+      "instances": Array [
+        Object {
+          "address": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+          "createdAt": 1512481078000,
+          "fromBloc": true,
+          "selected": true,
         },
       ],
     },

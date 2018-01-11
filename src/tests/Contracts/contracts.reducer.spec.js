@@ -28,18 +28,55 @@ describe('Contracts: reducer', () => {
         filter
       }
       expect(reducer(initialState, action)).toMatchSnapshot();
-    })
+    });
 
     // FETCH_CONTRACTS_SUCCESSFUL
-    test('on success', () => {
-      const action = fetchContractsSuccess(contracts);
-      const initialState = {
-        contracts: {},
-        filter: '',
-        error: null
-      }
-      expect(reducer(initialState, action)).toMatchSnapshot();
-    })
+    describe('on success', () => {
+
+      test('with initialstate of contract do not have values', () => {
+        const action = fetchContractsSuccess(contracts);
+        const initialState = {
+          contracts: {},
+          filter: '',
+          error: null
+        }
+        expect(reducer(initialState, action)).toMatchSnapshot();
+      });
+
+      test('with initialstate of contract has values', () => {
+        const data = {
+          "Cloner": [
+            {
+              "createdAt": 1512480630000,
+              "address": "d07e932212f7f368b6948ffd96e1d4c726c8395d"
+            },
+            {
+              "createdAt": 1512480770000,
+              "address": "2c6619f0418c2f191e2225091f7692363a91c336"
+            }
+          ],
+          "Diff": [
+            {
+              "createdAt": 1512480630000,
+              "address": "d07e932212f7f121b6948ffd96e1d4c726c8395d"
+            },
+            {
+              "createdAt": 1512480770000,
+              "address": "2c6619f0418c2f121e2225091f7692363a91c336"
+            }
+          ]
+        };
+        const action = fetchContractsSuccess(data);
+        const initialState = {
+          contracts: deepClone(contractsState),
+          filter: '',
+          error: null
+        }
+
+        expect(reducer(initialState, action)).toMatchSnapshot();
+      });
+
+    });
 
     // FETCH_CONTRACTS_FAILED
     test('on failure', () => {
@@ -50,9 +87,9 @@ describe('Contracts: reducer', () => {
         error
       };
       expect(reducer(initialState, action)).toMatchSnapshot();
-    })
+    });
 
-  })
+  });
 
   // CHANGE_CONTRACT_FILTER
   test('on change contract filter', () => {
@@ -62,20 +99,36 @@ describe('Contracts: reducer', () => {
       error: null
     }
     expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+  });
 
   // FETCH_STATE_SUCCESS
-  test('fetch state success', () => {
-    const action = fetchStateSuccess(reducerContract.name, reducerContract.address, reducerContract.state);
-    let initialContracts = deepClone(contractsState);
-    initialContracts['GreeterA']['instances'][0]['selected'] = true;
-    const initialState = {
-      contracts: initialContracts,
-      filter: filter,
-      error: 'ERROR'
-    }
-    expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+  describe('fetch state', () => {
+
+    test('update with appending state in contracts', () => {
+      const action = fetchStateSuccess(reducerContract.name, reducerContract.address, reducerContract.state);
+      let initialContracts = deepClone(contractsState);
+      initialContracts['GreeterA']['instances'][0]['selected'] = true;
+      const initialState = {
+        contracts: initialContracts,
+        filter: filter,
+        error: 'ERROR'
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+    test('update without appending state in contracts', () => {
+      const action = fetchStateSuccess(reducerContract.name, 'd07e932212f7f368b6948ffd96e1d4c726c8395', reducerContract.state);
+      let initialContracts = deepClone(contractsState);
+      initialContracts['GreeterA']['instances'][0]['selected'] = true;
+      const initialState = {
+        contracts: initialContracts,
+        filter: filter,
+        error: 'ERROR'
+      }
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+  });
 
   // SELECT_CONTRACT_INSTANCE
   test('select contract instance', () => {
@@ -86,7 +139,7 @@ describe('Contracts: reducer', () => {
       error
     }
     expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+  });
 
   // FETCH_ACCOUNT_SUCCESS
   test('fetch account success', () => {
@@ -98,7 +151,7 @@ describe('Contracts: reducer', () => {
       filter
     }
     expect(reducer(initialState, action)).toMatchSnapshot();
-  })
+  });
 
   // FETCH_CIRRUS_INSTANCES_SUCCESS
   test('fetch cirrus instances success', () => {
@@ -116,7 +169,7 @@ describe('Contracts: reducer', () => {
       filter,
       error
     }
-    expect((initialState, action)).toMatchSnapshot();
-  })
+    expect(reducer(initialState, action)).toMatchSnapshot();
+  });
 
 })
