@@ -60,6 +60,7 @@ extra-deps:
 - esqueleto-2.5.1
 - tasty-hunit-adapter-1.1
 - dequeue-0.1.12
+- directory-1.2.7.1
 
 resolver: lts-7.18
 compiler: ghc-8.0.2
@@ -75,11 +76,11 @@ ghc-options:
   ethereum-encryption:     -Wall -Werror -fno-warn-warnings-deprecations
   merkle-patricia-db:      -Wall -Werror -fno-warn-warnings-deprecations
   strato-init:             -Wall -Werror -fno-warn-warnings-deprecations
-  strato-p2p-client:       -Wall -Werror -fno-warn-warnings-deprecations
-  strato-p2p-server:       -Wall -Werror -fno-warn-warnings-deprecations
+  # strato-p2p-client:       -Wall -Werror -fno-warn-warnings-deprecations
+  # strato-p2p-server:       -Wall -Werror -fno-warn-warnings-deprecations
   strato-redis-blockdb:    -Wall -Werror -fno-warn-warnings-deprecations
   blockapps-tools:         -Wall -Werror -fno-warn-warnings-deprecations
-  ethereum-test:           -Wall -Werror -fno-warn-warnings-deprecations
+  # ethereum-test:           -Wall -Werror -fno-warn-warnings-deprecations
   strato-index:            -Wall -Werror
   strato-api:              -fno-warn-orphans
   blockapps-tools:         -Wall -Werror
