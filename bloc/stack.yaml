@@ -1,0 +1,49 @@
+resolver: nightly-2017-04-21
+packages:
+- bloc/bloc21/api
+- bloc/bloc21/client
+- bloc/bloc21/server
+- bloc/bloc22/api
+- bloc/bloc22/client
+- bloc/bloc22/server
+- bloc/exe
+- cirrus/api
+- cirrus/client
+- ethereum
+- ethereum-abi
+- solidity
+- strato/api
+- strato/client
+- strato/server
+- location:
+    git: https://github.com/echatav/secp256k1-haskell/
+    commit: c27236f93ba2af4da0865558e2dedf2d8643cd8c
+  extra-dep: true
+- location:
+    git: https://github.com/echatav/servant-aeson-specs/
+    commit: cedbf002b0d5855c17dc91de97e966ee339604fa
+  extra-dep: true
+- location:
+    git: https://github.com/echatav/largeint/
+    commit: 8cce2055e9ffffc89cb1ea2b507f837ff9d1f985
+  extra-dep: true
+- location:
+    git: https://github.com/iostat/relapse
+    commit: 2b25839d1b75508301adde293b8c6ef8591ef00a
+  extra-dep: true
+extra-deps:
+  - hflags-0.4.2
+  - saltine-0.0.0.4
+  - servant-options-0.1.0.0
+  - parsec3-numbers-0.1.0
+flags: {}
+extra-package-dbs: []
+
+ghc-options:
+  blockapps-bloc: -fsimpl-tick-factor=20000
+
+extra-include-dirs:
+- /usr/local/include
+
+extra-lib-dirs:
+- /usr/local/lib

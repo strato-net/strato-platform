@@ -1,0 +1,32 @@
+name: blockapps-cirrus-client
+version: 0.1.0.0
+synopsis: Cirrus microservice
+description: Cirrus microservice
+homepage: https://github.com/blockapps/blockapps-haskell/blockapps-cirrus
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    BlockApps.Cirrus.Client
+  default-language: Haskell2010
+  ghc-options: -Wall
+  build-depends: base
+    , blockapps-cirrus-api
+    , blockapps-solidity
+    , aeson
+    , containers
+    , http-client
+    , servant
+    , servant-client
+    , text
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/blockapps-cirrus
