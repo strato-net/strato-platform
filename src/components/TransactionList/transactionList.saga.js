@@ -12,7 +12,7 @@ import { env } from '../../env';
 
 const url = env.STRATO_URL + "/transaction/last/";
 
-function getTx(last) {
+export function getTx(last) {
   if (last === undefined) last = 15;
   return fetch(
     url + last.toString(),
@@ -33,7 +33,7 @@ function getTx(last) {
     });
 }
 
-function* fetchTx(action) {
+export function* fetchTx(action) {
   try {
     let response = yield call(getTx, action.last);
     yield put(fetchTxSuccess(response));

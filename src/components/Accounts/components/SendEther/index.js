@@ -17,7 +17,7 @@ import validate from './validate';
 
 // TODO: use solc instead of extabi for compile
 
-class CreateContract extends Component {
+class SendEther extends Component {
 
   // handleFromUsernameChange = (e) => {
   //   this.props.fromUsernameChange(e.target.value);
@@ -102,7 +102,6 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="from"
-                      // onChange={this.handleFromUsernameChange}
                       required
                     >
                       <option />
@@ -133,7 +132,7 @@ class CreateContract extends Component {
                     >
                       <option />
                       {
-                        fromUserAddresses ?
+                        fromUserAddresses.length ?
                           fromUserAddresses.map((address, i) => {
                             return (
                               <option key={address} value={address}>{address}</option>
@@ -267,7 +266,7 @@ class CreateContract extends Component {
                     >
                       <option />
                       {
-                        toUserAddresses ?
+                        toUserAddresses.length ?
                           toUserAddresses.map((address, i) => {
                             return (
                               <option key={address} value={address}>{address}</option>
@@ -331,7 +330,7 @@ class CreateContract extends Component {
 
 const selector = formValueSelector('send-ether');
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isOpen: state.sendEther.isOpen,
     result: state.sendEther.result,
@@ -341,7 +340,7 @@ function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({ form: 'send-ether', validate })(CreateContract);
+const formed = reduxForm({ form: 'send-ether', validate })(SendEther);
 const connected = connect(mapStateToProps, {
   sendEtherOpenModal,
   sendEtherCloseModal,

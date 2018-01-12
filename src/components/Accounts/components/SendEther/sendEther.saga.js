@@ -13,7 +13,7 @@ import { env } from '../../../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/send?resolve"
 
-function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
+export function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
   return fetch(
     url.replace(":user", from).replace(":address", fromAddress),
     {
@@ -21,7 +21,7 @@ function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({value, password, toAddress})
+      body: JSON.stringify({ value, password, toAddress })
     }
   )
     .then(function (response) {
@@ -32,15 +32,15 @@ function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
     });
 }
 
-function* sendEther(action) {
+export function* sendEther(action) {
   try {
     let response = yield call(
       sendEtherAPICall,
-        action.from,
-        action.fromAddress,
-        action.toAddress,
-        action.value,
-        action.password
+      action.from,
+      action.fromAddress,
+      action.toAddress,
+      action.value,
+      action.password
     );
     yield put(sendEtherSuccess(response));
   }

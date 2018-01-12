@@ -16,24 +16,24 @@ import { env } from '../../env.js'
 const cirrusUrl = env.CIRRUS_URL + '/:contractName?:queryString';
 const contractUrl = env.BLOC_URL + '/contracts/:contractName/Latest';
 
-function queryCirrusRequest(name, queryString) {
+export function queryCirrusRequest(name, queryString) {
   return fetch(
-    cirrusUrl.replace(":contractName", name).replace(':queryString',queryString),
+    cirrusUrl.replace(":contractName", name).replace(':queryString', queryString),
     {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json()
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
-function queryCirrusVarsRequest(contractName) {
+export function queryCirrusVarsRequest(contractName) {
   return fetch(
     contractUrl.replace(":contractName", contractName),
     {
@@ -42,30 +42,30 @@ function queryCirrusVarsRequest(contractName) {
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json()
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
-function* queryCirrusVars(action) {
+export function* queryCirrusVars(action) {
   try {
     const response = yield call(queryCirrusVarsRequest, action.contractName);
     yield put(queryCirrusVarsSuccess(response.xabi.vars));
   }
-  catch(err) {
+  catch (err) {
     yield put(queryCirrusVarsFailure(err))
   }
 }
 
-function* queryCirrus(action){
+export function* queryCirrus(action) {
   try {
     const response = yield call(queryCirrusRequest, action.contractName, action.queryString);
     yield put(queryCirrusSuccess(response));
   }
-  catch(err) {
+  catch (err) {
     yield put(queryCirrusFailure(err));
   }
 }

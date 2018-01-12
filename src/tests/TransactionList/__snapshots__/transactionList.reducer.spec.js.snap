@@ -1,0 +1,177 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`TransactionList: reducer set initial state 1`] = `
+Object {
+  "error": null,
+  "transactions": Array [],
+  "tx": Array [],
+}
+`;
+
+exports[`TransactionList: reducer transactions failure 1`] = `
+Object {
+  "error": "error",
+  "transactions": Array [],
+  "tx": Array [],
+}
+`;
+
+exports[`TransactionList: reducer transactions load 1`] = `
+Object {
+  "error": null,
+  "transactions": Array [
+    Object {
+      "blockNumber": 21,
+      "codeOrData": "0e3668f8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026673000000000000000000000000000000000000000000000000000000000000",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "9c47c9d3284248a6f85b9192aea2214db97252c67850ebfebb0e33eb6237949b",
+      "next": "",
+      "nonce": 18,
+      "origin": "API",
+      "r": "1b720e3006b58e466ee7c6635bab4e627afab0c5ea26d1937ac378f8669ce781",
+      "s": "6f8f8173644f7d6e847d0d95207b69f9e2834bde16e62a05f41f6bfd725ce0e4",
+      "timestamp": "2017-12-14 12:42:13.017694 UTC",
+      "to": "26acb720a5029f6e50b94e096e7df1d03340879f",
+      "transactionType": "FunctionCall",
+      "v": "1b",
+      "value": "0",
+    },
+    Object {
+      "blockNumber": 20,
+      "codeOrData": "0e3668f8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026673000000000000000000000000000000000000000000000000000000000000",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "5e06d623d2ec0eaad0f8b5072a85c6bf5f042924d85d77b1ed566c502a4f4b82",
+      "next": "",
+      "nonce": 17,
+      "origin": "API",
+      "r": "68e0e1c9602a4166a94a230d1d6075df7b280eeb4a8ade51a9adbb68bf247ae9",
+      "s": "f1caf64684d6f4ec2941c2583e78c004b6fb87665e521c46e407e446a976fd9",
+      "timestamp": "2017-12-14 12:41:32.229929 UTC",
+      "to": "26acb720a5029f6e50b94e096e7df1d03340879f",
+      "transactionType": "FunctionCall",
+      "v": "1c",
+      "value": "0",
+    },
+    Object {
+      "blockNumber": 19,
+      "codeOrData": "6060604052346000575b6062806100176000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680632a1afcd914603c575b6000565b346000576046605c565b6040518082815260200191505060405180910390f35b6000548156",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81",
+      "next": "",
+      "nonce": 16,
+      "origin": "API",
+      "r": "f5f15124e4d9395490989a6e6947492d40a3ba65afea0cce1584ca1bf0fde95d",
+      "s": "38230fe3a6b0a629f3ea5f441b13ff784d9c52d0663476e3b066eb1b138fc248",
+      "timestamp": "2017-12-13 07:47:05.998689 UTC",
+      "transactionType": "Contract",
+      "v": "1b",
+      "value": "0",
+    },
+  ],
+  "tx": Array [],
+}
+`;
+
+exports[`TransactionList: reducer transactions request 1`] = `
+Object {
+  "error": null,
+  "transactions": Array [],
+  "tx": Array [],
+}
+`;
+
+exports[`TransactionList: reducer transactions success 1`] = `
+Object {
+  "error": null,
+  "transactions": Array [],
+  "tx": Array [
+    Object {
+      "blockNumber": 21,
+      "codeOrData": "0e3668f8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026673000000000000000000000000000000000000000000000000000000000000",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "9c47c9d3284248a6f85b9192aea2214db97252c67850ebfebb0e33eb6237949b",
+      "next": "",
+      "nonce": 18,
+      "origin": "API",
+      "r": "1b720e3006b58e466ee7c6635bab4e627afab0c5ea26d1937ac378f8669ce781",
+      "s": "6f8f8173644f7d6e847d0d95207b69f9e2834bde16e62a05f41f6bfd725ce0e4",
+      "timestamp": "2017-12-14 12:42:13.017694 UTC",
+      "to": "26acb720a5029f6e50b94e096e7df1d03340879f",
+      "transactionType": "FunctionCall",
+      "v": "1b",
+      "value": "0",
+    },
+    Object {
+      "blockNumber": 20,
+      "codeOrData": "0e3668f8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026673000000000000000000000000000000000000000000000000000000000000",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "5e06d623d2ec0eaad0f8b5072a85c6bf5f042924d85d77b1ed566c502a4f4b82",
+      "next": "",
+      "nonce": 17,
+      "origin": "API",
+      "r": "68e0e1c9602a4166a94a230d1d6075df7b280eeb4a8ade51a9adbb68bf247ae9",
+      "s": "f1caf64684d6f4ec2941c2583e78c004b6fb87665e521c46e407e446a976fd9",
+      "timestamp": "2017-12-14 12:41:32.229929 UTC",
+      "to": "26acb720a5029f6e50b94e096e7df1d03340879f",
+      "transactionType": "FunctionCall",
+      "v": "1c",
+      "value": "0",
+    },
+  ],
+}
+`;
+
+exports[`TransactionList: reducer transactions update 1`] = `
+Object {
+  "error": null,
+  "transactions": Array [
+    Object {
+      "blockNumber": 21,
+      "codeOrData": "0e3668f8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026673000000000000000000000000000000000000000000000000000000000000",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "9c47c9d3284248a6f85b9192aea2214db97252c67850ebfebb0e33eb6237949b",
+      "next": "",
+      "nonce": 18,
+      "origin": "API",
+      "r": "1b720e3006b58e466ee7c6635bab4e627afab0c5ea26d1937ac378f8669ce781",
+      "s": "6f8f8173644f7d6e847d0d95207b69f9e2834bde16e62a05f41f6bfd725ce0e4",
+      "timestamp": "2017-12-14 12:42:13.017694 UTC",
+      "to": "26acb720a5029f6e50b94e096e7df1d03340879f",
+      "transactionType": "FunctionCall",
+      "v": "1b",
+      "value": "0",
+    },
+    Object {
+      "blockNumber": 20,
+      "codeOrData": "0e3668f8000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000026673000000000000000000000000000000000000000000000000000000000000",
+      "from": "d027272d732f730f3fef139aa40293a3a5800fbe",
+      "gasLimit": 100000000,
+      "gasPrice": 1,
+      "hash": "5e06d623d2ec0eaad0f8b5072a85c6bf5f042924d85d77b1ed566c502a4f4b82",
+      "next": "",
+      "nonce": 17,
+      "origin": "API",
+      "r": "68e0e1c9602a4166a94a230d1d6075df7b280eeb4a8ade51a9adbb68bf247ae9",
+      "s": "f1caf64684d6f4ec2941c2583e78c004b6fb87665e521c46e407e446a976fd9",
+      "timestamp": "2017-12-14 12:41:32.229929 UTC",
+      "to": "26acb720a5029f6e50b94e096e7df1d03340879f",
+      "transactionType": "FunctionCall",
+      "v": "1c",
+      "value": "0",
+    },
+  ],
+  "tx": Array [],
+}
+`;

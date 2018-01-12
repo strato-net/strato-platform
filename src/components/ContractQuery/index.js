@@ -31,9 +31,7 @@ class ContractQuery extends Component {
   }
 
   handleKeyUp(event) {
-    if(event.key === 'Enter'
-      && this.state.value !== ''
-      && this.state.field !== 'Select field') {
+    if(event.key === 'Enter' && this.state.value !== '' && this.state.field !== 'Select field') {
       this.handleAddTag();
     }
   }
@@ -102,7 +100,7 @@ class ContractQuery extends Component {
         key="column-address"
         name="address"
         renderCell={
-          (row) =>
+          (row) => 
             <Cell>
               <TruncatedFormat>
                 {self.props.contractQuery.queryResults[row].address}
@@ -134,7 +132,7 @@ class ContractQuery extends Component {
                 key={'column-'+propertyName}
                 name={propertyName}
                 renderCell={
-                  (row) =>
+                  (row) => 
                     <Cell>
                       {
                         self.props.contractQuery.vars[propertyName].type === 'Mapping' ||
@@ -265,7 +263,7 @@ class ContractQuery extends Component {
   }
 }
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   return {
     contractQuery: state.contractQuery
   };

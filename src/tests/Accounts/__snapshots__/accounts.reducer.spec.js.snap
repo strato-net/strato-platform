@@ -1,0 +1,262 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Accounts: reducer fetch account details on failure 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {
+      "76a3192ce9aa0531fe7e0e3489a469018c0bff03": Object {
+        "error": "ERROR",
+      },
+    },
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer fetch account details on success 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {
+      "76a3192ce9aa0531fe7e0e3489a469018c0bff03": Object {
+        "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
+        "balance": "999999999999699729688",
+        "code": "",
+        "codeHash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+        "contractRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+        "error": null,
+        "kind": "AddressStateRef",
+        "latestBlockNum": 9,
+        "next": "/eth/v1.2/account?address=76a3192ce9aa0531fe7e0e3489a469018c0bff03&index=7",
+        "nonce": 8,
+        "source": "",
+      },
+    },
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer fetch accounts on failure 1`] = `
+Object {
+  "accounts": Object {},
+  "error": "ERROR",
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer fetch accounts on request 1`] = `
+Object {
+  "accounts": Object {},
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer fetch accounts on success 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {},
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer fetch user address on failure 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {
+      "error": "ERROR",
+    },
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer fetch user address on success 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {
+      "45b53a8b688c3a3faca30e5842800922f80fdb8d": Object {
+        "error": null,
+      },
+      "60122a032bebcb89e228899b60c4d190b5a17aa3": Object {
+        "error": null,
+      },
+    },
+  },
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer set initial state 1`] = `
+Object {
+  "accounts": Object {},
+  "error": null,
+  "filter": "",
+}
+`;
+
+exports[`Accounts: reducer update accounts filter 1`] = `
+Object {
+  "accounts": Object {
+    "123456789012345678901234567890123": Object {},
+    "Admin_1085_64667": Object {},
+    "Admin_1177_31203": Object {},
+    "Admin_1177_39206": Object {},
+    "Admin_1177_49507": Object {},
+    "Admin_1301_62816": Object {},
+    "Admin_1301_86023": Object {},
+    "Buyer1": Object {},
+    "Buyer1177_18955": Object {},
+    "Buyer2": Object {},
+    "Supplier0_1301_46441": Object {},
+    "Supplier1": Object {},
+    "Supplier1177_62701": Object {},
+    "Supplier1_1301_46441": Object {},
+    "Supplier2": Object {},
+    "Supplier2_1301_46441": Object {},
+    "User_1177_14462": Object {},
+    "User_1177_26292": Object {},
+    "User_1177_37717": Object {},
+    "User_1177_42489": Object {},
+    "User_1177_52307": Object {},
+    "User_1177_59359": Object {},
+    "User_1177_59578": Object {},
+    "User_1177_69645 ?#%!@*": Object {},
+    "User_1177_79118": Object {},
+    "tanuj": Object {},
+  },
+  "error": null,
+  "filter": "Search accounts",
+}
+`;

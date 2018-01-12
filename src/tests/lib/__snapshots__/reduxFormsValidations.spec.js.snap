@@ -1,0 +1,5 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lib: reduxFormsValidations returns required field 1`] = `"Required"`;
+
+exports[`Lib: reduxFormsValidations returns undefined 1`] = `undefined`;

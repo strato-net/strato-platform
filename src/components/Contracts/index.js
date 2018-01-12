@@ -95,7 +95,7 @@ class Contracts extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     contracts: state.contracts.contracts,
     filter: state.contracts.filter

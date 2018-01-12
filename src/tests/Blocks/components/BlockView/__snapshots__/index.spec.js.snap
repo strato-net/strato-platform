@@ -1,0 +1,3371 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`BlockView: index mapStateToProps return block when blockData is empty 1`] = `
+Object {
+  "block": Object {
+    "blockData": Object {
+      "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+      "difficulty": 143854,
+      "extraData": 0,
+      "gasLimit": 2.7640800523559524e+31,
+      "gasUsed": 0,
+      "kind": "BlockData",
+      "mixHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "nonce": 6,
+      "number": 210,
+      "parentHash": "868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803",
+      "receiptsRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      "stateRoot": "ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca",
+      "timestamp": "2017-12-26T06:32:44Z",
+      "transactionsRoot": "64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d",
+      "unclesHash": "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    },
+    "blockUncles": Array [],
+    "kind": "Block",
+    "next": "",
+    "receiptTransactions": Array [
+      Object {
+        "from": "7241e4db9c40568b889277e152a08a956cfaa60f",
+        "gasLimit": 100000000,
+        "gasPrice": 1,
+        "hash": "503007d37d1e39a42bd6d009ec2a4efe6b9b6c6a7b1ce892e8621eca48e77156",
+        "kind": "Transaction",
+        "nonce": 0,
+        "r": "724b4be0569bd52aa7704fa24e3ff9ec96b1a604438b4883f3c63d0446c650e7",
+        "s": "7c44e50b354da261d288b84c5a6d24dfe173d8cb664d87c1ed9599ebd5989770",
+        "transactionType": "Contract",
+        "v": "1c",
+        "value": 0,
+      },
+    ],
+  },
+}
+`;
+
+exports[`BlockView: index mapStateToProps return block when queryEngine is empty 1`] = `
+Object {
+  "block": Object {
+    "blockData": Object {
+      "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+      "difficulty": 143854,
+      "extraData": 0,
+      "gasLimit": 2.7640800523559524e+31,
+      "gasUsed": 0,
+      "kind": "BlockData",
+      "mixHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "nonce": 6,
+      "number": 210,
+      "parentHash": "868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803",
+      "receiptsRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+      "stateRoot": "ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca",
+      "timestamp": "2017-12-26T06:32:44Z",
+      "transactionsRoot": "64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d",
+      "unclesHash": "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+    },
+    "blockUncles": Array [],
+    "kind": "Block",
+    "next": "",
+    "receiptTransactions": Array [
+      Object {
+        "from": "7241e4db9c40568b889277e152a08a956cfaa60f",
+        "gasLimit": 100000000,
+        "gasPrice": 1,
+        "hash": "503007d37d1e39a42bd6d009ec2a4efe6b9b6c6a7b1ce892e8621eca48e77156",
+        "kind": "Transaction",
+        "nonce": 0,
+        "r": "724b4be0569bd52aa7704fa24e3ff9ec96b1a604438b4883f3c63d0446c650e7",
+        "s": "7c44e50b354da261d288b84c5a6d24dfe173d8cb664d87c1ed9599ebd5989770",
+        "transactionType": "Contract",
+        "v": "1c",
+        "value": 0,
+      },
+    ],
+  },
+}
+`;
+
+exports[`BlockView: index render component with values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <BlockView
+    block={
+      Object {
+        "blockData": Object {
+          "coinbase": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+          "difficulty": 143854,
+          "extraData": 0,
+          "gasLimit": 2.7640800523559524e+31,
+          "gasUsed": 0,
+          "kind": "BlockData",
+          "mixHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "nonce": 6,
+          "number": 210,
+          "parentHash": "868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803",
+          "receiptsRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+          "stateRoot": "ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca",
+          "timestamp": "2017-12-26T06:32:44Z",
+          "transactionsRoot": "64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d",
+          "unclesHash": "1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+        },
+        "blockUncles": Array [],
+        "kind": "Block",
+        "next": "",
+        "receiptTransactions": Array [
+          Object {
+            "from": "7241e4db9c40568b889277e152a08a956cfaa60f",
+            "gasLimit": 100000000,
+            "gasPrice": 1,
+            "hash": "503007d37d1e39a42bd6d009ec2a4efe6b9b6c6a7b1ce892e8621eca48e77156",
+            "kind": "Transaction",
+            "nonce": 0,
+            "r": "724b4be0569bd52aa7704fa24e3ff9ec96b1a604438b4883f3c63d0446c650e7",
+            "s": "7c44e50b354da261d288b84c5a6d24dfe173d8cb664d87c1ed9599ebd5989770",
+            "transactionType": "Contract",
+            "v": "1c",
+            "value": 0,
+          },
+        ],
+      }
+    }
+    fetchBlockData={[Function]}
+    match={
+      Object {
+        "params": Object {
+          "block": 210,
+        },
+      }
+    }
+  />,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "host",
+    "props": Object {
+      "children": Array [
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-9"
+          >
+            <div
+              className="h3"
+            >
+              Block #
+              210
+            </div>
+          </div>
+          <div
+            className="col-sm-3 smd-pad-16 text-right"
+          >
+            <Blueprint.Button
+              className="pt-icon-arrow-left"
+              onClick={[Function]}
+              text="Back"
+            />
+          </div>
+        </div>,
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-12"
+          >
+            <div
+              className="pt-card"
+            >
+              <table
+                className="pt-table pt-str"
+              >
+                <thead>
+                  <tr>
+                    <th>
+                      Field
+                    </th>
+                    <th>
+                      Value
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      Parent Hash
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Difficulty
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          143854
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Nonce
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          6
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Coinbase
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      State Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Transactions Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Timestamp
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          2017-12-26 01:32:44 AM
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+      ],
+      "className": "container-fluid pt-dark",
+    },
+    "ref": null,
+    "rendered": Array [
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <div
+              className="col-sm-9"
+            >
+              <div
+                className="h3"
+              >
+                Block #
+                210
+              </div>
+            </div>,
+            <div
+              className="col-sm-3 smd-pad-16 text-right"
+            >
+              <Blueprint.Button
+                className="pt-icon-arrow-left"
+                onClick={[Function]}
+                text="Back"
+              />
+            </div>,
+          ],
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="h3"
+              >
+                Block #
+                210
+              </div>,
+              "className": "col-sm-9",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  "Block #",
+                  210,
+                ],
+                "className": "h3",
+              },
+              "ref": null,
+              "rendered": Array [
+                "Block #",
+                210,
+              ],
+              "type": "div",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <Blueprint.Button
+                className="pt-icon-arrow-left"
+                onClick={[Function]}
+                text="Back"
+              />,
+              "className": "col-sm-3 smd-pad-16 text-right",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "class",
+              "props": Object {
+                "className": "pt-icon-arrow-left",
+                "onClick": [Function],
+                "text": "Back",
+              },
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
+            "type": "div",
+          },
+        ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="col-sm-12"
+          >
+            <div
+              className="pt-card"
+            >
+              <table
+                className="pt-table pt-str"
+              >
+                <thead>
+                  <tr>
+                    <th>
+                      Field
+                    </th>
+                    <th>
+                      Value
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      Parent Hash
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Difficulty
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          143854
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Nonce
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          6
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Coinbase
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      State Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Transactions Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Timestamp
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          2017-12-26 01:32:44 AM
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>,
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="pt-card"
+            >
+              <table
+                className="pt-table pt-str"
+              >
+                <thead>
+                  <tr>
+                    <th>
+                      Field
+                    </th>
+                    <th>
+                      Value
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      Parent Hash
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Difficulty
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          143854
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Nonce
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          6
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Coinbase
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      State Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Transactions Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Timestamp
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          2017-12-26 01:32:44 AM
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>,
+            "className": "col-sm-12",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <table
+                className="pt-table pt-str"
+              >
+                <thead>
+                  <tr>
+                    <th>
+                      Field
+                    </th>
+                    <th>
+                      Value
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      Parent Hash
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Difficulty
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          143854
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Nonce
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          6
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Coinbase
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      State Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Transactions Root
+                    </td>
+                    <td>
+                      <HexText
+                        classes="small smd-pad-4"
+                        value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                      />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Timestamp
+                    </td>
+                    <td>
+                      <small>
+                        <Text
+                          ellipsize={true}
+                        >
+                          2017-12-26 01:32:44 AM
+                        </Text>
+                      </small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>,
+              "className": "pt-card",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <thead>
+                    <tr>
+                      <th>
+                        Field
+                      </th>
+                      <th>
+                        Value
+                      </th>
+                    </tr>
+                  </thead>,
+                  <tbody>
+                    <tr>
+                      <td>
+                        Parent Hash
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Difficulty
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            143854
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Nonce
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            6
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Coinbase
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        State Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Transactions Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Timestamp
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            2017-12-26 01:32:44 AM
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>,
+                ],
+                "className": "pt-table pt-str",
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": <tr>
+                      <th>
+                        Field
+                      </th>
+                      <th>
+                        Value
+                      </th>
+                    </tr>,
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": Array [
+                        <th>
+                          Field
+                        </th>,
+                        <th>
+                          Value
+                        </th>,
+                      ],
+                    },
+                    "ref": null,
+                    "rendered": Array [
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Field",
+                        },
+                        "ref": null,
+                        "rendered": "Field",
+                        "type": "th",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Value",
+                        },
+                        "ref": null,
+                        "rendered": "Value",
+                        "type": "th",
+                      },
+                    ],
+                    "type": "tr",
+                  },
+                  "type": "thead",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <tr>
+                        <td>
+                          Parent Hash
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                          />
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          Difficulty
+                        </td>
+                        <td>
+                          <small>
+                            <Text
+                              ellipsize={true}
+                            >
+                              143854
+                            </Text>
+                          </small>
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          Nonce
+                        </td>
+                        <td>
+                          <small>
+                            <Text
+                              ellipsize={true}
+                            >
+                              6
+                            </Text>
+                          </small>
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          Coinbase
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                          />
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          State Root
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                          />
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          Transactions Root
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                          />
+                        </td>
+                      </tr>,
+                      <tr>
+                        <td>
+                          Timestamp
+                        </td>
+                        <td>
+                          <small>
+                            <Text
+                              ellipsize={true}
+                            >
+                              2017-12-26 01:32:44 AM
+                            </Text>
+                          </small>
+                        </td>
+                      </tr>,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            Parent Hash
+                          </td>,
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                            />
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Parent Hash",
+                          },
+                          "ref": null,
+                          "rendered": "Parent Hash",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <HexText
+                              classes="small smd-pad-4"
+                              value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                            />,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "class",
+                            "props": Object {
+                              "classes": "small smd-pad-4",
+                              "value": "868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803",
+                            },
+                            "ref": null,
+                            "rendered": null,
+                            "type": [Function],
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            Difficulty
+                          </td>,
+                          <td>
+                            <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                143854
+                              </Text>
+                            </small>
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Difficulty",
+                          },
+                          "ref": null,
+                          "rendered": "Difficulty",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                143854
+                              </Text>
+                            </small>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <Text
+                                ellipsize={true}
+                              >
+                                143854
+                              </Text>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "children": 143854,
+                                "ellipsize": true,
+                              },
+                              "ref": null,
+                              "rendered": 143854,
+                              "type": [Function],
+                            },
+                            "type": "small",
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            Nonce
+                          </td>,
+                          <td>
+                            <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                6
+                              </Text>
+                            </small>
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Nonce",
+                          },
+                          "ref": null,
+                          "rendered": "Nonce",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                6
+                              </Text>
+                            </small>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <Text
+                                ellipsize={true}
+                              >
+                                6
+                              </Text>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "children": 6,
+                                "ellipsize": true,
+                              },
+                              "ref": null,
+                              "rendered": 6,
+                              "type": [Function],
+                            },
+                            "type": "small",
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            Coinbase
+                          </td>,
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                            />
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Coinbase",
+                          },
+                          "ref": null,
+                          "rendered": "Coinbase",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <HexText
+                              classes="small smd-pad-4"
+                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                            />,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "class",
+                            "props": Object {
+                              "classes": "small smd-pad-4",
+                              "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+                            },
+                            "ref": null,
+                            "rendered": null,
+                            "type": [Function],
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            State Root
+                          </td>,
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                            />
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "State Root",
+                          },
+                          "ref": null,
+                          "rendered": "State Root",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <HexText
+                              classes="small smd-pad-4"
+                              value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                            />,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "class",
+                            "props": Object {
+                              "classes": "small smd-pad-4",
+                              "value": "ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca",
+                            },
+                            "ref": null,
+                            "rendered": null,
+                            "type": [Function],
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            Transactions Root
+                          </td>,
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                            />
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Transactions Root",
+                          },
+                          "ref": null,
+                          "rendered": "Transactions Root",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <HexText
+                              classes="small smd-pad-4"
+                              value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                            />,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "class",
+                            "props": Object {
+                              "classes": "small smd-pad-4",
+                              "value": "64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d",
+                            },
+                            "ref": null,
+                            "rendered": null,
+                            "type": [Function],
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            Timestamp
+                          </td>,
+                          <td>
+                            <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                2017-12-26 01:32:44 AM
+                              </Text>
+                            </small>
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Timestamp",
+                          },
+                          "ref": null,
+                          "rendered": "Timestamp",
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                2017-12-26 01:32:44 AM
+                              </Text>
+                            </small>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <Text
+                                ellipsize={true}
+                              >
+                                2017-12-26 01:32:44 AM
+                              </Text>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "children": "2017-12-26 01:32:44 AM",
+                                "ellipsize": true,
+                              },
+                              "ref": null,
+                              "rendered": "2017-12-26 01:32:44 AM",
+                              "type": [Function],
+                            },
+                            "type": "small",
+                          },
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                  ],
+                  "type": "tbody",
+                },
+              ],
+              "type": "table",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        "type": "div",
+      },
+    ],
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": Array [
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-9"
+            >
+              <div
+                className="h3"
+              >
+                Block #
+                210
+              </div>
+            </div>
+            <div
+              className="col-sm-3 smd-pad-16 text-right"
+            >
+              <Blueprint.Button
+                className="pt-icon-arrow-left"
+                onClick={[Function]}
+                text="Back"
+              />
+            </div>
+          </div>,
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-12"
+            >
+              <div
+                className="pt-card"
+              >
+                <table
+                  className="pt-table pt-str"
+                >
+                  <thead>
+                    <tr>
+                      <th>
+                        Field
+                      </th>
+                      <th>
+                        Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        Parent Hash
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Difficulty
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            143854
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Nonce
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            6
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Coinbase
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        State Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Transactions Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Timestamp
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            2017-12-26 01:32:44 AM
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>,
+        ],
+        "className": "container-fluid pt-dark",
+      },
+      "ref": null,
+      "rendered": Array [
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": Array [
+              <div
+                className="col-sm-9"
+              >
+                <div
+                  className="h3"
+                >
+                  Block #
+                  210
+                </div>
+              </div>,
+              <div
+                className="col-sm-3 smd-pad-16 text-right"
+              >
+                <Blueprint.Button
+                  className="pt-icon-arrow-left"
+                  onClick={[Function]}
+                  text="Back"
+                />
+              </div>,
+            ],
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <div
+                  className="h3"
+                >
+                  Block #
+                  210
+                </div>,
+                "className": "col-sm-9",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    "Block #",
+                    210,
+                  ],
+                  "className": "h3",
+                },
+                "ref": null,
+                "rendered": Array [
+                  "Block #",
+                  210,
+                ],
+                "type": "div",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <Blueprint.Button
+                  className="pt-icon-arrow-left"
+                  onClick={[Function]}
+                  text="Back"
+                />,
+                "className": "col-sm-3 smd-pad-16 text-right",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "className": "pt-icon-arrow-left",
+                  "onClick": [Function],
+                  "text": "Back",
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
+              "type": "div",
+            },
+          ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="col-sm-12"
+            >
+              <div
+                className="pt-card"
+              >
+                <table
+                  className="pt-table pt-str"
+                >
+                  <thead>
+                    <tr>
+                      <th>
+                        Field
+                      </th>
+                      <th>
+                        Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        Parent Hash
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Difficulty
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            143854
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Nonce
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            6
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Coinbase
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        State Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Transactions Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Timestamp
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            2017-12-26 01:32:44 AM
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>,
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-card"
+              >
+                <table
+                  className="pt-table pt-str"
+                >
+                  <thead>
+                    <tr>
+                      <th>
+                        Field
+                      </th>
+                      <th>
+                        Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        Parent Hash
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Difficulty
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            143854
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Nonce
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            6
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Coinbase
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        State Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Transactions Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Timestamp
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            2017-12-26 01:32:44 AM
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>,
+              "className": "col-sm-12",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <table
+                  className="pt-table pt-str"
+                >
+                  <thead>
+                    <tr>
+                      <th>
+                        Field
+                      </th>
+                      <th>
+                        Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        Parent Hash
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Difficulty
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            143854
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Nonce
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            6
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Coinbase
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        State Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Transactions Root
+                      </td>
+                      <td>
+                        <HexText
+                          classes="small smd-pad-4"
+                          value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Timestamp
+                      </td>
+                      <td>
+                        <small>
+                          <Text
+                            ellipsize={true}
+                          >
+                            2017-12-26 01:32:44 AM
+                          </Text>
+                        </small>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>,
+                "className": "pt-card",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <thead>
+                      <tr>
+                        <th>
+                          Field
+                        </th>
+                        <th>
+                          Value
+                        </th>
+                      </tr>
+                    </thead>,
+                    <tbody>
+                      <tr>
+                        <td>
+                          Parent Hash
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          Difficulty
+                        </td>
+                        <td>
+                          <small>
+                            <Text
+                              ellipsize={true}
+                            >
+                              143854
+                            </Text>
+                          </small>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          Nonce
+                        </td>
+                        <td>
+                          <small>
+                            <Text
+                              ellipsize={true}
+                            >
+                              6
+                            </Text>
+                          </small>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          Coinbase
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          State Root
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          Transactions Root
+                        </td>
+                        <td>
+                          <HexText
+                            classes="small smd-pad-4"
+                            value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          Timestamp
+                        </td>
+                        <td>
+                          <small>
+                            <Text
+                              ellipsize={true}
+                            >
+                              2017-12-26 01:32:44 AM
+                            </Text>
+                          </small>
+                        </td>
+                      </tr>
+                    </tbody>,
+                  ],
+                  "className": "pt-table pt-str",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <tr>
+                        <th>
+                          Field
+                        </th>
+                        <th>
+                          Value
+                        </th>
+                      </tr>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <th>
+                            Field
+                          </th>,
+                          <th>
+                            Value
+                          </th>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Field",
+                          },
+                          "ref": null,
+                          "rendered": "Field",
+                          "type": "th",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Value",
+                          },
+                          "ref": null,
+                          "rendered": "Value",
+                          "type": "th",
+                        },
+                      ],
+                      "type": "tr",
+                    },
+                    "type": "thead",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": Array [
+                        <tr>
+                          <td>
+                            Parent Hash
+                          </td>
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                            />
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            Difficulty
+                          </td>
+                          <td>
+                            <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                143854
+                              </Text>
+                            </small>
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            Nonce
+                          </td>
+                          <td>
+                            <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                6
+                              </Text>
+                            </small>
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            Coinbase
+                          </td>
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                            />
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            State Root
+                          </td>
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                            />
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            Transactions Root
+                          </td>
+                          <td>
+                            <HexText
+                              classes="small smd-pad-4"
+                              value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                            />
+                          </td>
+                        </tr>,
+                        <tr>
+                          <td>
+                            Timestamp
+                          </td>
+                          <td>
+                            <small>
+                              <Text
+                                ellipsize={true}
+                              >
+                                2017-12-26 01:32:44 AM
+                              </Text>
+                            </small>
+                          </td>
+                        </tr>,
+                      ],
+                    },
+                    "ref": null,
+                    "rendered": Array [
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              Parent Hash
+                            </td>,
+                            <td>
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                              />
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Parent Hash",
+                            },
+                            "ref": null,
+                            "rendered": "Parent Hash",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <HexText
+                                classes="small smd-pad-4"
+                                value="868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803"
+                              />,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "classes": "small smd-pad-4",
+                                "value": "868f0fc14a4388e1652ffcf9910ee5f8656d9c0002407800a1f55d3606069803",
+                              },
+                              "ref": null,
+                              "rendered": null,
+                              "type": [Function],
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              Difficulty
+                            </td>,
+                            <td>
+                              <small>
+                                <Text
+                                  ellipsize={true}
+                                >
+                                  143854
+                                </Text>
+                              </small>
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Difficulty",
+                            },
+                            "ref": null,
+                            "rendered": "Difficulty",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <small>
+                                <Text
+                                  ellipsize={true}
+                                >
+                                  143854
+                                </Text>
+                              </small>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <Text
+                                  ellipsize={true}
+                                >
+                                  143854
+                                </Text>,
+                              },
+                              "ref": null,
+                              "rendered": Object {
+                                "instance": null,
+                                "key": undefined,
+                                "nodeType": "class",
+                                "props": Object {
+                                  "children": 143854,
+                                  "ellipsize": true,
+                                },
+                                "ref": null,
+                                "rendered": 143854,
+                                "type": [Function],
+                              },
+                              "type": "small",
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              Nonce
+                            </td>,
+                            <td>
+                              <small>
+                                <Text
+                                  ellipsize={true}
+                                >
+                                  6
+                                </Text>
+                              </small>
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Nonce",
+                            },
+                            "ref": null,
+                            "rendered": "Nonce",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <small>
+                                <Text
+                                  ellipsize={true}
+                                >
+                                  6
+                                </Text>
+                              </small>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <Text
+                                  ellipsize={true}
+                                >
+                                  6
+                                </Text>,
+                              },
+                              "ref": null,
+                              "rendered": Object {
+                                "instance": null,
+                                "key": undefined,
+                                "nodeType": "class",
+                                "props": Object {
+                                  "children": 6,
+                                  "ellipsize": true,
+                                },
+                                "ref": null,
+                                "rendered": 6,
+                                "type": [Function],
+                              },
+                              "type": "small",
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              Coinbase
+                            </td>,
+                            <td>
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                              />
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Coinbase",
+                            },
+                            "ref": null,
+                            "rendered": "Coinbase",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <HexText
+                                classes="small smd-pad-4"
+                                value="a1021e62fbb7fe282b7e2bd1ca26325af02bb43e"
+                              />,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "classes": "small smd-pad-4",
+                                "value": "a1021e62fbb7fe282b7e2bd1ca26325af02bb43e",
+                              },
+                              "ref": null,
+                              "rendered": null,
+                              "type": [Function],
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              State Root
+                            </td>,
+                            <td>
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                              />
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "State Root",
+                            },
+                            "ref": null,
+                            "rendered": "State Root",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <HexText
+                                classes="small smd-pad-4"
+                                value="ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca"
+                              />,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "classes": "small smd-pad-4",
+                                "value": "ad16f12eb1249d92fb95823dcd015dfb03e4628c7a36f1dfb787c01910e59dca",
+                              },
+                              "ref": null,
+                              "rendered": null,
+                              "type": [Function],
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              Transactions Root
+                            </td>,
+                            <td>
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                              />
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Transactions Root",
+                            },
+                            "ref": null,
+                            "rendered": "Transactions Root",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <HexText
+                                classes="small smd-pad-4"
+                                value="64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d"
+                              />,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "class",
+                              "props": Object {
+                                "classes": "small smd-pad-4",
+                                "value": "64f030ddfb2341468a9d4e4712eabf77f7712afc465a0a048f43c87fa7522b9d",
+                              },
+                              "ref": null,
+                              "rendered": null,
+                              "type": [Function],
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              Timestamp
+                            </td>,
+                            <td>
+                              <small>
+                                <Text
+                                  ellipsize={true}
+                                >
+                                  2017-12-26 01:32:44 AM
+                                </Text>
+                              </small>
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "Timestamp",
+                            },
+                            "ref": null,
+                            "rendered": "Timestamp",
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <small>
+                                <Text
+                                  ellipsize={true}
+                                >
+                                  2017-12-26 01:32:44 AM
+                                </Text>
+                              </small>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <Text
+                                  ellipsize={true}
+                                >
+                                  2017-12-26 01:32:44 AM
+                                </Text>,
+                              },
+                              "ref": null,
+                              "rendered": Object {
+                                "instance": null,
+                                "key": undefined,
+                                "nodeType": "class",
+                                "props": Object {
+                                  "children": "2017-12-26 01:32:44 AM",
+                                  "ellipsize": true,
+                                },
+                                "ref": null,
+                                "rendered": "2017-12-26 01:32:44 AM",
+                                "type": [Function],
+                              },
+                              "type": "small",
+                            },
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
+                    ],
+                    "type": "tbody",
+                  },
+                ],
+                "type": "table",
+              },
+              "type": "div",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+      ],
+      "type": "div",
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
+
+exports[`BlockView: index render component without values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <BlockView
+    block={undefined}
+    fetchBlockData={[Function]}
+    match={
+      Object {
+        "params": Object {
+          "block": undefined,
+        },
+      }
+    }
+  />,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "host",
+    "props": Object {
+      "children": Array [
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-9"
+          >
+            <div
+              className="h3"
+            >
+              Block #
+            </div>
+          </div>
+          <div
+            className="col-sm-3 smd-pad-16 text-right"
+          >
+            <Blueprint.Button
+              className="pt-icon-arrow-left"
+              onClick={[Function]}
+              text="Back"
+            />
+          </div>
+        </div>,
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-12"
+          >
+            <div
+              className="pt-card"
+            >
+              <table>
+                <tbody>
+                  <tr
+                    colSpan={2}
+                  >
+                    No data
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>,
+      ],
+      "className": "container-fluid pt-dark",
+    },
+    "ref": null,
+    "rendered": Array [
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <div
+              className="col-sm-9"
+            >
+              <div
+                className="h3"
+              >
+                Block #
+              </div>
+            </div>,
+            <div
+              className="col-sm-3 smd-pad-16 text-right"
+            >
+              <Blueprint.Button
+                className="pt-icon-arrow-left"
+                onClick={[Function]}
+                text="Back"
+              />
+            </div>,
+          ],
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="h3"
+              >
+                Block #
+              </div>,
+              "className": "col-sm-9",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  "Block #",
+                  undefined,
+                ],
+                "className": "h3",
+              },
+              "ref": null,
+              "rendered": Array [
+                "Block #",
+                undefined,
+              ],
+              "type": "div",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <Blueprint.Button
+                className="pt-icon-arrow-left"
+                onClick={[Function]}
+                text="Back"
+              />,
+              "className": "col-sm-3 smd-pad-16 text-right",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "class",
+              "props": Object {
+                "className": "pt-icon-arrow-left",
+                "onClick": [Function],
+                "text": "Back",
+              },
+              "ref": null,
+              "rendered": null,
+              "type": [Function],
+            },
+            "type": "div",
+          },
+        ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="col-sm-12"
+          >
+            <div
+              className="pt-card"
+            >
+              <table>
+                <tbody>
+                  <tr
+                    colSpan={2}
+                  >
+                    No data
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>,
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="pt-card"
+            >
+              <table>
+                <tbody>
+                  <tr
+                    colSpan={2}
+                  >
+                    No data
+                  </tr>
+                </tbody>
+              </table>
+            </div>,
+            "className": "col-sm-12",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <table>
+                <tbody>
+                  <tr
+                    colSpan={2}
+                  >
+                    No data
+                  </tr>
+                </tbody>
+              </table>,
+              "className": "pt-card",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <tbody>
+                  <tr
+                    colSpan={2}
+                  >
+                    No data
+                  </tr>
+                </tbody>,
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": <tr
+                    colSpan={2}
+                  >
+                    No data
+                  </tr>,
+                },
+                "ref": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "No data",
+                    "colSpan": 2,
+                  },
+                  "ref": null,
+                  "rendered": "No data",
+                  "type": "tr",
+                },
+                "type": "tbody",
+              },
+              "type": "table",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        "type": "div",
+      },
+    ],
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": Array [
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-9"
+            >
+              <div
+                className="h3"
+              >
+                Block #
+              </div>
+            </div>
+            <div
+              className="col-sm-3 smd-pad-16 text-right"
+            >
+              <Blueprint.Button
+                className="pt-icon-arrow-left"
+                onClick={[Function]}
+                text="Back"
+              />
+            </div>
+          </div>,
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-12"
+            >
+              <div
+                className="pt-card"
+              >
+                <table>
+                  <tbody>
+                    <tr
+                      colSpan={2}
+                    >
+                      No data
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>,
+        ],
+        "className": "container-fluid pt-dark",
+      },
+      "ref": null,
+      "rendered": Array [
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": Array [
+              <div
+                className="col-sm-9"
+              >
+                <div
+                  className="h3"
+                >
+                  Block #
+                </div>
+              </div>,
+              <div
+                className="col-sm-3 smd-pad-16 text-right"
+              >
+                <Blueprint.Button
+                  className="pt-icon-arrow-left"
+                  onClick={[Function]}
+                  text="Back"
+                />
+              </div>,
+            ],
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <div
+                  className="h3"
+                >
+                  Block #
+                </div>,
+                "className": "col-sm-9",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    "Block #",
+                    undefined,
+                  ],
+                  "className": "h3",
+                },
+                "ref": null,
+                "rendered": Array [
+                  "Block #",
+                  undefined,
+                ],
+                "type": "div",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <Blueprint.Button
+                  className="pt-icon-arrow-left"
+                  onClick={[Function]}
+                  text="Back"
+                />,
+                "className": "col-sm-3 smd-pad-16 text-right",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "className": "pt-icon-arrow-left",
+                  "onClick": [Function],
+                  "text": "Back",
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
+              "type": "div",
+            },
+          ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="col-sm-12"
+            >
+              <div
+                className="pt-card"
+              >
+                <table>
+                  <tbody>
+                    <tr
+                      colSpan={2}
+                    >
+                      No data
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>,
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-card"
+              >
+                <table>
+                  <tbody>
+                    <tr
+                      colSpan={2}
+                    >
+                      No data
+                    </tr>
+                  </tbody>
+                </table>
+              </div>,
+              "className": "col-sm-12",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <table>
+                  <tbody>
+                    <tr
+                      colSpan={2}
+                    >
+                      No data
+                    </tr>
+                  </tbody>
+                </table>,
+                "className": "pt-card",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": <tbody>
+                    <tr
+                      colSpan={2}
+                    >
+                      No data
+                    </tr>
+                  </tbody>,
+                },
+                "ref": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": <tr
+                      colSpan={2}
+                    >
+                      No data
+                    </tr>,
+                  },
+                  "ref": null,
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "No data",
+                      "colSpan": 2,
+                    },
+                    "ref": null,
+                    "rendered": "No data",
+                    "type": "tr",
+                  },
+                  "type": "tbody",
+                },
+                "type": "table",
+              },
+              "type": "div",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+      ],
+      "type": "div",
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;

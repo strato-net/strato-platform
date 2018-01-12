@@ -45,14 +45,13 @@ const formatCompilationErrors = function (error) {
 
   try {
     const jErrors = JSON.parse(text);
-    console.log(jErrors);
     return jErrors.error;
   } catch (e) {
     return text;
   }
 }
 
-const loadState = () => {
+export const loadState = () => {
   try {
     const serializedState = localStorage.getItem('code_editor_state');
     if (serializedState === null) {

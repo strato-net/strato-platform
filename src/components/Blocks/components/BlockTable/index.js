@@ -7,7 +7,7 @@ import { fetchBlockData } from '../../../BlockData/block-data.actions';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Button} from '@blueprintjs/core';
-import * as moment from 'moment';
+import moment from 'moment';
 import HexText from '../../../HexText';
 
 class BlockTable extends Component {
@@ -30,7 +30,7 @@ class BlockTable extends Component {
   //   this.props.dispatch(submit('block-query'));
   // }
 
-  submit = (values ) => {
+  submit = (values) => {
     this.props.updateQuery(values.query, values.value);
     this.props.dispatch(reset('block-query'));
   };
@@ -207,7 +207,7 @@ class BlockTable extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     query: state.queryEngine.query,
     queryResult: state.queryEngine.queryResult,
