@@ -36,8 +36,8 @@ npm run start
 | Variable | Default |
 | -------- | ------- |
 |`NODE_NAME`|LOCALHOST|
-|`BLOC_URL`|http://localhost/bloc/v2.1|
-|`BLOC_DOC_URL`|http://localhost/docs/?url=/bloc/v2.1/swagger.json|
+|`BLOC_URL`|http://localhost/bloc/v2.2|
+|`BLOC_DOC_URL`|http://localhost/docs/?url=/bloc/v2.2/swagger.json|
 |`STRATO_URL`|http://localhost/strato-api/eth/v1.2|
 |`STRATO_DOC_URL`|http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json|
 |`CIRRUS_URL`|http://localhost/cirrus/search|
@@ -46,5 +46,5 @@ npm run start
 #### Example Docker Run command
 
 ```
-docker run -d --name smd-ui -p 3035:3002 -e NODE_NAME=BAYAR6 -e BLOC_URL=http://bayar6.eastus.cloudapp.azure.com/bloc/v2.1 -e STRATO_URL=http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2 blockapps/smd-ui
+docker run -d --name smd-ui -p 3035:3002 -e NODE_NAME=BAYAR6 -e BLOC_URL=http://bayar6.eastus.cloudapp.azure.com/bloc/v2.2 -e STRATO_URL=http://bayar6.eastus.cloudapp.azure.com/strato-api/eth/v1.2 blockapps/smd-ui
 ```
