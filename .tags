@@ -1,0 +1,28 @@
+express	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var express = require('express');$/;"	variable	line:3
+helper	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var helper = require('..\/lib\/contract-helpers.js');$/;"	variable	line:4
+router	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var router = express.Router();$/;"	variable	line:5
+Promise	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var Promise = require('bluebird');$/;"	variable	line:6
+ba	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var ba = require('blockapps-js');$/;"	variable	line:7
+Solidity	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var Solidity = ba.Solidity;$/;"	variable	line:8
+cors	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var cors = require('cors');$/;"	variable	line:10
+traverse	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var traverse = require('traverse');$/;"	variable	line:11
+es	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var es = require('event-stream')$/;"	variable	line:12
+dnscache	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var dnscache = require('dnscache');$/;"	variable	line:14
+yaml	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var yaml = require('js-yaml');$/;"	variable	line:18
+fs	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var fs = require('fs');$/;"	variable	line:19
+config	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var config = yaml.safeLoad(fs.readFileSync('config.yaml'));$/;"	variable	line:20
+apiURI	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^var apiURI = config.apiURL;$/;"	variable	line:21
+getStatesFor	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function getStatesFor(contract, reducedState) {$/;"	function	line:128
+getStatesFor	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function getStatesFor(contract, reducedState) {$/;"	function	line:128
+buildContractState	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function buildContractState(contract, reducedState, attempt) {$/;"	function	line:261
+setTimeout	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^        setTimeout(function(){$/;"	function	line:291
+buildContractState	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function buildContractState(contract, reducedState, attempt) {$/;"	function	line:261
+DelayPromise	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^\/\/ function DelayPromise(delay, payload) {$/;"	function	line:300
+processBursts	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processBursts(bursts, results) {$/;"	function	line:308
+processBursts	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processBursts(bursts, results) {$/;"	function	line:308
+processBurst	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processBurst(burst) {$/;"	function	line:326
+processBurst	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processBurst(burst) {$/;"	function	line:326
+processItem	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processItem(payload) {$/;"	function	line:339
+processItem	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processItem(payload) {$/;"	function	line:339
+processArray	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processArray(array, burstSize) {$/;"	function	line:343
+processArray	/Users/charlescrain/dev/blockapps/repos/bloc/templates/app/routes/search.js	/^function processArray(array, burstSize) {$/;"	function	line:343
