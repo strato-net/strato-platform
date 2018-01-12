@@ -165,7 +165,6 @@ class TransactionTable extends Component {
         </div>
       </div>
 
-
     return (
       <div className="pt-card pt-dark pt-elevation-2">
         <div className="row smd-pad-4">
