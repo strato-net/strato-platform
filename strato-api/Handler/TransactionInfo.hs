@@ -7,6 +7,7 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE BangPatterns           #-}
 
 
 module Handler.TransactionInfo where
@@ -64,37 +65,40 @@ postTransactionR = do
 
 postTransactionListR :: Handler ()
 postTransactionListR = do
-   handlerStart <- liftIO $ getTime Realtime
+   !handlerStart <- liftIO $ getTime Realtime
 
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
 
-   parserStart <- liftIO $ getTime Realtime
+   !parserStart <- liftIO $ getTime Realtime
    tx <- parseJsonBody :: Handler (Result [RawTransaction'])
    case tx of
        (Success raws) -> do
-          txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
+          !txHashStart <- liftIO $ getTime Realtime
+          --txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
           let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
               hs = fmap (toJSON . transactionHash) txs
               txr = P.filter success $ P.zip hs txs
           let num = Import.length txs
-          $logDebug $ (T.pack $ show $ num) Import.++ " incoming transactions..."
+          $logError $ (T.pack $ show $ num) Import.++ " incoming transactions..."
           let num' = P.length $ P.filter (not . success) $ P.zip hs txs
-          $logDebug $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
-          insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
+          $logError $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
+          !insertTXStart <- liftIO $ getTime Realtime
+          --insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
           ecRecoverTime <- do
             a <- insertTX Log API Nothing (fmap snd txr)
             return a
-          $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
+          $logError $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
           emitKafkaTransactions $ snd <$> txr
-          sendResponseStart <- liftIO $ getTime Realtime
+          !sendResponseStart <- liftIO $ getTime Realtime
           let times = (P.map toNanoSecs $
-                [parserStart - handlerStart,
-                 txHashStart - parserStart,
-                 insertTXStart - txHashStart,
-                 sendResponseStart - insertTXStart
-                ]) P.++ [ecRecoverTime]
-          $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
+                        [ parserStart - handlerStart
+                        , txHashStart - parserStart
+                        , insertTXStart - txHashStart
+                        , sendResponseStart - insertTXStart
+                        ]
+                      ) P.++ [ecRecoverTime]
+          $logError $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
           sendResponseStatus status200 $ toJSON (fmap transactionHash txs) -- hs --times -- This is for debugging
        _ -> invalidArgs ["couldn't decode transactions"]
     where
