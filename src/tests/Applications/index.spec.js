@@ -3,6 +3,9 @@ import Applications, { mapStateToProps } from '../../components/Applications/ind
 
 describe('Applications: index', () => {
 
+  beforeAll(()=>{
+    jest.useFakeTimers()
+  })
   describe('component with', () => {
 
     test('initial values', () => {
@@ -12,6 +15,16 @@ describe('Applications: index', () => {
       }
       const wrapper = shallow(<Applications.WrappedComponent {...props} />)
       expect(wrapper).toMatchSnapshot()
+    })
+
+    test('timers', () => {
+      const props = {
+        applications: [],
+        fetchApplications: jest.fn()
+      }
+      const wrapper = shallow(<Applications.WrappedComponent {...props} />)
+      jest.runOnlyPendingTimers()
+      expect(props.fetchApplications).toHaveBeenCalled()
     })
 
     test('application data', () => {

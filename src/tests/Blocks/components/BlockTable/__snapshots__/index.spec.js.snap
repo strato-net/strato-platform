@@ -1,5 +1,47 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`BlockTable: index form required 1`] = `
+Object {
+  "registeredFields": Object {
+    "query": Object {
+      "count": 1,
+      "name": "query",
+      "type": "Field",
+    },
+    "value": Object {
+      "count": 1,
+      "name": "value",
+      "type": "Field",
+    },
+  },
+  "syncErrors": Object {
+    "query": "Required",
+    "value": "Required",
+  },
+}
+`;
+
+exports[`BlockTable: index form with values 1`] = `
+Object {
+  "registeredFields": Object {
+    "query": Object {
+      "count": 1,
+      "name": "query",
+      "type": "Field",
+    },
+    "value": Object {
+      "count": 1,
+      "name": "value",
+      "type": "Field",
+    },
+  },
+  "values": Object {
+    "query": "maxnumber",
+    "value": 1522,
+  },
+}
+`;
+
 exports[`BlockTable: index mapStateToProps 1`] = `
 Object {
   "query": Object {

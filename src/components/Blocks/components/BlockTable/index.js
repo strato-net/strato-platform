@@ -30,7 +30,7 @@ class BlockTable extends Component {
   //   this.props.dispatch(submit('block-query'));
   // }
 
-  submit = (values ) => {
+  submit = (values) => {
     this.props.updateQuery(values.query, values.value);
     this.props.dispatch(reset('block-query'));
   };

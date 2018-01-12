@@ -2,12 +2,15 @@ import React from 'react';
 import TransactionView, { mapStateToProps } from '../../../../components/Transactions/components/TransactionView/index';
 import { transactionDetail, updatedData } from '../transactionMock';
 import { Provider } from 'react-redux';
-import configureStore from 'redux-mock-store'
-import renderer from 'react-test-renderer';
-
-const mockStore = configureStore([]);
+import { createStore, combineReducers } from 'redux';
+import { reducer as formReducer } from 'redux-form';
 
 describe('TransactionView', () => {
+  let store
+
+  beforeEach(() => {
+    store = createStore(combineReducers({ form: formReducer }));
+  });
 
   describe('render', () => {
 
@@ -15,32 +18,33 @@ describe('TransactionView', () => {
       const props = {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
         tx: transactionDetail,
-        fetchTx: jest.fn()
-      }
-      const store = mockStore({ state: { Transactions: { tx: updatedData } } });
-      const wrapper = render(
-        <Provider store={store}>
-          <TransactionView.WrappedComponent {...props} />
-        </Provider>
+        fetchTx: jest.fn(),
+        store: store
+      };
+
+      const wrapper = shallow(
+        <TransactionView.WrappedComponent {...props} />
       );
+
       expect(wrapper).toMatchSnapshot();
     });
 
     test('no transaction mock is passed', () => {
       const props = {
         match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } },
-        tx: null,
-        fetchTx: jest.fn()
-      }
-      const wrapper = render(
-        <Provider store={mockStore({})}>
-          <TransactionView.WrappedComponent {...props} />
-        </Provider>
+        tx: { timestamp: "2017-12-13 07:47:05.998689 UTC" },
+        fetchTx: jest.fn(),
+        store: store
+      };
+
+      const wrapper = shallow(
+        <TransactionView.WrappedComponent {...props} />
       );
+
       expect(wrapper).toMatchSnapshot();
     });
 
-  })
+  });
 
   describe('simulate', () => {
 
@@ -50,12 +54,14 @@ describe('TransactionView', () => {
         tx: null,
         fetchTx: jest.fn(),
         history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
-      }
+      };
+
       const wrapper = mount(
-        <Provider store={mockStore({})}>
+        <Provider store={store}>
           <TransactionView.WrappedComponent {...props} />
         </Provider>
       );
+
       wrapper.find('Button').simulate('click');
       expect(props.history.goBack()).toBe('historyUpdated');
     });
@@ -66,12 +72,14 @@ describe('TransactionView', () => {
         tx: transactionDetail,
         fetchTx: jest.fn(),
         history: { goBack: jest.fn().mockReturnValue('historyUpdated') }
-      }
+      };
+
       const wrapper = mount(
-        <Provider store={mockStore({})}>
+        <Provider store={store}>
           <TransactionView.WrappedComponent {...props} />
         </Provider>
       );
+
       wrapper.find('Button').simulate('click');
       expect(props.history.goBack()).toBe('historyUpdated');
     });
@@ -85,7 +93,8 @@ describe('TransactionView', () => {
         transactions: {
           tx: updatedData
         }
-      }
+      };
+
       const ownProps = { match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } } };
       expect(mapStateToProps(state, ownProps)).toMatchSnapshot();
     });
@@ -104,11 +113,12 @@ describe('TransactionView', () => {
           ],
           "error": null
         }
-      }
+      };
+
       const ownProps = { match: { params: { hash: "70018a76a7aa0e6d54565ae22264ac48773a52204c47fd0166b5a6df6e8f2a81" } } };
       expect(mapStateToProps(state, ownProps)).toMatchSnapshot();
     });
 
-  })
+  });
 
-})
+});

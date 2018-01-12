@@ -10,8 +10,8 @@ describe('Contracts: index', () => {
       const props = {
         filter: '',
         contracts: {},
-        fetchContracts: jest.fn(() => Promise.resolve(0)),
-        changeContractFilter: jest.fn(() => Promise.resolve(0))
+        fetchContracts: jest.fn(),
+        changeContractFilter: jest.fn()
       }
       const wrapper = shallow(
         <Contracts.WrappedComponent {...props} />
@@ -23,8 +23,8 @@ describe('Contracts: index', () => {
       const props = {
         filter: 'Greeter',
         contracts: contracts,
-        fetchContracts: () => { },
-        changeContractFilter: () => { }
+        fetchContracts: jest.fn(),
+        changeContractFilter: jest.fn()
       }
       const wrapper = shallow(
         <Contracts.WrappedComponent {...props} />
@@ -54,8 +54,8 @@ describe('Contracts: index', () => {
     const props = {
       filter: 'Greeter',
       contracts: {},
-      fetchContracts: () => { },
-      changeContractFilter: () => { }
+      fetchContracts: jest.fn(),
+      changeContractFilter: jest.fn()
     }
     const wrapper = shallow(
       <Contracts.WrappedComponent {...props} />
@@ -67,13 +67,30 @@ describe('Contracts: index', () => {
     const props = {
       filter: '',
       contracts: contracts,
-      fetchContracts: () => { },
-      changeContractFilter: () => { }
+      fetchContracts: jest.fn(),
+      changeContractFilter: jest.fn()
     }
     const wrapper = shallow(
       <Contracts.WrappedComponent {...props} />
     );
     expect(wrapper).toMatchSnapshot();
+  });
+
+  test('search contract input', () => {
+    const props = {
+      filter: 'Greeter',
+      contracts: {},
+      fetchContracts: jest.fn(),
+      changeContractFilter: jest.fn()
+    }
+    const wrapper = shallow(
+      <Contracts.WrappedComponent {...props} />
+    );
+
+    wrapper.find('input').simulate('change', { target: { value: "UPDATE" } });
+    expect(props.changeContractFilter).toHaveBeenCalled();
+    expect(props.changeContractFilter.mock.calls.length).toBe(2);
+    expect(props.changeContractFilter.mock.calls).toMatchSnapshot();
   });
 
   test('mapStateToProps with default values', () => {

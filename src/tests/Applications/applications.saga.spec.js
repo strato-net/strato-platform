@@ -2,7 +2,8 @@ import watchFetchApplications, {
   fetchApplications,
   launchApps,
   launchApp,
-  getApplications
+  getApplications,
+  sleep
 } from '../../components/Applications/applications.saga';
 import {
   takeEvery,
@@ -70,6 +71,40 @@ describe('Applications: saga', () => {
   });
 
   describe('launch apps generator', () => {
+    
+    describe('inspection', ()=> {
+
+      test('success', () => {
+        const gen = launchApps({ type: "LAUNCH_APP", url:'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/' });
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));
+        expect(gen.next({status:300}).value).toEqual(call(sleep,1000)); 
+        expect(gen.next({status:200}).value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));      
+        expect(gen.next({status:200}).value).toEqual(put(launchAppSuccess()));
+        expect(gen.next().done).toBe(true);
+      })
+
+      test('failed', () => {
+        const gen = launchApps({ type: "LAUNCH_APP", url:'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/' });
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));
+        expect(gen.next({status:300}).value).toEqual(call(sleep,1000)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));      
+        expect(gen.next({status:300}).value).toEqual(call(sleep,1166.6666666666667)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));              
+        expect(gen.next({status:300}).value).toEqual(call(sleep,1400)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));              
+        expect(gen.next({status:300}).value).toEqual(call(sleep,1750)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));              
+        expect(gen.next({status:300}).value).toEqual(call(sleep,2333.3333333333335)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));              
+        expect(gen.next({status:300}).value).toEqual(call(sleep,3500)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));              
+        expect(gen.next({status:300}).value).toEqual(call(sleep,7000)); 
+        expect(gen.next().value).toEqual(call(launchApp, 'http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/'));              
+        expect(gen.next({status:300}).value).toEqual(put(launchAppFailure(Error('Timeout on app fetching'))));        
+        expect(gen.next().done).toBe(true);
+      })
+
+    })
 
     test('success 200', (done) => {
       fetch.mockResponse(JSON.stringify({ status: 200 }));
