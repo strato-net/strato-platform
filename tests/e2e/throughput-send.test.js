@@ -21,7 +21,7 @@ describe('Throughput', function () {
     userPairs = yield createUserPairs();
   });
 
-  it('should calculate throughput for network', function * () {
+  it('should calculate send throughput for network', function * () {
     
     const startTime = moment();
     let secondsToRemove = 0; // FIX ME: Remove once bloc is no longer blocking on tx status
