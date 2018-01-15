@@ -172,11 +172,6 @@ defaultQuarryConfig =
       lazyBlocks = False
     }
 
-defaultGeneralConfig  ::  GeneralConf
-defaultGeneralConfig =
-    GeneralConf {
-      fastECRecover = True
-    }
 
 defaultDiscoveryConfig  ::  DiscoveryConf
 defaultDiscoveryConfig =
@@ -207,7 +202,6 @@ defaultConfig =
       blockConfig        = defaultBlockConfig,
       quarryConfig       = defaultQuarryConfig,
       discoveryConfig    = defaultDiscoveryConfig,
-      generalConfig      = defaultGeneralConfig,
       statsConfig        = statsConfig'
     }
 
