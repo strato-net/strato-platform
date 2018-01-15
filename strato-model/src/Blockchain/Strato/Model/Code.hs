@@ -1,8 +1,9 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Blockchain.Strato.Model.Code where
 
 import qualified Data.ByteString     as B
-import           Data.Scientific     (toBoundedInteger, scientific)
+import qualified Data.Text           as T
 import           Data.Text.Encoding  (decodeUtf8, encodeUtf8)
 import           GHC.Generics
 import           Data.Aeson
@@ -19,12 +20,9 @@ instance RLPSerializable Code where
     rlpDecode = Code . rlpDecode
 
 instance ToJSON Code where
-  toJSON (Code bytes) = String . decodeUtf8 $ bytes
-  toJSON (PrecompiledCode x) = Number $ scientific (fromIntegral x) 0
+  toJSON (Code bytes) = String . ("" `T.append`) . decodeUtf8 $ bytes
+  toJSON (PrecompiledCode _) = error "cannot serialize precompiled codes"
 
 instance FromJSON Code where
   parseJSON (String bytes) = return . Code . encodeUtf8 $ bytes
-  parseJSON (Number x) = case toBoundedInteger x of
-      Nothing -> error "number not integral"
-      Just i -> return $ PrecompiledCode i
-  parseJSON _ = error "invalid code structure"
+  parseJSON _ = error "malformed code"
