@@ -79,6 +79,7 @@ pipeline {
               cd strato-getting-started
               sleep 5
               STRATO_GS_MODE="1" NODE_HOST=sa1.eastus2.cloudapp.azure.com ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }
@@ -91,6 +92,7 @@ pipeline {
               cd strato-getting-started
               sleep 10
               STRATO_GS_MODE="1" NODE_HOST=sa2.eastus2.cloudapp.azure.com BOOT_NODE_HOST=40.79.67.179 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }
@@ -103,6 +105,7 @@ pipeline {
               cd strato-getting-started
               sleep 15
               STRATO_GS_MODE="1" NODE_HOST=sa3.eastus2.cloudapp.azure.com BOOT_NODE_HOST=40.79.67.179 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }

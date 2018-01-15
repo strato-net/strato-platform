@@ -134,11 +134,11 @@ pipeline {
           "hackathon-1": {
             node('hackathon-1') {
               sh '''#!/bin/bash -le
-              ### TEMPORARY DISABLED TO KEEP THE CHAIN DATA
-              #set -x
-              #docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
-              #cd strato-getting-started
-              #STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }
@@ -150,6 +150,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-2.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }
@@ -161,6 +162,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-3.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }
@@ -172,6 +174,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-4.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }
@@ -183,6 +186,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               STRATO_GS_MODE="1" NODE_HOST=hackathon-5.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
               docker ps
               '''
             }

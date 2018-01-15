@@ -40,9 +40,9 @@ pipeline {
               cd strato-getting-started
               # BOOT_NODE_HOST is `silo1a.eastus.cloudapp.azure.com` node here:
               BOOT_NODE_HOST=40.71.168.16 NODE_HOST=stratodev.blockapps.net authBasic=false ./strato-multinode-run.sh --stable
-              docker ps
               docker rmi $(docker images -aq) || true #removing unused images only
               docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
+              docker ps
               '''
             }
           }
