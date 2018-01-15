@@ -24,13 +24,11 @@ import           Database.Persist.Postgresql hiding (get)
 import           Database.Persist.TH
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger        (MonadLogger, runNoLoggingT)
+import           Control.Monad.Logger        (runNoLoggingT)
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader
 
 import           Blockchain.DB.SQLDB         (runPostgresConn)
-
-import qualified Data.Text                   as T
 
 {- global registry of blockchains -}
 

@@ -27,6 +27,7 @@ data EVMCheckpoint = EVMCheckpoint {
 instance RLPSerializable EVMCheckpoint where
     rlpDecode (RLPArray [sha, header, RLPArray txShas, bbi]) =
         EVMCheckpoint (rlpDecode sha) (rlpDecode header) (rlpDecode <$> txShas) (rlpDecode bbi)
+    rlpDecode _ = error "unexpected RLP object"
     rlpEncode (EVMCheckpoint sha header txShas bbi) =
         RLPArray [rlpEncode sha, rlpEncode header, RLPArray (rlpEncode <$> txShas), rlpEncode bbi]
 

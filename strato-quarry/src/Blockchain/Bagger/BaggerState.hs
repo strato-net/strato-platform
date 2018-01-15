@@ -87,7 +87,7 @@ purgeFromATL address nonce atl = case M.lookup address atl of
     Just tl -> let newTL = M.delete nonce tl in M.insert address tl atl
 
 calculateIntrinsicTxFee :: BaggerState -> (OutputTx -> Integer)
-calculateIntrinsicTxFee bs@BaggerState{ miningCache = MiningCache{ bestBlockHeader = bh } } t@OutputTx{otBaseTx = bt} =
+calculateIntrinsicTxFee bs t@OutputTx{otBaseTx = bt} =
     TD.transactionGasPrice bt * calculateIntrinsicGasAtNextBlock bs t
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer

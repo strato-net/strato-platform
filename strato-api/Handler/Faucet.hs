@@ -11,7 +11,6 @@ import qualified Prelude                        as P
 import           Blockchain.Constants
 import           Blockchain.Data.Address
 import           Blockchain.Data.Transaction
-import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TXOrigin
 import           Blockchain.EthConf             (runKafkaConfigured)
 import           Blockchain.Sequencer.Event     (IngestEvent (IETx), IngestTx (..))

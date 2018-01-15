@@ -1,22 +1,39 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TemplateHaskell            #-}
 module Blockchain.Strato.Model.Address
     ( Address(..),
       prvKey2Address, pubKey2Address
     ) where
 
+import           Control.Monad
 import qualified Crypto.Hash.SHA3                     as C
+-- import           Data.Binary
 import           Data.Maybe                           (fromMaybe)
+import           Numeric
 
 import           Blockchain.Data.RLP
-import           Blockchain.Strato.Model.ExtendedWord (Word160)
+import qualified Blockchain.Strato.Model.Colors       as CL
+import           Blockchain.Strato.Model.Format
+import           Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import           Blockchain.Strato.Model.Util
 
+import qualified Data.Aeson                           as AS
+import           Data.Aeson.Types
+
 import           Data.Binary
+import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Lazy                 as BL
+
+import qualified Data.Text                            as T
 
 import           Network.Haskoin.Crypto               hiding (Address, Word160)
 import           Network.Haskoin.Internals            hiding (Address, Word160)
+-- import           Text.PrettyPrint.ANSI.Leijen         hiding ((<$>))
+import qualified Text.PrettyPrint.ANSI.Leijen         as Lei
+import           Web.PathPieces
 
 import           GHC.Generics
 
@@ -45,3 +62,41 @@ pubKey2Address pubKey =
     x = fromMaybe (error "getX failed in prvKey2Address") $ getX point
     y = fromMaybe (error "getY failed in prvKey2Address") $ getY point
     point = pubKeyPoint pubKey
+
+{-
+ Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
+ May remove in the future
+-}
+instance PathPiece Address where
+  toPathPiece (Address x) = T.pack $ showHex  (fromIntegral $ x :: Integer) ""
+  fromPathPiece t = Just (Address wd160)
+    where
+      ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
+
+{-
+ make into a string rather than an object
+-}
+instance AS.ToJSON Address where
+  toJSON (Address x) = String $ T.pack $ padZeros 40 $ showHex x ""
+
+instance AS.FromJSON Address where
+-- TODO- put this tighter definition back in again....  I needed to loosten the definition because genesis.json breaks some of the format.
+--  parseJSON (String s)
+--    | not (all (`elem` ("abcdefABCDEF0123456789"::String)) $ T.unpack s) ||
+--      not (T.length s == 40) =
+--        error $ "error converting json to Address: " ++ show s
+  parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ T.unpack s
+  parseJSON _          = mzero
+
+instance Lei.Pretty Address where
+  pretty (Address x) = Lei.text $ CL.yellow $ padZeros 40 $ showHex x ""
+
+instance Format Address where
+  format (Address x) = CL.yellow $ padZeros 40 $ showHex x ""
+
+instance Binary Address where
+  put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x
+  get = do
+    bytes <- replicateM 20 get
+    let byteString = B.pack bytes
+    return (Address $ fromInteger $ byteString2Integer byteString)

@@ -92,7 +92,7 @@ instance HasMemTXResultDB ContextM where
   flushTransactionResults = do
     ctx <- get
     let toWrite = contextTxResultQueue ctx
-    K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
     put $ ctx { contextTxResultQueue = [] }
 
 instance HasMemLogDB ContextM where
@@ -104,7 +104,7 @@ instance HasMemLogDB ContextM where
   flushLogEntries = do
     ctx <- get
     let toWrite = contextLogDBQueue ctx
-    K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.LogDBEntry <$> toWrite)
     put $ ctx { contextLogDBQueue = [] }
 
 data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo (SHA, BlockData, Integer, Int, Int)
