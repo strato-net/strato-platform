@@ -120,7 +120,6 @@ attemptBond prv sock portNum = do
                              (fromIntegral $ pPeerUdpPort p)
                              (fromIntegral $ pPeerTcpPort p))
                    (time+50)
-          liftIO $ setPeerBondingState (T.unpack $ pPeerIp p) (pPeerUdpPort p) 1
 
 udpHandshakeServer :: ( HasSQLDB m
                       , MonadResource m
@@ -172,29 +171,14 @@ handleValidPacket :: ( HasSQLDB m
                   -> m ()
 handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
     Ping{} -> do
-        curTime <- liftIO getCurrentTime
-        let ip   = sockAddrToIP addr
-            peer = PPeer { pPeerPubkey = Just otherPubKey
-                         , pPeerIp = T.pack ip
-                         , pPeerUdpPort = fromIntegral portNum
-                         , pPeerTcpPort = fromIntegral portNum --TODO- put correct TCP port in here
-                         ,  pPeerNumSessions = 0
-                         ,  pPeerLastTotalDifficulty = 0
-                         ,  pPeerLastMsg  = T.pack "msg"
-                         ,  pPeerLastMsgTime = curTime
-                         ,  pPeerEnableTime = curTime
-                         ,  pPeerUdpEnableTime = curTime
-                         ,  pPeerLastBestBlockHash = SHA 0
-                         ,  pPeerBondState = 0
-                         ,  pPeerActiveState = 0
-                         ,  pPeerVersion = T.pack "61" -- fix
-                         }
-        void $ addPeer peer
+        addPeer'
         time <- liftIO $ round `fmap` getPOSIXTime
         peerAddr <- fmap IPV4Addr $ liftIO $ inet_addr "127.0.0.1" -- todo: WHAT THE FUCK?!???!?!
         sendPacket sock prv addr $ Pong (Endpoint peerAddr 30303 30303) 4 (time+50)
 
-    Pong{} -> liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
+    Pong{} -> do
+        addPeer'
+        liftIO $ setPeerBondingState (sockAddrToIP addr) (fromIntegral portNum) 2
 
     (FindNeighbors targetPubkey _) -> do
         time <- liftIO $ round `fmap` getPOSIXTime
@@ -227,6 +211,25 @@ handleValidPacket prv sock addr portNum packet otherPubKey = case packet of
                          , pPeerVersion = T.pack "61" -- fix
                          }
         void $ addPeer peer
+  where addPeer' = do
+          curTime <- liftIO getCurrentTime
+          let ip   = sockAddrToIP addr
+              peer = PPeer { pPeerPubkey = Just otherPubKey
+                          , pPeerIp = T.pack ip
+                          , pPeerUdpPort = fromIntegral portNum
+                          , pPeerTcpPort = fromIntegral portNum --TODO- put correct TCP port in here
+                          ,  pPeerNumSessions = 0
+                          ,  pPeerLastTotalDifficulty = 0
+                          ,  pPeerLastMsg  = T.pack "msg"
+                          ,  pPeerLastMsgTime = curTime
+                          ,  pPeerEnableTime = curTime
+                          ,  pPeerUdpEnableTime = curTime
+                          ,  pPeerLastBestBlockHash = SHA 0
+                          ,  pPeerBondState = 0
+                          ,  pPeerActiveState = 0
+                          ,  pPeerVersion = T.pack "61" -- fix
+                          }
+          void $ addPeer peer
 
 getAddrPort :: SockAddr -> Either DiscoverException PortNumber
 getAddrPort (SockAddrInet portNumber _)      = Right portNumber
