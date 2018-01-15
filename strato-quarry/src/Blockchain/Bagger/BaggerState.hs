@@ -84,7 +84,7 @@ modifyATL f address atl = case M.lookup address atl of
 purgeFromATL :: Address -> Integer -> ATL -> ATL
 purgeFromATL address nonce atl = case M.lookup address atl of
     Nothing -> atl
-    Just tl -> let newTL = M.delete nonce tl in M.insert address tl atl
+    Just tl -> let newTL = M.delete nonce tl in M.insert address newTL atl
 
 calculateIntrinsicTxFee :: BaggerState -> (OutputTx -> Integer)
 calculateIntrinsicTxFee bs t@OutputTx{otBaseTx = bt} =
