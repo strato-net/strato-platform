@@ -37,12 +37,12 @@ pipeline {
               set -x
               bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
               docker rm -f $(docker ps -aq) || true
-              # UPGRADE DOCKER TO HAVE --volumes IN docker system prune BEFORE UNCOMMENTING THIS!
-              # docker system prune -f --volumes; docker system prune -f
               cd strato-getting-started
               # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
               BOOT_NODE_HOST=52.87.251.111 NODE_HOST=strato-testnet1.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
               docker ps
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
               '''
             }
           }
