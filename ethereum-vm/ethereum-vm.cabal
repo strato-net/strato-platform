@@ -21,7 +21,6 @@ library
     default-language: Haskell98
     build-depends:
                    base >= 4 && < 5
-                 , aeson
                  , base16-bytestring
                  , binary
                  , blockapps-data
@@ -31,23 +30,18 @@ library
                  , cryptohash
                  , directory
                  , either
-                 , esqueleto
                  , ethereum-encryption
                  , ethereum-rlp
-                 , filepath
                  , blockapps-haskoin
                  , hflags
                  , leveldb-haskell
-                 , lens
                  , merkle-patricia-db
                  , blockapps-milena
                  , mtl
-                 , monad-control
                  , monad-logger
                  , persistent-postgresql
                  , postgresql-simple
                  , resourcet
-                 , stm
                  , strato-adit
                  , strato-conf
                  , strato-quarry
@@ -55,18 +49,15 @@ library
                  , text
                  , time
                  , transformers
-                 , transformers-base
                  , vector
                  , ansi-wl-pprint
-                 , nibblestring
-                 , extra >=1.4.1 && <1.5
                  , strato-model
                  , strato-index
                  , strato-statediff
                  , strato-redis-blockdb
                  , hedis
                  , statsdi
-    exposed-modules: 
+    exposed-modules:
                      Blockchain.BlockChain
                      Blockchain.Data.ExecResults
                      Blockchain.TheDAOFork
@@ -99,31 +90,10 @@ executable ethereum-vm
     default-language: Haskell98
     build-depends:
                    base >= 4 && < 5
-                 , bytestring
-                 , containers
-                 , directory
-                 , esqueleto
-                 , blockapps-data
                  , blockapps-util
-                 , ethereum-rlp
                  , ethereum-vm
-                 , filepath
-                 , blockapps-haskoin
                  , hflags
-                 , lens
-                 , leveldb-haskell
-                 , merkle-patricia-db
-                 , blockapps-milena
                  , monad-logger
-                 , mtl
-                 , persistent-postgresql
-                 , postgresql-simple
-                 , resourcet
-                 , strato-quarry
-                 , text
-                 , time
-                 , transformers
-                 , strato-conf
     main-is: Main.hs
     ghc-options: -Wall -O2 -threaded
     buildable: True

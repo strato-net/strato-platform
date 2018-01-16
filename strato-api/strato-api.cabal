@@ -5,7 +5,7 @@ build-type:        Simple
 
 Flag dev
     Description:   Turn on development settings, like auto-reload templates.
-    Default:       True 
+    Default:       True
 
 Flag library-only
     Description:   Build for use with "yesod devel"
@@ -81,8 +81,7 @@ library
                 RecordWildCards
 
     build-depends: base                          >= 4
-                 , aeson                         >= 0.6        
-                 , aeson-pretty
+                 , aeson                         >= 0.6
                  , base16-bytestring
                  , bcrypt
                  , binary
@@ -91,66 +90,43 @@ library
                  , blockapps-data
                  , blockapps-haskoin
                  , blockapps-util
-                 , bytestring                    >= 0.9        
-                 , classy-prelude                >= 0.10.2
-                 , classy-prelude-conduit        >= 0.10.2
+                 , bytestring                    >= 0.9
                  , classy-prelude-yesod          >= 0.10.2
                  , clock
-                 , conduit                       >= 1.0        
-                 , conduit-combinators
-                 , conduit-extra
+                 , conduit                       >= 1.0
                  , containers
-                 , data-default
-                 , deepseq
                  , directory
                  , either
                  , entropy
-                 , esqueleto                
-                 , ethereum-rlp
-                 , ethereum-discovery 
-                 , fast-logger                   >= 2.2        
+                 , esqueleto
+                 , ethereum-discovery
+                 , fast-logger                   >= 2.2
                  , file-embed
                  , filepath
-                 , hjsmin                        >= 0.1        
-                 , http-conduit                  >= 2.1        
-                 , json-rpc-client
-                 , merkle-patricia-db
+                 , hjsmin                        >= 0.1
                  , mime-mail
-                 , monad-control                 >= 0.3        
-                 , monad-logger                  >= 0.3        
-                 , old-locale
-                 , parsec
-                 , persistent                    >= 2.0        
-                 , persistent-postgresql         >= 2.1.1      
-                 , persistent-template           >= 2.0        
-                 , postgresql-libpq
+                 , monad-logger                  >= 0.3
+                 , persistent                    >= 2.0
+                 , persistent-postgresql         >= 2.1.1
                  , postgresql-simple
                  , process
-                 , safe
-                 , shakespeare                   >= 2.0        
+                 , shakespeare                   >= 2.0
                  , solidity-abi
                  , strato-conf
-                 , strato-p2p
                  , strato-model
                  , strato-sequencer
                  , template-haskell
-                 , temporary
-                 , text                          >= 0.11       
+                 , text                          >= 0.11
                  , time
-                 , transformers
-                 , unordered-containers
-                 , vector
                  , wai
-                 , wai-extra                     >= 3.0        
-                 , wai-logger                    >= 2.2        
-                 , warp                          >= 3.0        
+                 , wai-extra                     >= 3.0
+                 , warp                          >= 3.0
                  , warp-tls
-                 , yaml                          >= 0.8        
-                 , yesod                         >= 1.4.1      
-                 , yesod-core                    >= 1.4.6      
-                 , yesod-form                    >= 1.4.0  
-                 , yesod-raml    
-                 , yesod-static                  >= 1.4.0.3    
+                 , yaml                          >= 0.8
+                 , yesod                         >= 1.4.1
+                 , yesod-core                    >= 1.4.6
+                 , yesod-raml
+                 , yesod-static                  >= 1.4.0.3
                  --, stack
                  --, yesod-table                   >= 2.0.0
 
@@ -212,7 +188,7 @@ test-suite test
                  , aeson
                  , blaze-html
                  , blaze-markup
-                 , solidity-abi                 
+                 , solidity-abi
                  , aeson-pretty
                  , bcrypt
                  , entropy
