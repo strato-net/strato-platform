@@ -3,7 +3,6 @@
 module Blockchain.Strato.Model.Code where
 
 import qualified Data.ByteString     as B
-import qualified Data.Text           as T
 import           Data.Text.Encoding  (decodeUtf8, encodeUtf8)
 import           GHC.Generics
 import           Data.Aeson
@@ -20,9 +19,9 @@ instance RLPSerializable Code where
     rlpDecode = Code . rlpDecode
 
 instance ToJSON Code where
-  toJSON (Code bytes) = String . ("" `T.append`) . decodeUtf8 $ bytes
+  toJSON (Code bytes) = String . decodeUtf8 $ bytes
   toJSON (PrecompiledCode _) = error "cannot serialize precompiled codes"
 
 instance FromJSON Code where
-  parseJSON (String bytes) = return . Code . encodeUtf8 $ bytes
+  parseJSON (String text) = return . Code . encodeUtf8 $ text
   parseJSON _ = error "malformed code"
