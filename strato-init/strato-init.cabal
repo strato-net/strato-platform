@@ -20,7 +20,7 @@ source-repository this
 executable strato-setup
     default-language: Haskell98
     ghc-options: -Wall -O2 -threaded
-    build-depends: 
+    build-depends:
                    base >= 4 && < 5
                  , aeson
                  , base16-bytestring
@@ -30,11 +30,9 @@ executable strato-setup
                  , strato-index
                  , bytestring
                  , containers
-                 , cryptohash
                  , directory
                  , entropy
                  , ethereum-discovery
-                 , ethereum-rlp
                  , file-embed
                  , filepath
                  , hedis
@@ -44,7 +42,6 @@ executable strato-setup
                  , blockapps-milena
                  , monad-logger
                  , persistent-postgresql
-                 , process
                  , resourcet
                  , strato-conf
                  , strato-redis-blockdb
@@ -52,9 +49,6 @@ executable strato-setup
                  , time
                  , transformers
                  , yaml
-                 , binary
-                 , stm
-                 , persistent
                  , strato-statediff
                  , split
     other-modules: Blockchain.BackupBlocks
@@ -81,7 +75,6 @@ executable strato-backup
                  , merkle-patricia-db
                  , monad-control
                  , monad-logger
-                 , nibblestring
                  , persistent-postgresql
                  , strato-conf
                  , transformers
@@ -98,7 +91,6 @@ executable strato-block-backup
                  , bytestring
                  , blockapps-milena
                  , strato-conf
-                 , transformers
     buildable: True
     main-is: BlockBackup.hs
     hs-source-dirs: src
@@ -107,7 +99,7 @@ executable strato-block-backup
 executable genesis-setup
     default-language: Haskell98
     ghc-options: -Wall -O2 -threaded
-    build-depends: 
+    build-depends:
                    base >= 4 && < 5
                  , aeson
                  , base16-bytestring
@@ -136,16 +128,12 @@ executable strato-ez-restore
     other-modules: Blockchain.BackupBlocks
     build-depends: base
                  , blockapps-data
-                 , persistent
                  , persistent-postgresql
-                 , mtl
                  , bytestring
                  , base16-bytestring
                  , transformers
                  , monad-logger
                  , strato-conf
-                 , binary
                  , blockapps-milena
-                 , strato-sequencer
                  , resourcet
                  , monad-control

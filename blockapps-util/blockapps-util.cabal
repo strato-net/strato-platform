@@ -25,15 +25,12 @@ library
                      , cryptohash
                      , ethereum-rlp
                      , fast-logger
-                     , filepath
                      , global-lock
                      , hflags
-                     , blockapps-haskoin
                      , monad-logger
                      , nibblestring
                      , path-pieces
                      , http-api-data
-                     , stm
                      , text
                      , unix
                      , time

@@ -15,8 +15,6 @@ import           Blockchain.RLPx
 import           Control.Concurrent                    hiding (yield)
 import           Control.Concurrent.SSem               (SSem)
 import qualified Control.Concurrent.SSem               as SSem
-import           Control.Concurrent.STM.MonadIO
-import           Control.Concurrent.STM.TVar           (readTVarIO)
 import           Control.Exception.Lifted
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -27,11 +25,9 @@ import qualified Data.ByteString.Char8                 as BC
 import           Data.Conduit
 import           Data.Conduit.Network
 import           Data.Maybe
-import qualified Data.Set                              as S
 import qualified Data.Text                             as T
 import           Data.Traversable                      (for)
 import qualified Network.Haskoin.Internals             as H
-import           System.Random
 
 import qualified Blockchain.Colors                     as C
 import           Blockchain.CommunicationConduit
@@ -44,7 +40,6 @@ import           Blockchain.Format
 import           Blockchain.Options
 import           Blockchain.Output                     (printLogMsg)
 import           Blockchain.P2PRPC
-import           Blockchain.P2PUtil
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.UDP
 import           Blockchain.TCPClientWithTimeout

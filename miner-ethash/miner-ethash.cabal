@@ -29,14 +29,11 @@ library
 executable miner-ethash
   main-is:             Main.hs
   build-depends:       base,
-                       arithmoi,
                        array,
                        binary,
                        bytestring,
-                       cryptohash,
                        mmap,
-                       miner-ethash,
-                       time
+                       miner-ethash
   ghc-options:         -Wall -O2
   hs-source-dirs:      exec_src
   default-language:    Haskell2010
@@ -44,13 +41,10 @@ executable miner-ethash
 executable mkDataset
   main-is:             mkDataset.hs
   build-depends:       base,
-                       arithmoi,
                        array,
                        binary,
                        bytestring,
-                       cryptohash,
-                       miner-ethash,
-                       time
+                       miner-ethash
   ghc-options:         -Wall -O2
   hs-source-dirs:      exec_src
   default-language:    Haskell2010

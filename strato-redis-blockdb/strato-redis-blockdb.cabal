@@ -36,22 +36,16 @@ executable strato-redis-viz
   other-modules:       Blockchain.Strato.RedisBlockDB.Test.Chain
   hs-source-dirs:      exec_src, test
   build-depends:
-        ansi-wl-pprint,
         optparse-applicative,
         blockapps-data,
-        blockapps-util,
         base,
         diagrams-contrib,
         diagrams-lib,
         diagrams-html5,
-        diagrams-canvas,
         containers,
-        bytestring,
         lens-family-th,
         lens-family,
         QuickCheck,
-        hedis,
-        text,
         strato-redis-blockdb,
         strato-model
   default-language:    Haskell2010

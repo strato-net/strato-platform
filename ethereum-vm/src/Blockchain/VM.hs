@@ -23,7 +23,6 @@ import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Char8              as BC
 import qualified Data.ByteString.Base16             as B16
 import           Data.Char
-import           Data.Either
 import           Data.Function
 import           Data.Maybe
 import qualified Data.Set                           as S
