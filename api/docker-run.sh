@@ -6,7 +6,10 @@ export blocRoot=http://${blocHost}/bloc/v2.2 # see config-prod.yaml
 export cirrusRoot=http://${cirrusHost} # see config-prod.yaml
 export postgresHost=${postgres_host}:${postgres_port} # see config/config.json
 export stratoRoot=http://${stratoHost}/eth/v1.2 # ALSO see config-prod.yaml
-# TODO: add sed command to change strings in config-prod.yaml using these vars
+
+sed -i -e 's|__stratoUrl__|http://'"${stratoHost}"'|g' config-prod.yaml
+sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
+sed -i -e 's|__searchUrl__|'"${cirrusRoot}"'|g' config-prod.yaml
 
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
 
