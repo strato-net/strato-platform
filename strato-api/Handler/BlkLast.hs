@@ -3,7 +3,6 @@ module Handler.BlkLast where
 import           Handler.Common
 import           Import
 
-import           Data.List
 import qualified Database.Esqueleto as E
 import qualified Prelude            as P
 

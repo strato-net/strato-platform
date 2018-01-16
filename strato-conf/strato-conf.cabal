@@ -37,7 +37,6 @@ library
                      , crypto-pubkey-types
                      , crypto-pubkey
                      , random
-                     , blockapps-util
                      , mtl
                      , transformers
                      , hedis
