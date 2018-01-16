@@ -15,7 +15,7 @@ const path = require('path');
 describe('Throughput', function () {
 
   this.timeout(config.timeout);
-  const contractName = 'SimpleStorage';
+  const contractName = 'SimpleIncrement';
   const contractFilename = path.join(config.contractsPath, 'SimpleIncrement.sol');
   let users;
   let contracts = [];
@@ -35,8 +35,9 @@ describe('Throughput', function () {
     const generators = [];
 
     for(let node of nodes) {
-      const txs = createBatchTx(users[node.id], contracts[node.id]);      
-      generators.push(rest.callList(users[node.id], user.address, txs, true, node.id));
+      const user = users[node.id];
+      const txs = createBatchTx(user, contracts[node.id]);      
+      generators.push(rest.callList(user, user.address, txs, true, node.id));
     }
 
     console.log('Submitting txs');
@@ -91,7 +92,7 @@ describe('Throughput', function () {
   }
 
   function * checkStates() {
-    const stateMatches = true;
+    let stateMatches = true;
     for (let node of nodes) {
       state = yield rest.getState(contracts[node.id]);
       stateMatches &= (state.x == config.batchSize);
@@ -110,6 +111,7 @@ describe('Throughput', function () {
         contractAddress: contract.address,
         contractName: contract.name,
         args: {},
+        value: 0,
         methodName: 'increment'
       });
     }
