@@ -4,7 +4,6 @@ packages:
 - strato-conf/
 - miner-ethash/
 - merkle-patricia-db/
-- strato-p2p/
 - solidity-abi/
 - blockapps-data/
 - ecrecover/
@@ -22,6 +21,7 @@ packages:
 - strato-sequencer/
 - ethereum-jsonrpc/
 - strato-model/
+- strato-p2p/
 - strato-redis-blockdb/
 - strato-statediff/
 - test-suite/
@@ -76,8 +76,7 @@ ghc-options:
   ethereum-encryption:     -Wall -Werror -fno-warn-warnings-deprecations
   merkle-patricia-db:      -Wall -Werror -fno-warn-warnings-deprecations
   strato-init:             -Wall -Werror -fno-warn-warnings-deprecations
-  # strato-p2p-client:       -Wall -Werror -fno-warn-warnings-deprecations
-  # strato-p2p-server:       -Wall -Werror -fno-warn-warnings-deprecations
+  strato-p2p:              -Wall -Werror -fno-warn-warnings-deprecations
   strato-redis-blockdb:    -Wall -Werror -fno-warn-warnings-deprecations
   blockapps-tools:         -Wall -Werror -fno-warn-warnings-deprecations
   # ethereum-test:           -Wall -Werror -fno-warn-warnings-deprecations
@@ -86,7 +85,7 @@ ghc-options:
   blockapps-tools:         -Wall -Werror
   strato-index:            -Wall -Werror -fno-warn-warnings-deprecations
   strato-sequencer:        -Wall -Werror -fno-warn-warnings-deprecations
-#  strato-quarry:           -Wall -Werror -fno-warn-warnings-deprecations
+  strato-quarry:           -Wall -Werror -fno-warn-warnings-deprecations
   strato-adit:             -Wall -Werror -fno-warn-warnings-deprecations
   strato-conf:             -Wall -Werror -fno-warn-warnings-deprecations -fno-warn-inline-rule-shadowing
 #  ethereum-jsonrpc:        -Wall -Werror -fno-warn-warnings-deprecations
