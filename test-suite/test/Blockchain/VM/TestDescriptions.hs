@@ -320,15 +320,6 @@ instance FromJSON B.ByteString where
       string2ByteString x = fst . B16.decode . BC.pack $ x
 -}
 
--- instance FromJSON Code where
---   parseJSON =
---     withText "SHA" $
---     pure . string2Code . T.unpack
---     where
---       string2Code  ::  String->Code
---       string2Code ('0':'x':rest) = Code . fst . B16.decode . BC.pack $ rest
---       string2Code x              = error $ "string2Code called with input of wrong format: " ++ x
-
 instance FromJSON Haskoin.PrvKey where
   parseJSON =
     withText "PrvKey" $
