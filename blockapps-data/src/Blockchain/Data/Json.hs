@@ -77,7 +77,7 @@ instance FromJSON RawTransaction' where
       (tv :: Word8) <- parseHexStr (t .: "v")
       bn <- t .:? "blockNumber" .!= (-1)
       h <- (t .: "hash")
-      -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction' 
+      -- Unfortunately, time is rendered with `show` in ToJSON for RawTransaction'
       -- instead of using the ToJSON instance for UTCTime, and so it fails
       -- to parse in FromJSON for UTCTime.
       let defaultTime = UTCTime (fromGregorian 1982 11 24) (secondsToDiffTime 0)
@@ -86,9 +86,9 @@ instance FromJSON RawTransaction' where
       o <- fmap read $ t .:? "origin" .!= "API"
       next <- t .:? "next" .!= ""
 
-      return (RawTransaction' 
-               (RawTransaction 
-                 time 
+      return (RawTransaction'
+               (RawTransaction
+                 time
                  (Address fa)
                  (tnon :: Integer)
                  (tgp :: Integer)
@@ -142,8 +142,6 @@ instance ToJSON Transaction' where
                 "hash" .= transactionHash tx,
                 "transactionType" .= (show $ transactionSemantics $ tx)]
 
-{-- needs to be updated --}
--- Needs "from", "hash", and "init" for Contract transactions
 instance FromJSON Transaction' where
     parseJSON (Object t) = do
       tto <- (t .:? "to")
@@ -212,10 +210,10 @@ instance FromJSON BlockData' where
       <*> v .: "nonce"
       <*> v .: "mixHash"
       )
-      
+
 instance FromJSON Block' where
     parseJSON = withObject "Block'" $ \v -> (Block'
-      <$> (Block 
+      <$> (Block
         <$> (bdPrimeToBd <$> (v .: "blockData"))
         <*> (map tPrimeToT <$> (v .: "receiptTransactions"))
         <*> (map bdPrimeToBd <$> (v .: "blockUncles")))
@@ -247,11 +245,6 @@ data AddressStateRef' = AddressStateRef' AddressStateRef String deriving (Eq, Sh
 instance ToJSON AddressStateRef' where
     toJSON (AddressStateRef' (AddressStateRef (Address x) n b cr c ch bNum src) next) =
         object ["next" .= next, "kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
-        "contractRoot" .= cr, "code" .= c, "codeHash" .= ch, "latestBlockNum" .= bNum, "source" .= src]
-
-instance ToJSON AddressStateRef where
-    toJSON (AddressStateRef (Address x) n b cr c ch bNum src) =
-        object ["kind" .= ("AddressStateRef" :: String), "address" .= (showHex x ""), "nonce" .= n, "balance" .= show b,
         "contractRoot" .= cr, "code" .= c, "codeHash" .= ch, "latestBlockNum" .= bNum, "source" .= src]
 
 instance FromJSON AddressStateRef' where
