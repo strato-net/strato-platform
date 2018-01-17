@@ -19,6 +19,7 @@ import qualified Database.Esqueleto          as E
 import qualified Prelude                     as P
 import           System.Clock
 
+import           Blockchain.Data.Json
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DBM
@@ -131,7 +132,6 @@ getTransactionR = do
                  $logDebug $ T.pack $ show showReject
 --                 let offset = (fromIntegral $ (maybe 0 id $ extractPage "page" getParameters)  :: Int64)
                  let index' = (fromIntegral $ (maybe showReject id $ extractPage' showReject "index" getParameters)  :: Int)
-                 let raw    = (fromIntegral $ (maybe 0 id $ extractPage "raw" getParameters) :: Integer) > 0
                  let paramMap = Map.fromList getParameters
                      paramMapRemoved = P.foldr (\param mp -> (Map.delete param mp)) paramMap transactionQueryParams
 
@@ -162,9 +162,7 @@ getTransactionR = do
                  -- this should actually use URL encoding code from Yesod
                  let next p = "/eth/v1.2/transaction?" P.++  (P.foldl1 (\a b -> (unpack a) P.++ "&" P.++ (unpack b)) $ P.map (\(k,v) -> (unpack k) P.++ "=" P.++ (unpack v)) (extra p))
 
-                 toRet raw (P.map E.entityVal modTxs) (next $ appendIndex getParameters)
+                 toRet (P.map E.entityVal modTxs) (next $ appendIndex getParameters)
 
                where
-                   toRet raw bs gp = case if' raw bs (P.map rtToRtPrime (P.zip (P.repeat gp) bs)) of
-                              Left a  -> returnJson a
-                              Right b -> returnJson b -- bandaid
+                   toRet bs gp = returnJson . P.map rtToRtPrime . P.zip (P.repeat gp) $ bs

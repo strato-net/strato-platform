@@ -41,7 +41,6 @@ getBlockInfoR = do
               sortParam <- lookupGetParam "sortby"
 
               let index'  = (fromIntegral $ (maybe 0 id $ extractPage "index" getParameters)  :: Integer)
-              let raw    = (fromIntegral $ (maybe 0 id $ extractPage "raw" getParameters) :: Integer) > 0
               let paramMap = Map.fromList getParameters
                   paramMapRemoved = P.foldr (\param mp -> (Map.delete param mp)) paramMap blockQueryParams
 
@@ -74,10 +73,7 @@ getBlockInfoR = do
               let next p = "/eth/v1.2/block?" P.++  (P.foldl1 (\a b -> (unpack a) P.++ "&" P.++ (unpack b)) $ P.map (\(k,v) -> (unpack k) P.++ "=" P.++ (unpack v)) (extra p))
               let addedParam = appendIndex getParameters
 
-              toRet raw modBlocks (next addedParam) -- consider removing nub - it takes time n^{2}
+              toRet modBlocks (next addedParam) -- consider removing nub - it takes time n^{2}
             where
-              toRet :: Bool -> [Block] -> String -> Handler Value
-              toRet raw bs gp = case if' raw bs (P.map bToBPrime (P.zip (P.repeat gp) bs)) of
-                      Left a  -> returnJson a
-                      Right b -> returnJson b
-
+              toRet :: [Block] -> String -> Handler Value
+              toRet bs gp = returnJson . P.map bToBPrime . P.zip (P.repeat gp) $ bs
