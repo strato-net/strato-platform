@@ -76,13 +76,7 @@ getBlockInfoR = do
               let next p = "/eth/v1.2/block?" P.++  (P.foldl1 (\a b -> (unpack a) P.++ "&" P.++ (unpack b)) $ P.map (\(k,v) -> (unpack k) P.++ "=" P.++ (unpack v)) (extra p))
               let addedParam = appendIndex getParameters
 
-              liftIO $ P.putStrLn (("Blocks are: " :: String) P.++ show modBlocks)
-              liftIO $ P.putStrLn (("transactions are: " :: String) P.++ show (P.map tBlock modBlocks))
-              liftIO $ P.putStrLn (("Hashes are: " :: String) P.++ show (P.map hashBlock modBlocks))
               toRet modBlocks (next addedParam) -- consider removing nub - it takes time n^{2}
             where
-              tBlock :: Block -> [Transaction]
-              tBlock (Block _ rts _) = rts
-              hashBlock = P.map transactionHash . tBlock
               toRet :: [Block] -> String -> Handler Value
               toRet bs gp = returnJson . P.map bToBPrime . P.zip (P.repeat gp) $ bs
