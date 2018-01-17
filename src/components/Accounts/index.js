@@ -61,10 +61,12 @@ class Accounts extends Component {
     })
       .forEach(function (user, index) {
         const addresses = Object.getOwnPropertyNames(accounts[user]);
+        let userClasseName = "pt-card pt-elevation-2 col-sm-4 smd-pointer"
+        userClasseName += addresses.length > 0 ? " selected" : ""
         rows.push(
-          <div className="smd-margin-8 smd-pointer" key={user}>
+          <div className="smd-margin-8" key={user}>
             <div className="row">
-              <div className="pt-card pt-elevation-2 col-sm-4" key={index} onClick={(e) => handleClick(user)}>
+              <div className={userClasseName} key={index} onClick={(e) => handleClick(user)}>
                 {user}
               </div>
               <div className="col-sm-8">
@@ -72,24 +74,24 @@ class Accounts extends Component {
                   addresses.length > 0 && addresses.map(address => {
                     const account = Object.getOwnPropertyNames(accounts).indexOf(user) >= 0 ? accounts[user][address] : {}
                     return < div className="pt-card address-margin-bottom" key={address}>
-                    <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
-                      <div className="col-sm-10"> 
-                        <h4>
-                          Address: &nbsp;&nbsp; <HexText value={address} classes="smd-pad-2" />
-                        </h4>
-                      </div>
-                      <div className="col-sm-2 text-right">
-                        <button
-                          className="pt-button pt-intent-primary pt-small"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            faucetRequest(user, address);
-                          }}>
-                          Faucet
+                      <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
+                        <div className="col-sm-10">
+                          <h4>
+                            Address: &nbsp;&nbsp; <HexText value={address} classes="smd-pad-2" />
+                          </h4>
+                        </div>
+                        <div className="col-sm-2 text-right">
+                          <button
+                            className="pt-button pt-intent-primary pt-small"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              faucetRequest(user, address);
+                            }}>
+                            Faucet
                         </button>
+                        </div>
                       </div>
-                    </div>
 
                       <table className="pt-table pt-str">
                         <thead>

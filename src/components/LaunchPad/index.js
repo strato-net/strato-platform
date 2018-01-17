@@ -13,7 +13,7 @@ import {
   appSetError,
   appReset
 } from './launchPad.actions';
-import { fetchAccounts } from '../Accounts/accounts.actions';
+import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
 import { canDeployApps } from '../../lib/envChecks';
 
 class LaunchPad extends Component {
@@ -83,6 +83,7 @@ class LaunchPad extends Component {
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
+    this.props.fetchUserAddresses(e.target.value)
   };
 
   submit = (values) => {
@@ -290,6 +291,7 @@ export default withRouter(
       usernameChange,
       loadLaunchPad,
       fetchAccounts,
+      fetchUserAddresses,
       appUploadRequest,
       appSetError,
       appReset

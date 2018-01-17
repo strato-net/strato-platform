@@ -38,12 +38,12 @@ export function getAccountsApi() {
         'Accept': 'application/json'
       },
     })
-  .then(function (response) {
-    return response.json()
-  })
-  .catch(function (error) {
-    throw error;
-  })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    })
 }
 
 export function getUserAddressesApi(username) {
@@ -56,12 +56,12 @@ export function getUserAddressesApi(username) {
       },
     }
   )
-  .then(function (response) {
-    return response.json();
-  })
-  .catch(function (error) {
-    throw error;
-  });
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 export function getAccountDetailApi(address) {
@@ -74,12 +74,12 @@ export function getAccountDetailApi(address) {
       },
     }
   )
-  .then(function (response) {
-    return response.json();
-  })
-  .catch(function (error) {
-    throw error;
-  });
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 export function postFaucet(address) {
@@ -93,12 +93,12 @@ export function postFaucet(address) {
       body: `address=${address}`
     }
   )
-  .then(function(response) {
-    return;
-  })
-  .catch(function(error) {
-    throw error;
-  })
+    .then(function (response) {
+      return;
+    })
+    .catch(function (error) {
+      throw error;
+    })
 }
 
 export function* getAccounts(action) {
@@ -106,14 +106,14 @@ export function* getAccounts(action) {
     const response = yield call(getAccountsApi);
     yield put(fetchAccountsSuccess(response));
     // dispatch the action if necessary
-    // if(action.loadAddresses) {
-    //   yield response.map(account => put( (account, action.loadBalances)));
-    // }
+    if (action.loadAddresses && response.length > 0) {
+      yield put(fetchUserAddresses(response[0], action.loadBalances));
+    }
   }
   catch (err) {
     yield put(fetchAccountsFailure(err));
   } finally {
-    if (yield cancelled()){
+    if (yield cancelled()) {
       yield put(hideLoading());
     }
   }
@@ -123,12 +123,12 @@ export function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
     yield put(fetchUserAddressesSuccess(action.name, response));
-    if(action.loadBalances) {
-      yield response.map(address => put(fetchAccountDetail(action.name,address)));
+    if (action.loadBalances) {
+      yield response.map(address => put(fetchAccountDetail(action.name, address)));
     }
   }
-  catch(err) {
-    yield put(fetchUserAddressesFailure(action.name,err));
+  catch (err) {
+    yield put(fetchUserAddressesFailure(action.name, err));
   }
 }
 
@@ -138,7 +138,7 @@ export function* getAccountDetail(action) {
     // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
   }
-  catch(err) {
+  catch (err) {
     yield put(fetchAccountDetailFailure(action.name, action.address, err));
   }
 }
@@ -149,7 +149,7 @@ export function* faucetAccount(action) {
     yield put(faucetSuccess());
     yield put(fetchAccountDetail(action.name, action.address));
   }
-  catch(err) {
+  catch (err) {
     yield put(faucetFailure(err))
   }
 }
