@@ -29,6 +29,6 @@ multinode:
 
 unit:
 	echo "testing unit tests"
-	stack test ethereum-discovery solidity-abi strato-p2p strato-api
+	stack test ethereum-discovery solidity-abi strato-p2p strato-api blockapps-data
 
 test: unit test-suite vm-tests multinode
