@@ -1,13 +1,13 @@
 import React, { Component } from 'react';
-import { fetchAccounts, changeAccountFilter, faucetRequest } from './accounts.actions';
+import { fetchAccounts, changeAccountFilter, faucetRequest, fetchUserAddresses, fetchAccountDetail } from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import NumberCard from '../NumberCard';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
 import HexText from '../HexText';
 import Tour from '../Tour';
+import './accounts.css';
 
 const tourSteps = [/* {
     title: 'Create User',
@@ -41,55 +41,99 @@ class Accounts extends Component {
   render() {
     const accounts = this.props.accounts;
     const filter = this.props.filter;
-    const history = this.props.history;
     const faucetRequest = this.props.faucetRequest;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
+    const self = this
 
     function handleClick(user, address) {
       mixpanelWrapper.track('accounts_row_click');
-      history.push('/accounts/' + user + '/' + address);
+      self.props.fetchUserAddresses(user, true)
     }
-    users
-      .forEach(function (user) {
-        const addresses = Object.getOwnPropertyNames(accounts[user]);
 
-        addresses.filter(function (address) {
-          if (!filter) {
-            return true;
-          }
-          return user
-            .toLowerCase()
-            .indexOf(filter) > -1 || address
-              .toLowerCase()
-              .indexOf(filter) > -1;
-        })
-          .forEach(function (address) {
-            if (address === 'error') {
-              return;
-            }
-            rows.push(
-              <tr key={address} onClick={(e) => handleClick(user, address)}>
-                <td>
-                  <button
-                    className="pt-button pt-intent-primary pt-small"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      faucetRequest(user, address);
-                    }}>
-                    Faucet
-                  </button>
-                </td>
-                <td>
-                  {user}
-                </td>
-                <td>
-                  <HexText value={address} classes="small smd-pad-4" />
-                </td>
-              </tr>
-            );
-          });
+    users.filter(user => {
+      if (!filter) {
+        return true;
+      }
+      return user
+        .toLowerCase()
+        .indexOf(filter) > -1
+    })
+      .forEach(function (user, index) {
+        const addresses = Object.getOwnPropertyNames(accounts[user]);
+        let userClasseName = "pt-card pt-elevation-2 col-sm-4 smd-pointer"
+        userClasseName += addresses.length > 0 ? " selected" : ""
+        rows.push(
+          <div className="smd-margin-8" key={user}>
+            <div className="row">
+              <div className={userClasseName} key={index} onClick={(e) => handleClick(user)}>
+                {user}
+              </div>
+              <div className="col-sm-8">
+                {
+                  addresses.length > 0 && addresses.map(address => {
+                    const account = Object.getOwnPropertyNames(accounts).indexOf(user) >= 0 ? accounts[user][address] : {}
+                    return < div className="pt-card address-margin-bottom" key={address}>
+                      <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
+                        <div className="col-sm-10">
+                          <h4>
+                            Address: &nbsp;&nbsp; <HexText value={address} classes="smd-pad-2" />
+                          </h4>
+                        </div>
+                        <div className="col-sm-2 text-right">
+                          <button
+                            className="pt-button pt-intent-primary pt-small"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              faucetRequest(user, address);
+                            }}>
+                            Faucet
+                        </button>
+                        </div>
+                      </div>
+
+                      <table className="pt-table pt-str">
+                        <thead>
+                          <tr>
+                            <th>Field</th>
+                            <th>Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td><strong>Contract Root</strong></td>
+                            <td><HexText value={account.contractRoot} classes="smd-pad-2" /></td>
+                          </tr>
+                          <tr>
+                            <td><strong>Kind</strong></td>
+                            <td>{account.kind}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Balance</strong></td>
+                            <td>{account.balance}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Latest Block Number</strong></td>
+                            <td>{account.latestBlockNum}</td>
+                          </tr>
+                          <tr>
+                            <td><strong>Code Hash</strong></td>
+                            <td><HexText value={account.codeHash} classes="smd-pad-2" /></td>
+                          </tr>
+                          <tr>
+                            <td><strong>Nonce</strong></td>
+                            <td>{account.nonce}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                  })}
+              </div>
+            </div>
+          </div>
+        );
       });
 
     return (
@@ -111,47 +155,26 @@ class Accounts extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-3">
-            <NumberCard number={users.length} description="Users" iconClass="fa-users" />
+          <div className="col-sm-4">
+            <div className="pt-input-group pt-dark pt-large">
+              <span className="pt-icon pt-icon-search"></span>
+              <input
+                className="pt-input"
+                type="search"
+                placeholder="Search accounts"
+                onChange={e => this.updateFilter(e.target.value.toLowerCase())}
+                dir="auto" />
+            </div>
           </div>
-          <div className="col-sm-9">
-            <div className="pt-card pt-elevation-2">
-              <div className="pt-input-group pt-dark pt-large">
-                <span className="pt-icon pt-icon-search"></span>
-                <input
-                  className="pt-input"
-                  type="search"
-                  placeholder="Search accounts"
-                  onChange={e => this.updateFilter(e.target.value.toLowerCase())}
-                  dir="auto" />
-              </div>
-              <table
-                className="pt-table pt-interactive pt-condensed pt-striped"
-                style={{
-                  tableLayout: 'fixed',
-                  width: '100%'
-                }}>
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th >
-                      <h4>Username</h4>
-                    </th>
-                    <th >
-                      <h4>Account</h4>
-                    </th>
-
+          <div className="container-fluid pt-dark">
+            <div className="row">
+              <div className="col-sm-12 accounts-margin-top">
+                {rows.length === 0
+                  ? <tr>
+                    <td colSpan={3}>No Accounts</td>
                   </tr>
-                </thead>
-
-                <tbody>
-                  {rows.length === 0
-                    ? <tr>
-                      <td colSpan={3}>No Accounts</td>
-                    </tr>
-                    : rows}
-                </tbody>
-              </table>
+                  : rows}
+              </div>
             </div>
           </div>
         </div>
@@ -172,4 +195,4 @@ export function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchAccounts, changeAccountFilter, faucetRequest })(Accounts));
+export default withRouter(connect(mapStateToProps, { fetchAccountDetail, fetchUserAddresses, fetchAccounts, changeAccountFilter, faucetRequest })(Accounts));
