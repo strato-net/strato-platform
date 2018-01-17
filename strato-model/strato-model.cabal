@@ -7,24 +7,29 @@ cabal-version:       >=1.10
 license:             Apache-2.0
 
 library
-  exposed-modules:      Blockchain.Strato.Model.Class
-                      , Blockchain.Strato.Model.ExtendedWord
-                      , Blockchain.Strato.Model.SHA
-                      , Blockchain.Strato.Model.Address
-                      , Blockchain.Strato.Model.Code
-                      , Blockchain.Strato.Model.Query
-                      , Blockchain.Strato.Model.Util 
+  exposed-modules:      Blockchain.Strato.Model.Address
                       , Blockchain.Strato.Model.BlockchainClass
+                      , Blockchain.Strato.Model.Class
+                      , Blockchain.Strato.Model.Code
+                      , Blockchain.Strato.Model.Colors
+                      , Blockchain.Strato.Model.ExtendedWord
+                      , Blockchain.Strato.Model.Format
+                      , Blockchain.Strato.Model.Query
+                      , Blockchain.Strato.Model.SHA
+                      , Blockchain.Strato.Model.Util
   other-modules:
-  build-depends:      aeson 
+  build-depends:      aeson
+                      , ansi-wl-pprint
                       , base
                       , base16-bytestring
                       , ethereum-rlp
                       , binary
                       , bytestring
+                      , path-pieces
                       , nibblestring
                       , cryptohash
                       , blockapps-haskoin
+                      , text
                       , time
                       , text
                       , scientific

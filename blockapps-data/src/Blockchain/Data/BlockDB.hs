@@ -115,7 +115,7 @@ nextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime
 
 -- if useDiffBomb is False then the expAdjustment is not added
 homesteadNextDifficulty::Bool->Bool->Integer->Difficulty->UTCTime->UTCTime->Difficulty
-homesteadNextDifficulty useDiffBomb useTestnet parentNumber oldDifficulty oldTime newTime =
+homesteadNextDifficulty useDiffBomb _useTestnet parentNumber oldDifficulty oldTime newTime =
   max nextDiff' minimumDifficulty + if not useDiffBomb then 0 else expAdjustment
     where
       block_timestamp = round (utcTimeToPOSIXSeconds newTime)::Integer
@@ -194,8 +194,8 @@ putBlocks difficultyBase blocks makeHashOne = do
            _ -> error "DB has multiple blocks with the same hash"
 
   where
-    updateBlockNumber b txHash  = do
-          ret <- SQL.getBy (UniqueTXHash txHash)
+    updateBlockNumber b txHash'  = do
+          ret <- SQL.getBy (UniqueTXHash txHash')
           key <-
             case ret of
              Just x  -> return $ entityKey x

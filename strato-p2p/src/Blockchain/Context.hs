@@ -104,8 +104,6 @@ clearActionTimestamp = do
 instance Show PS.Connection where
   show _ = "Postgres Simple Connection"
 
-type ContextMLite = StateT Context (ResourceT (LoggingT IO))
-
 runContextM :: (MonadBaseControl IO m )
             => s
             -> StateT s (ResourceT m) a
