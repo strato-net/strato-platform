@@ -106,9 +106,9 @@ export function* getAccounts(action) {
     const response = yield call(getAccountsApi);
     yield put(fetchAccountsSuccess(response));
     // dispatch the action if necessary
-    if(action.loadAddresses) {
-      yield response.map(account => put(fetchUserAddresses(account, action.loadBalances)));
-    }
+    // if(action.loadAddresses) {
+    //   yield response.map(account => put( (account, action.loadBalances)));
+    // }
   }
   catch (err) {
     yield put(fetchAccountsFailure(err));
@@ -123,9 +123,9 @@ export function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
     yield put(fetchUserAddressesSuccess(action.name, response));
-    // if(action.loadBalances) {
-    //   yield response.map(address => put(fetchAccountDetail(action.name,address)));
-    // }
+    if(action.loadBalances) {
+      yield response.map(address => put(fetchAccountDetail(action.name,address)));
+    }
   }
   catch(err) {
     yield put(fetchUserAddressesFailure(action.name,err));
