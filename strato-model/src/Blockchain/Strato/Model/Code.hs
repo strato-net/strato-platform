@@ -9,7 +9,6 @@ import           GHC.Generics
 import           Data.Aeson
 
 import           Blockchain.Data.RLP
--- import Debug.Trace
 
 data Code = Code{codeBytes::B.ByteString}
           | PrecompiledCode Int
@@ -20,7 +19,6 @@ instance RLPSerializable Code where
     rlpEncode (PrecompiledCode _) = error "Error in call to rlpEncode for Code: Precompiled contracts can not be serialized."
     rlpDecode = Code . rlpDecode
 
--- TODO(tim): fix these
 instance ToJSON Code where
   toJSON (Code bytes) = String . decodeUtf8 . B16.encode $ bytes
   toJSON (PrecompiledCode _) = error "cannot serialize precompiled codes"
