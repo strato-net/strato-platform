@@ -147,6 +147,15 @@ test-suite test
     ghc-options:       -Wall
     extra-libraries: pthread
 
+    other-modules: Handler.CommonSpec
+                 , Handler.HomeSpec
+                 , Handler.JsonSpec
+                 , Handler.RamlSpec
+                 , Hspec.Formatters.Blaze
+                 , Spec
+                 , TestImport
+
+
     extensions: TemplateHaskell
                 QuasiQuotes
                 OverloadedStrings
