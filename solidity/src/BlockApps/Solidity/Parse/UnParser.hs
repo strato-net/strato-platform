@@ -7,7 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module BlockApps.Solidity.Parse.UnParser where
 
-import           Data.Text
+import           Data.Text  (Text)
 import qualified Data.Text                  as Text
 import qualified Data.List                  as List
 import           Data.Map                   ()
@@ -32,7 +32,7 @@ unparseContract (name, (contract,inherited)) =
   <> Text.unpack name
   <> (case inherited of
         [] -> ""
-        xs -> " is " <> Text.unpack (intercalate ", " xs)
+        xs -> " is " <> Text.unpack (Text.intercalate ", " xs)
      )
   <> " {\n"
   <> List.concat (List.map (("\n    " <>) . unparseVar) (sortWith (varTypeAtBytes . snd) $ Map.toList $ xabiVars contract))
@@ -75,16 +75,29 @@ unparseFunc (name, Func{..}) =
     "function "
     <> name
     <> "("
-    <> intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
+    <> Text.intercalate ", " (List.map unparseArgs (sortWith (indexedTypeIndex . snd) $ Map.toList funcArgs))
     <> ") "
     <> case funcMutable of
         Just False -> "constant "
+        _ -> ""
+    <> case funcPayable of
+        Just True -> "payable "
+        _ -> ""
+    <> case funcVisibility of
+        Just Private -> "private "
+        Just Public -> "public "
+        Just Internal -> "internal "
+        Just External -> "external "
+        _ -> ""
+    <> case funcModifiers of
+        Just [] -> ""
+        Just xs -> Text.pack $ List.intercalate " " xs <> " "
         _ -> ""
     <> case Map.toList funcVals of
         [] -> ""
         vals ->
               "returns ("
-          <> intercalate ", " (List.map unparseVals vals)
+          <> Text.intercalate ", " (List.map unparseVals vals)
           <> ") "
     <> "{\n        "
     <> case funcContents of
@@ -97,7 +110,7 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
      "modifier "
   <> name
   <> "("
-  <> intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
+  <> Text.intercalate ", " (List.map unparseArgs (Map.toList modifierArgs))
   <> ") {\n        "
   <> case modifierContents of
        Just contents -> contents --(Text.concat . Text.lines $ contents)
@@ -133,8 +146,8 @@ unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
 unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
 unparseIndexedType IndexedType{indexedTypeType = Bytes (Just True) _ } = "bytes"
 unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
-  "bytes" <> (pack . show $ bytes)
-unparseIndexedType IndexedType{indexedTypeType = Label str} = pack str
+  "bytes" <> (Text.pack . show $ bytes)
+unparseIndexedType IndexedType{indexedTypeType = Label str} = Text.pack str
 unparseIndexedType IndexedType{indexedTypeType = Enum _ name _} = name
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
@@ -144,7 +157,7 @@ addFunction (name, contents) c =
                   , funcVals = Map.singleton "#0" IndexedType{ indexedTypeType=String (Just True)
                                                              , indexedTypeIndex=0
                                                              }
-                  , funcContents = Just $ pack contents
+                  , funcContents = Just $ Text.pack contents
                   , funcMutable = Just False
                   , funcPayable = Just False
                   , funcVisibility = Nothing

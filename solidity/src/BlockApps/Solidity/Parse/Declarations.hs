@@ -357,7 +357,7 @@ functionModifiers = do
       let returns = concat [v | ReturnsMod v <- vals]
           visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
           mutable = fromMaybe True $ listToMaybe [v | MutableMod v <- vals]
-          payable = fromMaybe True $ listToMaybe [v | PayableMod v <- vals]
+          payable = fromMaybe False $ listToMaybe [v | PayableMod v <- vals]
           otherMods = [v | OtherMod v <- vals]
       in (returns, visibility, mutable, payable, otherMods)
     returnModifier =
