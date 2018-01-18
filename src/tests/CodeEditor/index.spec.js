@@ -8,7 +8,6 @@ describe('CodeEditor: index', () => {
 
   beforeAll(() => {
     localStorage.clear();
-    localStorage.__STORE__ = {};
     files = [
       {
         name: 'file1.sol',
