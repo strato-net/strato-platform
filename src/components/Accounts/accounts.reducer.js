@@ -5,8 +5,9 @@ import {
   CHANGE_ACCOUNT_FILTER,
   FETCH_USER_ADDRESSES_SUCCESSFUL,
   FETCH_USER_ADDRESSES_FAILED,
-  FETCH_ACCOUNT_DETAIL_SUCCESSFULL,
-  FETCH_ACCOUNT_DETAIL_FAILED
+  FETCH_ACCOUNT_DETAIL_SUCCESS,
+  FETCH_ACCOUNT_DETAIL_FAILURE,
+  RESET_ACCOUNT_ADDRESS
 } from './accounts.actions';
 
 const initialState = {
@@ -71,7 +72,7 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
-    case FETCH_ACCOUNT_DETAIL_SUCCESSFULL:
+    case FETCH_ACCOUNT_DETAIL_SUCCESS:
       return {
         accounts: {
           ...state.accounts,
@@ -86,7 +87,16 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
-    case FETCH_ACCOUNT_DETAIL_FAILED:
+    case RESET_ACCOUNT_ADDRESS: 
+      return {
+        accounts: {
+          ...state.accounts,
+          [action.name]: {}
+        },
+        filter: state.filter,
+        error: state.error
+      }  
+    case FETCH_ACCOUNT_DETAIL_FAILURE:
       return {
         accounts: {
           ...state.accounts,

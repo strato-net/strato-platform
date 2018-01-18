@@ -1,12 +1,12 @@
 import React, { Component } from 'react';
-import { fetchAccounts, changeAccountFilter, faucetRequest, fetchUserAddresses, fetchAccountDetail } from './accounts.actions';
+import { fetchAccounts, changeAccountFilter, fetchUserAddresses, fetchAccountDetail, resetUserAddress } from './accounts.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import CreateUser from '../CreateUser';
 import SendEther from './components/SendEther';
-import HexText from '../HexText';
 import Tour from '../Tour';
+import Account from '../Account';
 import './accounts.css';
 
 const tourSteps = [/* {
@@ -28,7 +28,6 @@ const tourSteps = [/* {
 ];
 
 class Accounts extends Component {
-
   componentDidMount() {
     this.props.fetchAccounts(true, true);
     mixpanelWrapper.track('accounts_page_load')
@@ -38,18 +37,20 @@ class Accounts extends Component {
     this.props.changeAccountFilter(filter);
   };
 
+  onUserClick(user, address) {
+    if (address.length) {
+      this.props.resetUserAddress(user);
+    } else {
+      mixpanelWrapper.track('accounts_row_click');
+      this.props.fetchUserAddresses(user, true)
+    }
+  }
+
   render() {
     const accounts = this.props.accounts;
     const filter = this.props.filter;
-    const faucetRequest = this.props.faucetRequest;
     const users = Object.getOwnPropertyNames(accounts);
     const rows = [];
-    const self = this
-
-    function handleClick(user, address) {
-      mixpanelWrapper.track('accounts_row_click');
-      self.props.fetchUserAddresses(user, true)
-    }
 
     users.filter(user => {
       if (!filter) {
@@ -61,80 +62,24 @@ class Accounts extends Component {
     })
       .forEach(function (user, index) {
         const addresses = Object.getOwnPropertyNames(accounts[user]);
-        let userClasseName = "pt-card pt-elevation-2 col-sm-4 smd-pointer"
-        userClasseName += addresses.length > 0 ? " selected" : ""
+        let userClasseName = addresses.length > 0 ? " selected" : "";
+
         rows.push(
           <div className="smd-margin-8" key={user}>
             <div className="row">
-              <div className={userClasseName} key={index} onClick={(e) => handleClick(user)}>
+              <div className={`pt-card pt-elevation-2 col-sm-4 smd-pointer ${userClasseName}`} key={index} onClick={(e) => this.onUserClick(user, addresses)}>
                 {user}
               </div>
               <div className="col-sm-8">
                 {
                   addresses.length > 0 && addresses.map(address => {
-                    const account = Object.getOwnPropertyNames(accounts).indexOf(user) >= 0 ? accounts[user][address] : {}
-                    return < div className="pt-card address-margin-bottom" key={address}>
-                      <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
-                        <div className="col-sm-10">
-                          <h4>
-                            Address: &nbsp;&nbsp; <HexText value={address} classes="smd-pad-2" />
-                          </h4>
-                        </div>
-                        <div className="col-sm-2 text-right">
-                          <button
-                            className="pt-button pt-intent-primary pt-small"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              faucetRequest(user, address);
-                            }}>
-                            Faucet
-                        </button>
-                        </div>
-                      </div>
-
-                      <table className="pt-table pt-str">
-                        <thead>
-                          <tr>
-                            <th>Field</th>
-                            <th>Value</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td><strong>Contract Root</strong></td>
-                            <td><HexText value={account.contractRoot} classes="smd-pad-2" /></td>
-                          </tr>
-                          <tr>
-                            <td><strong>Kind</strong></td>
-                            <td>{account.kind}</td>
-                          </tr>
-                          <tr>
-                            <td><strong>Balance</strong></td>
-                            <td>{account.balance}</td>
-                          </tr>
-                          <tr>
-                            <td><strong>Latest Block Number</strong></td>
-                            <td>{account.latestBlockNum}</td>
-                          </tr>
-                          <tr>
-                            <td><strong>Code Hash</strong></td>
-                            <td><HexText value={account.codeHash} classes="smd-pad-2" /></td>
-                          </tr>
-                          <tr>
-                            <td><strong>Nonce</strong></td>
-                            <td>{account.nonce}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
+                    return <Account name={user} address={address} key={address} />
                   })}
               </div>
             </div>
           </div>
         );
-      });
+      }.bind(this));
 
     return (
       <div className="container-fluid pt-dark">
@@ -195,4 +140,13 @@ export function mapStateToProps(state) {
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchAccountDetail, fetchUserAddresses, fetchAccounts, changeAccountFilter, faucetRequest })(Accounts));
+export default withRouter(
+  connect(mapStateToProps,
+    {
+      fetchAccountDetail,
+      fetchUserAddresses,
+      fetchAccounts,
+      changeAccountFilter,
+      resetUserAddress
+    }
+  )(Accounts));

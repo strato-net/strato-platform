@@ -7,10 +7,11 @@ import {
   fetchUserAddressesSuccess,
   fetchUserAddressesFailure,
   fetchAccountDetailSuccess,
-  fetchAccountDetailFailure
+  fetchAccountDetailFailure,
+  resetUserAddress
 } from '../../components/Accounts/accounts.actions';
 import { deepClone } from '../helper/testHelper';
-import { accountsMock, reducerAccounts, filter, error, accountDetail } from "./accountsMock";
+import { accountsMock, reducerAccounts, filter, error, accountDetail, indexAccountsMock } from "./accountsMock";
 
 describe('Accounts: reducer', () => {
 
@@ -97,7 +98,7 @@ describe('Accounts: reducer', () => {
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
 
-  })
+  });
 
   describe('fetch account details', () => {
 
@@ -126,6 +127,20 @@ describe('Accounts: reducer', () => {
       const action = fetchAccountDetailFailure(data.name, data.address, data.error);
       const initialState = {
         accounts: reducerAccounts,
+        filter: '',
+        error: null
+      };
+      expect(reducer(initialState, action)).toMatchSnapshot();
+    });
+
+    // RESET_ACCOUNT_ADDRESS
+    test('reset account address', () => {
+      const data = {
+        name: 'Supplier1'
+      }
+      const action = resetUserAddress(data.name);
+      const initialState = {
+        accounts: indexAccountsMock,
         filter: '',
         error: null
       };

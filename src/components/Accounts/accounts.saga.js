@@ -7,8 +7,8 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_ACCOUNTS,
-  FETCH_ACCOUNT_ADDRESS,
-  FETCH_ACCOUNT_DETAIL,
+  FETCH_ACCOUNT_ADDRESS_REQUEST,
+  FETCH_ACCOUNT_DETAIL_REQUEST,
   fetchAccountsSuccess,
   fetchAccountsFailure,
   fetchUserAddresses,
@@ -23,6 +23,7 @@ import {
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
+import { delay } from 'redux-saga'
 
 const accountDataUrl = env.STRATO_URL + "/account?address=:address";
 const addressUrl = env.BLOC_URL + '/users/:user';
@@ -147,6 +148,7 @@ export function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.address);
     yield put(faucetSuccess());
+    yield call(delay, 100)
     yield put(fetchAccountDetail(action.name, action.address));
   }
   catch (err) {
@@ -157,8 +159,8 @@ export function* faucetAccount(action) {
 export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
-    takeEvery(FETCH_ACCOUNT_ADDRESS, getUserAddresses),
-    takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail),
+    takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
+    takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
     takeLatest(FAUCET_REQUEST, faucetAccount)
   ];
 }

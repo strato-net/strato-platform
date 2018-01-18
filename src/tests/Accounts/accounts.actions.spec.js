@@ -11,7 +11,8 @@ import {
   fetchAccountDetailFailure,
   faucetRequest,
   faucetSuccess,
-  faucetFailure
+  faucetFailure,
+  resetUserAddress
 } from '../../components/Accounts/accounts.actions';
 import { accountsMock, accountDetail, error } from './accountsMock';
 
@@ -66,6 +67,14 @@ describe('Accounts: action', () => {
       };
       expect(fetchUserAddressesFailure(data.name, data.error)).toMatchSnapshot();
     });
+
+    test('reset user', () => {
+      let data = {
+        name: 'Bid'
+      };
+
+      expect(resetUserAddress(data.name)).toMatchSnapshot();
+    })
 
   })
 

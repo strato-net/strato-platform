@@ -35,10 +35,12 @@ import {
   FETCH_ACCOUNTS_FAILED,
   FETCH_USER_ADDRESSES_SUCCESSFUL,
   FETCH_USER_ADDRESSES_FAILED,
-  FETCH_ACCOUNT_DETAIL_SUCCESSFULL,
-  FETCH_ACCOUNT_DETAIL_FAILED,
+  FETCH_ACCOUNT_DETAIL_SUCCESS,
+  FETCH_ACCOUNT_DETAIL_FAILURE,
   FAUCET_SUCCESS,
-  FAUCET_FAILURE
+  FAUCET_FAILURE,
+  FETCH_ACCOUNT_ADDRESS_REQUEST,
+  FETCH_ACCOUNT_DETAIL_REQUEST
 } from '../../components/Accounts/accounts.actions';
 import { expectSaga } from 'redux-saga-test-plan';
 import { accountsMock, userAddresses, error, accountDetail } from './accountsMock';
@@ -46,13 +48,13 @@ import { hideLoading } from 'react-redux-loading-bar';
 import { deepClone } from '../helper/testHelper';
 
 describe('Accounts: saga', () => {
-
+  
   test('watch accounts', () => {
     const gen = watchFetchContracts();
     const match = [
       takeLatest(FETCH_ACCOUNTS, getAccounts),
-      takeEvery(FETCH_ACCOUNT_ADDRESS, getUserAddresses),
-      takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail),
+      takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
+      takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
       takeLatest(FAUCET_REQUEST, faucetAccount)
     ]
     expect(gen.next().value).toEqual(match);
@@ -72,7 +74,7 @@ describe('Accounts: saga', () => {
         const gen = getAccounts(action);
         expect(gen.next().value).toEqual(call(getAccountsApi));
         expect(gen.next(accountsMock).value).toEqual(put(fetchAccountsSuccess(accountsMock)));
-        expect(gen.next(true).value).toEqual(accountsMock.map(account => put(fetchUserAddresses(account, action.loadBalances))));
+        expect(gen.next(true).value).toEqual(put(fetchUserAddresses(accountsMock[0], action.loadBalances)));
         expect(gen.throw(error).value).toEqual(put(fetchAccountsFailure(error)));
         expect(gen.next().value).toEqual(cancelled());
         expect(gen.next(true).value).toEqual(put(hideLoading()));
@@ -128,6 +130,7 @@ describe('Accounts: saga', () => {
       const gen = getUserAddresses(action);
       expect(gen.next().value).toEqual(call(getUserAddressesApi, action.name));
       expect(gen.next(userAddresses).value).toEqual(put(fetchUserAddressesSuccess(action.name, userAddresses)));
+      expect(gen.next(true).value).toEqual(userAddresses.map(address => put(fetchAccountDetail(action.name, address))));
       expect(gen.next().done).toBe(true);
     });
 
@@ -170,14 +173,14 @@ describe('Accounts: saga', () => {
       test('success', (done) => {
         fetch.mockResponse(JSON.stringify([accountDetail]));
         expectSaga(getAccountDetail, action)
-          .call.fn(getAccountDetailApi).put.like({ action: { type: FETCH_ACCOUNT_DETAIL_SUCCESSFULL } })
+          .call.fn(getAccountDetailApi).put.like({ action: { type: FETCH_ACCOUNT_DETAIL_SUCCESS } })
           .run().then((result) => { done() });
       });
 
       test('failure', (done) => {
         fetch.mockReject(error);
         expectSaga(getAccountDetail, action)
-          .call.fn(getAccountDetailApi).put.like({ action: { type: FETCH_ACCOUNT_DETAIL_FAILED } })
+          .call.fn(getAccountDetailApi).put.like({ action: { type: FETCH_ACCOUNT_DETAIL_FAILURE } })
           .run().then((result) => { done() });
       });
 
@@ -197,6 +200,7 @@ describe('Accounts: saga', () => {
       const gen = faucetAccount(action);
       expect(gen.next().value).toEqual(call(postFaucet, action.address));
       expect(gen.next().value).toEqual(put(faucetSuccess()));
+      gen.next().value
       expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address)));
       expect(gen.throw(error).value).toEqual(put(faucetFailure(error)));
       expect(gen.next().done).toBe(true);
