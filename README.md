@@ -5,18 +5,6 @@
 
 Note: If you are running through this guide and find something doesn't work, please update it.
 
-## mgit
-You must clone this repository using [mgit](http://github.com/blockapps/mgit)-- if you use the old-fashioned git you will be missing important components.
-
-```
-> git clone http://github.com/blockapps/mgit.git
-> cd mgit
-> stack install
-> alias mgit=./.stack-work/.stack-work/install/x86_64-osx/lts-3.4/7.10.2/bin/mgit
-> cd ..
-> mgit clone http://github.com/blockapps/monstrato.git
-> cd monstrato
-```
 
 ## alex
 `alex` is a haskell library for building lexers, and is a build-tool dependency for the repo. Make sure `~/.local/bin` is on your `PATH`.
