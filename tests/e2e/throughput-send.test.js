@@ -11,7 +11,7 @@ const nodes = config.nodes;
 const moment = require('moment');
 const constants = common.constants;
 
-describe('Throughput', function () {
+describe('Throughput - send', function () {
 
   this.timeout(config.timeout);
 
