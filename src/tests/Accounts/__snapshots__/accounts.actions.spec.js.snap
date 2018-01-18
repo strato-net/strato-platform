@@ -12,7 +12,7 @@ Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
   "error": "ERROR",
   "name": "tanuj",
-  "type": "FETCH_ACCOUNT_DETAIL_FAILED",
+  "type": "FETCH_ACCOUNT_DETAIL_FAILURE",
 }
 `;
 
@@ -20,7 +20,7 @@ exports[`Accounts: action fetch account detail request 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
   "name": "tanuj",
-  "type": "FETCH_ACCOUNT_DETAIL",
+  "type": "FETCH_ACCOUNT_DETAIL_REQUEST",
 }
 `;
 
@@ -40,7 +40,7 @@ Object {
     "source": "",
   },
   "name": "tanuj",
-  "type": "FETCH_ACCOUNT_DETAIL_SUCCESSFULL",
+  "type": "FETCH_ACCOUNT_DETAIL_SUCCESS",
 }
 `;
 
@@ -126,7 +126,14 @@ exports[`Accounts: action fetch user addresses request 1`] = `
 Object {
   "loadBalances": true,
   "name": "tanuj",
-  "type": "FETCH_ACCOUNT_ADDRESS",
+  "type": "FETCH_ACCOUNT_ADDRESS_REQUEST",
+}
+`;
+
+exports[`Accounts: action fetch user addresses reset user 1`] = `
+Object {
+  "name": "Bid",
+  "type": "RESET_ACCOUNT_ADDRESS",
 }
 `;
 

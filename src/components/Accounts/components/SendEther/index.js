@@ -6,7 +6,7 @@ import {
   fromUsernameChange,
   toUsernameChange
 } from './sendEther.actions';
-import { fetchAccounts } from '../../accounts.actions';
+import { fetchAccounts, fetchUserAddresses } from '../../accounts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
@@ -102,6 +102,9 @@ class SendEther extends Component {
                       className="pt-input"
                       component="select"
                       name="from"
+                      onChange={
+                        (e) => this.props.fetchUserAddresses(e.target.value, true)
+                      }
                       required
                     >
                       <option />
@@ -234,7 +237,9 @@ class SendEther extends Component {
                       className="pt-input"
                       component="select"
                       name="to"
-                      // onChange={this.handleToUsernameChange}
+                      onChange={
+                        (e) => this.props.fetchUserAddresses(e.target.value, true)
+                      }
                       required
                     >
                       <option />
@@ -346,6 +351,7 @@ const connected = connect(mapStateToProps, {
   sendEtherCloseModal,
   sendEther,
   fetchAccounts,
+  fetchUserAddresses,
   fromUsernameChange,
   toUsernameChange
 })(formed);

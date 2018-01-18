@@ -122,6 +122,7 @@ describe('SendEther: index', () => {
       sendEtherOpenModal: jest.fn(),
       sendEtherCloseModal: jest.fn(),
       sendEther: jest.fn(),
+      fetchUserAddresses: jest.fn(),
       fetchAccounts: jest.fn(),
       handleSubmit: jest.fn(),
       reset: jest.fn(),
@@ -142,11 +143,18 @@ describe('SendEther: index', () => {
     );
 
     const dialog = wrapper.dive().dive().dive().find('Dialog').dive();
+    console.log(dialog.find('Field').debug())
+    dialog.find('Field').at(0).simulate('change', { target: { value: 'Supplier1' } });
+    expect(props.fetchUserAddresses).toHaveBeenCalled()
+
     dialog.find('Field').at(3).simulate('click');
     dialog.find('Field').at(4).simulate('click');
     expect(dialog.find('Field').at(3).props().checked).toBeTruthy();
     expect(dialog.find('Field').at(4).props().checked).toBeFalsy();
 
+    dialog.find('Field').at(5).simulate('change', { target: { value: 'Supplier2' } });
+    expect(props.fetchUserAddresses).toHaveBeenCalled()
+    
     dialog.find('Button').last().simulate('click');
     expect(props.handleSubmit).toHaveBeenCalled();
     wrapper.dive().dive().dive().instance().submit(values);

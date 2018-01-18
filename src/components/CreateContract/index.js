@@ -8,7 +8,7 @@ import {
   usernameChange,
   contractNameChange
 } from './createContract.actions';
-import {fetchAccounts} from '../Accounts/accounts.actions';
+import {fetchAccounts, fetchUserAddresses} from '../Accounts/accounts.actions';
 import {fetchContracts} from '../Contracts/contracts.actions';
 import {Button, Dialog} from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
@@ -46,6 +46,7 @@ class CreateContract extends Component {
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
+    this.props.fetchUserAddresses(e.target.value,true)
   };
 
   handleContractNameChange = (e) => {
@@ -454,6 +455,7 @@ const connected = connect(mapStateToProps, {
   contractFormChange,
   fetchContracts,
   fetchAccounts,
+  fetchUserAddresses,
   usernameChange,
   contractNameChange
 })(formed);
