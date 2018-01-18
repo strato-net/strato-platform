@@ -50,6 +50,7 @@ ShallowWrapper {
     dispatch={[Function]}
     error={undefined}
     fetchAccounts={[Function]}
+    fetchUserAddresses={[Function]}
     form="create-app"
     handleSubmit={[Function]}
     history={
