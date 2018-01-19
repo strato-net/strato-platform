@@ -12,7 +12,7 @@ pipeline {
           set -x
           docker rm -f $(docker ps -aq) || true;
           if [ "$BUILD_TYPE" == "quick" ]; then
-            docker system prune -a
+            docker system prune -f
           else
             docker system prune -fa
             sudo rm -rf silo
