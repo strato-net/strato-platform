@@ -64,7 +64,6 @@ class CreateContract extends Component {
   }
 
   handleFileDrop = (files, dropZoneField) => {
-
     this.props.touch('contract');
     dropZoneField.input.onChange(files);
     const contract = files[0];
@@ -190,7 +189,6 @@ class CreateContract extends Component {
     const userAddresses = this.props.accounts && this.props.username ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.username])
       : null;
-
     return (
       <div className="smd-pad-16" style={{display:'inline-block'}}>
         <Button onClick={() => {
@@ -404,7 +402,7 @@ class CreateContract extends Component {
   }
 }
 
-const validate = (values) => {
+export const validate = (values) => {
   const errors = {};
 
   // const abi = CreateContract.props.abi.src;
@@ -417,7 +415,6 @@ const validate = (values) => {
   //     })
   //   }
   // });
-
   Object.getOwnPropertyNames(values).forEach((val) => {
     if (values[val] === '' || values[val] === undefined) {
       errors[val] = val + " Required";
@@ -430,7 +427,7 @@ export const CREATE_CONTRACT_FORM = 'create-contract'
 
 const selector = formValueSelector(CREATE_CONTRACT_FORM);
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isOpen: state.createContract.isOpen,
     abi: state.createContract.abi,

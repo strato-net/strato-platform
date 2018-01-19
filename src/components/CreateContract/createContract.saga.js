@@ -18,7 +18,7 @@ const url = env.BLOC_URL + "/users/:user/:address/contract?resolve"
 const compileUrl = env.STRATO_URL + "/extabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
-function createContractApiCall(contract, src, username, address, password, args) {
+export function createContractApiCall(contract, src, username, address, password, args) {
   return fetch(url.replace(":user", username).replace(":address", address), {
     method: 'POST',
     headers: {
@@ -32,7 +32,7 @@ function createContractApiCall(contract, src, username, address, password, args)
   });
 }
 
-function compileContractApiCall(contractName, source, s) {
+export function compileContractApiCall(contractName, source, s) {
   const searchable = [contractName];
   if (s) {
     fetch(blocCompileUrl, {
@@ -80,7 +80,7 @@ function compileContractApiCall(contractName, source, s) {
   });
 }
 
-function * createContract(action) {
+export function * createContract(action) {
   try {
     let response = yield call(createContractApiCall, action.payload.contract, action.payload.fileText, action.payload.username, action.payload.address, action.payload.password, action.payload.arguments);
     yield put(createContractSuccess(response));
@@ -92,7 +92,7 @@ function * createContract(action) {
   }
 }
 
-function * compileContract(action) {
+export function * compileContract(action) {
   try {
     let response = yield call(compileContractApiCall, action.name, action.contract, action.searchable);
     yield put(compileContractSuccess(response));
