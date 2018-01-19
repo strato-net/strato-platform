@@ -19,11 +19,18 @@ describe('Throughput - upload', function () {
   const contractFilename = path.join(config.contractsPath, 'SimpleStorage.sol');
   let users;
   let contracts = [];
+  let txs = []
 
   before(function * () {
     users = yield createUsers();
     for(let i = 0; i < users.length; i++) {
       yield rest.compileSearch([contractName], contractName, contractFilename, i);
+    }
+    for (var i = 0; i < config.batchSize; i++) {
+      txs.push({
+        contractName: contractName,
+        args: {},
+      });
     }
   });
 
@@ -33,8 +40,7 @@ describe('Throughput - upload', function () {
     const generators = [];
 
     for(let node of nodes) {
-      const user = users[node.id];
-      const txs = createBatchTx();      
+      const user = users[node.id];    
       generators.push(rest.uploadContractList(user, txs, true, node.id));
     }
 
@@ -53,8 +59,10 @@ describe('Throughput - upload', function () {
       yield promiseTimeout(100);
     }
 
+    const secondsToRemove = 0; // bEndTime.diff(bStartTime, 'seconds');
+
     const endTime = moment();
-    assert.isOk(statesMatch, "All counts should match");
+    assert.isOk(countMatch, "All counts should match");
     const seconds = endTime.diff(startTime, 'seconds') - secondsToRemove;
     console.log(`Bloc request seconds (removed): ${secondsToRemove}`);
     console.log(`Total Seconds: ${seconds}`);
@@ -80,18 +88,6 @@ describe('Throughput - upload', function () {
     return users;
   }
 
-  function createBatchTx() {
-    var txs = [];
-
-    for (var i = 0; i < config.batchSize; i++) {
-      txs.push({
-        contractName: contractName,
-        args: {},
-      });
-    }
-    return txs;
-  }
-
   function promiseTimeout(timeout) {
     return new Promise(function(resolve, reject) {
       setTimeout(function() {
@@ -100,7 +96,7 @@ describe('Throughput - upload', function () {
     });
   }
 
-  function * checkBalances(userPairs) {
+  function * checkCounts(userPairs) {
     const promises = [];
     for (let node of nodes) {
       promises.push(co(getContractCount(users[node.id])));
