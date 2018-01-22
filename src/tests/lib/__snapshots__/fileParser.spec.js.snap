@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lib: file parser import code 1`] = `"contract GreeterW {↵    /* Define variable greeting of the type string */↵    string greeting;↵↵    /* This runs when the contract is executed */↵    function GreeterW(string _greeting) public {↵        greeting = _greeting;↵    }↵↵    /* Main function */↵    function greet(string _greeting) constant returns (string) {↵        return greeting;↵    }↵}↵"`;
+
+exports[`Lib: file parser import statements 1`] = `
+Array [
+  "main.sol",
+]
+`;

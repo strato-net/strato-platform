@@ -75,7 +75,7 @@ class Account extends Component {
   }
 }
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   const name = ownProps.name;
   const address = ownProps.address;
   const accounts = state.accounts.accounts;

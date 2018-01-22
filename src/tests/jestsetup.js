@@ -14,6 +14,8 @@ global.shallow = shallow;
 global.render = render;
 global.mount = mount;
 
+Object.values = (obj) => Object.keys(obj).map(key => obj[key])
+
 expect.extend({
   toBeType(received, argument) {
     const initialType = typeof received;
