@@ -1,2 +1,19 @@
 @import '../../node_modules/react-md/src/scss/react-md';
 @import '../../node_modules/react-md/dist/react-md.indigo-pink.min.css';
+@import '../../node_modules/react-md/src/scss/react-md';
+
+$md-primary-color: $md-blue-grey-900;
+$md-secondary-color: $md-blue-a-700;
+$md-footer-color: $md-blue-grey-800;
+
+@include react-md-everything;
+
+footer {
+  background: #263238 !important
+}
+
+body {
+  background: #37474f !important;
+  margin: 0
+}
+

@@ -1,34 +1,58 @@
 import React, { Component } from 'react';
-import { withRouter } from 'react-router-dom';
-import { connect } from 'react-redux';
-import { NavLink } from 'react-router-dom';
 import { BottomNavigation, FontIcon } from 'react-md';
-import { Button, DialogContainer, NavigationDrawer, SVGIcon } from 'react-md';
-// import menu from 'icons/menu.svg';
-// import arrowBack from 'icons/arrow_back.svg';
+import { Button, NavigationDrawer } from 'react-md';
+import DAppsStore from '../DAppsStore/index';
+import MyDApps from '../MyDApps/index';
+import Updates from '../Updates/index';
+import Search from '../Search/index';
 
 const links = [{
   label: 'My Dapps',
   icon: <FontIcon iconClassName="fa fa-th-large" />,
+  style: { color: 'white' }
 }, {
   label: 'Dapps Store',
   icon: <FontIcon iconClassName="fa fa-rocket" />,
+  style: { color: 'white' }
 }, {
   label: 'Updates',
   icon: <FontIcon iconClassName="fa fa-download" />,
+  style: { color: 'white' }
 }, {
   label: 'Search',
   icon: <FontIcon iconClassName="fa fa-search" />,
+  style: { color: 'white' }
 }];
 
 class Dashboard extends Component {
+  state = { title: links[0].label, children: <MyDApps /> };
+
+  handleNavChange = (activeIndex) => {
+    const title = links[activeIndex].label;
+    let children;
+    switch (activeIndex) {
+      case 1:
+        children = <DAppsStore key="favorites" />;
+        break;
+      case 2:
+        children = <Updates key="nearby" />;
+        break;
+      case 3:
+        children = <Search key="nearby" />;
+        break;
+      default:
+        children = <MyDApps key="recent" />;
+    }
+
+    this.setState({ title, children });
+  };
 
   navigate() {
     this.props.history.push('/login');
   }
 
   render() {
-    const { welcome } = this.props;
+    const { children } = this.state;
 
     return (
       <div>
@@ -43,11 +67,15 @@ class Dashboard extends Component {
             persistentIcon={<FontIcon>menu</FontIcon>}
             contentId="main-demo-content"
           >
-            <h1> Dashboard </h1>
+            {children}
 
           </NavigationDrawer>
         </div>
-        <BottomNavigation links={links} dynamic={false} />
+        <BottomNavigation
+          links={links}
+          dynamic={false}
+          onNavChange={this.handleNavChange}
+        />
       </div>
     );
   }

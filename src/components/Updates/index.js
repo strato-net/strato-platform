@@ -1,14 +1,15 @@
+
 import React, { Component } from 'react';
 
-class Login extends Component {
+class Updates extends Component {
 
   render() {
     return (
       <div>
-        <h1> Login </h1>
+        <h1> Updates </h1>
       </div>
     );
   }
 }
 
-export default Login;
+export default Updates;
