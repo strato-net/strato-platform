@@ -11,15 +11,19 @@ import { fork } from 'redux-saga/effects';
 import App from "./App/App";
 
 // Reducers
+import AppsReducer from './components/Apps/apps.reducer';
 
 // sagas
+import watchFetchApps from './components/Apps/apps.saga';
 
 const rootReducer = combineReducers({
+  apps: AppsReducer
 });
 
 // YOUR SAGAS HERE
 const rootSaga = function* startForeman() {
   yield all([
+    fork(watchFetchApps)
   ])
 };
 

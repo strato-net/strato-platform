@@ -1,8 +1,10 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 import { BottomNavigation, FontIcon } from 'react-md';
 import { Button, NavigationDrawer } from 'react-md';
 import DAppsStore from '../DAppsStore/index';
-import MyDApps from '../MyDApps/index';
+import Apps from '../Apps';
 import Updates from '../Updates/index';
 import Search from '../Search/index';
 
@@ -25,7 +27,7 @@ const links = [{
 }];
 
 class Dashboard extends Component {
-  state = { title: links[0].label, children: <MyDApps /> };
+  state = { title: links[0].label, children: <Apps /> };
 
   handleNavChange = (activeIndex) => {
     const title = links[activeIndex].label;
@@ -41,7 +43,7 @@ class Dashboard extends Component {
         children = <Search key="nearby" />;
         break;
       default:
-        children = <MyDApps key="recent" />;
+        children = <Apps key="recent" />;
     }
 
     this.setState({ title, children });
@@ -62,13 +64,12 @@ class Dashboard extends Component {
             mobileDrawerType={NavigationDrawer.DrawerTypes.TEMPORARY}
             tabletDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
             desktopDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
-            toolbarTitle="Hello, World!"
+            toolbarTitle="Dapps"
             toolbarActions={<Button icon onClick={this.navigate.bind(this)}><FontIcon iconClassName="fa fa-user-circle" /></Button>}
             persistentIcon={<FontIcon>menu</FontIcon>}
             contentId="main-demo-content"
           >
             {children}
-
           </NavigationDrawer>
         </div>
         <BottomNavigation
@@ -81,4 +82,8 @@ class Dashboard extends Component {
   }
 }
 
-export default Dashboard;
+export function mapStateToProps(state) {
+  return { apps: state.apps };
+}
+
+export default withRouter(connect(mapStateToProps, null)(Dashboard));

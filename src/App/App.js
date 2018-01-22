@@ -5,11 +5,9 @@ import './App.css';
 class App extends Component {
   render() {
     return (
-      <div className="App" >
-        <main id="outer-container">
-          {scenes}
-        </main>
-      </div>
+      <section>
+        {scenes}
+      </section>
     );
   }
 }
