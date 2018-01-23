@@ -24,20 +24,12 @@ import qualified Data.Map           as Map
 import qualified Data.Text          as T
 import qualified Prelude            as P
 
-import Blockchain.SHA
-import Blockchain.Data.Transaction
-
 blockIdRef :: (E.Esqueleto query expr backend) =>(expr (Entity BlockDataRef), expr (Entity Block))-> expr (E.Value Bool)
 blockIdRef (a, t) = (a E.^. BlockDataRefBlockId E.==. t E.^. BlockId)
 
 getBlockInfoR :: Handler Value
 getBlockInfoR = do
               getParameters <- reqGetParams <$> getRequest
-
-              appNameMaybe <- lookupGetParam "appname"
-              case appNameMaybe of
-                (Just t)  -> liftIO $ putStrLn $ t
-                (Nothing) -> liftIO $ putStrLn "anon"
 
               limit <- liftIO $ myFetchLimit
 
