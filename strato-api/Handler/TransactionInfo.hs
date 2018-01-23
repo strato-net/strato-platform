@@ -48,7 +48,6 @@ postTransactionR :: Handler ()
 postTransactionR = do
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
-
    tx <- parseJsonBody :: Handler (Result RawTransaction')
    case tx of
        (Success (RawTransaction' raw "")) -> do
@@ -61,7 +60,9 @@ postTransactionR = do
               $logDebug $ "Successfully inserted tx: " Import.++ (T.pack $ format $ transactionHash tx')
               sendResponseStatus status200 (h' :: Text)
             _ -> invalidArgs ["invalid transaction hash"]
-       _ -> invalidArgs ["couldn't decode transaction"]
+       err-> do
+          $logDebugS "transaction parse error" . T.pack . show $ err
+          invalidArgs ["couldn't decode transaction"]
 
 postTransactionListR :: Handler ()
 postTransactionListR = do
