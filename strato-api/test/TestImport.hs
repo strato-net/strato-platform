@@ -23,14 +23,6 @@ import qualified Blockchain.Data.DataDefs as DataDefs
 import qualified Blockchain.DB.SQLDB as SQL
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
 
--- instance MonadResource (YesodExample App) where
---   liftResourceT = error "stupid constraint"
-instance MonadResource IO where
-    liftResourceT = error "stupid constraint"
-
-instance MonadLogger (YesodExample App) where
-  monadLoggerLog = error "stupid constraint part deux"
-
 instance SQL.HasSQLDB (YesodExample App) where
   getSQLDB = appConnPool <$> getTestYesod
 
