@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module TestImport
     ( module TestImport
     , module XX
@@ -5,9 +7,11 @@ module TestImport
 
 import           Application           (makeFoundation, makeLogware)
 import           ClassyPrelude         as XX hiding (delete, deleteBy)
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Resource
 import           Database.Persist      as XX hiding (get)
 import           Database.Persist.Postgresql
-import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute, 
+import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute,
                                         rawSql, runSqlPersistMPool, unSingle, runMigration)
 import           Foundation            as XX hiding (Handler)
 import           Test.Hspec            as XX
@@ -16,7 +20,19 @@ import           Yesod.Test            as XX
 
 import qualified Blockchain.Data.Blockchain as DataBlock
 import qualified Blockchain.Data.DataDefs as DataDefs
+import qualified Blockchain.DB.SQLDB as SQL
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
+
+-- instance MonadResource (YesodExample App) where
+--   liftResourceT = error "stupid constraint"
+instance MonadResource IO where
+    liftResourceT = error "stupid constraint"
+
+instance MonadLogger (YesodExample App) where
+  monadLoggerLog = error "stupid constraint part deux"
+
+instance SQL.HasSQLDB (YesodExample App) where
+  getSQLDB = appConnPool <$> getTestYesod
 
 runDB :: SqlPersistM a -> YesodExample App a
 runDB query = do

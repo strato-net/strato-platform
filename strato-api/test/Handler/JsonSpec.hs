@@ -19,8 +19,10 @@ import           System.IO                  (IOMode (..), withFile)
 import           Yesod.Test
 import qualified Yesod.Test                 as YT
 
+import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
+import           Blockchain.SHA
 import           Handler.Common
 
 import           Blockchain.Data.Address
@@ -45,11 +47,15 @@ bodyContains' text = withResponse $ \ res ->
 -- testJSON f want = withResponse $ \res ->
 --   let bs = fromJust (decode (simpleBody res) :: Maybe [Block])
 --       (success, got) = f bs want
---   in liftIO $ HUnit.assertBool 
---       ("Compared JSON contents: " ++ show got ++ " and " ++ show want) 
+--   in liftIO $ HUnit.assertBool
+--       ("Compared JSON contents: " ++ show got ++ " and " ++ show want)
 --       success
 
---genesis = (decode "[{\"blockUncles\":[],\"receiptTransactions\":[],\"blockData\":{\"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\",\"extraData\":0,\"gasUsed\":0,\"gasLimit\":3141592,\"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\",\"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\",\"number\":0,\"difficulty\":131072,\"timestamp\":\"1970-01-01T00:00:00.000Z\",\"coinbase\":{\"address\":\"0\"},\"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"nonce\":42,\"stateRoot\":\"9178d0f23c965d81f0834a4c72c6253ce6830f4022b1359aaebfc1ecba442d4e\",\"transactionsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\"}}]" ) ::  Maybe [Block]
+bPrimeToB :: Block' -> Block
+bPrimeToB (Block' b _) = b
+
+genesisBlock :: [Block]
+genesisBlock = map bPrimeToB (fromMaybe [] ((decode "[{\"blockUncles\":[],\"receiptTransactions\":[],\"blockData\":{\"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\",\"extraData\":0,\"gasUsed\":0,\"gasLimit\":3141592,\"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\",\"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\",\"number\":0,\"difficulty\":131072,\"timestamp\":\"1970-01-01T00:00:00.000Z\",\"coinbase\":{\"address\":\"0\"},\"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"nonce\":42,\"stateRoot\":\"9178d0f23c965d81f0834a4c72c6253ce6830f4022b1359aaebfc1ecba442d4e\",\"transactionsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\"}}]" ) ::  Maybe [Block']) :: [Block'])
 
 checkKeyValue k v = withResponse $ \ SResponse { simpleHeaders = h } ->
                          liftIO $ HUnit.assertBool ("Value should be " ++ (show v)) $
@@ -86,7 +92,7 @@ spec = withApp $ do
       it "returns blocks" $ do
         YT.request $ do
           setUrl BlockInfoR
-          addGetParam "index" "0" 
+          addGetParam "index" "0"
         statusIs 200
         YT.request $ do
           setUrl BlockInfoR
@@ -108,6 +114,7 @@ spec = withApp $ do
     describe "JSON Query string" $ do
       describe "Blocks" $ do
         it "Genesis block" $ do
+          putBlocks [(SHA 0, 0)] genesisBlock False
           YT.request $ do
             setUrl BlockInfoR
             addGetParam "number" "0"
@@ -148,7 +155,7 @@ spec = withApp $ do
 
       it "Access pattern" $ do
         YT.request $ do
-          setUrl BlockInfoR    
+          setUrl BlockInfoR
           addGetParam "minnumber" "0"
           addGetParam "maxnumber" "50"
           addGetParam "index" "0"
@@ -159,7 +166,7 @@ spec = withApp $ do
           setUrl BlockInfoR
           addGetParam "minnumber" "0"
           addGetParam "maxnumber" "50"
-          addGetParam "index" "0"  
+          addGetParam "index" "0"
         checkKeyValue "Content-Type" "application/json; charset=utf-8"
     describe "Transaction endpoints" $ do
       it "Transaction from block" $ do

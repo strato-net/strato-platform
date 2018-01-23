@@ -164,6 +164,7 @@ test-suite test
                 TupleSections
 
     build-depends: base
+                 , blockapps-util
                  , strato-api
                  , yesod-test >= 1.4.3 && < 1.5.5
                  , yesod-core
