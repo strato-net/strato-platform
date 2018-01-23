@@ -58,7 +58,7 @@ import           Control.Monad.Trans.Resource
 
 import           Blockchain.Strato.Model.Class
 
-blk2BlkDataRef :: (HasSQLDB m, MonadResource m) =>
+blk2BlkDataRef :: (HasSQLDB m) =>
                   M.Map SHA Integer->(Block, SHA)->BlockId->Bool->m BlockDataRef
 blk2BlkDataRef dm (b, hash') blkId makeHashOne= do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
@@ -83,7 +83,7 @@ blk2BlkDataRef dm (b, hash') blkId makeHashOne= do
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
 
-getBlock::(HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
+getBlock::(HasSQLDB m)=>
           SHA->m (Maybe Block)
 getBlock h = do
   db <- getSQLDB
@@ -167,8 +167,7 @@ getDifficultyMap difficultyBase blocksAndHashes = do
          ) blocksAndHashes)
 
 
-putBlocks::(HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)=>
-           [(SHA, Integer)]->[Block]->Bool->m [(Key Block, Key BlockDataRef)]
+putBlocks::(HasSQLDB m)=> [(SHA, Integer)]->[Block]->Bool->m [(Key Block, Key BlockDataRef)]
 putBlocks difficultyBase blocks makeHashOne = do
   let blocksAndHashes = map (\b -> (b, blockHash b)) blocks
   dm <- getDifficultyMap difficultyBase blocksAndHashes
