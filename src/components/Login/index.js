@@ -4,9 +4,20 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Card, CardTitle, CardText, TextField, Media } from 'react-md';
 import './login.css';
+import { validateUser } from './login.action';
+import ReduxedTextField from '../ReduxedTextField'
 
 class Login extends Component {
+
+  submit = (values) => {
+    this.props.validateUser({ username: values.username, password: values.password });
+  }
+
   render() {
+    const {
+      handleSubmit
+    } = this.props;
+
     return (
       <section>
         <div className="md-grid">
@@ -15,7 +26,7 @@ class Login extends Component {
               <img src="img/user.png" alt="Login splash" />
             </div> */}
             <form
-              onChange={(e) => { }} //Detects the change in form fields
+              onSubmit={handleSubmit(this.submit)}
             >
               <div className="md-grid">
                 <Field
@@ -25,7 +36,7 @@ class Login extends Component {
                   placeholder="Username"
                   required
                   className="md-cell md-cell--12 md-cell--center"
-                  component={TextField} />
+                  component={ReduxedTextField} />
                 <Field
                   id="password"
                   name="password"
@@ -33,7 +44,7 @@ class Login extends Component {
                   placeholder="Password"
                   required
                   className="md-cell md-cell--12"
-                  component={TextField} />
+                  component={ReduxedTextField} />
                 <div className="md-cell md-cell--12" />
                 <div className="md-cell md-cell--12 md-text-center">
                   <Button raised secondary className="loginButton" label="Login" type="submit"
@@ -56,18 +67,13 @@ class Login extends Component {
 }
 
 export function validate(values) {
+  console.log(values)
   const errors = {};
   if (!values.username) {
     errors.username = "Username Required";
   }
   if (!values.password) {
     errors.password = "Password Required";
-  }
-  if (!values.confirm_password) {
-    errors.confirm_password = "Must Confirm Password";
-  }
-  if (values.password !== values.confirm_password) {
-    errors.confirm_password = "Passwords Do Not Match";
   }
   return errors;
 }
@@ -77,11 +83,11 @@ export function mapStateToProps(state) {
     state
   };
 }
-const formed = reduxForm({ form: 'login-user', validate })(Login);
+const formed = reduxForm({ form: 'login', validate })(Login);
 const connected = connect(
   mapStateToProps,
   {
-
+    validateUser
   }
 )(formed);
 

@@ -15,13 +15,12 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         userName: action.userName,
-        password: action.password,
-        result: 'Sending...',
+        result: 'Validating...',
       };
     case VALIDATE_USER_SUCCESS:
       return {
         ...state,
-        result: ['Send success\n' + JSON.stringify(action.result).replace(",", "\n")]
+        result: 'login success'
       };
     case VALIDATE_USER_FAILURE:
       return {

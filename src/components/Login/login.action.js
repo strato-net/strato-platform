@@ -3,6 +3,7 @@ export const VALIDATE_USER_SUCCESS = "VALIDATE_USER_SUCCESS";
 export const VALIDATE_USER_FAILURE = "VALIDATE_USER_FAILURE";
 
 export const validateUser = function(payload) {
+  console.log("payload",payload)
   return {
     ...payload,
     type : VALIDATE_USER_REQUEST,

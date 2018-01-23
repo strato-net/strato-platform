@@ -9,9 +9,10 @@ import {
   validateUserFailure
 } from './login.action';
 
-import { env } from '../../../../env';
+import { env } from '../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/send?resolve"
+const userAddressURL = env.BLOC_URL + "/users/:user"
 
 export function validateUserAPICall(from, fromAddress, toAddress, value, password) {
   return fetch(
@@ -25,7 +26,33 @@ export function validateUserAPICall(from, fromAddress, toAddress, value, passwor
     }
   )
     .then(function (response) {
-      return response.json();
+      if (response.ok) {
+        return response.json();
+      } else {
+          throw response;
+      }
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
+export function userAddressAPICall(username) {
+  return fetch(
+    userAddressURL.replace(":user", username),
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    }
+  )
+    .then(function (response) {
+      if (response.ok) {
+        return response.json();
+      } else {
+          throw response.json();
+      }
     })
     .catch(function (error) {
       throw error;
@@ -34,12 +61,13 @@ export function validateUserAPICall(from, fromAddress, toAddress, value, passwor
 
 export function* validateUser(action) {
   try {
+    let addresses = yield call(userAddressAPICall, action.username)
     let response = yield call(
       validateUserAPICall,
       action.username,
-      action.fromAddress,
-      action.toAddress,
-      action.value,
+      addresses[0],
+      addresses[0],
+      0,
       action.password
     );
     yield put(validateUserSuccess(response));
