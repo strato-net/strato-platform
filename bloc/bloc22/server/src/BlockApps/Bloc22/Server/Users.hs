@@ -484,16 +484,16 @@ prepareSignedTx
   -> PostTransaction
 prepareSignedTx sk addr unsignedTx = PostTransaction
   { posttransactionHash = kecc
-  , posttransactionGasLimit = Strung $ fromIntegral gasLimit
+  , posttransactionGasLimit = fromIntegral gasLimit
   , posttransactionCodeOrData = code
-  , posttransactionGasPrice = Strung $ fromIntegral gasPrice
+  , posttransactionGasPrice = fromIntegral gasPrice
   , posttransactionTo = toAddr
   , posttransactionFrom = addr
   , posttransactionValue = Strung $ fromIntegral value
   , posttransactionR = Hex $ fromIntegral r
   , posttransactionS = Hex $ fromIntegral s
   , posttransactionV = Hex v
-  , posttransactionNonce = Strung $ fromIntegral nonce'
+  , posttransactionNonce = fromIntegral nonce'
   }
   where
     tx = signTransaction sk unsignedTx
