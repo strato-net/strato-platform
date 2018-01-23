@@ -15,22 +15,26 @@ import { reducer as formReducer } from 'redux-form';
 // Reducers
 import AppsReducer from './components/Apps/apps.reducer';
 import loginReducer from './components/Login/login.reducer';
+import registerReducer from './components/Register/register.reducer';
 
 // sagas
 import watchFetchApps from './components/Apps/apps.saga';
 import watchValidateUser from './components/Login/login.saga';
+import watchCreateUser from './components/Register/register.saga';
 
 const rootReducer = combineReducers({
  form: formReducer,
  apps: AppsReducer,
- login: loginReducer
+ login: loginReducer,
+ register: registerReducer
 });
 
 // YOUR SAGAS HERE
 const rootSaga = function* startForeman() {
  yield all([
    fork(watchFetchApps),
-   fork(watchValidateUser)
+   fork(watchValidateUser),
+   fork(watchCreateUser)
  ])
 };
 

@@ -50,7 +50,8 @@ class Dashboard extends Component {
   };
 
   navigate() {
-    this.props.history.push('/login');
+    let { register, history } = this.props;
+    register.username ? history.push('/profile') : history.push('/login');
   }
 
   render() {
@@ -60,7 +61,6 @@ class Dashboard extends Component {
       <div>
         <div>
           <NavigationDrawer
-            navItems={['red']}
             mobileDrawerType={NavigationDrawer.DrawerTypes.TEMPORARY}
             tabletDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
             desktopDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
@@ -83,7 +83,10 @@ class Dashboard extends Component {
 }
 
 export function mapStateToProps(state) {
-  return { apps: state.apps };
+  return { 
+    apps: state.apps,
+    register: state.register
+  };
 }
 
 export default withRouter(connect(mapStateToProps, null)(Dashboard));

@@ -1,64 +1,74 @@
 import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
-import { Button, Card, CardTitle, CardText, TextField, Media } from 'react-md';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
+import { Button, Card } from 'react-md';
+import ReduxedTextField from '../../components/ReduxedTextField';
+import { createUser } from './register.actions';
 import './Register.css';
 
 class Register extends Component {
+
+  submit = (values) => {
+    this.props.createUser(values.username, values.password);
+  }
 
   render() {
     return (
       <section>
         <div className="md-grid">
-        <Card className="md-block-centered content">
-          {/* <div className="md-cell md-cell--12 md-text-center">
+          <Card className="md-block-centered content">
+            <div className="md-cell md-cell--12 md-text-center">
               <img src="img/user.png" alt="Login splash" />
-             </div> */}
-              <form  
-              onChange={(e)=>{}} //Detects the change in form fields
-              >
-                <div className="md-grid">
-                  <Field
-                    id="username"
-                    name="username"
-                    type="text"
-                    placeholder="Username"
-                    required
-                    className="md-cell md-cell--12 md-cell--center"
-                    component={TextField} />
-                  <Field
-                    id="password"
-                    name="password"
-                    type="text"
-                    placeholder="Password"
-                    required
-                    className="md-cell md-cell--12"
-                    component={TextField} />
-                   <Field
-                    id="confirmpassword"
-                    name="confirmpassword"
-                    placeholder="Confirm password"
-                    type="text"
-                    required
-                    className="md-cell md-cell--12"
-                    component={TextField} />            
-                  <div className="md-cell md-cell--12" />
-                  <div className="md-cell md-cell--12 md-text-center">
-                    <Button raised secondary className="loginButton" label="create account" type="submit" 
-                    />
-                  </div>
+            </div>
+            <form>
+              <div className="md-grid">
+                <Field
+                  name="username"
+                  component={ReduxedTextField}
+                  type="text"
+                  placeholder="Username"
+                  id="username"
+                  className="md-cell md-cell--12 md-cell--center"
+                  tabIndex="1"
+                  required
+                />
+                <Field
+                  name="password"
+                  component={ReduxedTextField}
+                  type="password"
+                  placeholder="Password"
+                  id="password"
+                  className="md-cell md-cell--12"
+                  tabIndex="2"
+                  required
+                />
+                <Field
+                  name="confirm_password"
+                  component={ReduxedTextField}
+                  type="password"
+                  placeholder="Confirm Password"
+                  id="confirm_password"
+                  className="md-cell md-cell--12"
+                  tabIndex="3"
+                  required
+                />
+                <div className="md-cell md-cell--12" />
+                <div className="md-cell md-cell--12 md-text-center">
+                  <Button raised secondary className="loginButton" type="submit" onClick={this.props.handleSubmit(this.submit)}>
+                    create account
+                  </Button>
                 </div>
-              </form>
-          
-                    </Card>
+              </div>
+            </form>
+          </Card>
         </div>
       </section>
     );
   }
 }
 
-export function validate (values) {
+export function validate(values) {
   const errors = {};
   if (!values.username) {
     errors.username = "Username Required";
@@ -77,14 +87,14 @@ export function validate (values) {
 
 export function mapStateToProps(state) {
   return {
-   state
+
   };
 }
-const formed = reduxForm({ form: 'login-user', validate })(Register);
+const formed = reduxForm({ form: 'create-user', validate })(Register);
 const connected = connect(
   mapStateToProps,
   {
-    
+    createUser
   }
 )(formed);
 

@@ -40,7 +40,7 @@ class Login extends Component {
                 <Field
                   id="password"
                   name="password"
-                  type="text"
+                  type="password"
                   placeholder="Password"
                   required
                   className="md-cell md-cell--12"
