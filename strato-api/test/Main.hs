@@ -1,12 +1,14 @@
 module Main where
 
-
-import           Data.Maybe
-import           Hspec.Formatters.Blaze (blazeFormatter)
-import           System.IO
+import           Prelude
 import           Test.Hspec.Runner
 
+import Debug.Trace
 import qualified Spec
 
+predicate :: Path -> Bool
+predicate x@("Handler.Json":"JSON Query string":_, _)= trace (show x) True
+predicate _ = False
+
 main :: IO ()
-main = hspecWith defaultConfig {configFormatter = Just (blazeFormatter "static/css/bootstrap.css")} Spec.spec
+main = hspecWith (configAddFilter predicate defaultConfig) $ Spec.spec
