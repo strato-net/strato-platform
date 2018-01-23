@@ -56,7 +56,7 @@ describe('Throughput - upload', function () {
     while (!countMatch) {
       console.log(`Checking count ${countCheck++}`);
       countMatch = yield checkCounts();
-      yield promiseTimeout(100);
+      yield promiseTimeout(300);
     }
 
     const secondsToRemove = 0; // bEndTime.diff(bStartTime, 'seconds');

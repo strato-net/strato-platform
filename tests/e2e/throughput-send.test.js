@@ -45,7 +45,7 @@ describe('Throughput - send', function () {
     while (!balancesMatch) {
       console.log(`Checking balances ${balanceCheck++}`);
       balancesMatch = yield checkBalances(userPairs);
-      yield promiseTimeout(100);
+      yield promiseTimeout(300);
     }
 
     const endTime = moment();

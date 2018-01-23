@@ -52,7 +52,7 @@ describe('Throughput - fx call', function () {
     while (!statesMatch) {
       console.log(`Checking balances ${stateCheck++}`);
       statesMatch = yield checkStates();
-      yield promiseTimeout(100);
+      yield promiseTimeout(300);
     }
 
     const endTime = moment();
