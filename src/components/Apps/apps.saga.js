@@ -8,10 +8,9 @@ import {
   fetchAppsFailure,
   FETCH_APPS
 } from './apps.actions';
-// import { env } from '../../env';
+import { env } from '../../env';
 
-// const applicationsUrl = env.CIRRUS_URL + '/AppMetadata';
-const applicationsUrl = 'http://localhost/cirrus/search/AppMetadata';
+const applicationsUrl = env.CIRRUS_URL + '/AppMetadata';
 
 const applicationData = [{
   "address": "38a757f8a75453346dcb8149d52df09549f25562",
@@ -41,7 +40,7 @@ const applicationData = [{
   "version": "0.1.1",
   "host": "stratodev.blockapps.net",
   "description": "This apps demonstrates how to create a DApp using the STRATO platform"
-}]
+}];
 
 export function getApps() {
   return fetch(
