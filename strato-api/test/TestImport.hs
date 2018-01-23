@@ -12,7 +12,7 @@ import           Control.Monad.Trans.Resource
 import           Database.Persist      as XX hiding (get)
 import           Database.Persist.Postgresql
 import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute,
-                                        rawSql, runSqlPersistMPool, unSingle, runMigration)
+                                        rawSql, runSqlPersistMPool, unSingle, runMigrationSilent)
 import           Foundation            as XX hiding (Handler)
 import           Test.Hspec            as XX
 import           Yesod.Default.Config2 (ignoreEnv, loadYamlSettings)
@@ -62,9 +62,10 @@ wipeDB app = do
             query = "TRUNCATE TABLE " ++ (intercalate ", " escapedTables)
         rawExecute query []
 
-        runMigration DataBlock.migrateAll
-        runMigration DataDefs.migrateAll
-        runMigration DataPeer.migrateAll
+        _ <- runMigrationSilent DataBlock.migrateAll
+        _ <- runMigrationSilent DataDefs.migrateAll
+        _ <- runMigrationSilent DataPeer.migrateAll
+        return ()
 
 getTables :: MonadIO m => ReaderT SqlBackend m [Text]
 getTables = do
