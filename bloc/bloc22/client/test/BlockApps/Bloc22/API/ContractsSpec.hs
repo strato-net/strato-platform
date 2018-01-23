@@ -47,14 +47,8 @@ spec = do
         )
         (ClientEnv mgr blocUrl)
       contractsEither `shouldSatisfy` isRight
-    -- it "should also work when mappings are involved" $ \ TestConfig {..} -> do
-    --   contractsEither <- runClientM
-    --     (getContractsContract
-    --       (ContractName testContractName)
-    --       (Unnamed testContractAddress)
-    --     )
-    --     (ClientEnv mgr blocUrl)
-    --   contractsEither `shouldSatisfy` isRight
+    it "should also work when mappings are involved" $ \ TestConfig {..} -> do
+      pendingWith "Mappings not implemented for Contract Metadata"
   describe "getContractsFunctions" $
     it "get a list of contract functions for an uploaded contract at a specific address" $ \ TestConfig {..} -> do
       Right functionNames <- runClientM
