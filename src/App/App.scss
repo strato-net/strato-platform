@@ -5,6 +5,7 @@
 $md-primary-color: $md-blue-grey-900;
 $md-secondary-color: $md-blue-a-700;
 $md-footer-color: $md-blue-grey-800;
+$md-light-blue: $md-light-blue-400;
 
 @include react-md-everything;
 
@@ -15,5 +16,9 @@ footer {
 body {
   background: #37474f !important;
   margin: 0
+}
+
+div {
+  color: white
 }
 
