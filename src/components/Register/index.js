@@ -1,11 +1,12 @@
 import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import { withRouter, Redirect } from 'react-router-dom';
 import { Button, Card } from 'react-md';
 import ReduxedTextField from '../../components/ReduxedTextField';
 import { createUser } from './register.actions';
 import './Register.css';
+import { env } from '../../env'
 
 class Register extends Component {
 
@@ -14,6 +15,15 @@ class Register extends Component {
   }
 
   render() {
+    const { from } = this.props.location.state || { from: { pathname: '/' } }
+    const { redirectToReferrer } = this.props.register
+    if (redirectToReferrer) {
+      if (this.props.app) {
+        window.open(env.LOCAL_URL + this.props.app['url'], "_blank")
+      }
+      return (<Redirect to={from} />)
+    }
+
     return (
       <section>
         <div className="md-grid">
@@ -87,7 +97,8 @@ export function validate(values) {
 
 export function mapStateToProps(state) {
   return {
-
+    register: state.register,
+    app: state.apps.selectedApp,
   };
 }
 const formed = reduxForm({ form: 'create-user', validate })(Register);

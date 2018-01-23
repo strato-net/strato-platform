@@ -29,7 +29,7 @@ export function validateUserAPICall(from, fromAddress, toAddress, value, passwor
       if (response.ok) {
         return response.json();
       } else {
-          throw response;
+        throw response;
       }
     })
     .catch(function (error) {
@@ -51,7 +51,7 @@ export function userAddressAPICall(username) {
       if (response.ok) {
         return response.json();
       } else {
-          throw response.json();
+        throw response.json();
       }
     })
     .catch(function (error) {
@@ -70,7 +70,7 @@ export function* validateUser(action) {
       0,
       action.password
     );
-    yield put(validateUserSuccess(response));
+    yield put(validateUserSuccess(response, action.username, addresses[0]));
   }
   catch (err) {
     yield put(validateUserFailure(err));

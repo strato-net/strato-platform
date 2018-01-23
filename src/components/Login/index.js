@@ -1,22 +1,33 @@
 import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
+import { withRouter, Redirect } from 'react-router-dom';
 import { Button, Card, CardTitle, CardText, TextField, Media } from 'react-md';
 import './login.css';
 import { validateUser } from './login.action';
-import ReduxedTextField from '../ReduxedTextField'
+import ReduxedTextField from '../ReduxedTextField';
+import { env } from '../../env'
 
 class Login extends Component {
 
   submit = (values) => {
     this.props.validateUser({ username: values.username, password: values.password });
+    this.setState({ redirectToReferrer: true })
   }
 
   render() {
+    const { from } = this.props.location.state || { from: { pathname: '/' } }
     const {
       handleSubmit
     } = this.props;
+    const { redirectToReferrer } = this.props.login
+
+    if (redirectToReferrer) {
+      if (this.props.app) {
+        window.open(env.LOCAL_URL + this.props.app['url'], "_blank")
+      }
+      return (<Redirect to={from} />)
+    }
 
     return (
       <section>
@@ -67,7 +78,6 @@ class Login extends Component {
 }
 
 export function validate(values) {
-  console.log(values)
   const errors = {};
   if (!values.username) {
     errors.username = "Username Required";
@@ -80,7 +90,9 @@ export function validate(values) {
 
 export function mapStateToProps(state) {
   return {
-    state
+    login: state.login,
+    app: state.apps.selectedApp,
+
   };
 }
 const formed = reduxForm({ form: 'login', validate })(Login);

@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { fetchApps } from './apps.actions';
+import { fetchApps, selectApp } from './apps.actions';
 import {
   Button,
   Card,
@@ -17,7 +17,9 @@ class Apps extends Component {
   }
 
   launchApp(url) {
-    this.props.register.username ? window.open(env.LOCAL_URL + url, "_blank") : this.props.history.push('/login');
+    const user = localStorage.getItem('user')
+    const data = JSON.parse(user)
+    data && data.username ? window.open(env.LOCAL_URL + url, "_blank") : this.props.history.push('/login');
   }
 
   render() {
@@ -39,7 +41,10 @@ class Apps extends Component {
                       <div className="app-name">
                         <b><h3>{app['appName']}</h3></b>
                       </div>
-                      <Button flat onClick={() => this.launchApp(app['url'])}>GET</Button>
+                      <Button flat onClick={() => {
+                        this.props.selectApp(app)
+                        this.launchApp(app['url'])
+                      }}>GET</Button>
                     </div>
                     <hr />
                     <div className="md-grid no-padding">
@@ -61,8 +66,7 @@ class Apps extends Component {
 export function mapStateToProps(state) {
   return {
     apps: state.apps.apps,
-    register: state.register
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchApps })(Apps));
+export default withRouter(connect(mapStateToProps, { fetchApps, selectApp })(Apps));

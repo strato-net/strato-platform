@@ -50,8 +50,11 @@ class Dashboard extends Component {
   };
 
   navigate() {
-    let { register, history } = this.props;
-    register.username ? history.push('/profile') : history.push('/login');
+    const user = localStorage.getItem('user')
+    const data = JSON.parse(user)
+
+    let { history } = this.props;
+    data && data.username ? history.push('/profile') : history.push('/login');
   }
 
   render() {
@@ -83,9 +86,8 @@ class Dashboard extends Component {
 }
 
 export function mapStateToProps(state) {
-  return { 
+  return {
     apps: state.apps,
-    register: state.register
   };
 }
 
