@@ -2,17 +2,17 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter, Redirect } from 'react-router-dom';
-import { Button, Card, CardTitle, CardText, TextField, Media } from 'react-md';
-import './login.css';
+import { Button, Card } from 'react-md';
 import { validateUser } from './login.action';
 import ReduxedTextField from '../ReduxedTextField';
+import './login.css';
 import { env } from '../../env'
 
 class Login extends Component {
 
   submit = (values) => {
     this.props.validateUser({ username: values.username, password: values.password });
-    this.setState({ redirectToReferrer: true })
+    this.setState({ redirectToReferrer: true });
   }
 
   render() {
@@ -29,13 +29,11 @@ class Login extends Component {
       return (<Redirect to={from} />)
     }
 
+
     return (
       <section>
         <div className="md-grid">
           <Card className="md-block-centered content">
-            {/* <div className="md-cell md-cell--12 md-text-center">
-              <img src="img/user.png" alt="Login splash" />
-            </div> */}
             <form
               onSubmit={handleSubmit(this.submit)}
             >
@@ -58,8 +56,7 @@ class Login extends Component {
                   component={ReduxedTextField} />
                 <div className="md-cell md-cell--12" />
                 <div className="md-cell md-cell--12 md-text-center">
-                  <Button raised secondary className="loginButton" label="Login" type="submit"
-                  />
+                  <Button raised secondary className="loginButton" type="submit"> Login </Button>
                 </div>
               </div>
             </form>
@@ -79,12 +76,21 @@ class Login extends Component {
 
 export function validate(values) {
   const errors = {};
+  let reg = /^.{9,19}$/;
+
   if (!values.username) {
     errors.username = "Username Required";
+  }
+  if (!reg.test(values.username)) {
+    errors.username = "Username must be at least 10 characters and less than 20 characters";
   }
   if (!values.password) {
     errors.password = "Password Required";
   }
+  if (!reg.test(values.password)) {
+    errors.password = "Password must be at least 10 characters and less than 20 characters";
+  }
+
   return errors;
 }
 

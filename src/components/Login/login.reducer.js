@@ -1,5 +1,4 @@
 import {
-  VALIDATE_USER_REQUEST,
   VALIDATE_USER_SUCCESS,
   VALIDATE_USER_FAILURE
 } from './login.action';

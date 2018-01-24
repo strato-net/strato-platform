@@ -1,5 +1,4 @@
 import {
-  CREATE_USER_REQUEST,
   CREATE_USER_FAILURE,
   CREATE_USER_SUCCESS,
 } from './register.actions';

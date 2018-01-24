@@ -80,11 +80,19 @@ class Register extends Component {
 
 export function validate(values) {
   const errors = {};
+  let reg = /^.{9,19}$/;
+
   if (!values.username) {
     errors.username = "Username Required";
   }
+  if (!reg.test(values.username)) {
+    errors.username = "Username must be at least 10 characters and less than 20 characters";
+  }
   if (!values.password) {
     errors.password = "Password Required";
+  }
+  if (!reg.test(values.password)) {
+    errors.password = "Password must be at least 10 characters and less than 20 characters";
   }
   if (!values.confirm_password) {
     errors.confirm_password = "Must Confirm Password";
@@ -92,6 +100,7 @@ export function validate(values) {
   if (values.password !== values.confirm_password) {
     errors.confirm_password = "Passwords Do Not Match";
   }
+
   return errors;
 }
 
