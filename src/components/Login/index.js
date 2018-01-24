@@ -1,3 +1,4 @@
+import './login.css'
 import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -5,7 +6,7 @@ import { withRouter, Redirect } from 'react-router-dom';
 import { Button, Card, Snackbar } from 'react-md';
 import { validateUser, resetLoginMessage, resetRedirectRefer } from './login.action';
 import ReduxedTextField from '../ReduxedTextField';
-import { env } from '../../env'
+import { env } from '../../env';
 
 class Login extends Component {
 
@@ -34,7 +35,10 @@ class Login extends Component {
     return (
       <section>
         <div className="md-grid">
-          <Card className="md-block-centered content">
+          <Card className="md-block-centered content login-box">
+            <div className="md-cell md-cell--12 md-text-center">
+              <img src="img/user.png" alt="Login splash" />
+            </div>
             <form
               onSubmit={handleSubmit(this.submit)}
             >
@@ -61,7 +65,7 @@ class Login extends Component {
                 </div>
               </div>
             </form>
-            <div className="md-cell md-cell--12 md-text-center">
+            <div className="md-cell md-cell--12 md-text-center msg-login">
               To use DApps on STRATO Public you need to create an account, please sign up here:
                 </div>
             <div className="md-cell md-cell--12 md-text-center">

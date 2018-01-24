@@ -26,7 +26,7 @@ class Profile extends Component {
     return (
       <section>
         <div className="md-grid">
-          <Card className="md-block-centered content">
+          <Card className="md-block-centered content profile-box">
             <div className="md-grid">
               <h1 className="md-cell--12 md-text-center">
                 User Profile
