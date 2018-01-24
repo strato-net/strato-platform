@@ -16,7 +16,6 @@ import           Data.Time
 import           Data.Word
 
 import           Blockchain.Data.Address
---import Blockchain.MiscJSON
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.SHA
 
