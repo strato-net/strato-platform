@@ -7,10 +7,7 @@ module TestImport
 
 import           Application           (makeFoundation, makeLogware)
 import           ClassyPrelude         as XX hiding (delete, deleteBy)
-import           Control.Monad.Logger
-import           Control.Monad.Trans.Resource
 import           Database.Persist      as XX hiding (get)
-import           Database.Persist.Postgresql
 import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute,
                                         rawSql, runSqlPersistMPool, unSingle, runMigrationSilent)
 import           Foundation            as XX hiding (Handler)

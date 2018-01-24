@@ -111,6 +111,9 @@ rtToRtPrime (s, x) = RawTransaction' x s
 rtToRtPrime' :: RawTransaction -> RawTransaction'
 rtToRtPrime' x = RawTransaction' x ""
 
+rtPrimeToRt :: RawTransaction' -> RawTransaction
+rtPrimeToRt (RawTransaction' x _) = x
+
 data Transaction' = Transaction' Transaction deriving (Eq, Show)
 
 instance ToJSON Transaction' where
@@ -182,6 +185,9 @@ bToBPrime (s, x) = Block' x s
 
 bToBPrime' :: Block -> Block'
 bToBPrime' x = Block' x ""
+
+bPrimeToB :: Block' -> Block
+bPrimeToB (Block' x _) = x
 
 data BlockData' = BlockData' BlockData deriving (Eq, Show)
 

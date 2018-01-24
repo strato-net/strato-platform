@@ -3,12 +3,11 @@ module Main where
 import           Prelude
 import           Test.Hspec.Runner
 
-import Debug.Trace
 import qualified Spec
 
+-- Used to filter which tests are being run
 predicate :: Path -> Bool
-predicate x@("Handler.Json":"JSON Query string":_, _)= trace (show x) True
-predicate _ = False
+predicate _ = True
 
 main :: IO ()
 main = hspecWith (configAddFilter predicate defaultConfig) $ Spec.spec

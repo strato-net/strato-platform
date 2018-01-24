@@ -6,45 +6,43 @@ import           TestImport
 
 import           Network.Wai.Test
 import qualified Test.HUnit                 as HUnit
+import           Test.QuickCheck.Arbitrary
+import           Test.QuickCheck.Gen
 
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as BSL8
+import           Data.CaseInsensitive       (CI)
 import qualified Data.List                  as DL
 import           Data.Maybe
 import qualified Data.Text.Lazy             as TL
 
-import           Yesod.Test
 import qualified Yesod.Test                 as YT
 
+import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
 import           Blockchain.DB.SQLDB
 import           Blockchain.SHA
 
-import           Blockchain.Data.Address
 import           Handler.Filters
 
-contains  ::  BSL8.ByteString -> String -> Bool
+contains :: BSL8.ByteString -> String -> Bool
 contains a b = DL.isInfixOf b (TL.unpack $ decodeUtf8 a)
 
-bodyContains'  ::  String -> YesodExample site ()
+bodyContains' :: String -> YesodExample site ()
 bodyContains' needle = withResponse $ \ res ->
   let haystack = simpleBody res
   in liftIO $ HUnit.assertBool ("Expected body " ++ show haystack ++ " to contain " ++ needle) $ haystack `contains` needle
 
-testJSON  ::  (Show a, Eq a) => ([Block] -> a -> (Bool, a)) -> a -> YesodExample site ()
+testJSON  ::  (Show a, Eq a) => (a -> [Block] -> (Bool, a)) -> a -> YesodExample site ()
 testJSON f want = withResponse $ \res ->
-  let bps = eitherDecode (simpleBody res) :: Either String [Block']
-      extract (Right bps) = map bPrimeToB bps
+  let extract (Right bs) = map bPrimeToB bs
       extract (Left err) = error err
-      (success, got) = f (extract bps) want
+      (success, got) = f want . extract . eitherDecode . simpleBody $ res
   in liftIO $ HUnit.assertBool
       ("Compared JSON contents: " ++ show got ++ " and " ++ show want)
       success
-
-bPrimeToB :: Block' -> Block
-bPrimeToB (Block' b _) = b
 
 eitherGenesis :: Either String [Block]
 eitherGenesis = map bPrimeToB <$> (eitherDecode "[{\"blockUncles\":[],\"receiptTransactions\":[],\"blockData\":{\"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\",\"extraData\":0,\"gasUsed\":0,\"gasLimit\":3141592,\"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\",\"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\",\"number\":0,\"difficulty\":131072,\"timestamp\":\"1970-01-01T00:00:00.000Z\",\"coinbase\":\"0\",\"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"nonce\":42,\"stateRoot\":\"9178d0f23c965d81f0834a4c72c6253ce6830f4022b1359aaebfc1ecba442d4e\",\"transactionsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\"}, \"next\": \"/\"}]" ::  Either String [Block'])
@@ -55,32 +53,48 @@ genesisBlock = case eitherGenesis of
     Right [] -> error "no block"
     Right (b:_) -> b
 
+checkKeyValue :: CI ByteString -> ByteString -> YT.YesodExample site ()
 checkKeyValue k v = withResponse $ \ SResponse { simpleHeaders = h } ->
                          liftIO $ HUnit.assertBool ("Value should be " ++ (show v)) $
                          fromJust (lookup k h) == v
 
+getLengthOfBlocks  :: Integer -> [a] -> (Bool, Integer)
+getLengthOfBlocks n x = ((length x) == fromIntegral n, fromIntegral $ length x)
 
-getSR ::  Block -> String
-getSR (Block (BlockData _ph _uh cb@(Address a) sr tr rr lb d num gl gu ts ed non mh) rt bu) = show sr
+mapFirstOnData  ::  (Eq b) => (a -> b) -> b -> [a] -> (Bool, b)
+mapFirstOnData f n (x:_) = (f x == n, f x)
+mapFirstOnData _ _ [] = error "need a nonempty list"
 
-getLengthOfBlocks  ::  [a] -> Integer -> (Bool, Integer)
-getLengthOfBlocks x n = ((length x) == fromIntegral n, fromIntegral $ length x)
-
-mapOnData  ::  (Eq b) => (a -> b) -> [a] -> b -> (Bool, b)
-mapOnData f (x:xs) n = (f x == n, f x)
-
-mapFirstOnData  ::  (Eq b) => (a -> b) -> [a] -> b -> (Bool, b)
-mapFirstOnData f (x:xs) n = (f x == n, f x)
-
-getFirstBlockSR = mapFirstOnData getSR
+getFirstBlockNum :: Integer -> [Block] ->  (Bool, Integer)
 getFirstBlockNum = mapFirstOnData getBlockNum
-getFirstTxNum :: [RawTransaction] -> Int -> (Bool, Int)
-getFirstTxNum = mapFirstOnData getTxNum
-getLastBlockNum :: [Block] -> Integer -> (Bool, Integer)
-getLastBlockNum x n = getFirstBlockNum (reverse x) n
 
-readBlocks :: (HasSQLDB m) => m [Block]
-readBlocks = undefined
+getFirstTxNum :: Int -> [RawTransaction] -> (Bool, Int)
+getFirstTxNum = mapFirstOnData getTxNum
+
+-- We expect the randomly generated blocks to be inserted in ascending order
+setNum :: Integer -> Block -> Block
+setNum n b = let bd = blockBlockData b
+             in b { blockBlockData = bd { blockDataNumber = n} }
+
+insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [(Key Block, Key BlockDataRef)]
+insertRandomBlocks start size = do
+        blocks <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Block)
+        let numberedBlocks = zipWith setNum [start..] blocks
+        -- let difficulties = [(SHA . fromIntegral $ i, fromIntegral i) | i <- [1..size]]
+        let difficulties = map (\b -> (blockDataParentHash . blockBlockData $ b, 10)) numberedBlocks
+        putBlocks difficulties numberedBlocks False
+
+-- missing hash in difficulty map in addDifficulties: 6924549d6d290bee3ad0df9cf4e85e939b23d1ab0ff3071b436664c3c716fd41,
+--                                               hash=00ec2b902c2036b72d4b13995e82296567e322f06db4b96e7d143ec263189859
+-- addDifficulties -> Map -> [(SHA, Int, SHA)] -> Map
+-- fails `third tuple` is not a member of the map
+-- Where does it come from?
+-- getDifficultyMap:
+-- (x, y) -> (y, blockDataDifficulty $ blockBlockData x, blockDataParentHash $ blockBlockData x)
+-- the parent hashes are coming from the random blocks
+--
+equiv :: (Show a, Eq a) => a -> a -> YesodExample App ()
+equiv x y = liftIO $ x `shouldBe` y
 
 spec  ::  Spec
 spec = withApp $ do
@@ -105,7 +119,7 @@ spec = withApp $ do
         statusIs 200
 
     describe "Account endpoints" $ do
-      it "First account" $ do
+      xit "First account" $ do
         YT.request $ do
           setUrl AccountInfoR
           addGetParam "address" "1c11aa45c792e202e9ffdc2f12f99d0d209bef70"
@@ -116,20 +130,25 @@ spec = withApp $ do
     describe "JSON Query string" $ do
       describe "Blocks" $ do
         it "Genesis block" $ do
-          keys <- putBlocks [(SHA 0, 0)] [genesisBlock] False
-          liftIO $ length keys `shouldBe` 1
+          blockKeys <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+          length blockKeys `equiv` 1
           YT.request $ do
             setUrl BlockInfoR
             addGetParam "index" "0"
           statusIs 200
           bodyContains' "9178d0f23c965d81f0834a4c72c6253ce6830f4022b1359aaebfc1ecba442d4e"
       it "Indexing" $ do
+        _ <- putBlocks [(SHA 0, 0)] [genesisBlock] False
+        _ <- insertRandomBlocks 1 10
+        bs <- getBlocks
+        let nums = map (blockDataNumber . blockBlockData) bs
+        (sort nums) `equiv` [0..10]
         YT.request $ do
           setUrl BlockInfoR
-          addGetParam "maxnumber" "100"
-          addGetParam "index" "51"
+          addGetParam "maxnumber" "5"
+          addGetParam "index" "0"
         statusIs 200
-        testJSON getLengthOfBlocks 50
+        testJSON getLengthOfBlocks 6
       it "Indexing empty" $ do
         YT.request $ do
           setUrl BlockInfoR
@@ -138,6 +157,7 @@ spec = withApp $ do
         statusIs 200
         testJSON getLengthOfBlocks 0
       it "First block through inequalities" $ do
+        _ <- insertRandomBlocks 0 10
         YT.request $ do
           setUrl BlockInfoR
           addGetParam "maxnumber" "0"
@@ -146,13 +166,14 @@ spec = withApp $ do
         testJSON getLengthOfBlocks 1
         testJSON getFirstBlockNum 0
 
-      it "First 100 blocks through inequalities" $ do
+      it "First 10 blocks through inequalities" $ do
+        _ <- insertRandomBlocks 0 14
         YT.request $ do
           setUrl BlockInfoR
-          addGetParam "maxnumber" "100"
+          addGetParam "maxnumber" "9"
           addGetParam "minnumber" "0"
         statusIs 200
-        testJSON getLengthOfBlocks 100
+        testJSON getLengthOfBlocks 10
         testJSON getFirstBlockNum 0
 
       it "Access pattern" $ do
@@ -176,41 +197,57 @@ spec = withApp $ do
           setUrl TransactionR
           addGetParam "blocknumber" "0"
         statusIs 200
-    -- describe "Complicated endpoints" $ do
-    --  it "Last of previous index is one less than next index for blocks" $ do
-    --     YT.request $ do
-    --       setUrl BlockInfoR
-    --       addGetParam "minnumber" "1"
-    --       addGetParam "maxnumber" "201"
-    --       addGetParam "index" "0"
-    --     statusIs 200
-        -- n1 <- withResponse $ \ res -> do
-        --   return $ snd $ (getFirstBlockNum (fromJust $ (decode (simpleBody res)  ::  Maybe [Block])) 0)
-        -- YT.request $ do
-        --   setUrl BlockInfoR
-        --   addGetParam "minnumber" "1"
-        --   addGetParam "maxnumber" "201"
-        --   addGetParam "index" $ show n1
-        -- testJSON getLengthOfBlocks 100
-        -- n2 <- withResponse $ \ res -> do
-        --   return $ snd $ (getFirstBlockNum (fromJust $ (decode (simpleBody res)  ::  Maybe [Block])) 0)
-        -- liftIO $ HUnit.assertBool("N+1: ") $ n1 == n2
+    describe "Complicated endpoints" $ do
+     xit "Last of previous index is one less than next index for blocks" $ do
+        YT.request $ do
+          setUrl BlockInfoR
+          addGetParam "minnumber" "1"
+          addGetParam "maxnumber" "201"
+          addGetParam "index" "0"
+        statusIs 200
+        n1 <- withResponse $ \ res -> do return
+                                       . snd
+                                       . getFirstBlockNum 0
+                                       . map bPrimeToB
+                                       . fromJust
+                                       $ (decode (simpleBody res)  ::  Maybe [Block'])
+        YT.request $ do
+          setUrl BlockInfoR
+          addGetParam "minnumber" "1"
+          addGetParam "maxnumber" "201"
+          addGetParam "index" $ tshow n1
+        testJSON getLengthOfBlocks 100
+        n2 <- withResponse $ \ res -> do return
+                                       . snd
+                                       . getFirstBlockNum 0
+                                       . map bPrimeToB
+                                       . fromJust
+                                       $ (decode (simpleBody res)  ::  Maybe [Block'])
+        liftIO $ HUnit.assertBool("N+1: ") $ n1 == n2
 
-     -- it "Last of previous index is one less than next index for transactions" $ do
-     --    YT.request $ do
-     --      setUrl TransactionR
-     --      addGetParam "minvalue" "1"
-     --      addGetParam "maxvalue" "200000001"
-     --      addGetParam "index" "0"
-     --    statusIs 200
+     xit "Last of previous index is one less than next index for transactions" $ do
+        YT.request $ do
+          setUrl TransactionR
+          addGetParam "minvalue" "1"
+          addGetParam "maxvalue" "200000001"
+          addGetParam "index" "0"
+        statusIs 200
         -- TODO(tim) Insert transactions into the database so getFirstTxNum can succeed
-        -- n1 <- withResponse $ \ res -> do
-        --   return $ snd $ (getFirstTxNum (fromJust $ (decode (simpleBody res)  ::  Maybe [RawTransaction])) 0)
-        -- liftIO $ traceIO $ show n1
-        -- YT.request $ do
-        --   setUrl TransactionR
-        --   addGetParam "minvalue" "1"
-        --   addGetParam "maxvalue" "200000001"
-        -- n2 <- withResponse $ \ res -> do
-        --   return $ snd $ (getFirstTxNum (fromJust $ (decode (simpleBody res)  ::  Maybe [RawTransaction])) 0)
-        -- liftIO $ HUnit.assertBool("N+1: ") $ n1 == n2
+        n1 <- withResponse $ \ res -> do return
+                                       . snd
+                                       . getFirstTxNum 0
+                                       . map rtPrimeToRt
+                                       . fromJust
+                                       $ (decode (simpleBody res)  ::  Maybe [RawTransaction'])
+        liftIO $ print n1
+        YT.request $ do
+          setUrl TransactionR
+          addGetParam "minvalue" "1"
+          addGetParam "maxvalue" "200000001"
+        n2 <- withResponse $ \ res -> do return
+                                       . snd
+                                       . getFirstTxNum 0
+                                       . map rtPrimeToRt
+                                       . fromJust
+                                       $ (decode (simpleBody res)  ::  Maybe [RawTransaction'])
+        liftIO $ HUnit.assertBool("N+1: ") $ n1 == n2

@@ -13,6 +13,7 @@ module Blockchain.Data.BlockDB (
   blockHash,
   blockHeaderHash,
   getBlock,
+  getBlocks,
   putBlocks,
   nextDifficulty,
   homesteadNextDifficulty,
@@ -30,6 +31,7 @@ import           Data.List
 import qualified Data.Map                           as M
 import           Data.Maybe
 import qualified Data.Set                           as S
+import qualified Data.Text                          as T
 
 import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
@@ -60,7 +62,7 @@ import           Blockchain.Strato.Model.Class
 
 blk2BlkDataRef :: (HasSQLDB m) =>
                   M.Map SHA Integer->(Block, SHA)->BlockId->Bool->m BlockDataRef
-blk2BlkDataRef dm (b, hash') blkId makeHashOne= do
+blk2BlkDataRef dm (b, hash') blkId makeHashOne = do
   let difficulty' = fromMaybe (error $ "missing value in difficulty map: " ++ format hash') $
                    M.lookup hash' dm --  <- calcTotalDifficulty b blkId
   return (BlockDataRef pH uH cB sR tR rR lB d n gL gU t eD nc mH blkId hash'' True True difficulty') --- Horrible! Apparently I need to learn the Lens library, yesterday
@@ -82,6 +84,11 @@ blk2BlkDataRef dm (b, hash') blkId makeHashOne= do
       eD = blockDataExtraData bd
       nc = blockDataNonce bd
       mH = blockDataMixHash bd
+
+getBlocks :: HasSQLDB m => m [Block]
+getBlocks = do
+  db <- getSQLDB
+  liftM (map entityVal) . liftIO . SQL.runSqlPool (selectList [] []) $ db
 
 getBlock::(HasSQLDB m)=>
           SHA->m (Maybe Block)
@@ -181,7 +188,6 @@ putBlocks difficultyBase blocks makeHashOne = do
 
       case existingBlockData of
            [] -> do
-             --liftIO $ putStrLn "block is new"
              blkId <- SQL.insert b
              toInsert <- lift $ lift $ blk2BlkDataRef dm (b, hash') blkId makeHashOne
              forM_ (blockReceiptTransactions b) $ \tx -> do
