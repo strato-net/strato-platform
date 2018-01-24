@@ -19,6 +19,8 @@ library
                   BlockApps.Solidity.Contract
                   BlockApps.Solidity.Int
                   BlockApps.Solidity.Parse.Parser
+                  BlockApps.Solidity.Parse.UnParser
+                  BlockApps.Solidity.Parse.Declarations
                   BlockApps.Solidity.Parse.Selector
                   BlockApps.Solidity.SolidityValue
                   BlockApps.Solidity.Storage
@@ -32,8 +34,7 @@ library
                   BlockApps.SolidityVarReader
                   BlockApps.Storage
                   BlockApps.XAbiConverter
-  other-modules: BlockApps.Solidity.Parse.Declarations
-                 BlockApps.Solidity.Parse.Expression
+  other-modules: BlockApps.Solidity.Parse.Expression
                  BlockApps.Solidity.Parse.File
                  BlockApps.Solidity.Parse.Lexer
                  BlockApps.Solidity.Parse.ParserTypes
@@ -81,6 +82,7 @@ test-suite blockapps-solidity-test
     BlockApps.Solidity.StorageSpec
     BlockApps.Solidity.Parse.SelectorSpec
     BlockApps.Solidity.Parse.PragmaSpec
+    BlockApps.Solidity.Parse.UnParserSpec
     BlockApps.XAbiConverterSpec
   build-depends: base >=4 && < 5
                , aeson

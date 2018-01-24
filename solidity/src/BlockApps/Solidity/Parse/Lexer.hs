@@ -45,13 +45,13 @@ solidityLexer = P.makeTokenParser solidityLanguage
 solidityLanguage = javaStyle {
   P.reservedNames = [
      "pragma", "import", "library", "using",
-     "contract", "is", "public", "internal", "private", "external", "import",
+     "contract", "is", "public", "internal", "private", "external", "import", "payable",
      "event", "indexed", "anonymous",
      "bool", "true", "false",
      "uint", "int", "bytes", "byte", "real", "ureal", "string",
      "address", --"send", "balance",
      "enum", "struct", "mapping", "var",
-     "function", "returns", "return", "modifier",
+     "function", "returns", "return", "modifier", "payable",
      "delete", "constant", "storage", "memory", "calldata",
      "if", "else", "while", "for", "break", "continue",
      "call", "callcode", "length", "sha3", "sha256", "ripemd160", "ecrecover",

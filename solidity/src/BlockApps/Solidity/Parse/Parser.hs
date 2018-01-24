@@ -2,7 +2,7 @@
 -- Module: Parser
 -- Description: The Solidity source parser function
 -- Maintainer: Ryan Reich <ryan@blockapps.net>
-module BlockApps.Solidity.Parse.Parser (parseXabi) where
+module BlockApps.Solidity.Parse.Parser where
 
 import           Text.Parsec                          hiding (parse)
 
@@ -29,6 +29,11 @@ parseXabi filename input = do
 
   return $ map (fmap $ addContractNames $ map (Text.unpack . fst) xabis') xabis'
 
+parseXabiNoInheritanceMerge :: FileName -> String -> Either String [(Text, (Xabi, [Text]))]
+parseXabiNoInheritanceMerge filename input = do
+  showError $ runParser solidityFile "" filename input
+
+
 addContractNames::[String]->Xabi->Xabi
 addContractNames contracts xabi =
   xabi{xabiTypes=xabiTypes xabi `Map.union` Map.fromList (map ((\x -> (x, Contract 0)) . Text.pack) contracts)}
@@ -43,17 +48,17 @@ addInheritedDeclarations xabisWithInheritedDeclarations (xabi, parent:rest) = do
   parentXabi <- parentXabiOrError
   addInheritedDeclarations xabisWithInheritedDeclarations (xabiMerge xabi parentXabi, rest)
 
-
 xabiMerge::Xabi->Xabi->Xabi
 xabiMerge x y =
   Xabi{
     xabiFuncs=xabiFuncs x `Map.union` xabiFuncs y,
     xabiConstr=xabiConstr x,
     xabiVars= fmap (bumpAtBytes bumper) (xabiVars x) `Map.union` xabiVars y,
-    xabiTypes=xabiTypes x `Map.union` xabiTypes y
+    xabiTypes=xabiTypes x `Map.union` xabiTypes y,
+    xabiModifiers=xabiModifiers x `Map.union` xabiModifiers y
     }
   where
-    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 1
+    bumper = if null (xabiVars y) then 0 else maximum (fmap varTypeAtBytes (xabiVars y)) + 32
     bumpAtBytes n varType =
       varType {varTypeAtBytes = varTypeAtBytes varType + n}
 

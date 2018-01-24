@@ -2,12 +2,13 @@
 -- Module: Declarations
 -- Description: Parsers for top-level Solidity declarations
 -- Maintainer: Ryan Reich <ryan@blockapps.net
+-- Maintainer: Charles Crain <charles@blockapps.net>
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
-module BlockApps.Solidity.Parse.Declarations (solidityContract) where
+module BlockApps.Solidity.Parse.Declarations where
 
 --import Data.Either
 import           Data.List
-import qualified Data.Map                             as Map
+import qualified Data.Map as Map
 --import Data.Map (Map)
 import           Data.Maybe
 import           Data.Text                            (Text)
@@ -15,7 +16,7 @@ import qualified Data.Text                            as Text
 --import           Data.Char
 
 import           Text.Parsec
-import           Text.Parsec.Perm
+-- import           Text.Parsec.Perm
 --import           Text.Parsec.Number
 
 import           BlockApps.Solidity.Parse.Lexer
@@ -52,9 +53,13 @@ solidityContract = do
     (
       Text.pack contractName',
       (
-        Xabi{
-           xabiFuncs = Map.delete (Text.pack contractName') allFunctions
-           , xabiConstr = maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
+        Xabi { xabiFuncs = Map.delete (Text.pack contractName') allFunctions
+             , xabiConstr = if Map.member (Text.pack contractName') allFunctions
+                            then Map.singleton
+                                 (Text.pack contractName')
+                                 (allFunctions Map.! (Text.pack contractName'))
+                            else Map.empty
+               -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
            , xabiVars =
                 Map.fromList $
                 zipWith (\(v, isPublic) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing)) v)
@@ -64,6 +69,7 @@ solidityContract = do
              Map.fromList $
              [ (Text.pack name, enum) | (name, EnumDeclaration enum) <- declarations]
              ++ [ (Text.pack name, struct) | (name, StructDeclaration struct) <- declarations]
+           , xabiModifiers = Map.fromList [(Text.pack name, modifier) | (name, ModifierDeclaration modifier) <- declarations]
 
 --    contractName = contractName',
 --    contractObjs = filter (tupleHasValue . objValueType) contractObjs',
@@ -85,6 +91,7 @@ data Declaration =
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
   | VariableDeclaration Xabitype.Type Bool
+  deriving Show
 
 -- | Parses anything that a contract can declare at the top level: new types,
 -- variables, functions primarily, also events and function modifiers.
@@ -212,9 +219,9 @@ functionDeclaration = do
   functionArgs <- tupleDeclaration
 --  (functionRet, functionVisible, _, _) <- functionModifiers
   -- TODO - deal with funcitonVisible
-  (functionRet, _, _, _) <- functionModifiers
+  (functionRet, visibility, mutable, payable, modifiers) <- functionModifiers
 --  functionBody <- bracedCode <|> (semi >> return "")
-  _ <- bracedCode <|> (semi >> return "")
+  contents <- bracedCode <|> (semi >> return "")
   --TODO - deal with contractName
 --  contractName' <- getContractName
   _ <- getContractName
@@ -235,6 +242,13 @@ functionDeclaration = do
       , Xabi.funcVals =
            Map.fromList $
            zipWith (\v i -> fmap (Xabitype.IndexedType i) (nameUnnamed v i)) functionRet [0..]
+      , Xabi.funcContents = Just $ Text.pack contents
+
+      -- TODO: Get these values from parser
+      , Xabi.funcMutable  = Just mutable
+      , Xabi.funcPayable  = Just payable
+      , Xabi.funcVisibility = Just visibility
+      , Xabi.funcModifiers = Just modifiers
 
 
 --    objName = functionName,
@@ -277,14 +291,18 @@ modifierDeclaration = do
   name <- identifier
   args <- option [] tupleDeclaration
 --  defn <- bracedCode
-  _ <- bracedCode
+  contents <- bracedCode
+  let nameUnnamed (_name,ty) i = if Text.null _name then (Text.pack ('#' : show i),ty) else (_name,ty)
   return
     (
       name,
       ModifierDeclaration Xabi.Modifier{
-        Xabi.modifierArgs = undefined args -- :: Map Text Xabi.IndexedType
-      , Xabi.modifierSelector = undefined -- :: Text
-      , Xabi.modifierVals = undefined -- :: Map Text Xabi.IndexedType
+        Xabi.modifierArgs = -- undefined args -- :: Map Text Xabi.IndexedType
+           Map.fromList $
+             zipWith (\x i -> fmap (Xabitype.IndexedType i) (nameUnnamed x i)) args [0..]
+      , Xabi.modifierSelector = Text.pack name -- ? -- undefined -- :: Text
+      , Xabi.modifierVals = Map.fromList [] -- undefined -- :: Map Text Xabi.IndexedType
+      , Xabi.modifierContents = if null contents then Nothing else Just $ Text.pack contents
 --        objName = name,
 --        objValueType = NoValue,
 --        objArgType = args,
@@ -318,28 +336,43 @@ tupleDeclaration = parens $ commaSep $ do
 -- | Parses all the things that can modify a function declaration,
 -- including return value, explicit function modifiers, visibility and
 -- constant specifiers, and possibly base construtor arguments, in the case
--- of a constructor.  These can appear in any order, so we have to use
--- a special permutation parser for this.
-functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Bool, Bool, String)
-functionModifiers =
-  permute $
-  (\a b c d1 d2 d3 d4 -> (a, b, c, unwords [d1, d2, d3, d4])) <$?>
-  ([], returnModifier) <|?>
-  (True, visibilityModifier) <|?>
-  (True, mutabilityModifier) <|?>
-  ("", otherModifiers) <|?>
-  ("", otherModifiers) <|?>
-  ("", otherModifiers) <|?>
-  ("", otherModifiers) -- Fenceposts for the explicit modifiers
+-- of a constructor.  
+
+data FuncModifiers = ReturnsMod [(Text, Xabitype.Type)]
+                   | VisibilityMod Xabi.Visibility
+                   | MutableMod Bool
+                   | PayableMod Bool
+                   | OtherMod String
+
+functionModifiers :: SolidityParser ([(Text, Xabitype.Type)], Xabi.Visibility, Bool, Bool, [String])
+functionModifiers = do
+  vals <- many $ (ReturnsMod <$> returnModifier)
+             <|>  (VisibilityMod <$> visibilityModifier)
+             <|>  (MutableMod <$> mutabilityModifier)
+             <|>  (PayableMod <$> payableModifier)
+             <|>  (OtherMod <$> otherModifiers)
+  return $ formatVals vals
   where
+    formatVals vals = 
+      let returns = concat [v | ReturnsMod v <- vals]
+          visibility = fromMaybe Xabi.Public $ listToMaybe [v | VisibilityMod v <- vals]
+          mutable = fromMaybe True $ listToMaybe [v | MutableMod v <- vals]
+          payable = fromMaybe False $ listToMaybe [v | PayableMod v <- vals]
+          otherMods = [v | OtherMod v <- vals]
+      in (returns, visibility, mutable, payable, otherMods)
     returnModifier =
       reserved "returns" >> tupleDeclaration
     visibilityModifier =
-      ((reserved "public" <|> reserved "external") >> return True) <|>
-      ((reserved "internal" <|> reserved "private") >> return False)
+      (   (reserved "public"   >> return Xabi.Public)
+      <|> (reserved "private"  >> return Xabi.Private)
+      <|> (reserved "external" >> return Xabi.External)
+      <|> (reserved "internal" >> return Xabi.Internal)
+      )
     mutabilityModifier =
       reserved "constant" >> return False
-    otherModifiers = fmap unwords $ many $ do
+    payableModifier =
+      reserved "payable" >> return True
+    otherModifiers = do
       name <- identifier
       args <- optionMaybe parensCode
       return $ name ++ maybe "" (\s -> "(" ++ s ++ ")") args
