@@ -1,7 +1,8 @@
 import {
   VALIDATE_USER_SUCCESS,
   VALIDATE_USER_FAILURE,
-  RESET_LOGIN_MESSAGE
+  RESET_LOGIN_MESSAGE,
+  RESET_REDIRECT_REFER_LOGIN
 } from './login.action';
 
 const initialState = {
@@ -31,6 +32,11 @@ const reducer = function (state = initialState, action) {
         ...state,
         result: undefined
       };
+    case RESET_REDIRECT_REFER_LOGIN:
+      return {
+        ...state,
+        redirectToReferrer: false
+      }
     default:
       return state;
   }

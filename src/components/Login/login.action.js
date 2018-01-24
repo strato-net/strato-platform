@@ -2,6 +2,7 @@ export const VALIDATE_USER_REQUEST = "VALIDATE_USER_REQUEST";
 export const VALIDATE_USER_SUCCESS = "VALIDATE_USER_SUCCESS";
 export const VALIDATE_USER_FAILURE = "VALIDATE_USER_FAILURE";
 export const RESET_LOGIN_MESSAGE = "RESET_LOGIN_MESSAGE";
+export const RESET_REDIRECT_REFER_LOGIN = "RESET_REDIRECT_REFER_LOGIN";
 
 export const validateUser = function (payload) {
   return {
@@ -31,3 +32,9 @@ export const resetLoginMessage = function () {
     type: RESET_LOGIN_MESSAGE,
   }
 };
+
+export const resetRedirectRefer = function () {
+  return {
+    type: RESET_REDIRECT_REFER_LOGIN
+  }
+}

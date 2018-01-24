@@ -4,11 +4,15 @@ import { connect } from 'react-redux';
 import { withRouter, Redirect } from 'react-router-dom';
 import { Button, Card, Snackbar } from 'react-md';
 import ReduxedTextField from '../../components/ReduxedTextField';
-import { createUser, resetUserError } from './register.actions';
+import { createUser, resetRedirectRefer, resetUserError } from './register.actions';
 import './Register.css';
 import { env } from '../../env'
 
 class Register extends Component {
+
+  componentWillUnmount() {
+    this.props.resetRedirectRefer()
+  }
 
   submit = (values) => {
     this.props.createUser(values.username, values.password);
@@ -120,7 +124,8 @@ const connected = connect(
   mapStateToProps,
   {
     createUser,
-    resetUserError
+    resetUserError,
+    resetRedirectRefer
   }
 )(formed);
 

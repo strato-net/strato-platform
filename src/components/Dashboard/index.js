@@ -26,6 +26,7 @@ const links = [{
   style: { color: 'white' }
 }];
 
+
 class Dashboard extends Component {
   state = { title: links[0].label, children: <Apps /> };
 

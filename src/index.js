@@ -10,7 +10,7 @@ import { all } from 'redux-saga/effects';
 import { fork } from 'redux-saga/effects';
 import App from "./App/App";
 import { reducer as formReducer } from 'redux-form';
-
+import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
 
 // Reducers
 import AppsReducer from './components/Apps/apps.reducer';
@@ -22,11 +22,13 @@ import watchFetchApps from './components/Apps/apps.saga';
 import watchValidateUser from './components/Login/login.saga';
 import watchCreateUser from './components/Register/register.saga';
 
+
 const rootReducer = combineReducers({
  form: formReducer,
  apps: AppsReducer,
  login: loginReducer,
- register: registerReducer
+ register: registerReducer,
+ loadingBar: loadingBarReducer
 });
 
 // YOUR SAGAS HERE
@@ -42,11 +44,13 @@ const rootSaga = function* startForeman() {
 const sagaMiddleware = createSagaMiddleware();
 
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
-
+const loadignBarMiddleware =  loadingBarMiddleware({
+  promiseTypeSuffixes: ['REQUEST', 'SUCCESS', 'FAILURE'],
+})
 // mount it on the Store
 const store = createStore(rootReducer,
- process.env.NODE_ENV !== 'production' ? composeEnhancers(applyMiddleware(sagaMiddleware)) :
-   applyMiddleware(sagaMiddleware), );
+ process.env.NODE_ENV !== 'production' ? composeEnhancers(applyMiddleware(sagaMiddleware,loadignBarMiddleware)) :
+   applyMiddleware(sagaMiddleware, loadignBarMiddleware), );
 
 // then run the saga
 sagaMiddleware.run(rootSaga);

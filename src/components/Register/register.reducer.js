@@ -2,6 +2,7 @@ import {
   CREATE_USER_FAILURE,
   CREATE_USER_SUCCESS,
   RESET_USER_ERROR,
+  RESET_REDIRECT_REFER_REGISTER
 } from './register.actions';
 
 const initialState = {
@@ -22,7 +23,6 @@ const reducer = function (state = initialState, action) {
         redirectToReferrer: true
       };
     case CREATE_USER_FAILURE:
-      localStorage.clear();
       return {
         username: undefined,
         address: undefined,
@@ -33,6 +33,11 @@ const reducer = function (state = initialState, action) {
       return {
         error: undefined
       };
+    case RESET_REDIRECT_REFER_REGISTER:
+      return {
+        ...state,
+        redirectToReferrer: false
+      }
     default:
       return state;
   }

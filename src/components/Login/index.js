@@ -3,16 +3,18 @@ import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter, Redirect } from 'react-router-dom';
 import { Button, Card, Snackbar } from 'react-md';
-import { validateUser, resetLoginMessage } from './login.action';
+import { validateUser, resetLoginMessage, resetRedirectRefer } from './login.action';
 import ReduxedTextField from '../ReduxedTextField';
-import './login.css';
 import { env } from '../../env'
 
 class Login extends Component {
 
+  componentWillUnmount() {
+    this.props.resetRedirectRefer()
+  }
+
   submit = (values) => {
     this.props.validateUser({ username: values.username, password: values.password });
-    this.setState({ redirectToReferrer: true });
   }
 
   render() {
@@ -110,7 +112,8 @@ const connected = connect(
   mapStateToProps,
   {
     validateUser,
-    resetLoginMessage
+    resetLoginMessage,
+    resetRedirectRefer
   }
 )(formed);
 

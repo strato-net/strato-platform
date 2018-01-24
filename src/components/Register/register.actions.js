@@ -2,6 +2,7 @@ export const CREATE_USER_REQUEST = "CREATE_USER_REQUEST";
 export const CREATE_USER_SUCCESS = "CREATE_USER_SUCCESS";
 export const CREATE_USER_FAILURE = "CREATE_USER_FAILURE";
 export const RESET_USER_ERROR = "RESET_USER_ERROR";
+export const RESET_REDIRECT_REFER_REGISTER = "RESET_REDIRECT_REFER_REGISTER";
 
 export const createUser = function(username, password) {
   return {
@@ -29,5 +30,10 @@ export const createUserFailure = function(error) {
 export const resetUserError = function() {
   return {
     type: RESET_USER_ERROR
+  }
+}
+export const resetRedirectRefer = function () {
+  return {
+    type: RESET_REDIRECT_REFER_REGISTER
   }
 }
