@@ -22,43 +22,42 @@ import watchFetchApps from './components/Apps/apps.saga';
 import watchValidateUser from './components/Login/login.saga';
 import watchCreateUser from './components/Register/register.saga';
 
-
 const rootReducer = combineReducers({
- form: formReducer,
- apps: AppsReducer,
- login: loginReducer,
- register: registerReducer,
- loadingBar: loadingBarReducer
+  form: formReducer,
+  apps: AppsReducer,
+  login: loginReducer,
+  register: registerReducer,
+  loadingBar: loadingBarReducer
 });
 
 // YOUR SAGAS HERE
 const rootSaga = function* startForeman() {
- yield all([
-   fork(watchFetchApps),
-   fork(watchValidateUser),
-   fork(watchCreateUser)
- ])
+  yield all([
+    fork(watchFetchApps),
+    fork(watchValidateUser),
+    fork(watchCreateUser)
+  ])
 };
 
 // create the saga middleware
 const sagaMiddleware = createSagaMiddleware();
 
 const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
-const loadignBarMiddleware =  loadingBarMiddleware({
+const loadignBarMiddleware = loadingBarMiddleware({
   promiseTypeSuffixes: ['REQUEST', 'SUCCESS', 'FAILURE'],
 })
 // mount it on the Store
 const store = createStore(rootReducer,
- process.env.NODE_ENV !== 'production' ? composeEnhancers(applyMiddleware(sagaMiddleware,loadignBarMiddleware)) :
-   applyMiddleware(sagaMiddleware, loadignBarMiddleware), );
+  process.env.NODE_ENV !== 'production' ? composeEnhancers(applyMiddleware(sagaMiddleware, loadignBarMiddleware)) :
+    applyMiddleware(sagaMiddleware, loadignBarMiddleware), );
 
 // then run the saga
 sagaMiddleware.run(rootSaga);
 
 ReactDOM.render(
- <Provider store={store}>
-   <Router>
-     <App />
-   </Router>
- </Provider>, document.getElementById('root'));
+  <Provider store={store}>
+    <Router>
+      <App />
+    </Router>
+  </Provider>, document.getElementById('root'));
 registerServiceWorker();

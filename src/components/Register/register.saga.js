@@ -79,7 +79,6 @@ export function* createUser(action) {
       throw new Error(['Username already exists']);
     } else {
       let response = yield call(createUserApiCall, action.username, action.password);
-      console.log(response)
       yield call(delay, 1000)
       yield call(postFaucet, response)
       yield put(createUserSuccess(response, action.username));
