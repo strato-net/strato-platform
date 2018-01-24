@@ -16,18 +16,22 @@ import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar
 import AppsReducer from './components/Apps/apps.reducer';
 import loginReducer from './components/Login/login.reducer';
 import registerReducer from './components/Register/register.reducer';
+import profileReducer from './components/Profile/profile.reducer';
 
 // sagas
 import watchFetchApps from './components/Apps/apps.saga';
 import watchValidateUser from './components/Login/login.saga';
 import watchCreateUser from './components/Register/register.saga';
+import watchAccountActions from './components/Profile/profile.saga';
+
 
 const rootReducer = combineReducers({
   form: formReducer,
   apps: AppsReducer,
   login: loginReducer,
   register: registerReducer,
-  loadingBar: loadingBarReducer
+  loadingBar: loadingBarReducer,
+  profile: profileReducer
 });
 
 // YOUR SAGAS HERE
@@ -35,7 +39,8 @@ const rootSaga = function* startForeman() {
   yield all([
     fork(watchFetchApps),
     fork(watchValidateUser),
-    fork(watchCreateUser)
+    fork(watchCreateUser),
+    fork(watchAccountActions)
   ])
 };
 
