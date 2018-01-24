@@ -2,9 +2,9 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter, Redirect } from 'react-router-dom';
-import { Button, Card } from 'react-md';
+import { Button, Card, Snackbar } from 'react-md';
 import ReduxedTextField from '../../components/ReduxedTextField';
-import { createUser } from './register.actions';
+import { createUser, resetUserError } from './register.actions';
 import './Register.css';
 import { env } from '../../env'
 
@@ -72,6 +72,11 @@ class Register extends Component {
               </div>
             </form>
           </Card>
+          <Snackbar
+            toasts={this.props.register.error ? [{ text: this.props.register.error }] : []}
+            autohide={true}
+            onDismiss={() => { this.props.resetUserError() }}
+          />
         </div>
       </section>
     );
@@ -114,7 +119,8 @@ const formed = reduxForm({ form: 'create-user', validate })(Register);
 const connected = connect(
   mapStateToProps,
   {
-    createUser
+    createUser,
+    resetUserError
   }
 )(formed);
 

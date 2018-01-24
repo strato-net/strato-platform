@@ -11,7 +11,26 @@ import {
 
 import { env } from '../../env';
 
-const url = env.BLOC_URL + "/users/:user?faucet"
+const url = env.BLOC_URL + "/users/:user?faucet";
+const userAddressURL = env.BLOC_URL + "/users/:user";
+
+export function userAddressAPICall(username) {
+  return fetch(
+    userAddressURL.replace(":user", username),
+    {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    }
+  )
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
 
 export function createUserApiCall(username, password) {
   return fetch(
@@ -24,21 +43,26 @@ export function createUserApiCall(username, password) {
       body: 'password=' + password
     }
   )
-  .then(function(response) {
-    return response.json();
-  })
-  .catch(function(error) {
-    throw error;
-  });
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 export function* createUser(action) {
   try {
-    let response = yield call(createUserApiCall, action.username, action.password);
-    yield put(createUserSuccess(response, action.username));
+    let user = yield call(userAddressAPICall, action.username);
+    if (user && user.length) {
+      throw new Error(['Username already exists']);
+    } else {
+      let response = yield call(createUserApiCall, action.username, action.password);
+      yield put(createUserSuccess(response, action.username));
+    }
   }
   catch (err) {
-    yield put(createUserFailure(err));
+    yield put(createUserFailure(err.message));
   }
 }
 

@@ -1,14 +1,14 @@
 import {
   CREATE_USER_FAILURE,
   CREATE_USER_SUCCESS,
+  RESET_USER_ERROR,
 } from './register.actions';
 
 const initialState = {
-  username: null,
-  address: null,
-  error: null,
+  username: undefined,
+  address: undefined,
+  error: undefined,
   redirectToReferrer: false
-
 };
 
 const reducer = function (state = initialState, action) {
@@ -18,16 +18,20 @@ const reducer = function (state = initialState, action) {
       return {
         username: action.username,
         address: action.address,
-        error: null,
+        error: undefined,
         redirectToReferrer: true
       };
     case CREATE_USER_FAILURE:
       localStorage.clear();
       return {
-        username: null,
-        address: null,
+        username: undefined,
+        address: undefined,
         error: action.error,
         redirectToReferrer: false
+      };
+    case RESET_USER_ERROR:
+      return {
+        error: undefined
       };
     default:
       return state;

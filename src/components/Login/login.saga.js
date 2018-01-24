@@ -29,7 +29,7 @@ export function validateUserAPICall(from, fromAddress, toAddress, value, passwor
       if (response.ok) {
         return response.json();
       } else {
-        throw "Incorrect username or password"
+        throw new Error(['Incorrect username or password']);
       }
     })
     .catch(function (error) {
@@ -51,7 +51,7 @@ export function userAddressAPICall(username) {
       if (response.ok) {
         return response.json();
       } else {
-        throw 'Incorrect username or password';
+        throw new Error(['Incorrect username or password']);
       }
     })
     .catch(function (error) {
@@ -62,7 +62,8 @@ export function userAddressAPICall(username) {
 export function* validateUser(action) {
   try {
     let addresses = yield call(userAddressAPICall, action.username)
-    if (addresses && addresses.length === 0) { throw 'Incorrect username or password' }
+    console.log(addresses)
+    if (addresses && addresses.length === 0) { throw new Error(['Incorrect username or password']); }
     let response = yield call(
       validateUserAPICall,
       action.username,
@@ -74,7 +75,7 @@ export function* validateUser(action) {
     yield put(validateUserSuccess(response, action.username, addresses[0]));
   }
   catch (err) {
-    yield put(validateUserFailure(err));
+    yield put(validateUserFailure(err.message));
   }
 }
 

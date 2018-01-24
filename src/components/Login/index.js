@@ -69,6 +69,7 @@ class Login extends Component {
           </Card>
           <Snackbar
             toasts={this.props.login.result ? [{ text: this.props.login.result }] : []}
+            autohide={true}
             onDismiss={() => { this.props.resetLoginMessage() }}
           />
         </div>
