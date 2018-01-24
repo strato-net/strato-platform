@@ -3,6 +3,7 @@ import {
   put,
   call
 } from 'redux-saga/effects';
+import { delay } from 'redux-saga';
 import {
   CREATE_USER_REQUEST,
   createUserSuccess,
@@ -13,6 +14,7 @@ import { env } from '../../env';
 
 const url = env.BLOC_URL + "/users/:user?faucet";
 const userAddressURL = env.BLOC_URL + "/users/:user";
+const faucetUrl = env.STRATO_URL + "/faucet";
 
 export function userAddressAPICall(username) {
   return fetch(
@@ -51,6 +53,25 @@ export function createUserApiCall(username, password) {
     });
 }
 
+export function postFaucet(address) {
+  return fetch(
+    faucetUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `address=${address}`
+    }
+  )
+    .then(function (response) {
+      return;
+    })
+    .catch(function (error) {
+      throw error;
+    })
+}
+
 export function* createUser(action) {
   try {
     let user = yield call(userAddressAPICall, action.username);
@@ -58,6 +79,9 @@ export function* createUser(action) {
       throw new Error(['Username already exists']);
     } else {
       let response = yield call(createUserApiCall, action.username, action.password);
+      console.log(response)
+      yield call(delay, 1000)
+      yield call(postFaucet, response)
       yield put(createUserSuccess(response, action.username));
     }
   }

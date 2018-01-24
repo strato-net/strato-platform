@@ -33,7 +33,7 @@ export function getApps() {
       },
     })
     .then(function (response) {
-      return response.json()
+      return response.json();
     })
     .catch(function (error) {
       throw error;
