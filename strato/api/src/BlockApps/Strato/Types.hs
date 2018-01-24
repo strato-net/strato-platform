@@ -393,7 +393,6 @@ data Account = Account
   , accountContractRoot   :: Keccak256
   , accountCode           :: Text
   , accountCodeHash       :: Keccak256
-  , accountSource         :: Text
   , accountLatestBlockNum :: Natural
   , accountSource         :: Text
   } deriving (Eq, Show, Generic)
