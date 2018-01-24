@@ -1,13 +1,13 @@
 import {
   VALIDATE_USER_SUCCESS,
-  VALIDATE_USER_FAILURE
+  VALIDATE_USER_FAILURE,
+  RESET_LOGIN_MESSAGE
 } from './login.action';
 
 const initialState = {
-  result: 'Waiting to send...',
+  result: undefined,
   redirectToReferrer: false
 };
-
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
@@ -25,6 +25,11 @@ const reducer = function (state = initialState, action) {
         ...state,
         result: action.error,
         redirectToReferrer: false
+      };
+    case RESET_LOGIN_MESSAGE:
+      return {
+        ...state,
+        result: undefined
       };
     default:
       return state;

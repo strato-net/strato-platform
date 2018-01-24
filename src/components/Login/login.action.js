@@ -1,6 +1,7 @@
 export const VALIDATE_USER_REQUEST = "VALIDATE_USER_REQUEST";
 export const VALIDATE_USER_SUCCESS = "VALIDATE_USER_SUCCESS";
 export const VALIDATE_USER_FAILURE = "VALIDATE_USER_FAILURE";
+export const RESET_LOGIN_MESSAGE = "RESET_LOGIN_MESSAGE";
 
 export const validateUser = function (payload) {
   return {
@@ -22,5 +23,11 @@ export const validateUserFailure = function (error) {
   return {
     error: error,
     type: VALIDATE_USER_FAILURE,
+  }
+};
+
+export const resetLoginMessage = function () {
+  return {
+    type: RESET_LOGIN_MESSAGE,
   }
 };

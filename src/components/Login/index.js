@@ -2,8 +2,8 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter, Redirect } from 'react-router-dom';
-import { Button, Card } from 'react-md';
-import { validateUser } from './login.action';
+import { Button, Card, Snackbar } from 'react-md';
+import { validateUser, resetLoginMessage } from './login.action';
 import ReduxedTextField from '../ReduxedTextField';
 import './login.css';
 import { env } from '../../env'
@@ -28,7 +28,6 @@ class Login extends Component {
       }
       return (<Redirect to={from} />)
     }
-
 
     return (
       <section>
@@ -68,6 +67,10 @@ class Login extends Component {
                 onClick={() => this.props.history.push('/register')}> Create an account</Button>
             </div>
           </Card>
+          <Snackbar
+            toasts={this.props.login.result ? [{ text: this.props.login.result }] : []}
+            onDismiss={() => { this.props.resetLoginMessage() }}
+          />
         </div>
       </section>
     );
@@ -105,7 +108,8 @@ const formed = reduxForm({ form: 'login', validate })(Login);
 const connected = connect(
   mapStateToProps,
   {
-    validateUser
+    validateUser,
+    resetLoginMessage
   }
 )(formed);
 
