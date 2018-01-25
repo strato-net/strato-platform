@@ -1,7 +1,6 @@
 module Handler.PeerSpec where
 
 import TestImport
-import Handler.Peers
 import qualified Test.HUnit as HUnit
 import Network.Wai.Test (simpleBody)
 

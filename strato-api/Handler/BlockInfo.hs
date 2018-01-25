@@ -18,7 +18,6 @@ import           Import
 
 import qualified Database.Esqueleto as E
 
-import           Data.List
 import qualified Data.Map           as Map
 
 import qualified Data.Text          as T
@@ -57,11 +56,9 @@ getBlockInfoR = do
 
                     E.limit $ limit
 
-                    -- E.orderBy [E.asc (bdRef E.^. BlockDataRefNumber)]
-                    E.orderBy $ [(sortToOrderBy sortParam) $ (bdRef E.^. BlockDataRefNumber)]
-                    return blk
+                    E.distinctOnOrderBy [(sortToOrderBy sortParam) $ (bdRef E.^. BlockDataRefNumber)] (return blk)
 
-              let modBlocks = (nub (P.map entityVal (blks :: [Entity Block])))
+              let modBlocks = P.map entityVal $ (blks :: [Entity Block])
               let newindex = pack $ show $ 1+(getBlockNum $ P.last modBlocks)
               let extra p = P.zipWith extraFilter p (P.repeat (newindex))
               -- this should actually use URL encoding code from Yesod
