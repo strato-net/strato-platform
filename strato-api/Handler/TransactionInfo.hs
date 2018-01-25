@@ -71,7 +71,7 @@ postTransactionListR = do
    addHeader "Access-Control-Allow-Headers" "Content-Type"
 
    !parserStart <- liftIO $ getTime Realtime
-   tx <- parseJsonBody :: Handler (Result [RawTransaction'])
+   !tx <- parseJsonBody :: Handler (Result [RawTransaction'])
    case tx of
        (Success raws) -> do
           !txHashStart <- liftIO $ getTime Realtime
