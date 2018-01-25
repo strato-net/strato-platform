@@ -82,9 +82,7 @@ setNum n b = let bd = blockBlockData b
 insertRandomBlocks :: (HasSQLDB m) => Integer -> Int -> m [(Key Block, Key BlockDataRef)]
 insertRandomBlocks start size = do
         blocks <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Block)
-        let mytrace = id -- trace ("bs: " ++ show blocks)
-            numberedBlocks = zipWith setNum [start..] . mytrace $ blocks
-        -- let difficulties = [(SHA . fromIntegral $ i, fromIntegral i) | i <- [1..size]]
+        let numberedBlocks = zipWith setNum [start..] blocks
         let difficulties = map (\b -> (blockDataParentHash . blockBlockData $ b, 10)) numberedBlocks
         putBlocks difficulties numberedBlocks False
 
@@ -175,9 +173,8 @@ spec = withApp $ do
           addGetParam "maxnumber" "10"
           addGetParam "minnumber" "0"
         statusIs 200
-        -- testJSON  ::  (Show a, Eq a) => (a -> [Block] -> (Bool, a)) -> a -> YesodExample site ()
         let compareNumbers want bs = let got = sort . map (blockDataNumber . blockBlockData) $ bs
-                        in (got == want, got)
+                                     in (got == want, got)
         testJSON compareNumbers [0..10]
         testJSON getLengthOfBlocks 11
         testJSON getFirstBlockNum 0
