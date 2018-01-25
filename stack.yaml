@@ -67,7 +67,7 @@ extra-deps:
 - hspec-core-2.3.2
 - hspec-discover-2.3.2
 - hspec-expectations-0.8.2
-- quickcheck-io-0.2.0
+- quickcheck-io-0.1.4
 
 
 resolver: lts-7.18
