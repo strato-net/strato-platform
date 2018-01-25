@@ -143,6 +143,15 @@ executable         strato-api
 test-suite test
     type:              exitcode-stdio-1.0
     main-is:           Main.hs
+    other-modules:
+        Handler.CommonSpec
+        Handler.HomeSpec
+        Handler.JsonSpec
+        Handler.PeerSpec
+        Handler.RamlSpec
+        Spec
+        TestImport
+
     hs-source-dirs:    test
     ghc-options:       -Wall
     extra-libraries: pthread
