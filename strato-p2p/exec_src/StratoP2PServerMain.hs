@@ -13,7 +13,7 @@ import           Executable.StratoP2PServer
 
 main :: IO ()
 main = do
-  s <- $initHFlags "Strato Peer Server"
+  _ <- $initHFlags "Strato Peer Server"
   if flags_runUDPServer
     then void . forkIO $ runLoggingT ethereumDiscovery printLogMsg
     else return ()

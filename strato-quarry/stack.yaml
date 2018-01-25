@@ -1,7 +1,0 @@
-flags: {}
-packages:
-- '.'
-extra-deps:
-- blockapps-data-0.0.1
-- merkle-patricia-db-0.0.1
-resolver: lts-3.4

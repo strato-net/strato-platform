@@ -9,7 +9,6 @@ module Blockchain.Bagger.TransactionList
  , toList
  ) where
 
-import           Blockchain.Data.Address
 import           Blockchain.Data.TransactionDef
 import           Blockchain.Sequencer.Event     (OutputTx (..))
 import qualified Data.Map.Strict                as M
@@ -41,16 +40,16 @@ insertTransaction t tl =
                     else (Just t, tl)
 
 trimBelowNonce :: Integer -> TransactionList -> ([OutputTx], TransactionList)
-trimBelowNonce nonce tl = let (lt, gte) = M.partitionWithKey (\k _ -> k < nonce) tl in (M.elems lt, gte)
+trimBelowNonce nonce' tl = let (lt, gte) = M.partitionWithKey (\k _ -> k < nonce') tl in (M.elems lt, gte)
 
 trimAboveCost :: Integer -> (OutputTx -> Integer) -> TransactionList -> ([OutputTx], TransactionList)
 trimAboveCost maxCost calcCost tl =
     let (tooHigh, justRight) = M.partitionWithKey (\_ v -> calcCost v > maxCost) tl in (M.elems tooHigh, justRight)
 
 popSequential :: Integer -> TransactionList -> ([OutputTx], TransactionList)
-popSequential nonce tl = (popped, M.fromList kept)
+popSequential nonce' tl = (popped, M.fromList kept)
     where (_, popped, kept) = foldl theFold initialFoldState (M.toAscList tl)
-          initialFoldState  = (nonce - 1, [], [])
+          initialFoldState  = (nonce' - 1, [], [])
           theFold (lastNonce, popped', kept') e@(elemNonce, elemTx) =
             if elemNonce == lastNonce + 1
                 then (elemNonce, elemTx:popped', kept')

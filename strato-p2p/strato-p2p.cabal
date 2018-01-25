@@ -23,7 +23,6 @@ executable strato-p2p-client
                    base >= 4 && < 5
                  , blockapps-util
                  , hflags
-                 , ethereum-discovery
                  , monad-logger
                  , strato-p2p
     main-is: StratoP2PClientMain.hs
@@ -61,7 +60,6 @@ library
                  , containers
                  , crypto-pubkey
                  , crypto-pubkey-types
-                 , crypto-random
                  , dns
                  , esqueleto
                  , ethereum-discovery
@@ -73,17 +71,14 @@ library
                  , json-rpc-server
                  , json-rpc-client
                  , lifted-base
-                 , merkle-patricia-db
                  , monad-control
                  , monad-logger
                  , monadIO
                  , blockapps-milena
                  , mtl
                  , network
-                 , persistent
                  , persistent-postgresql
                  , postgresql-simple
-                 , random
                  , resourcet
                  , SafeSemaphore
                  , stm
@@ -136,7 +131,7 @@ test-suite strato-p2p-client-test
     other-modules: Event.EventSpec
     build-depends: base >=4 && < 5
       , hspec
-      , strato-p2p-client
+      , strato-p2p
       , conduit
       , strato-model
       , crypto-pubkey-types

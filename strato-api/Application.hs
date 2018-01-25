@@ -4,6 +4,7 @@ module Application
     , appMain
     , develMain
     , makeFoundation
+    , makeLogware
     -- * for DevelMain
     , getApplicationRepl
     , shutdownApp
@@ -19,6 +20,7 @@ import qualified Database.PostgreSQL.Simple           as PG
 
 import           Import
 import           Language.Haskell.TH.Syntax           (qLocation)
+import           Network.Wai (Middleware)
 import           Network.Wai.Handler.Warp             (Settings, defaultSettings, defaultShouldDisplayException,
                                                        getPort, setHost, setOnException, setPort)
 import           Network.Wai.Handler.WarpTLS
@@ -99,6 +101,19 @@ makeFoundation appSettings = do
     -- Return the foundation
     return $ mkFoundation pool
 
+makeLogware :: App -> IO Middleware
+makeLogware foundation =
+    mkRequestLogger def
+        { outputFormat =
+            if appDetailedRequestLogging $ appSettings foundation
+                then Detailed True
+                else Apache
+                        (if appIpFromHeader $ appSettings foundation
+                            then FromFallback
+                            else FromSocket)
+        , destination = Logger $ loggerSet $ appLogger foundation
+        }
+
 myLogger :: NoLoggingT m a -> m a
 myLogger = runNoLoggingT --runStdoutLoggingT
 
@@ -122,17 +137,7 @@ myPool = createPostgresqlPoolModified $ noPool
 -- applyng some additional middlewares.
 makeApplication :: App -> IO Application
 makeApplication foundation = do
-    logWare <- mkRequestLogger def
-        { outputFormat =
-            if appDetailedRequestLogging $ appSettings foundation
-                then Detailed True
-                else Apache
-                        (if appIpFromHeader $ appSettings foundation
-                            then FromFallback
-                            else FromSocket)
-        , destination = Logger $ loggerSet $ appLogger foundation
-        }
-
+    logWare <- makeLogware foundation
     -- Create the WAI application and apply middlewares
     app <- toWaiApp foundation
     return $ logWare $ defaultMiddlewaresNoLogging app

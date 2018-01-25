@@ -16,7 +16,6 @@ library
                      , bytestring
                      , cpu
                      , cryptohash
-                     , crypto-pubkey
                      , crypto-pubkey-types
                      , entropy
                      , errors
@@ -29,17 +28,14 @@ library
                      , mtl
                      , network
                      , network-uri
-                     , persistent
                      , persistent-postgresql
                      , persistent-template
-                     , postgresql-simple
                      , random
                      , resourcet
                      , split
                      , strato-conf
                      , text
                      , time
-                     , transformers
                      , monad-control
   exposed-modules:  Blockchain.Strato.Discovery.Data.Peer
                   , Blockchain.Strato.Discovery.UDP

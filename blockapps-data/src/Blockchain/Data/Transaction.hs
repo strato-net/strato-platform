@@ -51,7 +51,6 @@ import           Blockchain.Data.TransactionDef
 import           Blockchain.Data.TXOrigin
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
-import           Blockchain.EthConf
 import           Blockchain.FastECRecover
 import           Blockchain.SHA
 import           Blockchain.Util
@@ -138,7 +137,7 @@ insertTX mode origin blockNum txs = do
         map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
   afterECRecover <- rawTXs `deepseq` liftIO (getTime Realtime)
   insertRawTX mode rawTXs
-  return $ timeSpecAsNanoSecs $ afterECRecover - beforeECRecover
+  return $ toNanoSecs $ afterECRecover - beforeECRecover
 
 insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
                  TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
@@ -216,13 +215,10 @@ createContractCreationTX n gp gl val init' prvKey = do
   Switch to Either?
 -}
 whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
-whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature' xSignature theHash
+whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
         where
           xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
           SHA theHash = partialTransactionHash t
-          getPubKeyFromSignature' = if fastECRecover (generalConfig ethConf)
-                                    then getPubKeyFromSignature_fast
-                                    else getPubKeyFromSignature
 
 isMessageTX::Transaction->Bool
 isMessageTX MessageTX{} = True

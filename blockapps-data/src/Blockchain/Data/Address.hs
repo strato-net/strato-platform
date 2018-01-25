@@ -20,76 +20,17 @@ module Blockchain.Data.Address (
   formatAddressWithoutColor
   ) where
 
-import           Control.Monad
-
 import           Data.Binary
-import qualified Data.ByteString                 as B
 import qualified Data.ByteString.Lazy            as BL
 import qualified Data.NibbleString               as N
-import           Network.Haskoin.Crypto          hiding (Address)
 import           Numeric
-import           Text.PrettyPrint.ANSI.Leijen    hiding ((<$>))
 
 import           Blockchain.Data.RLP
-import           Blockchain.ExtWord
-
-import qualified Data.Text                       as T
-
-import qualified Data.Aeson                      as AS
-import           Data.Aeson.Types
-
-import qualified Blockchain.Colors               as C
-import           Blockchain.Format
 import           Blockchain.SHA
 import           Blockchain.Util
-import           Web.PathPieces
 
 import           Blockchain.Strato.Model.Address
 
-{-
- Was necessary to make Address a primary key - which we no longer do (but rather index on the address field).
- May remove in the future
--}
-instance PathPiece Address where
-  toPathPiece (Address x) = T.pack $ showHex  (fromIntegral $ x :: Integer) ""
-  fromPathPiece t = Just (Address wd160)
-    where
-      ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
-
-{-
- make into a string rather than an object
--}
-instance AS.ToJSON Address where
-  toJSON (Address x) = String $ T.pack $ padZeros 40 $ showHex x ""
-
-instance AS.FromJSON Address where
--- TODO- put this tighter definition back in again....  I needed to loosten the definition because genesis.json breaks some of the format.
---  parseJSON (String s)
---    | not (all (`elem` ("abcdefABCDEF0123456789"::String)) $ T.unpack s) ||
---      not (T.length s == 40) =
---        error $ "error converting json to Address: " ++ show s
-  parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ T.unpack s
-  parseJSON _          = mzero
-
-instance Pretty Address where
-  pretty (Address x) = yellow $ text $ padZeros 40 $ showHex x ""
-
-instance Format Address where
-  format (Address x) = C.yellow $ padZeros 40 $ showHex x ""
-
-instance Binary Address where
-  put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x
-  get = do
-    bytes <- replicateM 20 get
-    let byteString = B.pack bytes
-    return (Address $ fromInteger $ byteString2Integer byteString)
-
-{-
-instance RLPSerializable Address where
-  rlpEncode (Address a) = RLPString $ BL.toStrict $ encode a
-  rlpDecode (RLPString s) = Address $ decode $ BL.fromStrict s
-  rlpDecode x = error ("Malformed rlp object sent to rlp2Address: " ++ show x)
--}
 
 getNewAddress_unsafe ::Address->Integer->Address
 getNewAddress_unsafe a n =
