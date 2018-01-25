@@ -250,5 +250,4 @@ postWalletR = do
                                                    sendMailNewWallet emailDB (show $ J.encode userData)
                                                    return $ userData
 
---  sendResponse $ addressDB1
   returnJson $ newUser

@@ -66,16 +66,4 @@ getAccountInfoR = do
 postAccountCodeR :: Handler Value
 postAccountCodeR = do
         (postParams, _) <- runRequestBody
-        --liftIO $ traceIO $ show postParams
         accountInfo postParams
-
-
-
-
-
-
-
-
-
-
-

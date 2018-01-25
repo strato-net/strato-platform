@@ -4,6 +4,7 @@ module Handler.JsonSpec (spec) where
 
 import           TestImport
 
+import           Control.Monad.Logger
 import           Network.Wai.Test
 import qualified Test.HUnit                 as HUnit
 import           Test.QuickCheck.Arbitrary
@@ -22,10 +23,12 @@ import           Blockchain.Data.ArbitraryInstances ()
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Json
+import           Blockchain.Data.TransactionDef
 import           Blockchain.DB.SQLDB
 import           Blockchain.SHA
 
 import           Handler.Filters
+import           Handler.TransactionInfo
 
 contains :: BSL8.ByteString -> String -> Bool
 contains a b = DL.isInfixOf b (TL.unpack $ decodeUtf8 a)
@@ -84,15 +87,11 @@ insertRandomBlocks start size = do
         let difficulties = map (\b -> (blockDataParentHash . blockBlockData $ b, 10)) numberedBlocks
         putBlocks difficulties numberedBlocks False
 
--- missing hash in difficulty map in addDifficulties: 6924549d6d290bee3ad0df9cf4e85e939b23d1ab0ff3071b436664c3c716fd41,
---                                               hash=00ec2b902c2036b72d4b13995e82296567e322f06db4b96e7d143ec263189859
--- addDifficulties -> Map -> [(SHA, Int, SHA)] -> Map
--- fails `third tuple` is not a member of the map
--- Where does it come from?
--- getDifficultyMap:
--- (x, y) -> (y, blockDataDifficulty $ blockBlockData x, blockDataParentHash $ blockBlockData x)
--- the parent hashes are coming from the random blocks
---
+insertRandomTransactions :: Int -> YesodExample App ()
+insertRandomTransactions size = do
+        txs <- liftIO . generate . vectorOf size $ (arbitrary :: Gen Transaction)
+        runStdoutLoggingT . emitKafkaTransactions $ txs
+
 equiv :: (Show a, Eq a) => a -> a -> YesodExample App ()
 equiv x y = liftIO $ x `shouldBe` y
 
@@ -119,10 +118,13 @@ spec = withApp $ do
         statusIs 200
 
     describe "Account endpoints" $ do
-      xit "First account" $ do
+      it "First account" $ do
+        liftIO $ pendingWith "Requires a kafka instance to run these tests"
+        insertRandomTransactions 10
         YT.request $ do
           setUrl AccountInfoR
-          addGetParam "address" "1c11aa45c792e202e9ffdc2f12f99d0d209bef70"
+          -- addGetParam "address" "1c11aa45c792e202e9ffdc2f12f99d0d209bef70"
+          addGetParam "index" "0"
         statusIs 200
         bodyEquals "[]" -- No accounts defined
         bodyContains "contractRoot"
@@ -198,7 +200,9 @@ spec = withApp $ do
           addGetParam "blocknumber" "0"
         statusIs 200
     describe "Complicated endpoints" $ do
-     xit "Last of previous index is one less than next index for blocks" $ do
+     it "Last of previous index is one less than next index for blocks" $ do
+        liftIO $ pendingWith "Requires a kafka instance to run these tests"
+        insertRandomTransactions 10
         YT.request $ do
           setUrl BlockInfoR
           addGetParam "minnumber" "1"
@@ -225,14 +229,15 @@ spec = withApp $ do
                                        $ (decode (simpleBody res)  ::  Maybe [Block'])
         liftIO $ HUnit.assertBool("N+1: ") $ n1 == n2
 
-     xit "Last of previous index is one less than next index for transactions" $ do
+     it "Last of previous index is one less than next index for transactions" $ do
+        liftIO $ pendingWith "Requires a kafka instance to run these tests"
+        insertRandomTransactions 10
         YT.request $ do
           setUrl TransactionR
           addGetParam "minvalue" "1"
           addGetParam "maxvalue" "200000001"
           addGetParam "index" "0"
         statusIs 200
-        -- TODO(tim) Insert transactions into the database so getFirstTxNum can succeed
         n1 <- withResponse $ \ res -> do return
                                        . snd
                                        . getFirstTxNum 0
