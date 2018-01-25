@@ -63,9 +63,9 @@ extra-deps:
 - directory-1.2.7.1
 - aeson-diff-1.1.0.4
 - edit-distance-vector-1.0.0.4
-- hspec-2.4.4
-- hspec-core-2.4.4
-- hspec-discover-2.4.4
+- hspec-2.3.2
+- hspec-core-2.3.2
+- hspec-discover-2.3.2
 - hspec-expectations-0.8.2
 - quickcheck-io-0.2.0
 
