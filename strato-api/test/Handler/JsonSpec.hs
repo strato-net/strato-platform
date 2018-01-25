@@ -123,10 +123,8 @@ spec = withApp $ do
         insertRandomTransactions 10
         YT.request $ do
           setUrl AccountInfoR
-          -- addGetParam "address" "1c11aa45c792e202e9ffdc2f12f99d0d209bef70"
           addGetParam "index" "0"
         statusIs 200
-        bodyEquals "[]" -- No accounts defined
         bodyContains "contractRoot"
 
     describe "JSON Query string" $ do
@@ -136,7 +134,7 @@ spec = withApp $ do
           length blockKeys `equiv` 1
           YT.request $ do
             setUrl BlockInfoR
-            addGetParam "index" "0"
+            addGetParam "number" "0"
           statusIs 200
           bodyContains' "9178d0f23c965d81f0834a4c72c6253ce6830f4022b1359aaebfc1ecba442d4e"
       it "Indexing" $ do
