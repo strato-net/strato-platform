@@ -1,4 +1,4 @@
-module Handler.PeerSpec where 
+module Handler.PeerSpec where
 
 import TestImport
 import Handler.Peers
@@ -11,8 +11,9 @@ import Network.Wai.Test (simpleBody)
 spec :: Spec
 spec = withApp $ do
   it "lists peers" $ do
+      liftIO $ pendingWith "Needs to find an ethconf.yaml"
       get PeersR
       withResponse (\res ->
         let text = simpleBody res
         in liftIO $ HUnit.assertBool (show text) False)
-      statusIs 200 
+      statusIs 200
