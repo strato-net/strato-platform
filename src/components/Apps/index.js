@@ -26,6 +26,7 @@ class Apps extends Component {
     const { apps } = this.props;
 
     return (
+      apps.length > 0 ?
       apps.map((app, key) => {
         return (
           <div className="md-grid md-toolbar--relative apps" key={key}>
@@ -59,6 +60,13 @@ class Apps extends Component {
           </div>
         )
       })
+      : <div className="md-grid md-toolbar--relative apps">
+          <div className="md-cell md-cell--3-desktop md-cell--0-tablet" />
+          <div className="md-cell md-cell--6-desktop md-cell--8-tablet md-text-center" style={{ color: 'white'}}>
+            <h3 style={{ color: 'white'}}>There are no apps on this server</h3>
+          </div>
+          <div className="md-cell md-cell--3-desktop md-cell--0-tablet" />
+        </div>          
     );
   }
 }
