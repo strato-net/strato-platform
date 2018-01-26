@@ -38,7 +38,7 @@ class Profile extends Component {
                 {this.state.user && this.state.user.username}
               </h3>
               <h3 className="md-cell--12 md-text-center">
-                Balance: {account.balance}
+                Balance: {account.balance / Math.pow(10,18)}
               </h3>
               <div className="md-cell--12 md-text-center">
                 <Button raised primary onClick={() => this.props.history.goBack()}> return to dApp</Button>
