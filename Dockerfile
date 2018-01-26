@@ -1,13 +1,13 @@
 FROM node:boron-slim
 
 RUN mkdir -p /usr/src/app && \
-    npm install -g serve
+    npm install --verbose -g serve
 
 WORKDIR /usr/src/app
 
 COPY . /usr/src/app
 
-RUN npm install && \
+RUN npm install --verbose && \
     npm run build && \
     rm -rf node_modules public src
 
