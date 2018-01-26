@@ -1,11 +1,13 @@
 import {
   FETCH_APPS_FAILURE,
-  FETCH_APPS_SUCCESSFUL
+  FETCH_APPS_SUCCESSFUL,
+  SELECT_APP
 } from './apps.actions';
 
 const initialState = {
   apps: [],
-  error: null
+  error: null,
+  selectedApp: null
 };
 
 const reducer = function (state = initialState, action) {
@@ -30,6 +32,13 @@ const reducer = function (state = initialState, action) {
         apps: [],
         error: action.error,
       };
+
+    case SELECT_APP:
+      return {
+        ...state,
+        selectedApp: action.app
+      }
+
     default:
       return state;
 

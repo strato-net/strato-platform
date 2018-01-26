@@ -3,14 +3,17 @@ import { Route, Switch, Redirect } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Register from './components/Register';
+import Profile from './components/Profile';
+import EnsureAuthenticated from './components/EnsureAuthenticated';
 
 export const routes = (
   <Switch>
     <Route exact path="/">
       <Redirect to="/dashboard" />
     </Route>
-    <Route exact path="/login" component={ Login } />
-    <Route exact path="/register" component={ Register } />
-    <Route exact path="/dashboard" component={ Dashboard } />
+    <EnsureAuthenticated path="/login" component={Login} />
+    <EnsureAuthenticated path="/register" component={Register} />
+    <Route path="/profile" component={Profile} />
+    <Route path="/dashboard" component={Dashboard} />
   </Switch>
 );

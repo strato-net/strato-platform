@@ -5,7 +5,7 @@ class DAppsStore extends Component {
   render() {
     return (
       <div>
-        <h1> DAppsStore </h1>
+        <h1> DApps Store </h1>
       </div>
     );
   }

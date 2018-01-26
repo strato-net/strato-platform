@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { fetchApps } from './apps.actions';
+import { fetchApps, selectApp } from './apps.actions';
 import {
   Button,
   Card,
@@ -17,13 +17,16 @@ class Apps extends Component {
   }
 
   launchApp(url) {
-    this.props.register.username ? window.open(env.LOCAL_URL + url, "_blank") : this.props.history.push('/login');
+    const user = localStorage.getItem('user')
+    const data = JSON.parse(user)
+    data && data.username ? window.open(env.LOCAL_URL + url, "_blank") : this.props.history.push('/login');
   }
 
   render() {
     const { apps } = this.props;
 
     return (
+      apps.length > 0 ?
       apps.map((app, key) => {
         return (
           <div className="md-grid md-toolbar--relative apps" key={key}>
@@ -39,7 +42,10 @@ class Apps extends Component {
                       <div className="app-name">
                         <b><h3>{app['appName']}</h3></b>
                       </div>
-                      <Button flat onClick={() => this.launchApp(app['url'])}>GET</Button>
+                      <Button flat onClick={() => {
+                        this.props.selectApp(app)
+                        this.launchApp(app['url'])
+                      }}>GET</Button>
                     </div>
                     <hr />
                     <div className="md-grid no-padding">
@@ -54,6 +60,13 @@ class Apps extends Component {
           </div>
         )
       })
+      : <div className="md-grid md-toolbar--relative apps">
+          <div className="md-cell md-cell--3-desktop md-cell--0-tablet" />
+          <div className="md-cell md-cell--6-desktop md-cell--8-tablet md-text-center" style={{ color: 'white'}}>
+            <h3 style={{ color: 'white'}}>There are no apps on this server</h3>
+          </div>
+          <div className="md-cell md-cell--3-desktop md-cell--0-tablet" />
+        </div>          
     );
   }
 }
@@ -61,8 +74,7 @@ class Apps extends Component {
 export function mapStateToProps(state) {
   return {
     apps: state.apps.apps,
-    register: state.register
   };
 }
 
-export default withRouter(connect(mapStateToProps, { fetchApps })(Apps));
+export default withRouter(connect(mapStateToProps, { fetchApps, selectApp })(Apps));

@@ -1,30 +1,32 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { BottomNavigation, FontIcon } from 'react-md';
-import { Button, NavigationDrawer } from 'react-md';
+import { BottomNavigation, FontIcon, Button, Toolbar } from 'react-md';
 import DAppsStore from '../DAppsStore/index';
 import Apps from '../Apps';
 import Updates from '../Updates/index';
 import Search from '../Search/index';
 
 const links = [{
-  label: 'My Dapps',
+  label: 'DApps',
   icon: <FontIcon iconClassName="fa fa-th-large" />,
   style: { color: 'white' }
-}, {
-  label: 'Dapps Store',
-  icon: <FontIcon iconClassName="fa fa-rocket" />,
-  style: { color: 'white' }
-}, {
-  label: 'Updates',
-  icon: <FontIcon iconClassName="fa fa-download" />,
-  style: { color: 'white' }
-}, {
-  label: 'Search',
-  icon: <FontIcon iconClassName="fa fa-search" />,
-  style: { color: 'white' }
-}];
+}, 
+// {
+//   label: 'Dapps Store',
+//   icon: <FontIcon iconClassName="fa fa-rocket" />,
+//   style: { color: 'white' }
+// }, {
+//   label: 'Updates',
+//   icon: <FontIcon iconClassName="fa fa-download" />,
+//   style: { color: 'white' }
+// }, {
+//   label: 'Search',
+//   icon: <FontIcon iconClassName="fa fa-search" />,
+//   style: { color: 'white' }
+// }
+];
+
 
 class Dashboard extends Component {
   state = { title: links[0].label, children: <Apps /> };
@@ -43,15 +45,18 @@ class Dashboard extends Component {
         children = <Search key="nearby" />;
         break;
       default:
-        children = <Apps key="recent" />;
+        children = <Apps key="apps" />;
     }
 
     this.setState({ title, children });
   };
 
   navigate() {
-    let { register, history } = this.props;
-    register.username ? history.push('/profile') : history.push('/login');
+    const user = localStorage.getItem('user')
+    const data = JSON.parse(user)
+
+    let { history } = this.props;
+    data && data.username ? history.push('/profile') : history.push('/login');
   }
 
   render() {
@@ -59,18 +64,13 @@ class Dashboard extends Component {
 
     return (
       <div>
+        <Toolbar 
+          colored
+          title="DApps"
+          actions={<Button icon onClick={this.navigate.bind(this)}><FontIcon iconClassName="fa fa-user-circle" /></Button>}
+        />
         <div>
-          <NavigationDrawer
-            mobileDrawerType={NavigationDrawer.DrawerTypes.TEMPORARY}
-            tabletDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
-            desktopDrawerType={NavigationDrawer.DrawerTypes.PERSISTENT}
-            toolbarTitle="Dapps"
-            toolbarActions={<Button icon onClick={this.navigate.bind(this)}><FontIcon iconClassName="fa fa-user-circle" /></Button>}
-            persistentIcon={<FontIcon>menu</FontIcon>}
-            contentId="main-demo-content"
-          >
-            {children}
-          </NavigationDrawer>
+          {children}
         </div>
         <BottomNavigation
           links={links}
@@ -83,9 +83,8 @@ class Dashboard extends Component {
 }
 
 export function mapStateToProps(state) {
-  return { 
+  return {
     apps: state.apps,
-    register: state.register
   };
 }
 
