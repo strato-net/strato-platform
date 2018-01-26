@@ -61,7 +61,7 @@ deployments:
 
   - name: dapp-store
     repo: https://github.com/blockapps/dapp-store.git
-    ref: develop
+    ref: master
     compose:
       restart: always
       depends_on:
@@ -193,7 +193,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: dapp-store
+    ref: master
     compose:
       restart: always
       ports:
