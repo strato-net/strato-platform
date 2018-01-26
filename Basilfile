@@ -22,8 +22,10 @@ deployments:
     compose:
       restart: always
       depends_on:
-        - strato
+        - apex
         - bloch
+        - cirrus
+        - strato
       environment:
         NODE_NAME: "${NODE_NAME}"
         BLOC_URL: "${BLOC_URL}"
@@ -44,6 +46,7 @@ deployments:
         - bloch
         - cirrus
         - postgres
+        - strato
       volumes:
         - dapps:/usr/src/app/apps
       environment:
@@ -56,6 +59,19 @@ deployments:
         postgres_host: "postgres"
         postgres_port: "5432"
 
+  - name: dapp-store
+    repo: https://github.com/blockapps/dapp-store.git
+    ref: develop
+    compose:
+      restart: always
+      depends_on:
+        - bloch
+        - cirrus
+        - strato
+      environment:
+        BLOC_URL: "${BLOC_URL}"
+        STRATO_URL: "${STRATO_URL}"
+        CIRRUS_URL: "${CIRRUS_URL}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
@@ -177,7 +193,7 @@ deployments:
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
-    ref: master
+    ref: dapp-store
     compose:
       restart: always
       ports:
