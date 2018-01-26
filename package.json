@@ -6,6 +6,7 @@
     "node": "v8.9.4"
   },
   "private": true,
+  "homepage": "/dappstore/",
   "scripts": {
     "start": "npm-run-all -p watch-css start-js",
     "build": "npm-run-all build-css build-js",
