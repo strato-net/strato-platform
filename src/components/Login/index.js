@@ -6,7 +6,7 @@ import { withRouter, Redirect } from 'react-router-dom';
 import { Button, Card, Snackbar } from 'react-md';
 import { validateUser, resetLoginMessage, resetRedirectRefer } from './login.action';
 import ReduxedTextField from '../ReduxedTextField';
-import { env } from '../../env';
+
 
 class Login extends Component {
 
@@ -27,7 +27,7 @@ class Login extends Component {
 
     if (redirectToReferrer) {
       if (this.props.app) {
-        window.open(env.LOCAL_URL + this.props.app['url'], "_blank")
+        window.open(`${window.location.host}${this.props.app['url']}`, "_blank")
       }
       return (<Redirect to={from} />)
     }

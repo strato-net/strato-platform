@@ -8,7 +8,6 @@ import {
   FontIcon
 } from 'react-md';
 import './apps.css';
-import { env } from '../../env';
 
 class Apps extends Component {
 
@@ -19,7 +18,7 @@ class Apps extends Component {
   launchApp(url) {
     const user = localStorage.getItem('user')
     const data = JSON.parse(user)
-    data && data.username ? window.open(env.LOCAL_URL + url, "_blank") : this.props.history.push('/login');
+    data && data.username ? window.open(`${window.location.host}${url}`, "_blank") : this.props.history.push('/login');
   }
 
   render() {

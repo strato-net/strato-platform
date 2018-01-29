@@ -6,7 +6,6 @@ import { Button, Card, Snackbar } from 'react-md';
 import ReduxedTextField from '../../components/ReduxedTextField';
 import { createUser, resetRedirectRefer, resetUserError } from './register.actions';
 import './Register.css';
-import { env } from '../../env'
 
 class Register extends Component {
 
@@ -23,7 +22,7 @@ class Register extends Component {
     const { redirectToReferrer } = this.props.register
     if (redirectToReferrer) {
       if (this.props.app) {
-        window.open(env.LOCAL_URL + this.props.app['url'], "_blank")
+        window.open(`${window.location.host}${this.props.app['url']}` , "_blank")
       }
       return (<Redirect to={from} />)
     }
