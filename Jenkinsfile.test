@@ -69,6 +69,22 @@ pipeline {
         '''
       }
     }
+    
+    stage('E2E-Test') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
+          rm -rf blockapps-ba
+          git clone https://github.com/blockapps/blockapps-ba.git -b master
+          cd blockapps-ba
+          npm i
+          SERVER=localhost npm run deploy
+          SERVER=localhost npm run test
+        '''
+      }
+    }
+    
     stage('bloch-tests') {
       steps {
         sh '''#!/bin/bash -le
@@ -84,21 +100,6 @@ pipeline {
         '''
       }
     }
-    stage('E2E-Test') {
-      steps {
-        sh '''#!/bin/bash -le
-          set -x
-          echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
-          rm -rf blockapps-ba
-          git clone https://github.com/blockapps/blockapps-ba.git -b master
-          cd blockapps-ba
-          npm i
-          SERVER=localhost npm run deploy
-          SERVER=localhost npm run test
-        '''
-      }
-    }
-
     stage('Release') {
           steps {
             withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
