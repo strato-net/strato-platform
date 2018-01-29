@@ -170,7 +170,7 @@ data Transaction' = Transaction' Transaction deriving (Eq, Show)
 instance ToJSON Transaction' where
     toJSON (Transaction' tx@(MessageTX tnon tgp tgl (Address tto) tval td tr ts tv)) =
         object ["kind" .= ("Transaction" :: String),
-                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (Nothing)),"")),
+                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
                 "nonce" .= tnon,
                 "gasPrice" .= tgp,
                 "gasLimit" .= tgl,
@@ -185,7 +185,7 @@ instance ToJSON Transaction' where
     toJSON (Transaction' (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _)) = error "error in ToJSON for Transaction': You can't serialize a precompiled code"
     toJSON (Transaction' tx@(ContractCreationTX tnon tgp tgl tval (Code ti) tr ts tv)) =
         object ["kind" .= ("Transaction" :: String),
-                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (Nothing)),"")),
+                "from" .= ((uncurry showHex) $ ((fromMaybe (Address 0) (whoSignedThisTransaction tx)),"")),
                 "nonce" .= tnon,
                 "gasPrice" .= tgp,
                 "gasLimit" .= tgl,
