@@ -63,14 +63,16 @@ function extractTxTypes(receiptTransactions) {
 }
 
 function parseTransactionType(v) {
-  if(v.transactionTo == 0) {
-	  return 2; // Contract Creation
+  let c = v.match(/sContractCreation \{transactionNonce/g);
+  let s = v.match(/transactionData = \"\", transactionR/g);
+  if(c != null) {
+	  return "Contract";
   }
-  else if(v.transactionData == "") {
-	  return 1; // Transfer
+  else if(s != null) {
+	  return "Transfer";
   }
   else {
-	  return 0; // Function Call
+	  return "FunctionCall";
   }
 }
 
