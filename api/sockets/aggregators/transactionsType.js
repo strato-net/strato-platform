@@ -1,24 +1,28 @@
 const _ = require('underscore');
 const { TRANSACTIONS_TYPE } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
-var rp = require('request-promise');
 const config = require('../../config/app.config')
+const Block= require('../models/eth/block')
 
 let transactionsTypes
 
-const options = {
-  uri: `${process.env['stratoRoot']}/block/last/15`,
-  json: true
-}
-
 function getTransactionsType() {
-  rp(options)
-    .then(function (data) {
+  Block
+    .findAll(
+      {
+        attributes: [
+          'receipt_transactions'
+        ],
+        raw: true, 
+        limit: 15, 
+        order: [['id', 'DESC']] 
+      }
+    ).then(function (data) {
 
       let receiptTransactions = [];
 
-      _.map(data, function (data) {
-        receiptTransactions.push(data.receiptTransactions);
+      _.map(data, function (d) {
+        receiptTransactions.push(d.receipt_transactions);
       })
 
       const currentTxType = extractTxTypes(receiptTransactions);
@@ -36,7 +40,8 @@ function getTransactionsType() {
 function extractTxTypes(receiptTransactions) {
   let types = { "FunctionCall": 0, "Transfer": 0, "Contract": 0 };
   receiptTransactions.forEach(function (val) {
-    val.forEach(v => { types[v.transactionType]++ });
+    let val2 = JSON.parse(val);
+    val2.forEach(v => { types[parseTransactionType(v)]++ });
   })
   const filtered = _.keys(types)
     .filter((type)=>{
@@ -55,6 +60,18 @@ function extractTxTypes(receiptTransactions) {
     }]
   }
   return filtered;
+}
+
+function parseTransactionType(v) {
+  if(v.transactionTo == 0) {
+	  return 2; // Contract Creation
+  }
+  else if(v.transactionData == "") {
+	  return 1; // Transfer
+  }
+  else {
+	  return 0; // Function Call
+  }
 }
 
 getTransactionsType()
