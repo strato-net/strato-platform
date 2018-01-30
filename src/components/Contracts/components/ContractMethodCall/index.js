@@ -4,14 +4,14 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
-import { fetchAccounts } from '../../../Accounts/accounts.actions';
+import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
 import {
   methodCall,
   methodCallFetchArgs,
   methodCallOpenModal,
   methodCallCloseModal
 } from './contractMethodCall.actions';
-
+import { required } from '../../../../lib/reduxFormsValidations'
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
 
@@ -29,7 +29,7 @@ class ContractMethodCall extends Component {
       this.props.symbolName,
       this.props.lookup
     );
-    this.props.fetchAccounts(true, false);
+    this.props.fetchAccounts(false, false);
   }
 
   handleCloseModal = (e) => {
@@ -60,6 +60,10 @@ class ContractMethodCall extends Component {
     this.props.methodCall(this.props.lookup, payload);
   }
 
+  handleUsernameChange = (e) => {
+    this.props.fetchUserAddresses(e.target.value,false)
+  };
+
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
@@ -84,6 +88,8 @@ class ContractMethodCall extends Component {
                 type="text"
                 placeholder={self.props.modal.args[arg].type}
                 className="pt-input"
+                validate={required}
+                required
               />
             </td>
           </tr>
@@ -132,6 +138,8 @@ class ContractMethodCall extends Component {
                       className="pt-input"
                       name="modalUsername"
                       component="select"
+                      onChange = {this.handleUsernameChange}
+                      validate={required}
                       required
                     >
                       <option />
@@ -158,6 +166,7 @@ class ContractMethodCall extends Component {
                       className="pt-input"
                       component="select"
                       name="modalAddress"
+                      validate={required}
                       required
                     >
                       <option />
@@ -187,6 +196,7 @@ class ContractMethodCall extends Component {
                     placeholder="Password"
                     component="input"
                     type="password"
+                    validate={required}
                     required
                   />
                 </div>
@@ -201,7 +211,6 @@ class ContractMethodCall extends Component {
                   <Field
                     name="modalValue"
                     component={ValueInput}
-                    required
                   />
                 </div>
               </div>
@@ -239,7 +248,7 @@ class ContractMethodCall extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={this.handleCloseModal} />
                 <button
-                  disabled={this.props.pristine || this.props.submitting}
+                  disabled={this.props.pristine || this.props.submitting || !this.props.valid}
                   className="pt-button pt-intent-primary"
                   type="button"
                   onClick={handleSubmit(this.submit)}
@@ -255,6 +264,17 @@ class ContractMethodCall extends Component {
   }
 }
 
+export const validate = (values) => {
+  const errors = {};
+
+  Object.getOwnPropertyNames(values).forEach((val) => {
+    if (values[val] === '' || values[val] === undefined) {
+      errors[val] = val + " Required";
+    }
+  });
+  return errors
+};
+
 const selector = formValueSelector('contract-method-call');
 
 export function mapStateToProps(state, ownProps) {
@@ -268,7 +288,7 @@ export function mapStateToProps(state, ownProps) {
 }
 
 
-const formed = reduxForm({ form: 'contract-method-call' })(ContractMethodCall);
+const formed = reduxForm({ form: 'contract-method-call', validate})(ContractMethodCall);
 const connected = connect(
   mapStateToProps,
   {
@@ -276,6 +296,7 @@ const connected = connect(
     methodCallOpenModal,
     methodCallCloseModal,
     fetchAccounts,
+    fetchUserAddresses,
     methodCall,
   }
 )(formed);
