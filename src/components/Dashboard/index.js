@@ -73,11 +73,11 @@ class Dashboard extends Component {
         <div>
           {children}
         </div>
-        <BottomNavigation
+        {/* <BottomNavigation
           links={links}
           dynamic={false}
           onNavChange={this.handleNavChange}
-        />
+        /> */}
       </div>
     );
   }
