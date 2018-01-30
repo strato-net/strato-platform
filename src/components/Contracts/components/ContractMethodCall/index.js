@@ -88,6 +88,8 @@ class ContractMethodCall extends Component {
                 type="text"
                 placeholder={self.props.modal.args[arg].type}
                 className="pt-input"
+                validate={required}
+                required
               />
             </td>
           </tr>
@@ -137,6 +139,7 @@ class ContractMethodCall extends Component {
                       name="modalUsername"
                       component="select"
                       onChange = {this.handleUsernameChange}
+                      validate={required}
                       required
                     >
                       <option />
@@ -163,6 +166,7 @@ class ContractMethodCall extends Component {
                       className="pt-input"
                       component="select"
                       name="modalAddress"
+                      validate={required}
                       required
                     >
                       <option />
@@ -192,6 +196,7 @@ class ContractMethodCall extends Component {
                     placeholder="Password"
                     component="input"
                     type="password"
+                    validate={required}
                     required
                   />
                 </div>
@@ -206,7 +211,6 @@ class ContractMethodCall extends Component {
                   <Field
                     name="modalValue"
                     component={ValueInput}
-                    required
                   />
                 </div>
               </div>
