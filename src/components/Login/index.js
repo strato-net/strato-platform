@@ -27,7 +27,7 @@ class Login extends Component {
 
     if (redirectToReferrer) {
       if (this.props.app) {
-        window.open(`${window.location.protocol}//${window.location.host}${url}`, "_blank")
+        window.open(`${window.location.protocol}//${window.location.host}${this.props.app['url']}`, "_blank")
       }
       return (<Redirect to={from} />)
     }
