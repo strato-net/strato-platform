@@ -4,6 +4,7 @@ import {
   RESET_USER_ERROR,
   RESET_REDIRECT_REFER_REGISTER
 } from './register.actions';
+import { env } from '../../env';
 
 const initialState = {
   username: undefined,
@@ -15,7 +16,7 @@ const initialState = {
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case CREATE_USER_SUCCESS:
-      localStorage.setItem('user', JSON.stringify({ "username": action.username, "address": action.address }));
+      localStorage.setItem(env.USERKEY, JSON.stringify({ "username": action.username, "address": action.address }));
       return {
         username: action.username,
         address: action.address,

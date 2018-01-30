@@ -6,6 +6,7 @@ import DAppsStore from '../DAppsStore/index';
 import Apps from '../Apps';
 import Updates from '../Updates/index';
 import Search from '../Search/index';
+import { env } from '../../env';
 
 const links = [{
   label: 'DApps',
@@ -52,7 +53,7 @@ class Dashboard extends Component {
   };
 
   navigate() {
-    const user = localStorage.getItem('user')
+    const user = localStorage.getItem(env.USERKEY)
     const data = JSON.parse(user)
 
     let { history } = this.props;

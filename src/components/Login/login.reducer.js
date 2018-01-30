@@ -4,6 +4,7 @@ import {
   RESET_LOGIN_MESSAGE,
   RESET_REDIRECT_REFER_LOGIN
 } from './login.action';
+import { env } from '../../env';
 
 const initialState = {
   result: undefined,
@@ -13,7 +14,7 @@ const initialState = {
 const reducer = function (state = initialState, action) {
   switch (action.type) {
     case VALIDATE_USER_SUCCESS:
-      localStorage.setItem('user', JSON.stringify({ "username": action.username, "address": action.address }));
+      localStorage.setItem(env.USERKEY, JSON.stringify({ "username": action.username, "address": action.address }));
       return {
         ...state,
         userName: action.username,

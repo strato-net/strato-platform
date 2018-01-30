@@ -33,6 +33,11 @@ export function getAccountDetailApi(address) {
 export function* getAccountDetail(action) {
   try {
     const response = yield call(getAccountDetailApi, action.address);
+    if(response.length === 0) {
+      // account is invalid. logout user.
+      localStorage.removeItem(env.USERKEY);
+      return;
+    }
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
   }
   catch (err) {

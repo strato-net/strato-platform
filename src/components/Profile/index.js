@@ -3,6 +3,8 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Card, FontIcon } from 'react-md';
 import { fetchAccountDetail } from './profile.action';
+import { env } from '../../env';
+
 import './profile.css';
 
 class Profile extends Component {
@@ -14,7 +16,10 @@ class Profile extends Component {
   }
 
   componentDidMount() {
-    const user = localStorage.getItem('user');
+    const user = localStorage.getItem(env.USERKEY);
+    if(!user) {
+      this.props.history.push('/login');
+    }
     const data = JSON.parse(user);
     this.setState({ user: data });
     this.props.fetchAccountDetail(data.address)

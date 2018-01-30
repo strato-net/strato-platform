@@ -7,6 +7,7 @@ import {
   Card,
   FontIcon
 } from 'react-md';
+import { env } from '../../env';
 import './apps.css';
 
 class Apps extends Component {
@@ -16,7 +17,7 @@ class Apps extends Component {
   }
 
   launchApp(url) {
-    const user = localStorage.getItem('user')
+    const user = localStorage.getItem(env.USERKEY)
     const data = JSON.parse(user)
     data && data.username ? window.open(`${window.location.host}${url}`, "_blank") : this.props.history.push('/login');
   }
