@@ -86,19 +86,19 @@ class Login extends Component {
 
 export function validate(values) {
   const errors = {};
-  let reg = /^.{9,19}$/;
+  let reg = /^.{2,15}$/;
 
   if (!values.username) {
     errors.username = "Username Required";
   }
   if (!reg.test(values.username)) {
-    errors.username = "Username must be at least 10 characters and less than 20 characters";
+    errors.username = "Username must be at least 2 characters and less than 15 characters";
   }
   if (!values.password) {
     errors.password = "Password Required";
   }
-  if (!reg.test(values.password)) {
-    errors.password = "Password must be at least 10 characters and less than 20 characters";
+  else if (values.password.length < 6) {
+    errors.password = "Password must be at least 6 characters";
   }
 
   return errors;

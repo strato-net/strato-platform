@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { BottomNavigation, FontIcon, Button, Toolbar } from 'react-md';
+import { FontIcon, Button, Toolbar } from 'react-md';
 import DAppsStore from '../DAppsStore/index';
 import Apps from '../Apps';
 import Updates from '../Updates/index';
