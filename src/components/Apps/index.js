@@ -19,7 +19,7 @@ class Apps extends Component {
   launchApp(url) {
     const user = localStorage.getItem(env.USERKEY)
     const data = JSON.parse(user)
-    data && data.username ? window.open(`${window.location}//${window.location.host}${url}`, "_blank") : this.props.history.push('/login');
+    data && data.username ? window.open(`${window.location.protocol}//${window.location.host}${url}`, "_blank") : this.props.history.push('/login');
   }
 
   render() {
