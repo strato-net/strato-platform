@@ -30,7 +30,6 @@ class Profile extends Component {
 
     // TODO: create a logout handler
     if(!account || !account.balance || account.balance === NaN) {
-      localStorage.removeItem(env.USERKEY) 
       this.props.history.push('/login');
     }
 
