@@ -22,7 +22,7 @@ class Register extends Component {
     const { redirectToReferrer } = this.props.register
     if (redirectToReferrer) {
       if (this.props.app) {
-        window.open(`${window.location.host}${this.props.app['url']}` , "_blank")
+        window.open(`${window.location.protocol}//${window.location.host}${this.props.app['url']}` , "_blank")
       }
       return (<Redirect to={from} />)
     }
