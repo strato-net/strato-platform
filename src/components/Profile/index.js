@@ -28,6 +28,12 @@ class Profile extends Component {
   render() {
     const { account } = this.props.profile;
 
+    // TODO: create a logout handler
+    if(!account || !account.balance || account.balance === NaN) {
+      localStorage.removeItem(env.USERKEY) 
+      this.props.history.push('/login');
+    }
+
     return (
       <section>
         <div className="md-grid">
