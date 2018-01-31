@@ -37,7 +37,7 @@ class Login extends Component {
         <div className="md-grid">
           <Card className="md-block-centered content login-box">
             <div className="md-cell md-cell--12 md-text-center" style={{color: '#e7e7e7'}}>
-              <i class="fa fa-user-circle fa-5x"></i>
+              <i className="fa fa-user-circle fa-5x"></i>
             </div>
             <form
               onSubmit={handleSubmit(this.submit)}

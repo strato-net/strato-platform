@@ -36,7 +36,7 @@ export function* getAccountDetail(action) {
     if(response.length === 0) {
       // account is invalid. logout user.
       localStorage.removeItem(env.USERKEY);
-      return;
+      yield put(fetchAccountDetailFailure(action.name, action.address, 'No such user'));
     }
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
   }
