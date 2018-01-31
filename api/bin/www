@@ -39,7 +39,7 @@ co(function*(){
   // yield models.sequelize.sync();
   // yield createInitialData();
 
-  //yield registerAppMetadata();
+  yield registerAppMetadata();
   server.listen(port);
   server.on('error', onError);
   server.on('listening', onListening);
