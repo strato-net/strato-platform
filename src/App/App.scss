@@ -16,8 +16,13 @@ footer {
 body {
   background: #37474f !important;
   margin: 0;
-  height: 100vh;
 }
+
+html {
+  background: #37474f !important;
+  height: 100%;
+}
+
 
 .align-text-verticle-center {
   display: flex;
