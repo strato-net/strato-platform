@@ -3,17 +3,20 @@ const { GET_TRANSACTIONS } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 var rp = require('request-promise');
 const config = require('../../config/app.config')
-
-const options = {
-  uri: `${process.env['stratoRoot']}/transaction/last/15`,
-  json: true
-}
+const Transaction= require('../models/eth/transaction')
 
 let transactions
 
 function getTransactions() {
-  rp(options)
-    .then(function (currentTransactions) {
+  Transaction
+    .findAll(
+      {
+        raw: true, 
+        limit: 15, 
+        order: [['id', 'DESC']] 
+      }
+    ).then(function (currentTransactions) {
+      currentTransactions.forEach(t => { t.hash = t.tx_hash; t.transactionType = parseTransactionType(t); });
       if (!_.isEqual(transactions, currentTransactions)) {
         transactions = currentTransactions;
         emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_TRANSACTIONS, currentTransactions)
@@ -22,6 +25,18 @@ function getTransactions() {
     .catch(function (err) {
       console.log("err", err);
     });
+}
+
+function parseTransactionType(t) {
+  if(t.to_address == null) {
+	  return "Contract";
+  }
+  else if(t.code_or_data.length == 0) {
+	  return "Transfer";
+  }
+  else {
+	  return "FunctionCall";
+  }
 }
 
 getTransactions()
