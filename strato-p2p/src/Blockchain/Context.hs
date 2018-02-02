@@ -63,7 +63,7 @@ instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
 instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
     getRedisBlockDB = contextRedisBlockDB <$> get
 
-instance (MonadResource m, MonadBaseControl IO m, MonadState Context m) => HasSQLDB m where
+instance (MonadResource m, MonadBaseControl IO m, MonadState Context m, MonadIO m) => HasSQLDB m where
   getSQLDB = contextSQLDB <$> get
 
 getDebugMsg :: MonadState Context m => m String
@@ -103,8 +103,6 @@ clearActionTimestamp = do
 
 instance Show PS.Connection where
   show _ = "Postgres Simple Connection"
-
-type ContextMLite = StateT Context (ResourceT (LoggingT IO))
 
 runContextM :: (MonadBaseControl IO m )
             => s

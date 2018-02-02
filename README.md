@@ -5,24 +5,6 @@
 
 Note: If you are running through this guide and find something doesn't work, please update it.
 
-## mgit
-You must clone this repository using [mgit](http://github.com/blockapps/mgit)-- if you use the old-fashioned git you will be missing important components.
-
-```
-> git clone http://github.com/blockapps/mgit.git
-> cd mgit
-> stack install
-> alias mgit=./.stack-work/.stack-work/install/x86_64-osx/lts-3.4/7.10.2/bin/mgit
-> cd ..
-> mgit clone http://github.com/blockapps/monstrato.git
-> cd monstrato
-```
-
-## alex
-`alex` is a haskell library for building lexers, and is a build-tool dependency for the repo. Make sure `~/.local/bin` is on your `PATH`.
-```
-> stack install alex
-```
 
 ## postgres
 At the time of writing this it seems like we're able to use the latest postgres (v9.6), but ask if you are unsure which version you need. To install:
@@ -32,9 +14,25 @@ At the time of writing this it seems like we're able to use the latest postgres 
 
 ### Ubuntu
 ```
-> sudo apt-get install postgresql-9.6 
+> sudo apt-get install postgresql-9.6
 ```
-Make sure there is a postgres superuser named `postgres` (should exist by default) with password `api` (by hand). On Ubuntu, you might also need to change some configuration in `/etc/postgresql/9.6/main`-- namely where it says "Allow replication connections from localhost, by a user with the replication privelage.", change the `METHOD` for the `postgres` user of type `host` to `md5`.
+Make sure there is a postgres superuser named `postgres` (should exist by default) with password `api` (by hand):
+```
+> sudo -u postgres psql
+postgres=# ALTER USER postgres WITH PASSWORD 'api';
+postgres=# \q
+>
+```
+Note that when connecting as a (system) user other than `postgres`, you may need to specify an address:
+```
+> psql -U postgres
+psql: FATAL: Peer authentication failed for user "postgres"
+> psql -U postgres -h localhost
+Password for user postgres:
+postgres=#
+```
+
+On Ubuntu, you might also need to change some configuration in `/etc/postgresql/9.6/main`-- namely where it says "Allow replication connections from localhost, by a user with the replication privelage.", change the `METHOD` for the `postgres` user of type `host` to `md5`.
 
 ## LevelDB
 At the time of writing this the latest version is 1.19.
@@ -45,12 +43,9 @@ At the time of writing this the latest version is 1.19.
 > git leveldb
 > make
 ```
-### Ubuntu 
+### Ubuntu
 ```
-> sudo apt-get install snappy-dev
-> git clone https://github.com/google/leveldb.git
-> git leveldb
-> make
+> sudo apt install libleveldb-dev
 ```
 
 ## Kafka
@@ -59,19 +54,17 @@ Currently we're using v0.9.1.1, but this can change in the future. You'll need t
 ### MacOSX
 Again, you can use `brew search *` to figure out if the version you're looking for is currently on tap.
 ```
-> brew cask install java 
+> brew cask install java
 > brew install zookeeper
 > brew install kafka
 ```
 ### Ubuntu
+Consult the https://github.com/blockapps/kafka-packager for a rough approximation of how to install kafka.
+To build the docker image for it:
 ```
-> sudo apt-get install openjdk-8-jre 
-> sudo apt-get install zookeeperd=3.4.8-1
-> cd <path-to-monstrato-repo>/deployments/dpkg/kafka
-> ./setupKafka
-> sudo dpkg -i kafka.deb
-> sudo dpkg -i kafka.deb
+> sudo BASIL_BUILD_TAG=your_tag make -f Basilbuild
 ```
+If instead you want a system installation, the `Dockerfile.build` has references to the appropriate package versions and where to acquire them.
 This does it for dependencies. At the top level of the `monstrato` repo you should be able to run `stack install`.
 
 #Setting Up a Client Node
@@ -80,24 +73,24 @@ Make sure you are running Zookeeper, then start your kafka server. On Mac this w
 ```
 > brew services start zookeeper
 > brew services start kafka
-``` 
+```
 
 Make  directory called nodes, and inside of this directory make a node named with the current monstrato branch you are working on, e.g.
 ```
 > mkdir -p nodes/master-node
 > cd nodes/master-node
-``` 
+```
 
 Run `strato-setup` (an executable in `~/.local/bin` created when you ran `stack install`) with arguments telling it postgres and your kafka server
 ```
 > strato-setup -u postgres -p -K localhost
-``` 
+```
 Note: It could be the case that you don’t have the blockchain db in postgres, if you get some error indicating this do
 
 ```
 > cd blockapps-data
 > stack exec -- global-db
-``` 
+```
 
 1. You should now be able to see some directories and a genesis block `livenetGenesis.json`. (If for some reason this genesis block wasn’t created, you can find it in the repo. It will also create a database called `eth_<SOME_HASH>`. Next run `ethereum-discover`. This will start the peer finding process, writing peer info to the `etc` database. After this has run for a while, you can leave it as a background process or kill it.
 

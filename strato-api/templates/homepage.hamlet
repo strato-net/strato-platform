@@ -41,4 +41,3 @@
     All blockchain based applications will need to pull information from the blockchain. We've made that
     process simple. We've created an intuitive RESTful API for querying the Ethereum Blockchain. Our Haskell based
     Ethereum network peer (client) is in sync with the livenet and making data available to you.
-  

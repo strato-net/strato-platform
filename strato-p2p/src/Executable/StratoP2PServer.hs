@@ -14,21 +14,17 @@ import           Blockchain.CommunicationConduit
 import           Blockchain.Context
 import           Blockchain.RLPx
 import           Conduit
-import           Control.Concurrent                    hiding (yield)
-import           Control.Concurrent.STM.MonadIO
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Logger
 import           Crypto.PubKey.ECC.DH
 import           Data.Conduit.Network
-import qualified Data.Set                              as S
 import           Data.Streaming.Network                (appCloseConnection)
 import qualified Data.Text                             as T
 import qualified Database.Persist.Postgresql           as SQL
 
 import           Blockchain.ECIES
 import           Blockchain.EthConf
-import           Blockchain.P2PRPC
 import           Blockchain.P2PUtil
 import           Blockchain.ServOptions
 import           Blockchain.Strato.Discovery.Data.Peer

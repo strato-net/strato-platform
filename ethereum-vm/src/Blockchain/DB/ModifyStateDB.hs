@@ -6,21 +6,14 @@ module Blockchain.DB.ModifyStateDB (
   pay
 ) where
 
-import           Control.Monad
 import           Control.Monad.Logger
 import           Control.Monad.Trans
-import           Text.PrettyPrint.ANSI.Leijen    hiding ((<$>))
 
 import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.DB.HashDB
 import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
-import           Blockchain.VMOptions
-
-import qualified Data.Text                       as T
-
---import Debug.Trace
 
 addToBalance::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m)=>
               Address->Integer->m Bool
@@ -37,7 +30,7 @@ addToBalance address val = do
 
 pay::(HasMemAddressStateDB m, HasHashDB m, HasStateDB m, MonadIO m, MonadLogger m)=>
      String->Address->Address->Integer->m Bool
-pay description fromAddr toAddr val = do
+pay _description fromAddr toAddr val = do
   -- TODO - figure out why the next lines create infinite loops when run in pizza app (with debug flag on)
   -- until this is resolved, I am commenting this out.
   {-
@@ -58,18 +51,3 @@ pay description fromAddr toAddr val = do
     _ <- addToBalance fromAddr (-val)
     _ <- addToBalance toAddr val
     return True
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

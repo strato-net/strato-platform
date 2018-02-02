@@ -6,13 +6,6 @@ module Handler.Peers where
 
 import           Import                     hiding (readFile, (</>))
 
-import           Control.Monad.Trans.Except (runExceptT)
-import qualified Data.ByteString            as BS
-import qualified Data.ByteString.Lazy       as BL
-import           Data.Conduit.Network
-import           Data.Either                (isLeft)
-import qualified Data.Text                  as T
-import           Data.Traversable           (for)
 import           Blockchain.Strato.Discovery.Data.Peer
 
 getPeersR :: Handler Value

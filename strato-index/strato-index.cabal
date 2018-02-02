@@ -48,23 +48,13 @@ library
                , blockapps-data
                , blockapps-util
                , bytestring
-               , directory
-               , ethereum-rlp
-               , fast-logger
-               , filepath
-               , hflags
-               , lens
                , blockapps-milena
                , monad-logger
-               , mtl
                , persistent-postgresql
-               , process
                , resourcet
-               , stm
                , text
                , transformers
                , persistent
-               , containers
                , strato-conf
                , strato-sequencer
                , hedis

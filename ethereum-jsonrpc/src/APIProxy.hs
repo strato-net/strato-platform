@@ -13,9 +13,6 @@ apiBaseUrl="http://localhost:3000/eth/v1.2/"
 call::String->IO String
 call command = do
   manager <- liftIO $ newManager defaultManagerSettings
-  request <- liftIO $ parseUrl $ apiBaseUrl ++ command
+  request <- liftIO $ parseRequest $ apiBaseUrl ++ command
   response <- liftIO $ httpLbs request manager
-
-  --putStrLn $ "The status code was: " ++ (show $ statusCode $ responseStatus response)
   return $ BLC.unpack $ responseBody response
-

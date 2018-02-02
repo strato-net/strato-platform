@@ -11,7 +11,6 @@ module Blockchain.EthConf (
       QuarryConf(..),
       BlockConf(..),
       EthUniqueId(..),
-      GeneralConf(..),
       PrivKey(..),
       StatsConf(..), runStatsTConfigured,
       ethConf,
@@ -52,7 +51,6 @@ data EthConf =
         quarryConfig       :: QuarryConf,
         blockConfig        :: BlockConf,
         discoveryConfig    :: DiscoveryConf,
-        generalConfig      :: GeneralConf,
         statsConfig        :: Maybe StatsConf
     } deriving (Generic)
 
@@ -67,15 +65,6 @@ data DiscoveryConf =
 
 instance FromJSON DiscoveryConf
 instance ToJSON DiscoveryConf
-
-
-data GeneralConf =
-    GeneralConf {
-        fastECRecover :: Bool
-    } deriving (Generic)
-
-instance FromJSON GeneralConf
-instance ToJSON GeneralConf
 
 data SqlConf =
     SqlConf {
