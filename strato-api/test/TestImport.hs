@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module TestImport
     ( module TestImport
     , module XX
@@ -6,9 +8,8 @@ module TestImport
 import           Application           (makeFoundation, makeLogware)
 import           ClassyPrelude         as XX hiding (delete, deleteBy)
 import           Database.Persist      as XX hiding (get)
-import           Database.Persist.Postgresql
-import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute, 
-                                        rawSql, runSqlPersistMPool, unSingle, runMigration)
+import           Database.Persist.Sql  (SqlBackend, SqlPersistM, connEscapeName, rawExecute,
+                                        rawSql, runSqlPersistMPool, unSingle, runMigrationSilent)
 import           Foundation            as XX hiding (Handler)
 import           Test.Hspec            as XX
 import           Yesod.Default.Config2 (ignoreEnv, loadYamlSettings)
@@ -16,7 +17,11 @@ import           Yesod.Test            as XX
 
 import qualified Blockchain.Data.Blockchain as DataBlock
 import qualified Blockchain.Data.DataDefs as DataDefs
+import qualified Blockchain.DB.SQLDB as SQL
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
+
+instance SQL.HasSQLDB (YesodExample App) where
+  getSQLDB = appConnPool <$> getTestYesod
 
 runDB :: SqlPersistM a -> YesodExample App a
 runDB query = do
@@ -54,9 +59,10 @@ wipeDB app = do
             query = "TRUNCATE TABLE " ++ (intercalate ", " escapedTables)
         rawExecute query []
 
-        runMigration DataBlock.migrateAll
-        runMigration DataDefs.migrateAll
-        runMigration DataPeer.migrateAll
+        _ <- runMigrationSilent DataBlock.migrateAll
+        _ <- runMigrationSilent DataDefs.migrateAll
+        _ <- runMigrationSilent DataPeer.migrateAll
+        return ()
 
 getTables :: MonadIO m => ReaderT SqlBackend m [Text]
 getTables = do

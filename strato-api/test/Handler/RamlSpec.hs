@@ -1,7 +1,6 @@
-module Handler.RamlSpec where 
+module Handler.RamlSpec where
 
 import TestImport
-import Network.Wai.Test (simpleBody)
 
 spec :: Spec
 spec = withApp $ do
@@ -17,10 +16,10 @@ spec = withApp $ do
                         , "/account"
                         , "/transaction"
                         , "/storage"
-                        , "/register" 
-                        , "/wallet" 
-                        , "/developer" 
-                        , "/coinbase" 
-                        , "/peers" 
+                        , "/register"
+                        , "/wallet"
+                        , "/developer"
+                        , "/coinbase"
+                        , "/peers"
                         ]
-      
+

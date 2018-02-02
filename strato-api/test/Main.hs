@@ -1,12 +1,13 @@
 module Main where
 
-
-import           Data.Maybe
-import           Hspec.Formatters.Blaze (blazeFormatter)
-import           System.IO
+import           Prelude
 import           Test.Hspec.Runner
 
 import qualified Spec
 
+-- Used to filter which tests are being run
+predicate :: Path -> Bool
+predicate _ = True
+
 main :: IO ()
-main = hspecWith defaultConfig {configFormatter = Just (blazeFormatter "static/css/bootstrap.css")} Spec.spec
+main = hspecWith (configAddFilter predicate defaultConfig) $ Spec.spec

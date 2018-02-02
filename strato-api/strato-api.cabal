@@ -143,6 +143,15 @@ executable         strato-api
 test-suite test
     type:              exitcode-stdio-1.0
     main-is:           Main.hs
+    other-modules:
+        Handler.CommonSpec
+        Handler.HomeSpec
+        Handler.JsonSpec
+        Handler.PeerSpec
+        Handler.RamlSpec
+        Spec
+        TestImport
+
     hs-source-dirs:    test
     ghc-options:       -Wall
     extra-libraries: pthread
@@ -173,6 +182,7 @@ test-suite test
                 TupleSections
 
     build-depends: base
+                 , blockapps-util
                  , strato-api
                  , yesod-test >= 1.4.3 && < 1.5.5
                  , yesod-core
@@ -190,6 +200,7 @@ test-suite test
                  , warp
                  , wai
                  , wai-extra
+                 , hspec
                  , HUnit
                  , bytestring
                  , text
@@ -206,3 +217,6 @@ test-suite test
                  , timeit
                  , warp-tls
                  , ethereum-discovery
+                 , QuickCheck
+                 , hspec-expectations
+                 , case-insensitive

@@ -115,10 +115,6 @@ optionsTransactionR = do
 getTransactionR :: Handler Value
 getTransactionR = do
                  getParameters <- reqGetParams <$> getRequest
-                 appNameMaybe <- lookupGetParam "appname"
-                 case appNameMaybe of
-                   (Just t)  -> liftIO $ putStrLn $ t
-                   (Nothing) -> liftIO $ putStrLn "anon"
 
                  limit <- liftIO $ myFetchLimit
 

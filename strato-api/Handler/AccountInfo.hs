@@ -24,12 +24,6 @@ import qualified Prelude            as P
 
 accountInfo :: [(Text, Text)] -> Handler Value
 accountInfo params = do
-    appNameMaybe <- lookupGetParam "appname"
-
-    case appNameMaybe of
-       (Just t)  -> liftIO $ putStrLn $ t
-       (Nothing) -> liftIO $ putStrLn "anon"
-
     limit <- liftIO $ myFetchLimit
 
     let index'   = fromIntegral $ (maybe 0 id $ extractPage "index" params) :: Int64
@@ -72,16 +66,4 @@ getAccountInfoR = do
 postAccountCodeR :: Handler Value
 postAccountCodeR = do
         (postParams, _) <- runRequestBody
-        --liftIO $ traceIO $ show postParams
         accountInfo postParams
-
-
-
-
-
-
-
-
-
-
-
