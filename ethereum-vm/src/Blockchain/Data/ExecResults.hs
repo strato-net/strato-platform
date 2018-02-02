@@ -14,6 +14,7 @@ data ExecResults =
     erSuccess            :: Bool,
     erBlockData          :: BlockData,
     erRemainingBlockGas  :: Integer,
+    erRemainingTxGas     :: Integer,
     erReturnVal          :: Maybe B.ByteString,
     erTrace              :: [String],
     erLogs               :: [Log],

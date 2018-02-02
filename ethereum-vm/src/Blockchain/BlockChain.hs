@@ -409,6 +409,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     return ExecResults { erSuccess            = False
                                        , erBlockData          = b
                                        , erRemainingBlockGas  = remainingBlockGas - transactionGasLimit bt
+                                       , erRemainingTxGas     = 0
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
@@ -428,6 +429,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
                     return ExecResults { erSuccess            = True
                                        , erBlockData          = b
                                        , erRemainingBlockGas  = remainingBlockGas - (transactionGasLimit bt - realRefund - vmGasRemaining newVMState')
+                                       , erRemainingTxGas     = vmGasRemaining newVMState'
                                        , erReturnVal          = returnVal newVMState'
                                        , erTrace              = theTrace newVMState'
                                        , erLogs               = logs newVMState'
@@ -442,6 +444,7 @@ addTransaction isRunningTests' b remainingBlockGas t@OutputTx{otBaseTx=bt,otSign
             return ExecResults { erSuccess=False
                                , erBlockData=b
                                , erRemainingBlockGas=remainingBlockGas
+                               , erRemainingTxGas=transactionGasLimit bt
                                , erReturnVal=Nothing
                                , erTrace=[] --error "theTrace not set" -- seriously?
                                , erLogs=[]
@@ -508,9 +511,9 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
     (txrStatus, message, gasRemaining) =
       case result of
         Left err -> let fmt = format err in (Failure "Execution" Nothing ExecutionFailure Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
-        Right r  -> (Success, "Success!", erRemainingBlockGas r)
+        Right r  -> (Success, "Success!", erRemainingTxGas r)
     gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
-    etherUsed = gasUsed * fromInteger (transactionGasLimit t)
+    etherUsed = gasUsed * fromInteger (transactionGasPrice t)
 
   when flags_createTransactionResults $ do
       let beforeAddresses = S.fromList [ x | (x, ASModification _) <-  M.toList beforeMap ]
