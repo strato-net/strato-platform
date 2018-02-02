@@ -46,7 +46,7 @@ instance RLPSerializable ContextBestBlockInfo where
         x -> error $ "Unexpected tag for ContextBestBlockInfo `" ++ show x ++ "`"
     rlpDecode x = error $ "unexpected shape in rlpDecode ContextBestBlockInfo :: " ++ show x
     rlpEncode input = case input of
-        Unspecified -> RLPArray [rlpEncodeInt 1, RLPArray []]
+        Unspecified -> RLPArray [rlpEncodeInt 0, RLPArray []]
         ContextBestBlockInfo (sha, header, tdiff, txCount, uncleCount) ->
             RLPArray [rlpEncodeInt 1,
                   RLPArray [rlpEncode sha, rlpEncode header, rlpEncode tdiff, rlpEncodeInt txCount, rlpEncodeInt uncleCount]]
