@@ -38,6 +38,7 @@ packages:
     commit: 6e009c8b625a8c5253da5d9fd025c2467e387d13
   extra-dep: true
 extra-deps:
+- alex-3.1.7
 - Crypto-4.2.5.1
 - SHA2-0.2.5
 - leveldb-haskell-0.6.3
