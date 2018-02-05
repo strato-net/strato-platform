@@ -1,3 +1,0 @@
-contract SameName {
-    string myString;
-}

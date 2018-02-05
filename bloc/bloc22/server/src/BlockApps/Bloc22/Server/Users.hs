@@ -113,7 +113,7 @@ postUsersContract userName addr resolve
            _ -> throwError $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
        Just contract ->
          blocMaybe "Could not find global contract metadataId" $
-         Map.lookup contract idsAndDetails
+           Map.lookup contract idsAndDetails
     let
       (bin,leftOver) = Base16.decode $ Text.encodeUtf8 contractdetailsBin
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
@@ -516,16 +516,16 @@ prepareSignedTx
   -> PostTransaction
 prepareSignedTx sk addr unsignedTx = PostTransaction
   { posttransactionHash = kecc
-  , posttransactionGasLimit = Strung $ fromIntegral gasLimit
+  , posttransactionGasLimit = fromIntegral gasLimit
   , posttransactionCodeOrData = code
-  , posttransactionGasPrice = Strung $ fromIntegral gasPrice
+  , posttransactionGasPrice = fromIntegral gasPrice
   , posttransactionTo = toAddr
   , posttransactionFrom = addr
   , posttransactionValue = Strung $ fromIntegral value
   , posttransactionR = Hex $ fromIntegral r
   , posttransactionS = Hex $ fromIntegral s
   , posttransactionV = Hex v
-  , posttransactionNonce = Strung $ fromIntegral nonce'
+  , posttransactionNonce = fromIntegral nonce'
   }
   where
     tx = signTransaction sk unsignedTx

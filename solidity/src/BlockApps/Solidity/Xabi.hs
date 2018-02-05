@@ -29,10 +29,11 @@ import qualified BlockApps.Solidity.Xabi.Def  as Xabi
 import qualified BlockApps.Solidity.Xabi.Type as Xabi hiding (Enum)
 
 data Xabi = Xabi
-  { xabiFuncs  :: Map Text Func
-  , xabiConstr :: Map Text Xabi.IndexedType
-  , xabiVars   :: Map Text Xabi.VarType
-  , xabiTypes  :: Map Text Xabi.Def
+  { xabiFuncs     :: Map Text Func
+  , xabiConstr    :: Map Text Func
+  , xabiVars      :: Map Text Xabi.VarType
+  , xabiTypes     :: Map Text Xabi.Def
+  , xabiModifiers :: Map Text Modifier
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Xabi where
@@ -45,6 +46,7 @@ instance FromJSON Xabi where
          <*> v .:? "constr" .!= Map.empty
          <*> v .:? "vars" .!= Map.empty
          <*> v .:? "types" .!= Map.empty
+         <*> v .:? "mods" .!= Map.empty
 
 instance Arbitrary Xabi where arbitrary = genericArbitrary uniform
 
@@ -57,18 +59,42 @@ instance ToSchema Xabi where
       sampleXabi :: Xabi
       sampleXabi = Xabi
         { xabiFuncs = Map.fromList
-          [ ("get", Func {funcArgs = Map.fromList [], funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]})
-          , ("set", Func {funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})], funcVals = Map.fromList []})
+          [ ("get", Func { funcArgs = Map.fromList []
+                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcContents = Just "return x; "
+                         , funcMutable  = Nothing
+                         , funcPayable  = Nothing
+                         , funcVisibility = Nothing
+                         , funcModifiers = Nothing
+                         })
+          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcVals = Map.fromList []
+                         , funcContents = Just "return; "
+                         , funcMutable  = Nothing
+                         , funcPayable  = Nothing
+                         , funcVisibility = Nothing
+                         , funcModifiers = Nothing
+                         })
           ]
         , xabiConstr = Map.fromList []
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         }
 --------------------------------------------------------------------------------
 
 data Func = Func
   { funcArgs :: Map Text Xabi.IndexedType
   , funcVals :: Map Text Xabi.IndexedType
+
+  -- These Values are only used for parsing and unparsing solidity.
+  -- This data will not be stored in the db and will have no
+  -- relavance when constructing from the db.
+  , funcContents :: Maybe Text
+  , funcMutable :: Maybe Bool
+  , funcPayable :: Maybe Bool
+  , funcVisibility :: Maybe Visibility
+  , funcModifiers :: Maybe [String]
   } deriving (Eq,Show,Generic)
 
 instance ToJSON Func where
@@ -89,14 +115,59 @@ instance ToSchema Func where
       ex = Func
         { funcArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , funcContents = Just "return userAddress;"
+        , funcMutable  = Nothing
+        , funcPayable  = Nothing
+        , funcVisibility = Nothing
+        , funcModifiers = Nothing
         }
 
+data Visibility = Private
+                | Public
+                | Internal
+                | External
+  deriving (Eq,Show,Generic)
+
+instance ToJSON Visibility
+instance FromJSON Visibility
+instance Arbitrary Visibility where arbitrary = genericArbitrary uniform
+instance ToSchema Visibility where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Visibility of a Function"
+    & mapped.schema.description ?~ "Xabi Function Visibility"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: Visibility
+      ex = Public
 
 data Modifier = Modifier
   { modifierArgs     :: Map Text Xabi.IndexedType
   , modifierSelector :: Text
   , modifierVals     :: Map Text Xabi.IndexedType
+  , modifierContents :: Maybe Text
   } deriving (Eq,Show,Generic)
+
+instance ToJSON Modifier where
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+instance FromJSON Modifier where
+  parseJSON = genericParseJSON (aesonPrefix camelCase)
+
+instance Arbitrary Modifier where arbitrary = genericArbitrary uniform
+
+instance ToSchema Modifier where
+  declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
+    & mapped.name ?~ "Function Modifier"
+    & mapped.schema.description ?~ "Xabi Function Modifier"
+    & mapped.schema.example ?~ toJSON ex
+    where
+      ex :: Modifier
+      ex = Modifier
+        { modifierArgs = Map.fromList [("userAddress", Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , modifierSelector = "0adfe412"
+        , modifierVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , modifierContents = Nothing
+        }
 
 newtype Event = Event { eventLogs :: Map Text Xabi.IndexedType }
               deriving (Eq,Show,Generic)
@@ -156,12 +227,27 @@ instance ToSchema ContractDetails where
       sampleXabi :: Xabi
       sampleXabi = Xabi
         { xabiFuncs = Map.fromList
-          [ ("get", Func {funcArgs = Map.fromList [], funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]})
-          , ("set", Func {funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})], funcVals = Map.fromList []})
+          [ ("get", Func { funcArgs = Map.fromList []
+                         , funcVals = Map.fromList [("#0",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcContents = Just "return x; "
+                         , funcMutable  = Nothing
+                         , funcPayable  = Nothing
+                         , funcVisibility = Nothing
+                         , funcModifiers = Nothing
+                         })
+          , ("set", Func { funcArgs = Map.fromList [("x",Xabi.IndexedType {indexedTypeIndex = 0, indexedTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+                         , funcVals = Map.fromList []
+                         , funcContents = Just "return; "
+                         , funcMutable  = Nothing
+                         , funcPayable  = Nothing
+                         , funcVisibility = Nothing
+                         , funcModifiers = Nothing
+                         })
           ]
         , xabiConstr = Map.fromList []
         , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
+        , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         }
 
 --------------------------------------------------------------------------------

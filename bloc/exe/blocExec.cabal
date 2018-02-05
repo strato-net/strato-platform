@@ -14,10 +14,8 @@ cabal-version:       >=1.10
 executable blockapps-bloc
   hs-source-dirs: app
   main-is: Main.hs
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror -fsimpl-tick-factor=20000
   build-depends: base
-               , blockapps-bloc21-api
-               , blockapps-bloc21-server
                , blockapps-bloc22-api
                , blockapps-bloc22-server
                , blockapps-strato-api
@@ -43,7 +41,6 @@ executable bloc-docs
   main-is: Main.hs
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N -Werror
   build-depends: base
-    , blockapps-bloc21-api
     , blockapps-bloc22-api
     , lens
     , swagger2
