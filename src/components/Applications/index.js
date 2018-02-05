@@ -38,6 +38,7 @@ class Applications extends Component {
             <h3>Welcome to Launchpad</h3>
           </div>
           <div className="col-sm-2 text-right smd-pad-vertical-12">
+            { this.props.isLoggedIn &&
             <Tooltip
               content={<span>Unable to deploy apps when running multinode on localhost</span>}
               inline={true}
@@ -53,7 +54,7 @@ class Applications extends Component {
                   Deploy
                 </button>
               </Link>
-            </Tooltip>
+            </Tooltip>}
           </div>
         </div>
         <div>
@@ -78,6 +79,7 @@ class Applications extends Component {
 export function mapStateToProps(state) {
   return {
     applications: state.applications.applications,
+    isLoggedIn: state.user.isLoggedIn
   };
 }
 

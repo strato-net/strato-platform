@@ -1,12 +1,31 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import './applications-card.css'
-import { withRouter} from 'react-router-dom';
+import { withRouter } from 'react-router-dom';
 import { launchApp } from '../Applications/applications.actions';
+import { Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
 import ReactLoading from 'react-loading';
 
 class ApplicationCard extends Component {
 
+  constructor() {
+    super()
+    this.state = {
+      isOpen: false
+    }
+  }
+
+  handleClick = () => {
+    this.setState({ isOpen: !this.state.isOpen });
+  };
+
+  launch(app) {
+    if (!this.props.isLoggedIn) {
+      this.props.history.push('/login');
+      return;
+    }
+    this.props.launchApp(app.address, app.url)
+  }
 
   render() {
     const { app } = this.props;
@@ -24,12 +43,29 @@ class ApplicationCard extends Component {
                 </div>
               </div>
               <div className="col-sm-2">
-                { app.isLoading ?
+                <Popover
+                  position={Position.BOTTOM}
+                  content={
+                  <Menu>
+                    <MenuItem onClick={this.handleSave} text="Facebook" />
+                    <MenuItem onClick={this.handleDelete} text="Twitter" />
+                    <MenuItem onClick={this.handleDelete} text="State of Dapps" />
+                  </Menu>}
+                  popoverClassName={"popoverClassName"}
+                >
+                  <button
+                    className="pt-button pt-intent-primary"
+                    onClick={this.handleClick}
+                  >
+                    Share
+                  </button>
+                </Popover>
+                {app.isLoading ?
                   <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> :
-                  <a  rel="noopener noreferrer">
+                  <a rel="noopener noreferrer">
                     <button
                       className="pt-button pt-intent-primary pull-right"
-                      onClick={() => this.props.launchApp(app.address,app.url)}
+                      onClick={() => this.launch(app)}
                     >
                       Launch
                     </button>
@@ -55,12 +91,13 @@ class ApplicationCard extends Component {
 export function mapStateToProps(state) {
   return {
     isLoading: state.applications.isLoading,
+    isLoggedIn: state.user.isLoggedIn,
     url: state.applications.url
   };
 }
 
 export default withRouter(
-  connect( mapStateToProps,
+  connect(mapStateToProps,
     {
       launchApp
     }

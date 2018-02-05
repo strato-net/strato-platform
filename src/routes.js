@@ -21,9 +21,11 @@ import CodeEditor from './components/CodeEditor';
 export const routes = (
   <Switch>
     <Route exact path="/" component={App}>
-      <Redirect to="/login" />
+      <Redirect to="/apps" />
     </Route>
     <Route exact path="/login" component={Login} />
+    <Route exact path="/launchpad" component={LaunchPad} />
+    <Route exact path="/apps" component={Applications} />
     <ProtectedRoute exact path="/home" component={Dashboard} />
     <ProtectedRoute exact path="/nodes" component={Nodes} />
     <ProtectedRoute exact path="/blocks" component={Blocks} />
@@ -35,7 +37,5 @@ export const routes = (
     <ProtectedRoute exact path="/contracts" component={Contracts} />
     <ProtectedRoute exact path="/contracts/:name/query" component={ContractQuery} />
     <ProtectedRoute exact path="/code_editor" component={CodeEditor} />
-    <ProtectedRoute exact path="/apps" component={Applications} />
-    <ProtectedRoute exact path="/launchpad" component={LaunchPad} />
   </Switch>
 );
