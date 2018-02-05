@@ -220,12 +220,13 @@ deployments:
         API_URL: "/strato-api/eth/v1.2/swagger.json"
 
   - name: kafka
-    repo: https://github.com/blockapps/kafka-packager.git
-    ref: master
     compose:
+      image: spotify/kafka:latest
       restart: always
       environment:
-        ADVERTISED_HOST_NAME: "kafka"
-        KAFKA_DELETE_TOPIC_ENABLE: "true"
-        KAFKA_LOG_CLEANER_ENABLE: "false"
-        KAFKA_LOG_RETENTION_HOURS: "2147483647"
+        ADVERTISED_HOST: "kafka"
+        ADVERTISED_PORT: "9092"
+        # ADVERTISED_HOST_NAME: "kafka"
+        # KAFKA_DELETE_TOPIC_ENABLE: "true"
+        # KAFKA_LOG_CLEANER_ENABLE: "false"
+        # KAFKA_LOG_RETENTION_HOURS: "2147483647"
