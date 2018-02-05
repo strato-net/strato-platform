@@ -13,7 +13,7 @@ import { env } from '../../env';
 
 const url = env.STRATO_URL + "/block/last/15"
 
-function getBlockData() {
+export function getBlockData() {
   return fetch(
     url,
     {
@@ -33,7 +33,7 @@ function getBlockData() {
     });
 }
 
-function* fetchBlockData(action) {
+export function* fetchBlockData(action) {
   try {
     let response = yield call(getBlockData);
     yield put(fetchBlockDataSuccess(response));

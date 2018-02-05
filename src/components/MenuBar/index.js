@@ -49,7 +49,7 @@ class MenuBar extends Component {
             <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanelWrapper.track("bloc_docs_click")}}>Bloc API</button>
           </a>
           <a href={ env.STRATO_DOC_URL } target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanelWrapper.track("strato_docs_click")}}>Strato API</button>
+            <button className="pt-button pt-minimal pt-small" onClick={() => {mixpanelWrapper.track("strato_docs_click")}}>STRATO API</button>
           </a>
           {this.afterLoggedIn()}
         </div>
@@ -58,7 +58,7 @@ class MenuBar extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isLoggedIn: state.user.isLoggedIn,
     currentUser: state.user.currentUser,

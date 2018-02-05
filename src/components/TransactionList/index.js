@@ -1,46 +1,35 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
-import {fetchTx} from './transactionList.actions';
 import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
-import {Text, Tooltip, Position} from '@blueprintjs/core';
-import { env } from '../../env';
-import * as moment from 'moment';
+import { Text } from '@blueprintjs/core';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { parseDateFromString } from '../../lib/dateUtils';
+import HexText from '../HexText';
+import { GET_TRANSACTIONS } from '../../sockets/rooms';
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
 
 class TransactionList extends Component {
 
   componentDidMount() {
-    this.props.fetchTx();
-    this.startPoll();
+    this.props.subscribeRoom(GET_TRANSACTIONS)
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
-  }
-
-  startPoll() {
-    const fetchTx = this.props.fetchTx;
-    this.timeout = setInterval(function () {
-      fetchTx();
-    }, env.POLLING_FREQUENCY);
+    this.props.unSubscribeRoom(GET_TRANSACTIONS)
   }
 
   render() {
     const self = this;
-    let txRows = this.props.tx.slice(0, 5).map(
-      function (tx, i) {
+    let txRows = this.props.transactions !== undefined && this.props.transactions.slice(0, 5).map(
+      function (tx, i) {        
         return (
           <tr
             key={i}
             onClick={e => {mixpanelWrapper.track("dashboard_transaction_click"); self.props.history.push('/transactions/' + tx.hash)}}
           >
             <td width="40%">
-              <Text ellipsize={true}>
-                <Tooltip content={tx.hash} position={Position.TOP_LEFT}>
-                  <small>{tx.hash}</small>
-                </Tooltip>
-              </Text>
+              <HexText value={tx.hash} classes="small smd-pad-4"/>
             </td>
             <td width="23%" className="text-right">
               <small>{tx.value}</small>
@@ -48,7 +37,7 @@ class TransactionList extends Component {
             <td width="22%">
               <Text ellipsize={true}>
                 <small>
-                  {moment(new Date(tx.timestamp)).format('YYYY-MM-DD hh:mm:ss A')}
+                  {parseDateFromString(tx.timestamp)}
                 </small>
               </Text>
             </td>
@@ -81,10 +70,10 @@ class TransactionList extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
-    tx: state.transactions.tx
+    transactions: state.transactions.transactions
   };
 }
 
-export default withRouter(connect(mapStateToProps, {fetchTx})(TransactionList));
+export default withRouter(connect(mapStateToProps, {subscribeRoom,unSubscribeRoom})(TransactionList));

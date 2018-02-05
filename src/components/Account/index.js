@@ -1,85 +1,92 @@
-import React, {Component} from 'react';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
-import {Button} from '@blueprintjs/core';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
+import { Button } from '@blueprintjs/core';
+import HexText from '../HexText';
+import { faucetRequest } from '../Accounts/accounts.actions';
 
 class Account extends Component {
+  //TODO: add an option to faucet the account. Tell user to faucet if account does not exist.
   render() {
-    const name = this.props.match.params.name;
-    const account = this.props.account;
+    const {
+      name,
+      address,
+      account
+    } = this.props;
+
     return (
-      <div className="container-fluid pt-dark">
-        <div className="row">
-          <div className="col-sm-9">
-            <div className="h3">{name}</div>
-            <div className="h4">{account.address}</div>
+      < div className="pt-card address-margin-bottom" key={address}>
+        <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
+          <div className="col-sm-10">
+            <h4>
+              Address: &nbsp;&nbsp; <HexText value={address} classes="smd-pad-2" />
+            </h4>
           </div>
-          <div className="col-sm-3 smd-pad-16 text-right">
+          <div className="col-sm-2 text-right">
             <Button
-              onClick={(e) => { mixpanelWrapper.track('account_view_go_back_click'); this.props.history.goBack();}}
-              className="pt-icon-arrow-left"
-              text="Back"
-            />
+              className="pt-button pt-intent-primary pt-small"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.props.faucetRequest(name, address);
+              }}>
+                Faucet
+              </Button>
           </div>
         </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <div className="pt-card">
-              <table className="pt-table pt-str">
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><strong>Contract Root</strong></td>
-                    <td>{account.contractRoot}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Kind</strong></td>
-                    <td>{account.kind}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Balance</strong></td>
-                    <td>{account.balance}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Latest Block Number</strong></td>
-                    <td>{account.latestBlockNum}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Code Hash</strong></td>
-                    <td>{account.codeHash}</td>
-                  </tr>
-                  <tr>
-                    <td><strong>Nonce</strong></td>
-                    <td>{account.nonce}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+
+        <table className="pt-table pt-str">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Contract Root</strong></td>
+              <td><HexText value={account.contractRoot} classes="smd-pad-2" /></td>
+            </tr>
+            <tr>
+              <td><strong>Kind</strong></td>
+              <td>{account.kind}</td>
+            </tr>
+            <tr>
+              <td><strong>Balance</strong></td>
+              <td>{account.balance}</td>
+            </tr>
+            <tr>
+              <td><strong>Latest Block Number</strong></td>
+              <td>{account.latestBlockNum}</td>
+            </tr>
+            <tr>
+              <td><strong>Code Hash</strong></td>
+              <td><HexText value={account.codeHash} classes="smd-pad-2" /></td>
+            </tr>
+            <tr>
+              <td><strong>Nonce</strong></td>
+              <td>{account.nonce}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+
     );
   }
 }
 
-function mapStateToProps(state, ownProps) {
-  const name = ownProps.match.params.name;
-  const address = ownProps.match.params.address;
-
+export function mapStateToProps(state, ownProps) {
+  const name = ownProps.name;
+  const address = ownProps.address;
+  const accounts = state.accounts.accounts;
   return {
-    account: state.accounts.accounts[name][address],
+    account: Object.getOwnPropertyNames(accounts).indexOf(name) >= 0 ? state.accounts.accounts[name][address] : {},
   };
 }
 
 export default withRouter(
   connect(
     mapStateToProps,
-    {}
+    { faucetRequest }
   )(Account)
 );

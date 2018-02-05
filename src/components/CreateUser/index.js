@@ -20,7 +20,6 @@ class CreateUser extends Component {
   }
 
   render() {
-
     return (
       <div className="smd-pad-16">
         <Button onClick={() => {
@@ -40,7 +39,7 @@ class CreateUser extends Component {
           >
             <div className="pt-dialog-body">
               <div className="pt-form-group input">
-                <div className={"input" + (this.props.errors && this.props.errors.password) ? "pt-form-group pt-intent-danger" : ""}>
+                <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-a">
                     Username
                   </label>
@@ -51,13 +50,14 @@ class CreateUser extends Component {
                       type="text"
                       placeholder="Username"
                       className="pt-input form-width"
+                      tabIndex="1"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.username}</div>
                   </div>
                 </div>
 
-                <div className={"input" + (this.props.errors && this.props.errors.password) ? "pt-form-group pt-intent-danger" : ""}>
+                <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
                     Password
                   </label>
@@ -68,13 +68,14 @@ class CreateUser extends Component {
                       type="password"
                       placeholder="Password"
                       className="pt-input form-width"
+                      tabIndex="2"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.password}</div>
                   </div>
                 </div>
 
-                <div className={"input" + (this.props.errors && this.props.errors.password) ? "pt-form-group pt-intent-danger" : ""}>
+                <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-b">
                     Confirm Password
                   </label>
@@ -85,6 +86,7 @@ class CreateUser extends Component {
                       type="password"
                       placeholder="Confirm Password"
                       className="pt-input form-width"
+                      tabIndex="3"
                       required
                     />
                     <div className="pt-form-helper-text">{this.props.errors && this.props.errors.confirm_password}</div>
@@ -119,7 +121,7 @@ class CreateUser extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   let errors = {errors: undefined};
   if (state.form && state.form["create-user"]) {
     errors = {errors: state.form["create-user"].syncErrors}
@@ -130,7 +132,7 @@ function mapStateToProps(state) {
   };
 }
 
-function validate (values) {
+export function validate (values) {
   const errors = {};
   if (!values.username) {
     errors.username = "Username Required";

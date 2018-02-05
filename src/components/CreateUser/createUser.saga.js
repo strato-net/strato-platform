@@ -15,9 +15,9 @@ import {
 
 import { env } from '../../env';
 
-const url = env.BLOC_URL + "/users/:user?faucet"
+const url = env.BLOC_URL + "/users/:user"
 
-function createUserApiCall(username, password) {
+export function createUserApiCall(username, password) {
   return fetch(
     url.replace(":user", username),
     {
@@ -36,11 +36,11 @@ function createUserApiCall(username, password) {
   });
 }
 
-function* createUser(action) {
+export function* createUser(action) {
   try {
     let response = yield call(createUserApiCall, action.username, action.password);
     yield put(createUserSuccess(response));
-    yield put(fetchAccounts());
+    yield put(fetchAccounts(false, false));
   }
   catch (err) {
     yield put(createUserFailure(err));

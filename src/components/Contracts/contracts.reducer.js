@@ -30,7 +30,7 @@ const reducer = function (state = initialState, action) {
       const contractArray = state.contracts[action.name].instances;
       contractArray.forEach((contract) => {
         if (action.address === contract.address) {
-          contract['balance'] = action.account[0].balance;
+          contract['balance'] = action.account.length > 0 ? action.account[0].balance : "0";
         }
       })
       contracts[action.name].instances = contractArray;
@@ -43,16 +43,16 @@ const reducer = function (state = initialState, action) {
       const contractNames = Object.getOwnPropertyNames(action.contracts);
       const updatedContracts = {};
       contractNames.forEach((name) => {
-        if(state.contracts[name]) {
+        if (state.contracts[name]) {
           // new instances
           const newInstances = action.contracts[name]
-            .filter((instance)=>{
+            .filter((instance) => {
               return state.contracts[name].instances
                 .filter((i) => {
                   return i.address === instance.address
                 }).length === 0;
             })
-            .map((instance)=>{
+            .map((instance) => {
               return {
                 ...instance,
                 fromBloc: true
@@ -63,14 +63,14 @@ const reducer = function (state = initialState, action) {
           };
         }
         else {
-          updatedContracts[name]= {
+          updatedContracts[name] = {
             instances: action.contracts[name]
-            .map((instance)=>{
-              return {
-                ...instance,
-                fromBloc: true
-              }
-            })
+              .map((instance) => {
+                return {
+                  ...instance,
+                  fromBloc: true
+                }
+              })
           };
         }
       });
@@ -127,7 +127,7 @@ const reducer = function (state = initialState, action) {
         const exists = updatedInstances.filter((i) => {
           return i.address === instance.address
         }).length === 1;
-        if(!exists) {
+        if (!exists) {
           updatedInstances.push({
             ...instance,
             fromCirrus: true

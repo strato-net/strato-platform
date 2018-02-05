@@ -1,0 +1,133 @@
+import React from 'react';
+import Accounts, { mapStateToProps } from '../../components/Accounts';
+import { error, accountsMock, filter, reducerAccounts, indexAccountsMock } from './accountsMock';
+import { deepClone } from '../helper/testHelper';
+
+describe('Accounts: index', () => {
+
+  describe('render with', () => {
+
+    test('empty values', () => {
+      const props = {
+        accounts: [],
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
+
+      expect(wrapper).toMatchSnapshot();
+    });
+
+    test('mocked values', () => {
+      const props = {
+        accounts: indexAccountsMock,
+        filter: '',
+        history: {},
+        fetchAccounts: jest.fn(),
+        changeAccountFilter: jest.fn(),
+        faucetRequest: jest.fn(),
+        resetUserAddress: jest.fn(),
+        fetchUserAddresses: jest.fn()
+      }
+      const wrapper = shallow(
+        <Accounts.WrappedComponent {...props} />
+      );
+      
+      expect(wrapper).toMatchSnapshot();
+    });
+
+  });
+
+  test('hide account on click', () => {
+    const props = {
+      accounts: indexAccountsMock,
+      filter: '',
+      history: {},
+      fetchAccounts: jest.fn(),
+      changeAccountFilter: jest.fn(),
+      faucetRequest: jest.fn(),
+      resetUserAddress: jest.fn(),
+      fetchUserAddresses: jest.fn()
+    };
+
+    const wrapper = shallow(
+      <Accounts.WrappedComponent {...props} />
+    );
+
+    wrapper.find('div').at(13).simulate('click');
+    expect(props.resetUserAddress).toHaveBeenCalled();
+  });
+
+  test('open account on click', () => {
+    const props = {
+      accounts: indexAccountsMock,
+      filter: '',
+      history: { push: jest.fn() },
+      fetchAccounts: jest.fn(),
+      changeAccountFilter: jest.fn(),
+      faucetRequest: jest.fn(),
+      resetUserAddress: jest.fn(),
+      fetchUserAddresses: jest.fn()
+    }
+    const wrapper = shallow(
+      <Accounts.WrappedComponent {...props} />
+    );
+
+    wrapper.find('div').at(57).simulate('click');
+    expect(props.fetchUserAddresses).toHaveBeenCalled();
+  });
+
+  test('invoke onchange on input and trigger changeAccountFilter', () => {
+    const props = {
+      accounts: indexAccountsMock,
+      filter: '',
+      history: { push: jest.fn() },
+      fetchAccounts: jest.fn(),
+      changeAccountFilter: jest.fn(),
+      faucetRequest: jest.fn(),
+      resetUserAddress: jest.fn(),
+      fetchUserAddresses: jest.fn()
+    }
+    const wrapper = shallow(
+      <Accounts.WrappedComponent {...props} />
+    );
+    wrapper.find('input').simulate('change', { target: { name: "pollName", value: "spam" } });
+    expect(props.changeAccountFilter).toHaveBeenCalled();
+  });
+
+  test('componentDidMount', () => {
+    const props = {
+      accounts: indexAccountsMock,
+      filter: filter,
+      history: {},
+      fetchAccounts: jest.fn(),
+      changeAccountFilter: jest.fn(),
+      faucetRequest: jest.fn(),
+      resetUserAddress: jest.fn(),
+      fetchUserAddresses: jest.fn()
+    }
+    const wrapper = shallow(
+      <Accounts.WrappedComponent {...props} />
+    );
+    expect(props.fetchAccounts).toHaveBeenCalled();
+    expect(props.fetchAccounts.mock.calls).toEqual([[true, true]]);
+  });
+
+  test('mapStateToProps with default values', () => {
+    const state = {
+      accounts: {
+        accounts: indexAccountsMock,
+        filter: filter
+      }
+    }
+    expect(mapStateToProps(state)).toMatchSnapshot();
+  });
+
+});

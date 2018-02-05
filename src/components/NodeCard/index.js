@@ -1,89 +1,94 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { env } from '../../env';
-import {Text} from '@blueprintjs/core';
-import {
-  fetchNodeDetail,
-  fetchNodePeers,
-  fetchNodeCoinbase
-} from './nodeCard.actions';
+import { Collapse } from '@blueprintjs/core';
 import './nodeCard.css';
+import PeersCard from '../PeersCard';
+import HexText from '../HexText';
+import { subscribeRoom, unSubscribeRoom } from '../../sockets/socket.actions'
+import {
+  GET_COINBASE,
+  GET_PEERS
+} from '../../sockets/rooms'
 
 class NodeCard extends Component {
 
+  constructor() {
+    super()
+    this.state = {
+      isOpen: false
+    }
+  }
+
   componentDidMount() {
-    //this.props.fetchNodeDetail(this.props.nodeIndex);
-    this.props.fetchNodePeers(this.props.nodeIndex);
-    this.props.fetchNodeCoinbase(this.props.nodeIndex);
-    this.startPoll();
+    this.props.subscribeRoom(GET_COINBASE)
+    this.props.subscribeRoom(GET_PEERS)
   }
 
   componentWillUnmount() {
-    clearTimeout(this.timeout)
+    this.props.unSubscribeRoom(GET_COINBASE)
+    this.props.unSubscribeRoom(GET_PEERS)
   }
 
-  startPoll() {
-    const fetchNodePeers = this.props.fetchNodePeers;
-    const nodeIndex = this.props.nodeIndex;
-
-    this.timeout = setInterval(function () {
-      fetchNodePeers(nodeIndex);
-    }, env.POLLING_FREQUENCY);
-  }
+  handleClick = () => {
+    this.setState({ isOpen: !this.state.isOpen });
+  };
 
   render() {
-    const node = this.props.nodes[this.props.nodeIndex];
-    const peers = node.peers && node.peers.serverPeers && node.peers.clientPeers ?
-      (node.peers.serverPeers.length + node.peers.clientPeers.length).toString()
-      : 'unknown';
-
-    const blockNumber = this.props.blockData.length > 0 ?
-      this.props.blockData[0].blockData.number.toString()
-      : 'unknown';
-
+    const node = this.props.node;
+    const peers = node.peers ? Object.getOwnPropertyNames(node.peers) : [];
+    const blockNumber = this.props.dashboard.lastBlockNumber;
     let className = 'pt-card pt-elevation-2 ';
-    className += node.apiFailure ? 'node-warning' : 'node-success';
+    className += node && node.coinbase ?  'node-success pt-interactive' : 'node-warning pt-interactive';
+    let arrowIcon = 'col-xs-3 text-right pt-icon-standard '
+    arrowIcon += this.state.isOpen ? 'pt-icon-caret-up' : 'pt-icon-caret-down'
 
     return (
-      <div className={className}>
-        <h5>{node.name}</h5>
-        <div className="row pt-text-muted">
-          <div className="col-xs-3">
-            <small>Coinbase</small>
+      <div>
+        <div className={className} onClick={this.handleClick}>
+          <div className="row">
+            <div className="col-xs-9">
+              <h5>{node.name}</h5>
+            </div>
+            <span className={arrowIcon}></span>
           </div>
-          <div className="col-xs-9">
-            <Text ellipsize={true}>
-              <small>{node.coinbase}</small>
-            </Text>
+          <div className="row pt-text-muted">
+            <div className="col-xs-3">
+              <small>Coinbase</small>
+            </div>
+            <div className="col-xs-9">
+              <small> <HexText value={node && node.coinbase && node.coinbase.coinbase} classes="smd-pad-2" /> </small>
+            </div>
+          </div>
+          <div className="row pt-text-muted">
+            <div className="col-xs-3">
+              <small>Block</small>
+            </div>
+            <div className="col-xs-9">
+              <small>{blockNumber}</small>
+            </div>
+          </div>
+          <div className="row pt-text-muted">
+            <div className="col-xs-3">
+              <small>Peers</small>
+            </div>
+            <div className="col-xs-9">
+              <small>{peers.length}</small>
+            </div>
           </div>
         </div>
-        <div className="row pt-text-muted">
-          <div className="col-xs-3">
-            <small>Block</small>
-          </div>
-          <div className="col-xs-9">
-            <small>{blockNumber}</small>
-          </div>
-        </div>
-        <div className="row pt-text-muted">
-          <div className="col-xs-3">
-            <small>Peers</small>
-          </div>
-          <div className="col-xs-9">
-            <small>{peers}</small>
-          </div>
-        </div>
+        <Collapse isOpen={this.state.isOpen}>
+          <PeersCard />
+        </Collapse>
       </div>
     );
   }
-
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
-    blockData: state.blockData.blockData,
-    nodes: state.nodes.nodes
+    dashboard: state.dashboard,
+    node: state.node
   };
 }
 
@@ -91,9 +96,8 @@ export default withRouter(
   connect(
     mapStateToProps,
     {
-      fetchNodeDetail,
-      fetchNodePeers,
-      fetchNodeCoinbase
+      subscribeRoom,
+      unSubscribeRoom,
     }
   )(NodeCard)
 );

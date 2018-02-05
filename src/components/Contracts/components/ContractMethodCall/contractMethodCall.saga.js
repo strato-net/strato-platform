@@ -16,9 +16,9 @@ import { env } from '../../../../env.js'
 
 const contractsUrl = env.BLOC_URL + "/contracts/:contractName/:contractAddress";
 const methodUrl = env.BLOC_URL +
-  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call";
+  "/users/:username/:userAddress/contract/:contractName/:contractAddress/call?resolve";
 
-function getArgs(contractName, contractAddress, symbol) {
+export function getArgs(contractName, contractAddress, symbol) {
   return fetch(
     contractsUrl.replace(":contractName", contractName).replace(":contractAddress", contractAddress),
     {
@@ -27,15 +27,15 @@ function getArgs(contractName, contractAddress, symbol) {
         'Accept': 'application/json'
       },
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json();
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
-function postMethodCall(payload) {
+export function postMethodCall(payload) {
   return fetch(
     methodUrl
       .replace(':username', payload.username)
@@ -55,33 +55,33 @@ function postMethodCall(payload) {
         args: payload.args
       })
     })
-    .then(function(response) {
+    .then(function (response) {
       return response.json();
     })
-    .catch(function(error) {
+    .catch(function (error) {
       throw error;
     });
 }
 
-function* methodCall(action) {
+export function* methodCall(action) {
   try {
-    const response = yield call(postMethodCall,action.payload);
+    const response = yield call(postMethodCall, action.payload);
     yield put(fetchState(action.payload.contractName, action.payload.contractAddress));
-    yield put(methodCallSuccess(action.key,JSON.stringify(response, null, 2)));
+    yield put(methodCallSuccess(action.key, JSON.stringify(response, null, 2)));
   }
-  catch(err) {
+  catch (err) {
     yield put(methodCallFailure(action.key, err));
   }
 }
 
-function* fetchArgs(action) {
+export function* fetchArgs(action) {
   try {
     const response = yield call(getArgs, action.name, action.address, action.symbol);
     const args = response.xabi.funcs[action.symbol].args;
     yield put(methodCallFetchArgsSuccess(action.key, args));
   }
   catch (err) {
-    yield put(methodCallFetchArgsFailure(action.key,err));
+    yield put(methodCallFetchArgsFailure(action.key, err));
   }
 }
 

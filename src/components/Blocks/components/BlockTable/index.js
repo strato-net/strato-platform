@@ -6,8 +6,9 @@ import {BLOCK_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes
 import { fetchBlockData } from '../../../BlockData/block-data.actions';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
-import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
-import * as moment from 'moment';
+import {Text, Button} from '@blueprintjs/core';
+import moment from 'moment';
+import HexText from '../../../HexText';
 
 class BlockTable extends Component {
 
@@ -29,7 +30,7 @@ class BlockTable extends Component {
   //   this.props.dispatch(submit('block-query'));
   // }
 
-  submit = (values ) => {
+  submit = (values) => {
     this.props.updateQuery(values.query, values.value);
     this.props.dispatch(reset('block-query'));
   };
@@ -47,7 +48,7 @@ class BlockTable extends Component {
       mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
-
+    
     let blockRows = this.props.queryResult.map(
       function (block) {
         return (
@@ -58,12 +59,7 @@ class BlockTable extends Component {
               <small>{block.blockData.number}</small>
             </td>
             <td width="22.5%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.parentHash}
-                         position={Position.TOP_LEFT}>
-                  <small>{block.blockData.parentHash}</small>
-                </Tooltip>
-              </Text>
+              <HexText value={block.blockData.parentHash} classes="small smd-pad-4"/>
             </td>
             <td width="15%">
               <Text ellipsize={true}>
@@ -80,14 +76,7 @@ class BlockTable extends Component {
               </Text>
             </td>
             <td width="22.5%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={block.blockData.coinbase}
-                         position={Position.TOP_LEFT}>
-                  <small>
-                    {block.blockData.coinbase}
-                  </small>
-                </Tooltip>
-              </Text>
+              <HexText value={block.blockData.coinbase} classes="small smd-pad-4"/>
             </td>
             <td width="20%">
               <Text ellipsize={true}>
@@ -157,7 +146,7 @@ class BlockTable extends Component {
     const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
       const queryValue = query[queryType];
       return (
-        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
+        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right-4">
                   {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
@@ -218,7 +207,7 @@ class BlockTable extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     query: state.queryEngine.query,
     queryResult: state.queryEngine.queryResult,

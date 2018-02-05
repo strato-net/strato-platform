@@ -1,13 +1,14 @@
 import React, {Component} from 'react';
 import {connect} from 'react-redux';
-import {Field, reduxForm, reset, submit} from 'redux-form';
+import {Field, reduxForm, reset} from 'redux-form';
 import {TRANSACTION_QUERY_TYPES, RESOURCE_TYPES} from '../../../QueryEngine/queryTypes';
 import {updateQuery, clearQuery, executeQuery, removeQuery} from '../../../QueryEngine/queryEngine.actions';
 import {withRouter} from 'react-router-dom';
 import {Text, Position, Tooltip, Button} from '@blueprintjs/core';
-import * as moment from 'moment';
+import { parseDateFromString } from '../../../../lib/dateUtils';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import {fetchTx} from '../../../TransactionList/transactionList.actions';
+import HexText from '../../../HexText';
 
 class TransactionTable extends Component {
 
@@ -32,9 +33,9 @@ class TransactionTable extends Component {
     }
   }
 
-  dispatchSubmit = () => {
-    this.props.dispatch(submit('transaction-query'));
-  }
+  // dispatchSubmit = () => {
+  //   this.props.dispatch(submit('transaction-query'));
+  // }
 
   refresh = () => {
     this.props.clearQuery();
@@ -57,11 +58,7 @@ class TransactionTable extends Component {
             handleClick(tx.hash)
           }}>
             <td width="40%">
-              <Text ellipsize={true}>
-                <Tooltip tooltipClassName="smd-padding-8" content={tx.hash} position={Position.TOP_LEFT}>
-                  <small>{tx.hash}</small>
-                </Tooltip>
-              </Text>
+              <HexText value={tx.hash} classes="small smd-pad-4"/>
             </td>
             <td width="10%">
               <Text ellipsize={true}>
@@ -80,7 +77,7 @@ class TransactionTable extends Component {
             <td width="20%">
               <Text ellipsize={true}>
                 <small>
-                  {moment(tx.timestamp).format('YYYY-MM-DD hh:mm:ss A')}
+                  {parseDateFromString(tx.timestamp)}
                 </small>
               </Text>
             </td>
@@ -148,7 +145,7 @@ class TransactionTable extends Component {
     const tags = Object.getOwnPropertyNames(query).map((queryType, i) => {
       const queryValue = query[queryType];
       return (
-        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right">
+        <span key={'tag-' + queryType + '-' + i } className="pt-tag pt-tag-removable smd-margin-right-4">
                   {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
@@ -167,7 +164,6 @@ class TransactionTable extends Component {
           </div>
         </div>
       </div>
-
 
     return (
       <div className="pt-card pt-dark pt-elevation-2">
@@ -210,7 +206,7 @@ class TransactionTable extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     query: state.queryEngine.query,
     queryResults: state.queryEngine.queryResult,

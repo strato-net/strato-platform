@@ -4,7 +4,8 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import {Button, Text} from '@blueprintjs/core';
 import { fetchBlockData } from '../../../BlockData/block-data.actions';
-import * as moment from 'moment';
+import HexText from '../../../HexText';
+import moment from 'moment';
 
 class BlockView extends Component {
 
@@ -56,9 +57,7 @@ class BlockView extends Component {
                     <tr>
                       <td>Parent Hash</td>
                       <td>
-                        <Text ellipsize={true}>
-                          <small>{block.blockData.parentHash}</small>
-                        </Text>
+                        <HexText value={block.blockData.parentHash} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
@@ -84,31 +83,19 @@ class BlockView extends Component {
                     <tr>
                       <td>Coinbase</td>
                       <td>
-                        <small>
-                          <Text ellipsize={true}>
-                            {block.blockData.coinbase}
-                          </Text>
-                        </small>
+                        <HexText value={block.blockData.coinbase} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
                       <td>State Root</td>
                       <td>
-                        <small>
-                          <Text ellipsize={true}>
-                            {block.blockData.stateRoot}
-                          </Text>
-                        </small>
+                        <HexText value={block.blockData.stateRoot} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
                       <td>Transactions Root</td>
                       <td>
-                        <small>
-                          <Text ellipsize={true}>
-                            {block.blockData.transactionsRoot}
-                          </Text>
-                        </small>
+                        <HexText value={block.blockData.transactionsRoot} classes="small smd-pad-4"/>
                       </td>
                     </tr>
                     <tr>
@@ -133,7 +120,7 @@ class BlockView extends Component {
   }
 }
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   const blockNumber = Number(ownProps.match.params.block);
   return {
     block: state.blockData.blockData.filter((val) => {

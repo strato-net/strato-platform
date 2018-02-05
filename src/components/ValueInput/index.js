@@ -1,6 +1,6 @@
 import React, {Component} from 'react';
 
-import unitMap from '../../lib/constants'
+import unitMap from '../../lib/constants';
 
 class ValueInput extends Component {
 

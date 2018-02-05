@@ -7,8 +7,8 @@ import {
 } from 'redux-saga/effects';
 import {
   FETCH_ACCOUNTS,
-  FETCH_ACCOUNT_ADDRESS,
-  FETCH_ACCOUNT_DETAIL,
+  FETCH_ACCOUNT_ADDRESS_REQUEST,
+  FETCH_ACCOUNT_DETAIL_REQUEST,
   fetchAccountsSuccess,
   fetchAccountsFailure,
   fetchUserAddresses,
@@ -16,16 +16,21 @@ import {
   fetchUserAddressesFailure,
   fetchAccountDetail,
   fetchAccountDetailSuccess,
-  fetchAccountDetailFailure
+  fetchAccountDetailFailure,
+  FAUCET_REQUEST,
+  faucetSuccess,
+  faucetFailure
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
+import { delay } from 'redux-saga'
 
 const accountDataUrl = env.STRATO_URL + "/account?address=:address";
 const addressUrl = env.BLOC_URL + '/users/:user';
 const usernameUrl = env.BLOC_URL + "/users";
+const faucetUrl = env.STRATO_URL + "/faucet"
 
-function getAccountsApi() {
+export function getAccountsApi() {
   return fetch(
     usernameUrl,
     {
@@ -34,15 +39,15 @@ function getAccountsApi() {
         'Accept': 'application/json'
       },
     })
-  .then(function (response) {
-    return response.json()
-  })
-  .catch(function (error) {
-    throw error;
-  })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    })
 }
 
-function getUserAddressesApi(username) {
+export function getUserAddressesApi(username) {
   return fetch(
     addressUrl.replace(':user', username),
     {
@@ -52,15 +57,15 @@ function getUserAddressesApi(username) {
       },
     }
   )
-  .then(function (response) {
-    return response.json();
-  })
-  .catch(function (error) {
-    throw error;
-  });
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
-function getAccountDetailApi(address) {
+export function getAccountDetailApi(address) {
   return fetch(
     accountDataUrl.replace(":address", address),
     {
@@ -70,56 +75,92 @@ function getAccountDetailApi(address) {
       },
     }
   )
-  .then(function (response) {
-    return response.json();
-  })
-  .catch(function (error) {
-    throw error;
-  });
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
-function* getAccounts(action) {
+export function postFaucet(address) {
+  return fetch(
+    faucetUrl,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `address=${address}`
+    }
+  )
+    .then(function (response) {
+      return;
+    })
+    .catch(function (error) {
+      throw error;
+    })
+}
+
+export function* getAccounts(action) {
   try {
     const response = yield call(getAccountsApi);
     yield put(fetchAccountsSuccess(response));
-    // dispatch the action
-    yield response.map(account => put(fetchUserAddresses(account)));
+    // dispatch the action if necessary
+    if (action.loadAddresses && response.length > 0) {
+      yield put(fetchUserAddresses(response[0], action.loadBalances));
+    }
   }
   catch (err) {
     yield put(fetchAccountsFailure(err));
   } finally {
-    if (yield cancelled()){
+    if (yield cancelled()) {
       yield put(hideLoading());
     }
   }
 }
 
-function* getUserAddresses(action) {
+export function* getUserAddresses(action) {
   try {
     const response = yield call(getUserAddressesApi, action.name);
     yield put(fetchUserAddressesSuccess(action.name, response));
-    yield response.map(address => put(fetchAccountDetail(action.name,address)));
+    if (action.loadBalances) {
+      yield response.map(address => put(fetchAccountDetail(action.name, address)));
+    }
   }
-  catch(err) {
-    yield put(fetchUserAddressesFailure(action.name,err));
+  catch (err) {
+    yield put(fetchUserAddressesFailure(action.name, err));
   }
 }
 
-function* getAccountDetail(action) {
+export function* getAccountDetail(action) {
   try {
     const response = yield call(getAccountDetailApi, action.address);
     // don't ask about response['0'].
     yield put(fetchAccountDetailSuccess(action.name, action.address, response['0']));
   }
-  catch(err) {
+  catch (err) {
     yield put(fetchAccountDetailFailure(action.name, action.address, err));
   }
 }
 
-export default function* watchFetchAccounts() {
+export function* faucetAccount(action) {
+  try {
+    yield call(postFaucet, action.address);
+    yield put(faucetSuccess());
+    yield call(delay, 100)
+    yield put(fetchAccountDetail(action.name, action.address));
+  }
+  catch (err) {
+    yield put(faucetFailure(err))
+  }
+}
+
+export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
-    takeEvery(FETCH_ACCOUNT_ADDRESS, getUserAddresses),
-    takeEvery(FETCH_ACCOUNT_DETAIL, getAccountDetail)
+    takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
+    takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
+    takeLatest(FAUCET_REQUEST, faucetAccount)
   ];
 }

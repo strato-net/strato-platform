@@ -47,9 +47,11 @@ const reducer = function (state = initialState, action) {
       };
     case EXECUTE_QUERY_SUCCESS:
       let result = action.queryResult;
-      if (state.query.last) {
-        result = result.slice(-15);
-      }
+      // Not sure what this is for but seems to be preventing
+      // all results from being displayed when last > 15
+      // if (state.query.last) {
+      //   result = result.slice(stat);
+      // }
       return {
         query: state.query,
         queryResult: result,

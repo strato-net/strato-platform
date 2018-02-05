@@ -1,17 +1,17 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import { Button, Dialog } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
-import { fetchAccounts } from '../../../Accounts/accounts.actions';
+import { fetchAccounts, fetchUserAddresses } from '../../../Accounts/accounts.actions';
 import {
   methodCall,
   methodCallFetchArgs,
   methodCallOpenModal,
   methodCallCloseModal
 } from './contractMethodCall.actions';
-
+import { required } from '../../../../lib/reduxFormsValidations'
 import './contractMethodCall.css';
 import ValueInput from "../../../ValueInput";
 
@@ -22,13 +22,14 @@ class ContractMethodCall extends Component {
     e.preventDefault();
     mixpanelWrapper.track("method_call_button_click");
     this.props.methodCallOpenModal(this.props.lookup);
+    const address = this.props.fromCirrus && this.props.fromBloc === undefined ? this.props.contractName : this.props.contractAddress
     this.props.methodCallFetchArgs(
       this.props.contractName,
-      this.props.contractAddress,
+      address,
       this.props.symbolName,
       this.props.lookup
     );
-    this.props.fetchAccounts();
+    this.props.fetchAccounts(false, false);
   }
 
   handleCloseModal = (e) => {
@@ -40,7 +41,7 @@ class ContractMethodCall extends Component {
   }
 
   submit = (values) => {
-
+    
     const payload = {
       contractName: this.props.contractName,
       contractAddress: this.props.contractAddress,
@@ -59,6 +60,10 @@ class ContractMethodCall extends Component {
     this.props.methodCall(this.props.lookup, payload);
   }
 
+  handleUsernameChange = (e) => {
+    this.props.fetchUserAddresses(e.target.value,false)
+  };
+
   render() {
     const params = [];
     const handleSubmit = this.props.handleSubmit;
@@ -69,13 +74,13 @@ class ContractMethodCall extends Component {
       Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
       : null;
 
-    if(this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
+    if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
       const self = this;
-      args.forEach(function(arg,i){
+      args.forEach(function (arg, i) {
         params.push(
           <tr key={self.props.symbolName + '-args-' + i}>
-            <td style={{paddingTop: '10px'}}>{arg}</td>
+            <td style={{ paddingTop: '10px' }}>{arg}</td>
             <td>
               <Field
                 name={arg}
@@ -83,6 +88,8 @@ class ContractMethodCall extends Component {
                 type="text"
                 placeholder={self.props.modal.args[arg].type}
                 className="pt-input"
+                validate={required}
+                required
               />
             </td>
           </tr>
@@ -102,7 +109,6 @@ class ContractMethodCall extends Component {
         <Button
           className="pt-minimal pt-small pt-intent-primary"
           onClick={this.handleOpenModal}
-          disabled={!this.props.fromBloc}
         >
           Call Method
         </Button>
@@ -122,7 +128,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '5px'}}>
+                  <label className="pt-label" style={{ marginTop: '5px' }}>
                     Username
                   </label>
                 </div>
@@ -132,13 +138,17 @@ class ContractMethodCall extends Component {
                       className="pt-input"
                       name="modalUsername"
                       component="select"
+                      onChange = {this.handleUsernameChange}
+                      validate={required}
                       required
                     >
                       <option />
                       {
-                        users.map((user,i) => { return (
-                          <option key={'user' + i} value={user}>{user}</option>
-                        )})
+                        users.map((user, i) => {
+                          return (
+                            <option key={'user' + i} value={user}>{user}</option>
+                          )
+                        })
                       }
                     </Field>
                   </div>
@@ -146,7 +156,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '9px'}}>
+                  <label className="pt-label" style={{ marginTop: '9px' }}>
                     Address
                   </label>
                 </div>
@@ -156,14 +166,17 @@ class ContractMethodCall extends Component {
                       className="pt-input"
                       component="select"
                       name="modalAddress"
+                      validate={required}
                       required
                     >
                       <option />
                       {
                         userAddresses ?
-                          userAddresses.map((address,i) => { return (
-                            <option key={address} value={address}>{address}</option>
-                          )})
+                          userAddresses.map((address, i) => {
+                            return (
+                              <option key={address} value={address}>{address}</option>
+                            )
+                          })
                           : ''
                       }
                     </Field>
@@ -172,7 +185,7 @@ class ContractMethodCall extends Component {
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '9px'}}>
+                  <label className="pt-label" style={{ marginTop: '9px' }}>
                     Password
                   </label>
                 </div>
@@ -183,13 +196,14 @@ class ContractMethodCall extends Component {
                     placeholder="Password"
                     component="input"
                     type="password"
+                    validate={required}
                     required
                   />
                 </div>
               </div>
               <div className="row">
                 <div className="col-sm-3 text-right">
-                  <label className="pt-label" style={{marginTop: '9px'}}>
+                  <label className="pt-label" style={{ marginTop: '9px' }}>
                     Value
                   </label>
                 </div>
@@ -197,7 +211,6 @@ class ContractMethodCall extends Component {
                   <Field
                     name="modalValue"
                     component={ValueInput}
-                    required
                   />
                 </div>
               </div>
@@ -226,7 +239,7 @@ class ContractMethodCall extends Component {
                   <hr />
                   <h5>Results</h5>
                   <pre className="smd-scrollable">
-                    {this.props.modal.result} <br/>
+                    {this.props.modal.result} <br />
                   </pre>
                 </div>
               </div>
@@ -235,7 +248,7 @@ class ContractMethodCall extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={this.handleCloseModal} />
                 <button
-                  disabled={this.props.pristine || this.props.submitting}
+                  disabled={this.props.pristine || this.props.submitting || !this.props.valid}
                   className="pt-button pt-intent-primary"
                   type="button"
                   onClick={handleSubmit(this.submit)}
@@ -251,9 +264,20 @@ class ContractMethodCall extends Component {
   }
 }
 
+export const validate = (values) => {
+  const errors = {};
+
+  Object.getOwnPropertyNames(values).forEach((val) => {
+    if (values[val] === '' || values[val] === undefined) {
+      errors[val] = val + " Required";
+    }
+  });
+  return errors
+};
+
 const selector = formValueSelector('contract-method-call');
 
-function mapStateToProps(state, ownProps) {
+export function mapStateToProps(state, ownProps) {
   return {
     modal: state.methodCall.modals
       && state.methodCall.modals[ownProps.lookup] ?
@@ -264,7 +288,7 @@ function mapStateToProps(state, ownProps) {
 }
 
 
-const formed = reduxForm({ form: 'contract-method-call' })(ContractMethodCall);
+const formed = reduxForm({ form: 'contract-method-call', validate})(ContractMethodCall);
 const connected = connect(
   mapStateToProps,
   {
@@ -272,6 +296,7 @@ const connected = connect(
     methodCallOpenModal,
     methodCallCloseModal,
     fetchAccounts,
+    fetchUserAddresses,
     methodCall,
   }
 )(formed);

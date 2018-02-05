@@ -1,7 +1,7 @@
-import React, {Component} from 'react';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
-import {Button, Collapse} from '@blueprintjs/core';
+import React, { Component } from 'react';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
+import { Button, Collapse } from '@blueprintjs/core';
 import {
   selectContractInstance,
   fetchState,
@@ -12,11 +12,13 @@ import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Link } from 'react-router-dom';
+import HexText from '../../../HexText';
+import { Tooltip, Position } from '@blueprintjs/core';
 
 class ContractCard extends Component {
   constructor(props) {
     super(props);
-    this.state = {isOpen: false};
+    this.state = { isOpen: false };
   }
 
   componentWillMount() {
@@ -30,12 +32,12 @@ class ContractCard extends Component {
     const instances = contract && contract.instances ? contract.instances : [];
     const self = this;
     const re = /[0-9a-fA-F]{40}$/;
-    const showQueryBuilder = instances.reduce((acc,instance)=> {
+    const showQueryBuilder = instances.reduce((acc, instance) => {
       return acc || instance.fromCirrus;
     }, false);
 
     instances
-      .filter((instance) => {return re.test(instance.address)})
+      .filter((instance) => { return re.test(instance.address) })
       .forEach(function (instance) {
         cardData.push(
           <tr
@@ -48,17 +50,20 @@ class ContractCard extends Component {
             }}
             key={'card-data-' + instance.address}
           >
-            <td style={{border: 'none'}}>
-              <small>{instance.address}</small>
+            <td style={{ border: 'none' }}>
+              <HexText value={instance.address} classes="small smd-pad-4" />
             </td>
-            <td style={{border: 'none'}}>
-              { instance.fromCirrus ?
-                  <span className="pt-tag pt-intent-primary">Indexed</span> : ''
+            <td style={{ border: 'none' }}>
+              {instance.fromBloc ?
+                <span className="pt-tag pt-intent-success smd-margin-right-4">Bloc</span> : ''
+              }
+              {instance.fromCirrus ?
+                <span className="pt-tag pt-intent-primary">Cirrus</span> : ''
               }
             </td>
           </tr>
         );
-    });
+      });
 
     cardData = cardData.length === 0 ? [<tr key={1}>
       <td colSpan={2} className="text-center">No Instances</td>
@@ -70,26 +75,38 @@ class ContractCard extends Component {
     );
     let state = null;
 
-    if(selectedInstance.length > 0 && selectedInstance[0].state) {
+    if (selectedInstance.length > 0 && selectedInstance[0].state) {
       const instance = selectedInstance[0];
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
-      if(symbols.length > 0) {
+      if (symbols.length > 0) {
         symbols.forEach((symbol, i) => {
           const symbolState = instance.state[symbol];
           symbolTable.push(
             <tr key={symbol + ' ' + i}>
-              <td style={{verticalAlign: 'middle'}}>{symbol}</td>
-              <td style={{maxWidth: '300px'}}>
+              <td
+                style={{
+                  verticalAlign: 'middle',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '90px'
+                }}>
+                <Tooltip
+                  content={symbol}
+                  position={Position.TOP_LEFT}>
+                  {symbol}
+                </Tooltip>
+              </td>
+              <td style={{ maxWidth: '300px' }}>
                 <pre>
                   {
                     typeof symbolState === 'string' ?
                       symbolState
-                      : JSON.stringify(symbolState,null,2)
+                      : JSON.stringify(symbolState, null, 2)
                   }
                 </pre>
               </td>
-              <td style={{verticalAlign: 'middle'}}>
+              <td style={{ verticalAlign: 'middle' }}>
                 {
                   typeof symbolState === 'string' && symbolState.startsWith('function') ?
                     <ContractMethodCall
@@ -113,7 +130,7 @@ class ContractCard extends Component {
         <div className="pt-card pt-elevation-2">
           <div className="row">
             <div className="col-sm-12 text-right">
-              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div>: ''} </span>
+              <span className="pt-monospace-text"> {instance && instance.balance ? <div> Balance: {instance.balance} wei </div> : ''} </span>
             </div>
           </div>
           <div className="row">
@@ -123,7 +140,7 @@ class ContractCard extends Component {
                   <tr>
                     <th>Symbol</th>
                     <th className="text-right">State</th>
-                    <th style={{width: '105px'}} className="text-right"></th>
+                    <th style={{ width: '105px' }} className="text-right"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -142,8 +159,8 @@ class ContractCard extends Component {
         <div className="col-sm-6">
           <div className="pt-card pt-elevation-2">
             <div className="row">
-              <div className="col-sm-6"><h4>{name}</h4></div>
-              <div className="col-sm-6 text-right">
+              <div className="col-sm-4"><h4>{name}</h4></div>
+              <div className="col-sm-8 text-right">
                 <div className="pt-button-group">
                   {
                     showQueryBuilder ?
@@ -155,13 +172,13 @@ class ContractCard extends Component {
                       : null
                   }
                   <Button type="button"
-                     className="pt-icon-double-caret-vertical btn-sm"
-                     onClick={() => {
-                       mixpanelWrapper.track("contracts_toggle_collapse_click");
-                       this.setState({
-                         isOpen: !this.state.isOpen
-                       })
-                     }}
+                    className="pt-icon-double-caret-vertical btn-sm"
+                    onClick={() => {
+                      mixpanelWrapper.track("contracts_toggle_collapse_click");
+                      this.setState({
+                        isOpen: !this.state.isOpen
+                      })
+                    }}
                   >
                     {this.state.isOpen ? "Hide" : "Show"} Contracts
                   </Button>
@@ -175,10 +192,10 @@ class ContractCard extends Component {
                 <Collapse isOpen={this.state.isOpen} component="table" className="col-sm-12" transitionDuration={100}>
                   <table className="pt-table pt-interactive pt-condensed pt-striped smd-full-width">
                     <thead>
-                    <tr>
-                      <th>Contract Address</th>
-                      <th></th>
-                    </tr>
+                      <tr>
+                        <th>Contract Address</th>
+                        <th></th>
+                      </tr>
                     </thead>
                     <tbody>{cardData}</tbody>
                   </table>
@@ -196,7 +213,7 @@ class ContractCard extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
   };
 }

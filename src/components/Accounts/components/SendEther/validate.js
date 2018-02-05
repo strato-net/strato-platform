@@ -1,4 +1,4 @@
-const validate = (values) => {
+export const validate = (values) => {
     const errors = {};
 
     if (!values.from) {

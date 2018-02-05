@@ -6,7 +6,7 @@ import {
   fromUsernameChange,
   toUsernameChange
 } from './sendEther.actions';
-import { fetchAccounts } from '../../accounts.actions';
+import { fetchAccounts, fetchUserAddresses } from '../../accounts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
@@ -17,7 +17,7 @@ import validate from './validate';
 
 // TODO: use solc instead of extabi for compile
 
-class CreateContract extends Component {
+class SendEther extends Component {
 
   // handleFromUsernameChange = (e) => {
   //   this.props.fromUsernameChange(e.target.value);
@@ -36,6 +36,11 @@ class CreateContract extends Component {
     }
   }
 
+  closeModal = () => {
+    this.props.sendEtherCloseModal();
+    this.props.fetchAccounts(true, true);
+  }
+
   submit = (values) => {
     const toAddress = this.state.form.userSelected ? values.toAddress : values.address
     const payload = {
@@ -52,13 +57,6 @@ class CreateContract extends Component {
 
   componentDidMount() {
     mixpanelWrapper.track("send_ether_loaded");
-    this.props.fetchAccounts();
-  }
-
-  componentWillReceiveProps(newProps) {
-    if (this.props.isOpen !== newProps.isOpen) {
-      this.props.fetchAccounts();
-    }
   }
 
   render() {
@@ -84,7 +82,7 @@ class CreateContract extends Component {
           <Dialog
             iconName="inbox"
             isOpen={this.props.isOpen}
-            onClose={this.props.sendEtherCloseModal}
+            onClose={this.closeModal}
             title="Send Ether"
             style={{
               width: "560px"
@@ -104,7 +102,9 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="from"
-                      // onChange={this.handleFromUsernameChange}
+                      onChange={
+                        (e) => this.props.fetchUserAddresses(e.target.value, true)
+                      }
                       required
                     >
                       <option />
@@ -135,7 +135,7 @@ class CreateContract extends Component {
                     >
                       <option />
                       {
-                        fromUserAddresses ?
+                        fromUserAddresses.length ?
                           fromUserAddresses.map((address, i) => {
                             return (
                               <option key={address} value={address}>{address}</option>
@@ -237,7 +237,9 @@ class CreateContract extends Component {
                       className="pt-input"
                       component="select"
                       name="to"
-                      // onChange={this.handleToUsernameChange}
+                      onChange={
+                        (e) => this.props.fetchUserAddresses(e.target.value, true)
+                      }
                       required
                     >
                       <option />
@@ -269,7 +271,7 @@ class CreateContract extends Component {
                     >
                       <option />
                       {
-                        toUserAddresses ?
+                        toUserAddresses.length ?
                           toUserAddresses.map((address, i) => {
                             return (
                               <option key={address} value={address}>{address}</option>
@@ -314,8 +316,7 @@ class CreateContract extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track("send_ether_cancel");
-                  this.props.sendEtherCloseModal()
-                  this.props.fetchAccounts()
+                  this.closeModal();
                 }} />
                 <Button
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
@@ -334,7 +335,7 @@ class CreateContract extends Component {
 
 const selector = formValueSelector('send-ether');
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     isOpen: state.sendEther.isOpen,
     result: state.sendEther.result,
@@ -344,12 +345,13 @@ function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({ form: 'send-ether', validate })(CreateContract);
+const formed = reduxForm({ form: 'send-ether', validate })(SendEther);
 const connected = connect(mapStateToProps, {
   sendEtherOpenModal,
   sendEtherCloseModal,
   sendEther,
   fetchAccounts,
+  fetchUserAddresses,
   fromUsernameChange,
   toUsernameChange
 })(formed);
