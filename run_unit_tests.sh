@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-stack test blockapps-ethereum
-stack test blockapps-ethereum-abi
-stack test blockapps-solidity
-stack test blockapps-strato-api
+
+declare -i RESULT=0
+TESTS=(
+  blockapps-ethereum
+  blockapps-ethereum-abi
+  blockapps-solidity
+  blockapps-strato-api
+)
+
+for tst in ${TESTS[@]}; do
+  stack test $tst
+  RESULT=RESULT+$?
+done
+
+exit $RESULT
