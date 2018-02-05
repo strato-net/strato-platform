@@ -1,5 +1,4 @@
-{-# LANGUAGE
-  OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BlockApps.Solidity.StorageSpec where
 

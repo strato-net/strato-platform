@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BlockApps.Bloc22.Database.Solc (compileSolc) where
+module BlockApps.Bloc22.Database.Solc where
 
 import           Control.Monad              hiding (mapM_)
-import           Data.Aeson
+import           Control.Arrow              (first)
+import           Data.Aeson hiding (String)
+import Data.Monoid ((<>))
 import qualified Data.List                  as List
 import           Data.Map                   ()
 import qualified Data.Map                   as Map
@@ -26,8 +29,10 @@ import qualified Data.Aeson                 as Aeson
 import qualified Data.ByteString.Lazy       as BL
 import qualified Data.Text.Encoding         as Text
 
-
 import BlockApps.Bloc22.Monad
+import BlockApps.Solidity.Parse.Parser
+import BlockApps.Solidity.Parse.UnParser
+
 
 -- Query parameters allowed:
 --   src: solidity source code to be compiled, as a (url-encoded) string
@@ -51,7 +56,20 @@ compileSolc mainSrc = do
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
     Left (err,_) -> blocError . AnError . Text.pack $ err
     Right res ->
-      maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact") return $ Map.lookup "src" res
+      maybe (blocError . AnError $ "SolcError : No \"src\" field in json artifact")
+            return $ Map.lookup "src" res
+
+
+-- For solc compiling during testing, outside of Bloc monad
+compileSolcIO :: Text -> IO (Either String Aeson.Value)
+compileSolcIO mainSrc = do
+  (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
+  eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
+  return $ case eRes of
+    Left (err, ExitFailure 1) -> Left err
+    Left (err,_) -> Left err
+    Right res ->
+      maybe (Left $ "SolcError : No \"src\" field in json artifact") Right $ Map.lookup "src" res
 
 runSolc :: Map String String
         -> Map String String
@@ -189,3 +207,19 @@ getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
 --  let mainFiles = maybe mainFiles0 (\s -> Map.insert "src" s mainFiles0) $
 --                  Map.lookup "src" postParams
 --  return (postParams, mainFiles, importFiles)
+
+
+addGetSourceFuncToSource :: Text -> Either String Text
+addGetSourceFuncToSource src = do
+  -- Supply empty string for parser as it's only used for error reporting
+  fileContents <- parseXabiNoInheritanceMerge "" (unpack src)
+  let src' = formatSrc src
+      modifiedContents = List.map (fmap (first (addF src'))) fileContents
+  return . pack . unparse $ modifiedContents
+  where
+    addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
+    formatSrc = replace "\"" "\\\""
+              . replace "\n" "\\n" 
+
+stripLines :: Text -> Text
+stripLines = Text.concat . Text.lines

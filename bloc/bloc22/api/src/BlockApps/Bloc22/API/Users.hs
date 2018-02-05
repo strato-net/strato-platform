@@ -73,7 +73,7 @@ instance ToJSON BlocTransactionData where
                                  ]
     Upload details     -> object [ "tag" .= ("Upload":: Text)
                                  , "contents" .= (details::ContractDetails)
-                                 ]  
+                                 ]
     Call   solVals     -> object [ "tag" .= ("Call":: Text)
                                  , "contents" .= (solVals::[SolidityValue])
                                  ]
@@ -91,16 +91,16 @@ instance ToSample BlocTransactionData where
   toSamples _ = samples
     [ Send PostTransaction {
         posttransactionHash       = keccak256 "foo"
-      , posttransactionGasLimit   = Strung 100000
+      , posttransactionGasLimit   = 100000
       , posttransactionCodeOrData = "Code or Data"
-      , posttransactionGasPrice   = Strung 1
+      , posttransactionGasPrice   = 1
       , posttransactionTo         = Just $ Address 0xdeadbeef
       , posttransactionFrom       = Address 0x12345678
       , posttransactionValue      = Strung 0
       , posttransactionR          = Hex 0xdeadbeef
       , posttransactionS          = Hex 0xdeadbeef
       , posttransactionV          = Hex 0x1c
-      , posttransactionNonce      = Strung 9876
+      , posttransactionNonce      = 9876
       }
     , Upload ContractDetails {
         contractdetailsBin        = "Contract Bin"
@@ -109,10 +109,11 @@ instance ToSample BlocTransactionData where
       , contractdetailsCodeHash   = keccak256 "Contract Code Hash"
       , contractdetailsName       = "Contract Name"
       , contractdetailsXabi       = Xabi {
-                                      xabiFuncs  = Map.fromList []
-                                    , xabiConstr = Map.fromList []
-                                    , xabiVars   = Map.fromList []
-                                    , xabiTypes  = Map.fromList []
+                                      xabiFuncs     = Map.fromList []
+                                    , xabiConstr    = Map.fromList []
+                                    , xabiVars      = Map.fromList []
+                                    , xabiTypes     = Map.fromList []
+                                    , xabiModifiers = Map.fromList []
                                     }
       }
     , Call [] -- probably make a better Call sample

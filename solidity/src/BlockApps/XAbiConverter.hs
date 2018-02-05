@@ -234,7 +234,20 @@ xAbiToContract contractXabi@Xabi{..} = mdo
 contractToXabi::Contract->Xabi
 contractToXabi Contract{..} =
   let
-    functions = Map.fromList [(name, Func (Map.fromList $ zipWith (argToIndexedTypes typeDefs) [0..] args) (Map.fromList $ zipWith (varToIndexedTypes typeDefs) [0..] rets)) | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct]
+    functions =
+      Map.fromList
+        [ ( name , Func { funcArgs = (Map.fromList $ zipWith (argToIndexedTypes typeDefs) [0..] args)
+                        , funcVals = (Map.fromList $ zipWith (varToIndexedTypes typeDefs) [0..] rets)
+                        , funcContents = Nothing
+                        , funcMutable = Nothing
+                        , funcPayable = Nothing
+                        , funcVisibility = Nothing
+                        , funcModifiers = Nothing
+                        }
+                        
+          )
+        | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct
+        ]
     vars = filter (not . isFunction . snd . snd) $ Map.toList $ fields mainStruct::[(Text, (Storage.Position, Type))]
     isFunction::Type->Bool
     isFunction TypeFunction{} = True
@@ -245,7 +258,8 @@ contractToXabi Contract{..} =
       xabiFuncs = functions,
       xabiConstr = Map.empty,
       xabiVars = Map.fromList $ map (fmap $ fieldToVarType typeDefs) vars,
-      xabiTypes = Map.empty
+      xabiTypes = Map.empty,
+      xabiModifiers = Map.empty
       }
 
 fieldToVarType::TypeDefs->(Storage.Position, Type)->Xabi.VarType

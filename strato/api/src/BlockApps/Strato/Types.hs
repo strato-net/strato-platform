@@ -189,6 +189,7 @@ instance ToSchema Account where
           , accountCode           = "60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056"
           , accountCodeHash       = keccak256 "989ad6524e83e1a38b485bb898d27b5dbc65fc33905c3d3a2fd41c5bb91c3fc8"
           , accountLatestBlockNum = 23
+          , accountSource         = "pragma solidity ^0.4.8;\n\ncontract SimpleStorage {\n\n\tuint public myInt;\n\n\tfunction SimpleStorage(uint _myInt) {\n\t\tmyInt = _myInt;\n\t}\n}"
           }
 
 instance ToSchema Difficulty
@@ -274,16 +275,16 @@ instance ToJSON Transaction where
 
 data PostTransaction = PostTransaction
   { posttransactionHash       :: Keccak256
-  , posttransactionGasLimit   :: Strung Natural
+  , posttransactionGasLimit   :: Natural
   , posttransactionCodeOrData :: Text
-  , posttransactionGasPrice   :: Strung Natural
+  , posttransactionGasPrice   :: Natural
   , posttransactionTo         :: Maybe Address
   , posttransactionFrom       :: Address
   , posttransactionValue      :: Strung Natural
   , posttransactionR          :: Hex Natural
   , posttransactionS          :: Hex Natural
   , posttransactionV          :: Hex Word8
-  , posttransactionNonce      :: Strung Natural
+  , posttransactionNonce      :: Natural
   } deriving (Eq, Show, Generic)
 
 instance FromJSON PostTransaction where
@@ -298,16 +299,16 @@ instance Arbitrary PostTransaction where
 instance ToSample PostTransaction where
   toSamples _ = singleSample PostTransaction
     { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-    , posttransactionGasLimit = Strung 21000
+    , posttransactionGasLimit = 21000
     , posttransactionCodeOrData = ""
-    , posttransactionGasPrice = Strung 50000000000
+    , posttransactionGasPrice = 50000000000
     , posttransactionTo = Just $ Address 0xdeadbeef
     , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
     , posttransactionValue = Strung 10000000000000000000
     , posttransactionR = Hex 1 -- make valid examples
     , posttransactionS = Hex 1 -- make valid examples
     , posttransactionV = Hex 0x1c
-    , posttransactionNonce = Strung 0
+    , posttransactionNonce = 0
     }
 
 instance ToSchema PostTransaction where
@@ -318,32 +319,32 @@ instance ToSchema PostTransaction where
       ex :: PostTransaction
       ex = PostTransaction
         { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
-        , posttransactionGasLimit = Strung 21000
+        , posttransactionGasLimit = 21000
         , posttransactionCodeOrData = ""
-        , posttransactionGasPrice = Strung 50000000000
+        , posttransactionGasPrice = 50000000000
         , posttransactionTo = Just $ Address 0xdeadbeef
         , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
         , posttransactionValue = Strung 10000000000000000000
         , posttransactionR = Hex 1 -- make valid examples
         , posttransactionS = Hex 1 -- make valid examples
         , posttransactionV = Hex 0x1c
-        , posttransactionNonce = Strung 0
+        , posttransactionNonce = 0
         }
 
 
 toPostTx :: Transaction -> PostTransaction
 toPostTx Transaction{..} = PostTransaction
   { posttransactionHash = transactionHash
-  , posttransactionGasLimit = transactionGasLimit
+  , posttransactionGasLimit = unStrung transactionGasLimit
   , posttransactionCodeOrData = fromMaybe "" transactionCodeOrData
-  , posttransactionGasPrice = transactionGasPrice
+  , posttransactionGasPrice = unStrung transactionGasPrice
   , posttransactionTo = transactionTo
   , posttransactionFrom = transactionFrom
   , posttransactionValue = transactionValue
   , posttransactionR = transactionR
   , posttransactionS = transactionS
   , posttransactionV = transactionV
-  , posttransactionNonce = transactionNonce
+  , posttransactionNonce = unStrung transactionNonce
   }
 
 
@@ -393,6 +394,7 @@ data Account = Account
   , accountCode           :: Text
   , accountCodeHash       :: Keccak256
   , accountLatestBlockNum :: Natural
+  , accountSource         :: Text
   } deriving (Eq, Show, Generic)
 
 instance FromJSON Account where

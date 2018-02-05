@@ -8,7 +8,9 @@
 module BlockApps.Bloc22.API.SpecUtils where
 
 import           Data.Text                 (Text, pack)
+import           Test.Hspec
 import           GHC.Generics
+import Data.Either
 import           Servant.Client
 import           Test.QuickCheck.Instances ()
 
@@ -22,6 +24,8 @@ data TestConfig = TestConfig
   { mgr                          :: Manager
   , blocUrl                      :: BaseUrl
   , stratoUrl                    :: BaseUrl
+  , blocUrlMulti                 :: Maybe BaseUrl
+  , stratoUrlMulti               :: Maybe BaseUrl
   , userName                     :: UserName
   , userAddress                  :: Address
   , toUserName                   :: UserName
@@ -72,6 +76,31 @@ getResolvedTx testConfig io = do
     Left _ -> return eResult
     Right result -> resolveTx testConfig $ blocTransactionHash result
 
+getResolvedBatchTx :: TestConfig -> IO (Either ServantError [BlocTransactionResult]) -> IO [Either ServantError BlocTransactionResult]
+getResolvedBatchTx testConfig io = do
+  eResult <- io
+  case eResult of
+    Left err -> return [Left err]
+    Right results -> mapM (resolveTx testConfig . blocTransactionHash) results
+
+resolveTxMulti :: TestConfig -> Keccak256 -> IO (Either ServantError BlocTransactionResult)
+resolveTxMulti testConfig@TestConfig{..} hash = do
+  let Just blocclient = blocUrlMulti
+  eResult <- runClientM (getBlocTransactionResult hash True) (ClientEnv mgr blocclient)
+  case eResult of
+    Left _ -> return eResult
+    Right result -> 
+      case blocTransactionStatus result of
+        Pending -> resolveTxMulti testConfig hash
+        _ -> return eResult
+
+getResolvedTxMulti :: TestConfig -> IO (Either ServantError BlocTransactionResult) -> IO (Either ServantError BlocTransactionResult)
+getResolvedTxMulti testConfig io = do
+  eResult <- io
+  case eResult of
+    Left _ -> return eResult
+    Right result -> resolveTxMulti testConfig $ blocTransactionHash result
+
 resolveBlocTx :: BlocTransactionResult -> ClientM BlocTransactionResult
 resolveBlocTx bloc = do
   result <- flip getBlocTransactionResult True $ blocTransactionHash bloc
@@ -79,5 +108,15 @@ resolveBlocTx bloc = do
     Pending -> resolveBlocTx result
     _ -> return result
 
+fromEither :: (Show b, Show a) => Either b a -> IO a
+fromEither x = do
+  logleft x
+  x `shouldSatisfy` isRight
+  let Right r = x
+  return r
 
+logleft :: (Show b) => Either b a -> IO ()
+logleft x = case x of
+  Left err -> print err
+  Right _ -> return ()
 

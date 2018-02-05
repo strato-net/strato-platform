@@ -1,3 +1,0 @@
-contract SameName {
-    uint myInt;
-}
