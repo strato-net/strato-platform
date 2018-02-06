@@ -3,8 +3,10 @@ import { connect } from 'react-redux';
 import './applications-card.css'
 import { withRouter } from 'react-router-dom';
 import { launchApp } from '../Applications/applications.actions';
-import { Menu, MenuItem, Popover, Position } from '@blueprintjs/core';
+import { Menu, MenuItem, Popover, Position, Button } from '@blueprintjs/core';
 import ReactLoading from 'react-loading';
+import Login from '../Login';
+import { openLoginOverlay } from '../User/user.actions';
 
 class ApplicationCard extends Component {
 
@@ -20,15 +22,41 @@ class ApplicationCard extends Component {
   };
 
   launch(app) {
-    if (!this.props.isLoggedIn) {
-      this.props.history.push('/login');
-      return;
-    }
     this.props.launchApp(app.address, app.url)
+  }
+
+  shareWithFb() {
+    window.FB.ui({
+      method: 'share_open_graph',
+      action_type: 'og.likes',
+      action_properties: JSON.stringify({
+        object: this.props.app.url,
+      })
+    }, function (response) {
+      // Debug response (optional)
+      console.log(response);
+    });
+  }
+
+  renderLogin() {
+    return (
+      <Button onClick={() => {
+        if (this.props.isLoggedIn) {
+          this.props.history.replace('/apps');
+        } else {
+          this.props.openLoginOverlay();
+        }
+      }} className="pt-intent-primary"
+        id="Login-button"
+        text={'Launch'} />
+    );
   }
 
   render() {
     const { app } = this.props;
+    // http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/
+    const twitterUrl = "https://twitter.com/intent/tweet?url=" + app.url
+    console.log('Lets check:', app)
     return (
       <div className="pt-card app-card">
         <div className="row">
@@ -46,11 +74,20 @@ class ApplicationCard extends Component {
                 <Popover
                   position={Position.BOTTOM}
                   content={
-                  <Menu>
-                    <MenuItem onClick={this.handleSave} text="Facebook" />
-                    <MenuItem onClick={this.handleDelete} text="Twitter" />
-                    <MenuItem onClick={this.handleDelete} text="State of Dapps" />
-                  </Menu>}
+                    <Menu>
+                      <MenuItem onClick={this.shareWithFb} text="Facebook" />
+                      <a className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                        href={twitterUrl}
+                        data-size="large"
+                        data-text="custom share text"
+                        data-url="https://dev.twitter.com/web/tweet-button"
+                        data-hashtags="example,demo"
+                        data-via="twitterdev"
+                        data-related="twitterapi,twitter">
+                        Tweet
+                        </a>
+                      <MenuItem onClick={this.handleDelete} text="State of Dapps" />
+                    </Menu>}
                   popoverClassName={"popoverClassName"}
                 >
                   <button
@@ -60,7 +97,7 @@ class ApplicationCard extends Component {
                     Share
                   </button>
                 </Popover>
-                {app.isLoading ?
+                {!this.props.isLoggedIn? this.renderLogin() : (app.isLoading ?
                   <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> :
                   <a rel="noopener noreferrer">
                     <button
@@ -69,7 +106,7 @@ class ApplicationCard extends Component {
                     >
                       Launch
                     </button>
-                  </a>
+                  </a>)
                 }
               </div>
             </div>
@@ -99,7 +136,8 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(mapStateToProps,
     {
-      launchApp
+      launchApp,
+      openLoginOverlay
     }
   )(ApplicationCard)
 );

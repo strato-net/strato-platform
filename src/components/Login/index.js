@@ -39,18 +39,19 @@ class Login extends Component {
 
   render() {
     const { handleSubmit } = this.props;
-
+    
     return (
       <div className="smd-pad-16">
-        <Button onClick={() => {
+        {/* <Button onClick={() => {
           if (this.props.isLoggedIn) {
             this.props.history.replace('/apps');
           } else {
             this.props.openLoginOverlay();
+            this.setState({number: 1});
           }
         }} className="pt-intent-primary"
           id="Login-button"
-          text="For Developer" />
+          text={this.props.title || 'For Developer'} /> */}
         <form>
           <Dialog
             iconName="inbox"
