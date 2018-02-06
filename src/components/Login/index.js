@@ -5,6 +5,8 @@ import { withRouter } from 'react-router-dom';
 import { login, openLoginOverlay, closeLoginOverlay } from '../User/user.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import validate from './validate.js';
+import CreateUser from '../CreateUser';
+import './Login.css';
 
 class Login extends Component {
 
@@ -46,8 +48,8 @@ class Login extends Component {
           } else {
             this.props.openLoginOverlay();
           }
-        }} className="pt-intent-primary pt-icon-add"
-          id="accounts-create-user-button"
+        }} className="pt-intent-primary"
+          id="Login-button"
           text="For Developer" />
         <form>
           <Dialog
@@ -73,7 +75,7 @@ class Login extends Component {
                       required
                       tabIndex="1"
                     /> <br />
-                    <span style={{ color: 'red', fontSize: '10px' }}>{this.errorMessageFor('email')}</span>
+                    <span className="error-text">{this.errorMessageFor('email')}</span>
                   </div>
                 </div>
 
@@ -90,7 +92,7 @@ class Login extends Component {
                       type="password"
                       required
                     /> <br />
-                    <span style={{ color: 'red', fontSize: '10px' }}>{this.errorMessageFor('password')}</span>
+                    <span className="error-text">{this.errorMessageFor('password')}</span>
                   </div>
                 </div>
               </div>
@@ -101,15 +103,14 @@ class Login extends Component {
               </div>
             </div>
 
-            <div className="pt-dialog-footer">
+            <div className="pt-dialog-footer text-center">
               <div className="pt-dialog-footer-actions">
-                <Button text="Cancel" onClick={() => {
-                  this.props.closeLoginOverlay();
-                }} />
+                <CreateUser />
                 <Button
                   type="button"
                   onClick={handleSubmit(this.submit)}
                   text={'Login'}
+                  className="pt-intent-primary pt-icon-log-in"
                 />
               </div>
             </div>

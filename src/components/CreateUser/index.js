@@ -1,9 +1,9 @@
-import React, {Component} from 'react';
-import {openOverlay, closeOverlay, createUser} from './createUser.actions';
-import {Button, Dialog, Intent} from '@blueprintjs/core';
+import React, { Component } from 'react';
+import { openOverlay, closeOverlay, createUser } from './createUser.actions';
+import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 
 import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
@@ -21,14 +21,11 @@ class CreateUser extends Component {
 
   render() {
     return (
-      <div className="smd-pad-16">
+      <div>
         <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
           this.props.openOverlay()
-        }} className="pt-intent-primary pt-icon-add"
-        id="accounts-create-user-button"
-                text="Create User"/>
-
+        }} text="Create User" className="pt-icon-add" />
         <form>
           <Dialog
             iconName="inbox"
@@ -106,7 +103,7 @@ class CreateUser extends Component {
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track('create_user_close_click');
                   this.props.closeOverlay()
-                }}/>
+                }} />
                 <Button
                   intent={Intent.PRIMARY}
                   onClick={this.props.handleSubmit(this.submit)}
@@ -122,9 +119,9 @@ class CreateUser extends Component {
 }
 
 export function mapStateToProps(state) {
-  let errors = {errors: undefined};
+  let errors = { errors: undefined };
   if (state.form && state.form["create-user"]) {
-    errors = {errors: state.form["create-user"].syncErrors}
+    errors = { errors: state.form["create-user"].syncErrors }
   }
   return {
     isOpen: state.createUser.isOpen,
@@ -132,7 +129,7 @@ export function mapStateToProps(state) {
   };
 }
 
-export function validate (values) {
+export function validate(values) {
   const errors = {};
   if (!values.username) {
     errors.username = "Username Required";
