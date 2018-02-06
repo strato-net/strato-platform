@@ -6,7 +6,7 @@ import { parseJwt, readCookie } from '../../lib/parsejwt';
 import { setCurrentUser } from '../User/user.actions';
 
 class ProtectedRoute extends Route {
-  
+
   componentDidMount() {
     let token = readCookie('token');
 
@@ -20,9 +20,9 @@ class ProtectedRoute extends Route {
   render() {
     const component = super.render();
 
-    if(!this.props.isLoggedIn) {
+    if (!this.props.isLoggedIn) {
       return (<Redirect to={{
-        pathname: '/login',
+        pathname: '/apps',
         state: { from: this.props.location }
       }} />);
     }

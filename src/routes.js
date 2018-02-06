@@ -11,9 +11,7 @@ import TransactionView from './components/Transactions/components/TransactionVie
 import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
 import App from './App';
-import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
-// import EnsureLoggedInContainer from './components/Auth';
 import Applications from './components/Applications/';
 import LaunchPad from './components/LaunchPad/';
 import CodeEditor from './components/CodeEditor';
@@ -23,7 +21,6 @@ export const routes = (
     <Route exact path="/" component={App}>
       <Redirect to="/apps" />
     </Route>
-    <Route exact path="/login" component={Login} />
     <Route exact path="/launchpad" component={LaunchPad} />
     <Route exact path="/apps" component={Applications} />
     <ProtectedRoute exact path="/home" component={Dashboard} />

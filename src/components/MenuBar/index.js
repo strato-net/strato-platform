@@ -6,6 +6,7 @@ import './menubar.css';
 import logo from './blockapps-cube-color-430x500.png';
 import { env } from '../../env';
 import { logout } from '../User/user.actions';
+import Login from '../Login';
 
 class MenuBar extends Component {
 
@@ -43,6 +44,8 @@ class MenuBar extends Component {
           <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
+          <Login />
+          <span className="pt-navbar-divider"/>
           <small className="pt-text-muted">v{ process.env.REACT_APP_VERSION } </small>
           <span className="pt-navbar-divider"/>
           <a href={ env.BLOC_DOC_URL } target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">

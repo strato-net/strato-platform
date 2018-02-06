@@ -4,6 +4,8 @@ export const LOGIN_REQUEST_FAILURE = 'LOGIN_REQUEST_FAILURE';
 export const LOGOUT_REQUEST = 'LOGOUT_REQUEST';
 export const LOGOUT_REQUEST_SUCCESS = 'LOGOUT_REQUEST_SUCCESS';
 export const SET_CURRENT_USER = 'SET_CURRENT_USER';
+export const OPEN_LOGIN_OVERLAY = 'OPEN_LOGIN_OVERLAY';
+export const CLOSE_LOGIN_OVERLAY = 'CLOSE_LOGIN_OVERLAY';
 
 export const login = function (payload) {
   return {
@@ -28,6 +30,21 @@ export const loginFailure = function (email, error) {
     error
   }
 }
+
+export const openLoginOverlay = function () {
+  return {
+    type: OPEN_LOGIN_OVERLAY,
+    isOpen: true
+  }
+}
+
+export const closeLoginOverlay = function () {
+  return {
+    type: CLOSE_LOGIN_OVERLAY,
+    isOpen: false
+  }
+}
+
 
 export const logout = function () {
   return {

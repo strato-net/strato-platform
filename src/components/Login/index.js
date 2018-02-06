@@ -2,30 +2,30 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { login } from '../User/user.actions';
-import { Button } from '@blueprintjs/core';
+import { login, openLoginOverlay, closeLoginOverlay } from '../User/user.actions';
+import { Button, Dialog } from '@blueprintjs/core';
 import validate from './validate.js';
 
 class Login extends Component {
-  
+
   constructor() {
     super();
-    this.state = {errors: null}
+    this.state = { errors: null }
   }
 
   submit = (values) => {
     let errors = validate(values);
-    this.setState({errors});
+    this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
       const payload = {
         email: values.email,
         password: values.password
       };
-  
+
       this.props.login(payload);
       this.props.history.push('/home');
-    } 
+    }
   }
 
   errorMessageFor(fieldName) {
@@ -36,66 +36,84 @@ class Login extends Component {
   }
 
   render() {
-    const {handleSubmit} = this.props;
+    const { handleSubmit } = this.props;
 
     return (
-      <div className="container-fluid pt-dark" id="tour-welcome" style={{marginTop: '56px'}}>
-        <form style={{margin: '0px auto', display: 'table'}} className="pt-card pt-dark pt-elevation-2">
-          <div className="pt-dialog-body">
-            <div className="row">
-              <div className="col-sm-12 text-center">
-                <h3>Login</h3>
+      <div className="smd-pad-16">
+        <Button onClick={() => {
+          if (this.props.isLoggedIn) {
+            this.props.history.replace('/apps');
+          } else {
+            this.props.openLoginOverlay();
+          }
+        }} className="pt-intent-primary pt-icon-add"
+          id="accounts-create-user-button"
+          text="For Developer" />
+        <form>
+          <Dialog
+            iconName="inbox"
+            isOpen={this.props.isOpen}
+            onClose={this.props.closeLoginOverlay}
+            title="Login"
+            className="pt-dark"
+          >
+            <div className="pt-dialog-body">
+              <div className="pt-form-group input">
+                <div className="pt-form-group pt-intent-danger">
+                  <label className="pt-label" htmlFor="input-a">
+                    Email
+                  </label>
+                  <div className="pt-form-content">
+                    <Field
+                      name="email"
+                      className="pt-input form-width"
+                      placeholder="Email"
+                      component="input"
+                      type="email"
+                      required
+                      tabIndex="1"
+                    /> <br />
+                    <span style={{ color: 'red', fontSize: '10px' }}>{this.errorMessageFor('email')}</span>
+                  </div>
+                </div>
+
+                <div className="pt-form-group pt-intent-danger">
+                  <label className="pt-label" htmlFor="input-b">
+                    Password
+                  </label>
+                  <div className="pt-form-content">
+                    <Field
+                      name="password"
+                      className="pt-input form-width"
+                      placeholder="Password"
+                      component="input"
+                      type="password"
+                      required
+                    /> <br />
+                    <span style={{ color: 'red', fontSize: '10px' }}>{this.errorMessageFor('password')}</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="col-sm-3"></div>
+                <div className="col-sm-3"></div>
+                <div className="col-sm-3"></div>
               </div>
             </div>
-            <div className="row">
-              <div className="col-sm-4 text-right">
-                <label className="pt-label" style={{marginTop: '9px'}}>
-                  Email
-                </label>
-              </div>
-              <div className="col-sm-8 smd-pad-4">
-                <Field
-                  name="email"
-                  className="pt-input"
-                  placeholder="Email"
-                  component="input"
-                  type="email"
-                  required
-                /> <br/>
-                <span style={{color: 'red', fontSize: '10px'}}>{this.errorMessageFor('email')}</span>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-4 text-right">
-                <label className="pt-label" style={{marginTop: '9px'}}>
-                  Password
-                </label>
-              </div>
-              <div className="col-sm-8 smd-pad-4">
-                <Field
-                  name="password"
-                  className="pt-input"
-                  placeholder="Password"
-                  component="input"
-                  type="password"
-                  required
-                /> <br/>
-                <span style={{color: 'red', fontSize: '10px'}}>{this.errorMessageFor('password')}</span>
-              </div>
-            </div>
-            <div className="row">
-              <div className="col-sm-12 text-center">
+
+            <div className="pt-dialog-footer">
+              <div className="pt-dialog-footer-actions">
+                <Button text="Cancel" onClick={() => {
+                  this.props.closeLoginOverlay();
+                }} />
                 <Button
-                  className="pt-button pt-intent-primary col-pad-4"
-                  style={{marginTop: '10px', width: '10pc'}}
                   type="button"
                   onClick={handleSubmit(this.submit)}
                   text={'Login'}
                 />
               </div>
             </div>
-            <div> { this.props.loginError || '' } </div>
-          </div>
+          </Dialog>
         </form>
       </div>
     );
@@ -104,7 +122,9 @@ class Login extends Component {
 
 function mapStateToProps(state) {
   return {
-    loginError: state.user.error, 
+    loginError: state.user.error,
+    isLoggedIn: state.user.isLoggedIn,
+    isOpen: state.user.isOpen
   };
 }
 
@@ -112,7 +132,9 @@ const formed = reduxForm({ form: 'login' })(Login);
 const connected = connect(
   mapStateToProps,
   {
-    login
+    login,
+    openLoginOverlay,
+    closeLoginOverlay
   }
 )(formed);
 
