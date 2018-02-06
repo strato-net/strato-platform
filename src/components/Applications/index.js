@@ -38,37 +38,37 @@ class Applications extends Component {
             <h3>Welcome to Launchpad</h3>
           </div>
           <div className="col-sm-2 text-right smd-pad-vertical-12">
-            { this.props.isLoggedIn &&
-            <Tooltip
-              content={<span>Unable to deploy apps when running multinode on localhost</span>}
-              inline={true}
-              position={Position.LEFT}
-              isDisabled={canDeployApps}
-            >
-              <Link to="/launchpad">
-                <button
-                  type="button"
-                  className="pt-button pt-intent-primary"
-                  disabled={!canDeployApps}
-                >
-                  Deploy
+            {this.props.isLoggedIn &&
+              <Tooltip
+                content={<span>Unable to deploy apps when running multinode on localhost</span>}
+                inline={true}
+                position={Position.LEFT}
+                isDisabled={canDeployApps}
+              >
+                <Link to="/launchpad">
+                  <button
+                    type="button"
+                    className="pt-button pt-intent-primary"
+                    disabled={!canDeployApps}
+                  >
+                    Deploy
                 </button>
-              </Link>
-            </Tooltip>}
+                </Link>
+              </Tooltip>}
           </div>
         </div>
         <div>
-        {
-          this.props.applications && this.props.applications.length > 0 ?
-          this.props.applications.map((app, index) => {
-            return( <ApplicationCard app={app} key={index} /> );
-          }) :
-          <div className="row" style={{'paddingBottom': '40px' }}>
-            <div className="col-sm-12 text-center">
-              Deploy an application to get started
+          {
+            this.props.applications && this.props.applications.length > 0 ?
+              this.props.applications.map((app, index) => {
+                return (<ApplicationCard app={app} key={index} />);
+              }) :
+              <div className="row" style={{ 'paddingBottom': '40px' }}>
+                <div className="col-sm-12 text-center">
+                  Deploy an application to get started
             </div>
-          </div>
-        }
+              </div>
+          }
         </div>
       </div>
     );
@@ -84,7 +84,7 @@ export function mapStateToProps(state) {
 }
 
 export default withRouter(
-  connect( mapStateToProps,
+  connect(mapStateToProps,
     {
       fetchApplications
     }

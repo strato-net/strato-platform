@@ -24,13 +24,17 @@ class ApplicationCard extends Component {
     this.props.launchApp(app.address, app.url)
   }
 
-  shareWithFb() {
+  shareWithFb(urlToShare) {
     window.FB.ui({
       method: 'share_open_graph',
       action_type: 'og.likes',
       action_properties: JSON.stringify({
-        object: this.props.app.url,
-      })
+        object: {
+          'og:url': urlToShare, // your url to share
+          'og:title': 'Blockapps',
+          'og:description': 'To restore to digital transactions the reliability and efficiency of face-to-face interactions through secure and connected information.',
+        }
+      }),
     }, function (response) {
       // Debug response (optional)
       console.log(response);
@@ -53,9 +57,8 @@ class ApplicationCard extends Component {
 
   render() {
     const { app } = this.props;
-    // http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/
-    const twitterUrl = "https://twitter.com/intent/tweet?url=" + app.url
-    console.log('Lets check:', app)
+    const urlToShare = window.location.origin + app.url
+    const twitterUrl = "https://twitter.com/intent/tweet?url=" + urlToShare
     return (
       <div className="pt-card app-card">
         <div className="row">
@@ -74,7 +77,7 @@ class ApplicationCard extends Component {
                   position={Position.BOTTOM}
                   content={
                     <Menu>
-                      <MenuItem onClick={this.shareWithFb} text="Facebook" />
+                      <MenuItem onClick={() => this.shareWithFb(urlToShare)} text="Facebook" />
                       <a className="twitter-share-button pt-menu-item pt-popover-dismiss"
                         href={twitterUrl}
                         data-size="large"
