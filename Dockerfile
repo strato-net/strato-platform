@@ -15,4 +15,6 @@ RUN cd /usr/lib/cirrus && \
 
 COPY doit.sh /
 
+EXPOSE 3333
+
 ENTRYPOINT ["sh", "/doit.sh"]
