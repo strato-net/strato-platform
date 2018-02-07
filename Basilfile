@@ -226,7 +226,4 @@ deployments:
       environment:
         ADVERTISED_HOST: "kafka"
         ADVERTISED_PORT: "9092"
-        # ADVERTISED_HOST_NAME: "kafka"
-        # KAFKA_DELETE_TOPIC_ENABLE: "true"
-        # KAFKA_LOG_CLEANER_ENABLE: "false"
-        # KAFKA_LOG_RETENTION_HOURS: "2147483647"
+        # AUTO_CREATE_TOPICS: "true"
