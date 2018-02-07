@@ -10,7 +10,6 @@ import           Database.Persist.TH
 import           Data.Aeson
 
 import           Blockchain.Data.PersistTypes ()
-import           Blockchain.MiscJSON          ()
 
 import           Blockchain.Format
 import           Blockchain.SHA

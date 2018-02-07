@@ -37,8 +37,8 @@ import           System.FilePath
 import           Blockchain.APIFiles
 import qualified Blockchain.Colors                  as CL
 import           Blockchain.Constants
-import           Blockchain.Data.Blockchain
-import           Blockchain.Data.DataDefs
+import           Blockchain.Data.Blockchain         as Blockchain
+import qualified Blockchain.Data.DataDefs           as DataDefs
 import           Blockchain.Data.GenesisBlock
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
@@ -172,11 +172,6 @@ defaultQuarryConfig =
       lazyBlocks = False
     }
 
-defaultGeneralConfig  ::  GeneralConf
-defaultGeneralConfig =
-    GeneralConf {
-      fastECRecover = True
-    }
 
 defaultDiscoveryConfig  ::  DiscoveryConf
 defaultDiscoveryConfig =
@@ -207,7 +202,6 @@ defaultConfig =
       blockConfig        = defaultBlockConfig,
       quarryConfig       = defaultQuarryConfig,
       discoveryConfig    = defaultDiscoveryConfig,
-      generalConfig      = defaultGeneralConfig,
       statsConfig        = statsConfig'
     }
 
@@ -373,6 +367,7 @@ oneTimeSetup genesisBlockName = do
 
       currPath <- getCurrentDirectory
 
+      Blockchain.migrateDB pgConnGlobal
       _ <- insertBlockchain pgConnGlobal currPath uniqueString
 
       {- CONFIG: Create the local database -}
@@ -402,7 +397,7 @@ oneTimeSetup genesisBlockName = do
          liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
          liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
 
-         runMigration migrateAll
+         runMigration DataDefs.migrateAll
 
          EthDiscovery.setup bootnodes
 

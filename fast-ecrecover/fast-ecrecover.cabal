@@ -25,18 +25,18 @@ library
   exposed-modules:
     Blockchain.FastECRecover
   build-depends:
-    -- 
+    base >= 4.9 && < 4.10,
+    --
     blockapps-haskoin,
     ethereum-encryption,
     blockapps-util,
     blockapps-ecrecover == 0.4.*,
-    -- 
+    --
     binary < 0.9,
-    base >= 4.8 && < 4.10,
     bytestring >= 0.10 && < 0.20
 
 benchmark benchmark
-  type: 
+  type:
     exitcode-stdio-1.0
   hs-source-dirs:
     benchmark
@@ -65,12 +65,12 @@ benchmark benchmark
     -fprof-auto
     "-with-rtsopts=-N -p -s -h -i0.1"
   build-depends:
-    -- 
+    --
     fast-ecrecover,
     blockapps-haskoin,
     ethereum-encryption,
     blockapps-util,
-    -- 
+    --
     binary < 0.9,
     criterion,
     -- basics:

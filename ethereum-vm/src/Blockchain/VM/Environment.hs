@@ -8,8 +8,6 @@ import           Blockchain.Data.Code
 import           Blockchain.Data.DataDefs
 import           Blockchain.ExtWord
 
-import           Blockchain.Sequencer.Event (OutputBlock (..))
-
 data Environment =
     Environment {
       envOwner       :: Address,

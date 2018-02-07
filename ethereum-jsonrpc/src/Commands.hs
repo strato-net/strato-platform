@@ -4,7 +4,7 @@ module Commands (
   methods
   ) where
 
-import           Control.Monad.Error
+import           Control.Monad.Except
 import           Control.Monad.IO.Class
 import qualified Crypto.Hash.SHA3            as SHA3
 import qualified Data.Aeson                  as JSON
@@ -329,7 +329,8 @@ eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Require
                        JRCGetStorageAt {
                          jrcAddress=address,
                          jrcBlockString=blockString,
-                         jrcId=id
+                         jrcId=id,
+                         jrcKey=""
                          }
              return $ BC.unpack result
 

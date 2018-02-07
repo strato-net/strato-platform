@@ -26,7 +26,7 @@ import           Blockchain.EthConf           (connStr)
 
 type SQLDB = SQL.ConnectionPool
 
-class (MonadResource m, MonadBaseControl IO m) => HasSQLDB m where
+class (MonadIO m, MonadBaseControl IO m) => HasSQLDB m where
   getSQLDB :: m SQLDB
 
 sqlQuery :: HasSQLDB m => SQL.SqlPersistT (ResourceT m) a->m a

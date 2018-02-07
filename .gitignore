@@ -13,3 +13,12 @@ test-suite/tests
 *.iml
 *.swp
 .DS_Store
+
+blockapps-data/certs/
+blockapps-data/config/
+blockapps-data/livenetGenesis.json
+blockapps-data/static/
+certs/
+config/
+livenetGenesis.json
+static/

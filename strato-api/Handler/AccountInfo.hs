@@ -24,16 +24,9 @@ import qualified Prelude            as P
 
 accountInfo :: [(Text, Text)] -> Handler Value
 accountInfo params = do
-    appNameMaybe <- lookupGetParam "appname"
-
-    case appNameMaybe of
-       (Just t)  -> liftIO $ putStrLn $ t
-       (Nothing) -> liftIO $ putStrLn "anon"
-
     limit <- liftIO $ myFetchLimit
 
     let index'   = fromIntegral $ (maybe 0 id $ extractPage "index" params) :: Int64
-    let raw      = (fromIntegral $ (maybe 0 id $ extractPage "raw" params) :: Integer) > 0
     let paramMap = Map.fromList params
         paramMapRemoved = P.foldr (\param mp -> (Map.delete param mp)) paramMap accountQueryParams
 
@@ -60,12 +53,10 @@ accountInfo params = do
     -- this should actually use URL encoding code from Yesod
     let next p = "/eth/v1.2/account?" P.++  (P.foldl1 (\a b -> (unpack a) P.++ "&" P.++ (unpack b)) $ P.map (\(k,v) -> (unpack k) P.++ "=" P.++ (unpack v)) (extra p))
 
-    toRet raw (P.map E.entityVal modAccounts) (next $ appendIndex params)
+    toRet (P.map E.entityVal modAccounts) (next $ appendIndex params)
   where
-    toRet :: Bool -> [AddressStateRef] -> String -> Handler Value
-    toRet raw as gp = case if' raw as (P.map asrToAsrPrime (P.zip (P.repeat gp) as)) of
-              Left a  -> returnJson a
-              Right b -> returnJson b
+    toRet :: [AddressStateRef] -> String -> Handler Value
+    toRet as gp = returnJson . P.map asrToAsrPrime . P.zip (P.repeat gp) $ as
 
 getAccountInfoR :: Handler Value
 getAccountInfoR = do
@@ -75,16 +66,4 @@ getAccountInfoR = do
 postAccountCodeR :: Handler Value
 postAccountCodeR = do
         (postParams, _) <- runRequestBody
-        --liftIO $ traceIO $ show postParams
         accountInfo postParams
-
-
-
-
-
-
-
-
-
-
-
