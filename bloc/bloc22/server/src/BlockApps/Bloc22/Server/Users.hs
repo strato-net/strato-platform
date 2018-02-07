@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Users where
 
 import           Control.Concurrent
 import           Control.Arrow
+import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
 import           Crypto.Secp256k1
@@ -30,6 +31,7 @@ import qualified Data.Text                         as Text
 import qualified Data.Text.Encoding                as Text
 import           Data.Traversable
 import           Opaleye                           hiding (not)
+import           System.Clock
 
 import           BlockApps.Bloc22.API.Users
 import           BlockApps.Bloc22.API.Utils
@@ -57,6 +59,7 @@ import           BlockApps.XAbiConverter
 
 data TransactionHeader = TransactionHeader
   { transactionheaderToAddr   :: Maybe Address
+  , transactionheaderFromAddr :: Address
   , transactionheaderTxParams :: TxParams
   , transactionheaderValue    :: Wei
   , transactionheaderCode     :: ByteString
@@ -85,17 +88,14 @@ postUsersFill _ addr resolve = blocTransaction $ do
 
 postUsersSend :: UserName -> Address -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr resolve
-  (PostSendParameters toAddr value password txParams@TxParams{..}) = do
-    accts <- blocStrato $ getAccountsFilter
-      accountsFilterParams{qaAddress = Just addr}
-    case listToMaybe accts of
-      Nothing   -> throwError . UserError $ "strato error: failed to find account"
-      Just acct -> return (sk,acct)
-    acct <- getAccountSecKey userName password addr
-    tx <- prepareTx acct $
+  (PostSendParameters toAddr value password mTxParams) = do
+    sk <- getAccountSecKey userName password addr
+    txParams <- getAccountTxParams addr mTxParams
+    tx <- prepareTx sk $
       TransactionHeader
         (Just toAddr)
-        (fromMaybe emptyTxParams txParams)
+        addr
+        txParams
         (Wei (fromIntegral $ unStrung value))
         ByteString.empty
         0
@@ -104,8 +104,9 @@ postUsersSend userName addr resolve
 
 postUsersContract :: UserName -> Address -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr resolve
-  (PostUsersContractRequest src password maybeContract args txParams value) = blocTransaction $ do
-    acct <- getAccountSecKey userName password addr
+  (PostUsersContractRequest src password maybeContract args mTxParams value) = blocTransaction $ do
+    sk <- getAccountSecKey userName password addr
+    txParams <- getAccountTxParams addr mTxParams
     --TODO: check what happens with mismatching args
     idsAndDetails <- compileContract src
     logWith logNotice ("constructor arguments: " <> Text.pack (show args))
@@ -124,10 +125,11 @@ postUsersContract userName addr resolve
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
     mFunctionId <- getConstructorId cmId
     argsBin <- buildArgumentByteString (fmap (fmap argValueToText) args) mFunctionId
-    tx <- prepareTx acct $
+    tx <- prepareTx sk $
       TransactionHeader
         Nothing
-        (fromMaybe emptyTxParams txParams)
+        addr
+        txParams
         (Wei (fromIntegral (maybe 0 unStrung value)))
         (bin <> argsBin)
         0
@@ -143,8 +145,9 @@ postUsersContract userName addr resolve
 
 postUsersUploadList :: UserName -> Address -> Bool -> UploadListRequest -> Bloc [BlocTransactionResult]
 postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resolve) = do
-  acct <- getAccountSecKey userName pw addr
-  namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args txParams value,nonceIncr) -> do
+  sk <- getAccountSecKey userName pw addr
+  namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args mTxParams value,nonceIncr) -> do
+    txParams <- getAccountTxParams addr mTxParams
     (bin16,cmId) <- blocQuery1 $ proc () -> do
       (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
       returnA -< (bin16,cmId)
@@ -153,10 +156,11 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
     unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
     mFunctionId <- getConstructorId cmId
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
-    tx <- prepareTx acct $
+    tx <- prepareTx sk $
         TransactionHeader
           Nothing
-          (fromMaybe emptyTxParams txParams)
+          addr
+          txParams
           (Wei (maybe 0 fromIntegral $ fmap unStrung value))
           (bin <> argsBin)
           nonceIncr
@@ -175,17 +179,19 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
 
 postUsersSendList :: UserName -> Address -> Bool -> PostSendListRequest -> Bloc [BlocTransactionResult]
 postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = do
-  acct <- getAccountSecKey userName pw addr
-  txHeaders <- return $ zipWith
-                 (\(SendTransaction toAddr (Strung value) txParams) i
-                    ->  TransactionHeader
-                          (Just toAddr)
-                          (fromMaybe emptyTxParams txParams)
-                          (Wei $ fromIntegral value)
-                          (ByteString.empty)
-                          i
-                 ) txs [0..]
-  txs' <- mapM (prepareTx acct) txHeaders
+  sk <- getAccountSecKey userName pw addr
+  txHeaders <- zipWithM
+    (\(SendTransaction toAddr (Strung value) mTxParams) i -> do
+        txParams <- getAccountTxParams addr mTxParams
+        return $ TransactionHeader
+          (Just toAddr)
+          addr
+          txParams
+          (Wei $ fromIntegral value)
+          (ByteString.empty)
+          i
+    ) txs [0..]
+  txs' <- mapM (prepareTx sk) txHeaders
   hashes <- blocStrato $ postTxList txs'
   forM hashes $ flip getBlocTransactionResult' (resolve || resolve')
 
@@ -208,9 +214,10 @@ postUsersContractMethodList
   -> PostMethodListRequest
   -> Bloc [BlocTransactionResult]
 postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} = do
-  acct <- getAccountSecKey userName postmethodlistrequestPassword userAddr
+  sk <- getAccountSecKey userName postmethodlistrequestPassword userAddr
   txsCmIdsFuncNames <- for (zip postmethodlistrequestTxs [0..]) $
     \ (MethodCall{..},nonceIncr) -> do
+      txParams <- getAccountTxParams userAddr methodcallTxParams
       cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
       xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
       let eitherErrorOrContract = xAbiToContract xabi
@@ -227,10 +234,11 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
 
       functionId <- getFunctionId cmId methodcallMethodName
       argsBin <- buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
-      tx <- prepareTx acct $
+      tx <- prepareTx sk $
         TransactionHeader
           (Just methodcallContractAddress)
-          (fromMaybe emptyTxParams methodcallTxParams)
+          userAddr
+          txParams
           (Wei (fromIntegral $ unStrung methodcallValue))
           (sel <> argsBin)
           nonceIncr
@@ -262,8 +270,9 @@ postUsersContractMethod
   (ContractName contractName)
   contractAddr
   resolve
-  (PostUsersContractMethodRequest password funcName args value txParams) = do
-    acct <- getAccountSecKey userName password userAddr
+  (PostUsersContractMethodRequest password funcName args value mTxParams) = do
+    sk <- getAccountSecKey userName password userAddr
+    txParams <- getAccountTxParams userAddr mTxParams
     cmId <- getContractsMetaDataIdExhaustive contractName contractAddr
 
     xabi <- getContractXabiByMetadataId cmId
@@ -280,10 +289,11 @@ postUsersContractMethod
        _ -> throwError . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
     functionId <- getFunctionId cmId funcName
     argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) (Just functionId)
-    tx <- prepareTx acct $
+    tx <- prepareTx sk $
       TransactionHeader
         (Just contractAddr)
-        (fromMaybe emptyTxParams txParams)
+        userAddr
+        txParams
         (Wei (maybe 0 (fromIntegral . unStrung) value))
         ((sel::ByteString) <> (argsBin::ByteString))
         0
@@ -465,12 +475,22 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
         let vals = map snd (sortOn fst (toList argsVals))
         return $ toStorage (ValueArrayFixed (fromIntegral (length vals)) vals)
 
+getAccountTxParams :: Address -> Maybe TxParams -> Bloc TxParams
+getAccountTxParams addr = \case
+  Just params -> return params
+  Nothing -> do
+    accts <- blocStrato $ getAccountsFilter
+      accountsFilterParams{qaAddress = Just addr}
+    case listToMaybe accts of
+      Nothing   -> throwError . UserError $ "strato error: failed to find account"
+      Just acct -> return emptyTxParams{txparamsNonce = Just $ accountNonce acct}
+
 prepareTx
-  :: (SecKey,Account)
+  :: SecKey
   -> TransactionHeader
   -> Bloc PostTransaction
-prepareTx (sk,acct) txHeader = do
-  return . prepareSignedTx sk (accountAddress acct) $ prepareUnsignedTx (accountNonce acct) txHeader
+prepareTx sk txHeader = do
+  return . prepareSignedTx sk (transactionheaderFromAddr txHeader) $ prepareUnsignedTx txHeader
 
 getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
@@ -496,9 +516,10 @@ getAccountSecKey userName password addr = do
     Nothing -> throwError $ UserError "incorrect password"
     Just sk -> return sk
 
-prepareUnsignedTx :: Nonce -> TransactionHeader -> UnsignedTransaction
-prepareUnsignedTx (Nonce nonce) TransactionHeader{..} =
-  UnsignedTransaction
+prepareUnsignedTx :: TransactionHeader -> UnsignedTransaction
+prepareUnsignedTx TransactionHeader{..} =
+  let Nonce nonce = fromMaybe (Nonce 0) (txparamsNonce transactionheaderTxParams)
+  in UnsignedTransaction
   { unsignedTransactionNonce = Nonce (nonce + fromIntegral transactionheaderNonceInc)
   , unsignedTransactionGasPrice =
       fromMaybe (Wei 1) (txparamsGasPrice transactionheaderTxParams)
