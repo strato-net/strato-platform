@@ -85,7 +85,12 @@ postUsersFill _ addr resolve = blocTransaction $ do
 
 postUsersSend :: UserName -> Address -> Bool -> PostSendParameters -> Bloc BlocTransactionResult
 postUsersSend userName addr resolve
-  (PostSendParameters toAddr value password txParams) = do
+  (PostSendParameters toAddr value password txParams@TxParams{..}) = do
+    accts <- blocStrato $ getAccountsFilter
+      accountsFilterParams{qaAddress = Just addr}
+    case listToMaybe accts of
+      Nothing   -> throwError . UserError $ "strato error: failed to find account"
+      Just acct -> return (sk,acct)
     acct <- getAccountSecKey userName password addr
     tx <- prepareTx acct $
       TransactionHeader
@@ -467,7 +472,7 @@ prepareTx
 prepareTx (sk,acct) txHeader = do
   return . prepareSignedTx sk (accountAddress acct) $ prepareUnsignedTx (accountNonce acct) txHeader
 
-getAccountSecKey :: UserName -> Password -> Address -> Bloc (SecKey, Account)
+getAccountSecKey :: UserName -> Password -> Address -> Bloc SecKey
 getAccountSecKey userName password addr = do
   uIds <- blocQuery $ proc () -> do
     (uId,name) <- queryTable usersTable -< ()
@@ -489,12 +494,7 @@ getAccountSecKey userName password addr = do
       decryptSecKey password salt nonce encSecKey
   case skMaybe of
     Nothing -> throwError $ UserError "incorrect password"
-    Just sk -> do
-      accts <- blocStrato $ getAccountsFilter
-        accountsFilterParams{qaAddress = Just addr}
-      case listToMaybe accts of
-        Nothing   -> throwError . UserError $ "strato error: failed to find account"
-        Just acct -> return (sk,acct)
+    Just sk -> return sk
 
 prepareUnsignedTx :: Nonce -> TransactionHeader -> UnsignedTransaction
 prepareUnsignedTx (Nonce nonce) TransactionHeader{..} =
