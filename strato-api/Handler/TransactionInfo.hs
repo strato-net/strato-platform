@@ -65,17 +65,23 @@ postTransactionR = do
 
 postTransactionListR :: Handler ()
 postTransactionListR = do
-   !handlerStart <- liftIO $ getTime Realtime
+   let x = 1 + 2
+       y = 3 + 4
+       z = 5 + 6
+
+   $logError "Beginning TransactionListR"
+   handlerStart <- (x :: Int) `deepseq` (liftIO $ getTime Realtime)
 
    addHeader "Access-Control-Allow-Origin" "*"
    addHeader "Access-Control-Allow-Headers" "Content-Type"
 
-   !parserStart <- liftIO $ getTime Realtime
-   !tx <- parseJsonBody :: Handler (Result [RawTransaction'])
+   $logError "Beginning JSON parser"
+   parserStart <- (y :: Int) `deepseq` (liftIO $ getTime Realtime)
+   tx <- parseJsonBody :: Handler (Result [RawTransaction'])
+   $logError "Finished JSON parser"
    case tx of
        (Success raws) -> do
-          !txHashStart <- liftIO $ getTime Realtime
-          --txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
+          txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
           let txs = fmap (\(RawTransaction' raw _) -> rawTX2TX $ raw) raws
               hs = fmap (toJSON . transactionHash) txs
               txr = P.filter success $ P.zip hs txs
@@ -83,14 +89,13 @@ postTransactionListR = do
           $logError $ (T.pack $ show $ num) Import.++ " incoming transactions..."
           let num' = P.length $ P.filter (not . success) $ P.zip hs txs
           $logError $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
-          !insertTXStart <- liftIO $ getTime Realtime
-          --insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
+          insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
           ecRecoverTime <- do
             a <- insertTX Log API Nothing (fmap snd txr)
             return a
           $logError $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
           emitKafkaTransactions $ snd <$> txr
-          !sendResponseStart <- liftIO $ getTime Realtime
+          sendResponseStart <- (z :: Int) `deepseq` (liftIO $ getTime Realtime)
           let times = (P.map toNanoSecs $
                         [ parserStart - handlerStart
                         , txHashStart - parserStart
