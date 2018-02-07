@@ -2,14 +2,16 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { Position, Tooltip } from '@blueprintjs/core';
+import { Position, Tooltip, Button } from '@blueprintjs/core';
 
 import { fetchApplications } from '../Applications/applications.actions';
 import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
-
+import Faucet from '../Faucet'
+import cli from '../../cli.pdf'
 import { env } from '../../env';
-
+import {downloadPDFFile } from '../../lib/fileHandler'
+import  './application.css'
 
 class Applications extends Component {
 
@@ -34,10 +36,16 @@ class Applications extends Component {
     return (
       <div className="container-fluid pt-dark">
         <div className="row smd-pad-12">
-          <div className="col-sm-10">
+          <div className="col-sm-6">
             <h3>Welcome to Launchpad</h3>
           </div>
-          <div className="col-sm-2 text-right smd-pad-vertical-12">
+          <div className="col-sm-6 text-right">
+            { this.props.isLoggedIn && <span> <Faucet /> </span>}
+            {this.props.isLoggedIn && <Button onClick={() => {
+              mixpanelWrapper.track('Add_App_click');
+              downloadPDFFile('cli.pdf',cli)
+            }} text="Add App" className="pt-icon-add right-align" />}
+
             {this.props.isLoggedIn &&
               <Tooltip
                 content={<span>Unable to deploy apps when running multinode on localhost</span>}
@@ -45,7 +53,7 @@ class Applications extends Component {
                 position={Position.LEFT}
                 isDisabled={canDeployApps}
               >
-                <Link to="/launchpad">
+                <Link className="right-align" to="/launchpad">
                   <button
                     type="button"
                     className="pt-button pt-intent-primary"

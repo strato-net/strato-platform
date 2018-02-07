@@ -12,6 +12,7 @@ import { reducer as formReducer } from 'redux-form';
 import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
 import App from "./App/";
 
+import faucetReducer from './components/Faucet/faucet.reducer'
 import dashboardReducer from './components/Dashboard/dashboard.reducer';
 import accountsReducer from './components/Accounts/accounts.reducer';
 import blockDataReducer from './components/BlockData/block-data.reducer'
@@ -30,6 +31,7 @@ import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
 import applicationsReducer from './components/Applications/applications.reducer';
 import launchPadReducer from './components/LaunchPad/launchPad.reducer';
 
+import watchFaucet from './components/Faucet/faucet.saga'
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
 import watchFetchTx from './components/TransactionList/transactionList.saga'
@@ -87,7 +89,8 @@ const rootReducer = combineReducers({
   user: userReducer, 
   applications: applicationsReducer,
   launchPad: launchPadReducer,
-  dashboard: dashboardReducer
+  dashboard: dashboardReducer,
+  faucet: faucetReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -112,7 +115,8 @@ const rootSaga = function* startForeman() {
     fork(watchFetchApplications),
     fork(watchAppUpload),
     fork(watchCommunicateOverSocket),
-    fork(watchFetchUser)
+    fork(watchFetchUser),
+    fork(watchFaucet)
   ]
 };
 

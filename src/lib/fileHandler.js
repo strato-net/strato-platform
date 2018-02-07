@@ -7,3 +7,13 @@ export function downloadFile(name, content) {
     element.click();
     document.body.removeChild(element);
 }
+
+export function downloadPDFFile(name, content) {
+    var element = document.createElement('a');
+    element.setAttribute('href', content);
+    element.setAttribute('download', name);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+}
