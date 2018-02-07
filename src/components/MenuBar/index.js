@@ -28,9 +28,8 @@ class MenuBar extends Component {
 
   renderLogin() {
     return (
-      !this.props.isLoggedIn &&
       <Button onClick={() => {
-        this.props.openLoginOverlay();
+        window.open('http://localhost:3001/#/dashboard', '_blank');
       }} className="pt-intent-primary"
         id="Login-button"
         text={'For Developer'} />

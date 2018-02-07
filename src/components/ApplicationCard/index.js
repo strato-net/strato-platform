@@ -41,17 +41,14 @@ class ApplicationCard extends Component {
     });
   }
 
-  renderLogin() {
+  renderLogin(app) {
     return (
       <Button onClick={() => {
-        if (this.props.isLoggedIn) {
-          this.props.history.replace('/apps');
-        } else {
-          this.props.openLoginOverlay();
-        }
+        this.props.openLoginOverlay();
+        this.props.isLoggedIn && this.props.launchApp(app.address, app.url);
       }} className="pt-intent-primary"
         id="Login-button"
-        text={'Launch'} />
+        text={`Launch (1 USD)`} />
     );
   }
 
@@ -100,14 +97,14 @@ class ApplicationCard extends Component {
                     Share
                   </button>
                 </Popover>
-                {!this.props.isLoggedIn ? this.renderLogin() : (app.isLoading ?
-                  <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> :
+                {!this.props.isLoggedIn ? this.renderLogin(app) : (app.isLoading ?
+                  <span className="launch-loader"> <ReactLoading type="bars" color="#f5f8fa" className="pull-right" height={0} width={30} /> </span> :
                   <button
                     className="pt-button pt-intent-primary pull-right"
                     onClick={() => this.launch(app)}
                   >
-                    Launch
-                    </button>)
+                    Launch (1 USD)
+                  </button>)
                 }
               </div>
             </div>
