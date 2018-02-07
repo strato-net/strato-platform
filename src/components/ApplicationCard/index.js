@@ -30,7 +30,7 @@ class ApplicationCard extends Component {
       action_type: 'og.likes',
       action_properties: JSON.stringify({
         object: {
-          'og:url': urlToShare, // your url to share
+          'og:url': 'https://www.facebook.com/sharer/sharer.php?u=https%3A//blockapps.net/demo1', // your url to share
           'og:title': 'Blockapps',
           'og:description': 'To restore to digital transactions the reliability and efficiency of face-to-face interactions through secure and connected information.',
         }
@@ -79,13 +79,13 @@ class ApplicationCard extends Component {
                         href={twitterUrl}
                         data-size="large"
                         data-text="custom share text"
-                        data-url="https://dev.twitter.com/web/tweet-button"
+                        data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
                         data-hashtags="example,demo"
                         data-via="twitterdev"
                         data-related="twitterapi,twitter">
                         Tweet
                         </a>
-                      <MenuItem onClick={this.handleDelete} text="State of Dapps" />
+                      <MenuItem onClick={() => { window.open('https://www.stateofthedapps.com/dapps/new/form', '_blank') }} text="State of Dapps" />
                     </Menu>}
                   popoverClassName={"popoverClassName"}
                   className={"share-popover"}
