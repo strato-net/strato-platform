@@ -6,11 +6,12 @@ import {
   OPEN_LOGIN_OVERLAY,
   CLOSE_LOGIN_OVERLAY
 } from './user.actions';
+import { readCookie } from '../../lib/parsejwt';
 
 const initialState = {
   email: null,
   currentUser: {},
-  isLoggedIn: false,
+  isLoggedIn: readCookie('token') !== "undefined" ? true : false,
   error: null,
   isOpen: false
 };
