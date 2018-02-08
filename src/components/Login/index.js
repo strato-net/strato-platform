@@ -5,8 +5,10 @@ import { withRouter } from 'react-router-dom';
 import { login, openLoginOverlay, closeLoginOverlay } from '../User/user.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import validate from './validate.js';
-import CreateUser from '../CreateUser';
+import { openOverlay } from '../CreateUser/createUser.actions';
+import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './Login.css';
+
 
 class Login extends Component {
 
@@ -39,7 +41,7 @@ class Login extends Component {
 
   render() {
     const { handleSubmit } = this.props;
-    
+
     return (
       <div className="smd-pad-16">
         {/* <Button onClick={() => {
@@ -106,7 +108,10 @@ class Login extends Component {
 
             <div className="pt-dialog-footer text-center">
               <div className="pt-dialog-footer-actions">
-                <CreateUser />
+                <Button onClick={() => {
+                  mixpanelWrapper.track('create_user_open_click');
+                  this.props.openOverlay();
+                }} text="Create User" className="pt-icon-add" />
                 <Button
                   type="button"
                   onClick={handleSubmit(this.submit)}
@@ -136,7 +141,8 @@ const connected = connect(
   {
     login,
     openLoginOverlay,
-    closeLoginOverlay
+    closeLoginOverlay,
+    openOverlay
   }
 )(formed);
 

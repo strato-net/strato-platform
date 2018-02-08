@@ -20,7 +20,7 @@ class Faucet extends Component {
   }
 
   render() {
-    const { handleSubmit, pristine, reset, submitting, error } = this.props
+    const { submitting, error } = this.props
     return (
       <div>
         <Button onClick={() => {

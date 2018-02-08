@@ -6,7 +6,7 @@ import { Provider } from 'react-redux';
 import { HashRouter as Router } from 'react-router-dom'
 import { createStore, applyMiddleware, combineReducers, compose } from 'redux';
 import createSagaMiddleware from 'redux-saga';
-import { fork } from 'redux-saga/effects';
+import { fork, all } from 'redux-saga/effects';
 import { routerReducer } from 'react-router-redux';
 import { reducer as formReducer } from 'redux-form';
 import { loadingBarReducer, loadingBarMiddleware } from 'react-redux-loading-bar'
@@ -86,7 +86,7 @@ const rootReducer = combineReducers({
   codeEditor: codeEditorReducer,
   loadingBar: loadingBarReducer,
   tour: tourReducer,
-  user: userReducer, 
+  user: userReducer,
   applications: applicationsReducer,
   launchPad: launchPadReducer,
   dashboard: dashboardReducer,
@@ -94,7 +94,7 @@ const rootReducer = combineReducers({
 });
 
 const rootSaga = function* startForeman() {
-  yield [// YOUR SAGAS HERE
+  yield all([// YOUR SAGAS HERE
     fork(watchFetchBlockData),
     fork(watchFetchTx),
     fork(watchCreateUser),
@@ -117,7 +117,7 @@ const rootSaga = function* startForeman() {
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchFaucet)
-  ]
+  ])
 };
 
 // create the saga middleware

@@ -22,10 +22,7 @@ class CreateUser extends Component {
   render() {
     return (
       <div>
-        <Button onClick={() => {
-          mixpanelWrapper.track('create_user_open_click');
-          this.props.openOverlay()
-        }} text="Create User" className="pt-icon-add" />
+        
         <form>
           <Dialog
             iconName="inbox"
