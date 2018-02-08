@@ -44,16 +44,6 @@ class Login extends Component {
 
     return (
       <div className="smd-pad-16">
-        {/* <Button onClick={() => {
-          if (this.props.isLoggedIn) {
-            this.props.history.replace('/apps');
-          } else {
-            this.props.openLoginOverlay();
-            this.setState({number: 1});
-          }
-        }} className="pt-intent-primary"
-          id="Login-button"
-          text={this.props.title || 'For Developer'} /> */}
         <form>
           <Dialog
             iconName="inbox"
@@ -63,7 +53,7 @@ class Login extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
-              <div className="pt-form-group input">
+              <div className="pt-form-group">
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-a">
                     Email
@@ -71,7 +61,7 @@ class Login extends Component {
                   <div className="pt-form-content">
                     <Field
                       name="email"
-                      className="pt-input form-width"
+                      className="pt-input form-width smd-full-width"
                       placeholder="Email"
                       component="input"
                       type="email"

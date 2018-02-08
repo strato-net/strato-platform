@@ -32,7 +32,7 @@ class CreateUser extends Component {
             className="pt-dark"
           >
             <div className="pt-dialog-body">
-              <div className="pt-form-group input">
+              <div className="pt-form-group">
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-a">
                     Username

@@ -60,6 +60,7 @@ class Accounts extends Component {
         .indexOf(filter) > -1
     })
       .forEach(function (user, index) {
+        if (index !== 0) return;
         const addresses = Object.getOwnPropertyNames(accounts[user]);
         let userClasseName = addresses.length > 0 ? " selected" : "";
 
