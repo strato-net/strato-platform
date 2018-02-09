@@ -1,7 +1,7 @@
 {
   "development": {
     "username": "postgres",
-    "password": "",
+    "password": "api",
     "database": "apex_dev",
     "host": "localhost",
     "port": "5432",
@@ -9,7 +9,7 @@
   },
   "test": {
     "username": "postgres",
-    "password": "",
+    "password": "api",
     "database": "apex_test",
     "host": "127.0.0.1",
     "port": "5432",
@@ -17,7 +17,7 @@
   },
   "production" : {
     "username": "postgres",
-    "password": "",
+    "password": "api",
     "database": "apex_prod",
     "host": "postgres",
     "port": "5432",

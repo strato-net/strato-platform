@@ -2,12 +2,13 @@
 module.exports = function (sequelize, DataTypes) {
   let User = sequelize.define('User', {
     username: {type: DataTypes.STRING, unique: true, allowNull: false},
-    passwordHash: {type: DataTypes.STRING}
+    passwordHash: {type: DataTypes.STRING},
+    accountAddress: {type: DataTypes.STRING, unique: true}
   });
 
   User.associate = function(models) {
     User.belongsToMany(models.Role, {through: 'UserRole'});
-    User.hasMany(models.Token)
+    // User.hasMany(models.Token)
   };
 
   /**
