@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import './applications-card.css'
 import { withRouter } from 'react-router-dom';
-import { launchApp } from '../Applications/applications.actions';
+import { launchApp, selectApp } from '../Applications/applications.actions';
 import { Menu, MenuItem, Popover, Position, Button } from '@blueprintjs/core';
 import ReactLoading from 'react-loading';
 import { openLoginOverlay } from '../User/user.actions';
@@ -44,8 +44,8 @@ class ApplicationCard extends Component {
   renderLogin(app) {
     return (
       <Button onClick={() => {
+        this.props.selectApp(app)
         this.props.openLoginOverlay();
-        this.props.isLoggedIn && this.props.launchApp(app.address, app.url);
       }} className="pt-intent-primary"
         id="Login-button"
         text={`Launch (1 USD)`} />
@@ -135,7 +135,8 @@ export default withRouter(
   connect(mapStateToProps,
     {
       launchApp,
-      openLoginOverlay
+      openLoginOverlay,
+      selectApp
     }
   )(ApplicationCard)
 );

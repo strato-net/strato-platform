@@ -8,7 +8,7 @@ import validate from './validate.js';
 import { openOverlay } from '../CreateUser/createUser.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './Login.css';
-
+import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
 
 class Login extends Component {
 
@@ -28,7 +28,6 @@ class Login extends Component {
       };
 
       this.props.login(payload);
-      this.props.history.push('/home');
     }
   }
 
@@ -37,6 +36,14 @@ class Login extends Component {
       return this.state.errors[fieldName];
     }
     return null;
+  }
+
+  componentWillReceiveProps(newProps) {
+    if (newProps.isLoggedIn && newProps.selectedApp) {
+      newProps.launchApp(newProps.selectedApp.address, newProps.selectedApp.url)
+      newProps.resetSelectedApp()
+      newProps.history.replace('/home');
+    }
   }
 
   render() {
@@ -48,7 +55,10 @@ class Login extends Component {
           <Dialog
             iconName="inbox"
             isOpen={this.props.isOpen}
-            onClose={this.props.closeLoginOverlay}
+            onClose={() => {
+              this.props.resetSelectedApp()
+              this.props.closeLoginOverlay()
+            }}
             title="Login"
             className="pt-dark"
           >
@@ -120,7 +130,10 @@ function mapStateToProps(state) {
   return {
     loginError: state.user.error,
     isLoggedIn: state.user.isLoggedIn,
-    isOpen: state.user.isOpen
+    from: state.user.from,
+    isOpen: state.user.isOpen,
+    selectedApp: state.applications.selectedApp,
+
   };
 }
 
@@ -131,7 +144,9 @@ const connected = connect(
     login,
     openLoginOverlay,
     closeLoginOverlay,
-    openOverlay
+    openOverlay,
+    launchApp,
+    resetSelectedApp
   }
 )(formed);
 

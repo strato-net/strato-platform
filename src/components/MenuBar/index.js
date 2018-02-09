@@ -45,7 +45,7 @@ class MenuBar extends Component {
       }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'Login'} />
     )
   }
-  
+
   renderSignup() {
     return (
       <Button onClick={() => {
@@ -76,8 +76,7 @@ class MenuBar extends Component {
         <div className="pt-navbar-group pt-align-right">
           {!this.props.isLoggedIn && this.renderLogin()}
           {!this.props.isLoggedIn && this.renderSignup()}
-          <span className="pt-navbar-divider" />
-          {this.renderDeveloperButton()}
+          {!this.props.isLoggedIn && this.renderDeveloperButton()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">v{process.env.REACT_APP_VERSION} </small>
           <span className="pt-navbar-divider" />

@@ -71,7 +71,7 @@ function* logout() {
     yield call(logoutAccount);
     yield put(logoutSuccess());
     /*Please remove when acutal API is integrated*/
-    setCookie('token');
+    setCookie('token', null, -1);
     /* ----------------- */
   } catch(err) {
     // Handle when you have error on logout
