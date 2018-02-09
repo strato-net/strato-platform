@@ -7,11 +7,10 @@ import { Position, Tooltip, Button } from '@blueprintjs/core';
 import { fetchApplications } from '../Applications/applications.actions';
 import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
-import Faucet from '../Faucet'
 import cli from '../../cli.pdf'
 import { env } from '../../env';
-import {downloadPDFFile } from '../../lib/fileHandler'
-import  './application.css'
+import { downloadPDFFile } from '../../lib/fileHandler'
+import './application.css'
 
 class Applications extends Component {
 
@@ -33,6 +32,10 @@ class Applications extends Component {
   }
 
   render() {
+    // TODO with user address(JWT)
+    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=Requesting faucet funds into <USER ADDRESS> on the STRATO public network`;
+    // -----------------------------
+
     return (
       <div className="container-fluid pt-dark">
         <div className="row smd-pad-12">
@@ -40,10 +43,12 @@ class Applications extends Component {
             <h3>Welcome to Launchpad</h3>
           </div>
           <div className="col-sm-6 text-right">
-            { this.props.isLoggedIn && <span> <Faucet /> </span>}
+            {this.props.isLoggedIn && <a className="mailto" href={mailto}>
+              <Button text="Faucet" onClick={mixpanelWrapper.track('Faucet_click')} className="right-align" />
+            </a>}
             {this.props.isLoggedIn && <Button onClick={() => {
               mixpanelWrapper.track('Add_App_click');
-              downloadPDFFile('cli.pdf',cli)
+              downloadPDFFile('cli.pdf', cli)
             }} text="Add App" className="pt-icon-add right-align" />}
 
             {this.props.isLoggedIn &&
