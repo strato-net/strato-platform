@@ -22,7 +22,7 @@ class CreateUser extends Component {
   render() {
     return (
       <div>
-        
+
         <form>
           <Dialog
             iconName="inbox"

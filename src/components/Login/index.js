@@ -66,7 +66,6 @@ class Login extends Component {
                       component="input"
                       type="email"
                       required
-                      tabIndex="1"
                     /> <br />
                     <span className="error-text">{this.errorMessageFor('email')}</span>
                   </div>
