@@ -26,3 +26,13 @@ export function setCookie(cname,cvalue,exdays) {
   var expires = "expires=" + d.toGMTString();
   document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
 }
+
+export function currentUser() {
+  let token = readCookie('token');
+
+  if (token !== 'undefined') {
+    return parseJwt(token);
+  }
+  
+  return {};
+}

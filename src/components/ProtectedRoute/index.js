@@ -2,20 +2,9 @@ import React from 'react';
 import { Route, Redirect } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { parseJwt, readCookie } from '../../lib/parsejwt';
 import { setCurrentUser } from '../User/user.actions';
 
 class ProtectedRoute extends Route {
-
-  componentDidMount() {
-    let token = readCookie('token');
-
-    if (!this.props.isLoggedIn && token) {
-      let parsed = parseJwt(token);
-      this.props.setCurrentUser(parsed);
-      this.props.history.push('/home');
-    }
-  }
 
   render() {
     const component = super.render();

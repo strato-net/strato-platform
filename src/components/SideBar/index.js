@@ -14,7 +14,7 @@ class SideBar extends Component {
   render() {
     const navLinksData = (
       [
-        {path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-dashboard"},
+        {path: '/home', label: 'Network', id: 'dashboard', icon: "fa-dashboard"},
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
         {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link"},
         {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange"},
@@ -53,7 +53,7 @@ class SideBar extends Component {
             onClick={() => {mixpanelWrapper.track('nav_link_contracts_click')}}
           >
             <i className='fa fa-rocket'> </i>
-            <span className="menu-text">Apps</span>
+            <span className="menu-text">Dashboard</span>
           </NavLink>
         </div>
         <div>
