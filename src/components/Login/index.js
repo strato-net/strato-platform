@@ -66,13 +66,13 @@ class Login extends Component {
               <div className="pt-form-group">
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-a">
-                    Email
+                    Username
                   </label>
                   <div className="pt-form-content">
                     <Field
                       name="email"
                       className="pt-input form-width smd-full-width"
-                      placeholder="Email"
+                      placeholder="Username"
                       component="input"
                       type="email"
                       required

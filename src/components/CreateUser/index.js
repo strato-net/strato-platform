@@ -7,6 +7,8 @@ import { withRouter } from 'react-router-dom';
 
 import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { openFaucetOverlay } from '../Faucet/faucet.actions';
+import Faucet from '../Faucet';
 
 class CreateUser extends Component {
 
@@ -17,12 +19,12 @@ class CreateUser extends Component {
   submit = (values) => {
     mixpanelWrapper.track('create_user_submit_click');
     this.props.createUser(values.username, values.password);
+    this.props.openFaucetOverlay();
   }
 
   render() {
     return (
       <div>
-
         <form>
           <Dialog
             iconName="inbox"
@@ -110,6 +112,7 @@ class CreateUser extends Component {
             </div>
           </Dialog>
         </form>
+        <Faucet />
       </div>
     );
   }
@@ -150,6 +153,7 @@ const connected = connect(
     openOverlay,
     closeOverlay,
     createUser,
+    openFaucetOverlay
   }
 )(formed);
 
