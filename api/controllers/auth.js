@@ -85,24 +85,25 @@ module.exports = {
         err.status = 400;
         return next(err);
       }
-      // TODO: basic validation for username/password
 
-      // Create user in db if not exists
+      if (username.length < 2 || username.length > 15) {
+        let err = new Error("Username must be at least 2 characters and 15 characters max");
+        err.status = 400;
+        return next(err);
+      }
+      if (password.length < 6) {
+        let err = new Error("Password must be at least 6 characters");
+        err.status = 400;
+        return next(err);
+      }
+
+      // Create user in db if does not exist
+      let newUser;
       try {
-        const newUser = yield models.User.create({
+        newUser = yield models.User.create({
           username: username,
           passwordHash: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
         });
-
-        // Find developer role
-        const developerRole = yield models.Role.findOne({
-          where: {
-            name: 'developer'
-          }
-        });
-
-        // Add developer role to new user
-        yield newUser.addRole(developerRole);
       } catch (error) {
         if (error.name === "SequelizeUniqueConstraintError") {
           let err = new Error("user already exists");
@@ -112,20 +113,35 @@ module.exports = {
         throw error;
       }
 
+      // Find developer role
+      const developerRole = yield models.Role.findOne({
+        where: {
+          name: 'developer'
+        }
+      });
+
+      // Add developer role to new user
+      yield newUser.addRole(developerRole);
+
       // Create blockchain user in bloc
+      let blocUser;
       try {
-        const blocUser = yield blockappsRest.createUser(username, password);
-        // TODO: updateAccount address for user in db with value of blocUser.account
-        res.status(200).json({
-          message: 'user created'
-        });
+        blocUser = yield blockappsRest.createUser(username, password);
       } catch(blocError) {
-        // TODO: remove user from db
-        // TODO: check error type (some might be expected, not 500)
+        newUser.destroy();
+        // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
         let err = new Error('could not create bloc account: ', blocError);
         err.status = 500;
         return next(err);
       }
+
+      // Set the account address to user in db
+      newUser.accountAddress = blocUser.address;
+      yield newUser.save({fields: ['accountAddress']});
+
+      res.status(200).json({
+        message: 'user created, please login'
+      });
     })
   }
 };

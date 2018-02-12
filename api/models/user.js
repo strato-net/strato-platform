@@ -37,6 +37,7 @@ module.exports = function (sequelize, DataTypes) {
       id: this.id,
       username: this.username,
       roles: this['Roles'].map(role => role.name),
+      accountAddress: this.accountAddress
     }
   };
 
