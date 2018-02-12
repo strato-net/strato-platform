@@ -44,7 +44,7 @@ class Applications extends Component {
           </div>
           <div className="col-sm-6 text-right">
             {this.props.isLoggedIn && <a className="mailto" href={mailto}>
-              <Button text="Faucet" onClick={mixpanelWrapper.track('Faucet_click')} className="right-align" />
+              <Button text="Request Token" onClick={mixpanelWrapper.track('Faucet_click')} className="right-align" />
             </a>}
             {this.props.isLoggedIn && <Button onClick={() => {
               mixpanelWrapper.track('Add_App_click');

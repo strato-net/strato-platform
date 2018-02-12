@@ -77,7 +77,7 @@ class SendEther extends Component {
           mixpanelWrapper.track("send_ether_open_click");
           this.props.sendEtherOpenModal()
         }} className="pt-intent-primary pt-icon-add"
-          text="Send Ether" />
+          text="Send Tokens" />
         <form>
           <Dialog
             iconName="inbox"

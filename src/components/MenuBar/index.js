@@ -31,19 +31,9 @@ class MenuBar extends Component {
   renderDeveloperButton() {
     return (
       <Button onClick={() => {
-        window.open('http://localhost:3001/#/dashboard', '_blank');
-      }} className="pt-button pt-minimal pt-small menubar-button"
-        id="developer-button"
-        text={'For Developer'} />
-    );
-  }
-
-  renderLogin() {
-    return (
-      <Button onClick={() => {
         this.props.openLoginOverlay();
-      }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'Login'} />
-    )
+      }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'For Developer'} />
+    );
   }
 
   renderSignup() {
@@ -74,9 +64,8 @@ class MenuBar extends Component {
           <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
-          {!this.props.isLoggedIn && this.renderLogin()}
-          {!this.props.isLoggedIn && this.renderSignup()}
           {!this.props.isLoggedIn && this.renderDeveloperButton()}
+          {!this.props.isLoggedIn && this.renderSignup()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">v{process.env.REACT_APP_VERSION} </small>
           <span className="pt-navbar-divider" />
