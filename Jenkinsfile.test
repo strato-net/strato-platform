@@ -89,14 +89,16 @@ pipeline {
       steps {
         sh '''#!/bin/bash -le
           echo 'Running BlockApps Haskell tests to verify the build to be healthy'
+          # Optimized flow to not rebuild stack each time from the scratch
           if [ ! -d blockapps-haskell ]; then
-            git clone https://github.com/blockapps/blockapps-haskell.git -b $SILO_BRANCH_NAME
+            git clone https://github.com/blockapps/blockapps-haskell.git
           fi
           cd blockapps-haskell
+          git checkout $(cd ../repos/blockapps-haskell && git branch) # use same branch as Basilfile
           git pull
           stack test blockapps-bloc22-server
           stack test blockapps-solidity --test-arguments="--match=Declarations"
-          stack test blockapps-bloc22-client 
+          stack test blockapps-bloc22-client
         '''
       }
     }
