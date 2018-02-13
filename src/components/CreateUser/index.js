@@ -20,7 +20,6 @@ class CreateUser extends Component {
   submit = (values) => {
     mixpanelWrapper.track('create_user_submit_click');
     this.props.createUser(values.username, values.password);
-    this.props.openWalkThroughOverlay();
   }
 
   render() {
@@ -129,6 +128,7 @@ export function mapStateToProps(state) {
   }
   return {
     isOpen: state.createUser.isOpen,
+    isLoggedIn: state.user.isLoggedIn,
     ...errors
   };
 }

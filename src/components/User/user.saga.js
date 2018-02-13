@@ -61,7 +61,7 @@ function* login(action) {
     setCookie('token', token, 1);
     /* ----------------- */
 
-  } catch(err) {
+  } catch (err) {
     yield put(loginFailure(action.email, err));
   }
 }
@@ -73,7 +73,7 @@ function* logout() {
     /*Please remove when acutal API is integrated*/
     setCookie('token', null, -1);
     /* ----------------- */
-  } catch(err) {
+  } catch (err) {
     // Handle when you have error on logout
   }
 }
