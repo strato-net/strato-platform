@@ -8,6 +8,29 @@ const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 
 
+const sendLoginResponse = function(res, user) {
+  let tokenData;
+  try {
+    tokenData = authHandler.issue(user);
+  }
+  catch(err) {
+    return next(err);
+  }
+
+  res.cookie(
+    appConfig.jwtConfig.authCookieName,
+    tokenData.token,
+    {
+      domain: appConfig.jwtConfig.authCookieDomain,
+      httpOnly: true,
+      secure: appConfig.jwtConfig.authCookieSecure,
+      expire: moment(tokenData.expireDate).toDate()
+    }
+  );
+
+  res.status(200).json({user: user.toJson()});
+};
+
 module.exports = {
   // no check if the user is already logged in - always login with credentials provided
   login: function (req, res, next) {
@@ -42,25 +65,7 @@ module.exports = {
               err.status = 401;
               return next(err);
             } else {
-              let tokenData;
-              try {
-                tokenData = authHandler.issue(user);
-              }
-              catch(err) {
-                return next(err);
-              }
-
-              res.cookie(
-                appConfig.jwtConfig.authCookieName,
-                tokenData.token,
-                {
-                  domain: appConfig.jwtConfig.authCookieDomain,
-                  httpOnly: true,
-                  secure: appConfig.jwtConfig.authCookieSecure,
-                  expire: moment(tokenData.expireDate).toDate()
-                }
-              );
-              res.status(200).json({user: user.toJson()});
+              sendLoginResponse(res, user);
             }
           }
         });
@@ -122,6 +127,7 @@ module.exports = {
 
       // Add developer role to new user
       yield newUser.addRole(developerRole);
+      newUser['Roles'] = [developerRole]; // dirty trick to prevent .toJson() error; todo: refactor
 
       // Create blockchain user in bloc
       let blocUser;
@@ -139,9 +145,7 @@ module.exports = {
       newUser.accountAddress = blocUser.address;
       yield newUser.save({fields: ['accountAddress']});
 
-      res.status(200).json({
-        message: 'user created, please login'
-      });
+      sendLoginResponse(res, newUser);
     })
   }
 };
