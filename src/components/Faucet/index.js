@@ -9,6 +9,13 @@ import './faucet.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 class Faucet extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isContinue: false,
+      initialModal: 'Faucet'
+    }
+  }
 
   componentDidMount() {
     mixpanelWrapper.track("faucet_loaded");
@@ -18,73 +25,104 @@ class Faucet extends Component {
     mixpanelWrapper.track('faucet_submit_click');
     let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is <USER ADDRESS>.`;
     window.location.href = mailto;
-    this.props.closeFaucetOverlay();
+    this.setState({ isContinue: true });
   }
 
   render() {
-    const { submitting, error } = this.props
+    const { submitting, errors } = this.props;
+
     return (
       <div>
-        {/* <Button onClick={() => {
-          mixpanelWrapper.track('faucet_open_click');
-          this.props.openFaucetOverlay()
-        }} text="Faucet" className="pt-icon-add right-align" /> */}
         <form>
           <Dialog
             iconName="inbox"
             isOpen={this.props.isTokenOpen}
             onClose={this.props.closeFaucetOverlay}
-            title="STRATO Token Request Form"
+            title={this.state.initialModal === "Faucet" ? "STRATO Token Request Form" : "How to Deploy an App on STRATO"}
             className="pt-dark"
           >
-            <div className="pt-dialog-body">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <div className="pt-form-content">
-                    Using and launching apps requires tokens. Please complete the form below to email us your token request.
+             {this.state.initialModal === "Faucet" && <div>
+              <div className="pt-dialog-body">
+                <div className="pt-form-group">
+                  <div className="pt-form-group pt-intent-danger">
+                    <div className="pt-form-content">
+                      Using and launching apps requires tokens. Please complete the form below to email us your token request.
                   </div>
-                </div>
+                  </div>
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    What are you building?
+                  <div className="pt-form-group pt-intent-danger">
+                    <label className="pt-label" htmlFor="input-b">
+                      What are you building?
                   </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="building"
-                      component="textarea"
-                      type="text"
-                      placeholder="What are you building?"
-                      className="pt-input form-width"
-                      tabIndex="3"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{error && this.props.errors.building}</div>
+                    <div className="pt-form-content">
+                      <Field
+                        name="building"
+                        component="textarea"
+                        type="text"
+                        placeholder="What are you building?"
+                        className="pt-input form-width"
+                        tabIndex="3"
+                        required
+                      />
+                      <div className="pt-form-helper-text">{errors && this.props.errors.building}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="col-sm-3"></div>
+                  <div className="col-sm-3"></div>
+                  <div className="col-sm-3"></div>
+                </div>
+              </div>
+
+              <div className="pt-dialog-footer">
+                <div className="pt-dialog-footer-actions">
+                  <Button text="Continue"
+                    intent={Intent.PRIMARY}
+                    onClick={() => {
+                      mixpanelWrapper.track('faucet_close_click');
+                      this.setState({ initialModal: "CLI", isContinue: false });
+                    }} disabled={!this.state.isContinue} />
+                  <Button
+                    intent={Intent.PRIMARY}
+                    onClick={this.props.handleSubmit(this.submit)}
+                    text="Submit"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+            </div>}
+
+            {this.state.initialModal === "CLI" && <div>
+              <div className="pt-dialog-body">
+                <div className="pt-form-group">
+                  <div className="pt-form-group pt-intent-danger">
+                    <div className="pt-form-content">
+                      The ​ bloc CLI​ is designed to make it easy for developers to download, deploy, and manage their
+                      apps from the command line. The ​ bloc CLI​ is a Node.js module that will allow users to download,
+                      zip, and deploy ​ App Bundles​ and services to STRATO, as well as to monitor their account
+                      balance. The ​ bloc CLI​ is intended to be used in conjunction with the ​ STRATO Public Web App.
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
+              <div className="pt-dialog-footer">
+                <div className="pt-dialog-footer-actions">
+                  <Button text="Back" onClick={() => {
+                    mixpanelWrapper.track('faucet_close_click');
+                    this.setState({ initialModal: "Faucet" });
+                  }} />
+                  <Button
+                    intent={Intent.PRIMARY}
+                    onClick={() => { this.props.closeFaucetOverlay() }}
+                    text="Finish"
+                    disabled={submitting}
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="pt-dialog-footer">
-              <div className="pt-dialog-footer-actions">
-                <Button text="Continue" onClick={() => {
-                  mixpanelWrapper.track('faucet_close_click');
-                  this.props.closeFaucetOverlay()
-                }} />
-                <Button
-                  intent={Intent.PRIMARY}
-                  onClick={this.props.handleSubmit(this.submit)}
-                  text="Submit"
-                  disabled={submitting}
-                />
-              </div>
-            </div>
+            </div>}
           </Dialog>
         </form>
       </div>
