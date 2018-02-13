@@ -9,7 +9,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker rm -f $(docker ps -aq) || true; docker system prune -f
+          docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes
           docker ps
         '''
        }
@@ -19,6 +19,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
+            set -x
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             # Make sure all repos are cloned
             basil clone
@@ -39,30 +40,40 @@ pipeline {
     stage('Deploy') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           basil compose > docker-compose.yml
-
-          NODE_NAME=localhost \
-          BLOC_URL=http://localhost/bloc/v2.1 \
-          BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.1/swagger.json \
-          STRATO_URL=http://localhost/strato-api/eth/v1.2 \
-          STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
-          stratoHost=nginx \
-          cirrusurl=nginx/cirrus \
-          ssl=false \
-          docker-compose up -d
-          sleep 32 # wait for cirrus to restart (remove when container dependencies are fixed)
+          export NODE_HOST=${NODE_HOST:-cd10.eastus.cloudapp.azure.com}
+          NODE_NAME=${NODE_NAME:-$NODE_HOST} \
+            BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
+            BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
+            STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2} \
+            STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json} \
+            CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
+            APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
+            STRATO_GS_MODE=1 \
+            docker-compose up -d
           docker ps
           # Few quick tests
-          curl -f http://localhost/cirrus/search/
-          curl -f http://localhost/strato-api/eth/v1.2/stats/difficulty
-          curl -f http://localhost/bloc/v2.1/users
+          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+          do
+            echo "waiting for bloc to be available through nginx"
+            sleep 1
+          done
+          echo "bloc is available"
+          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
+          do
+            echo "waiting for cirrus to be available through nginx"
+            sleep 1
+          done
+          echo "cirrus is available"
         '''
       }
     }
-
+    
     stage('E2E-Test') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
           git clone https://github.com/blockapps/blockapps-ba.git -b transaction-state-management
@@ -77,7 +88,24 @@ pipeline {
         '''
       }
     }
-
+    
+    stage('bloch-tests') {
+      steps {
+        sh '''#!/bin/bash -le
+          echo 'Running BlockApps Haskell tests to verify the build to be healthy'
+          # Optimized flow to not rebuild stack each time from the scratch
+          if [ ! -d blockapps-haskell ]; then
+            git clone https://github.com/blockapps/blockapps-haskell.git
+          fi
+          cd blockapps-haskell
+          git checkout $(cd ../repos/blockapps-haskell && git rev-parse --abbrev-ref HEAD) # use same branch as Basilfile
+          git pull
+          stack test blockapps-bloc22-server
+          stack test blockapps-solidity --test-arguments="--match=Declarations"
+          stack test blockapps-bloc22-client
+        '''
+      }
+    }
     stage('Release') {
           steps {
             withEnv(["TAG_NAME=build-${env.BUILD_NUMBER}", "PATH=$PATH:/usr/local/go/bin"]) {
@@ -85,6 +113,7 @@ pipeline {
                 usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER')
               ]) {
                 sh '''#!/bin/bash -le
+                  set -x
                   docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                   basil build --release
                   basil push

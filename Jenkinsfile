@@ -3,14 +3,21 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
+  parameters { string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the silo test job). DEFAULT: "full"') }
 
   stages {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
-          docker rm -f $(docker ps -aq) || true; docker system prune -fa
+          set -x
+          docker rm -f $(docker ps -aq) || true;
+          if [ "$BUILD_TYPE" == "quick" ]; then
+            docker system prune -f
+          else
+            docker system prune -fa
+            sudo rm -rf silo
+          fi
           docker ps
-          sudo rm -rf silo
         '''
        }
     }
@@ -19,11 +26,24 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
           sh '''#!/bin/bash -le
+            set -x
             docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
             git config --global credential.helper store
-            git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
-            cd silo
-            basil clone
+            if [ "$BUILD_TYPE" == "quick" ]; then
+              cd silo
+              basil clone
+              # Checkout branches specified in Basilfile
+              basil checkout
+              # Git pull all the latest
+              dirs=($(find ./repos -mindepth 1 -maxdepth 1 -type d))
+              for dir in "${dirs[@]}"; do
+                (cd "$dir" && git pull)
+              done
+            else
+              git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+              cd silo
+              basil clone
+            fi
             basil compose --release > docker-compose.release.yml
             basil snapshot > Basilfile.snapshot
             basil build
@@ -34,24 +54,33 @@ pipeline {
     stage('Deploy') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           cd silo
           basil compose > docker-compose.yml
-
-          NODE_NAME=localhost \
-          BLOC_URL=http://localhost/bloc/v2.2 \
-          BLOC_DOC_URL=http://localhost/docs/?url=/bloc/v2.1/swagger.json \
-          STRATO_URL=http://localhost/strato-api/eth/v1.2 \
-          STRATO_DOC_URL=http://localhost/docs/?url=/strato-api/eth/v1.2/swagger.json \
-          stratoHost=nginx \
-          cirrusurl=nginx/cirrus \
-          ssl=false \
-          docker-compose up -d
-          sleep 32 # wait for cirrus to restart (remove when container dependencies are fixed)
+          export NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com}
+          NODE_NAME=${NODE_NAME:-$NODE_HOST} \
+            BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
+            BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
+            STRATO_URL=${STRATO_URL:-http://$NODE_HOST/strato-api/eth/v1.2} \
+            STRATO_DOC_URL=${STRATO_DOC_URL:-http://$NODE_HOST/docs/?url=/strato-api/eth/v1.2/swagger.json} \
+            CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
+            APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
+            STRATO_GS_MODE=1 \
+            docker-compose up -d
           docker ps
           # Few quick tests
-          curl -f http://localhost/cirrus/search/
-          curl -f http://localhost/strato-api/eth/v1.2/stats/difficulty
-          curl -f http://localhost/bloc/v2.1/users
+          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
+          do
+            echo "waiting for bloc to be available through nginx"
+            sleep 1
+          done
+          echo "bloc is available"
+          until curl --silent --output /dev/null --fail --location ${NODE_HOST}/cirrus/contract/
+          do
+            echo "waiting for cirrus to be available through nginx"
+            sleep 1
+          done
+          echo "cirrus is available"
         '''
       }
     }
@@ -59,9 +88,13 @@ pipeline {
     stage('E2E-Test') {
       steps {
         sh '''#!/bin/bash -le
+<<<<<<< HEAD
           echo 'Running e2e tests from silo/tests'
           ./test-instance.sh
 
+=======
+          set -x
+>>>>>>> master
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
           git clone https://github.com/blockapps/blockapps-ba.git
@@ -81,6 +114,7 @@ pipeline {
             usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GITHUB_TOKEN', usernameVariable: 'USR')
           ]) {
             sh '''#!/bin/bash -le
+              set -x
               cd silo
               docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
               basil build --release

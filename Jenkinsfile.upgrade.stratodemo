@@ -1,0 +1,123 @@
+pipeline {
+  agent none
+  parameters {string(name: 'FOOL_PROOF', defaultValue: '', description: 'Type "footgun" to confirm you know what you are doing and what are the consequences to which this may lead')}
+  stages {
+    stage('Prepare to deploy') {
+      steps {
+        parallel (
+          "stratodemo1": {
+            node('stratodemo1') {
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  if [ "$FOOL_PROOF" -ne "footgun" ]; then exit 1; fi
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  sudo rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  curl -s -L https://github.com/blockapps/strato-getting-started/releases/latest | egrep -o '/blockapps/strato-getting-started/releases/download/build-[0-9]*/docker-compose.release.yml' | wget --base=http://github.com/ -i - -O docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          },
+          "stratodemo2": {
+            node('stratodemo2') {
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  if [ "$FOOL_PROOF" -ne "footgun" ]; then exit 1; fi
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  sudo rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  curl -s -L https://github.com/blockapps/strato-getting-started/releases/latest | egrep -o '/blockapps/strato-getting-started/releases/download/build-[0-9]*/docker-compose.release.yml' | wget --base=http://github.com/ -i - -O docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          },
+          "stratodemo3": {
+            node('stratodemo3') {
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  if [ "$FOOL_PROOF" -ne "footgun" ]; then exit 1; fi
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  sudo rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  curl -s -L https://github.com/blockapps/strato-getting-started/releases/latest | egrep -o '/blockapps/strato-getting-started/releases/download/build-[0-9]*/docker-compose.release.yml' | wget --base=http://github.com/ -i - -O docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          }
+        )
+      }
+    }
+    stage('Deploy multinode') {
+      steps {
+        parallel (
+          "stratodemo1": {
+            node('stratodemo1') {
+              sh '''#!/bin/bash -le
+              set -x
+              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
+              docker rm -f $(docker ps -aq) || true
+              cd strato-getting-started
+              # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
+              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=stratodemo1.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
+              docker ps
+              '''
+            }
+          },
+          "stratodemo2": {
+            node('stratodemo2') {
+              sh '''#!/bin/bash -le
+              set -x
+              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
+              docker rm -f $(docker ps -aq) || true
+              cd strato-getting-started
+              # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
+              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=stratodemo2.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
+              docker ps
+              '''
+            }
+          },
+          "stratodemo3": {
+            node('stratodemo3') {
+              sh '''#!/bin/bash -le
+              set -x
+              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
+              docker rm -f $(docker ps -aq) || true
+              cd strato-getting-started
+              # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
+              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=stratodemo3.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
+              docker ps
+              '''
+            }
+          }
+        )
+      }
+    }
+  }
+}
