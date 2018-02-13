@@ -5,11 +5,12 @@ import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { Position, Tooltip, Button } from '@blueprintjs/core';
 
 import { fetchApplications } from '../Applications/applications.actions';
+import { openCLIOverlay } from '../CLI/cli.actions';
 import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
-import cli from '../../cli.pdf'
 import { env } from '../../env';
-import { downloadPDFFile } from '../../lib/fileHandler';
+import CLI from '../CLI';
+
 import './application.css'
 
 class Applications extends Component {
@@ -46,10 +47,8 @@ class Applications extends Component {
             {this.props.isLoggedIn && <a className="mailto" href={mailto}>
               <Button text="Request Token" onClick={mixpanelWrapper.track('Faucet_click')} className="right-align" />
             </a>}
-            {this.props.isLoggedIn && <Button onClick={() => {
-              mixpanelWrapper.track('Add_App_click');
-              downloadPDFFile('cli.pdf', cli)
-            }} text="Add App" className="pt-icon-add right-align" />}
+            {this.props.isLoggedIn &&
+              <Button onClick={() => {this.props.openCLIOverlay()}} text="Add App" className="pt-icon-add right-align" />}
 
             {this.props.isLoggedIn &&
               <Tooltip
@@ -65,7 +64,7 @@ class Applications extends Component {
                     disabled={!canDeployApps}
                   >
                     Deploy
-                </button>
+                  </button>
                 </Link>
               </Tooltip>}
           </div>
@@ -83,6 +82,7 @@ class Applications extends Component {
               </div>
           }
         </div>
+        <CLI />
       </div>
     );
   }
@@ -99,7 +99,8 @@ export function mapStateToProps(state) {
 export default withRouter(
   connect(mapStateToProps,
     {
-      fetchApplications
+      fetchApplications,
+      openCLIOverlay
     }
   )(Applications)
 );
