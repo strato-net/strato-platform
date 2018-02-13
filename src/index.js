@@ -29,7 +29,7 @@ import userReducer from './components/User/user.reducer';
 import codeEditorReducer from './components/CodeEditor/codeEditor.reducer';
 import applicationsReducer from './components/Applications/applications.reducer';
 import launchPadReducer from './components/LaunchPad/launchPad.reducer';
-import faucetReducer from './components/Faucet/faucet.reducer';
+import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -89,7 +89,7 @@ const rootReducer = combineReducers({
   applications: applicationsReducer,
   launchPad: launchPadReducer,
   dashboard: dashboardReducer,
-  faucet: faucetReducer
+  walkThrough: walkThroughReducer
 });
 
 const rootSaga = function* startForeman() {

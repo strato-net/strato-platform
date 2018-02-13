@@ -8,8 +8,8 @@ import { withRouter } from 'react-router-dom';
 
 import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { openFaucetOverlay } from '../Faucet/faucet.actions';
-import Faucet from '../Faucet';
+import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import WalkThrough from '../WalkThrough';
 
 class CreateUser extends Component {
 
@@ -20,7 +20,7 @@ class CreateUser extends Component {
   submit = (values) => {
     mixpanelWrapper.track('create_user_submit_click');
     this.props.createUser(values.username, values.password);
-    this.props.openFaucetOverlay();
+    this.props.openWalkThroughOverlay();
   }
 
   render() {
@@ -116,7 +116,7 @@ class CreateUser extends Component {
             </div>
           </Dialog>
         </form>
-        <Faucet />
+        <WalkThrough />
       </div>
     );
   }
@@ -157,7 +157,7 @@ const connected = connect(
     openOverlay,
     closeOverlay,
     createUser,
-    openFaucetOverlay,
+    openWalkThroughOverlay,
     openLoginOverlay
   }
 )(formed);

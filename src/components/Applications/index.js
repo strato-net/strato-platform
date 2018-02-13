@@ -9,7 +9,7 @@ import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
 import cli from '../../cli.pdf'
 import { env } from '../../env';
-import { downloadPDFFile } from '../../lib/fileHandler'
+import { downloadPDFFile } from '../../lib/fileHandler';
 import './application.css'
 
 class Applications extends Component {
