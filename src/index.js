@@ -31,6 +31,7 @@ import applicationsReducer from './components/Applications/applications.reducer'
 import launchPadReducer from './components/LaunchPad/launchPad.reducer';
 import cliReducer from './components/CLI/cli.reducer';
 import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
+import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -91,7 +92,8 @@ const rootReducer = combineReducers({
   launchPad: launchPadReducer,
   dashboard: dashboardReducer,
   cli: cliReducer,
-  walkThrough: walkThroughReducer
+  walkThrough: walkThroughReducer,
+  tokenRequest: tokenRequestReducer
 });
 
 const rootSaga = function* startForeman() {

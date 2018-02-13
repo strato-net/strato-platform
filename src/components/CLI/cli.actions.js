@@ -1,5 +1,5 @@
-export const OPEN_OVERLAY = "OPEN_TOKEN_MODAL";
-export const CLOSE_OVERLAY = "CLOSE_TOKEN_MODAL";
+export const OPEN_OVERLAY = "OPEN_CLI_MODAL";
+export const CLOSE_OVERLAY = "CLOSE_CLI_MODAL";
 
 export const openCLIOverlay = function() {
   return {

@@ -6,10 +6,12 @@ import { Position, Tooltip, Button } from '@blueprintjs/core';
 
 import { fetchApplications } from '../Applications/applications.actions';
 import { openCLIOverlay } from '../CLI/cli.actions';
+import { openTokenRequestOverlay } from '../TokenRequest/tokenRequest.actions';
 import ApplicationCard from '../ApplicationCard';
 import { canDeployApps } from '../../lib/envChecks';
 import { env } from '../../env';
 import CLI from '../CLI';
+import TokenRequest from '../TokenRequest';
 
 import './application.css'
 
@@ -33,9 +35,6 @@ class Applications extends Component {
   }
 
   render() {
-    // TODO with user address(JWT)
-    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=Requesting faucet funds into <USER ADDRESS> on the STRATO public network`;
-    // -----------------------------
 
     return (
       <div className="container-fluid pt-dark">
@@ -44,11 +43,10 @@ class Applications extends Component {
             <h3>Welcome to Launchpad</h3>
           </div>
           <div className="col-sm-6 text-right">
-            {this.props.isLoggedIn && <a className="mailto" href={mailto}>
-              <Button text="Request Token" onClick={mixpanelWrapper.track('Faucet_click')} className="right-align" />
-            </a>}
             {this.props.isLoggedIn &&
-              <Button onClick={() => {this.props.openCLIOverlay()}} text="Add App" className="pt-icon-add right-align" />}
+              <Button text="Request Token" onClick={this.props.openTokenRequestOverlay} className="right-align" />}
+            {this.props.isLoggedIn &&
+              <Button onClick={this.props.openCLIOverlay} text="Add App" className="pt-icon-add right-align" />}
 
             {this.props.isLoggedIn &&
               <Tooltip
@@ -83,6 +81,7 @@ class Applications extends Component {
           }
         </div>
         <CLI />
+        <TokenRequest />
       </div>
     );
   }
@@ -100,7 +99,8 @@ export default withRouter(
   connect(mapStateToProps,
     {
       fetchApplications,
-      openCLIOverlay
+      openCLIOverlay,
+      openTokenRequestOverlay
     }
   )(Applications)
 );
