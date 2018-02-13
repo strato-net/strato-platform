@@ -8,7 +8,7 @@ import cli from '../../cli.pdf'
 
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
-class DownloadCLI extends Component {
+class CLI extends Component {
 
   render() {
     return (
@@ -63,4 +63,4 @@ export function mapStateToProps(state) {
 
 export default withRouter(connect(mapStateToProps, {
   closeCLIOverlay,
-})(DownloadCLI));
+})(CLI));

@@ -7,6 +7,7 @@ import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { downloadPDFFile } from '../../lib/fileHandler';
 import cli from '../../cli.pdf';
+import { faucetRequest } from '../Accounts/accounts.actions';
 import './walkThrough.css';
 
 class WalkThrough extends Component {
@@ -73,6 +74,8 @@ class WalkThrough extends Component {
               onClick={() => {
                 mixpanelWrapper.track('faucet_close_click');
                 this.setState({ initialModal: "CLI", isContinue: false });
+                // Faucet account using jwt tobe done
+                this.props.faucetRequest('19ec7fac17c24ed9482790b15de678af6c580617');
               }} disabled={!this.state.isContinue} />
             <Button
               intent={Intent.PRIMARY}
@@ -173,7 +176,8 @@ const connected = connect(
   mapStateToProps,
   {
     openWalkThroughOverlay,
-    closeWalkThroughOverlay
+    closeWalkThroughOverlay,
+    faucetRequest
   }
 )(formed);
 
