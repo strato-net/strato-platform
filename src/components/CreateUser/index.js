@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { openOverlay, closeOverlay, createUser } from './createUser.actions';
+import { openLoginOverlay } from '../User/user.actions';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -99,10 +100,13 @@ class CreateUser extends Component {
 
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
-                <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track('create_user_close_click');
-                  this.props.closeOverlay()
-                }} />
+                <Button
+                  text="Already Have An Account?"
+                  onClick={() => {
+                    this.props.closeOverlay();
+                    this.props.openLoginOverlay();
+                  }}
+                />
                 <Button
                   intent={Intent.PRIMARY}
                   onClick={this.props.handleSubmit(this.submit)}
@@ -153,7 +157,8 @@ const connected = connect(
     openOverlay,
     closeOverlay,
     createUser,
-    openFaucetOverlay
+    openFaucetOverlay,
+    openLoginOverlay
   }
 )(formed);
 

@@ -109,6 +109,7 @@ class Login extends Component {
               <div className="pt-dialog-footer-actions">
                 <Button onClick={() => {
                   mixpanelWrapper.track('create_user_open_click');
+                  this.props.closeLoginOverlay();
                   this.props.openOverlay();
                 }} text="Create User" className="pt-icon-add" />
                 <Button

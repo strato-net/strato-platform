@@ -48,7 +48,7 @@ class ApplicationCard extends Component {
         this.props.openLoginOverlay();
       }} className="pt-intent-primary"
         id="Login-button"
-        text={`Launch (1 USD)`} />
+        text={'Launch'} />
     );
   }
 
@@ -103,7 +103,7 @@ class ApplicationCard extends Component {
                     className="pt-button pt-intent-primary pull-right"
                     onClick={() => this.launch(app)}
                   >
-                    Launch (1 USD)
+                    Launch
                   </button>)
                 }
               </div>
