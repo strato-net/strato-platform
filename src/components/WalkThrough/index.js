@@ -135,7 +135,7 @@ class WalkThrough extends Component {
         <form>
           <Dialog
             isOpen={this.props.isWalkThroughOpen}
-            onClose={this.props.closeFaucetOverlay}
+            onClose={this.props.closeWalkThroughOverlay}
             title={this.state.initialModal === "Faucet" ? "STRATO Token Request Form" : "How to Deploy an App on STRATO"}
             className="pt-dark"
           >
