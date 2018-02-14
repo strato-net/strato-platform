@@ -10,6 +10,7 @@ import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import WalkThrough from '../WalkThrough';
+import { toasts } from "../Toasts";
 
 class CreateUser extends Component {
 
@@ -20,6 +21,11 @@ class CreateUser extends Component {
   submit = (values) => {
     mixpanelWrapper.track('create_user_submit_click');
     this.props.createUser(values.username, values.password);
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.serverError)
+      toasts.show({ message: nextProps.serverError });
   }
 
   render() {
@@ -129,6 +135,7 @@ export function mapStateToProps(state) {
   return {
     isOpen: state.createUser.isOpen,
     isLoggedIn: state.user.isLoggedIn,
+    serverError: state.createUser.error,
     ...errors
   };
 }
