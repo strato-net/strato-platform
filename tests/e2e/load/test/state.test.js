@@ -44,7 +44,6 @@ describe('LOAD TEST: state', function() {
       assert.equal(parseInt(value, 16), total, 'value');
       if (readState) {
         const state = yield rest.getState(contract);
-        console.log(state);
         assert.equal(state.titles.length-1, total, 'all created');
       }
     }

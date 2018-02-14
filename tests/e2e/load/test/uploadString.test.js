@@ -70,7 +70,7 @@ describe('LOAD TEST: Upload from string', function() {
     console.log(`Total:  seconds: ${seconds},  TPS ${batchCount/seconds}, 1 TX: ${seconds/batchCount} seconds `);
   });
 
-  it(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it.skip(`Upload simple - from string: Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
     const uid = util.uid();
     const contractName = 'TitleCA';
     const contractString = getContractString(contractName, batchSize);
@@ -89,13 +89,14 @@ describe('LOAD TEST: Upload from string', function() {
     printTiming(startTime, batchCount, batchSize);
   });
 
-  it.only(`Upload from string: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it(`Upload from string: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
     const uid = util.uid();
-    const contractName = 'TitleCA';
+    const contractName = 'TitleXXX';
     const contractString = getContractString(contractName, batchSize);
 
     const startTime = moment();
 
+    console.log({batchSize, batchCount});
     const nonce = yield getNonce(admin);
     console.log('Starting nonce', nonce);
 
@@ -112,7 +113,75 @@ describe('LOAD TEST: Upload from string', function() {
     yield waitResults(hashes);
     printTiming(startTime, batchCount, batchSize);
   });
+
+  it.only(`Upload from json array: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+    const uid = util.uid();
+    const titlesJsonArray = createTitlesJsonArray(batchSize, batchCount);
+    console.log('titlesJsonArray', titlesJsonArray);
+
+    const startTime = moment();
+
+    console.log({batchSize, batchCount});
+    const nonce = yield getNonce(admin);
+    console.log('Starting nonce', nonce);
+
+    const doNotResolve = true;
+    const hashes = [];
+    for (var i = 0; i < titlesJsonArray.length; i++) {
+      console.log(`------------------- Contract: ${i} ---------------------`);
+      const titleJson = titlesJsonArray[i];
+      const contractName = 'Title_' + uid;
+      const contractString = createContractStringFromJson(contractName, titleJson);
+      console.log(contractString);
+
+      const args = {vin: titleJson.vin};
+      const txParams = {nonce: nonce+i};
+      const hash = yield rest.uploadContractString(admin, contractName, contractString, util.usc(args), doNotResolve, txParams);
+      hashes.push(hash);
+    }
+    // wait for the hashes to resolve
+    yield waitResults(hashes);
+    printTiming(startTime, batchCount, batchSize);
+  });
 });
+
+function createTitlesJsonArray(count) {
+  const jsonArray = [];
+  for (var i = 0; i < count; i++) {
+    const json = {
+      vin: `vin_${i}`,
+      data: {
+        amount: 1000 + i,
+        name: '"John Doe"',
+      },
+    };
+    jsonArray.push(json);
+  }
+  return jsonArray;
+}
+
+function getTemplate() {
+  const template = ''+
+  'contract _contractName_ { \n' +
+  '  string public vin; \n'+
+  '  uint public amount; \n'+
+  '  string public name; \n'+
+  '  function _contractName_(string _vin) public { \n'+
+  '    vin = _vin; \n'+
+  '  } \n'+
+  '} \n';
+  return template;
+}
+
+function createContractStringFromJson(contractName, titlesJson) {
+  var template = getTemplate();
+  template = template.replace(new RegExp('_contractName_', 'g'), contractName);
+  for (field in titlesJson.data) {
+    console.log(field, titlesJson.data[field]);
+    template = template.replace(` ${field};`, ` ${field} = ${titlesJson.data[field]};`);
+  }
+  return template;
+}
 
 function printTiming(startTime, batchCount, batchSize) {
   const endTime = moment();
@@ -150,13 +219,13 @@ function* sleep(milli) {
 
 function getContractString(contractName, count) {
   const template = ''+
-'  contract $contractName$ {'+
-'    string public vin;'+
-'    $vars$'+
-'    function Title(string _vin) public {'+
-'      vin = _vin;'+
-'    }'+
-'  }';
+'contract $contractName$ {'+
+'  string public vin;'+
+'  $vars$'+
+'  function Title(string _vin) public {'+
+'    vin = _vin;'+
+'  }'+
+'}';
 
   const allVars = [];
   for (var i = 0; i < count; i++) {
