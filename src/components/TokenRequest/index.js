@@ -7,20 +7,16 @@ import { withRouter } from 'react-router-dom';
 import './tokenRequest.css';
 
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { faucetRequest } from '../Accounts/accounts.actions';
 
 class TokenRequest extends Component {
-
-  constructor() {
-    super();
-    this.state = { isContinue: false };
-  }
 
   submit = (values) => {
     mixpanelWrapper.track('Faucet_click');
     // TODO with user address(JWT)
-    const mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is <USER ADDRESS>.`;
+    const mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.address}.`;
     window.location.href = mailto;
-    this.setState({ isContinue: true });
+    this.props.faucetRequest(this.props.currentUser.address);
   }
 
   render() {
@@ -90,6 +86,7 @@ export function mapStateToProps(state) {
   }
   return {
     isTokenOpen: state.tokenRequest.isTokenOpen,
+    currentUser: state.user.currentUser,
     ...errors
   };
 }
@@ -106,6 +103,7 @@ export function validate(values) {
 const formed = reduxForm({ form: 'tokenRequest', validate })(TokenRequest);
 const connected = connect(mapStateToProps, {
   closeTokenRequestOverlay,
+  faucetRequest
 })(formed);
 
 export default withRouter(connected);

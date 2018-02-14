@@ -25,7 +25,7 @@ class WalkThrough extends Component {
 
   submit = (values) => {
     mixpanelWrapper.track('faucet_submit_click');
-    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is <USER ADDRESS>.`;
+    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.address}.`;
     window.location.href = mailto;
     this.setState({ isContinue: true });
   }
@@ -38,7 +38,7 @@ class WalkThrough extends Component {
             <div className="pt-form-group pt-intent-danger">
               <div className="pt-form-content">
                 Using and launching apps requires tokens. Please complete the form below to email us your token request.
-                  </div>
+              </div>
             </div>
 
             <div className="pt-form-group pt-intent-danger">
@@ -75,7 +75,7 @@ class WalkThrough extends Component {
                 mixpanelWrapper.track('faucet_close_click');
                 this.setState({ initialModal: "CLI", isContinue: false });
                 // Faucet account using jwt tobe done
-                this.props.faucetRequest('19ec7fac17c24ed9482790b15de678af6c580617');
+                this.props.faucetRequest(this.props.currentUser.address);
               }} disabled={!this.state.isContinue} />
             <Button
               intent={Intent.PRIMARY}
@@ -138,6 +138,7 @@ class WalkThrough extends Component {
             onClose={this.props.closeWalkThroughOverlay}
             title={this.state.initialModal === "Faucet" ? "STRATO Token Request Form" : "How to Deploy an App on STRATO"}
             className="pt-dark"
+            iconName="pt-icon-walk"
           >
             {this.state.initialModal === "Faucet" && this.faucetContent()}
 
@@ -158,6 +159,7 @@ export function mapStateToProps(state) {
   }
   return {
     isWalkThroughOpen: state.walkThrough.isWalkThroughOpen,
+    currentUser: state.user.currentUser,
     ...errors
   };
 }
