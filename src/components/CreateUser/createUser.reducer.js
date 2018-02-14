@@ -9,7 +9,8 @@ import {
 const initialState = {
   isOpen: false,
   compileSuccess: false,
-  error: false
+  error: false,
+  spinning: false
 };
 
 const reducer = function (state = initialState, action) {

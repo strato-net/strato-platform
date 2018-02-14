@@ -14,18 +14,26 @@ import { toasts } from "../Toasts";
 
 class CreateUser extends Component {
 
+  constructor() {
+    super();
+    this.state = { serverError: null }
+  }
+
   componentDidMount() {
     mixpanelWrapper.track("create_user_loaded");
   }
 
   submit = (values) => {
+    this.setState({ serverError: null })
     mixpanelWrapper.track('create_user_submit_click');
     this.props.createUser(values.username, values.password);
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.serverError)
+    if (nextProps.serverError && this.state.serverError !== nextProps.serverError) {
       toasts.show({ message: nextProps.serverError });
+      this.setState({ serverError: nextProps.serverError })
+    }
   }
 
   render() {
@@ -116,6 +124,7 @@ class CreateUser extends Component {
                   intent={Intent.PRIMARY}
                   onClick={this.props.handleSubmit(this.submit)}
                   text="Create User"
+                  disabled={this.props.spinning}
                 />
               </div>
             </div>
@@ -136,6 +145,7 @@ export function mapStateToProps(state) {
     isOpen: state.createUser.isOpen,
     isLoggedIn: state.user.isLoggedIn,
     serverError: state.createUser.error,
+    spinning: state.createUser.spinning,
     ...errors
   };
 }
