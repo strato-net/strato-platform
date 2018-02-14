@@ -16,17 +16,11 @@ class CreateUser extends Component {
 
   constructor() {
     super();
-    this.state = { serverError: null }
+    this.state = { serverError: null, errors: null }
   }
 
   componentDidMount() {
     mixpanelWrapper.track("create_user_loaded");
-  }
-
-  submit = (values) => {
-    this.setState({ serverError: null })
-    mixpanelWrapper.track('create_user_submit_click');
-    this.props.createUser(values.username, values.password);
   }
 
   componentWillReceiveProps(nextProps) {
@@ -34,6 +28,22 @@ class CreateUser extends Component {
       toasts.show({ message: nextProps.serverError });
       this.setState({ serverError: nextProps.serverError })
     }
+  }
+
+  submit = (values) => {
+    const errors = validate(values);
+    this.setState({ errors, serverError: null });
+    if (JSON.stringify(errors) === JSON.stringify({})) {
+      mixpanelWrapper.track('create_user_submit_click');
+      this.props.createUser(values.username, values.password);
+    }
+  }
+
+  errorMessageFor(fieldName) {
+    if (this.state.errors && this.state.errors[fieldName]) {
+      return this.state.errors[fieldName];
+    }
+    return null;
   }
 
   render() {
@@ -63,7 +73,7 @@ class CreateUser extends Component {
                       tabIndex="1"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.username}</div>
+                    <div className="pt-form-helper-text">{this.errorMessageFor('username')}</div>
                   </div>
                 </div>
 
@@ -81,7 +91,7 @@ class CreateUser extends Component {
                       tabIndex="2"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.password}</div>
+                    <div className="pt-form-helper-text">{this.errorMessageFor('password')}</div>
                   </div>
                 </div>
 
@@ -99,7 +109,7 @@ class CreateUser extends Component {
                       tabIndex="3"
                       required
                     />
-                    <div className="pt-form-helper-text">{this.props.errors && this.props.errors.confirm_password}</div>
+                    <div className="pt-form-helper-text">{this.errorMessageFor('confirm_password')}</div>
                   </div>
                 </div>
               </div>
@@ -137,16 +147,11 @@ class CreateUser extends Component {
 }
 
 export function mapStateToProps(state) {
-  let errors = { errors: undefined };
-  if (state.form && state.form["create-user"]) {
-    errors = { errors: state.form["create-user"].syncErrors }
-  }
   return {
     isOpen: state.createUser.isOpen,
     isLoggedIn: state.user.isLoggedIn,
     serverError: state.createUser.error,
-    spinning: state.createUser.spinning,
-    ...errors
+    spinning: state.createUser.spinning
   };
 }
 
@@ -171,7 +176,7 @@ export function validate(values) {
   return errors;
 }
 
-const formed = reduxForm({ form: 'create-user', validate })(CreateUser);
+const formed = reduxForm({ form: 'create-user' })(CreateUser);
 const connected = connect(
   mapStateToProps,
   {
