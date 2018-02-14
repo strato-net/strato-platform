@@ -8,7 +8,7 @@ WORKDIR /usr/src/app
 COPY . /usr/src/app
 
 RUN npm install --verbose && \
-    npm test && \
+#    npm test && \
     npm run build && \
     rm -rf node_modules public src
 
