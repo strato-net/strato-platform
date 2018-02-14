@@ -28,10 +28,12 @@ export function setCookie(cname, cvalue, exdays) {
 }
 
 export function currentUser() {
-  let token = readCookie('token');
+  let token = readCookie('STRATO');
 
   if (token !== undefined) {
-    return parseJwt(token);
+    let jwtData = parseJwt(token)
+
+    return jwtData.user;
   }
 
   return {};

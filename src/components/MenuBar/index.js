@@ -18,7 +18,7 @@ class MenuBar extends Component {
       return (
         <div>
           <a target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small"> Welcome, {this.props.currentUser.name} </button>
+            <button className="pt-button pt-minimal pt-small"> Welcome, {this.props.currentUser.username} </button>
           </a>
           <a target="_blank" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>

@@ -6,27 +6,28 @@ export const LOGOUT_REQUEST_SUCCESS = 'LOGOUT_REQUEST_SUCCESS';
 export const SET_CURRENT_USER = 'SET_CURRENT_USER';
 export const OPEN_LOGIN_OVERLAY = 'OPEN_LOGIN_OVERLAY';
 export const CLOSE_LOGIN_OVERLAY = 'CLOSE_LOGIN_OVERLAY';
+export const RESET_ERROR = 'RESET_ERROR';
 
 export const login = function (payload) {
   return {
     type: LOGIN_REQUEST,
-    email: payload.email,
+    username: payload.username,
     password: payload.password
   }
 }
 
-export const loginSuccess = function (email, response) {
+export const loginSuccess = function (username, response) {
   return {
     type: LOGIN_REQUEST_SUCCESS,
-    email,
+    username,
     currentUser: response
   }
 }
 
-export const loginFailure = function (email, error) {
+export const loginFailure = function (username, error) {
   return {
     type: LOGIN_REQUEST_FAILURE,
-    email,
+    username,
     error
   }
 }
@@ -54,7 +55,7 @@ export const logout = function () {
 
 export const logoutSuccess = function () {
   return {
-    type: LOGOUT_REQUEST_SUCCESS
+    type: LOGOUT_REQUEST_SUCCESS,
   }
 }
 
@@ -62,5 +63,11 @@ export const setCurrentUser = function (jwtResponse) {
   return {
     type: SET_CURRENT_USER,
     currentUser: jwtResponse
+  }
+}
+
+export const resetError = function () {
+  return {
+    type: RESET_ERROR
   }
 }

@@ -2,13 +2,14 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { login, openLoginOverlay, closeLoginOverlay } from '../User/user.actions';
+import { login, openLoginOverlay, closeLoginOverlay, resetError } from '../User/user.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import validate from './validate.js';
 import { openOverlay } from '../CreateUser/createUser.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './Login.css';
 import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
+import { toasts } from "../Toasts";
 
 class Login extends Component {
 
@@ -23,7 +24,7 @@ class Login extends Component {
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
       const payload = {
-        email: values.email,
+        username: values.username,
         password: values.password
       };
 
@@ -43,6 +44,11 @@ class Login extends Component {
       newProps.launchApp(newProps.selectedApp.address, newProps.selectedApp.url)
       newProps.resetSelectedApp()
       newProps.history.replace('/home');
+    }
+
+    if (newProps.serverError) {
+      toasts.show({ message: newProps.serverError });
+      this.props.resetError();
     }
   }
 
@@ -70,14 +76,14 @@ class Login extends Component {
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="email"
+                      name="username"
                       className="pt-input form-width smd-full-width"
                       placeholder="Username"
                       component="input"
-                      type="email"
+                      type="input"
                       required
                     /> <br />
-                    <span className="error-text">{this.errorMessageFor('email')}</span>
+                    <span className="error-text">{this.errorMessageFor('username')}</span>
                   </div>
                 </div>
 
@@ -116,6 +122,7 @@ class Login extends Component {
                   type="button"
                   onClick={handleSubmit(this.submit)}
                   text={'Login'}
+                  disabled={this.props.spinning}
                   className="pt-intent-primary pt-icon-log-in"
                 />
               </div>
@@ -129,12 +136,12 @@ class Login extends Component {
 
 function mapStateToProps(state) {
   return {
-    loginError: state.user.error,
     isLoggedIn: state.user.isLoggedIn,
     from: state.user.from,
     isOpen: state.user.isOpen,
     selectedApp: state.applications.selectedApp,
-
+    serverError: state.user.error,
+    spinning: state.user.spinning
   };
 }
 
@@ -147,7 +154,8 @@ const connected = connect(
     closeLoginOverlay,
     openOverlay,
     launchApp,
-    resetSelectedApp
+    resetSelectedApp,
+    resetError
   }
 )(formed);
 

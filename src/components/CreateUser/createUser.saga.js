@@ -16,7 +16,6 @@ import {
 import { env } from '../../env';
 import { loginSuccess } from '../User/user.actions';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
-const user = require('../../mock_api/user.json');
 
 const url = env.APEX_URL + "/users"
 
@@ -48,6 +47,7 @@ export function* createUser(action) {
     } else {
       yield put(createUserSuccess(response));
       // yield put(fetchAccounts(false, false));
+      let user = { id: response.user.id, username: response.user.username, address: response.user.accountAddress };
       yield put(loginSuccess(action.username, user));
       yield put(openWalkThroughOverlay());
     }

@@ -10,59 +10,61 @@ import {
   loginFailure,
   logoutSuccess
 } from './user.actions';
-import { setCookie } from '../../lib/parsejwt';
-import { token } from '../../mock_api/token';
-const user = require('../../mock_api/user.json'); // Remove this when actual API is implemented
+import { env } from '../../env';
 
-function loginRequest(email, password) {
-  return user;
-  // return fetch(
-  //   verifyUserUrl,
-  //   {
-  //     method: 'POST',
-  //     headers: {
-  //       'Accept': 'application/json'
-  //     },
-  //     body: JSON.stringify({email, password})
-  //   }
-  //   .then(function (response) {
-  //     return response.json();
-  //   })
-  //   .catch( function (error) {
-  //     throw error;
-  //   })
-  // )
+const loginUrl = env.APEX_URL + "/login";
+const logoutUrl = env.APEX_URL + "/logout";
+
+function loginRequest(username, password) {
+  return fetch(
+    loginUrl,
+    {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 function logoutAccount() {
-  return true;
-  // return fetch(
-  //   logoutUrl,
-  //   {
-  //     method: 'POST',
-  //     headers: {
-  //       'Accept': 'application/json'
-  //     }
-  //   }
-  //   .then(function (response) {
-  //     response.json();
-  //   })
-  //   .catch( function (error) {
-  //     throw error;
-  //   })
-  // )
+  return fetch(
+    logoutUrl,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    })
 }
 
 function* login(action) {
   try {
-    const response = yield call(loginRequest, action.email, action.password);
-    yield put(loginSuccess(action.email, response));
-    /*Please remove when acutal API is integrated*/
-    setCookie('token', token, 1);
-    /* ----------------- */
-
+    const response = yield call(loginRequest, action.username, action.password);
+    if (!response.error) {
+      let user = { id: response.user.id, username: response.user.username, address: response.user.accountAddress };
+      yield put(loginSuccess(action.username, user));
+    } else {
+      yield put(loginFailure(action.username, response.error.message));
+    }
   } catch (err) {
-    yield put(loginFailure(action.email, err));
+    yield put(loginFailure(action.username, err));
   }
 }
 
@@ -70,9 +72,6 @@ function* logout() {
   try {
     yield call(logoutAccount);
     yield put(logoutSuccess());
-    /*Please remove when acutal API is integrated*/
-    setCookie('token', null, -1);
-    /* ----------------- */
   } catch (err) {
     // Handle when you have error on logout
   }
