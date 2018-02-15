@@ -121,8 +121,8 @@ class CreateContract extends Component {
 
     const payload = {
       contract: contractname,
-      username: this.props.currentUser.username,
-      address: this.props.currentUser.address,
+      username: values.username,
+      address: values.address,
       password: values.password,
       searchable: values.searchable,
       fileText: fileText,
@@ -184,11 +184,11 @@ class CreateContract extends Component {
 
   render() {
     const { handleSubmit, pristine, submitting, valid } = this.props;
-    // const users = Object.getOwnPropertyNames(this.props.accounts);
+    const users = Object.getOwnPropertyNames(this.props.accounts);
     const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
     // const userAddresses = this.props.accounts && this.props.username ?
-      // Object.getOwnPropertyNames(this.props.accounts[this.props.username])
-      // : null;
+    //   Object.getOwnPropertyNames(this.props.accounts[this.props.username])
+    //   : null;
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
@@ -217,15 +217,16 @@ class CreateContract extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   <div>
-                    {/* <Field
+                    <Field
                       className="pt-input"
                       component="select"
                       name="username"
                       onChange={this.handleUsernameChange}
                       validate={required}
                       required
+                      value={this.props.initialValues.username}
+                      disabled
                     >
-                      <option />
                       {
                         users.map((user, i) => {
                           return (
@@ -233,8 +234,7 @@ class CreateContract extends Component {
                           )
                         })
                       }
-                    </Field> */}
-                    {this.props.currentUser.username}
+                    </Field>
                   </div>
                 </div>
               </div>
@@ -246,15 +246,17 @@ class CreateContract extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   <div>
-                    {/* <Field
+                    {<Field
                       className="pt-input"
                       component="select"
                       name="address"
                       validate={required}
                       required
+                      value={this.props.initialValues.address}
+                      disabled
                     >
-                      <option />
-                      {
+                      <option value={this.props.initialValues.address}>{this.props.initialValues.address}</option>
+                      {/*
                         userAddresses ?
                           userAddresses.map((address, i) => {
                             return (
@@ -262,9 +264,8 @@ class CreateContract extends Component {
                             )
                           })
                           : ''
-                      }
-                    </Field> */}
-                    {this.props.currentUser.address}
+                      */}
+                    </Field>}
                   </div>
                 </div>
               </div>
@@ -441,10 +442,13 @@ export function mapStateToProps(state) {
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
     currentUser: state.user.currentUser,
-    searchable: selector(state, 'searchable')
+    searchable: selector(state, 'searchable'),
+    initialValues: {
+      username: state.user.currentUser.username,
+      address: state.user.currentUser.address
+    }
   };
 }
-
 
 const formed = reduxForm({ form: CREATE_CONTRACT_FORM, validate })(CreateContract);
 const connected = connect(mapStateToProps, {

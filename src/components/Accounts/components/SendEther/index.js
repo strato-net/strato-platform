@@ -63,9 +63,9 @@ class SendEther extends Component {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
 
-    const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
-      : [];
+    // const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
+    //   Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
+    //   : [];
 
     const toUserAddresses = this.props.accounts && this.props.toUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.toUsername])
@@ -106,8 +106,9 @@ class SendEther extends Component {
                         (e) => this.props.fetchUserAddresses(e.target.value, true)
                       }
                       required
+                      value={this.props.initialValues.from}
+                      disabled
                     >
-                      <option />
                       {
                         users.map((user, i) => {
                           return (
@@ -132,9 +133,11 @@ class SendEther extends Component {
                       component="select"
                       name="fromAddress"
                       required
+                      value={this.props.initialValues.fromAddress}
+                      disabled
                     >
-                      <option />
-                      {
+                      <option value={this.props.initialValues.fromAddress}>{this.props.initialValues.fromAddress}</option>
+                      {/*
                         fromUserAddresses.length ?
                           fromUserAddresses.map((address, i) => {
                             return (
@@ -142,7 +145,7 @@ class SendEther extends Component {
                             )
                           })
                           : ''
-                      }
+                      */}
                     </Field>
                   </div>
                 </div>
@@ -341,7 +344,11 @@ export function mapStateToProps(state) {
     result: state.sendEther.result,
     accounts: state.accounts.accounts,
     fromUsername: selector(state, 'from'),
-    toUsername: selector(state, 'to')
+    toUsername: selector(state, 'to'),
+    initialValues: {
+      from: state.user.currentUser.username,
+      fromAddress: state.user.currentUser.address
+    }
   };
 }
 

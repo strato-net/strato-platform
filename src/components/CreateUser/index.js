@@ -53,7 +53,11 @@ class CreateUser extends Component {
           <Dialog
             iconName="inbox"
             isOpen={this.props.isOpen}
-            onClose={this.props.closeOverlay}
+            onClose={() => {
+              this.props.reset();
+              this.setState({ errors: null })
+              this.props.closeOverlay();
+            }}
             title="Create New User"
             className="pt-dark"
           >

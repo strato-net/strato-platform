@@ -61,6 +61,8 @@ class Login extends Component {
             iconName="inbox"
             isOpen={this.props.isOpen}
             onClose={() => {
+              this.props.reset()
+              this.setState({ errors: null })
               this.props.resetSelectedApp()
               this.props.closeLoginOverlay()
             }}
