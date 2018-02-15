@@ -50,6 +50,7 @@ class SendEther extends Component {
       toAddress: toAddress,
       value: values.value
     };
+
     this.props.sendEther(payload);
     mixpanelWrapper.track('send_ether_submit_click_successful');
     this.props.reset();
@@ -106,7 +107,6 @@ class SendEther extends Component {
                         (e) => this.props.fetchUserAddresses(e.target.value, true)
                       }
                       required
-                      value={this.props.initialValues.from}
                       disabled
                     >
                       {
@@ -133,7 +133,6 @@ class SendEther extends Component {
                       component="select"
                       name="fromAddress"
                       required
-                      value={this.props.initialValues.fromAddress}
                       disabled
                     >
                       <option value={this.props.initialValues.fromAddress}>{this.props.initialValues.fromAddress}</option>

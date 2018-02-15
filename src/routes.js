@@ -21,8 +21,8 @@ export const routes = (
     <Route exact path="/" component={App}>
       <Redirect to="/apps" />
     </Route>
-    <Route exact path="/launchpad" component={LaunchPad} />
     <Route exact path="/apps" component={Applications} />
+    <ProtectedRoute exact path="/launchpad" component={LaunchPad} />
     <ProtectedRoute exact path="/home" component={Dashboard} />
     <ProtectedRoute exact path="/nodes" component={Nodes} />
     <ProtectedRoute exact path="/blocks" component={Blocks} />

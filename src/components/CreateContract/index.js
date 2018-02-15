@@ -224,7 +224,6 @@ class CreateContract extends Component {
                       onChange={this.handleUsernameChange}
                       validate={required}
                       required
-                      value={this.props.initialValues.username}
                       disabled
                     >
                       {
@@ -252,7 +251,6 @@ class CreateContract extends Component {
                       name="address"
                       validate={required}
                       required
-                      value={this.props.initialValues.address}
                       disabled
                     >
                       <option value={this.props.initialValues.address}>{this.props.initialValues.address}</option>
