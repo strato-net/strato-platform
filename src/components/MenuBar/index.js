@@ -29,20 +29,24 @@ class MenuBar extends Component {
   }
 
   renderDeveloperButton() {
-    return (
-      <Button onClick={() => {
-        this.props.openLoginOverlay();
-      }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'For Developer'} />
-    );
+    if (!this.props.isLoggedIn) {
+      return (
+        <Button onClick={() => {
+          this.props.openLoginOverlay();
+        }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'For Developer'} />
+      );
+    }
   }
 
   renderSignup() {
-    return (
-      <Button onClick={() => {
-        mixpanelWrapper.track('create_user_open_click');
-        this.props.openOverlay();
-      }} text="Sign Up" className="pt-button pt-minimal pt-small menubar-button" />
-    )
+    if (!this.props.isLoggedIn) {
+      return (
+        <Button onClick={() => {
+          mixpanelWrapper.track('create_user_open_click');
+          this.props.openOverlay();
+        }} text="Sign Up" className="pt-button pt-minimal pt-small menubar-button" />
+      )
+    }
   }
 
   render() {
@@ -64,8 +68,8 @@ class MenuBar extends Component {
           <div className="pt-navbar-heading">STRATO Management Dashboard</div>
         </div>
         <div className="pt-navbar-group pt-align-right">
-          {!this.props.isLoggedIn && this.renderDeveloperButton()}
-          {!this.props.isLoggedIn && this.renderSignup()}
+          {this.renderDeveloperButton()}
+          {this.renderSignup()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">v{process.env.REACT_APP_VERSION} </small>
           <span className="pt-navbar-divider" />
