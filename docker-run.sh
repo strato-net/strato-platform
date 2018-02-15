@@ -17,6 +17,10 @@ fi
 
 ln -sf nginx-$(${ssl:-false} || echo "no")ssl.conf /etc/nginx/nginx.conf
 
+if [ "$ssl" = true ] ; then
+	cp -r /tmp/ssl/* /etc/ssl/
+fi
+
 BLOC_TIMEOUT=$((blockTime * 5))
 if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT} ]
 then
