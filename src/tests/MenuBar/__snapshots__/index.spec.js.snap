@@ -14,7 +14,7 @@ exports[`MenuBar: index button execute for developer 1`] = `
   className="pt-button pt-minimal pt-small menubar-button"
   id="Login-button"
   onClick={[Function]}
-  text="For Developer"
+  text="For Developers"
 />
 `;
 
