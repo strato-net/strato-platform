@@ -1,12 +1,12 @@
 import {
-  SEND_ETHER_REQUEST,
-  SEND_ETHER_SUCCESS,
-  SEND_ETHER_FAILURE,
-  SEND_ETHER_OPEN_MODAL,
-  SEND_ETHER_CLOSE_MODAL,
+  SEND_TOKENS_REQUEST,
+  SEND_TOKENS_SUCCESS,
+  SEND_TOKENS_FAILURE,
+  SEND_TOKENS_OPEN_MODAL,
+  SEND_TOKENS_CLOSE_MODAL,
   FROM_USERNAME_CHANGE,
   TO_USERNAME_CHANGE
-} from './sendEther.actions';
+} from './sendTokens.actions';
 
 const initialState = {
   isOpen: false,
@@ -16,7 +16,7 @@ const initialState = {
 
 const reducer = function (state = initialState, action) {
   switch (action.type) {
-    case SEND_ETHER_REQUEST:
+    case SEND_TOKENS_REQUEST:
       return {
         ...state,
         from: action.from,
@@ -28,22 +28,22 @@ const reducer = function (state = initialState, action) {
         isOpen: true,
         result: 'Sending...',
       };
-    case SEND_ETHER_SUCCESS:
+    case SEND_TOKENS_SUCCESS:
       return {
         ...state,
         result: ['Send success\n' + JSON.stringify(action.result).replace(",", "\n")]
       };
-    case SEND_ETHER_FAILURE:
+    case SEND_TOKENS_FAILURE:
       return {
         ...state,
         result: action.error
       };
-    case SEND_ETHER_OPEN_MODAL:
+    case SEND_TOKENS_OPEN_MODAL:
       return {
         ...state,
         isOpen: true,
       };
-    case SEND_ETHER_CLOSE_MODAL:
+    case SEND_TOKENS_CLOSE_MODAL:
       return {
         isOpen: false
       };

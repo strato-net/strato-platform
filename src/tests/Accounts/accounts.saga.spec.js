@@ -200,8 +200,8 @@ describe('Accounts: saga', () => {
       const gen = faucetAccount(action);
       expect(gen.next().value).toEqual(call(postFaucet, action.address));
       expect(gen.next().value).toEqual(put(faucetSuccess()));
-      gen.next().value
-      expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address)));
+      // gen.next().value
+      // expect(gen.next().value).toEqual(put(fetchAccountDetail(action.name, action.address)));
       expect(gen.throw(error).value).toEqual(put(faucetFailure(error)));
       expect(gen.next().done).toBe(true);
     });

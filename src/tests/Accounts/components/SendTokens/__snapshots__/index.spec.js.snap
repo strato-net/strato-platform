@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`SendEther: index mapStateToProps with default state 1`] = `
+exports[`SendTokens: index mapStateToProps with default state 1`] = `
 Object {
   "accounts": Object {
     "123456789012345678901234567890123": Object {
@@ -130,17 +130,21 @@ Object {
     },
   },
   "fromUsername": undefined,
+  "initialValues": Object {
+    "from": "Admin_1177_49507",
+    "fromAddress": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+  },
   "isOpen": true,
   "result": "On success we get result",
   "toUsername": undefined,
 }
 `;
 
-exports[`SendEther: index render component with values 1`] = `
+exports[`SendTokens: index render component with values 1`] = `
 ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
-  Symbol(enzyme.__unrendered__): <SendEther
+  Symbol(enzyme.__unrendered__): <SendTokens
     accounts={
       Object {
         "123456789012345678901234567890123": Object {
@@ -299,10 +303,15 @@ ShallowWrapper {
     dispatch={[Function]}
     error={undefined}
     fetchAccounts={[Function]}
-    form="send-ether"
+    form="send-tokens"
     fromUsername="Admin_1177_49507"
     handleSubmit={[Function]}
-    initialValues={undefined}
+    initialValues={
+      Object {
+        "from": "Admin_1177_49507",
+        "fromAddress": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+      }
+    }
     initialize={[Function]}
     initialized={false}
     invalid={false}
@@ -311,9 +320,9 @@ ShallowWrapper {
     pure={true}
     reset={[Function]}
     result={null}
-    sendEther={[Function]}
-    sendEtherCloseModal={[Function]}
-    sendEtherOpenModal={[Function]}
+    sendTokens={[Function]}
+    sendTokensCloseModal={[Function]}
+    sendTokensOpenModal={[Function]}
     store={
       Object {
         "dispatch": [Function],
@@ -370,7 +379,7 @@ ShallowWrapper {
         <Blueprint.Button
           className="pt-intent-primary pt-icon-add"
           onClick={[Function]}
-          text="Send Ether"
+          text="Send Tokens"
         />,
         <form>
           <Blueprint.Dialog
@@ -384,7 +393,7 @@ ShallowWrapper {
                 "width": "560px",
               }
             }
-            title="Send Ether"
+            title="Send Tokens"
           >
             <div
               className="pt-dialog-body"
@@ -410,11 +419,12 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="from"
                       onChange={[Function]}
                       required={true}
+                      value="Admin_1177_49507"
                     >
-                      <option />
                       <option
                         value="Admin_1085_64667"
                       >
@@ -565,10 +575,11 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="fromAddress"
                       required={true}
+                      value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                     >
-                      <option />
                       <option
                         value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                       >
@@ -890,7 +901,7 @@ ShallowWrapper {
                   className="pt-intent-primary"
                   disabled={true}
                   onClick={[Function]}
-                  text="Send Ether"
+                  text="Send Tokens"
                 />
               </div>
             </div>
@@ -908,7 +919,7 @@ ShallowWrapper {
         "props": Object {
           "className": "pt-intent-primary pt-icon-add",
           "onClick": [Function],
-          "text": "Send Ether",
+          "text": "Send Tokens",
         },
         "ref": null,
         "rendered": null,
@@ -930,7 +941,7 @@ ShallowWrapper {
                 "width": "560px",
               }
             }
-            title="Send Ether"
+            title="Send Tokens"
           >
             <div
               className="pt-dialog-body"
@@ -956,11 +967,12 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="from"
                       onChange={[Function]}
                       required={true}
+                      value="Admin_1177_49507"
                     >
-                      <option />
                       <option
                         value="Admin_1085_64667"
                       >
@@ -1111,10 +1123,11 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="fromAddress"
                       required={true}
+                      value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                     >
-                      <option />
                       <option
                         value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                       >
@@ -1436,7 +1449,7 @@ ShallowWrapper {
                   className="pt-intent-primary"
                   disabled={true}
                   onClick={[Function]}
-                  text="Send Ether"
+                  text="Send Tokens"
                 />
               </div>
             </div>
@@ -1474,11 +1487,12 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="from"
                         onChange={[Function]}
                         required={true}
+                        value="Admin_1177_49507"
                       >
-                        <option />
                         <option
                           value="Admin_1085_64667"
                         >
@@ -1629,10 +1643,11 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="fromAddress"
                         required={true}
+                        value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                       >
-                        <option />
                         <option
                           value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                         >
@@ -1954,7 +1969,7 @@ ShallowWrapper {
                     className="pt-intent-primary"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>
               </div>,
@@ -1966,7 +1981,7 @@ ShallowWrapper {
             "style": Object {
               "width": "560px",
             },
-            "title": "Send Ether",
+            "title": "Send Tokens",
           },
           "ref": null,
           "rendered": Array [
@@ -1997,11 +2012,12 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="from"
                           onChange={[Function]}
                           required={true}
+                          value="Admin_1177_49507"
                         >
-                          <option />
                           <option
                             value="Admin_1085_64667"
                           >
@@ -2152,10 +2168,11 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="fromAddress"
                           required={true}
+                          value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                         >
-                          <option />
                           <option
                             value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                           >
@@ -2492,11 +2509,12 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value="Admin_1177_49507"
                           >
-                            <option />
                             <option
                               value="Admin_1085_64667"
                             >
@@ -2668,11 +2686,12 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value="Admin_1177_49507"
                           >
-                            <option />
                             <option
                               value="Admin_1085_64667"
                             >
@@ -2811,11 +2830,12 @@ ShallowWrapper {
                           "children": <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value="Admin_1177_49507"
                           >
-                            <option />
                             <option
                               value="Admin_1085_64667"
                             >
@@ -2951,152 +2971,142 @@ ShallowWrapper {
                           "nodeType": "class",
                           "props": Object {
                             "children": Array [
-                              <option />,
-                              Array [
-                                <option
-                                  value="Admin_1085_64667"
-                                >
-                                  Admin_1085_64667
-                                </option>,
-                                <option
-                                  value="Supplier1"
-                                >
-                                  Supplier1
-                                </option>,
-                                <option
-                                  value="Supplier2"
-                                >
-                                  Supplier2
-                                </option>,
-                                <option
-                                  value="Buyer1"
-                                >
-                                  Buyer1
-                                </option>,
-                                <option
-                                  value="Buyer2"
-                                >
-                                  Buyer2
-                                </option>,
-                                <option
-                                  value="Admin_1177_49507"
-                                >
-                                  Admin_1177_49507
-                                </option>,
-                                <option
-                                  value="Admin_1177_39206"
-                                >
-                                  Admin_1177_39206
-                                </option>,
-                                <option
-                                  value="Admin_1177_31203"
-                                >
-                                  Admin_1177_31203
-                                </option>,
-                                <option
-                                  value="User_1177_14462"
-                                >
-                                  User_1177_14462
-                                </option>,
-                                <option
-                                  value="123456789012345678901234567890123"
-                                >
-                                  123456789012345678901234567890123
-                                </option>,
-                                <option
-                                  value="User_1177_26292"
-                                >
-                                  User_1177_26292
-                                </option>,
-                                <option
-                                  value="User_1177_69645 ?#%!@*"
-                                >
-                                  User_1177_69645 ?#%!@*
-                                </option>,
-                                <option
-                                  value="User_1177_59578"
-                                >
-                                  User_1177_59578
-                                </option>,
-                                <option
-                                  value="User_1177_79118"
-                                >
-                                  User_1177_79118
-                                </option>,
-                                <option
-                                  value="User_1177_59359"
-                                >
-                                  User_1177_59359
-                                </option>,
-                                <option
-                                  value="User_1177_42489"
-                                >
-                                  User_1177_42489
-                                </option>,
-                                <option
-                                  value="User_1177_37717"
-                                >
-                                  User_1177_37717
-                                </option>,
-                                <option
-                                  value="User_1177_52307"
-                                >
-                                  User_1177_52307
-                                </option>,
-                                <option
-                                  value="Buyer1177_18955"
-                                >
-                                  Buyer1177_18955
-                                </option>,
-                                <option
-                                  value="Supplier1177_62701"
-                                >
-                                  Supplier1177_62701
-                                </option>,
-                                <option
-                                  value="Admin_1301_86023"
-                                >
-                                  Admin_1301_86023
-                                </option>,
-                                <option
-                                  value="Admin_1301_62816"
-                                >
-                                  Admin_1301_62816
-                                </option>,
-                                <option
-                                  value="Supplier0_1301_46441"
-                                >
-                                  Supplier0_1301_46441
-                                </option>,
-                                <option
-                                  value="Supplier1_1301_46441"
-                                >
-                                  Supplier1_1301_46441
-                                </option>,
-                                <option
-                                  value="Supplier2_1301_46441"
-                                >
-                                  Supplier2_1301_46441
-                                </option>,
-                              ],
+                              <option
+                                value="Admin_1085_64667"
+                              >
+                                Admin_1085_64667
+                              </option>,
+                              <option
+                                value="Supplier1"
+                              >
+                                Supplier1
+                              </option>,
+                              <option
+                                value="Supplier2"
+                              >
+                                Supplier2
+                              </option>,
+                              <option
+                                value="Buyer1"
+                              >
+                                Buyer1
+                              </option>,
+                              <option
+                                value="Buyer2"
+                              >
+                                Buyer2
+                              </option>,
+                              <option
+                                value="Admin_1177_49507"
+                              >
+                                Admin_1177_49507
+                              </option>,
+                              <option
+                                value="Admin_1177_39206"
+                              >
+                                Admin_1177_39206
+                              </option>,
+                              <option
+                                value="Admin_1177_31203"
+                              >
+                                Admin_1177_31203
+                              </option>,
+                              <option
+                                value="User_1177_14462"
+                              >
+                                User_1177_14462
+                              </option>,
+                              <option
+                                value="123456789012345678901234567890123"
+                              >
+                                123456789012345678901234567890123
+                              </option>,
+                              <option
+                                value="User_1177_26292"
+                              >
+                                User_1177_26292
+                              </option>,
+                              <option
+                                value="User_1177_69645 ?#%!@*"
+                              >
+                                User_1177_69645 ?#%!@*
+                              </option>,
+                              <option
+                                value="User_1177_59578"
+                              >
+                                User_1177_59578
+                              </option>,
+                              <option
+                                value="User_1177_79118"
+                              >
+                                User_1177_79118
+                              </option>,
+                              <option
+                                value="User_1177_59359"
+                              >
+                                User_1177_59359
+                              </option>,
+                              <option
+                                value="User_1177_42489"
+                              >
+                                User_1177_42489
+                              </option>,
+                              <option
+                                value="User_1177_37717"
+                              >
+                                User_1177_37717
+                              </option>,
+                              <option
+                                value="User_1177_52307"
+                              >
+                                User_1177_52307
+                              </option>,
+                              <option
+                                value="Buyer1177_18955"
+                              >
+                                Buyer1177_18955
+                              </option>,
+                              <option
+                                value="Supplier1177_62701"
+                              >
+                                Supplier1177_62701
+                              </option>,
+                              <option
+                                value="Admin_1301_86023"
+                              >
+                                Admin_1301_86023
+                              </option>,
+                              <option
+                                value="Admin_1301_62816"
+                              >
+                                Admin_1301_62816
+                              </option>,
+                              <option
+                                value="Supplier0_1301_46441"
+                              >
+                                Supplier0_1301_46441
+                              </option>,
+                              <option
+                                value="Supplier1_1301_46441"
+                              >
+                                Supplier1_1301_46441
+                              </option>,
+                              <option
+                                value="Supplier2_1301_46441"
+                              >
+                                Supplier2_1301_46441
+                              </option>,
                             ],
                             "className": "pt-input",
                             "component": "select",
+                            "disabled": true,
                             "name": "from",
                             "onChange": [Function],
                             "required": true,
+                            "value": "Admin_1177_49507",
                           },
                           "ref": null,
                           "rendered": Array [
-                            Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {},
-                              "ref": null,
-                              "rendered": null,
-                              "type": "option",
-                            },
                             Object {
                               "instance": null,
                               "key": "user0",
@@ -3431,10 +3441,11 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                           >
-                            <option />
                             <option
                               value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
@@ -3486,10 +3497,11 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                           >
-                            <option />
                             <option
                               value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
@@ -3508,10 +3520,11 @@ ShallowWrapper {
                           "children": <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                           >
-                            <option />
                             <option
                               value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
@@ -3526,45 +3539,31 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "class",
                           "props": Object {
-                            "children": Array [
-                              <option />,
-                              Array [
-                                <option
-                                  value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
-                                >
-                                  0bdd9ade6477ba753650cc5d9ce40a17c42246c1
-                                </option>,
-                              ],
-                            ],
+                            "children": <option
+                              value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
+                            >
+                              0bdd9ade6477ba753650cc5d9ce40a17c42246c1
+                            </option>,
                             "className": "pt-input",
                             "component": "select",
+                            "disabled": true,
                             "name": "fromAddress",
                             "required": true,
+                            "value": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
                           },
                           "ref": null,
-                          "rendered": Array [
-                            Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {},
-                              "ref": null,
-                              "rendered": null,
-                              "type": "option",
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+                              "value": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
                             },
-                            Object {
-                              "instance": null,
-                              "key": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                              "nodeType": "host",
-                              "props": Object {
-                                "children": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                                "value": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                              },
-                              "ref": null,
-                              "rendered": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                              "type": "option",
-                            },
-                          ],
+                            "ref": null,
+                            "rendered": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+                            "type": "option",
+                          },
                           "type": [Function],
                         },
                         "type": "div",
@@ -5146,7 +5145,7 @@ ShallowWrapper {
                     className="pt-intent-primary"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>,
                 "className": "pt-dialog-footer",
@@ -5166,7 +5165,7 @@ ShallowWrapper {
                       className="pt-intent-primary"
                       disabled={true}
                       onClick={[Function]}
-                      text="Send Ether"
+                      text="Send Tokens"
                     />,
                   ],
                   "className": "pt-dialog-footer-actions",
@@ -5193,7 +5192,7 @@ ShallowWrapper {
                       "className": "pt-intent-primary",
                       "disabled": true,
                       "onClick": [Function],
-                      "text": "Send Ether",
+                      "text": "Send Tokens",
                     },
                     "ref": null,
                     "rendered": null,
@@ -5222,7 +5221,7 @@ ShallowWrapper {
           <Blueprint.Button
             className="pt-intent-primary pt-icon-add"
             onClick={[Function]}
-            text="Send Ether"
+            text="Send Tokens"
           />,
           <form>
             <Blueprint.Dialog
@@ -5236,7 +5235,7 @@ ShallowWrapper {
                   "width": "560px",
                 }
               }
-              title="Send Ether"
+              title="Send Tokens"
             >
               <div
                 className="pt-dialog-body"
@@ -5262,11 +5261,12 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="from"
                         onChange={[Function]}
                         required={true}
+                        value="Admin_1177_49507"
                       >
-                        <option />
                         <option
                           value="Admin_1085_64667"
                         >
@@ -5417,10 +5417,11 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="fromAddress"
                         required={true}
+                        value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                       >
-                        <option />
                         <option
                           value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                         >
@@ -5742,7 +5743,7 @@ ShallowWrapper {
                     className="pt-intent-primary"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>
               </div>
@@ -5760,7 +5761,7 @@ ShallowWrapper {
           "props": Object {
             "className": "pt-intent-primary pt-icon-add",
             "onClick": [Function],
-            "text": "Send Ether",
+            "text": "Send Tokens",
           },
           "ref": null,
           "rendered": null,
@@ -5782,7 +5783,7 @@ ShallowWrapper {
                   "width": "560px",
                 }
               }
-              title="Send Ether"
+              title="Send Tokens"
             >
               <div
                 className="pt-dialog-body"
@@ -5808,11 +5809,12 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="from"
                         onChange={[Function]}
                         required={true}
+                        value="Admin_1177_49507"
                       >
-                        <option />
                         <option
                           value="Admin_1085_64667"
                         >
@@ -5963,10 +5965,11 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="fromAddress"
                         required={true}
+                        value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                       >
-                        <option />
                         <option
                           value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                         >
@@ -6288,7 +6291,7 @@ ShallowWrapper {
                     className="pt-intent-primary"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>
               </div>
@@ -6326,11 +6329,12 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="from"
                           onChange={[Function]}
                           required={true}
+                          value="Admin_1177_49507"
                         >
-                          <option />
                           <option
                             value="Admin_1085_64667"
                           >
@@ -6481,10 +6485,11 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="fromAddress"
                           required={true}
+                          value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                         >
-                          <option />
                           <option
                             value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                           >
@@ -6806,7 +6811,7 @@ ShallowWrapper {
                       className="pt-intent-primary"
                       disabled={true}
                       onClick={[Function]}
-                      text="Send Ether"
+                      text="Send Tokens"
                     />
                   </div>
                 </div>,
@@ -6818,7 +6823,7 @@ ShallowWrapper {
               "style": Object {
                 "width": "560px",
               },
-              "title": "Send Ether",
+              "title": "Send Tokens",
             },
             "ref": null,
             "rendered": Array [
@@ -6849,11 +6854,12 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value="Admin_1177_49507"
                           >
-                            <option />
                             <option
                               value="Admin_1085_64667"
                             >
@@ -7004,10 +7010,11 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                           >
-                            <option />
                             <option
                               value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
@@ -7344,11 +7351,12 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="from"
                               onChange={[Function]}
                               required={true}
+                              value="Admin_1177_49507"
                             >
-                              <option />
                               <option
                                 value="Admin_1085_64667"
                               >
@@ -7520,11 +7528,12 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="from"
                               onChange={[Function]}
                               required={true}
+                              value="Admin_1177_49507"
                             >
-                              <option />
                               <option
                                 value="Admin_1085_64667"
                               >
@@ -7663,11 +7672,12 @@ ShallowWrapper {
                             "children": <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="from"
                               onChange={[Function]}
                               required={true}
+                              value="Admin_1177_49507"
                             >
-                              <option />
                               <option
                                 value="Admin_1085_64667"
                               >
@@ -7803,152 +7813,142 @@ ShallowWrapper {
                             "nodeType": "class",
                             "props": Object {
                               "children": Array [
-                                <option />,
-                                Array [
-                                  <option
-                                    value="Admin_1085_64667"
-                                  >
-                                    Admin_1085_64667
-                                  </option>,
-                                  <option
-                                    value="Supplier1"
-                                  >
-                                    Supplier1
-                                  </option>,
-                                  <option
-                                    value="Supplier2"
-                                  >
-                                    Supplier2
-                                  </option>,
-                                  <option
-                                    value="Buyer1"
-                                  >
-                                    Buyer1
-                                  </option>,
-                                  <option
-                                    value="Buyer2"
-                                  >
-                                    Buyer2
-                                  </option>,
-                                  <option
-                                    value="Admin_1177_49507"
-                                  >
-                                    Admin_1177_49507
-                                  </option>,
-                                  <option
-                                    value="Admin_1177_39206"
-                                  >
-                                    Admin_1177_39206
-                                  </option>,
-                                  <option
-                                    value="Admin_1177_31203"
-                                  >
-                                    Admin_1177_31203
-                                  </option>,
-                                  <option
-                                    value="User_1177_14462"
-                                  >
-                                    User_1177_14462
-                                  </option>,
-                                  <option
-                                    value="123456789012345678901234567890123"
-                                  >
-                                    123456789012345678901234567890123
-                                  </option>,
-                                  <option
-                                    value="User_1177_26292"
-                                  >
-                                    User_1177_26292
-                                  </option>,
-                                  <option
-                                    value="User_1177_69645 ?#%!@*"
-                                  >
-                                    User_1177_69645 ?#%!@*
-                                  </option>,
-                                  <option
-                                    value="User_1177_59578"
-                                  >
-                                    User_1177_59578
-                                  </option>,
-                                  <option
-                                    value="User_1177_79118"
-                                  >
-                                    User_1177_79118
-                                  </option>,
-                                  <option
-                                    value="User_1177_59359"
-                                  >
-                                    User_1177_59359
-                                  </option>,
-                                  <option
-                                    value="User_1177_42489"
-                                  >
-                                    User_1177_42489
-                                  </option>,
-                                  <option
-                                    value="User_1177_37717"
-                                  >
-                                    User_1177_37717
-                                  </option>,
-                                  <option
-                                    value="User_1177_52307"
-                                  >
-                                    User_1177_52307
-                                  </option>,
-                                  <option
-                                    value="Buyer1177_18955"
-                                  >
-                                    Buyer1177_18955
-                                  </option>,
-                                  <option
-                                    value="Supplier1177_62701"
-                                  >
-                                    Supplier1177_62701
-                                  </option>,
-                                  <option
-                                    value="Admin_1301_86023"
-                                  >
-                                    Admin_1301_86023
-                                  </option>,
-                                  <option
-                                    value="Admin_1301_62816"
-                                  >
-                                    Admin_1301_62816
-                                  </option>,
-                                  <option
-                                    value="Supplier0_1301_46441"
-                                  >
-                                    Supplier0_1301_46441
-                                  </option>,
-                                  <option
-                                    value="Supplier1_1301_46441"
-                                  >
-                                    Supplier1_1301_46441
-                                  </option>,
-                                  <option
-                                    value="Supplier2_1301_46441"
-                                  >
-                                    Supplier2_1301_46441
-                                  </option>,
-                                ],
+                                <option
+                                  value="Admin_1085_64667"
+                                >
+                                  Admin_1085_64667
+                                </option>,
+                                <option
+                                  value="Supplier1"
+                                >
+                                  Supplier1
+                                </option>,
+                                <option
+                                  value="Supplier2"
+                                >
+                                  Supplier2
+                                </option>,
+                                <option
+                                  value="Buyer1"
+                                >
+                                  Buyer1
+                                </option>,
+                                <option
+                                  value="Buyer2"
+                                >
+                                  Buyer2
+                                </option>,
+                                <option
+                                  value="Admin_1177_49507"
+                                >
+                                  Admin_1177_49507
+                                </option>,
+                                <option
+                                  value="Admin_1177_39206"
+                                >
+                                  Admin_1177_39206
+                                </option>,
+                                <option
+                                  value="Admin_1177_31203"
+                                >
+                                  Admin_1177_31203
+                                </option>,
+                                <option
+                                  value="User_1177_14462"
+                                >
+                                  User_1177_14462
+                                </option>,
+                                <option
+                                  value="123456789012345678901234567890123"
+                                >
+                                  123456789012345678901234567890123
+                                </option>,
+                                <option
+                                  value="User_1177_26292"
+                                >
+                                  User_1177_26292
+                                </option>,
+                                <option
+                                  value="User_1177_69645 ?#%!@*"
+                                >
+                                  User_1177_69645 ?#%!@*
+                                </option>,
+                                <option
+                                  value="User_1177_59578"
+                                >
+                                  User_1177_59578
+                                </option>,
+                                <option
+                                  value="User_1177_79118"
+                                >
+                                  User_1177_79118
+                                </option>,
+                                <option
+                                  value="User_1177_59359"
+                                >
+                                  User_1177_59359
+                                </option>,
+                                <option
+                                  value="User_1177_42489"
+                                >
+                                  User_1177_42489
+                                </option>,
+                                <option
+                                  value="User_1177_37717"
+                                >
+                                  User_1177_37717
+                                </option>,
+                                <option
+                                  value="User_1177_52307"
+                                >
+                                  User_1177_52307
+                                </option>,
+                                <option
+                                  value="Buyer1177_18955"
+                                >
+                                  Buyer1177_18955
+                                </option>,
+                                <option
+                                  value="Supplier1177_62701"
+                                >
+                                  Supplier1177_62701
+                                </option>,
+                                <option
+                                  value="Admin_1301_86023"
+                                >
+                                  Admin_1301_86023
+                                </option>,
+                                <option
+                                  value="Admin_1301_62816"
+                                >
+                                  Admin_1301_62816
+                                </option>,
+                                <option
+                                  value="Supplier0_1301_46441"
+                                >
+                                  Supplier0_1301_46441
+                                </option>,
+                                <option
+                                  value="Supplier1_1301_46441"
+                                >
+                                  Supplier1_1301_46441
+                                </option>,
+                                <option
+                                  value="Supplier2_1301_46441"
+                                >
+                                  Supplier2_1301_46441
+                                </option>,
                               ],
                               "className": "pt-input",
                               "component": "select",
+                              "disabled": true,
                               "name": "from",
                               "onChange": [Function],
                               "required": true,
+                              "value": "Admin_1177_49507",
                             },
                             "ref": null,
                             "rendered": Array [
-                              Object {
-                                "instance": null,
-                                "key": undefined,
-                                "nodeType": "host",
-                                "props": Object {},
-                                "ref": null,
-                                "rendered": null,
-                                "type": "option",
-                              },
                               Object {
                                 "instance": null,
                                 "key": "user0",
@@ -8283,10 +8283,11 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="fromAddress"
                               required={true}
+                              value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
-                              <option />
                               <option
                                 value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                               >
@@ -8338,10 +8339,11 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="fromAddress"
                               required={true}
+                              value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
-                              <option />
                               <option
                                 value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                               >
@@ -8360,10 +8362,11 @@ ShallowWrapper {
                             "children": <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="fromAddress"
                               required={true}
+                              value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                             >
-                              <option />
                               <option
                                 value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
                               >
@@ -8378,45 +8381,31 @@ ShallowWrapper {
                             "key": undefined,
                             "nodeType": "class",
                             "props": Object {
-                              "children": Array [
-                                <option />,
-                                Array [
-                                  <option
-                                    value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
-                                  >
-                                    0bdd9ade6477ba753650cc5d9ce40a17c42246c1
-                                  </option>,
-                                ],
-                              ],
+                              "children": <option
+                                value="0bdd9ade6477ba753650cc5d9ce40a17c42246c1"
+                              >
+                                0bdd9ade6477ba753650cc5d9ce40a17c42246c1
+                              </option>,
                               "className": "pt-input",
                               "component": "select",
+                              "disabled": true,
                               "name": "fromAddress",
                               "required": true,
+                              "value": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
                             },
                             "ref": null,
-                            "rendered": Array [
-                              Object {
-                                "instance": null,
-                                "key": undefined,
-                                "nodeType": "host",
-                                "props": Object {},
-                                "ref": null,
-                                "rendered": null,
-                                "type": "option",
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+                                "value": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
                               },
-                              Object {
-                                "instance": null,
-                                "key": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                                "nodeType": "host",
-                                "props": Object {
-                                  "children": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                                  "value": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                                },
-                                "ref": null,
-                                "rendered": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
-                                "type": "option",
-                              },
-                            ],
+                              "ref": null,
+                              "rendered": "0bdd9ade6477ba753650cc5d9ce40a17c42246c1",
+                              "type": "option",
+                            },
                             "type": [Function],
                           },
                           "type": "div",
@@ -9998,7 +9987,7 @@ ShallowWrapper {
                       className="pt-intent-primary"
                       disabled={true}
                       onClick={[Function]}
-                      text="Send Ether"
+                      text="Send Tokens"
                     />
                   </div>,
                   "className": "pt-dialog-footer",
@@ -10018,7 +10007,7 @@ ShallowWrapper {
                         className="pt-intent-primary"
                         disabled={true}
                         onClick={[Function]}
-                        text="Send Ether"
+                        text="Send Tokens"
                       />,
                     ],
                     "className": "pt-dialog-footer-actions",
@@ -10045,7 +10034,7 @@ ShallowWrapper {
                         "className": "pt-intent-primary",
                         "disabled": true,
                         "onClick": [Function],
-                        "text": "Send Ether",
+                        "text": "Send Tokens",
                       },
                       "ref": null,
                       "rendered": null,
@@ -10075,11 +10064,11 @@ ShallowWrapper {
 }
 `;
 
-exports[`SendEther: index render component without values 1`] = `
+exports[`SendTokens: index render component without values 1`] = `
 ShallowWrapper {
   "length": 1,
   Symbol(enzyme.__root__): [Circular],
-  Symbol(enzyme.__unrendered__): <SendEther
+  Symbol(enzyme.__unrendered__): <SendTokens
     accounts={Array []}
     anyTouched={false}
     array={
@@ -10110,10 +10099,15 @@ ShallowWrapper {
     dispatch={[Function]}
     error={undefined}
     fetchAccounts={[Function]}
-    form="send-ether"
+    form="send-tokens"
     fromUsername=""
     handleSubmit={[Function]}
-    initialValues={undefined}
+    initialValues={
+      Object {
+        "from": "",
+        "fromAddress": "",
+      }
+    }
     initialize={[Function]}
     initialized={false}
     invalid={false}
@@ -10122,9 +10116,9 @@ ShallowWrapper {
     pure={true}
     reset={[Function]}
     result={null}
-    sendEther={[Function]}
-    sendEtherCloseModal={[Function]}
-    sendEtherOpenModal={[Function]}
+    sendTokens={[Function]}
+    sendTokensCloseModal={[Function]}
+    sendTokensOpenModal={[Function]}
     store={
       Object {
         "dispatch": [Function],
@@ -10181,7 +10175,7 @@ ShallowWrapper {
         <Blueprint.Button
           className="pt-intent-primary pt-icon-add"
           onClick={[Function]}
-          text="Send Ether"
+          text="Send Tokens"
         />,
         <form>
           <Blueprint.Dialog
@@ -10195,7 +10189,7 @@ ShallowWrapper {
                 "width": "560px",
               }
             }
-            title="Send Ether"
+            title="Send Tokens"
           >
             <div
               className="pt-dialog-body"
@@ -10221,11 +10215,12 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="from"
                       onChange={[Function]}
                       required={true}
+                      value=""
                     >
-                      <option />
                       <option
                         value="length"
                       >
@@ -10256,11 +10251,16 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="fromAddress"
                       required={true}
+                      value=""
                     >
-                      <option />
-                      
+                      <option
+                        value=""
+                      >
+                        
+                      </option>
                     </Field>
                   </div>
                 </div>
@@ -10453,7 +10453,7 @@ ShallowWrapper {
                   className="pt-disabled"
                   disabled={true}
                   onClick={[Function]}
-                  text="Send Ether"
+                  text="Send Tokens"
                 />
               </div>
             </div>
@@ -10471,7 +10471,7 @@ ShallowWrapper {
         "props": Object {
           "className": "pt-intent-primary pt-icon-add",
           "onClick": [Function],
-          "text": "Send Ether",
+          "text": "Send Tokens",
         },
         "ref": null,
         "rendered": null,
@@ -10493,7 +10493,7 @@ ShallowWrapper {
                 "width": "560px",
               }
             }
-            title="Send Ether"
+            title="Send Tokens"
           >
             <div
               className="pt-dialog-body"
@@ -10519,11 +10519,12 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="from"
                       onChange={[Function]}
                       required={true}
+                      value=""
                     >
-                      <option />
                       <option
                         value="length"
                       >
@@ -10554,11 +10555,16 @@ ShallowWrapper {
                     <Field
                       className="pt-input"
                       component="select"
+                      disabled={true}
                       name="fromAddress"
                       required={true}
+                      value=""
                     >
-                      <option />
-                      
+                      <option
+                        value=""
+                      >
+                        
+                      </option>
                     </Field>
                   </div>
                 </div>
@@ -10751,7 +10757,7 @@ ShallowWrapper {
                   className="pt-disabled"
                   disabled={true}
                   onClick={[Function]}
-                  text="Send Ether"
+                  text="Send Tokens"
                 />
               </div>
             </div>
@@ -10789,11 +10795,12 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="from"
                         onChange={[Function]}
                         required={true}
+                        value=""
                       >
-                        <option />
                         <option
                           value="length"
                         >
@@ -10824,11 +10831,16 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="fromAddress"
                         required={true}
+                        value=""
                       >
-                        <option />
-                        
+                        <option
+                          value=""
+                        >
+                          
+                        </option>
                       </Field>
                     </div>
                   </div>
@@ -11021,7 +11033,7 @@ ShallowWrapper {
                     className="pt-disabled"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>
               </div>,
@@ -11033,7 +11045,7 @@ ShallowWrapper {
             "style": Object {
               "width": "560px",
             },
-            "title": "Send Ether",
+            "title": "Send Tokens",
           },
           "ref": null,
           "rendered": Array [
@@ -11064,11 +11076,12 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="from"
                           onChange={[Function]}
                           required={true}
+                          value=""
                         >
-                          <option />
                           <option
                             value="length"
                           >
@@ -11099,11 +11112,16 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="fromAddress"
                           required={true}
+                          value=""
                         >
-                          <option />
-                          
+                          <option
+                            value=""
+                          >
+                            
+                          </option>
                         </Field>
                       </div>
                     </div>
@@ -11311,11 +11329,12 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value=""
                           >
-                            <option />
                             <option
                               value="length"
                             >
@@ -11367,11 +11386,12 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value=""
                           >
-                            <option />
                             <option
                               value="length"
                             >
@@ -11390,11 +11410,12 @@ ShallowWrapper {
                           "children": <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value=""
                           >
-                            <option />
                             <option
                               value="length"
                             >
@@ -11410,32 +11431,22 @@ ShallowWrapper {
                           "nodeType": "class",
                           "props": Object {
                             "children": Array [
-                              <option />,
-                              Array [
-                                <option
-                                  value="length"
-                                >
-                                  length
-                                </option>,
-                              ],
+                              <option
+                                value="length"
+                              >
+                                length
+                              </option>,
                             ],
                             "className": "pt-input",
                             "component": "select",
+                            "disabled": true,
                             "name": "from",
                             "onChange": [Function],
                             "required": true,
+                            "value": "",
                           },
                           "ref": null,
                           "rendered": Array [
-                            Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {},
-                              "ref": null,
-                              "rendered": null,
-                              "type": "option",
-                            },
                             Object {
                               "instance": null,
                               "key": "user0",
@@ -11482,11 +11493,16 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value=""
                           >
-                            <option />
-                            
+                            <option
+                              value=""
+                            >
+                              
+                            </option>
                           </Field>
                         </div>
                       </div>,
@@ -11533,11 +11549,16 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value=""
                           >
-                            <option />
-                            
+                            <option
+                              value=""
+                            >
+                              
+                            </option>
                           </Field>
                         </div>,
                         "className": "col-sm-8 smd-pad-4",
@@ -11551,11 +11572,16 @@ ShallowWrapper {
                           "children": <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value=""
                           >
-                            <option />
-                            
+                            <option
+                              value=""
+                            >
+                              
+                            </option>
                           </Field>,
                           "className": "pt-select",
                         },
@@ -11565,28 +11591,31 @@ ShallowWrapper {
                           "key": undefined,
                           "nodeType": "class",
                           "props": Object {
-                            "children": Array [
-                              <option />,
-                              "",
-                            ],
+                            "children": <option
+                              value=""
+                            >
+                              
+                            </option>,
                             "className": "pt-input",
                             "component": "select",
+                            "disabled": true,
                             "name": "fromAddress",
                             "required": true,
+                            "value": "",
                           },
                           "ref": null,
-                          "rendered": Array [
-                            Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {},
-                              "ref": null,
-                              "rendered": null,
-                              "type": "option",
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "",
+                              "value": "",
                             },
-                            "",
-                          ],
+                            "ref": null,
+                            "rendered": "",
+                            "type": "option",
+                          },
                           "type": [Function],
                         },
                         "type": "div",
@@ -12371,7 +12400,7 @@ ShallowWrapper {
                     className="pt-disabled"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>,
                 "className": "pt-dialog-footer",
@@ -12391,7 +12420,7 @@ ShallowWrapper {
                       className="pt-disabled"
                       disabled={true}
                       onClick={[Function]}
-                      text="Send Ether"
+                      text="Send Tokens"
                     />,
                   ],
                   "className": "pt-dialog-footer-actions",
@@ -12418,7 +12447,7 @@ ShallowWrapper {
                       "className": "pt-disabled",
                       "disabled": true,
                       "onClick": [Function],
-                      "text": "Send Ether",
+                      "text": "Send Tokens",
                     },
                     "ref": null,
                     "rendered": null,
@@ -12447,7 +12476,7 @@ ShallowWrapper {
           <Blueprint.Button
             className="pt-intent-primary pt-icon-add"
             onClick={[Function]}
-            text="Send Ether"
+            text="Send Tokens"
           />,
           <form>
             <Blueprint.Dialog
@@ -12461,7 +12490,7 @@ ShallowWrapper {
                   "width": "560px",
                 }
               }
-              title="Send Ether"
+              title="Send Tokens"
             >
               <div
                 className="pt-dialog-body"
@@ -12487,11 +12516,12 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="from"
                         onChange={[Function]}
                         required={true}
+                        value=""
                       >
-                        <option />
                         <option
                           value="length"
                         >
@@ -12522,11 +12552,16 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="fromAddress"
                         required={true}
+                        value=""
                       >
-                        <option />
-                        
+                        <option
+                          value=""
+                        >
+                          
+                        </option>
                       </Field>
                     </div>
                   </div>
@@ -12719,7 +12754,7 @@ ShallowWrapper {
                     className="pt-disabled"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>
               </div>
@@ -12737,7 +12772,7 @@ ShallowWrapper {
           "props": Object {
             "className": "pt-intent-primary pt-icon-add",
             "onClick": [Function],
-            "text": "Send Ether",
+            "text": "Send Tokens",
           },
           "ref": null,
           "rendered": null,
@@ -12759,7 +12794,7 @@ ShallowWrapper {
                   "width": "560px",
                 }
               }
-              title="Send Ether"
+              title="Send Tokens"
             >
               <div
                 className="pt-dialog-body"
@@ -12785,11 +12820,12 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="from"
                         onChange={[Function]}
                         required={true}
+                        value=""
                       >
-                        <option />
                         <option
                           value="length"
                         >
@@ -12820,11 +12856,16 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="fromAddress"
                         required={true}
+                        value=""
                       >
-                        <option />
-                        
+                        <option
+                          value=""
+                        >
+                          
+                        </option>
                       </Field>
                     </div>
                   </div>
@@ -13017,7 +13058,7 @@ ShallowWrapper {
                     className="pt-disabled"
                     disabled={true}
                     onClick={[Function]}
-                    text="Send Ether"
+                    text="Send Tokens"
                   />
                 </div>
               </div>
@@ -13055,11 +13096,12 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="from"
                           onChange={[Function]}
                           required={true}
+                          value=""
                         >
-                          <option />
                           <option
                             value="length"
                           >
@@ -13090,11 +13132,16 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="fromAddress"
                           required={true}
+                          value=""
                         >
-                          <option />
-                          
+                          <option
+                            value=""
+                          >
+                            
+                          </option>
                         </Field>
                       </div>
                     </div>
@@ -13287,7 +13334,7 @@ ShallowWrapper {
                       className="pt-disabled"
                       disabled={true}
                       onClick={[Function]}
-                      text="Send Ether"
+                      text="Send Tokens"
                     />
                   </div>
                 </div>,
@@ -13299,7 +13346,7 @@ ShallowWrapper {
               "style": Object {
                 "width": "560px",
               },
-              "title": "Send Ether",
+              "title": "Send Tokens",
             },
             "ref": null,
             "rendered": Array [
@@ -13330,11 +13377,12 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="from"
                             onChange={[Function]}
                             required={true}
+                            value=""
                           >
-                            <option />
                             <option
                               value="length"
                             >
@@ -13365,11 +13413,16 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="fromAddress"
                             required={true}
+                            value=""
                           >
-                            <option />
-                            
+                            <option
+                              value=""
+                            >
+                              
+                            </option>
                           </Field>
                         </div>
                       </div>
@@ -13577,11 +13630,12 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="from"
                               onChange={[Function]}
                               required={true}
+                              value=""
                             >
-                              <option />
                               <option
                                 value="length"
                               >
@@ -13633,11 +13687,12 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="from"
                               onChange={[Function]}
                               required={true}
+                              value=""
                             >
-                              <option />
                               <option
                                 value="length"
                               >
@@ -13656,11 +13711,12 @@ ShallowWrapper {
                             "children": <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="from"
                               onChange={[Function]}
                               required={true}
+                              value=""
                             >
-                              <option />
                               <option
                                 value="length"
                               >
@@ -13676,32 +13732,22 @@ ShallowWrapper {
                             "nodeType": "class",
                             "props": Object {
                               "children": Array [
-                                <option />,
-                                Array [
-                                  <option
-                                    value="length"
-                                  >
-                                    length
-                                  </option>,
-                                ],
+                                <option
+                                  value="length"
+                                >
+                                  length
+                                </option>,
                               ],
                               "className": "pt-input",
                               "component": "select",
+                              "disabled": true,
                               "name": "from",
                               "onChange": [Function],
                               "required": true,
+                              "value": "",
                             },
                             "ref": null,
                             "rendered": Array [
-                              Object {
-                                "instance": null,
-                                "key": undefined,
-                                "nodeType": "host",
-                                "props": Object {},
-                                "ref": null,
-                                "rendered": null,
-                                "type": "option",
-                              },
                               Object {
                                 "instance": null,
                                 "key": "user0",
@@ -13748,11 +13794,16 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="fromAddress"
                               required={true}
+                              value=""
                             >
-                              <option />
-                              
+                              <option
+                                value=""
+                              >
+                                
+                              </option>
                             </Field>
                           </div>
                         </div>,
@@ -13799,11 +13850,16 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="fromAddress"
                               required={true}
+                              value=""
                             >
-                              <option />
-                              
+                              <option
+                                value=""
+                              >
+                                
+                              </option>
                             </Field>
                           </div>,
                           "className": "col-sm-8 smd-pad-4",
@@ -13817,11 +13873,16 @@ ShallowWrapper {
                             "children": <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="fromAddress"
                               required={true}
+                              value=""
                             >
-                              <option />
-                              
+                              <option
+                                value=""
+                              >
+                                
+                              </option>
                             </Field>,
                             "className": "pt-select",
                           },
@@ -13831,28 +13892,31 @@ ShallowWrapper {
                             "key": undefined,
                             "nodeType": "class",
                             "props": Object {
-                              "children": Array [
-                                <option />,
-                                "",
-                              ],
+                              "children": <option
+                                value=""
+                              >
+                                
+                              </option>,
                               "className": "pt-input",
                               "component": "select",
+                              "disabled": true,
                               "name": "fromAddress",
                               "required": true,
+                              "value": "",
                             },
                             "ref": null,
-                            "rendered": Array [
-                              Object {
-                                "instance": null,
-                                "key": undefined,
-                                "nodeType": "host",
-                                "props": Object {},
-                                "ref": null,
-                                "rendered": null,
-                                "type": "option",
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": "",
+                                "value": "",
                               },
-                              "",
-                            ],
+                              "ref": null,
+                              "rendered": "",
+                              "type": "option",
+                            },
                             "type": [Function],
                           },
                           "type": "div",
@@ -14637,7 +14701,7 @@ ShallowWrapper {
                       className="pt-disabled"
                       disabled={true}
                       onClick={[Function]}
-                      text="Send Ether"
+                      text="Send Tokens"
                     />
                   </div>,
                   "className": "pt-dialog-footer",
@@ -14657,7 +14721,7 @@ ShallowWrapper {
                         className="pt-disabled"
                         disabled={true}
                         onClick={[Function]}
-                        text="Send Ether"
+                        text="Send Tokens"
                       />,
                     ],
                     "className": "pt-dialog-footer-actions",
@@ -14684,7 +14748,7 @@ ShallowWrapper {
                         "className": "pt-disabled",
                         "disabled": true,
                         "onClick": [Function],
-                        "text": "Send Ether",
+                        "text": "Send Tokens",
                       },
                       "ref": null,
                       "rendered": null,

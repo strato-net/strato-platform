@@ -1,11 +1,11 @@
 import React, { Component } from 'react';
 import {
-  sendEtherOpenModal,
-  sendEtherCloseModal,
-  sendEther,
+  sendTokensOpenModal,
+  sendTokensCloseModal,
+  sendTokens,
   fromUsernameChange,
   toUsernameChange
-} from './sendEther.actions';
+} from './sendTokens.actions';
 import { fetchAccounts, fetchUserAddresses } from '../../accounts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
@@ -17,7 +17,7 @@ import validate from './validate';
 
 // TODO: use solc instead of extabi for compile
 
-class SendEther extends Component {
+class SendTokens extends Component {
 
   // handleFromUsernameChange = (e) => {
   //   this.props.fromUsernameChange(e.target.value);
@@ -37,7 +37,7 @@ class SendEther extends Component {
   }
 
   closeModal = () => {
-    this.props.sendEtherCloseModal();
+    this.props.sendTokensCloseModal();
     this.props.fetchAccounts(true, true);
   }
 
@@ -50,8 +50,7 @@ class SendEther extends Component {
       toAddress: toAddress,
       value: values.value
     };
-
-    this.props.sendEther(payload);
+    this.props.sendTokens(payload);
     mixpanelWrapper.track('send_ether_submit_click_successful');
     this.props.reset();
   };
@@ -76,7 +75,7 @@ class SendEther extends Component {
       <div className="smd-pad-16">
         <Button onClick={() => {
           mixpanelWrapper.track("send_ether_open_click");
-          this.props.sendEtherOpenModal()
+          this.props.sendTokensOpenModal()
         }} className="pt-intent-primary pt-icon-add"
           text="Send Tokens" />
         <form>
@@ -84,7 +83,7 @@ class SendEther extends Component {
             iconName="inbox"
             isOpen={this.props.isOpen}
             onClose={this.closeModal}
-            title="Send Ether"
+            title="Send Tokens"
             style={{
               width: "560px"
             }}
@@ -324,7 +323,7 @@ class SendEther extends Component {
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                   onClick={handleSubmit(this.submit)}
                   disabled={pristine || submitting || !valid}
-                  text="Send Ether"
+                  text="Send Tokens"
                 />
               </div>
             </div>
@@ -335,12 +334,12 @@ class SendEther extends Component {
   }
 }
 
-const selector = formValueSelector('send-ether');
+const selector = formValueSelector('send-tokens');
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.sendEther.isOpen,
-    result: state.sendEther.result,
+    isOpen: state.sendTokens.isOpen,
+    result: state.sendTokens.result,
     accounts: state.accounts.accounts,
     fromUsername: selector(state, 'from'),
     toUsername: selector(state, 'to'),
@@ -351,11 +350,11 @@ export function mapStateToProps(state) {
   };
 }
 
-const formed = reduxForm({ form: 'send-ether', validate })(SendEther);
+const formed = reduxForm({ form: 'send-tokens', validate })(SendTokens);
 const connected = connect(mapStateToProps, {
-  sendEtherOpenModal,
-  sendEtherCloseModal,
-  sendEther,
+  sendTokensOpenModal,
+  sendTokensCloseModal,
+  sendTokens,
   fetchAccounts,
   fetchUserAddresses,
   fromUsernameChange,

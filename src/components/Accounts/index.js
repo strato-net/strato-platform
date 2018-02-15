@@ -3,7 +3,7 @@ import { fetchAccounts, changeAccountFilter, fetchUserAddresses, fetchAccountDet
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import SendEther from './components/SendEther';
+import SendTokens from './components/SendTokens';
 import Tour from '../Tour';
 import Account from '../Account';
 import './accounts.css';
@@ -93,7 +93,7 @@ class Accounts extends Component {
           </div>
           <div className="col-sm-8 text-right">
             <div className="pt-button-group">
-              <SendEther />
+              <SendTokens />
             </div>
           </div>
         </div>

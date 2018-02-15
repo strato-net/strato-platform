@@ -13,11 +13,11 @@ export const validate = (values) => {
         errors.value = 'Please enter a password';
     }
 
-    if(!values.radio && !values.toAddress) {
+    if (!values.radio && !values.toAddress) {
         errors.value = "Please select address"
     }
 
-    if(values.radio === "0" && !values.toAddress ) {
+    if (values.radio === "0" && !values.toAddress) {
         errors.value = "Please select address"
     }
     if (values.radio === "1" && !values.address) {

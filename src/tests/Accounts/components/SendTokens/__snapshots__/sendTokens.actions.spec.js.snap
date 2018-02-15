@@ -1,52 +1,52 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`SendEther: action change fromUsername 1`] = `
+exports[`SendTokens: action change fromUsername 1`] = `
 Object {
   "fromUsername": "tanuj",
   "type": "FROM_USERNAME_CHANGE",
 }
 `;
 
-exports[`SendEther: action change toUsername 1`] = `
+exports[`SendTokens: action change toUsername 1`] = `
 Object {
   "toUsername": "tanuj",
   "type": "TO_USERNAME_CHANGE",
 }
 `;
 
-exports[`SendEther: action close sendEther modal 1`] = `
+exports[`SendTokens: action close sendTokens modal 1`] = `
 Object {
   "isOpen": false,
-  "type": "SEND_ETHER_CLOSE_MODAL",
+  "type": "SEND_TOKENS_CLOSE_MODAL",
 }
 `;
 
-exports[`SendEther: action open sendEther modal 1`] = `
+exports[`SendTokens: action open sendTokens modal 1`] = `
 Object {
   "isOpen": true,
-  "type": "SEND_ETHER_OPEN_MODAL",
+  "type": "SEND_TOKENS_OPEN_MODAL",
 }
 `;
 
-exports[`SendEther: action send ether 1`] = `
+exports[`SendTokens: action send tokens 1`] = `
 Object {
   "from": "tanuj",
   "fromAddress": "af2edbd07a49eeaccb31a1cd3b6f7d81083ea1ca",
   "password": "pass",
   "toAddress": "60122a032bebcb89e228899b60c4d190b5a17aa3",
-  "type": "SEND_ETHER_REQUEST",
+  "type": "SEND_TOKENS_REQUEST",
   "value": 3,
 }
 `;
 
-exports[`SendEther: action sendEther failure 1`] = `
+exports[`SendTokens: action sendTokens failure 1`] = `
 Object {
   "error": "ERROR",
-  "type": "SEND_ETHER_FAILURE",
+  "type": "SEND_TOKENS_FAILURE",
 }
 `;
 
-exports[`SendEther: action sendEther success 1`] = `
+exports[`SendTokens: action sendTokens success 1`] = `
 Object {
   "result": Object {
     "data": Object {
@@ -83,6 +83,6 @@ Object {
       "transactionHash": "5c93794214fc3fcecf7a6948d74010a5a1859a878322a91135c1ed30c8c7a505",
     },
   },
-  "type": "SEND_ETHER_SUCCESS",
+  "type": "SEND_TOKENS_SUCCESS",
 }
 `;
