@@ -42,8 +42,7 @@ class Login extends Component {
   componentWillReceiveProps(newProps) {
     if (newProps.isLoggedIn && newProps.selectedApp) {
       newProps.launchApp(newProps.selectedApp.address, newProps.selectedApp.url)
-      newProps.resetSelectedApp()
-      newProps.history.replace('/home');
+      newProps.resetSelectedApp();
     }
 
     if (newProps.serverError) {

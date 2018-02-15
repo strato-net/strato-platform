@@ -17,9 +17,9 @@ class MenuBar extends Component {
     if (this.props.isLoggedIn) {
       return (
         <div>
-          <a target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small"> Welcome, {this.props.currentUser.username} </button>
-          </a>
+          <span className="pt-navbar-divider" />
+          <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
+          <span className="pt-navbar-divider" />
           <a target="_blank" rel="noopener noreferrer">
             <button className="pt-button pt-minimal pt-small" onClick={() => { this.props.logout() }}>Logout</button>
           </a>
