@@ -68,14 +68,7 @@ ShallowWrapper {
           </div>
           <div
             className="col-sm-2 text-right"
-          >
-            <Blueprint.Button
-              className="pt-button pt-intent-primary pt-small"
-              onClick={[Function]}
-            >
-              Faucet
-            </Blueprint.Button>
-          </div>
+          />
         </div>,
         <table
           className="pt-table pt-str"
@@ -175,14 +168,7 @@ ShallowWrapper {
             </div>,
             <div
               className="col-sm-2 text-right"
-            >
-              <Blueprint.Button
-                className="pt-button pt-intent-primary pt-small"
-                onClick={[Function]}
-              >
-                Faucet
-              </Blueprint.Button>
-            </div>,
+            />,
           ],
           "className": "row smd-pad-2 smd-margin-4 smd-vertical-center",
         },
@@ -241,28 +227,10 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Blueprint.Button
-                className="pt-button pt-intent-primary pt-small"
-                onClick={[Function]}
-              >
-                Faucet
-              </Blueprint.Button>,
               "className": "col-sm-2 text-right",
             },
             "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": "Faucet",
-                "className": "pt-button pt-intent-primary pt-small",
-                "onClick": [Function],
-              },
-              "ref": null,
-              "rendered": "Faucet",
-              "type": [Function],
-            },
+            "rendered": null,
             "type": "div",
           },
         ],
@@ -863,14 +831,7 @@ ShallowWrapper {
             </div>
             <div
               className="col-sm-2 text-right"
-            >
-              <Blueprint.Button
-                className="pt-button pt-intent-primary pt-small"
-                onClick={[Function]}
-              >
-                Faucet
-              </Blueprint.Button>
-            </div>
+            />
           </div>,
           <table
             className="pt-table pt-str"
@@ -970,14 +931,7 @@ ShallowWrapper {
               </div>,
               <div
                 className="col-sm-2 text-right"
-              >
-                <Blueprint.Button
-                  className="pt-button pt-intent-primary pt-small"
-                  onClick={[Function]}
-                >
-                  Faucet
-                </Blueprint.Button>
-              </div>,
+              />,
             ],
             "className": "row smd-pad-2 smd-margin-4 smd-vertical-center",
           },
@@ -1036,28 +990,10 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Blueprint.Button
-                  className="pt-button pt-intent-primary pt-small"
-                  onClick={[Function]}
-                >
-                  Faucet
-                </Blueprint.Button>,
                 "className": "col-sm-2 text-right",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": "Faucet",
-                  "className": "pt-button pt-intent-primary pt-small",
-                  "onClick": [Function],
-                },
-                "ref": null,
-                "rendered": "Faucet",
-                "type": [Function],
-              },
+              "rendered": null,
               "type": "div",
             },
           ],

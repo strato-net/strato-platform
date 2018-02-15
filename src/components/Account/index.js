@@ -14,7 +14,7 @@ class Account extends Component {
     } = this.props;
 
     return (
-      < div className="pt-card address-margin-bottom" key={address}>
+      <div className="pt-card address-margin-bottom" key={address}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
           <div className="col-sm-10">
             <h4>
