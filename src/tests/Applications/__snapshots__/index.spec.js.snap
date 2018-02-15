@@ -35,46 +35,15 @@ ShallowWrapper {
           className="row smd-pad-12"
         >
           <div
-            className="col-sm-10"
+            className="col-sm-6"
           >
             <h3>
               Welcome to Launchpad
             </h3>
           </div>
           <div
-            className="col-sm-2 text-right smd-pad-vertical-12"
-          >
-            <Blueprint.Tooltip
-              content={
-                <span>
-                  Unable to deploy apps when running multinode on localhost
-                </span>
-              }
-              hoverCloseDelay={0}
-              hoverOpenDelay={100}
-              inline={true}
-              isDisabled={true}
-              openOnTargetFocus={true}
-              position={10}
-              rootElementTag="span"
-              transitionDuration={100}
-              useSmartArrowPositioning={true}
-              useSmartPositioning={false}
-            >
-              <Link
-                replace={false}
-                to="/launchpad"
-              >
-                <button
-                  className="pt-button pt-intent-primary"
-                  disabled={false}
-                  type="button"
-                >
-                  Deploy
-                </button>
-              </Link>
-            </Blueprint.Tooltip>
-          </div>
+            className="col-sm-6 text-right"
+          />
         </div>,
         <div>
           <withRouter(Connect(ApplicationCard))
@@ -89,6 +58,8 @@ ShallowWrapper {
             }
           />
         </div>,
+        <withRouter(Connect(CLI)) />,
+        <withRouter(Connect(ReduxForm)) />,
       ],
       "className": "container-fluid pt-dark",
     },
@@ -101,46 +72,15 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-10"
+              className="col-sm-6"
             >
               <h3>
                 Welcome to Launchpad
               </h3>
             </div>,
             <div
-              className="col-sm-2 text-right smd-pad-vertical-12"
-            >
-              <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>
-            </div>,
+              className="col-sm-6 text-right"
+            />,
           ],
           "className": "row smd-pad-12",
         },
@@ -154,7 +94,7 @@ ShallowWrapper {
               "children": <h3>
                 Welcome to Launchpad
               </h3>,
-              "className": "col-sm-10",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -175,105 +115,19 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>,
-              "className": "col-sm-2 text-right smd-pad-vertical-12",
+              "children": Array [
+                undefined,
+                undefined,
+                undefined,
+              ],
+              "className": "col-sm-6 text-right",
             },
             "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>,
-                "content": <span>
-                  Unable to deploy apps when running multinode on localhost
-                </span>,
-                "hoverCloseDelay": 0,
-                "hoverOpenDelay": 100,
-                "inline": true,
-                "isDisabled": true,
-                "openOnTargetFocus": true,
-                "position": 10,
-                "rootElementTag": "span",
-                "transitionDuration": 100,
-                "useSmartArrowPositioning": true,
-                "useSmartPositioning": false,
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>,
-                  "replace": false,
-                  "to": "/launchpad",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Deploy",
-                    "className": "pt-button pt-intent-primary",
-                    "disabled": false,
-                    "type": "button",
-                  },
-                  "ref": null,
-                  "rendered": "Deploy",
-                  "type": "button",
-                },
-                "type": [Function],
-              },
-              "type": [Function],
-            },
+            "rendered": Array [
+              undefined,
+              undefined,
+              undefined,
+            ],
             "type": "div",
           },
         ],
@@ -320,6 +174,24 @@ ShallowWrapper {
         ],
         "type": "div",
       },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
     ],
     "type": "div",
   },
@@ -334,46 +206,15 @@ ShallowWrapper {
             className="row smd-pad-12"
           >
             <div
-              className="col-sm-10"
+              className="col-sm-6"
             >
               <h3>
                 Welcome to Launchpad
               </h3>
             </div>
             <div
-              className="col-sm-2 text-right smd-pad-vertical-12"
-            >
-              <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>
-            </div>
+              className="col-sm-6 text-right"
+            />
           </div>,
           <div>
             <withRouter(Connect(ApplicationCard))
@@ -388,6 +229,8 @@ ShallowWrapper {
               }
             />
           </div>,
+          <withRouter(Connect(CLI)) />,
+          <withRouter(Connect(ReduxForm)) />,
         ],
         "className": "container-fluid pt-dark",
       },
@@ -400,46 +243,15 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-10"
+                className="col-sm-6"
               >
                 <h3>
                   Welcome to Launchpad
                 </h3>
               </div>,
               <div
-                className="col-sm-2 text-right smd-pad-vertical-12"
-              >
-                <Blueprint.Tooltip
-                  content={
-                    <span>
-                      Unable to deploy apps when running multinode on localhost
-                    </span>
-                  }
-                  hoverCloseDelay={0}
-                  hoverOpenDelay={100}
-                  inline={true}
-                  isDisabled={true}
-                  openOnTargetFocus={true}
-                  position={10}
-                  rootElementTag="span"
-                  transitionDuration={100}
-                  useSmartArrowPositioning={true}
-                  useSmartPositioning={false}
-                >
-                  <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>
-                </Blueprint.Tooltip>
-              </div>,
+                className="col-sm-6 text-right"
+              />,
             ],
             "className": "row smd-pad-12",
           },
@@ -453,7 +265,7 @@ ShallowWrapper {
                 "children": <h3>
                   Welcome to Launchpad
                 </h3>,
-                "className": "col-sm-10",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -474,105 +286,19 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Blueprint.Tooltip
-                  content={
-                    <span>
-                      Unable to deploy apps when running multinode on localhost
-                    </span>
-                  }
-                  hoverCloseDelay={0}
-                  hoverOpenDelay={100}
-                  inline={true}
-                  isDisabled={true}
-                  openOnTargetFocus={true}
-                  position={10}
-                  rootElementTag="span"
-                  transitionDuration={100}
-                  useSmartArrowPositioning={true}
-                  useSmartPositioning={false}
-                >
-                  <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>
-                </Blueprint.Tooltip>,
-                "className": "col-sm-2 text-right smd-pad-vertical-12",
+                "children": Array [
+                  undefined,
+                  undefined,
+                  undefined,
+                ],
+                "className": "col-sm-6 text-right",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>,
-                  "content": <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>,
-                  "hoverCloseDelay": 0,
-                  "hoverOpenDelay": 100,
-                  "inline": true,
-                  "isDisabled": true,
-                  "openOnTargetFocus": true,
-                  "position": 10,
-                  "rootElementTag": "span",
-                  "transitionDuration": 100,
-                  "useSmartArrowPositioning": true,
-                  "useSmartPositioning": false,
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>,
-                    "replace": false,
-                    "to": "/launchpad",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Deploy",
-                      "className": "pt-button pt-intent-primary",
-                      "disabled": false,
-                      "type": "button",
-                    },
-                    "ref": null,
-                    "rendered": "Deploy",
-                    "type": "button",
-                  },
-                  "type": [Function],
-                },
-                "type": [Function],
-              },
+              "rendered": Array [
+                undefined,
+                undefined,
+                undefined,
+              ],
               "type": "div",
             },
           ],
@@ -619,6 +345,24 @@ ShallowWrapper {
           ],
           "type": "div",
         },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
       ],
       "type": "div",
     },
@@ -658,46 +402,15 @@ ShallowWrapper {
           className="row smd-pad-12"
         >
           <div
-            className="col-sm-10"
+            className="col-sm-6"
           >
             <h3>
               Welcome to Launchpad
             </h3>
           </div>
           <div
-            className="col-sm-2 text-right smd-pad-vertical-12"
-          >
-            <Blueprint.Tooltip
-              content={
-                <span>
-                  Unable to deploy apps when running multinode on localhost
-                </span>
-              }
-              hoverCloseDelay={0}
-              hoverOpenDelay={100}
-              inline={true}
-              isDisabled={true}
-              openOnTargetFocus={true}
-              position={10}
-              rootElementTag="span"
-              transitionDuration={100}
-              useSmartArrowPositioning={true}
-              useSmartPositioning={false}
-            >
-              <Link
-                replace={false}
-                to="/launchpad"
-              >
-                <button
-                  className="pt-button pt-intent-primary"
-                  disabled={false}
-                  type="button"
-                >
-                  Deploy
-                </button>
-              </Link>
-            </Blueprint.Tooltip>
-          </div>
+            className="col-sm-6 text-right"
+          />
         </div>,
         <div>
           <div
@@ -715,6 +428,8 @@ ShallowWrapper {
             </div>
           </div>
         </div>,
+        <withRouter(Connect(CLI)) />,
+        <withRouter(Connect(ReduxForm)) />,
       ],
       "className": "container-fluid pt-dark",
     },
@@ -727,46 +442,15 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-10"
+              className="col-sm-6"
             >
               <h3>
                 Welcome to Launchpad
               </h3>
             </div>,
             <div
-              className="col-sm-2 text-right smd-pad-vertical-12"
-            >
-              <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>
-            </div>,
+              className="col-sm-6 text-right"
+            />,
           ],
           "className": "row smd-pad-12",
         },
@@ -780,7 +464,7 @@ ShallowWrapper {
               "children": <h3>
                 Welcome to Launchpad
               </h3>,
-              "className": "col-sm-10",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -801,105 +485,19 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>,
-              "className": "col-sm-2 text-right smd-pad-vertical-12",
+              "children": Array [
+                undefined,
+                undefined,
+                undefined,
+              ],
+              "className": "col-sm-6 text-right",
             },
             "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>,
-                "content": <span>
-                  Unable to deploy apps when running multinode on localhost
-                </span>,
-                "hoverCloseDelay": 0,
-                "hoverOpenDelay": 100,
-                "inline": true,
-                "isDisabled": true,
-                "openOnTargetFocus": true,
-                "position": 10,
-                "rootElementTag": "span",
-                "transitionDuration": 100,
-                "useSmartArrowPositioning": true,
-                "useSmartPositioning": false,
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>,
-                  "replace": false,
-                  "to": "/launchpad",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Deploy",
-                    "className": "pt-button pt-intent-primary",
-                    "disabled": false,
-                    "type": "button",
-                  },
-                  "ref": null,
-                  "rendered": "Deploy",
-                  "type": "button",
-                },
-                "type": [Function],
-              },
-              "type": [Function],
-            },
+            "rendered": Array [
+              undefined,
+              undefined,
+              undefined,
+            ],
             "type": "div",
           },
         ],
@@ -958,6 +556,24 @@ ShallowWrapper {
         },
         "type": "div",
       },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
     ],
     "type": "div",
   },
@@ -972,46 +588,15 @@ ShallowWrapper {
             className="row smd-pad-12"
           >
             <div
-              className="col-sm-10"
+              className="col-sm-6"
             >
               <h3>
                 Welcome to Launchpad
               </h3>
             </div>
             <div
-              className="col-sm-2 text-right smd-pad-vertical-12"
-            >
-              <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>
-            </div>
+              className="col-sm-6 text-right"
+            />
           </div>,
           <div>
             <div
@@ -1029,6 +614,8 @@ ShallowWrapper {
               </div>
             </div>
           </div>,
+          <withRouter(Connect(CLI)) />,
+          <withRouter(Connect(ReduxForm)) />,
         ],
         "className": "container-fluid pt-dark",
       },
@@ -1041,46 +628,15 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-10"
+                className="col-sm-6"
               >
                 <h3>
                   Welcome to Launchpad
                 </h3>
               </div>,
               <div
-                className="col-sm-2 text-right smd-pad-vertical-12"
-              >
-                <Blueprint.Tooltip
-                  content={
-                    <span>
-                      Unable to deploy apps when running multinode on localhost
-                    </span>
-                  }
-                  hoverCloseDelay={0}
-                  hoverOpenDelay={100}
-                  inline={true}
-                  isDisabled={true}
-                  openOnTargetFocus={true}
-                  position={10}
-                  rootElementTag="span"
-                  transitionDuration={100}
-                  useSmartArrowPositioning={true}
-                  useSmartPositioning={false}
-                >
-                  <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>
-                </Blueprint.Tooltip>
-              </div>,
+                className="col-sm-6 text-right"
+              />,
             ],
             "className": "row smd-pad-12",
           },
@@ -1094,7 +650,7 @@ ShallowWrapper {
                 "children": <h3>
                   Welcome to Launchpad
                 </h3>,
-                "className": "col-sm-10",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -1115,105 +671,19 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Blueprint.Tooltip
-                  content={
-                    <span>
-                      Unable to deploy apps when running multinode on localhost
-                    </span>
-                  }
-                  hoverCloseDelay={0}
-                  hoverOpenDelay={100}
-                  inline={true}
-                  isDisabled={true}
-                  openOnTargetFocus={true}
-                  position={10}
-                  rootElementTag="span"
-                  transitionDuration={100}
-                  useSmartArrowPositioning={true}
-                  useSmartPositioning={false}
-                >
-                  <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>
-                </Blueprint.Tooltip>,
-                "className": "col-sm-2 text-right smd-pad-vertical-12",
+                "children": Array [
+                  undefined,
+                  undefined,
+                  undefined,
+                ],
+                "className": "col-sm-6 text-right",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>,
-                  "content": <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>,
-                  "hoverCloseDelay": 0,
-                  "hoverOpenDelay": 100,
-                  "inline": true,
-                  "isDisabled": true,
-                  "openOnTargetFocus": true,
-                  "position": 10,
-                  "rootElementTag": "span",
-                  "transitionDuration": 100,
-                  "useSmartArrowPositioning": true,
-                  "useSmartPositioning": false,
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>,
-                    "replace": false,
-                    "to": "/launchpad",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Deploy",
-                      "className": "pt-button pt-intent-primary",
-                      "disabled": false,
-                      "type": "button",
-                    },
-                    "ref": null,
-                    "rendered": "Deploy",
-                    "type": "button",
-                  },
-                  "type": [Function],
-                },
-                "type": [Function],
-              },
+              "rendered": Array [
+                undefined,
+                undefined,
+                undefined,
+              ],
               "type": "div",
             },
           ],
@@ -1272,6 +742,24 @@ ShallowWrapper {
           },
           "type": "div",
         },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
       ],
       "type": "div",
     },
@@ -1321,46 +809,15 @@ ShallowWrapper {
           className="row smd-pad-12"
         >
           <div
-            className="col-sm-10"
+            className="col-sm-6"
           >
             <h3>
               Welcome to Launchpad
             </h3>
           </div>
           <div
-            className="col-sm-2 text-right smd-pad-vertical-12"
-          >
-            <Blueprint.Tooltip
-              content={
-                <span>
-                  Unable to deploy apps when running multinode on localhost
-                </span>
-              }
-              hoverCloseDelay={0}
-              hoverOpenDelay={100}
-              inline={true}
-              isDisabled={true}
-              openOnTargetFocus={true}
-              position={10}
-              rootElementTag="span"
-              transitionDuration={100}
-              useSmartArrowPositioning={true}
-              useSmartPositioning={false}
-            >
-              <Link
-                replace={false}
-                to="/launchpad"
-              >
-                <button
-                  className="pt-button pt-intent-primary"
-                  disabled={false}
-                  type="button"
-                >
-                  Deploy
-                </button>
-              </Link>
-            </Blueprint.Tooltip>
-          </div>
+            className="col-sm-6 text-right"
+          />
         </div>,
         <div>
           <withRouter(Connect(ApplicationCard))
@@ -1375,6 +832,8 @@ ShallowWrapper {
             }
           />
         </div>,
+        <withRouter(Connect(CLI)) />,
+        <withRouter(Connect(ReduxForm)) />,
       ],
       "className": "container-fluid pt-dark",
     },
@@ -1387,46 +846,15 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-10"
+              className="col-sm-6"
             >
               <h3>
                 Welcome to Launchpad
               </h3>
             </div>,
             <div
-              className="col-sm-2 text-right smd-pad-vertical-12"
-            >
-              <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>
-            </div>,
+              className="col-sm-6 text-right"
+            />,
           ],
           "className": "row smd-pad-12",
         },
@@ -1440,7 +868,7 @@ ShallowWrapper {
               "children": <h3>
                 Welcome to Launchpad
               </h3>,
-              "className": "col-sm-10",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -1461,105 +889,19 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>,
-              "className": "col-sm-2 text-right smd-pad-vertical-12",
+              "children": Array [
+                undefined,
+                undefined,
+                undefined,
+              ],
+              "className": "col-sm-6 text-right",
             },
             "ref": null,
-            "rendered": Object {
-              "instance": null,
-              "key": undefined,
-              "nodeType": "class",
-              "props": Object {
-                "children": <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>,
-                "content": <span>
-                  Unable to deploy apps when running multinode on localhost
-                </span>,
-                "hoverCloseDelay": 0,
-                "hoverOpenDelay": 100,
-                "inline": true,
-                "isDisabled": true,
-                "openOnTargetFocus": true,
-                "position": 10,
-                "rootElementTag": "span",
-                "transitionDuration": 100,
-                "useSmartArrowPositioning": true,
-                "useSmartPositioning": false,
-              },
-              "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>,
-                  "replace": false,
-                  "to": "/launchpad",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": "Deploy",
-                    "className": "pt-button pt-intent-primary",
-                    "disabled": false,
-                    "type": "button",
-                  },
-                  "ref": null,
-                  "rendered": "Deploy",
-                  "type": "button",
-                },
-                "type": [Function],
-              },
-              "type": [Function],
-            },
+            "rendered": Array [
+              undefined,
+              undefined,
+              undefined,
+            ],
             "type": "div",
           },
         ],
@@ -1606,6 +948,24 @@ ShallowWrapper {
         ],
         "type": "div",
       },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
     ],
     "type": "div",
   },
@@ -1620,46 +980,15 @@ ShallowWrapper {
             className="row smd-pad-12"
           >
             <div
-              className="col-sm-10"
+              className="col-sm-6"
             >
               <h3>
                 Welcome to Launchpad
               </h3>
             </div>
             <div
-              className="col-sm-2 text-right smd-pad-vertical-12"
-            >
-              <Blueprint.Tooltip
-                content={
-                  <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>
-                }
-                hoverCloseDelay={0}
-                hoverOpenDelay={100}
-                inline={true}
-                isDisabled={true}
-                openOnTargetFocus={true}
-                position={10}
-                rootElementTag="span"
-                transitionDuration={100}
-                useSmartArrowPositioning={true}
-                useSmartPositioning={false}
-              >
-                <Link
-                  replace={false}
-                  to="/launchpad"
-                >
-                  <button
-                    className="pt-button pt-intent-primary"
-                    disabled={false}
-                    type="button"
-                  >
-                    Deploy
-                  </button>
-                </Link>
-              </Blueprint.Tooltip>
-            </div>
+              className="col-sm-6 text-right"
+            />
           </div>,
           <div>
             <withRouter(Connect(ApplicationCard))
@@ -1674,6 +1003,8 @@ ShallowWrapper {
               }
             />
           </div>,
+          <withRouter(Connect(CLI)) />,
+          <withRouter(Connect(ReduxForm)) />,
         ],
         "className": "container-fluid pt-dark",
       },
@@ -1686,46 +1017,15 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-10"
+                className="col-sm-6"
               >
                 <h3>
                   Welcome to Launchpad
                 </h3>
               </div>,
               <div
-                className="col-sm-2 text-right smd-pad-vertical-12"
-              >
-                <Blueprint.Tooltip
-                  content={
-                    <span>
-                      Unable to deploy apps when running multinode on localhost
-                    </span>
-                  }
-                  hoverCloseDelay={0}
-                  hoverOpenDelay={100}
-                  inline={true}
-                  isDisabled={true}
-                  openOnTargetFocus={true}
-                  position={10}
-                  rootElementTag="span"
-                  transitionDuration={100}
-                  useSmartArrowPositioning={true}
-                  useSmartPositioning={false}
-                >
-                  <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>
-                </Blueprint.Tooltip>
-              </div>,
+                className="col-sm-6 text-right"
+              />,
             ],
             "className": "row smd-pad-12",
           },
@@ -1739,7 +1039,7 @@ ShallowWrapper {
                 "children": <h3>
                   Welcome to Launchpad
                 </h3>,
-                "className": "col-sm-10",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -1760,105 +1060,19 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <Blueprint.Tooltip
-                  content={
-                    <span>
-                      Unable to deploy apps when running multinode on localhost
-                    </span>
-                  }
-                  hoverCloseDelay={0}
-                  hoverOpenDelay={100}
-                  inline={true}
-                  isDisabled={true}
-                  openOnTargetFocus={true}
-                  position={10}
-                  rootElementTag="span"
-                  transitionDuration={100}
-                  useSmartArrowPositioning={true}
-                  useSmartPositioning={false}
-                >
-                  <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>
-                </Blueprint.Tooltip>,
-                "className": "col-sm-2 text-right smd-pad-vertical-12",
+                "children": Array [
+                  undefined,
+                  undefined,
+                  undefined,
+                ],
+                "className": "col-sm-6 text-right",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "class",
-                "props": Object {
-                  "children": <Link
-                    replace={false}
-                    to="/launchpad"
-                  >
-                    <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>
-                  </Link>,
-                  "content": <span>
-                    Unable to deploy apps when running multinode on localhost
-                  </span>,
-                  "hoverCloseDelay": 0,
-                  "hoverOpenDelay": 100,
-                  "inline": true,
-                  "isDisabled": true,
-                  "openOnTargetFocus": true,
-                  "position": 10,
-                  "rootElementTag": "span",
-                  "transitionDuration": 100,
-                  "useSmartArrowPositioning": true,
-                  "useSmartPositioning": false,
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <button
-                      className="pt-button pt-intent-primary"
-                      disabled={false}
-                      type="button"
-                    >
-                      Deploy
-                    </button>,
-                    "replace": false,
-                    "to": "/launchpad",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Deploy",
-                      "className": "pt-button pt-intent-primary",
-                      "disabled": false,
-                      "type": "button",
-                    },
-                    "ref": null,
-                    "rendered": "Deploy",
-                    "type": "button",
-                  },
-                  "type": [Function],
-                },
-                "type": [Function],
-              },
+              "rendered": Array [
+                undefined,
+                undefined,
+                undefined,
+              ],
               "type": "div",
             },
           ],
@@ -1905,6 +1119,24 @@ ShallowWrapper {
           ],
           "type": "div",
         },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
       ],
       "type": "div",
     },
@@ -1922,5 +1154,6 @@ ShallowWrapper {
 exports[`Applications: index mapStateToProps with default state 1`] = `
 Object {
   "applications": Array [],
+  "isLoggedIn": false,
 }
 `;
