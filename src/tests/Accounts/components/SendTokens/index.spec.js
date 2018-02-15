@@ -163,7 +163,6 @@ describe('SendTokens: index', () => {
     );
 
     const dialog = wrapper.dive().dive().dive().find('Dialog').dive();
-    console.log(dialog.find('Field').debug())
     dialog.find('Field').at(0).simulate('change', { target: { value: 'Supplier1' } });
     expect(props.fetchUserAddresses).toHaveBeenCalled()
 
