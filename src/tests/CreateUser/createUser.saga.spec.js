@@ -32,7 +32,6 @@ describe('CreateUser: saga', () => {
       const gen = createUser({ type: CREATE_USER_REQUEST, ...formData });
       expect(gen.next().value).toEqual(call(createUserApiCall, formData.username, formData.password));
       expect(gen.next(mockResponse).value).toEqual(put(createUserSuccess(mockResponse)));
-      expect(gen.next().value).toEqual(put(fetchAccounts(false, false)));
       expect(gen.throw(error).value).toEqual(put(createUserFailure(error)));
       expect(gen.next().done).toBe(true);
     })
