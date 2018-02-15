@@ -71,7 +71,7 @@
     ],
     "verbose": true,
     "moduleNameMapper": {
-      "\\.(css|less|png)$": "identity-obj-proxy"
+      "\\.(css|less|png|pdf)$": "identity-obj-proxy"
     }
   }
 }
