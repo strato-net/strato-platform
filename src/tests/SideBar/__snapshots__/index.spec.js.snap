@@ -9,7 +9,7 @@ exports[`SideBar: index render component 1`] = `
       </i>
       <span className=\\"menu-text\\">
          
-        Dashboard
+        Network
       </span>
     </NavLink>
     <NavLink id=\\"blocks\\" to=\\"/blocks\\" className=\\"menu-item\\" activeClassName=\\"active-menu-item\\" onClick={[Function: onClick]}>
@@ -65,7 +65,7 @@ exports[`SideBar: index render component 1`] = `
          
       </i>
       <span className=\\"menu-text\\">
-        Apps
+        Dashboard
       </span>
     </NavLink>
   </div>
@@ -117,7 +117,7 @@ exports[`SideBar: index sequence of links first position /home 1`] = `
     className="menu-text"
   >
      
-    Dashboard
+    Network
   </span>
 </NavLink>
 `;
@@ -182,7 +182,7 @@ exports[`SideBar: index sequence of links seventh position /apps 1`] = `
   <span
     className="menu-text"
   >
-    Apps
+    Dashboard
   </span>
 </NavLink>
 `;
