@@ -424,7 +424,7 @@ ShallowWrapper {
             <div
               className="col-sm-12 text-center"
             >
-              Deploy an application to get started
+              No Applications found
             </div>
           </div>
         </div>,
@@ -519,7 +519,7 @@ ShallowWrapper {
             <div
               className="col-sm-12 text-center"
             >
-              Deploy an application to get started
+              No Applications found
             </div>
           </div>,
         },
@@ -532,7 +532,7 @@ ShallowWrapper {
             "children": <div
               className="col-sm-12 text-center"
             >
-              Deploy an application to get started
+              No Applications found
             </div>,
             "className": "row",
             "style": Object {
@@ -545,11 +545,11 @@ ShallowWrapper {
             "key": undefined,
             "nodeType": "host",
             "props": Object {
-              "children": "Deploy an application to get started",
+              "children": "No Applications found",
               "className": "col-sm-12 text-center",
             },
             "ref": null,
-            "rendered": "Deploy an application to get started",
+            "rendered": "No Applications found",
             "type": "div",
           },
           "type": "div",
@@ -610,7 +610,7 @@ ShallowWrapper {
               <div
                 className="col-sm-12 text-center"
               >
-                Deploy an application to get started
+                No Applications found
               </div>
             </div>
           </div>,
@@ -705,7 +705,7 @@ ShallowWrapper {
               <div
                 className="col-sm-12 text-center"
               >
-                Deploy an application to get started
+                No Applications found
               </div>
             </div>,
           },
@@ -718,7 +718,7 @@ ShallowWrapper {
               "children": <div
                 className="col-sm-12 text-center"
               >
-                Deploy an application to get started
+                No Applications found
               </div>,
               "className": "row",
               "style": Object {
@@ -731,11 +731,11 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "Deploy an application to get started",
+                "children": "No Applications found",
                 "className": "col-sm-12 text-center",
               },
               "ref": null,
-              "rendered": "Deploy an application to get started",
+              "rendered": "No Applications found",
               "type": "div",
             },
             "type": "div",

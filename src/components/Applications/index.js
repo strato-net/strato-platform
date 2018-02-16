@@ -75,8 +75,8 @@ class Applications extends Component {
               }) :
               <div className="row" style={{ 'paddingBottom': '40px' }}>
                 <div className="col-sm-12 text-center">
-                  Deploy an application to get started
-            </div>
+                  {this.props.isLoggedIn ? "Deploy an application to get started" : "No Applications found"}
+                </div>
               </div>
           }
         </div>
