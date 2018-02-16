@@ -2,19 +2,22 @@
 
 exports[`Test createUser index mapStateToProps with errors 1`] = `
 Object {
-  "errors": Object {
-    "confirm_password": "Must Confirm Password",
-    "password": "Password Required",
-    "username": "Username Required",
-  },
+  "isLoggedIn": true,
   "isOpen": true,
+  "serverError": Object {
+    "password": "password required",
+    "username": "Username required",
+  },
+  "spinning": true,
 }
 `;
 
 exports[`Test createUser index mapStateToProps without errors 1`] = `
 Object {
-  "errors": undefined,
+  "isLoggedIn": undefined,
   "isOpen": true,
+  "serverError": Object {},
+  "spinning": true,
 }
 `;
 
@@ -107,7 +110,6 @@ ShallowWrapper {
     triggerSubmit={undefined}
     untouch={[Function]}
     valid={true}
-    validate={[Function]}
     warning={undefined}
   />,
   Symbol(enzyme.__renderer__): Object {
@@ -123,12 +125,6 @@ ShallowWrapper {
     "nodeType": "host",
     "props": Object {
       "children": Array [
-        <Blueprint.Button
-          className="pt-intent-primary pt-icon-add"
-          id="accounts-create-user-button"
-          onClick={[Function]}
-          text="Create User"
-        />,
         <form>
           <Blueprint.Dialog
             canOutsideClickClose={true}
@@ -142,7 +138,7 @@ ShallowWrapper {
               className="pt-dialog-body"
             >
               <div
-                className="pt-form-group input"
+                className="pt-form-group"
               >
                 <div
                   className="pt-form-group pt-intent-danger"
@@ -167,9 +163,7 @@ ShallowWrapper {
                     />
                     <div
                       className="pt-form-helper-text"
-                    >
-                      Username Required
-                    </div>
+                    />
                   </div>
                 </div>
                 <div
@@ -195,9 +189,7 @@ ShallowWrapper {
                     />
                     <div
                       className="pt-form-helper-text"
-                    >
-                      Password Required
-                    </div>
+                    />
                   </div>
                 </div>
                 <div
@@ -223,9 +215,7 @@ ShallowWrapper {
                     />
                     <div
                       className="pt-form-helper-text"
-                    >
-                      Must Confirm Password
-                    </div>
+                    />
                   </div>
                 </div>
               </div>
@@ -249,9 +239,10 @@ ShallowWrapper {
               >
                 <Blueprint.Button
                   onClick={[Function]}
-                  text="Cancel"
+                  text="Already Have An Account?"
                 />
                 <Blueprint.Button
+                  disabled={undefined}
                   intent={0}
                   onClick={[Function]}
                   text="Create User"
@@ -260,25 +251,11 @@ ShallowWrapper {
             </div>
           </Blueprint.Dialog>
         </form>,
+        <withRouter(Connect(ReduxForm)) />,
       ],
-      "className": "smd-pad-16",
     },
     "ref": null,
     "rendered": Array [
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "class",
-        "props": Object {
-          "className": "pt-intent-primary pt-icon-add",
-          "id": "accounts-create-user-button",
-          "onClick": [Function],
-          "text": "Create User",
-        },
-        "ref": null,
-        "rendered": null,
-        "type": [Function],
-      },
       Object {
         "instance": null,
         "key": undefined,
@@ -296,7 +273,7 @@ ShallowWrapper {
               className="pt-dialog-body"
             >
               <div
-                className="pt-form-group input"
+                className="pt-form-group"
               >
                 <div
                   className="pt-form-group pt-intent-danger"
@@ -321,9 +298,7 @@ ShallowWrapper {
                     />
                     <div
                       className="pt-form-helper-text"
-                    >
-                      Username Required
-                    </div>
+                    />
                   </div>
                 </div>
                 <div
@@ -349,9 +324,7 @@ ShallowWrapper {
                     />
                     <div
                       className="pt-form-helper-text"
-                    >
-                      Password Required
-                    </div>
+                    />
                   </div>
                 </div>
                 <div
@@ -377,9 +350,7 @@ ShallowWrapper {
                     />
                     <div
                       className="pt-form-helper-text"
-                    >
-                      Must Confirm Password
-                    </div>
+                    />
                   </div>
                 </div>
               </div>
@@ -403,9 +374,10 @@ ShallowWrapper {
               >
                 <Blueprint.Button
                   onClick={[Function]}
-                  text="Cancel"
+                  text="Already Have An Account?"
                 />
                 <Blueprint.Button
+                  disabled={undefined}
                   intent={0}
                   onClick={[Function]}
                   text="Create User"
@@ -426,7 +398,7 @@ ShallowWrapper {
                 className="pt-dialog-body"
               >
                 <div
-                  className="pt-form-group input"
+                  className="pt-form-group"
                 >
                   <div
                     className="pt-form-group pt-intent-danger"
@@ -451,9 +423,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Username Required
-                      </div>
+                      />
                     </div>
                   </div>
                   <div
@@ -479,9 +449,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Password Required
-                      </div>
+                      />
                     </div>
                   </div>
                   <div
@@ -507,9 +475,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Must Confirm Password
-                      </div>
+                      />
                     </div>
                   </div>
                 </div>
@@ -533,9 +499,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -558,7 +525,7 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   <div
-                    className="pt-form-group input"
+                    className="pt-form-group"
                   >
                     <div
                       className="pt-form-group pt-intent-danger"
@@ -583,9 +550,7 @@ ShallowWrapper {
                         />
                         <div
                           className="pt-form-helper-text"
-                        >
-                          Username Required
-                        </div>
+                        />
                       </div>
                     </div>
                     <div
@@ -611,9 +576,7 @@ ShallowWrapper {
                         />
                         <div
                           className="pt-form-helper-text"
-                        >
-                          Password Required
-                        </div>
+                        />
                       </div>
                     </div>
                     <div
@@ -639,9 +602,7 @@ ShallowWrapper {
                         />
                         <div
                           className="pt-form-helper-text"
-                        >
-                          Must Confirm Password
-                        </div>
+                        />
                       </div>
                     </div>
                   </div>,
@@ -690,9 +651,7 @@ ShallowWrapper {
                           />
                           <div
                             className="pt-form-helper-text"
-                          >
-                            Username Required
-                          </div>
+                          />
                         </div>
                       </div>,
                       <div
@@ -718,9 +677,7 @@ ShallowWrapper {
                           />
                           <div
                             className="pt-form-helper-text"
-                          >
-                            Password Required
-                          </div>
+                          />
                         </div>
                       </div>,
                       <div
@@ -746,13 +703,11 @@ ShallowWrapper {
                           />
                           <div
                             className="pt-form-helper-text"
-                          >
-                            Must Confirm Password
-                          </div>
+                          />
                         </div>
                       </div>,
                     ],
-                    "className": "pt-form-group input",
+                    "className": "pt-form-group",
                   },
                   "ref": null,
                   "rendered": Array [
@@ -782,9 +737,7 @@ ShallowWrapper {
                             />
                             <div
                               className="pt-form-helper-text"
-                            >
-                              Username Required
-                            </div>
+                            />
                           </div>,
                         ],
                         "className": "pt-form-group pt-intent-danger",
@@ -821,9 +774,7 @@ ShallowWrapper {
                               />,
                               <div
                                 className="pt-form-helper-text"
-                              >
-                                Username Required
-                              </div>,
+                              />,
                             ],
                             "className": "pt-form-content",
                           },
@@ -851,11 +802,11 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": "Username Required",
+                                "children": null,
                                 "className": "pt-form-helper-text",
                               },
                               "ref": null,
-                              "rendered": "Username Required",
+                              "rendered": null,
                               "type": "div",
                             },
                           ],
@@ -890,9 +841,7 @@ ShallowWrapper {
                             />
                             <div
                               className="pt-form-helper-text"
-                            >
-                              Password Required
-                            </div>
+                            />
                           </div>,
                         ],
                         "className": "pt-form-group pt-intent-danger",
@@ -929,9 +878,7 @@ ShallowWrapper {
                               />,
                               <div
                                 className="pt-form-helper-text"
-                              >
-                                Password Required
-                              </div>,
+                              />,
                             ],
                             "className": "pt-form-content",
                           },
@@ -959,11 +906,11 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": "Password Required",
+                                "children": null,
                                 "className": "pt-form-helper-text",
                               },
                               "ref": null,
-                              "rendered": "Password Required",
+                              "rendered": null,
                               "type": "div",
                             },
                           ],
@@ -998,9 +945,7 @@ ShallowWrapper {
                             />
                             <div
                               className="pt-form-helper-text"
-                            >
-                              Must Confirm Password
-                            </div>
+                            />
                           </div>,
                         ],
                         "className": "pt-form-group pt-intent-danger",
@@ -1037,9 +982,7 @@ ShallowWrapper {
                               />,
                               <div
                                 className="pt-form-helper-text"
-                              >
-                                Must Confirm Password
-                              </div>,
+                              />,
                             ],
                             "className": "pt-form-content",
                           },
@@ -1067,11 +1010,11 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": "Must Confirm Password",
+                                "children": null,
                                 "className": "pt-form-helper-text",
                               },
                               "ref": null,
-                              "rendered": "Must Confirm Password",
+                              "rendered": null,
                               "type": "div",
                             },
                           ],
@@ -1151,9 +1094,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -1170,9 +1114,10 @@ ShallowWrapper {
                   "children": Array [
                     <Blueprint.Button
                       onClick={[Function]}
-                      text="Cancel"
+                      text="Already Have An Account?"
                     />,
                     <Blueprint.Button
+                      disabled={undefined}
                       intent={0}
                       onClick={[Function]}
                       text="Create User"
@@ -1188,7 +1133,7 @@ ShallowWrapper {
                     "nodeType": "class",
                     "props": Object {
                       "onClick": [Function],
-                      "text": "Cancel",
+                      "text": "Already Have An Account?",
                     },
                     "ref": null,
                     "rendered": null,
@@ -1199,6 +1144,7 @@ ShallowWrapper {
                     "key": undefined,
                     "nodeType": "class",
                     "props": Object {
+                      "disabled": undefined,
                       "intent": 0,
                       "onClick": [Function],
                       "text": "Create User",
@@ -1217,6 +1163,15 @@ ShallowWrapper {
         },
         "type": "form",
       },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
     ],
     "type": "div",
   },
@@ -1227,12 +1182,6 @@ ShallowWrapper {
       "nodeType": "host",
       "props": Object {
         "children": Array [
-          <Blueprint.Button
-            className="pt-intent-primary pt-icon-add"
-            id="accounts-create-user-button"
-            onClick={[Function]}
-            text="Create User"
-          />,
           <form>
             <Blueprint.Dialog
               canOutsideClickClose={true}
@@ -1246,7 +1195,7 @@ ShallowWrapper {
                 className="pt-dialog-body"
               >
                 <div
-                  className="pt-form-group input"
+                  className="pt-form-group"
                 >
                   <div
                     className="pt-form-group pt-intent-danger"
@@ -1271,9 +1220,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Username Required
-                      </div>
+                      />
                     </div>
                   </div>
                   <div
@@ -1299,9 +1246,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Password Required
-                      </div>
+                      />
                     </div>
                   </div>
                   <div
@@ -1327,9 +1272,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Must Confirm Password
-                      </div>
+                      />
                     </div>
                   </div>
                 </div>
@@ -1353,9 +1296,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -1364,25 +1308,11 @@ ShallowWrapper {
               </div>
             </Blueprint.Dialog>
           </form>,
+          <withRouter(Connect(ReduxForm)) />,
         ],
-        "className": "smd-pad-16",
       },
       "ref": null,
       "rendered": Array [
-        Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "class",
-          "props": Object {
-            "className": "pt-intent-primary pt-icon-add",
-            "id": "accounts-create-user-button",
-            "onClick": [Function],
-            "text": "Create User",
-          },
-          "ref": null,
-          "rendered": null,
-          "type": [Function],
-        },
         Object {
           "instance": null,
           "key": undefined,
@@ -1400,7 +1330,7 @@ ShallowWrapper {
                 className="pt-dialog-body"
               >
                 <div
-                  className="pt-form-group input"
+                  className="pt-form-group"
                 >
                   <div
                     className="pt-form-group pt-intent-danger"
@@ -1425,9 +1355,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Username Required
-                      </div>
+                      />
                     </div>
                   </div>
                   <div
@@ -1453,9 +1381,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Password Required
-                      </div>
+                      />
                     </div>
                   </div>
                   <div
@@ -1481,9 +1407,7 @@ ShallowWrapper {
                       />
                       <div
                         className="pt-form-helper-text"
-                      >
-                        Must Confirm Password
-                      </div>
+                      />
                     </div>
                   </div>
                 </div>
@@ -1507,9 +1431,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -1530,7 +1455,7 @@ ShallowWrapper {
                   className="pt-dialog-body"
                 >
                   <div
-                    className="pt-form-group input"
+                    className="pt-form-group"
                   >
                     <div
                       className="pt-form-group pt-intent-danger"
@@ -1555,9 +1480,7 @@ ShallowWrapper {
                         />
                         <div
                           className="pt-form-helper-text"
-                        >
-                          Username Required
-                        </div>
+                        />
                       </div>
                     </div>
                     <div
@@ -1583,9 +1506,7 @@ ShallowWrapper {
                         />
                         <div
                           className="pt-form-helper-text"
-                        >
-                          Password Required
-                        </div>
+                        />
                       </div>
                     </div>
                     <div
@@ -1611,9 +1532,7 @@ ShallowWrapper {
                         />
                         <div
                           className="pt-form-helper-text"
-                        >
-                          Must Confirm Password
-                        </div>
+                        />
                       </div>
                     </div>
                   </div>
@@ -1637,9 +1556,10 @@ ShallowWrapper {
                   >
                     <Blueprint.Button
                       onClick={[Function]}
-                      text="Cancel"
+                      text="Already Have An Account?"
                     />
                     <Blueprint.Button
+                      disabled={undefined}
                       intent={0}
                       onClick={[Function]}
                       text="Create User"
@@ -1662,7 +1582,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": Array [
                     <div
-                      className="pt-form-group input"
+                      className="pt-form-group"
                     >
                       <div
                         className="pt-form-group pt-intent-danger"
@@ -1687,9 +1607,7 @@ ShallowWrapper {
                           />
                           <div
                             className="pt-form-helper-text"
-                          >
-                            Username Required
-                          </div>
+                          />
                         </div>
                       </div>
                       <div
@@ -1715,9 +1633,7 @@ ShallowWrapper {
                           />
                           <div
                             className="pt-form-helper-text"
-                          >
-                            Password Required
-                          </div>
+                          />
                         </div>
                       </div>
                       <div
@@ -1743,9 +1659,7 @@ ShallowWrapper {
                           />
                           <div
                             className="pt-form-helper-text"
-                          >
-                            Must Confirm Password
-                          </div>
+                          />
                         </div>
                       </div>
                     </div>,
@@ -1794,9 +1708,7 @@ ShallowWrapper {
                             />
                             <div
                               className="pt-form-helper-text"
-                            >
-                              Username Required
-                            </div>
+                            />
                           </div>
                         </div>,
                         <div
@@ -1822,9 +1734,7 @@ ShallowWrapper {
                             />
                             <div
                               className="pt-form-helper-text"
-                            >
-                              Password Required
-                            </div>
+                            />
                           </div>
                         </div>,
                         <div
@@ -1850,13 +1760,11 @@ ShallowWrapper {
                             />
                             <div
                               className="pt-form-helper-text"
-                            >
-                              Must Confirm Password
-                            </div>
+                            />
                           </div>
                         </div>,
                       ],
-                      "className": "pt-form-group input",
+                      "className": "pt-form-group",
                     },
                     "ref": null,
                     "rendered": Array [
@@ -1886,9 +1794,7 @@ ShallowWrapper {
                               />
                               <div
                                 className="pt-form-helper-text"
-                              >
-                                Username Required
-                              </div>
+                              />
                             </div>,
                           ],
                           "className": "pt-form-group pt-intent-danger",
@@ -1925,9 +1831,7 @@ ShallowWrapper {
                                 />,
                                 <div
                                   className="pt-form-helper-text"
-                                >
-                                  Username Required
-                                </div>,
+                                />,
                               ],
                               "className": "pt-form-content",
                             },
@@ -1955,11 +1859,11 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": "Username Required",
+                                  "children": null,
                                   "className": "pt-form-helper-text",
                                 },
                                 "ref": null,
-                                "rendered": "Username Required",
+                                "rendered": null,
                                 "type": "div",
                               },
                             ],
@@ -1994,9 +1898,7 @@ ShallowWrapper {
                               />
                               <div
                                 className="pt-form-helper-text"
-                              >
-                                Password Required
-                              </div>
+                              />
                             </div>,
                           ],
                           "className": "pt-form-group pt-intent-danger",
@@ -2033,9 +1935,7 @@ ShallowWrapper {
                                 />,
                                 <div
                                   className="pt-form-helper-text"
-                                >
-                                  Password Required
-                                </div>,
+                                />,
                               ],
                               "className": "pt-form-content",
                             },
@@ -2063,11 +1963,11 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": "Password Required",
+                                  "children": null,
                                   "className": "pt-form-helper-text",
                                 },
                                 "ref": null,
-                                "rendered": "Password Required",
+                                "rendered": null,
                                 "type": "div",
                               },
                             ],
@@ -2102,9 +2002,7 @@ ShallowWrapper {
                               />
                               <div
                                 className="pt-form-helper-text"
-                              >
-                                Must Confirm Password
-                              </div>
+                              />
                             </div>,
                           ],
                           "className": "pt-form-group pt-intent-danger",
@@ -2141,9 +2039,7 @@ ShallowWrapper {
                                 />,
                                 <div
                                   className="pt-form-helper-text"
-                                >
-                                  Must Confirm Password
-                                </div>,
+                                />,
                               ],
                               "className": "pt-form-content",
                             },
@@ -2171,11 +2067,11 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": "Must Confirm Password",
+                                  "children": null,
                                   "className": "pt-form-helper-text",
                                 },
                                 "ref": null,
-                                "rendered": "Must Confirm Password",
+                                "rendered": null,
                                 "type": "div",
                               },
                             ],
@@ -2255,9 +2151,10 @@ ShallowWrapper {
                   >
                     <Blueprint.Button
                       onClick={[Function]}
-                      text="Cancel"
+                      text="Already Have An Account?"
                     />
                     <Blueprint.Button
+                      disabled={undefined}
                       intent={0}
                       onClick={[Function]}
                       text="Create User"
@@ -2274,9 +2171,10 @@ ShallowWrapper {
                     "children": Array [
                       <Blueprint.Button
                         onClick={[Function]}
-                        text="Cancel"
+                        text="Already Have An Account?"
                       />,
                       <Blueprint.Button
+                        disabled={undefined}
                         intent={0}
                         onClick={[Function]}
                         text="Create User"
@@ -2292,7 +2190,7 @@ ShallowWrapper {
                       "nodeType": "class",
                       "props": Object {
                         "onClick": [Function],
-                        "text": "Cancel",
+                        "text": "Already Have An Account?",
                       },
                       "ref": null,
                       "rendered": null,
@@ -2303,6 +2201,7 @@ ShallowWrapper {
                       "key": undefined,
                       "nodeType": "class",
                       "props": Object {
+                        "disabled": undefined,
                         "intent": 0,
                         "onClick": [Function],
                         "text": "Create User",
@@ -2320,6 +2219,15 @@ ShallowWrapper {
             "type": [Function],
           },
           "type": "form",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
         },
       ],
       "type": "div",
@@ -2418,7 +2326,6 @@ ShallowWrapper {
     triggerSubmit={undefined}
     untouch={[Function]}
     valid={true}
-    validate={[Function]}
     warning={undefined}
   />,
   Symbol(enzyme.__renderer__): Object {
@@ -2434,12 +2341,6 @@ ShallowWrapper {
     "nodeType": "host",
     "props": Object {
       "children": Array [
-        <Blueprint.Button
-          className="pt-intent-primary pt-icon-add"
-          id="accounts-create-user-button"
-          onClick={[Function]}
-          text="Create User"
-        />,
         <form>
           <Blueprint.Dialog
             canOutsideClickClose={true}
@@ -2453,7 +2354,7 @@ ShallowWrapper {
               className="pt-dialog-body"
             >
               <div
-                className="pt-form-group input"
+                className="pt-form-group"
               >
                 <div
                   className="pt-form-group pt-intent-danger"
@@ -2554,9 +2455,10 @@ ShallowWrapper {
               >
                 <Blueprint.Button
                   onClick={[Function]}
-                  text="Cancel"
+                  text="Already Have An Account?"
                 />
                 <Blueprint.Button
+                  disabled={undefined}
                   intent={0}
                   onClick={[Function]}
                   text="Create User"
@@ -2565,25 +2467,11 @@ ShallowWrapper {
             </div>
           </Blueprint.Dialog>
         </form>,
+        <withRouter(Connect(ReduxForm)) />,
       ],
-      "className": "smd-pad-16",
     },
     "ref": null,
     "rendered": Array [
-      Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "class",
-        "props": Object {
-          "className": "pt-intent-primary pt-icon-add",
-          "id": "accounts-create-user-button",
-          "onClick": [Function],
-          "text": "Create User",
-        },
-        "ref": null,
-        "rendered": null,
-        "type": [Function],
-      },
       Object {
         "instance": null,
         "key": undefined,
@@ -2601,7 +2489,7 @@ ShallowWrapper {
               className="pt-dialog-body"
             >
               <div
-                className="pt-form-group input"
+                className="pt-form-group"
               >
                 <div
                   className="pt-form-group pt-intent-danger"
@@ -2702,9 +2590,10 @@ ShallowWrapper {
               >
                 <Blueprint.Button
                   onClick={[Function]}
-                  text="Cancel"
+                  text="Already Have An Account?"
                 />
                 <Blueprint.Button
+                  disabled={undefined}
                   intent={0}
                   onClick={[Function]}
                   text="Create User"
@@ -2725,7 +2614,7 @@ ShallowWrapper {
                 className="pt-dialog-body"
               >
                 <div
-                  className="pt-form-group input"
+                  className="pt-form-group"
                 >
                   <div
                     className="pt-form-group pt-intent-danger"
@@ -2826,9 +2715,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -2851,7 +2741,7 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   <div
-                    className="pt-form-group input"
+                    className="pt-form-group"
                   >
                     <div
                       className="pt-form-group pt-intent-danger"
@@ -3033,7 +2923,7 @@ ShallowWrapper {
                         </div>
                       </div>,
                     ],
-                    "className": "pt-form-group input",
+                    "className": "pt-form-group",
                   },
                   "ref": null,
                   "rendered": Array [
@@ -3128,7 +3018,7 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": undefined,
+                                "children": null,
                                 "className": "pt-form-helper-text",
                               },
                               "ref": null,
@@ -3232,7 +3122,7 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": undefined,
+                                "children": null,
                                 "className": "pt-form-helper-text",
                               },
                               "ref": null,
@@ -3336,7 +3226,7 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": undefined,
+                                "children": null,
                                 "className": "pt-form-helper-text",
                               },
                               "ref": null,
@@ -3420,9 +3310,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -3439,9 +3330,10 @@ ShallowWrapper {
                   "children": Array [
                     <Blueprint.Button
                       onClick={[Function]}
-                      text="Cancel"
+                      text="Already Have An Account?"
                     />,
                     <Blueprint.Button
+                      disabled={undefined}
                       intent={0}
                       onClick={[Function]}
                       text="Create User"
@@ -3457,7 +3349,7 @@ ShallowWrapper {
                     "nodeType": "class",
                     "props": Object {
                       "onClick": [Function],
-                      "text": "Cancel",
+                      "text": "Already Have An Account?",
                     },
                     "ref": null,
                     "rendered": null,
@@ -3468,6 +3360,7 @@ ShallowWrapper {
                     "key": undefined,
                     "nodeType": "class",
                     "props": Object {
+                      "disabled": undefined,
                       "intent": 0,
                       "onClick": [Function],
                       "text": "Create User",
@@ -3486,6 +3379,15 @@ ShallowWrapper {
         },
         "type": "form",
       },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "function",
+        "props": Object {},
+        "ref": null,
+        "rendered": null,
+        "type": [Function],
+      },
     ],
     "type": "div",
   },
@@ -3496,12 +3398,6 @@ ShallowWrapper {
       "nodeType": "host",
       "props": Object {
         "children": Array [
-          <Blueprint.Button
-            className="pt-intent-primary pt-icon-add"
-            id="accounts-create-user-button"
-            onClick={[Function]}
-            text="Create User"
-          />,
           <form>
             <Blueprint.Dialog
               canOutsideClickClose={true}
@@ -3515,7 +3411,7 @@ ShallowWrapper {
                 className="pt-dialog-body"
               >
                 <div
-                  className="pt-form-group input"
+                  className="pt-form-group"
                 >
                   <div
                     className="pt-form-group pt-intent-danger"
@@ -3616,9 +3512,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -3627,25 +3524,11 @@ ShallowWrapper {
               </div>
             </Blueprint.Dialog>
           </form>,
+          <withRouter(Connect(ReduxForm)) />,
         ],
-        "className": "smd-pad-16",
       },
       "ref": null,
       "rendered": Array [
-        Object {
-          "instance": null,
-          "key": undefined,
-          "nodeType": "class",
-          "props": Object {
-            "className": "pt-intent-primary pt-icon-add",
-            "id": "accounts-create-user-button",
-            "onClick": [Function],
-            "text": "Create User",
-          },
-          "ref": null,
-          "rendered": null,
-          "type": [Function],
-        },
         Object {
           "instance": null,
           "key": undefined,
@@ -3663,7 +3546,7 @@ ShallowWrapper {
                 className="pt-dialog-body"
               >
                 <div
-                  className="pt-form-group input"
+                  className="pt-form-group"
                 >
                   <div
                     className="pt-form-group pt-intent-danger"
@@ -3764,9 +3647,10 @@ ShallowWrapper {
                 >
                   <Blueprint.Button
                     onClick={[Function]}
-                    text="Cancel"
+                    text="Already Have An Account?"
                   />
                   <Blueprint.Button
+                    disabled={undefined}
                     intent={0}
                     onClick={[Function]}
                     text="Create User"
@@ -3787,7 +3671,7 @@ ShallowWrapper {
                   className="pt-dialog-body"
                 >
                   <div
-                    className="pt-form-group input"
+                    className="pt-form-group"
                   >
                     <div
                       className="pt-form-group pt-intent-danger"
@@ -3888,9 +3772,10 @@ ShallowWrapper {
                   >
                     <Blueprint.Button
                       onClick={[Function]}
-                      text="Cancel"
+                      text="Already Have An Account?"
                     />
                     <Blueprint.Button
+                      disabled={undefined}
                       intent={0}
                       onClick={[Function]}
                       text="Create User"
@@ -3913,7 +3798,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": Array [
                     <div
-                      className="pt-form-group input"
+                      className="pt-form-group"
                     >
                       <div
                         className="pt-form-group pt-intent-danger"
@@ -4095,7 +3980,7 @@ ShallowWrapper {
                           </div>
                         </div>,
                       ],
-                      "className": "pt-form-group input",
+                      "className": "pt-form-group",
                     },
                     "ref": null,
                     "rendered": Array [
@@ -4190,7 +4075,7 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": undefined,
+                                  "children": null,
                                   "className": "pt-form-helper-text",
                                 },
                                 "ref": null,
@@ -4294,7 +4179,7 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": undefined,
+                                  "children": null,
                                   "className": "pt-form-helper-text",
                                 },
                                 "ref": null,
@@ -4398,7 +4283,7 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": undefined,
+                                  "children": null,
                                   "className": "pt-form-helper-text",
                                 },
                                 "ref": null,
@@ -4482,9 +4367,10 @@ ShallowWrapper {
                   >
                     <Blueprint.Button
                       onClick={[Function]}
-                      text="Cancel"
+                      text="Already Have An Account?"
                     />
                     <Blueprint.Button
+                      disabled={undefined}
                       intent={0}
                       onClick={[Function]}
                       text="Create User"
@@ -4501,9 +4387,10 @@ ShallowWrapper {
                     "children": Array [
                       <Blueprint.Button
                         onClick={[Function]}
-                        text="Cancel"
+                        text="Already Have An Account?"
                       />,
                       <Blueprint.Button
+                        disabled={undefined}
                         intent={0}
                         onClick={[Function]}
                         text="Create User"
@@ -4519,7 +4406,7 @@ ShallowWrapper {
                       "nodeType": "class",
                       "props": Object {
                         "onClick": [Function],
-                        "text": "Cancel",
+                        "text": "Already Have An Account?",
                       },
                       "ref": null,
                       "rendered": null,
@@ -4530,6 +4417,7 @@ ShallowWrapper {
                       "key": undefined,
                       "nodeType": "class",
                       "props": Object {
+                        "disabled": undefined,
                         "intent": 0,
                         "onClick": [Function],
                         "text": "Create User",
@@ -4548,6 +4436,15 @@ ShallowWrapper {
           },
           "type": "form",
         },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "function",
+          "props": Object {},
+          "ref": null,
+          "rendered": null,
+          "type": [Function],
+        },
       ],
       "type": "div",
     },
@@ -4565,6 +4462,7 @@ ShallowWrapper {
 exports[`Test createUser index validate when password does not match 1`] = `
 Object {
   "confirm_password": "Passwords Do Not Match",
+  "password": "Password must be at least 6 characters",
 }
 `;
 
@@ -4576,4 +4474,8 @@ Object {
 }
 `;
 
-exports[`Test createUser index validate with values 1`] = `Object {}`;
+exports[`Test createUser index validate with values 1`] = `
+Object {
+  "password": "Password must be at least 6 characters",
+}
+`;

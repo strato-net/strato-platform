@@ -48,6 +48,9 @@ describe('Applications: index', () => {
     const state = {
       applications: {
         applications: []
+      },
+      user: {
+        isLoggedIn: false
       }
     }
     expect(mapStateToProps(state)).toMatchSnapshot();

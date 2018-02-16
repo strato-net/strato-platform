@@ -1,11 +1,11 @@
 import React from 'react';
-import SendEther, { mapStateToProps } from '../../../../components/Accounts/components/SendEther/index';
+import SendTokens, { mapStateToProps } from '../../../../components/Accounts/components/SendTokens/index';
 import { Provider } from 'react-redux';
 import { reducer as formReducer } from 'redux-form';
 import { createStore, combineReducers } from 'redux';
 import { indexAccountsMock } from '../../accountsMock';
 
-describe('SendEther: index', () => {
+describe('SendTokens: index', () => {
 
   let store
 
@@ -23,15 +23,19 @@ describe('SendEther: index', () => {
         fromUsername: '',
         toUsername: '',
         createDisabled: true,
-        sendEtherOpenModal: jest.fn(),
-        sendEtherCloseModal: jest.fn(),
-        sendEther: jest.fn(),
+        sendTokensOpenModal: jest.fn(),
+        sendTokensCloseModal: jest.fn(),
+        sendTokens: jest.fn(),
         fetchAccounts: jest.fn(),
-        store: store
+        store: store,
+        initialValues: {
+          from: '',
+          fromAddress: ''
+        }
       };
 
       const wrapper = shallow(
-        <SendEther.WrappedComponent {...props} />
+        <SendTokens.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper).toMatchSnapshot();
@@ -45,15 +49,19 @@ describe('SendEther: index', () => {
         fromUsername: 'Admin_1177_49507',
         toUsername: 'User_1177_26292',
         createDisabled: false,
-        sendEtherOpenModal: jest.fn(),
-        sendEtherCloseModal: jest.fn(),
-        sendEther: jest.fn(),
+        sendTokensOpenModal: jest.fn(),
+        sendTokensCloseModal: jest.fn(),
+        sendTokens: jest.fn(),
         fetchAccounts: jest.fn(),
-        store: store
+        store: store,
+        initialValues: {
+          from: 'Admin_1177_49507',
+          fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+        }
       };
 
       const wrapper = shallow(
-        <SendEther.WrappedComponent {...props} />
+        <SendTokens.WrappedComponent {...props} />
       ).dive().dive().dive();
 
       expect(wrapper).toMatchSnapshot();
@@ -70,20 +78,24 @@ describe('SendEther: index', () => {
       fromUsername: 'Admin_1177_49507',
       toUsername: 'User_1177_26292',
       createDisabled: false,
-      sendEtherOpenModal: jest.fn(),
-      sendEtherCloseModal: jest.fn(),
-      sendEther: jest.fn(),
-      fetchAccounts: jest.fn()
+      sendTokensOpenModal: jest.fn(),
+      sendTokensCloseModal: jest.fn(),
+      sendTokens: jest.fn(),
+      fetchAccounts: jest.fn(),
+      initialValues: {
+        from: 'Admin_1177_49507',
+        fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     };
 
     const wrapper = mount(
       <Provider store={store}>
-        <SendEther.WrappedComponent {...props} />
+        <SendTokens.WrappedComponent {...props} />
       </Provider>
     );
 
     wrapper.find('Button').simulate('click');
-    expect(props.sendEtherOpenModal).toHaveBeenCalled();
+    expect(props.sendTokensOpenModal).toHaveBeenCalled();
   });
 
   test('close modal on click', () => {
@@ -94,20 +106,24 @@ describe('SendEther: index', () => {
       fromUsername: 'Admin_1177_49507',
       toUsername: 'User_1177_26292',
       createDisabled: false,
-      sendEtherOpenModal: jest.fn(),
-      sendEtherCloseModal: jest.fn(),
-      sendEther: jest.fn(),
+      sendTokensOpenModal: jest.fn(),
+      sendTokensCloseModal: jest.fn(),
+      sendTokens: jest.fn(),
       fetchAccounts: jest.fn(),
-      store: store
+      store: store,
+      initialValues: {
+        from: 'Admin_1177_49507',
+        fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     };
 
     const wrapper = shallow(
-      <SendEther.WrappedComponent {...props} />
+      <SendTokens.WrappedComponent {...props} />
     );
 
     const dialog = wrapper.dive().dive().dive().find('Dialog');
     dialog.find('Button').first().simulate('click');
-    expect(props.sendEtherCloseModal).toHaveBeenCalled();
+    expect(props.sendTokensCloseModal).toHaveBeenCalled();
     expect(props.fetchAccounts).toHaveBeenCalled();
   });
 
@@ -119,14 +135,18 @@ describe('SendEther: index', () => {
       fromUsername: 'Admin_1177_49507',
       toUsername: 'User_1177_26292',
       createDisabled: false,
-      sendEtherOpenModal: jest.fn(),
-      sendEtherCloseModal: jest.fn(),
-      sendEther: jest.fn(),
+      sendTokensOpenModal: jest.fn(),
+      sendTokensCloseModal: jest.fn(),
+      sendTokens: jest.fn(),
       fetchUserAddresses: jest.fn(),
       fetchAccounts: jest.fn(),
       handleSubmit: jest.fn(),
       reset: jest.fn(),
-      store: store
+      store: store,
+      initialValues: {
+        from: 'Admin_1177_49507',
+        fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     };
 
     const values = {
@@ -139,11 +159,10 @@ describe('SendEther: index', () => {
     };
 
     const wrapper = shallow(
-      <SendEther.WrappedComponent {...props} />
+      <SendTokens.WrappedComponent {...props} />
     );
 
     const dialog = wrapper.dive().dive().dive().find('Dialog').dive();
-    console.log(dialog.find('Field').debug())
     dialog.find('Field').at(0).simulate('change', { target: { value: 'Supplier1' } });
     expect(props.fetchUserAddresses).toHaveBeenCalled()
 
@@ -154,21 +173,27 @@ describe('SendEther: index', () => {
 
     dialog.find('Field').at(5).simulate('change', { target: { value: 'Supplier2' } });
     expect(props.fetchUserAddresses).toHaveBeenCalled()
-    
+
     dialog.find('Button').last().simulate('click');
     expect(props.handleSubmit).toHaveBeenCalled();
     wrapper.dive().dive().dive().instance().submit(values);
-    expect(props.sendEther).toHaveBeenCalled();
+    expect(props.sendTokens).toHaveBeenCalled();
   });
 
   test('mapStateToProps with default state', () => {
     const state = {
-      sendEther: {
+      sendTokens: {
         isOpen: true,
         result: 'On success we get result'
       },
       accounts: {
         accounts: indexAccountsMock
+      },
+      user: {
+        currentUser: {
+          username: 'Admin_1177_49507',
+          accountAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+        }
       }
     };
 

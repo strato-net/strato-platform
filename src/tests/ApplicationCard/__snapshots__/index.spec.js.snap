@@ -3,6 +3,7 @@
 exports[`ApplicationCard: index mapStateToProps with default state 1`] = `
 Object {
   "isLoading": false,
+  "isLoggedIn": false,
   "url": "http://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/",
 }
 `;
@@ -39,7 +40,7 @@ ShallowWrapper {
         className="row"
       >
         <div
-          className="col-sm-2 text-right"
+          className="col-sm-1 text-center"
         >
           <i
             aria-hidden="true"
@@ -47,13 +48,13 @@ ShallowWrapper {
           />
         </div>
         <div
-          className="col-sm-10"
+          className="col-sm-11"
         >
           <div
             className="row"
           >
             <div
-              className="col-sm-10"
+              className="col-sm-8"
             >
               <div
                 className="heading"
@@ -70,18 +71,71 @@ ShallowWrapper {
               </div>
             </div>
             <div
-              className="col-sm-2"
+              className="col-sm-4 launchAndShare"
             >
-              <a
-                rel="noopener noreferrer"
+              <Blueprint.Popover
+                arrowSize={30}
+                className="share-popover"
+                content={
+                  <Blueprint.Menu>
+                    <a
+                      className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                      onClick={[Function]}
+                    >
+                      Facebook
+                    </a>
+                    <a
+                      className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                      data-hashtags="example,demo"
+                      data-related="twitterapi,twitter"
+                      data-size="large"
+                      data-text="custom share text"
+                      data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                      data-via="twitterdev"
+                      href="https://twitter.com/intent/tweet?url=nullundefined"
+                    >
+                      Tweet
+                    </a>
+                    <Blueprint.MenuItem
+                      disabled={false}
+                      onClick={[Function]}
+                      popoverProps={Object {}}
+                      shouldDismissPopover={true}
+                      submenuViewportMargin={Object {}}
+                      text="State of Dapps"
+                      useSmartPositioning={true}
+                    />
+                  </Blueprint.Menu>
+                }
+                defaultIsOpen={false}
+                hoverCloseDelay={300}
+                hoverOpenDelay={150}
+                inheritDarkTheme={true}
+                inline={false}
+                interactionKind={0}
+                isDisabled={false}
+                isModal={false}
+                openOnTargetFocus={true}
+                popoverClassName="popoverClassName"
+                position={7}
+                rootElementTag="span"
+                transitionDuration={300}
+                useSmartArrowPositioning={true}
+                useSmartPositioning={false}
               >
                 <button
                   className="pt-button pt-intent-primary pull-right"
                   onClick={[Function]}
                 >
-                  Launch
+                  Share
                 </button>
-              </a>
+              </Blueprint.Popover>
+              <Blueprint.Button
+                className="pt-intent-primary"
+                id="Login-button"
+                onClick={[Function]}
+                text="Launch"
+              />
             </div>
           </div>
           <div
@@ -106,7 +160,7 @@ ShallowWrapper {
       "props": Object {
         "children": Array [
           <div
-            className="col-sm-2 text-right"
+            className="col-sm-1 text-center"
           >
             <i
               aria-hidden="true"
@@ -114,13 +168,13 @@ ShallowWrapper {
             />
           </div>,
           <div
-            className="col-sm-10"
+            className="col-sm-11"
           >
             <div
               className="row"
             >
               <div
-                className="col-sm-10"
+                className="col-sm-8"
               >
                 <div
                   className="heading"
@@ -137,18 +191,71 @@ ShallowWrapper {
                 </div>
               </div>
               <div
-                className="col-sm-2"
+                className="col-sm-4 launchAndShare"
               >
-                <a
-                  rel="noopener noreferrer"
+                <Blueprint.Popover
+                  arrowSize={30}
+                  className="share-popover"
+                  content={
+                    <Blueprint.Menu>
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                        onClick={[Function]}
+                      >
+                        Facebook
+                      </a>
+                      <a
+                        className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                        data-hashtags="example,demo"
+                        data-related="twitterapi,twitter"
+                        data-size="large"
+                        data-text="custom share text"
+                        data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                        data-via="twitterdev"
+                        href="https://twitter.com/intent/tweet?url=nullundefined"
+                      >
+                        Tweet
+                      </a>
+                      <Blueprint.MenuItem
+                        disabled={false}
+                        onClick={[Function]}
+                        popoverProps={Object {}}
+                        shouldDismissPopover={true}
+                        submenuViewportMargin={Object {}}
+                        text="State of Dapps"
+                        useSmartPositioning={true}
+                      />
+                    </Blueprint.Menu>
+                  }
+                  defaultIsOpen={false}
+                  hoverCloseDelay={300}
+                  hoverOpenDelay={150}
+                  inheritDarkTheme={true}
+                  inline={false}
+                  interactionKind={0}
+                  isDisabled={false}
+                  isModal={false}
+                  openOnTargetFocus={true}
+                  popoverClassName="popoverClassName"
+                  position={7}
+                  rootElementTag="span"
+                  transitionDuration={300}
+                  useSmartArrowPositioning={true}
+                  useSmartPositioning={false}
                 >
                   <button
                     className="pt-button pt-intent-primary pull-right"
                     onClick={[Function]}
                   >
-                    Launch
+                    Share
                   </button>
-                </a>
+                </Blueprint.Popover>
+                <Blueprint.Button
+                  className="pt-intent-primary"
+                  id="Login-button"
+                  onClick={[Function]}
+                  text="Launch"
+                />
               </div>
             </div>
             <div
@@ -176,7 +283,7 @@ ShallowWrapper {
               aria-hidden="true"
               className="fa fa-rocket fa-5x"
             />,
-            "className": "col-sm-2 text-right",
+            "className": "col-sm-1 text-center",
           },
           "ref": null,
           "rendered": Object {
@@ -203,7 +310,7 @@ ShallowWrapper {
                 className="row"
               >
                 <div
-                  className="col-sm-10"
+                  className="col-sm-8"
                 >
                   <div
                     className="heading"
@@ -220,18 +327,71 @@ ShallowWrapper {
                   </div>
                 </div>
                 <div
-                  className="col-sm-2"
+                  className="col-sm-4 launchAndShare"
                 >
-                  <a
-                    rel="noopener noreferrer"
+                  <Blueprint.Popover
+                    arrowSize={30}
+                    className="share-popover"
+                    content={
+                      <Blueprint.Menu>
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                          onClick={[Function]}
+                        >
+                          Facebook
+                        </a>
+                        <a
+                          className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                          data-hashtags="example,demo"
+                          data-related="twitterapi,twitter"
+                          data-size="large"
+                          data-text="custom share text"
+                          data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                          data-via="twitterdev"
+                          href="https://twitter.com/intent/tweet?url=nullundefined"
+                        >
+                          Tweet
+                        </a>
+                        <Blueprint.MenuItem
+                          disabled={false}
+                          onClick={[Function]}
+                          popoverProps={Object {}}
+                          shouldDismissPopover={true}
+                          submenuViewportMargin={Object {}}
+                          text="State of Dapps"
+                          useSmartPositioning={true}
+                        />
+                      </Blueprint.Menu>
+                    }
+                    defaultIsOpen={false}
+                    hoverCloseDelay={300}
+                    hoverOpenDelay={150}
+                    inheritDarkTheme={true}
+                    inline={false}
+                    interactionKind={0}
+                    isDisabled={false}
+                    isModal={false}
+                    openOnTargetFocus={true}
+                    popoverClassName="popoverClassName"
+                    position={7}
+                    rootElementTag="span"
+                    transitionDuration={300}
+                    useSmartArrowPositioning={true}
+                    useSmartPositioning={false}
                   >
                     <button
                       className="pt-button pt-intent-primary pull-right"
                       onClick={[Function]}
                     >
-                      Launch
+                      Share
                     </button>
-                  </a>
+                  </Blueprint.Popover>
+                  <Blueprint.Button
+                    className="pt-intent-primary"
+                    id="Login-button"
+                    onClick={[Function]}
+                    text="Launch"
+                  />
                 </div>
               </div>,
               <div
@@ -245,7 +405,7 @@ ShallowWrapper {
                 />
               </div>,
             ],
-            "className": "col-sm-10",
+            "className": "col-sm-11",
           },
           "ref": null,
           "rendered": Array [
@@ -256,7 +416,7 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   <div
-                    className="col-sm-10"
+                    className="col-sm-8"
                   >
                     <div
                       className="heading"
@@ -273,18 +433,71 @@ ShallowWrapper {
                     </div>
                   </div>,
                   <div
-                    className="col-sm-2"
+                    className="col-sm-4 launchAndShare"
                   >
-                    <a
-                      rel="noopener noreferrer"
+                    <Blueprint.Popover
+                      arrowSize={30}
+                      className="share-popover"
+                      content={
+                        <Blueprint.Menu>
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                            onClick={[Function]}
+                          >
+                            Facebook
+                          </a>
+                          <a
+                            className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                            data-hashtags="example,demo"
+                            data-related="twitterapi,twitter"
+                            data-size="large"
+                            data-text="custom share text"
+                            data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                            data-via="twitterdev"
+                            href="https://twitter.com/intent/tweet?url=nullundefined"
+                          >
+                            Tweet
+                          </a>
+                          <Blueprint.MenuItem
+                            disabled={false}
+                            onClick={[Function]}
+                            popoverProps={Object {}}
+                            shouldDismissPopover={true}
+                            submenuViewportMargin={Object {}}
+                            text="State of Dapps"
+                            useSmartPositioning={true}
+                          />
+                        </Blueprint.Menu>
+                      }
+                      defaultIsOpen={false}
+                      hoverCloseDelay={300}
+                      hoverOpenDelay={150}
+                      inheritDarkTheme={true}
+                      inline={false}
+                      interactionKind={0}
+                      isDisabled={false}
+                      isModal={false}
+                      openOnTargetFocus={true}
+                      popoverClassName="popoverClassName"
+                      position={7}
+                      rootElementTag="span"
+                      transitionDuration={300}
+                      useSmartArrowPositioning={true}
+                      useSmartPositioning={false}
                     >
                       <button
                         className="pt-button pt-intent-primary pull-right"
                         onClick={[Function]}
                       >
-                        Launch
+                        Share
                       </button>
-                    </a>
+                    </Blueprint.Popover>
+                    <Blueprint.Button
+                      className="pt-intent-primary"
+                      id="Login-button"
+                      onClick={[Function]}
+                      text="Launch"
+                    />
                   </div>,
                 ],
                 "className": "row",
@@ -309,7 +522,7 @@ ShallowWrapper {
                          
                       </span>
                     </div>,
-                    "className": "col-sm-10",
+                    "className": "col-sm-8",
                   },
                   "ref": null,
                   "rendered": Object {
@@ -381,48 +594,164 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": <a
-                      rel="noopener noreferrer"
-                    >
-                      <button
-                        className="pt-button pt-intent-primary pull-right"
-                        onClick={[Function]}
+                    "children": Array [
+                      <Blueprint.Popover
+                        arrowSize={30}
+                        className="share-popover"
+                        content={
+                          <Blueprint.Menu>
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                              onClick={[Function]}
+                            >
+                              Facebook
+                            </a>
+                            <a
+                              className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                              data-hashtags="example,demo"
+                              data-related="twitterapi,twitter"
+                              data-size="large"
+                              data-text="custom share text"
+                              data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                              data-via="twitterdev"
+                              href="https://twitter.com/intent/tweet?url=nullundefined"
+                            >
+                              Tweet
+                            </a>
+                            <Blueprint.MenuItem
+                              disabled={false}
+                              onClick={[Function]}
+                              popoverProps={Object {}}
+                              shouldDismissPopover={true}
+                              submenuViewportMargin={Object {}}
+                              text="State of Dapps"
+                              useSmartPositioning={true}
+                            />
+                          </Blueprint.Menu>
+                        }
+                        defaultIsOpen={false}
+                        hoverCloseDelay={300}
+                        hoverOpenDelay={150}
+                        inheritDarkTheme={true}
+                        inline={false}
+                        interactionKind={0}
+                        isDisabled={false}
+                        isModal={false}
+                        openOnTargetFocus={true}
+                        popoverClassName="popoverClassName"
+                        position={7}
+                        rootElementTag="span"
+                        transitionDuration={300}
+                        useSmartArrowPositioning={true}
+                        useSmartPositioning={false}
                       >
-                        Launch
-                      </button>
-                    </a>,
-                    "className": "col-sm-2",
+                        <button
+                          className="pt-button pt-intent-primary pull-right"
+                          onClick={[Function]}
+                        >
+                          Share
+                        </button>
+                      </Blueprint.Popover>,
+                      <Blueprint.Button
+                        className="pt-intent-primary"
+                        id="Login-button"
+                        onClick={[Function]}
+                        text="Launch"
+                      />,
+                    ],
+                    "className": "col-sm-4 launchAndShare",
                   },
                   "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": <button
-                        className="pt-button pt-intent-primary pull-right"
-                        onClick={[Function]}
-                      >
-                        Launch
-                      </button>,
-                      "rel": "noopener noreferrer",
-                    },
-                    "ref": null,
-                    "rendered": Object {
+                  "rendered": Array [
+                    Object {
                       "instance": null,
                       "key": undefined,
-                      "nodeType": "host",
+                      "nodeType": "class",
                       "props": Object {
-                        "children": "Launch",
-                        "className": "pt-button pt-intent-primary pull-right",
-                        "onClick": [Function],
+                        "arrowSize": 30,
+                        "children": <button
+                          className="pt-button pt-intent-primary pull-right"
+                          onClick={[Function]}
+                        >
+                          Share
+                        </button>,
+                        "className": "share-popover",
+                        "content": <Blueprint.Menu>
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                            onClick={[Function]}
+                          >
+                            Facebook
+                          </a>
+                          <a
+                            className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                            data-hashtags="example,demo"
+                            data-related="twitterapi,twitter"
+                            data-size="large"
+                            data-text="custom share text"
+                            data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                            data-via="twitterdev"
+                            href="https://twitter.com/intent/tweet?url=nullundefined"
+                          >
+                            Tweet
+                          </a>
+                          <Blueprint.MenuItem
+                            disabled={false}
+                            onClick={[Function]}
+                            popoverProps={Object {}}
+                            shouldDismissPopover={true}
+                            submenuViewportMargin={Object {}}
+                            text="State of Dapps"
+                            useSmartPositioning={true}
+                          />
+                        </Blueprint.Menu>,
+                        "defaultIsOpen": false,
+                        "hoverCloseDelay": 300,
+                        "hoverOpenDelay": 150,
+                        "inheritDarkTheme": true,
+                        "inline": false,
+                        "interactionKind": 0,
+                        "isDisabled": false,
+                        "isModal": false,
+                        "openOnTargetFocus": true,
+                        "popoverClassName": "popoverClassName",
+                        "position": 7,
+                        "rootElementTag": "span",
+                        "transitionDuration": 300,
+                        "useSmartArrowPositioning": true,
+                        "useSmartPositioning": false,
                       },
                       "ref": null,
-                      "rendered": "Launch",
-                      "type": "button",
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Share",
+                          "className": "pt-button pt-intent-primary pull-right",
+                          "onClick": [Function],
+                        },
+                        "ref": null,
+                        "rendered": "Share",
+                        "type": "button",
+                      },
+                      "type": [Function],
                     },
-                    "type": "a",
-                  },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "className": "pt-intent-primary",
+                        "id": "Login-button",
+                        "onClick": [Function],
+                        "text": "Launch",
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                  ],
                   "type": "div",
                 },
               ],
@@ -482,7 +811,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-2 text-right"
+            className="col-sm-1 text-center"
           >
             <i
               aria-hidden="true"
@@ -490,13 +819,13 @@ ShallowWrapper {
             />
           </div>
           <div
-            className="col-sm-10"
+            className="col-sm-11"
           >
             <div
               className="row"
             >
               <div
-                className="col-sm-10"
+                className="col-sm-8"
               >
                 <div
                   className="heading"
@@ -513,18 +842,71 @@ ShallowWrapper {
                 </div>
               </div>
               <div
-                className="col-sm-2"
+                className="col-sm-4 launchAndShare"
               >
-                <a
-                  rel="noopener noreferrer"
+                <Blueprint.Popover
+                  arrowSize={30}
+                  className="share-popover"
+                  content={
+                    <Blueprint.Menu>
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                        onClick={[Function]}
+                      >
+                        Facebook
+                      </a>
+                      <a
+                        className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                        data-hashtags="example,demo"
+                        data-related="twitterapi,twitter"
+                        data-size="large"
+                        data-text="custom share text"
+                        data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                        data-via="twitterdev"
+                        href="https://twitter.com/intent/tweet?url=nullundefined"
+                      >
+                        Tweet
+                      </a>
+                      <Blueprint.MenuItem
+                        disabled={false}
+                        onClick={[Function]}
+                        popoverProps={Object {}}
+                        shouldDismissPopover={true}
+                        submenuViewportMargin={Object {}}
+                        text="State of Dapps"
+                        useSmartPositioning={true}
+                      />
+                    </Blueprint.Menu>
+                  }
+                  defaultIsOpen={false}
+                  hoverCloseDelay={300}
+                  hoverOpenDelay={150}
+                  inheritDarkTheme={true}
+                  inline={false}
+                  interactionKind={0}
+                  isDisabled={false}
+                  isModal={false}
+                  openOnTargetFocus={true}
+                  popoverClassName="popoverClassName"
+                  position={7}
+                  rootElementTag="span"
+                  transitionDuration={300}
+                  useSmartArrowPositioning={true}
+                  useSmartPositioning={false}
                 >
                   <button
                     className="pt-button pt-intent-primary pull-right"
                     onClick={[Function]}
                   >
-                    Launch
+                    Share
                   </button>
-                </a>
+                </Blueprint.Popover>
+                <Blueprint.Button
+                  className="pt-intent-primary"
+                  id="Login-button"
+                  onClick={[Function]}
+                  text="Launch"
+                />
               </div>
             </div>
             <div
@@ -549,7 +931,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-2 text-right"
+              className="col-sm-1 text-center"
             >
               <i
                 aria-hidden="true"
@@ -557,13 +939,13 @@ ShallowWrapper {
               />
             </div>,
             <div
-              className="col-sm-10"
+              className="col-sm-11"
             >
               <div
                 className="row"
               >
                 <div
-                  className="col-sm-10"
+                  className="col-sm-8"
                 >
                   <div
                     className="heading"
@@ -580,18 +962,71 @@ ShallowWrapper {
                   </div>
                 </div>
                 <div
-                  className="col-sm-2"
+                  className="col-sm-4 launchAndShare"
                 >
-                  <a
-                    rel="noopener noreferrer"
+                  <Blueprint.Popover
+                    arrowSize={30}
+                    className="share-popover"
+                    content={
+                      <Blueprint.Menu>
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                          onClick={[Function]}
+                        >
+                          Facebook
+                        </a>
+                        <a
+                          className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                          data-hashtags="example,demo"
+                          data-related="twitterapi,twitter"
+                          data-size="large"
+                          data-text="custom share text"
+                          data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                          data-via="twitterdev"
+                          href="https://twitter.com/intent/tweet?url=nullundefined"
+                        >
+                          Tweet
+                        </a>
+                        <Blueprint.MenuItem
+                          disabled={false}
+                          onClick={[Function]}
+                          popoverProps={Object {}}
+                          shouldDismissPopover={true}
+                          submenuViewportMargin={Object {}}
+                          text="State of Dapps"
+                          useSmartPositioning={true}
+                        />
+                      </Blueprint.Menu>
+                    }
+                    defaultIsOpen={false}
+                    hoverCloseDelay={300}
+                    hoverOpenDelay={150}
+                    inheritDarkTheme={true}
+                    inline={false}
+                    interactionKind={0}
+                    isDisabled={false}
+                    isModal={false}
+                    openOnTargetFocus={true}
+                    popoverClassName="popoverClassName"
+                    position={7}
+                    rootElementTag="span"
+                    transitionDuration={300}
+                    useSmartArrowPositioning={true}
+                    useSmartPositioning={false}
                   >
                     <button
                       className="pt-button pt-intent-primary pull-right"
                       onClick={[Function]}
                     >
-                      Launch
+                      Share
                     </button>
-                  </a>
+                  </Blueprint.Popover>
+                  <Blueprint.Button
+                    className="pt-intent-primary"
+                    id="Login-button"
+                    onClick={[Function]}
+                    text="Launch"
+                  />
                 </div>
               </div>
               <div
@@ -619,7 +1054,7 @@ ShallowWrapper {
                 aria-hidden="true"
                 className="fa fa-rocket fa-5x"
               />,
-              "className": "col-sm-2 text-right",
+              "className": "col-sm-1 text-center",
             },
             "ref": null,
             "rendered": Object {
@@ -646,7 +1081,7 @@ ShallowWrapper {
                   className="row"
                 >
                   <div
-                    className="col-sm-10"
+                    className="col-sm-8"
                   >
                     <div
                       className="heading"
@@ -663,18 +1098,71 @@ ShallowWrapper {
                     </div>
                   </div>
                   <div
-                    className="col-sm-2"
+                    className="col-sm-4 launchAndShare"
                   >
-                    <a
-                      rel="noopener noreferrer"
+                    <Blueprint.Popover
+                      arrowSize={30}
+                      className="share-popover"
+                      content={
+                        <Blueprint.Menu>
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                            onClick={[Function]}
+                          >
+                            Facebook
+                          </a>
+                          <a
+                            className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                            data-hashtags="example,demo"
+                            data-related="twitterapi,twitter"
+                            data-size="large"
+                            data-text="custom share text"
+                            data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                            data-via="twitterdev"
+                            href="https://twitter.com/intent/tweet?url=nullundefined"
+                          >
+                            Tweet
+                          </a>
+                          <Blueprint.MenuItem
+                            disabled={false}
+                            onClick={[Function]}
+                            popoverProps={Object {}}
+                            shouldDismissPopover={true}
+                            submenuViewportMargin={Object {}}
+                            text="State of Dapps"
+                            useSmartPositioning={true}
+                          />
+                        </Blueprint.Menu>
+                      }
+                      defaultIsOpen={false}
+                      hoverCloseDelay={300}
+                      hoverOpenDelay={150}
+                      inheritDarkTheme={true}
+                      inline={false}
+                      interactionKind={0}
+                      isDisabled={false}
+                      isModal={false}
+                      openOnTargetFocus={true}
+                      popoverClassName="popoverClassName"
+                      position={7}
+                      rootElementTag="span"
+                      transitionDuration={300}
+                      useSmartArrowPositioning={true}
+                      useSmartPositioning={false}
                     >
                       <button
                         className="pt-button pt-intent-primary pull-right"
                         onClick={[Function]}
                       >
-                        Launch
+                        Share
                       </button>
-                    </a>
+                    </Blueprint.Popover>
+                    <Blueprint.Button
+                      className="pt-intent-primary"
+                      id="Login-button"
+                      onClick={[Function]}
+                      text="Launch"
+                    />
                   </div>
                 </div>,
                 <div
@@ -688,7 +1176,7 @@ ShallowWrapper {
                   />
                 </div>,
               ],
-              "className": "col-sm-10",
+              "className": "col-sm-11",
             },
             "ref": null,
             "rendered": Array [
@@ -699,7 +1187,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": Array [
                     <div
-                      className="col-sm-10"
+                      className="col-sm-8"
                     >
                       <div
                         className="heading"
@@ -716,18 +1204,71 @@ ShallowWrapper {
                       </div>
                     </div>,
                     <div
-                      className="col-sm-2"
+                      className="col-sm-4 launchAndShare"
                     >
-                      <a
-                        rel="noopener noreferrer"
+                      <Blueprint.Popover
+                        arrowSize={30}
+                        className="share-popover"
+                        content={
+                          <Blueprint.Menu>
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                              onClick={[Function]}
+                            >
+                              Facebook
+                            </a>
+                            <a
+                              className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                              data-hashtags="example,demo"
+                              data-related="twitterapi,twitter"
+                              data-size="large"
+                              data-text="custom share text"
+                              data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                              data-via="twitterdev"
+                              href="https://twitter.com/intent/tweet?url=nullundefined"
+                            >
+                              Tweet
+                            </a>
+                            <Blueprint.MenuItem
+                              disabled={false}
+                              onClick={[Function]}
+                              popoverProps={Object {}}
+                              shouldDismissPopover={true}
+                              submenuViewportMargin={Object {}}
+                              text="State of Dapps"
+                              useSmartPositioning={true}
+                            />
+                          </Blueprint.Menu>
+                        }
+                        defaultIsOpen={false}
+                        hoverCloseDelay={300}
+                        hoverOpenDelay={150}
+                        inheritDarkTheme={true}
+                        inline={false}
+                        interactionKind={0}
+                        isDisabled={false}
+                        isModal={false}
+                        openOnTargetFocus={true}
+                        popoverClassName="popoverClassName"
+                        position={7}
+                        rootElementTag="span"
+                        transitionDuration={300}
+                        useSmartArrowPositioning={true}
+                        useSmartPositioning={false}
                       >
                         <button
                           className="pt-button pt-intent-primary pull-right"
                           onClick={[Function]}
                         >
-                          Launch
+                          Share
                         </button>
-                      </a>
+                      </Blueprint.Popover>
+                      <Blueprint.Button
+                        className="pt-intent-primary"
+                        id="Login-button"
+                        onClick={[Function]}
+                        text="Launch"
+                      />
                     </div>,
                   ],
                   "className": "row",
@@ -752,7 +1293,7 @@ ShallowWrapper {
                            
                         </span>
                       </div>,
-                      "className": "col-sm-10",
+                      "className": "col-sm-8",
                     },
                     "ref": null,
                     "rendered": Object {
@@ -824,48 +1365,164 @@ ShallowWrapper {
                     "key": undefined,
                     "nodeType": "host",
                     "props": Object {
-                      "children": <a
-                        rel="noopener noreferrer"
-                      >
-                        <button
-                          className="pt-button pt-intent-primary pull-right"
-                          onClick={[Function]}
+                      "children": Array [
+                        <Blueprint.Popover
+                          arrowSize={30}
+                          className="share-popover"
+                          content={
+                            <Blueprint.Menu>
+                              <a
+                                className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                                onClick={[Function]}
+                              >
+                                Facebook
+                              </a>
+                              <a
+                                className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                                data-hashtags="example,demo"
+                                data-related="twitterapi,twitter"
+                                data-size="large"
+                                data-text="custom share text"
+                                data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                                data-via="twitterdev"
+                                href="https://twitter.com/intent/tweet?url=nullundefined"
+                              >
+                                Tweet
+                              </a>
+                              <Blueprint.MenuItem
+                                disabled={false}
+                                onClick={[Function]}
+                                popoverProps={Object {}}
+                                shouldDismissPopover={true}
+                                submenuViewportMargin={Object {}}
+                                text="State of Dapps"
+                                useSmartPositioning={true}
+                              />
+                            </Blueprint.Menu>
+                          }
+                          defaultIsOpen={false}
+                          hoverCloseDelay={300}
+                          hoverOpenDelay={150}
+                          inheritDarkTheme={true}
+                          inline={false}
+                          interactionKind={0}
+                          isDisabled={false}
+                          isModal={false}
+                          openOnTargetFocus={true}
+                          popoverClassName="popoverClassName"
+                          position={7}
+                          rootElementTag="span"
+                          transitionDuration={300}
+                          useSmartArrowPositioning={true}
+                          useSmartPositioning={false}
                         >
-                          Launch
-                        </button>
-                      </a>,
-                      "className": "col-sm-2",
+                          <button
+                            className="pt-button pt-intent-primary pull-right"
+                            onClick={[Function]}
+                          >
+                            Share
+                          </button>
+                        </Blueprint.Popover>,
+                        <Blueprint.Button
+                          className="pt-intent-primary"
+                          id="Login-button"
+                          onClick={[Function]}
+                          text="Launch"
+                        />,
+                      ],
+                      "className": "col-sm-4 launchAndShare",
                     },
                     "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": <button
-                          className="pt-button pt-intent-primary pull-right"
-                          onClick={[Function]}
-                        >
-                          Launch
-                        </button>,
-                        "rel": "noopener noreferrer",
-                      },
-                      "ref": null,
-                      "rendered": Object {
+                    "rendered": Array [
+                      Object {
                         "instance": null,
                         "key": undefined,
-                        "nodeType": "host",
+                        "nodeType": "class",
                         "props": Object {
-                          "children": "Launch",
-                          "className": "pt-button pt-intent-primary pull-right",
-                          "onClick": [Function],
+                          "arrowSize": 30,
+                          "children": <button
+                            className="pt-button pt-intent-primary pull-right"
+                            onClick={[Function]}
+                          >
+                            Share
+                          </button>,
+                          "className": "share-popover",
+                          "content": <Blueprint.Menu>
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                              onClick={[Function]}
+                            >
+                              Facebook
+                            </a>
+                            <a
+                              className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                              data-hashtags="example,demo"
+                              data-related="twitterapi,twitter"
+                              data-size="large"
+                              data-text="custom share text"
+                              data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                              data-via="twitterdev"
+                              href="https://twitter.com/intent/tweet?url=nullundefined"
+                            >
+                              Tweet
+                            </a>
+                            <Blueprint.MenuItem
+                              disabled={false}
+                              onClick={[Function]}
+                              popoverProps={Object {}}
+                              shouldDismissPopover={true}
+                              submenuViewportMargin={Object {}}
+                              text="State of Dapps"
+                              useSmartPositioning={true}
+                            />
+                          </Blueprint.Menu>,
+                          "defaultIsOpen": false,
+                          "hoverCloseDelay": 300,
+                          "hoverOpenDelay": 150,
+                          "inheritDarkTheme": true,
+                          "inline": false,
+                          "interactionKind": 0,
+                          "isDisabled": false,
+                          "isModal": false,
+                          "openOnTargetFocus": true,
+                          "popoverClassName": "popoverClassName",
+                          "position": 7,
+                          "rootElementTag": "span",
+                          "transitionDuration": 300,
+                          "useSmartArrowPositioning": true,
+                          "useSmartPositioning": false,
                         },
                         "ref": null,
-                        "rendered": "Launch",
-                        "type": "button",
+                        "rendered": Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Share",
+                            "className": "pt-button pt-intent-primary pull-right",
+                            "onClick": [Function],
+                          },
+                          "ref": null,
+                          "rendered": "Share",
+                          "type": "button",
+                        },
+                        "type": [Function],
                       },
-                      "type": "a",
-                    },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "class",
+                        "props": Object {
+                          "className": "pt-intent-primary",
+                          "id": "Login-button",
+                          "onClick": [Function],
+                          "text": "Launch",
+                        },
+                        "ref": null,
+                        "rendered": null,
+                        "type": [Function],
+                      },
+                    ],
                     "type": "div",
                   },
                 ],
@@ -958,7 +1615,7 @@ ShallowWrapper {
         className="row"
       >
         <div
-          className="col-sm-2 text-right"
+          className="col-sm-1 text-center"
         >
           <i
             aria-hidden="true"
@@ -966,13 +1623,13 @@ ShallowWrapper {
           />
         </div>
         <div
-          className="col-sm-10"
+          className="col-sm-11"
         >
           <div
             className="row"
           >
             <div
-              className="col-sm-10"
+              className="col-sm-8"
             >
               <div
                 className="heading"
@@ -991,15 +1648,70 @@ ShallowWrapper {
               </div>
             </div>
             <div
-              className="col-sm-2"
+              className="col-sm-4 launchAndShare"
             >
-              <Loading
-                className="pull-right"
-                color="#f5f8fa"
-                delay={1000}
-                height={0}
-                type="bars"
-                width={30}
+              <Blueprint.Popover
+                arrowSize={30}
+                className="share-popover"
+                content={
+                  <Blueprint.Menu>
+                    <a
+                      className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                      onClick={[Function]}
+                    >
+                      Facebook
+                    </a>
+                    <a
+                      className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                      data-hashtags="example,demo"
+                      data-related="twitterapi,twitter"
+                      data-size="large"
+                      data-text="custom share text"
+                      data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                      data-via="twitterdev"
+                      href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                    >
+                      Tweet
+                    </a>
+                    <Blueprint.MenuItem
+                      disabled={false}
+                      onClick={[Function]}
+                      popoverProps={Object {}}
+                      shouldDismissPopover={true}
+                      submenuViewportMargin={Object {}}
+                      text="State of Dapps"
+                      useSmartPositioning={true}
+                    />
+                  </Blueprint.Menu>
+                }
+                defaultIsOpen={false}
+                hoverCloseDelay={300}
+                hoverOpenDelay={150}
+                inheritDarkTheme={true}
+                inline={false}
+                interactionKind={0}
+                isDisabled={false}
+                isModal={false}
+                openOnTargetFocus={true}
+                popoverClassName="popoverClassName"
+                position={7}
+                rootElementTag="span"
+                transitionDuration={300}
+                useSmartArrowPositioning={true}
+                useSmartPositioning={false}
+              >
+                <button
+                  className="pt-button pt-intent-primary pull-right"
+                  onClick={[Function]}
+                >
+                  Share
+                </button>
+              </Blueprint.Popover>
+              <Blueprint.Button
+                className="pt-intent-primary"
+                id="Login-button"
+                onClick={[Function]}
+                text="Launch"
               />
             </div>
           </div>
@@ -1025,7 +1737,7 @@ ShallowWrapper {
       "props": Object {
         "children": Array [
           <div
-            className="col-sm-2 text-right"
+            className="col-sm-1 text-center"
           >
             <i
               aria-hidden="true"
@@ -1033,13 +1745,13 @@ ShallowWrapper {
             />
           </div>,
           <div
-            className="col-sm-10"
+            className="col-sm-11"
           >
             <div
               className="row"
             >
               <div
-                className="col-sm-10"
+                className="col-sm-8"
               >
                 <div
                   className="heading"
@@ -1058,15 +1770,70 @@ ShallowWrapper {
                 </div>
               </div>
               <div
-                className="col-sm-2"
+                className="col-sm-4 launchAndShare"
               >
-                <Loading
-                  className="pull-right"
-                  color="#f5f8fa"
-                  delay={1000}
-                  height={0}
-                  type="bars"
-                  width={30}
+                <Blueprint.Popover
+                  arrowSize={30}
+                  className="share-popover"
+                  content={
+                    <Blueprint.Menu>
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                        onClick={[Function]}
+                      >
+                        Facebook
+                      </a>
+                      <a
+                        className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                        data-hashtags="example,demo"
+                        data-related="twitterapi,twitter"
+                        data-size="large"
+                        data-text="custom share text"
+                        data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                        data-via="twitterdev"
+                        href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                      >
+                        Tweet
+                      </a>
+                      <Blueprint.MenuItem
+                        disabled={false}
+                        onClick={[Function]}
+                        popoverProps={Object {}}
+                        shouldDismissPopover={true}
+                        submenuViewportMargin={Object {}}
+                        text="State of Dapps"
+                        useSmartPositioning={true}
+                      />
+                    </Blueprint.Menu>
+                  }
+                  defaultIsOpen={false}
+                  hoverCloseDelay={300}
+                  hoverOpenDelay={150}
+                  inheritDarkTheme={true}
+                  inline={false}
+                  interactionKind={0}
+                  isDisabled={false}
+                  isModal={false}
+                  openOnTargetFocus={true}
+                  popoverClassName="popoverClassName"
+                  position={7}
+                  rootElementTag="span"
+                  transitionDuration={300}
+                  useSmartArrowPositioning={true}
+                  useSmartPositioning={false}
+                >
+                  <button
+                    className="pt-button pt-intent-primary pull-right"
+                    onClick={[Function]}
+                  >
+                    Share
+                  </button>
+                </Blueprint.Popover>
+                <Blueprint.Button
+                  className="pt-intent-primary"
+                  id="Login-button"
+                  onClick={[Function]}
+                  text="Launch"
                 />
               </div>
             </div>
@@ -1095,7 +1862,7 @@ ShallowWrapper {
               aria-hidden="true"
               className="fa fa-rocket fa-5x"
             />,
-            "className": "col-sm-2 text-right",
+            "className": "col-sm-1 text-center",
           },
           "ref": null,
           "rendered": Object {
@@ -1122,7 +1889,7 @@ ShallowWrapper {
                 className="row"
               >
                 <div
-                  className="col-sm-10"
+                  className="col-sm-8"
                 >
                   <div
                     className="heading"
@@ -1141,15 +1908,70 @@ ShallowWrapper {
                   </div>
                 </div>
                 <div
-                  className="col-sm-2"
+                  className="col-sm-4 launchAndShare"
                 >
-                  <Loading
-                    className="pull-right"
-                    color="#f5f8fa"
-                    delay={1000}
-                    height={0}
-                    type="bars"
-                    width={30}
+                  <Blueprint.Popover
+                    arrowSize={30}
+                    className="share-popover"
+                    content={
+                      <Blueprint.Menu>
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                          onClick={[Function]}
+                        >
+                          Facebook
+                        </a>
+                        <a
+                          className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                          data-hashtags="example,demo"
+                          data-related="twitterapi,twitter"
+                          data-size="large"
+                          data-text="custom share text"
+                          data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                          data-via="twitterdev"
+                          href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                        >
+                          Tweet
+                        </a>
+                        <Blueprint.MenuItem
+                          disabled={false}
+                          onClick={[Function]}
+                          popoverProps={Object {}}
+                          shouldDismissPopover={true}
+                          submenuViewportMargin={Object {}}
+                          text="State of Dapps"
+                          useSmartPositioning={true}
+                        />
+                      </Blueprint.Menu>
+                    }
+                    defaultIsOpen={false}
+                    hoverCloseDelay={300}
+                    hoverOpenDelay={150}
+                    inheritDarkTheme={true}
+                    inline={false}
+                    interactionKind={0}
+                    isDisabled={false}
+                    isModal={false}
+                    openOnTargetFocus={true}
+                    popoverClassName="popoverClassName"
+                    position={7}
+                    rootElementTag="span"
+                    transitionDuration={300}
+                    useSmartArrowPositioning={true}
+                    useSmartPositioning={false}
+                  >
+                    <button
+                      className="pt-button pt-intent-primary pull-right"
+                      onClick={[Function]}
+                    >
+                      Share
+                    </button>
+                  </Blueprint.Popover>
+                  <Blueprint.Button
+                    className="pt-intent-primary"
+                    id="Login-button"
+                    onClick={[Function]}
+                    text="Launch"
                   />
                 </div>
               </div>,
@@ -1164,7 +1986,7 @@ ShallowWrapper {
                 />
               </div>,
             ],
-            "className": "col-sm-10",
+            "className": "col-sm-11",
           },
           "ref": null,
           "rendered": Array [
@@ -1175,7 +1997,7 @@ ShallowWrapper {
               "props": Object {
                 "children": Array [
                   <div
-                    className="col-sm-10"
+                    className="col-sm-8"
                   >
                     <div
                       className="heading"
@@ -1194,15 +2016,70 @@ ShallowWrapper {
                     </div>
                   </div>,
                   <div
-                    className="col-sm-2"
+                    className="col-sm-4 launchAndShare"
                   >
-                    <Loading
-                      className="pull-right"
-                      color="#f5f8fa"
-                      delay={1000}
-                      height={0}
-                      type="bars"
-                      width={30}
+                    <Blueprint.Popover
+                      arrowSize={30}
+                      className="share-popover"
+                      content={
+                        <Blueprint.Menu>
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                            onClick={[Function]}
+                          >
+                            Facebook
+                          </a>
+                          <a
+                            className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                            data-hashtags="example,demo"
+                            data-related="twitterapi,twitter"
+                            data-size="large"
+                            data-text="custom share text"
+                            data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                            data-via="twitterdev"
+                            href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                          >
+                            Tweet
+                          </a>
+                          <Blueprint.MenuItem
+                            disabled={false}
+                            onClick={[Function]}
+                            popoverProps={Object {}}
+                            shouldDismissPopover={true}
+                            submenuViewportMargin={Object {}}
+                            text="State of Dapps"
+                            useSmartPositioning={true}
+                          />
+                        </Blueprint.Menu>
+                      }
+                      defaultIsOpen={false}
+                      hoverCloseDelay={300}
+                      hoverOpenDelay={150}
+                      inheritDarkTheme={true}
+                      inline={false}
+                      interactionKind={0}
+                      isDisabled={false}
+                      isModal={false}
+                      openOnTargetFocus={true}
+                      popoverClassName="popoverClassName"
+                      position={7}
+                      rootElementTag="span"
+                      transitionDuration={300}
+                      useSmartArrowPositioning={true}
+                      useSmartPositioning={false}
+                    >
+                      <button
+                        className="pt-button pt-intent-primary pull-right"
+                        onClick={[Function]}
+                      >
+                        Share
+                      </button>
+                    </Blueprint.Popover>
+                    <Blueprint.Button
+                      className="pt-intent-primary"
+                      id="Login-button"
+                      onClick={[Function]}
+                      text="Launch"
                     />
                   </div>,
                 ],
@@ -1230,7 +2107,7 @@ ShallowWrapper {
                          
                       </span>
                     </div>,
-                    "className": "col-sm-10",
+                    "className": "col-sm-8",
                   },
                   "ref": null,
                   "rendered": Object {
@@ -1304,33 +2181,164 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": <Loading
-                      className="pull-right"
-                      color="#f5f8fa"
-                      delay={1000}
-                      height={0}
-                      type="bars"
-                      width={30}
-                    />,
-                    "className": "col-sm-2",
+                    "children": Array [
+                      <Blueprint.Popover
+                        arrowSize={30}
+                        className="share-popover"
+                        content={
+                          <Blueprint.Menu>
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                              onClick={[Function]}
+                            >
+                              Facebook
+                            </a>
+                            <a
+                              className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                              data-hashtags="example,demo"
+                              data-related="twitterapi,twitter"
+                              data-size="large"
+                              data-text="custom share text"
+                              data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                              data-via="twitterdev"
+                              href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                            >
+                              Tweet
+                            </a>
+                            <Blueprint.MenuItem
+                              disabled={false}
+                              onClick={[Function]}
+                              popoverProps={Object {}}
+                              shouldDismissPopover={true}
+                              submenuViewportMargin={Object {}}
+                              text="State of Dapps"
+                              useSmartPositioning={true}
+                            />
+                          </Blueprint.Menu>
+                        }
+                        defaultIsOpen={false}
+                        hoverCloseDelay={300}
+                        hoverOpenDelay={150}
+                        inheritDarkTheme={true}
+                        inline={false}
+                        interactionKind={0}
+                        isDisabled={false}
+                        isModal={false}
+                        openOnTargetFocus={true}
+                        popoverClassName="popoverClassName"
+                        position={7}
+                        rootElementTag="span"
+                        transitionDuration={300}
+                        useSmartArrowPositioning={true}
+                        useSmartPositioning={false}
+                      >
+                        <button
+                          className="pt-button pt-intent-primary pull-right"
+                          onClick={[Function]}
+                        >
+                          Share
+                        </button>
+                      </Blueprint.Popover>,
+                      <Blueprint.Button
+                        className="pt-intent-primary"
+                        id="Login-button"
+                        onClick={[Function]}
+                        text="Launch"
+                      />,
+                    ],
+                    "className": "col-sm-4 launchAndShare",
                   },
                   "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "className": "pull-right",
-                      "color": "#f5f8fa",
-                      "delay": 1000,
-                      "height": 0,
-                      "type": "bars",
-                      "width": 30,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "arrowSize": 30,
+                        "children": <button
+                          className="pt-button pt-intent-primary pull-right"
+                          onClick={[Function]}
+                        >
+                          Share
+                        </button>,
+                        "className": "share-popover",
+                        "content": <Blueprint.Menu>
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                            onClick={[Function]}
+                          >
+                            Facebook
+                          </a>
+                          <a
+                            className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                            data-hashtags="example,demo"
+                            data-related="twitterapi,twitter"
+                            data-size="large"
+                            data-text="custom share text"
+                            data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                            data-via="twitterdev"
+                            href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                          >
+                            Tweet
+                          </a>
+                          <Blueprint.MenuItem
+                            disabled={false}
+                            onClick={[Function]}
+                            popoverProps={Object {}}
+                            shouldDismissPopover={true}
+                            submenuViewportMargin={Object {}}
+                            text="State of Dapps"
+                            useSmartPositioning={true}
+                          />
+                        </Blueprint.Menu>,
+                        "defaultIsOpen": false,
+                        "hoverCloseDelay": 300,
+                        "hoverOpenDelay": 150,
+                        "inheritDarkTheme": true,
+                        "inline": false,
+                        "interactionKind": 0,
+                        "isDisabled": false,
+                        "isModal": false,
+                        "openOnTargetFocus": true,
+                        "popoverClassName": "popoverClassName",
+                        "position": 7,
+                        "rootElementTag": "span",
+                        "transitionDuration": 300,
+                        "useSmartArrowPositioning": true,
+                        "useSmartPositioning": false,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Share",
+                          "className": "pt-button pt-intent-primary pull-right",
+                          "onClick": [Function],
+                        },
+                        "ref": null,
+                        "rendered": "Share",
+                        "type": "button",
+                      },
+                      "type": [Function],
                     },
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "className": "pt-intent-primary",
+                        "id": "Login-button",
+                        "onClick": [Function],
+                        "text": "Launch",
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                  ],
                   "type": "div",
                 },
               ],
@@ -1390,7 +2398,7 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-2 text-right"
+            className="col-sm-1 text-center"
           >
             <i
               aria-hidden="true"
@@ -1398,13 +2406,13 @@ ShallowWrapper {
             />
           </div>
           <div
-            className="col-sm-10"
+            className="col-sm-11"
           >
             <div
               className="row"
             >
               <div
-                className="col-sm-10"
+                className="col-sm-8"
               >
                 <div
                   className="heading"
@@ -1423,15 +2431,70 @@ ShallowWrapper {
                 </div>
               </div>
               <div
-                className="col-sm-2"
+                className="col-sm-4 launchAndShare"
               >
-                <Loading
-                  className="pull-right"
-                  color="#f5f8fa"
-                  delay={1000}
-                  height={0}
-                  type="bars"
-                  width={30}
+                <Blueprint.Popover
+                  arrowSize={30}
+                  className="share-popover"
+                  content={
+                    <Blueprint.Menu>
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                        onClick={[Function]}
+                      >
+                        Facebook
+                      </a>
+                      <a
+                        className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                        data-hashtags="example,demo"
+                        data-related="twitterapi,twitter"
+                        data-size="large"
+                        data-text="custom share text"
+                        data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                        data-via="twitterdev"
+                        href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                      >
+                        Tweet
+                      </a>
+                      <Blueprint.MenuItem
+                        disabled={false}
+                        onClick={[Function]}
+                        popoverProps={Object {}}
+                        shouldDismissPopover={true}
+                        submenuViewportMargin={Object {}}
+                        text="State of Dapps"
+                        useSmartPositioning={true}
+                      />
+                    </Blueprint.Menu>
+                  }
+                  defaultIsOpen={false}
+                  hoverCloseDelay={300}
+                  hoverOpenDelay={150}
+                  inheritDarkTheme={true}
+                  inline={false}
+                  interactionKind={0}
+                  isDisabled={false}
+                  isModal={false}
+                  openOnTargetFocus={true}
+                  popoverClassName="popoverClassName"
+                  position={7}
+                  rootElementTag="span"
+                  transitionDuration={300}
+                  useSmartArrowPositioning={true}
+                  useSmartPositioning={false}
+                >
+                  <button
+                    className="pt-button pt-intent-primary pull-right"
+                    onClick={[Function]}
+                  >
+                    Share
+                  </button>
+                </Blueprint.Popover>
+                <Blueprint.Button
+                  className="pt-intent-primary"
+                  id="Login-button"
+                  onClick={[Function]}
+                  text="Launch"
                 />
               </div>
             </div>
@@ -1457,7 +2520,7 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-2 text-right"
+              className="col-sm-1 text-center"
             >
               <i
                 aria-hidden="true"
@@ -1465,13 +2528,13 @@ ShallowWrapper {
               />
             </div>,
             <div
-              className="col-sm-10"
+              className="col-sm-11"
             >
               <div
                 className="row"
               >
                 <div
-                  className="col-sm-10"
+                  className="col-sm-8"
                 >
                   <div
                     className="heading"
@@ -1490,15 +2553,70 @@ ShallowWrapper {
                   </div>
                 </div>
                 <div
-                  className="col-sm-2"
+                  className="col-sm-4 launchAndShare"
                 >
-                  <Loading
-                    className="pull-right"
-                    color="#f5f8fa"
-                    delay={1000}
-                    height={0}
-                    type="bars"
-                    width={30}
+                  <Blueprint.Popover
+                    arrowSize={30}
+                    className="share-popover"
+                    content={
+                      <Blueprint.Menu>
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                          onClick={[Function]}
+                        >
+                          Facebook
+                        </a>
+                        <a
+                          className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                          data-hashtags="example,demo"
+                          data-related="twitterapi,twitter"
+                          data-size="large"
+                          data-text="custom share text"
+                          data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                          data-via="twitterdev"
+                          href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                        >
+                          Tweet
+                        </a>
+                        <Blueprint.MenuItem
+                          disabled={false}
+                          onClick={[Function]}
+                          popoverProps={Object {}}
+                          shouldDismissPopover={true}
+                          submenuViewportMargin={Object {}}
+                          text="State of Dapps"
+                          useSmartPositioning={true}
+                        />
+                      </Blueprint.Menu>
+                    }
+                    defaultIsOpen={false}
+                    hoverCloseDelay={300}
+                    hoverOpenDelay={150}
+                    inheritDarkTheme={true}
+                    inline={false}
+                    interactionKind={0}
+                    isDisabled={false}
+                    isModal={false}
+                    openOnTargetFocus={true}
+                    popoverClassName="popoverClassName"
+                    position={7}
+                    rootElementTag="span"
+                    transitionDuration={300}
+                    useSmartArrowPositioning={true}
+                    useSmartPositioning={false}
+                  >
+                    <button
+                      className="pt-button pt-intent-primary pull-right"
+                      onClick={[Function]}
+                    >
+                      Share
+                    </button>
+                  </Blueprint.Popover>
+                  <Blueprint.Button
+                    className="pt-intent-primary"
+                    id="Login-button"
+                    onClick={[Function]}
+                    text="Launch"
                   />
                 </div>
               </div>
@@ -1527,7 +2645,7 @@ ShallowWrapper {
                 aria-hidden="true"
                 className="fa fa-rocket fa-5x"
               />,
-              "className": "col-sm-2 text-right",
+              "className": "col-sm-1 text-center",
             },
             "ref": null,
             "rendered": Object {
@@ -1554,7 +2672,7 @@ ShallowWrapper {
                   className="row"
                 >
                   <div
-                    className="col-sm-10"
+                    className="col-sm-8"
                   >
                     <div
                       className="heading"
@@ -1573,15 +2691,70 @@ ShallowWrapper {
                     </div>
                   </div>
                   <div
-                    className="col-sm-2"
+                    className="col-sm-4 launchAndShare"
                   >
-                    <Loading
-                      className="pull-right"
-                      color="#f5f8fa"
-                      delay={1000}
-                      height={0}
-                      type="bars"
-                      width={30}
+                    <Blueprint.Popover
+                      arrowSize={30}
+                      className="share-popover"
+                      content={
+                        <Blueprint.Menu>
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                            onClick={[Function]}
+                          >
+                            Facebook
+                          </a>
+                          <a
+                            className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                            data-hashtags="example,demo"
+                            data-related="twitterapi,twitter"
+                            data-size="large"
+                            data-text="custom share text"
+                            data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                            data-via="twitterdev"
+                            href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                          >
+                            Tweet
+                          </a>
+                          <Blueprint.MenuItem
+                            disabled={false}
+                            onClick={[Function]}
+                            popoverProps={Object {}}
+                            shouldDismissPopover={true}
+                            submenuViewportMargin={Object {}}
+                            text="State of Dapps"
+                            useSmartPositioning={true}
+                          />
+                        </Blueprint.Menu>
+                      }
+                      defaultIsOpen={false}
+                      hoverCloseDelay={300}
+                      hoverOpenDelay={150}
+                      inheritDarkTheme={true}
+                      inline={false}
+                      interactionKind={0}
+                      isDisabled={false}
+                      isModal={false}
+                      openOnTargetFocus={true}
+                      popoverClassName="popoverClassName"
+                      position={7}
+                      rootElementTag="span"
+                      transitionDuration={300}
+                      useSmartArrowPositioning={true}
+                      useSmartPositioning={false}
+                    >
+                      <button
+                        className="pt-button pt-intent-primary pull-right"
+                        onClick={[Function]}
+                      >
+                        Share
+                      </button>
+                    </Blueprint.Popover>
+                    <Blueprint.Button
+                      className="pt-intent-primary"
+                      id="Login-button"
+                      onClick={[Function]}
+                      text="Launch"
                     />
                   </div>
                 </div>,
@@ -1596,7 +2769,7 @@ ShallowWrapper {
                   />
                 </div>,
               ],
-              "className": "col-sm-10",
+              "className": "col-sm-11",
             },
             "ref": null,
             "rendered": Array [
@@ -1607,7 +2780,7 @@ ShallowWrapper {
                 "props": Object {
                   "children": Array [
                     <div
-                      className="col-sm-10"
+                      className="col-sm-8"
                     >
                       <div
                         className="heading"
@@ -1626,15 +2799,70 @@ ShallowWrapper {
                       </div>
                     </div>,
                     <div
-                      className="col-sm-2"
+                      className="col-sm-4 launchAndShare"
                     >
-                      <Loading
-                        className="pull-right"
-                        color="#f5f8fa"
-                        delay={1000}
-                        height={0}
-                        type="bars"
-                        width={30}
+                      <Blueprint.Popover
+                        arrowSize={30}
+                        className="share-popover"
+                        content={
+                          <Blueprint.Menu>
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                              onClick={[Function]}
+                            >
+                              Facebook
+                            </a>
+                            <a
+                              className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                              data-hashtags="example,demo"
+                              data-related="twitterapi,twitter"
+                              data-size="large"
+                              data-text="custom share text"
+                              data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                              data-via="twitterdev"
+                              href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                            >
+                              Tweet
+                            </a>
+                            <Blueprint.MenuItem
+                              disabled={false}
+                              onClick={[Function]}
+                              popoverProps={Object {}}
+                              shouldDismissPopover={true}
+                              submenuViewportMargin={Object {}}
+                              text="State of Dapps"
+                              useSmartPositioning={true}
+                            />
+                          </Blueprint.Menu>
+                        }
+                        defaultIsOpen={false}
+                        hoverCloseDelay={300}
+                        hoverOpenDelay={150}
+                        inheritDarkTheme={true}
+                        inline={false}
+                        interactionKind={0}
+                        isDisabled={false}
+                        isModal={false}
+                        openOnTargetFocus={true}
+                        popoverClassName="popoverClassName"
+                        position={7}
+                        rootElementTag="span"
+                        transitionDuration={300}
+                        useSmartArrowPositioning={true}
+                        useSmartPositioning={false}
+                      >
+                        <button
+                          className="pt-button pt-intent-primary pull-right"
+                          onClick={[Function]}
+                        >
+                          Share
+                        </button>
+                      </Blueprint.Popover>
+                      <Blueprint.Button
+                        className="pt-intent-primary"
+                        id="Login-button"
+                        onClick={[Function]}
+                        text="Launch"
                       />
                     </div>,
                   ],
@@ -1662,7 +2890,7 @@ ShallowWrapper {
                            
                         </span>
                       </div>,
-                      "className": "col-sm-10",
+                      "className": "col-sm-8",
                     },
                     "ref": null,
                     "rendered": Object {
@@ -1736,33 +2964,164 @@ ShallowWrapper {
                     "key": undefined,
                     "nodeType": "host",
                     "props": Object {
-                      "children": <Loading
-                        className="pull-right"
-                        color="#f5f8fa"
-                        delay={1000}
-                        height={0}
-                        type="bars"
-                        width={30}
-                      />,
-                      "className": "col-sm-2",
+                      "children": Array [
+                        <Blueprint.Popover
+                          arrowSize={30}
+                          className="share-popover"
+                          content={
+                            <Blueprint.Menu>
+                              <a
+                                className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                                onClick={[Function]}
+                              >
+                                Facebook
+                              </a>
+                              <a
+                                className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                                data-hashtags="example,demo"
+                                data-related="twitterapi,twitter"
+                                data-size="large"
+                                data-text="custom share text"
+                                data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                                data-via="twitterdev"
+                                href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                              >
+                                Tweet
+                              </a>
+                              <Blueprint.MenuItem
+                                disabled={false}
+                                onClick={[Function]}
+                                popoverProps={Object {}}
+                                shouldDismissPopover={true}
+                                submenuViewportMargin={Object {}}
+                                text="State of Dapps"
+                                useSmartPositioning={true}
+                              />
+                            </Blueprint.Menu>
+                          }
+                          defaultIsOpen={false}
+                          hoverCloseDelay={300}
+                          hoverOpenDelay={150}
+                          inheritDarkTheme={true}
+                          inline={false}
+                          interactionKind={0}
+                          isDisabled={false}
+                          isModal={false}
+                          openOnTargetFocus={true}
+                          popoverClassName="popoverClassName"
+                          position={7}
+                          rootElementTag="span"
+                          transitionDuration={300}
+                          useSmartArrowPositioning={true}
+                          useSmartPositioning={false}
+                        >
+                          <button
+                            className="pt-button pt-intent-primary pull-right"
+                            onClick={[Function]}
+                          >
+                            Share
+                          </button>
+                        </Blueprint.Popover>,
+                        <Blueprint.Button
+                          className="pt-intent-primary"
+                          id="Login-button"
+                          onClick={[Function]}
+                          text="Launch"
+                        />,
+                      ],
+                      "className": "col-sm-4 launchAndShare",
                     },
                     "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "class",
-                      "props": Object {
-                        "className": "pull-right",
-                        "color": "#f5f8fa",
-                        "delay": 1000,
-                        "height": 0,
-                        "type": "bars",
-                        "width": 30,
+                    "rendered": Array [
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "class",
+                        "props": Object {
+                          "arrowSize": 30,
+                          "children": <button
+                            className="pt-button pt-intent-primary pull-right"
+                            onClick={[Function]}
+                          >
+                            Share
+                          </button>,
+                          "className": "share-popover",
+                          "content": <Blueprint.Menu>
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
+                              onClick={[Function]}
+                            >
+                              Facebook
+                            </a>
+                            <a
+                              className="twitter-share-button pt-menu-item pt-popover-dismiss"
+                              data-hashtags="example,demo"
+                              data-related="twitterapi,twitter"
+                              data-size="large"
+                              data-text="custom share text"
+                              data-url="https://twitter.com/intent/tweet?text=Check%20out%20my%20app%20on%20STRATO%20Public!%20http://blockapps.net/demo1"
+                              data-via="twitterdev"
+                              href="https://twitter.com/intent/tweet?url=nullhttp://stratodev.blockapps.net/apps/e80b681c42f831ea3c4b8db531f5e165/"
+                            >
+                              Tweet
+                            </a>
+                            <Blueprint.MenuItem
+                              disabled={false}
+                              onClick={[Function]}
+                              popoverProps={Object {}}
+                              shouldDismissPopover={true}
+                              submenuViewportMargin={Object {}}
+                              text="State of Dapps"
+                              useSmartPositioning={true}
+                            />
+                          </Blueprint.Menu>,
+                          "defaultIsOpen": false,
+                          "hoverCloseDelay": 300,
+                          "hoverOpenDelay": 150,
+                          "inheritDarkTheme": true,
+                          "inline": false,
+                          "interactionKind": 0,
+                          "isDisabled": false,
+                          "isModal": false,
+                          "openOnTargetFocus": true,
+                          "popoverClassName": "popoverClassName",
+                          "position": 7,
+                          "rootElementTag": "span",
+                          "transitionDuration": 300,
+                          "useSmartArrowPositioning": true,
+                          "useSmartPositioning": false,
+                        },
+                        "ref": null,
+                        "rendered": Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "Share",
+                            "className": "pt-button pt-intent-primary pull-right",
+                            "onClick": [Function],
+                          },
+                          "ref": null,
+                          "rendered": "Share",
+                          "type": "button",
+                        },
+                        "type": [Function],
                       },
-                      "ref": null,
-                      "rendered": null,
-                      "type": [Function],
-                    },
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "class",
+                        "props": Object {
+                          "className": "pt-intent-primary",
+                          "id": "Login-button",
+                          "onClick": [Function],
+                          "text": "Launch",
+                        },
+                        "ref": null,
+                        "rendered": null,
+                        "type": [Function],
+                      },
+                    ],
                     "type": "div",
                   },
                 ],

@@ -1,11 +1,11 @@
 import React, { Component } from 'react';
 import {
-  sendEtherOpenModal,
-  sendEtherCloseModal,
-  sendEther,
+  sendTokensOpenModal,
+  sendTokensCloseModal,
+  sendTokens,
   fromUsernameChange,
   toUsernameChange
-} from './sendEther.actions';
+} from './sendTokens.actions';
 import { fetchAccounts, fetchUserAddresses } from '../../accounts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
@@ -17,7 +17,7 @@ import validate from './validate';
 
 // TODO: use solc instead of extabi for compile
 
-class SendEther extends Component {
+class SendTokens extends Component {
 
   // handleFromUsernameChange = (e) => {
   //   this.props.fromUsernameChange(e.target.value);
@@ -37,7 +37,7 @@ class SendEther extends Component {
   }
 
   closeModal = () => {
-    this.props.sendEtherCloseModal();
+    this.props.sendTokensCloseModal();
     this.props.fetchAccounts(true, true);
   }
 
@@ -50,7 +50,7 @@ class SendEther extends Component {
       toAddress: toAddress,
       value: values.value
     };
-    this.props.sendEther(payload);
+    this.props.sendTokens(payload);
     mixpanelWrapper.track('send_ether_submit_click_successful');
     this.props.reset();
   };
@@ -63,9 +63,9 @@ class SendEther extends Component {
     const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
 
-    const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
-      : [];
+    // const fromUserAddresses = this.props.accounts && this.props.fromUsername ?
+    //   Object.getOwnPropertyNames(this.props.accounts[this.props.fromUsername])
+    //   : [];
 
     const toUserAddresses = this.props.accounts && this.props.toUsername ?
       Object.getOwnPropertyNames(this.props.accounts[this.props.toUsername])
@@ -75,15 +75,15 @@ class SendEther extends Component {
       <div className="smd-pad-16">
         <Button onClick={() => {
           mixpanelWrapper.track("send_ether_open_click");
-          this.props.sendEtherOpenModal()
+          this.props.sendTokensOpenModal()
         }} className="pt-intent-primary pt-icon-add"
-          text="Send Ether" />
+          text="Send Tokens" />
         <form>
           <Dialog
             iconName="inbox"
             isOpen={this.props.isOpen}
             onClose={this.closeModal}
-            title="Send Ether"
+            title="Send Tokens"
             style={{
               width: "560px"
             }}
@@ -106,8 +106,8 @@ class SendEther extends Component {
                         (e) => this.props.fetchUserAddresses(e.target.value, true)
                       }
                       required
+                      disabled
                     >
-                      <option />
                       {
                         users.map((user, i) => {
                           return (
@@ -132,9 +132,10 @@ class SendEther extends Component {
                       component="select"
                       name="fromAddress"
                       required
+                      disabled
                     >
-                      <option />
-                      {
+                      <option value={this.props.initialValues.fromAddress}>{this.props.initialValues.fromAddress}</option>
+                      {/*
                         fromUserAddresses.length ?
                           fromUserAddresses.map((address, i) => {
                             return (
@@ -142,7 +143,7 @@ class SendEther extends Component {
                             )
                           })
                           : ''
-                      }
+                      */}
                     </Field>
                   </div>
                 </div>
@@ -322,7 +323,7 @@ class SendEther extends Component {
                   className={this.props.createDisabled ? "pt-disabled" : "pt-intent-primary"}
                   onClick={handleSubmit(this.submit)}
                   disabled={pristine || submitting || !valid}
-                  text="Send Ether"
+                  text="Send Tokens"
                 />
               </div>
             </div>
@@ -333,23 +334,27 @@ class SendEther extends Component {
   }
 }
 
-const selector = formValueSelector('send-ether');
+const selector = formValueSelector('send-tokens');
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.sendEther.isOpen,
-    result: state.sendEther.result,
+    isOpen: state.sendTokens.isOpen,
+    result: state.sendTokens.result,
     accounts: state.accounts.accounts,
     fromUsername: selector(state, 'from'),
-    toUsername: selector(state, 'to')
+    toUsername: selector(state, 'to'),
+    initialValues: {
+      from: state.user.currentUser.username,
+      fromAddress: state.user.currentUser.accountAddress
+    }
   };
 }
 
-const formed = reduxForm({ form: 'send-ether', validate })(SendEther);
+const formed = reduxForm({ form: 'send-tokens', validate })(SendTokens);
 const connected = connect(mapStateToProps, {
-  sendEtherOpenModal,
-  sendEtherCloseModal,
-  sendEther,
+  sendTokensOpenModal,
+  sendTokensCloseModal,
+  sendTokens,
   fetchAccounts,
   fetchUserAddresses,
   fromUsernameChange,

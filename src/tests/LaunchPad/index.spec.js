@@ -41,6 +41,9 @@ describe("Launchpad: index", () => {
         appPackage: null,
         requestCompleted: false
       },
+      currentUser: {
+        accountAddress: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
+      },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
       fetchAccounts: jest.fn(),
@@ -64,8 +67,20 @@ describe("Launchpad: index", () => {
         username: '',
         error: '',
         appPackage: null,
-        requestCompleted: false
+        requestCompleted: false,
       },
+      user: {
+        "username": null,
+        "currentUser": {
+          "id": 6,
+          "username": "tanuj41",
+          "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+        },
+        "isLoggedIn": true,
+        "error": null,
+        "isOpen": false,
+        "spinning": false
+      }
     }
     expect(mapStateToProps(state)).toMatchSnapshot();
   });
@@ -79,6 +94,9 @@ describe("Launchpad: index", () => {
         firstLoad: true,
         requestCompleted: false,
         username: ""
+      },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
       },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
@@ -105,6 +123,9 @@ describe("Launchpad: index", () => {
         firstLoad: true,
         requestCompleted: false,
         username: "Buyer1"
+      },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
       },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
@@ -162,6 +183,9 @@ describe("Launchpad: index", () => {
         requestCompleted: false,
         username: "Buyer1"
       },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
+      },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
       fetchAccounts: jest.fn(),
@@ -201,6 +225,9 @@ describe("Launchpad: index", () => {
         requestCompleted: false,
         username: "Buyer1"
       },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
+      },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
       fetchAccounts: jest.fn(),
@@ -238,6 +265,9 @@ describe("Launchpad: index", () => {
         requestCompleted: false,
         username: "Buyer1"
       },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
+      },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
       fetchAccounts: jest.fn(),
@@ -274,6 +304,9 @@ describe("Launchpad: index", () => {
         requestCompleted: false,
         username: "Buyer1"
       },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
+      },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),
       fetchAccounts: jest.fn(),
@@ -302,6 +335,9 @@ describe("Launchpad: index", () => {
         firstLoad: true,
         requestCompleted: true,
         username: "Buyer1"
+      },
+      currentUser: {
+        address: '86ee0c9644611495c0a1b1074e40d4e6db2f6b26'
       },
       usernameChange: jest.fn(),
       loadLaunchPad: jest.fn(),

@@ -19,21 +19,21 @@ describe('Account: index', () => {
     expect(wrapper).toMatchSnapshot();
   });
 
-  test('simulate click', () => {
-    const props = {
-      account: accountDetails,
-      name: '',
-      address: '',
-      faucetRequest: jest.fn(),
-      preventDefault: jest.fn(),
-      stopPropagation: jest.fn()
-    }
-    const wrapper = shallow(
-      <Account.WrappedComponent {...props} />
-    );
-    wrapper.find('Button').simulate('click', { preventDefault() { }, stopPropagation() { } })
-    expect(props.faucetRequest).toHaveBeenCalled()
-  });
+  // test('simulate click', () => {
+  //   const props = {
+  //     account: accountDetails,
+  //     name: '',
+  //     address: '',
+  //     faucetRequest: jest.fn(),
+  //     preventDefault: jest.fn(),
+  //     stopPropagation: jest.fn()
+  //   }
+  //   const wrapper = shallow(
+  //     <Account.WrappedComponent {...props} />
+  //   );
+  //   wrapper.find('Button').simulate('click', { preventDefault() { }, stopPropagation() { } })
+  //   expect(props.faucetRequest).toHaveBeenCalled()
+  // });
 
   describe('mapStateToProps', () => {
     test('with values', () => {

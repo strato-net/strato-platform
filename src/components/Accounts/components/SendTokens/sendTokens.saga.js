@@ -4,16 +4,16 @@ import {
   call
 } from 'redux-saga/effects';
 import {
-  SEND_ETHER_REQUEST,
-  sendEtherSuccess,
-  sendEtherFailure
-} from './sendEther.actions';
+  SEND_TOKENS_REQUEST,
+  sendTokensSuccess,
+  sendTokensFailure
+} from './sendTokens.actions';
 
 import { env } from '../../../../env';
 
 const url = env.BLOC_URL + "/users/:user/:address/send?resolve"
 
-export function sendEtherAPICall(from, fromAddress, toAddress, value, password) {
+export function sendTokensAPICall(from, fromAddress, toAddress, value, password) {
   return fetch(
     url.replace(":user", from).replace(":address", fromAddress),
     {
@@ -32,23 +32,23 @@ export function sendEtherAPICall(from, fromAddress, toAddress, value, password) 
     });
 }
 
-export function* sendEther(action) {
+export function* sendTokens(action) {
   try {
     let response = yield call(
-      sendEtherAPICall,
+      sendTokensAPICall,
       action.from,
       action.fromAddress,
       action.toAddress,
       action.value,
       action.password
     );
-    yield put(sendEtherSuccess(response));
+    yield put(sendTokensSuccess(response));
   }
   catch (err) {
-    yield put(sendEtherFailure(err));
+    yield put(sendTokensFailure(err));
   }
 }
 
-export default function* watchSendEther() {
-  yield takeLatest(SEND_ETHER_REQUEST, sendEther);
+export default function* watchsendTokens() {
+  yield takeLatest(SEND_TOKENS_REQUEST, sendTokens);
 }

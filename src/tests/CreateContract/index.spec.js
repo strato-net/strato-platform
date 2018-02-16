@@ -69,7 +69,11 @@ describe('CreateContract: index', () => {
       onChangeEditorContractName: jest.fn(),
       touch: jest.fn(),
       reset: jest.fn(),
-      pristine: false, submitting: false, valid: false
+      pristine: false, submitting: false, valid: false,
+      initialValues: {
+        username: '',
+        address: ''
+      }
     }
     const wrapper = render(
       <Provider store={store}>
@@ -108,7 +112,11 @@ describe('CreateContract: index', () => {
       onChangeEditorContractName: jest.fn(),
       touch: jest.fn(),
       reset: jest.fn(),
-      pristine: false, submitting: false, valid: false
+      pristine: false, submitting: false, valid: false,
+      initialValues: {
+        username: 'Admin_1177_49507',
+        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     }
     const wrapper = render(
       <Provider store={store}>
@@ -147,7 +155,11 @@ describe('CreateContract: index', () => {
       onChangeEditorContractName: jest.fn(),
       touch: jest.fn(),
       reset: jest.fn(),
-      pristine: false, submitting: false, valid: false
+      pristine: false, submitting: false, valid: false,
+      initialValues: {
+        username: 'Admin_1177_49507',
+        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     }
     const wrapper = mount(
       <Provider store={store}>
@@ -188,7 +200,11 @@ describe('CreateContract: index', () => {
       touch: jest.fn(),
       reset: jest.fn(),
       pristine: false, submitting: false, valid: false,
-      store: store
+      store: store,
+      initialValues: {
+        username: 'Admin_1177_49507',
+        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     }
     const wrapper = mount(
       <Provider store={store}>
@@ -229,7 +245,11 @@ describe('CreateContract: index', () => {
       touch: jest.fn(),
       reset: jest.fn(),
       pristine: false, submitting: false, valid: false,
-      store: store
+      store: store,
+      initialValues: {
+        username: 'Admin_1177_49507',
+        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     }
     const wrapper = shallow(
       <CreateContract.WrappedComponent {...props} />
@@ -269,7 +289,11 @@ describe('CreateContract: index', () => {
       reset: jest.fn(),
       pristine: false, submitting: false, valid: false,
       store: store,
-      handleSubmit: jest.fn()
+      handleSubmit: jest.fn(),
+      initialValues: {
+        username: 'Admin_1177_49507',
+        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     }
     const wrapper = shallow(
       <CreateContract.WrappedComponent {...props} />
@@ -331,7 +355,11 @@ describe('CreateContract: index', () => {
       reset: jest.fn(),
       pristine: false, submitting: false, valid: false,
       store: store,
-      handleSubmit: jest.fn()
+      handleSubmit: jest.fn(),
+      initialValues: {
+        username: 'Admin_1177_49507',
+        address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+      }
     }
 
     const wrapper = shallow(
@@ -369,6 +397,13 @@ describe('CreateContract: index', () => {
       },
       accounts: {
         accounts: indexAccountsMock
+      },
+      user: {
+        "currentUser": {
+          "id": 6,
+          "username": "tanuj41",
+          "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+        },
       }
 
     }

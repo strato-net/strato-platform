@@ -19,6 +19,11 @@ describe('ContractMethodCall: index', () => {
       modal: {},
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
+      currentUser: {
+        "id": '',
+        "username": '',
+        "address": ''
+      },
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -38,6 +43,18 @@ describe('ContractMethodCall: index', () => {
       methodCall: {
         modals: undefined
       },
+      user: {
+        "username": null,
+        "currentUser": {
+          "id": 6,
+          "username": "tanuj41",
+          "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+        },
+        "isLoggedIn": true,
+        "error": null,
+        "isOpen": false,
+        "spinning": false
+      },
       accounts: indexAccountsMock
     }
     expect(mapStateToProps(state, 'methodCallgreetf62c8965f2129d178aa28c043f9b3d0cd52f9e2e')).toMatchSnapshot();
@@ -48,6 +65,11 @@ describe('ContractMethodCall: index', () => {
       modal: modals,
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
+      currentUser: {
+        "id": 6,
+        "username": "tanuj41",
+        "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+      },
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -68,6 +90,11 @@ describe('ContractMethodCall: index', () => {
       modal: modals,
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
+      currentUser: {
+        "id": 6,
+        "username": "tanuj41",
+        "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+      },
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),
@@ -89,6 +116,11 @@ describe('ContractMethodCall: index', () => {
       modal: modals,
       accounts: indexAccountsMock,
       modalUsername: 'Buyer1',
+      currentUser: {
+        "id": 6,
+        "username": "tanuj41",
+        "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+      },
       methodCallFetchArgs: jest.fn(),
       methodCallOpenModal: jest.fn(),
       methodCallCloseModal: jest.fn(),

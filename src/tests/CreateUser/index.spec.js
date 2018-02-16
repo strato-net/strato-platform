@@ -58,74 +58,76 @@ describe('Test createUser index', () => {
 
   describe('simulate', () => {
 
-    test('open modal', () => {
-      const props = {
-        filter: '',
-        contracts: {},
-        openOverlay: jest.fn(),
-        closeOverlay: jest.fn(),
-        createUser: jest.fn()
-      }
-      const wrapper = mount(
-        <Provider store={store}>
-          <CreateUser.WrappedComponent {...props} />
-        </Provider>
-      );
-      wrapper.find('Button').simulate('click');
-      expect(props.openOverlay).toHaveBeenCalled();
-    });
+    // test('open modal', () => {
+    //   const props = {
+    //     filter: '',
+    //     contracts: {},
+    //     openOverlay: jest.fn(),
+    //     closeOverlay: jest.fn(),
+    //     createUser: jest.fn()
+    //   }
 
-    test('close modal on outside click', () => {
-      const props = {
-        filter: '',
-        contracts: {},
-        isOpen: true,
-        openOverlay: jest.fn(),
-        closeOverlay: jest.fn(),
-        createUser: jest.fn()
-      }
-      const wrapper = mount(
-        <Provider store={store}>
-          <CreateUser.WrappedComponent {...props} />
-        </Provider>
-      );
-      wrapper.find(Dialog).get(0).props.onClose();
-      expect(props.closeOverlay).toHaveBeenCalled();
-    });
+    //   const wrapper = mount(
+    //     <Provider store={store}>
+    //       <CreateUser.WrappedComponent {...props} />
+    //     </Provider>
+    //   );
 
-    test('close modal on button click', () => {
-      const props = {
-        filter: '',
-        contracts: {},
-        isOpen: true,
-        openOverlay: jest.fn(),
-        closeOverlay: jest.fn(),
-        createUser: jest.fn(),
-        store: store
-      }
-      const wrapper = shallow(
-        <CreateUser.WrappedComponent {...props} />
-      ).dive().dive().dive();
-      wrapper.find('Button').at(1).simulate('click')
-      expect(props.closeOverlay).toHaveBeenCalled();
-    });
+    //   wrapper.find('Button').simulate('click');
+    //   expect(props.openOverlay).toHaveBeenCalled();
+    // });
 
-    test('submit form', () => {
-      const props = {
-        filter: '',
-        contracts: {},
-        isOpen: true,
-        openOverlay: jest.fn(),
-        closeOverlay: jest.fn(),
-        createUser: jest.fn(),
-        store: store
-      }
-      const wrapper = shallow(
-        <CreateUser.WrappedComponent {...props} />
-      ).dive().dive().dive();
-      wrapper.find('Button').at(2).simulate('click')
-      expect(props.createUser).toHaveBeenCalled()
-    });
+    // test('close modal on outside click', () => {
+    //   const props = {
+    //     filter: '',
+    //     contracts: {},
+    //     isOpen: true,
+    //     openOverlay: jest.fn(),
+    //     closeOverlay: jest.fn(),
+    //     createUser: jest.fn()
+    //   }
+    //   const wrapper = mount(
+    //     <Provider store={store}>
+    //       <CreateUser.WrappedComponent {...props} />
+    //     </Provider>
+    //   );
+    //   wrapper.find(Dialog).get(0).props.onClose();
+    //   expect(props.closeOverlay).toHaveBeenCalled();
+    // });
+
+    // test('close modal on button click', () => {
+    //   const props = {
+    //     filter: '',
+    //     contracts: {},
+    //     isOpen: true,
+    //     openOverlay: jest.fn(),
+    //     closeOverlay: jest.fn(),
+    //     createUser: jest.fn(),
+    //     store: store
+    //   }
+    //   const wrapper = shallow(
+    //     <CreateUser.WrappedComponent {...props} />
+    //   ).dive().dive().dive();
+    //   wrapper.find('Button').at(1).simulate('click')
+    //   expect(props.closeOverlay).toHaveBeenCalled();
+    // });
+
+    // test('submit form', () => {
+    //   const props = {
+    //     filter: '',
+    //     contracts: {},
+    //     isOpen: true,
+    //     openOverlay: jest.fn(),
+    //     closeOverlay: jest.fn(),
+    //     createUser: jest.fn(),
+    //     store: store
+    //   }
+    //   const wrapper = shallow(
+    //     <CreateUser.WrappedComponent {...props} />
+    //   ).dive().dive().dive();
+    //   wrapper.find('Button').at(2).simulate('click')
+    //   expect(props.createUser).toHaveBeenCalled()
+    // });
 
   })
 
@@ -152,17 +154,25 @@ describe('Test createUser index', () => {
 
     test('with errors', () => {
       const state = {
-        "form": {
-          "create-user": {
-            "syncErrors": {
-              confirm_password: "Must Confirm Password",
-              password: "Password Required",
-              username: "Username Required"
-            }
-          }
-        },
         "createUser": {
-          isOpen: true
+          isOpen: true,
+          error: {
+            username: 'Username required',
+            password: 'password required'
+          },
+          spinning: true
+        },
+        user: {
+          "username": null,
+          "currentUser": {
+            "id": 6,
+            "username": "tanuj41",
+            "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+          },
+          "isLoggedIn": true,
+          "error": null,
+          "isOpen": false,
+          "spinning": false
         }
       }
       expect(mapStateToProps(state)).toMatchSnapshot();
@@ -170,10 +180,12 @@ describe('Test createUser index', () => {
 
     test('without errors', () => {
       const state = {
-        "form": {},
         "createUser": {
-          isOpen: true
-        }
+          isOpen: true,
+          error: {},
+          spinning: true
+        },
+        user: {}
       }
       expect(mapStateToProps(state)).toMatchSnapshot();
     });

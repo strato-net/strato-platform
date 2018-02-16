@@ -9,38 +9,48 @@ import {
   createUserFailure,
 } from './createUser.actions';
 
-import {
-  fetchAccounts
-} from '../Accounts/accounts.actions';
+// import {
+//   fetchAccounts
+// } from '../Accounts/accounts.actions';
 
 import { env } from '../../env';
+import { loginSuccess } from '../User/user.actions';
+import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 
-const url = env.BLOC_URL + "/users/:user"
+const url = env.APEX_URL + "/users"
 
 export function createUserApiCall(username, password) {
   return fetch(
-    url.replace(":user", username),
+    url,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: 'password=' + password
+      body: "username=" + username + "&password=" + password,
+      credentials: 'include'
     }
   )
-  .then(function(response) {
-    return response;
-  })
-  .catch(function(error) {
-    throw error;
-  });
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 export function* createUser(action) {
   try {
     let response = yield call(createUserApiCall, action.username, action.password);
-    yield put(createUserSuccess(response));
-    yield put(fetchAccounts(false, false));
+    if (response.error) {
+      yield put(createUserFailure(response.error.message));
+    } else {
+      yield put(createUserSuccess(response.user));
+      // yield put(fetchAccounts(false, false));
+      localStorage.setItem('token', JSON.stringify(response.user));
+      yield put(loginSuccess(action.username, response.user));
+      yield put(openWalkThroughOverlay());
+    }
   }
   catch (err) {
     yield put(createUserFailure(err));

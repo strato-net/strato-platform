@@ -1,12 +1,12 @@
-import { validate } from '../../../../components/Accounts/components/SendEther/validate';
-import { sendEtherForm } from './sendEtherMock';
+import { validate } from '../../../../components/Accounts/components/SendTokens/validate';
+import { sendTokensForm } from './sendTokensMock';
 
-describe('SendEther: validate', () => {
+describe('SendTokens: validate', () => {
 
-  let sendEtherFormValidate
+  let sendTokensFormValidate
 
   beforeEach(() => {
-    sendEtherFormValidate = {
+    sendTokensFormValidate = {
       from: undefined,
       fromAddress: undefined,
       password: undefined,
@@ -18,11 +18,11 @@ describe('SendEther: validate', () => {
   describe('when form has', () => {
 
     test('values', () => {
-      expect(validate(sendEtherForm)).toMatchSnapshot();
+      expect(validate(sendTokensForm)).toMatchSnapshot();
     });
 
     test('no values', () => {
-      expect(validate(sendEtherFormValidate)).toMatchSnapshot();
+      expect(validate(sendTokensFormValidate)).toMatchSnapshot();
     });
 
   })
@@ -31,7 +31,7 @@ describe('SendEther: validate', () => {
 
     test('user is selected (0th index)', () => {
       const values = {
-        ...sendEtherFormValidate,
+        ...sendTokensFormValidate,
         radio: "0"
       };
       expect(validate(values)).toMatchSnapshot();
@@ -39,7 +39,7 @@ describe('SendEther: validate', () => {
 
     test('address is selected (1st index)', () => {
       const values = {
-        ...sendEtherFormValidate,
+        ...sendTokensFormValidate,
         radio: "1"
       };
       expect(validate(values)).toMatchSnapshot();

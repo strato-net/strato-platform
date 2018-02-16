@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import {
   contractOpenModal,
   contractCloseModal,
@@ -8,13 +8,13 @@ import {
   usernameChange,
   contractNameChange
 } from './createContract.actions';
-import {fetchAccounts, fetchUserAddresses} from '../Accounts/accounts.actions';
-import {fetchContracts} from '../Contracts/contracts.actions';
-import {Button, Dialog} from '@blueprintjs/core';
+import { fetchAccounts, fetchUserAddresses } from '../Accounts/accounts.actions';
+import { fetchContracts } from '../Contracts/contracts.actions';
+import { Button, Dialog } from '@blueprintjs/core';
 import Dropzone from 'react-dropzone'
-import {Field, reduxForm, formValueSelector} from 'redux-form';
-import {connect} from 'react-redux';
-import {withRouter} from 'react-router-dom';
+import { Field, reduxForm, formValueSelector } from 'redux-form';
+import { connect } from 'react-redux';
+import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
@@ -30,13 +30,13 @@ class CreateContract extends Component {
         <Dropzone
           className="dropzone"
           name={field.name}
-          onDrop = { ( filesToUpload, e ) => this.handleFileDrop(filesToUpload, field) }
+          onDrop={(filesToUpload, e) => this.handleFileDrop(filesToUpload, field)}
         >
-          {({isDragActive, isDragReject, acceptedFiles}) => {
-              if (isDragActive) {
-                return (<p className="pt-intent-success">Drop to Upload!</p>);
-              }
-              return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
+          {({ isDragActive, isDragReject, acceptedFiles }) => {
+            if (isDragActive) {
+              return (<p className="pt-intent-success">Drop to Upload!</p>);
+            }
+            return (<p className="pt-intent-success">{acceptedFiles.length > 0 ? acceptedFiles[0].name : 'Drop a file here, or click to select files to upload.'}</p>)
           }}
         </Dropzone>
         {touchedAndHasErrors && <span className="error">{field.meta.error}</span>}
@@ -46,15 +46,15 @@ class CreateContract extends Component {
 
   handleUsernameChange = (e) => {
     this.props.usernameChange(e.target.value);
-    this.props.fetchUserAddresses(e.target.value,true)
+    this.props.fetchUserAddresses(e.target.value, true)
   };
 
   handleContractNameChange = (e) => {
-    this.props.sourceFromEditor?
-    this.props.onChangeEditorContractName(e.target.value)
-    :this.props.contractNameChange(
-      e.target.value
-    );
+    this.props.sourceFromEditor ?
+      this.props.onChangeEditorContractName(e.target.value)
+      : this.props.contractNameChange(
+        e.target.value
+      );
   }
 
   componentWillReceiveProps(nextProps) {
@@ -94,8 +94,8 @@ class CreateContract extends Component {
   };
 
   handleContractSearchabilityChange = (e) => {
-    const contractName = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
-    const source = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
+    const contractName = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
+    const source = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
     if (source.length) {
       this.props.compileContract(
         contractName,
@@ -107,8 +107,8 @@ class CreateContract extends Component {
 
   submit = (values) => {
     const args = {};
-    const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
-    const abi = this.props.sourceFromEditor?this.props.sourceFromEditor:this.props.abi.src;
+    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
+    const abi = this.props.sourceFromEditor ? this.props.sourceFromEditor : this.props.abi.src;
     Object.values(abi).forEach(val => {
       if (val.constr !== undefined) {
         return Object.getOwnPropertyNames(val.constr).forEach((arg) => {
@@ -117,7 +117,7 @@ class CreateContract extends Component {
         })
       }
     });
-    const fileText = this.props.textFromEditor?this.props.textFromEditor:this.props.contract
+    const fileText = this.props.textFromEditor ? this.props.textFromEditor : this.props.contract
 
     const payload = {
       contract: contractname,
@@ -141,8 +141,8 @@ class CreateContract extends Component {
   }
 
   compilation() {
-    const src =  this.props.sourceFromEditor?this.props.sourceFromEditor:(this.props.abi === undefined ? undefined : this.props.abi.src);
-    const contractname = this.props.sourceFromEditor?this.props.contractNameFromEditor:this.props.contractName
+    const src = this.props.sourceFromEditor ? this.props.sourceFromEditor : (this.props.abi === undefined ? undefined : this.props.abi.src);
+    const contractname = this.props.sourceFromEditor ? this.props.contractNameFromEditor : this.props.contractName
     if (src === undefined) {
       return (<tr>
         <td colSpan={3}>
@@ -183,23 +183,23 @@ class CreateContract extends Component {
   }
 
   render() {
-    const {handleSubmit, pristine, submitting, valid} = this.props;
+    const { handleSubmit, pristine, submitting, valid } = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    const contracts = this.props.sourceFromEditor? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
-    const userAddresses = this.props.accounts && this.props.username ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.username])
-      : null;
+    const contracts = this.props.sourceFromEditor ? Object.keys(this.props.sourceFromEditor) : this.props.abi && this.props.abi.src && Object.keys(this.props.abi.src);
+    // const userAddresses = this.props.accounts && this.props.username ?
+    //   Object.getOwnPropertyNames(this.props.accounts[this.props.username])
+    //   : null;
     return (
-      <div className="smd-pad-16" style={{display:'inline-block'}}>
+      <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <Button onClick={() => {
           mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal()
         }}
-        id="tour-create-contract-button"
+          id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
           text="Create Contract"
-          disabled={(this.props.enableCreateContract!==undefined &&!this.props.enableCreateContract)?true:false}
-           />
+          disabled={(this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) ? true : false}
+        />
         <form>
           <Dialog
             iconName="inbox"
@@ -216,7 +216,7 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
+                  <div>
                     <Field
                       className="pt-input"
                       component="select"
@@ -224,8 +224,8 @@ class CreateContract extends Component {
                       onChange={this.handleUsernameChange}
                       validate={required}
                       required
+                      disabled
                     >
-                      <option />
                       {
                         users.map((user, i) => {
                           return (
@@ -244,16 +244,17 @@ class CreateContract extends Component {
                   </label>
                 </div>
                 <div className="col-sm-9 smd-pad-4">
-                  <div className="pt-select">
-                    <Field
+                  <div>
+                    {<Field
                       className="pt-input"
                       component="select"
                       name="address"
                       validate={required}
                       required
+                      disabled
                     >
-                      <option />
-                      {
+                      <option value={this.props.initialValues.address}>{this.props.initialValues.address}</option>
+                      {/*
                         userAddresses ?
                           userAddresses.map((address, i) => {
                             return (
@@ -261,8 +262,8 @@ class CreateContract extends Component {
                             )
                           })
                           : ''
-                      }
-                    </Field>
+                      */}
+                    </Field>}
                   </div>
                 </div>
               </div>
@@ -293,17 +294,17 @@ class CreateContract extends Component {
                 <div className="col-sm-9 smd-pad-4">
                   <label className="pt-control pt-checkbox">
                     <Field
-                        id="input-b"
-                        className="form-width"
-                        name="searchable"
-                        type="checkbox"
-                        component="input"
-                        dir="auto"
-                        title="Searchable"
-                        onChange={this.handleContractSearchabilityChange}
-                        required
+                      id="input-b"
+                      className="form-width"
+                      name="searchable"
+                      type="checkbox"
+                      component="input"
+                      dir="auto"
+                      title="Searchable"
+                      onChange={this.handleContractSearchabilityChange}
+                      required
                     />
-                  <span className="pt-control-indicator"></span>
+                    <span className="pt-control-indicator"></span>
                     Searchable
                 </label>
                 </div>
@@ -311,7 +312,7 @@ class CreateContract extends Component {
               {!this.props.sourceFromEditor &&
                 <div className="row">
                   <div className="col-sm-3 text-right">
-                    <label className="pt-label smd-pad-4" style={{margin:0}}>
+                    <label className="pt-label smd-pad-4" style={{ margin: 0 }}>
                       Source file
                     </label>
                   </div>
@@ -338,20 +339,20 @@ class CreateContract extends Component {
                 <div className="col-sm-9 smd-pad-4">
                   <div className="pt-select">
                     <Field
-                        className="pt-select"
-                        component="select"
-                        name="contractName"
-                        onChange={this.handleContractNameChange}
-                      >
-                        {
-                          contracts.map((value, index) => {
-                            return (
-                              <option key={value} value={value}>{value}</option>
-                            )
-                          })
-                        }
-                      </Field>
-                    </div>
+                      className="pt-select"
+                      component="select"
+                      name="contractName"
+                      onChange={this.handleContractNameChange}
+                    >
+                      {
+                        contracts.map((value, index) => {
+                          return (
+                            <option key={value} value={value}>{value}</option>
+                          )
+                        })
+                      }
+                    </Field>
+                  </div>
                 </div>
               </div>}
               <div className="row">
@@ -365,14 +366,14 @@ class CreateContract extends Component {
                 <div className="col-sm-12 smd-scrollable">
                   <table className="pt-table pt-condensed pt-striped smd-full-width">
                     <thead>
-                    <tr>
-                      <th>Arg</th>
-                      <th>Type</th>
-                      <th>Value</th>
-                    </tr>
+                      <tr>
+                        <th>Arg</th>
+                        <th>Type</th>
+                        <th>Value</th>
+                      </tr>
                     </thead>
                     <tbody>
-                    {this.compilation()}
+                      {this.compilation()}
                     </tbody>
                   </table>
                 </div>
@@ -384,7 +385,7 @@ class CreateContract extends Component {
                 <Button text="Cancel" onClick={() => {
                   mixpanelWrapper.track("create_contract_cancel");
                   this.props.contractCloseModal()
-                }}/>
+                }} />
                 <Button
                   type="submit"
                   onClick={handleSubmit(this.submit)}
@@ -438,12 +439,16 @@ export function mapStateToProps(state) {
     username: state.createContract.username,
     isToasts: state.createContract.isToasts,
     toastsMessage: state.createContract.toastsMessage,
-    searchable: selector(state, 'searchable')
+    currentUser: state.user.currentUser,
+    searchable: selector(state, 'searchable'),
+    initialValues: {
+      username: state.user.currentUser.username,
+      address: state.user.currentUser.accountAddress
+    }
   };
 }
 
-
-const formed = reduxForm({form: CREATE_CONTRACT_FORM, validate})(CreateContract);
+const formed = reduxForm({ form: CREATE_CONTRACT_FORM, validate })(CreateContract);
 const connected = connect(mapStateToProps, {
   contractOpenModal,
   contractCloseModal,

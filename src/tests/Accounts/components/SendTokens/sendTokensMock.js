@@ -1,4 +1,4 @@
-export const sendEtherResponse = {
+export const sendTokensResponse = {
   "status": "Success",
   "hash": "5c93794214fc3fcecf7a6948d74010a5a1859a878322a91135c1ed30c8c7a505",
   "txResult": {
@@ -36,7 +36,7 @@ export const sendEtherResponse = {
 
 export const error = "ERROR";
 
-export const sendEtherForm = {
+export const sendTokensForm = {
   from: "tanuj",
   fromAddress: "af2edbd07a49eeaccb31a1cd3b6f7d81083ea1ca",
   password: "pass",

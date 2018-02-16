@@ -9,6 +9,8 @@ import {
 const initialState = {
   isOpen: false,
   compileSuccess: false,
+  error: false,
+  spinning: false
 };
 
 const reducer = function (state = initialState, action) {
@@ -28,7 +30,7 @@ const reducer = function (state = initialState, action) {
       };
     case CREATE_USER_FAILURE:
       return {
-        isOpen: false,
+        isOpen: true,
         spinning: false,
         error: action.error
       };
@@ -37,10 +39,11 @@ const reducer = function (state = initialState, action) {
         isOpen: false,
         spinning: false,
         response: action.response,
+        error: false,
       };
-  default:
-  return state;
-}
+    default:
+      return state;
+  }
 };
 
 export default reducer;

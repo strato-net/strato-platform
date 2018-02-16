@@ -1,16 +1,16 @@
-import reducer from '../../../../components/Accounts/components/SendEther/sendEther.reducer';
+import reducer from '../../../../components/Accounts/components/SendTokens/sendTokens.reducer';
 import {
-  sendEther,
-  sendEtherSuccess,
-  sendEtherFailure,
-  sendEtherOpenModal,
-  sendEtherCloseModal,
+  sendTokens,
+  sendTokensSuccess,
+  sendTokensFailure,
+  sendTokensOpenModal,
+  sendTokensCloseModal,
   toUsernameChange,
   fromUsernameChange
-} from '../../../../components/Accounts/components/SendEther/sendEther.actions';
-import { sendEtherForm, sendEtherResponse, error } from './sendEtherMock';
+} from '../../../../components/Accounts/components/SendTokens/sendTokens.actions';
+import { sendTokensForm, sendTokensResponse, error } from './sendTokensMock';
 
-describe('SendEther: reducer', () => {
+describe('SendTokens: reducer', () => {
 
   let initialState
 
@@ -25,28 +25,28 @@ describe('SendEther: reducer', () => {
     expect(reducer(undefined, {})).toMatchSnapshot();
   });
 
-  test('initiate sendEtherRequest', () => {
-    const action = sendEther(sendEtherForm);
+  test('initiate sendTokensRequest', () => {
+    const action = sendTokens(sendTokensForm);
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('update ether on sendEtherRequest success', () => {
-    const action = sendEtherSuccess(sendEtherResponse);
+  test('update tokens on sendTokensRequest success', () => {
+    const action = sendTokensSuccess(sendTokensResponse);
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
-  test('update error on sendEtherRequest failure', () => {
-    const action = sendEtherFailure(error);
+  test('update error on sendTokensRequest failure', () => {
+    const action = sendTokensFailure(error);
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
   test('modal open', () => {
-    const action = sendEtherOpenModal();
+    const action = sendTokensOpenModal();
     expect(reducer(initialState, action)).toMatchSnapshot();
   });
 
   test('modal close', () => {
-    const action = sendEtherCloseModal();
+    const action = sendTokensCloseModal();
     const state = {
       isOpen: true,
       result: 'Waiting to send...'

@@ -94,9 +94,9 @@ class LaunchPad extends Component {
   render() {
     const {handleSubmit, pristine, submitting, valid} = this.props;
     const users = Object.getOwnPropertyNames(this.props.accounts);
-    const userAddresses = this.props.accounts && this.props.launchPad.username ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.launchPad.username])
-      : null;
+    // const userAddresses = this.props.accounts && this.props.launchPad.username ?
+    //   Object.getOwnPropertyNames(this.props.accounts[this.props.launchPad.username])
+    //   : null;
 
     return (
       <div className="container-fluid pt-dark">
@@ -151,6 +151,7 @@ class LaunchPad extends Component {
                         name="appUsername"
                         onChange={this.handleUsernameChange}
                         validate={required}
+                        disabled
                         required
                       >
                         <option />
@@ -179,16 +180,17 @@ class LaunchPad extends Component {
                         name="appUserAddress"
                         validate={required}
                         required
+                        disabled
                       >
-                        <option />
-                        {
+                        <option value={this.props.currentUser.accountAddress}>{this.props.currentUser.accountAddress}</option>
+                        {/* {
                           userAddresses ?
                             userAddresses.map((address, i) => {
                               return (
                                 <option key={address} value={address}>{address}</option>
                               )
                             })
-                            : ''
+                            : '' */}
                         }
                       </Field>
                     </div>
@@ -277,7 +279,12 @@ function validate (values) {
 export function mapStateToProps(state) {
   return {
     accounts: state.accounts.accounts,
-    launchPad: state.launchPad
+    launchPad: state.launchPad,
+    currentUser: state.user.currentUser,
+    initialValues: {
+      appUsername: state.user.currentUser.username,
+      appUserAddress: state.user.currentUser.accountAddress
+    }
   };
 }
 
