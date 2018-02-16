@@ -88,10 +88,18 @@ instance ToJSONKey Address where
     where f x = Text.pack $ addressString x
           g x = AesonEnc.text . Text.pack $ addressString x
 
+padZeros :: Int -> String -> String
+padZeros n string = replicate (n - length string) '0' ++ string
+
+show160 :: Word160 -> String
+show160 (LargeKey w32 w128) = (show128 w128) ++ (padZeros 8 (showHex w32 ""))
+
+show128 :: Word128 -> String
+show128 (LargeKey w1 w2) = (padZeros 16 (showHex w2 "")) ++ (padZeros 16 (showHex w1 ""))
+
 addressString :: Address -> String
-addressString (Address address) = padZeros 40 (showHex address "")
-  where
-    padZeros n string = replicate (n - length string) '0' ++ string
+addressString (Address address) = show160 address
+
 stringAddress :: String -> Maybe Address
 stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
 
