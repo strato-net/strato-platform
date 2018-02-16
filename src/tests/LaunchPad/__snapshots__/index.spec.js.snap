@@ -4,7 +4,7 @@ exports[`Launchpad: index mapStateToProps with default state 1`] = `
 Object {
   "accounts": undefined,
   "currentUser": Object {
-    "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
     "id": 6,
     "username": "tanuj41",
   },
@@ -56,7 +56,7 @@ ShallowWrapper {
     clearSubmitErrors={[Function]}
     currentUser={
       Object {
-        "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+        "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
       }
     }
     destroy={[Function]}

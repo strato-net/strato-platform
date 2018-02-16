@@ -171,7 +171,7 @@ class ContractMethodCall extends Component {
                       disabled
                       required
                     >
-                      <option value={this.props.currentUser.address}>{this.props.currentUser.address}</option>
+                      <option value={this.props.currentUser.accountAddress}>{this.props.currentUser.accountAddress}</option>
                       {/* {
                         userAddresses ?
                           userAddresses.map((address, i) => {
@@ -288,7 +288,7 @@ export function mapStateToProps(state, ownProps) {
     currentUser: state.user.currentUser,
     initialValues: {
       modalUsername: state.user.currentUser.username,
-      modalAddress: state.user.currentUser.address
+      modalAddress: state.user.currentUser.accountAddress
     },
     modalUsername: selector(state, 'modalUsername')
   };

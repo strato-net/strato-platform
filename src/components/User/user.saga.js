@@ -58,8 +58,8 @@ function* login(action) {
   try {
     const response = yield call(loginRequest, action.username, action.password);
     if (!response.error) {
-      let user = { id: response.user.id, username: response.user.username, address: response.user.accountAddress };
-      yield put(loginSuccess(action.username, user));
+      yield put(loginSuccess(action.username, response.user));
+      localStorage.setItem('token', JSON.stringify(response.user));
     } else {
       yield put(loginFailure(action.username, response.error.message));
     }
@@ -72,6 +72,7 @@ function* logout() {
   try {
     yield call(logoutAccount);
     yield put(logoutSuccess());
+    localStorage.removeItem('token');
   } catch (err) {
     // Handle when you have error on logout
   }

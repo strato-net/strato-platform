@@ -26,15 +26,3 @@ export function setCookie(cname, cvalue, exdays) {
   var expires = "expires=" + d.toGMTString();
   document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
 }
-
-export function currentUser() {
-  let token = readCookie('STRATO');
-
-  if (token !== undefined) {
-    let jwtData = parseJwt(token)
-
-    return jwtData.user;
-  }
-
-  return {};
-}

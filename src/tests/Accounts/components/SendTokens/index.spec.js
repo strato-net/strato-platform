@@ -173,7 +173,7 @@ describe('SendTokens: index', () => {
 
     dialog.find('Field').at(5).simulate('change', { target: { value: 'Supplier2' } });
     expect(props.fetchUserAddresses).toHaveBeenCalled()
-    
+
     dialog.find('Button').last().simulate('click');
     expect(props.handleSubmit).toHaveBeenCalled();
     wrapper.dive().dive().dive().instance().submit(values);
@@ -192,7 +192,7 @@ describe('SendTokens: index', () => {
       user: {
         currentUser: {
           username: 'Admin_1177_49507',
-          address: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
+          accountAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
         }
       }
     };

@@ -345,7 +345,7 @@ export function mapStateToProps(state) {
     toUsername: selector(state, 'to'),
     initialValues: {
       from: state.user.currentUser.username,
-      fromAddress: state.user.currentUser.address
+      fromAddress: state.user.currentUser.accountAddress
     }
   };
 }

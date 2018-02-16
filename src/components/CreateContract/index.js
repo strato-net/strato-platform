@@ -443,7 +443,7 @@ export function mapStateToProps(state) {
     searchable: selector(state, 'searchable'),
     initialValues: {
       username: state.user.currentUser.username,
-      address: state.user.currentUser.address
+      address: state.user.currentUser.accountAddress
     }
   };
 }

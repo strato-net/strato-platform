@@ -182,7 +182,7 @@ class LaunchPad extends Component {
                         required
                         disabled
                       >
-                        <option value={this.props.currentUser.address}>{this.props.currentUser.address}</option>
+                        <option value={this.props.currentUser.accountAddress}>{this.props.currentUser.accountAddress}</option>
                         {/* {
                           userAddresses ?
                             userAddresses.map((address, i) => {
@@ -283,7 +283,7 @@ export function mapStateToProps(state) {
     currentUser: state.user.currentUser,
     initialValues: {
       appUsername: state.user.currentUser.username,
-      appUserAddress: state.user.currentUser.address
+      appUserAddress: state.user.currentUser.accountAddress
     }
   };
 }

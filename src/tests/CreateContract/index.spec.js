@@ -402,7 +402,7 @@ describe('CreateContract: index', () => {
         "currentUser": {
           "id": 6,
           "username": "tanuj41",
-          "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+          "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
         },
       }
 

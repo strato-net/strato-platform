@@ -45,10 +45,10 @@ export function* createUser(action) {
     if (response.error) {
       yield put(createUserFailure(response.error.message));
     } else {
-      yield put(createUserSuccess(response));
+      yield put(createUserSuccess(response.user));
       // yield put(fetchAccounts(false, false));
-      let user = { id: response.user.id, username: response.user.username, address: response.user.accountAddress };
-      yield put(loginSuccess(action.username, user));
+      localStorage.setItem('token', JSON.stringify(response.user));
+      yield put(loginSuccess(action.username, response.user));
       yield put(openWalkThroughOverlay());
     }
   }

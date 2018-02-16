@@ -14,9 +14,9 @@ class TokenRequest extends Component {
   submit = (values) => {
     mixpanelWrapper.track('Faucet_click');
     // TODO with user address(JWT)
-    const mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.address}.`;
+    const mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.accountAddress}.`;
     window.location.href = mailto;
-    this.props.faucetRequest(this.props.currentUser.address);
+    this.props.faucetRequest(this.props.currentUser.accountAddress);
   }
 
   render() {

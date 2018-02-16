@@ -8,7 +8,7 @@ import {
   CLOSE_LOGIN_OVERLAY,
   RESET_ERROR
 } from './user.actions';
-import { currentUser } from '../../lib/parsejwt';
+import { currentUser } from '../../lib/localStorage';
 
 const initialState = {
   username: null,

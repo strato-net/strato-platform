@@ -25,7 +25,7 @@ class WalkThrough extends Component {
 
   submit = (values) => {
     mixpanelWrapper.track('faucet_submit_click');
-    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.address}.`;
+    let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.accountAddress}.`;
     window.location.href = mailto;
     this.setState({ isContinue: true });
   }
@@ -75,7 +75,7 @@ class WalkThrough extends Component {
                 mixpanelWrapper.track('faucet_close_click');
                 this.setState({ initialModal: "CLI", isContinue: false });
                 // Faucet account using jwt tobe done
-                this.props.faucetRequest(this.props.currentUser.address);
+                this.props.faucetRequest(this.props.currentUser.accountAddress);
               }} disabled={!this.state.isContinue} />
             <Button
               intent={Intent.PRIMARY}
