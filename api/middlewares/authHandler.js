@@ -33,6 +33,7 @@ const authHandler = {
       user: {
         id: user.id,
         username: user.username,
+        address: user.accountAddress
       },
     };
 

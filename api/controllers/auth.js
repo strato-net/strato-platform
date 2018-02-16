@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
-const fs = require('fs');
+const blockappsRest = require('blockapps-rest').rest;
+const co = require('co');
 const moment = require('moment');
 
 const appConfig = require('../config/app.config');
@@ -7,8 +8,31 @@ const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 
 
+const sendLoginResponse = function(res, user) {
+  let tokenData;
+  try {
+    tokenData = authHandler.issue(user);
+  }
+  catch(err) {
+    return next(err);
+  }
+
+  res.cookie(
+    appConfig.jwtConfig.authCookieName,
+    tokenData.token,
+    {
+      domain: appConfig.jwtConfig.authCookieDomain,
+      httpOnly: true,
+      secure: appConfig.jwtConfig.authCookieSecure,
+      expire: moment(tokenData.expireDate).toDate()
+    }
+  );
+
+  res.status(200).json({user: user.toJson()});
+};
+
 module.exports = {
-  // Login can be executed by logged-in users and re-logins with new credentials provided
+  // no check if the user is already logged in - always login with credentials provided
   login: function (req, res, next) {
     const username = req.body.username;
     const password = req.body.password;
@@ -41,25 +65,7 @@ module.exports = {
               err.status = 401;
               return next(err);
             } else {
-              let tokenData;
-              try {
-                tokenData = authHandler.issue(user);
-              }
-              catch(err) {
-                return next(err);
-              }
-
-              res.cookie(
-                appConfig.jwtConfig.authCookieName,
-                tokenData.token,
-                {
-                  domain: appConfig.jwtConfig.authCookieDomain,
-                  httpOnly: true,
-                  secure: appConfig.jwtConfig.authCookieSecure,
-                  expire: moment(tokenData.expireDate).toDate()
-                }
-              );
-              res.status(200).json({user: user.toJson()});
+              sendLoginResponse(res, user);
             }
           }
         });
@@ -75,50 +81,71 @@ module.exports = {
   },
 
   create: function(req, res, next) {
-    const key = req.body.key;
-    const username = req.body.username;
-    const password = req.body.password;
+    co(function* () {
+      const username = req.body.username;
+      const password = req.body.password;
 
-    if (!key || !username || !password) {
-      let err = new Error("wrong params, expected: {key, username, password}");
-      err.status = 400;
-      return next(err);
-    }
-
-    fs.readFile('USERKEY', 'utf8', function (err,data) {
-      if (err) {
-        let err = new Error('USERKEY file does not exist - initial user is already created');
-        err.status = 403;
+      if (!username || !password) {
+        let err = new Error("wrong params, expected: {username, password}");
+        err.status = 400;
         return next(err);
       }
-      if (data === key) {
-        // Create user
-        models.User.create(
-          {
-            username: username,
-            passwordHash: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
-          }
-        ).then(function (newUser) {
-          models.Role.findOne({
-            where: {
-              name: 'admin'
-            }
-          }).then(function (adminRole) {
-            newUser.addRole(adminRole).then(() => {
-              fs.unlink('USERKEY', function () {
-                res.status(200).json({
-                  message: 'user created'
-                });
-              });
-            })
-          });
-        }).catch(err => next(err));
-      } else {
-        let err = new Error('wrong key provided');
-        err.status = 403;
+
+      if (username.length < 2 || username.length > 15) {
+        let err = new Error("Username must be at least 2 characters and 15 characters max");
+        err.status = 400;
         return next(err);
       }
-    });
-  },
+      if (password.length < 6) {
+        let err = new Error("Password must be at least 6 characters");
+        err.status = 400;
+        return next(err);
+      }
 
+      // Create user in db if does not exist
+      let newUser;
+      try {
+        newUser = yield models.User.create({
+          username: username,
+          passwordHash: bcrypt.hashSync(password, appConfig.passwordSaltRounds),
+        });
+      } catch (error) {
+        if (error.name === "SequelizeUniqueConstraintError") {
+          let err = new Error("user already exists");
+          err.status = 409;
+          return next(err);
+        }
+        throw error;
+      }
+
+      // Find developer role
+      const developerRole = yield models.Role.findOne({
+        where: {
+          name: 'developer'
+        }
+      });
+
+      // Add developer role to new user
+      yield newUser.addRole(developerRole);
+      newUser['Roles'] = [developerRole]; // dirty trick to prevent .toJson() error; todo: refactor
+
+      // Create blockchain user in bloc
+      let blocUser;
+      try {
+        blocUser = yield blockappsRest.createUser(username, password);
+      } catch(blocError) {
+        newUser.destroy();
+        // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
+        let err = new Error('could not create bloc account: ', blocError);
+        err.status = 500;
+        return next(err);
+      }
+
+      // Set the account address to user in db
+      newUser.accountAddress = blocUser.address;
+      yield newUser.save({fields: ['accountAddress']});
+
+      sendLoginResponse(res, newUser);
+    })
+  }
 };
