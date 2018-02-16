@@ -45,7 +45,7 @@ class TokenRequest extends Component {
                     name="building"
                     component="textarea"
                     type="text"
-                    placeholder="What are you building?"
+                    placeholder="I am building..."
                     className="pt-input form-width"
                     tabIndex="3"
                     required

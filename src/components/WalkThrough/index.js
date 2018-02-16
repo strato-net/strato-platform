@@ -50,7 +50,7 @@ class WalkThrough extends Component {
                   name="building"
                   component="textarea"
                   type="text"
-                  placeholder="What are you building?"
+                  placeholder="I am building..."
                   className="pt-input form-width"
                   tabIndex="3"
                   required
@@ -96,14 +96,10 @@ class WalkThrough extends Component {
           <div className="pt-form-group">
             <div className="pt-form-group pt-intent-danger">
               <div className="pt-form-content">
-                The ​ bloc CLI​ is designed to make it easy for developers to download, deploy, and manage their
-                apps from the command line. The ​ bloc CLI​ is a Node.js module that will allow users to download,
-                zip, and deploy ​ App Bundles​ and services to STRATO, as well as to monitor their account
-                balance. The ​ bloc CLI​ is intended to be used in conjunction with the ​ STRATO Public Web App.
                 <a onClick={() => {
                   mixpanelWrapper.track('Add_App_click');
                   downloadPDFFile('cli.pdf', cli)
-                }}> Click to download PDF </a>
+                }}> Click here</a> to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
               </div>
             </div>
           </div>
