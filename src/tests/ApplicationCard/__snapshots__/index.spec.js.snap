@@ -78,15 +78,12 @@ ShallowWrapper {
                 className="share-popover"
                 content={
                   <Blueprint.Menu>
-                    <Blueprint.MenuItem
-                      disabled={false}
+                    <a
+                      className="facebook-share-button pt-menu-item pt-popover-dismiss"
                       onClick={[Function]}
-                      popoverProps={Object {}}
-                      shouldDismissPopover={true}
-                      submenuViewportMargin={Object {}}
-                      text="Facebook"
-                      useSmartPositioning={true}
-                    />
+                    >
+                      Facebook
+                    </a>
                     <a
                       className="twitter-share-button pt-menu-item pt-popover-dismiss"
                       data-hashtags="example,demo"
@@ -201,15 +198,12 @@ ShallowWrapper {
                   className="share-popover"
                   content={
                     <Blueprint.Menu>
-                      <Blueprint.MenuItem
-                        disabled={false}
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
                         onClick={[Function]}
-                        popoverProps={Object {}}
-                        shouldDismissPopover={true}
-                        submenuViewportMargin={Object {}}
-                        text="Facebook"
-                        useSmartPositioning={true}
-                      />
+                      >
+                        Facebook
+                      </a>
                       <a
                         className="twitter-share-button pt-menu-item pt-popover-dismiss"
                         data-hashtags="example,demo"
@@ -340,15 +334,12 @@ ShallowWrapper {
                     className="share-popover"
                     content={
                       <Blueprint.Menu>
-                        <Blueprint.MenuItem
-                          disabled={false}
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
                           onClick={[Function]}
-                          popoverProps={Object {}}
-                          shouldDismissPopover={true}
-                          submenuViewportMargin={Object {}}
-                          text="Facebook"
-                          useSmartPositioning={true}
-                        />
+                        >
+                          Facebook
+                        </a>
                         <a
                           className="twitter-share-button pt-menu-item pt-popover-dismiss"
                           data-hashtags="example,demo"
@@ -449,15 +440,12 @@ ShallowWrapper {
                       className="share-popover"
                       content={
                         <Blueprint.Menu>
-                          <Blueprint.MenuItem
-                            disabled={false}
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
                             onClick={[Function]}
-                            popoverProps={Object {}}
-                            shouldDismissPopover={true}
-                            submenuViewportMargin={Object {}}
-                            text="Facebook"
-                            useSmartPositioning={true}
-                          />
+                          >
+                            Facebook
+                          </a>
                           <a
                             className="twitter-share-button pt-menu-item pt-popover-dismiss"
                             data-hashtags="example,demo"
@@ -612,15 +600,12 @@ ShallowWrapper {
                         className="share-popover"
                         content={
                           <Blueprint.Menu>
-                            <Blueprint.MenuItem
-                              disabled={false}
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
                               onClick={[Function]}
-                              popoverProps={Object {}}
-                              shouldDismissPopover={true}
-                              submenuViewportMargin={Object {}}
-                              text="Facebook"
-                              useSmartPositioning={true}
-                            />
+                            >
+                              Facebook
+                            </a>
                             <a
                               className="twitter-share-button pt-menu-item pt-popover-dismiss"
                               data-hashtags="example,demo"
@@ -692,15 +677,12 @@ ShallowWrapper {
                         </button>,
                         "className": "share-popover",
                         "content": <Blueprint.Menu>
-                          <Blueprint.MenuItem
-                            disabled={false}
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
                             onClick={[Function]}
-                            popoverProps={Object {}}
-                            shouldDismissPopover={true}
-                            submenuViewportMargin={Object {}}
-                            text="Facebook"
-                            useSmartPositioning={true}
-                          />
+                          >
+                            Facebook
+                          </a>
                           <a
                             className="twitter-share-button pt-menu-item pt-popover-dismiss"
                             data-hashtags="example,demo"
@@ -867,15 +849,12 @@ ShallowWrapper {
                   className="share-popover"
                   content={
                     <Blueprint.Menu>
-                      <Blueprint.MenuItem
-                        disabled={false}
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
                         onClick={[Function]}
-                        popoverProps={Object {}}
-                        shouldDismissPopover={true}
-                        submenuViewportMargin={Object {}}
-                        text="Facebook"
-                        useSmartPositioning={true}
-                      />
+                      >
+                        Facebook
+                      </a>
                       <a
                         className="twitter-share-button pt-menu-item pt-popover-dismiss"
                         data-hashtags="example,demo"
@@ -990,15 +969,12 @@ ShallowWrapper {
                     className="share-popover"
                     content={
                       <Blueprint.Menu>
-                        <Blueprint.MenuItem
-                          disabled={false}
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
                           onClick={[Function]}
-                          popoverProps={Object {}}
-                          shouldDismissPopover={true}
-                          submenuViewportMargin={Object {}}
-                          text="Facebook"
-                          useSmartPositioning={true}
-                        />
+                        >
+                          Facebook
+                        </a>
                         <a
                           className="twitter-share-button pt-menu-item pt-popover-dismiss"
                           data-hashtags="example,demo"
@@ -1129,15 +1105,12 @@ ShallowWrapper {
                       className="share-popover"
                       content={
                         <Blueprint.Menu>
-                          <Blueprint.MenuItem
-                            disabled={false}
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
                             onClick={[Function]}
-                            popoverProps={Object {}}
-                            shouldDismissPopover={true}
-                            submenuViewportMargin={Object {}}
-                            text="Facebook"
-                            useSmartPositioning={true}
-                          />
+                          >
+                            Facebook
+                          </a>
                           <a
                             className="twitter-share-button pt-menu-item pt-popover-dismiss"
                             data-hashtags="example,demo"
@@ -1238,15 +1211,12 @@ ShallowWrapper {
                         className="share-popover"
                         content={
                           <Blueprint.Menu>
-                            <Blueprint.MenuItem
-                              disabled={false}
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
                               onClick={[Function]}
-                              popoverProps={Object {}}
-                              shouldDismissPopover={true}
-                              submenuViewportMargin={Object {}}
-                              text="Facebook"
-                              useSmartPositioning={true}
-                            />
+                            >
+                              Facebook
+                            </a>
                             <a
                               className="twitter-share-button pt-menu-item pt-popover-dismiss"
                               data-hashtags="example,demo"
@@ -1401,15 +1371,12 @@ ShallowWrapper {
                           className="share-popover"
                           content={
                             <Blueprint.Menu>
-                              <Blueprint.MenuItem
-                                disabled={false}
+                              <a
+                                className="facebook-share-button pt-menu-item pt-popover-dismiss"
                                 onClick={[Function]}
-                                popoverProps={Object {}}
-                                shouldDismissPopover={true}
-                                submenuViewportMargin={Object {}}
-                                text="Facebook"
-                                useSmartPositioning={true}
-                              />
+                              >
+                                Facebook
+                              </a>
                               <a
                                 className="twitter-share-button pt-menu-item pt-popover-dismiss"
                                 data-hashtags="example,demo"
@@ -1481,15 +1448,12 @@ ShallowWrapper {
                           </button>,
                           "className": "share-popover",
                           "content": <Blueprint.Menu>
-                            <Blueprint.MenuItem
-                              disabled={false}
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
                               onClick={[Function]}
-                              popoverProps={Object {}}
-                              shouldDismissPopover={true}
-                              submenuViewportMargin={Object {}}
-                              text="Facebook"
-                              useSmartPositioning={true}
-                            />
+                            >
+                              Facebook
+                            </a>
                             <a
                               className="twitter-share-button pt-menu-item pt-popover-dismiss"
                               data-hashtags="example,demo"
@@ -1691,15 +1655,12 @@ ShallowWrapper {
                 className="share-popover"
                 content={
                   <Blueprint.Menu>
-                    <Blueprint.MenuItem
-                      disabled={false}
+                    <a
+                      className="facebook-share-button pt-menu-item pt-popover-dismiss"
                       onClick={[Function]}
-                      popoverProps={Object {}}
-                      shouldDismissPopover={true}
-                      submenuViewportMargin={Object {}}
-                      text="Facebook"
-                      useSmartPositioning={true}
-                    />
+                    >
+                      Facebook
+                    </a>
                     <a
                       className="twitter-share-button pt-menu-item pt-popover-dismiss"
                       data-hashtags="example,demo"
@@ -1816,15 +1777,12 @@ ShallowWrapper {
                   className="share-popover"
                   content={
                     <Blueprint.Menu>
-                      <Blueprint.MenuItem
-                        disabled={false}
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
                         onClick={[Function]}
-                        popoverProps={Object {}}
-                        shouldDismissPopover={true}
-                        submenuViewportMargin={Object {}}
-                        text="Facebook"
-                        useSmartPositioning={true}
-                      />
+                      >
+                        Facebook
+                      </a>
                       <a
                         className="twitter-share-button pt-menu-item pt-popover-dismiss"
                         data-hashtags="example,demo"
@@ -1957,15 +1915,12 @@ ShallowWrapper {
                     className="share-popover"
                     content={
                       <Blueprint.Menu>
-                        <Blueprint.MenuItem
-                          disabled={false}
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
                           onClick={[Function]}
-                          popoverProps={Object {}}
-                          shouldDismissPopover={true}
-                          submenuViewportMargin={Object {}}
-                          text="Facebook"
-                          useSmartPositioning={true}
-                        />
+                        >
+                          Facebook
+                        </a>
                         <a
                           className="twitter-share-button pt-menu-item pt-popover-dismiss"
                           data-hashtags="example,demo"
@@ -2068,15 +2023,12 @@ ShallowWrapper {
                       className="share-popover"
                       content={
                         <Blueprint.Menu>
-                          <Blueprint.MenuItem
-                            disabled={false}
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
                             onClick={[Function]}
-                            popoverProps={Object {}}
-                            shouldDismissPopover={true}
-                            submenuViewportMargin={Object {}}
-                            text="Facebook"
-                            useSmartPositioning={true}
-                          />
+                          >
+                            Facebook
+                          </a>
                           <a
                             className="twitter-share-button pt-menu-item pt-popover-dismiss"
                             data-hashtags="example,demo"
@@ -2235,15 +2187,12 @@ ShallowWrapper {
                         className="share-popover"
                         content={
                           <Blueprint.Menu>
-                            <Blueprint.MenuItem
-                              disabled={false}
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
                               onClick={[Function]}
-                              popoverProps={Object {}}
-                              shouldDismissPopover={true}
-                              submenuViewportMargin={Object {}}
-                              text="Facebook"
-                              useSmartPositioning={true}
-                            />
+                            >
+                              Facebook
+                            </a>
                             <a
                               className="twitter-share-button pt-menu-item pt-popover-dismiss"
                               data-hashtags="example,demo"
@@ -2315,15 +2264,12 @@ ShallowWrapper {
                         </button>,
                         "className": "share-popover",
                         "content": <Blueprint.Menu>
-                          <Blueprint.MenuItem
-                            disabled={false}
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
                             onClick={[Function]}
-                            popoverProps={Object {}}
-                            shouldDismissPopover={true}
-                            submenuViewportMargin={Object {}}
-                            text="Facebook"
-                            useSmartPositioning={true}
-                          />
+                          >
+                            Facebook
+                          </a>
                           <a
                             className="twitter-share-button pt-menu-item pt-popover-dismiss"
                             data-hashtags="example,demo"
@@ -2492,15 +2438,12 @@ ShallowWrapper {
                   className="share-popover"
                   content={
                     <Blueprint.Menu>
-                      <Blueprint.MenuItem
-                        disabled={false}
+                      <a
+                        className="facebook-share-button pt-menu-item pt-popover-dismiss"
                         onClick={[Function]}
-                        popoverProps={Object {}}
-                        shouldDismissPopover={true}
-                        submenuViewportMargin={Object {}}
-                        text="Facebook"
-                        useSmartPositioning={true}
-                      />
+                      >
+                        Facebook
+                      </a>
                       <a
                         className="twitter-share-button pt-menu-item pt-popover-dismiss"
                         data-hashtags="example,demo"
@@ -2617,15 +2560,12 @@ ShallowWrapper {
                     className="share-popover"
                     content={
                       <Blueprint.Menu>
-                        <Blueprint.MenuItem
-                          disabled={false}
+                        <a
+                          className="facebook-share-button pt-menu-item pt-popover-dismiss"
                           onClick={[Function]}
-                          popoverProps={Object {}}
-                          shouldDismissPopover={true}
-                          submenuViewportMargin={Object {}}
-                          text="Facebook"
-                          useSmartPositioning={true}
-                        />
+                        >
+                          Facebook
+                        </a>
                         <a
                           className="twitter-share-button pt-menu-item pt-popover-dismiss"
                           data-hashtags="example,demo"
@@ -2758,15 +2698,12 @@ ShallowWrapper {
                       className="share-popover"
                       content={
                         <Blueprint.Menu>
-                          <Blueprint.MenuItem
-                            disabled={false}
+                          <a
+                            className="facebook-share-button pt-menu-item pt-popover-dismiss"
                             onClick={[Function]}
-                            popoverProps={Object {}}
-                            shouldDismissPopover={true}
-                            submenuViewportMargin={Object {}}
-                            text="Facebook"
-                            useSmartPositioning={true}
-                          />
+                          >
+                            Facebook
+                          </a>
                           <a
                             className="twitter-share-button pt-menu-item pt-popover-dismiss"
                             data-hashtags="example,demo"
@@ -2869,15 +2806,12 @@ ShallowWrapper {
                         className="share-popover"
                         content={
                           <Blueprint.Menu>
-                            <Blueprint.MenuItem
-                              disabled={false}
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
                               onClick={[Function]}
-                              popoverProps={Object {}}
-                              shouldDismissPopover={true}
-                              submenuViewportMargin={Object {}}
-                              text="Facebook"
-                              useSmartPositioning={true}
-                            />
+                            >
+                              Facebook
+                            </a>
                             <a
                               className="twitter-share-button pt-menu-item pt-popover-dismiss"
                               data-hashtags="example,demo"
@@ -3036,15 +2970,12 @@ ShallowWrapper {
                           className="share-popover"
                           content={
                             <Blueprint.Menu>
-                              <Blueprint.MenuItem
-                                disabled={false}
+                              <a
+                                className="facebook-share-button pt-menu-item pt-popover-dismiss"
                                 onClick={[Function]}
-                                popoverProps={Object {}}
-                                shouldDismissPopover={true}
-                                submenuViewportMargin={Object {}}
-                                text="Facebook"
-                                useSmartPositioning={true}
-                              />
+                              >
+                                Facebook
+                              </a>
                               <a
                                 className="twitter-share-button pt-menu-item pt-popover-dismiss"
                                 data-hashtags="example,demo"
@@ -3116,15 +3047,12 @@ ShallowWrapper {
                           </button>,
                           "className": "share-popover",
                           "content": <Blueprint.Menu>
-                            <Blueprint.MenuItem
-                              disabled={false}
+                            <a
+                              className="facebook-share-button pt-menu-item pt-popover-dismiss"
                               onClick={[Function]}
-                              popoverProps={Object {}}
-                              shouldDismissPopover={true}
-                              submenuViewportMargin={Object {}}
-                              text="Facebook"
-                              useSmartPositioning={true}
-                            />
+                            >
+                              Facebook
+                            </a>
                             <a
                               className="twitter-share-button pt-menu-item pt-popover-dismiss"
                               data-hashtags="example,demo"
