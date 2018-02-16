@@ -25,20 +25,12 @@ class ApplicationCard extends Component {
   }
 
   shareWithFb(urlToShare) {
-    window.FB.ui({
-      method: 'share_open_graph',
-      action_type: 'og.likes',
-      action_properties: JSON.stringify({
-        object: {
-          'og:url': 'https://www.facebook.com/sharer/sharer.php?u=https%3A//blockapps.net/demo1', // your url to share
-          'og:title': 'Blockapps',
-          'og:description': 'To restore to digital transactions the reliability and efficiency of face-to-face interactions through secure and connected information.',
-        }
-      }),
-    }, function (response) {
-      // Debug response (optional)
-      console.log(response);
-    });
+    const height = 329;
+    const width = 575;
+    const top = (window.innerHeight - height) / 2;
+    const left = (window.innerWidth  - width) / 2;
+    const opts = 'status=1, width=' + width + ',height=' + height +',top='+ top + ',left=' + left;
+    window.open('https://www.facebook.com/sharer/sharer.php?u=https%3A//blockapps.net/demo1', 'facebook-share-dialog', opts);
   }
 
   renderLogin(app) {
@@ -56,6 +48,7 @@ class ApplicationCard extends Component {
     const { app } = this.props;
     const urlToShare = window.location.origin + app.url
     const twitterUrl = "https://twitter.com/intent/tweet?url=" + urlToShare
+
     return (
       <div className="pt-card app-card">
         <div className="row">
@@ -74,7 +67,7 @@ class ApplicationCard extends Component {
                   position={Position.BOTTOM}
                   content={
                     <Menu>
-                      <MenuItem onClick={() => this.shareWithFb(urlToShare)} text="Facebook" />
+                      <a className="facebook-share-button pt-menu-item pt-popover-dismiss" onClick={this.shareWithFb}>Facebook</a>
                       <a className="twitter-share-button pt-menu-item pt-popover-dismiss"
                         href={twitterUrl}
                         data-size="large"
@@ -84,7 +77,7 @@ class ApplicationCard extends Component {
                         data-via="twitterdev"
                         data-related="twitterapi,twitter">
                         Tweet
-                        </a>
+                      </a>
                       <MenuItem onClick={() => { window.open('https://www.stateofthedapps.com/dapps/new/form', '_blank') }} text="State of Dapps" />
                     </Menu>}
                   popoverClassName={"popoverClassName"}
