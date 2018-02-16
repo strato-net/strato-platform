@@ -71,8 +71,8 @@ function* login(action) {
 function* logout() {
   try {
     yield call(logoutAccount);
-    yield put(logoutSuccess());
     localStorage.removeItem('token');
+    yield put(logoutSuccess());
   } catch (err) {
     // Handle when you have error on logout
   }

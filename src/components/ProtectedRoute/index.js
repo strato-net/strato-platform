@@ -2,14 +2,16 @@ import React from 'react';
 import { Route, Redirect } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { setCurrentUser } from '../User/user.actions';
+import { logoutSuccess } from '../User/user.actions';
+import { currentUser } from '../../lib/localStorage';
 
 class ProtectedRoute extends Route {
 
   render() {
     const component = super.render();
 
-    if (!this.props.isLoggedIn) {
+    if (!Object.keys(currentUser()).length) {
+      this.props.logoutSuccess();
       return (<Redirect to={{
         pathname: '/apps',
         state: { from: this.props.location }
@@ -29,6 +31,6 @@ function mapStateToProps(state) {
 
 export default withRouter(
   connect(mapStateToProps, {
-    setCurrentUser
+    logoutSuccess
   })(ProtectedRoute)
 );
