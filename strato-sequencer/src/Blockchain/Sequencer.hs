@@ -3,7 +3,6 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE RecordWildCards   #-}
 module Blockchain.Sequencer where
 
 import           Control.Monad.Logger
@@ -49,11 +48,6 @@ sequencer = forever $ do
         setGauge (length pendingLDBWrites) ctr_sequencer_ldb_batch_size
         $logInfoS "sequencer" "Applied pending LDB writes"
         unless (lenOutEv == 0) $ do
-            forM_ outEv $ \case
-                            OETx _ OutputTx{..} -> $logInfoS "seguencer" . T.pack $ "### OutputTx: " ++ show otHash
-                            OEBlock OutputBlock{..} -> $logInfoS "sequencer" . T.pack $ "### OutputBlock: " ++ show (BDB.blockDataNumber obBlockData, obTotalDifficulty)
-                            OEJsonRpcCommand _ -> $logInfoS "sequencer" . T.pack $ "### Got a JsonRpcCommand! Don't know how this happened!"
-            $logInfoS "sequencer" . T.pack $ "###"
             writeSeqEvents' outEv
             $logInfoS "sequencer" . T.pack $ "Wrote " ++ show lenOutEv ++ " SeqEvents"
         setNextIngestedOffset ofs
