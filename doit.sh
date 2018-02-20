@@ -54,7 +54,7 @@ function newnode {
   runForever cleanupLogs
 
   echo "Becoming strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
+   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
 }
 
 function cleanupDB {
