@@ -75,7 +75,7 @@ deployments:
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: master
+    ref: bloc-performance
     compose:
       restart: always
       depends_on:
@@ -123,7 +123,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: master
+    ref: strato-bottleneck
     compose:
       restart: always
       ports:
