@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -30,6 +31,7 @@ import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
+import           BlockApps.Solidity.SolidityValue
 import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types
@@ -68,8 +70,10 @@ getContractsContract = getContractDetails
 getContractsState :: ContractName
                   -> MaybeNamed Address
                   -> Maybe Text
+                  -> Maybe Int
+                  -> Maybe Int
                   -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId mName = do
+getContractsState contract@(ContractName contractName) contractId mName mLen mStart = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -97,10 +101,15 @@ getContractsState contract@(ContractName contractName) contractId mName = do
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
 
-      ret = case mName of
-        Nothing -> map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
+  ret <- case mName of
+        Nothing ->
+          let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
+              solVals = map (fmap valueToSolidityValue) vals
+          in return solVals
         Just name ->
-          map (fmap valueToSolidityValue) $ decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 [name]
+          let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 [name]
+              solVals = map (fmap sliceAndConvert) vals
+          in return solVals
 
   logWith logNotice $ Text.unlines
     [ "Storage:"
@@ -109,6 +118,16 @@ getContractsState contract@(ContractName contractName) contractId mName = do
     ]
 
   return $ Map.fromList ret
+  where
+    sliceAndConvert = sliceArray . valueToSolidityValue
+    sliceArray = \case
+      (SolidityArray vals) ->
+          let len = maybe (length vals) id mLen
+              start = maybe 0 id mStart
+          in SolidityArray (take len . drop start $ vals)
+      val -> val
+
+
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
