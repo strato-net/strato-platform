@@ -111,6 +111,7 @@ type GetContractsState = "contracts"
   :> Capture "contractName" ContractName
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
+  :> QueryParam "name" Text
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
 
 type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format

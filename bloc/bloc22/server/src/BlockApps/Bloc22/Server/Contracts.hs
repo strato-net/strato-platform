@@ -65,8 +65,11 @@ getContractsData (ContractName contractName) = blocTransaction $ do
 getContractsContract :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
 getContractsContract = getContractDetails
 
-getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId = do
+getContractsState :: ContractName
+                  -> MaybeNamed Address
+                  -> Maybe Text
+                  -> Bloc GetContractsStateResponses -- state-translation
+getContractsState contract@(ContractName contractName) contractId mName = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -93,7 +96,6 @@ getContractsState contract@(ContractName contractName) contractId = do
 
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
-
 
       ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
 

@@ -178,7 +178,6 @@ word256ToByteString=BL.toStrict . encode
 byteStringToWord256::ByteString->Word256
 byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) $ zip [31,30..0] $ map fromIntegral $ ByteString.unpack x
 
-
 decodeValues
   :: TypeDefs
   -> Struct
@@ -189,8 +188,13 @@ decodeValues typeDefs' struct'@Struct{..} storage offset =
   let
     varNames = Map.keys fields
   in
-   --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
-   zip varNames $ mapMaybe (decodeValue typeDefs' storage offset struct') varNames
+    flip zipMaybe varNames (decodeValue typeDefs' storage offset struct')
+  where
+    zipMaybe :: (a -> Maybe b) -> [a] -> [(a,b)]
+    zipMaybe _ [] = []
+    zipMaybe f (a:as) = case (f a) of
+                          Nothing -> zipMaybe f as
+                          Just b -> (a,b) : (zipMaybe f as)
 
 decodeValue
   :: TypeDefs
