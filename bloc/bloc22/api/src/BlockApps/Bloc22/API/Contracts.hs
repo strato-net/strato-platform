@@ -114,6 +114,9 @@ type GetContractsState = "contracts"
   :> QueryParam "name" Text
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
 
+instance ToParam (QueryParam "name" Text) where
+  toParam _ = DocQueryParam "name" ["id","value"] "Names of contract variables" List
+
 type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples

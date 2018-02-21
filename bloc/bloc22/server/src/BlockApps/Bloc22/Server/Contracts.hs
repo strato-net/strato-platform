@@ -97,7 +97,10 @@ getContractsState contract@(ContractName contractName) contractId mName = do
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
 
-      ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
+      ret = case mName of
+        Nothing -> map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
+        Just name ->
+          map (fmap valueToSolidityValue) $ decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 [name]
 
   logWith logNotice $ Text.unlines
     [ "Storage:"

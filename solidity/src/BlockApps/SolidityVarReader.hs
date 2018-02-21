@@ -5,6 +5,7 @@
 module BlockApps.SolidityVarReader (
   decodeValue,
   decodeValues,
+  decodeValuesFromList,
   decodeMapValue,
   word256ToByteString,
   byteStringToWord256,
@@ -24,7 +25,6 @@ import qualified Data.ByteString.Lazy             as BL
 import           Data.LargeWord
 import           Data.List
 import qualified Data.Map                         as Map
-import           Data.Maybe
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -185,10 +185,17 @@ decodeValues
   -> Word256
   -> [(Text, Value)]
 decodeValues typeDefs' struct'@Struct{..} storage offset =
-  let
-    varNames = Map.keys fields
-  in
-    flip zipMaybe varNames (decodeValue typeDefs' storage offset struct')
+  decodeValuesFromList typeDefs' struct' storage offset (Map.keys fields)
+
+decodeValuesFromList
+  :: TypeDefs
+  -> Struct
+  -> Storage
+  -> Word256
+  -> [Text]
+  -> [(Text, Value)]
+decodeValuesFromList typeDefs' struct'@Struct{..} storage offset varNames =
+  flip zipMaybe varNames (decodeValue typeDefs' storage offset struct')
   where
     zipMaybe :: (a -> Maybe b) -> [a] -> [(a,b)]
     zipMaybe _ [] = []
