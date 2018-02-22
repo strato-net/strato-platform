@@ -63,7 +63,6 @@ instance MonadError BlocError Bloc where
     logWith logError (Text.pack (formatError err))
     Bloc $ throwError err
   catchError m handle = do
-    logWith logError "catching error"
     Bloc $ catchError (runBloc m) (runBloc . handle)
 
 dbErrorToUserError :: MonadError BlocError m => m a -> m a
