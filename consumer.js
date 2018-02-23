@@ -59,14 +59,6 @@ function start() {
   }
 }
 
-
-function resetOffset(scope) {
-  const topics = {
-    [scope.kafkaTopic]: [0]
-  };
-  scope.consumer.updateOffsets(topics);
-}
-
 function consume(scope) {
   return (m) => {
     var localScope = {};
@@ -339,22 +331,37 @@ function addressToState(accounts, address) {
       addressFormatted = removeHexPrefix(address);
 
   if(global.contractMap[codeHash] === undefined) {
-    return Promise.reject(new Error("No table found"));
+
+    const options = {
+      method: 'GET',
+      url: blocRoot + '/contracts/lolololololol/' + addressFormatted + '/state',
+      headers: {
+        'cache-control': 'no-cache',
+        'content-type': 'application/json',
+        'accept': 'application/json'
+      },
+      json: true
+    };
+  
+    return rp(options).then((v) => {global.contractMap[codeHash] = v})
   }
-  const name = global.contractMap[codeHash].name;
+  else {
 
-  const options = {
-    method: 'GET',
-    url: blocRoot + '/contracts/' + name + '/' + addressFormatted + '/state',
-    headers: {
-      'cache-control': 'no-cache',
-      'content-type': 'application/json',
-      'accept': 'application/json'
-    },
-    json: true
-  };
+    const name = global.contractMap[codeHash].name;
 
-  return rp(options);
+    const options = {
+      method: 'GET',
+      url: blocRoot + '/contracts/' + name + '/' + addressFormatted + '/state',
+      headers: {
+        'cache-control': 'no-cache',
+        'content-type': 'application/json',
+        'accept': 'application/json'
+      },
+      json: true
+    };
+
+    return rp(options);
+  }
 
 }
 
