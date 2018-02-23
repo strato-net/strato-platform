@@ -312,14 +312,18 @@ upload = function (req, res, next) {
       err.status = 400;
       return next(err);
     }
-    tempPaths.push(req.file.path);
 
     const username = req.body.username;
     const address = req.body.address;
     const password = req.body.password;
     const file = req.file;
-
-    if (!username || !address || !password || !file) {
+    if (!file) {
+      let err = new Error("wrong params, expected: {username, address, password, file}");
+      err.status = 400;
+      return next(err);
+    }
+    tempPaths.push(req.file.path);
+    if (!username || !address || !password) {
       removePathsIfExist(tempPaths);
       let err = new Error("wrong params, expected: {username, address, password, file}");
       err.status = 400;
