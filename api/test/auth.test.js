@@ -50,7 +50,6 @@ describe('App', function() {
           .post('/login')
           .send({username: "you", password: "hunter2"})
           .end(function(err, res) {
-            console.log(`Text is ${res.text}`);
             assert.equal(res.status, '200');
             done();
           });
@@ -61,9 +60,22 @@ describe('App', function() {
         .post('/logout')
         .end(function(err, res) {
           assert.equal(res.status, '401');
-					done();
+          done();
         });
     });
+
+    it('400s when missing an arg', function(done) {
+      chai.request(app)
+          .post('/dapps')
+          .send({username: "dev",
+                password: "hunter3",
+                address: "0x171717171"})
+          .end(function(err, res) {
+            assert.equal(res.status, '400');
+            done();
+          });
+    });
+
 
   });
 });
