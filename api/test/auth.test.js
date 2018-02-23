@@ -12,11 +12,12 @@ chai.use(chaiHttp);
 
 describe('App', function() {
   describe('post /login', function() {
-    it('responds with status 401', function(done) {
+    it('replies Bad Request without un/pw', function(done) {
       chai.request(app)
         .post('/login')
         .end(function(err, res) {
-          assert.equal(res.status, '401');
+          assert(res.text.includes("wrong params"));
+          assert.equal(res.status, '400');
           done();
         });
     });
