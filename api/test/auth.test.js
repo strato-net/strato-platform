@@ -56,5 +56,14 @@ describe('App', function() {
           });
        });
     });
+    it('doesn\'t log out without creds', function(done) {
+      chai.request(app)
+        .post('/logout')
+        .end(function(err, res) {
+          assert.equal(res.status, '401');
+					done();
+        });
+    });
+
   });
 });
