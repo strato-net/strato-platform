@@ -55,7 +55,7 @@
     "npm-run-all": "4.1.1"
   },
   "jshintConfig": {
-      "esnext": true,
-      "node": true,
-  },
+    "esnext": true,
+    "node": true
+  }
 }
