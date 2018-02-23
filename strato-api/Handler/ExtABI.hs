@@ -29,6 +29,7 @@ postExtABIR = do
 
 allXABI :: Map String String -> [String] -> EitherT String IO Aeson.Value
 allXABI allSrc mainFileNames = do
-  allParsed <- bimapEitherT show id $ hoistEither $ sequence $ Map.mapWithKey parseSolidity allSrc
-  hoistEither $ either (Right . Aeson.toJSON) (Right . Aeson.toJSON) $ sequence $ Map.fromList [(name, jsonABI name allParsed) | name <- mainFileNames]
+  allParsed <- bimapEitherT show id . hoistEither . sequence . Map.mapWithKey parseSolidity $ allSrc
+  let jsonify = either Aeson.toJSON Aeson.toJSON
+  right . jsonify . sequence . Map.fromList $ [(name, jsonABI name allParsed) | name <- mainFileNames]
 
