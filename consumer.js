@@ -385,5 +385,4 @@ function removeHexPrefix(str) {
 
 module.exports = {
   start:start,
-  resetOffset:resetOffset,
 };
