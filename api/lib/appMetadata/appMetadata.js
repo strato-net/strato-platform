@@ -1,3 +1,4 @@
+/* jshint esnext: true */
 const ba = require('blockapps-rest');
 const rest = ba.rest;
 
@@ -19,11 +20,11 @@ function* uploadContract(admin, args) {
 function setContract(admin, contract) {
   contract.getState = function* () {
     return yield rest.getState(contract);
-  }
+  };
 
   contract.update = function* (args, user) {
     return yield update(admin,contract, args, user);
-  }
+  };
 
   return contract;
 }
@@ -37,7 +38,7 @@ function* compileSearch() {
 // ================== contract methods ====================
 function* update(admin, contract, args, user) {
   rest.verbose('update', args);
-  const signer = (user) ? user : admin
+  const signer = (user) ? user : admin;
 
   // function update( string _appName, string _version, string _maintainer
   //                 , string _url, string _description ) onlyOwner {
