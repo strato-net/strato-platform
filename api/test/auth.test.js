@@ -5,15 +5,19 @@ const assert = chai.assert;
 
 const initDb = require('../migrations/init-script/initdb.js');
 const models = require('../models');
+const createInitialData = require('../migrations/init-script/init');
 const app = require('../app');
 
 
 chai.use(chaiHttp);
 
 describe('App', function() {
+  this.timeout(10000);
   before(async function() {
+    await initDb.dropdb();
     await initDb();
     await models.sequelize.sync();
+    await createInitialData();
   });
 
   describe('post /login', function() {
@@ -36,5 +40,21 @@ describe('App', function() {
           done();
         });
      });
+    it('creates accounts', function(done) {
+      chai.request(app)
+       .post('/users')
+       .send({username: "you", password: "hunter2"})
+       .end(function(err, res) {
+         assert.equal(res.status, '200');
+        chai.request(app)
+          .post('/login')
+          .send({username: "you", password: "hunter2"})
+          .end(function(err, res) {
+            console.log(`Text is ${res.text}`);
+            assert.equal(res.status, '200');
+            done();
+          });
+       });
+    });
   });
 });

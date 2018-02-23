@@ -24,3 +24,18 @@ module.exports = function initdb() {
     })
   })
 };
+
+module.exports.dropdb = function() {
+  const pgToolsConfig = {
+    user: config.username,
+    password: config.password,
+    port: config.port,
+    host: config.host,
+  };
+  return new Promise((resolve, reject) => {
+      pgtools.dropdb(pgToolsConfig, config.database, function (err, res) {
+        return err ? reject(err) : resolve();
+      })
+  })
+};
+
