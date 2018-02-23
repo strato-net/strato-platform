@@ -33,11 +33,18 @@ data TestConfig = TestConfig
   , pw                           :: Password
   , simpleStorageContractName    :: Text
   , simpleStorageContractAddress :: Address
+  , testContractName             :: Text
+  , testContractAddress          :: Address
+  , simpleMappingContractName    :: Text
+  , simpleMappingContractAddress :: Address
+  , twoContractsContractName    :: Text
+  , twoContractsContractAddress :: Address
   , txParams                     :: Maybe TxParams
   , txParamsLowNonce             :: Maybe TxParams
   , simpleStorageSrc             :: Text
   , testSrc                      :: Text
   , simpleMappingSrc             :: Text
+  , twoContractsSrc              :: Text
   , delay                        :: Int --microsecond
   } deriving (Generic)
 
