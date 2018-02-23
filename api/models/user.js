@@ -1,3 +1,4 @@
+/* jshint esnext: true */
 'use strict';
 module.exports = function (sequelize, DataTypes) {
   let User = sequelize.define('User', {
@@ -25,20 +26,20 @@ module.exports = function (sequelize, DataTypes) {
       }
     ).then(user => {
       if (!user) {
-        throw new Error('unknown user id')
+        throw new Error('unknown user id');
       } else {
         return user.Roles.map(roleObj => roleObj.dataValues.name).includes(roleName);
       }
-    })
+    });
   };
 
   User.prototype.toJson = function() {
     return {
       id: this.id,
       username: this.username,
-      roles: this['Roles'].map(role => role.name),
+      roles: this.Roles.map(role => role.name),
       accountAddress: this.accountAddress
-    }
+    };
   };
 
   return User;
