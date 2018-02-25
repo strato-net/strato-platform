@@ -105,6 +105,12 @@ getContractsState contract@(ContractName contractName) contractId = do
 
   return $ Map.fromList ret
 
+getContractsDetails :: Address -> Bloc ContractDetails
+getContractsDetails contractAddress = do
+  toUserError
+    (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
+      $ getContractDetailsByAddressOnly contractAddress
+
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId

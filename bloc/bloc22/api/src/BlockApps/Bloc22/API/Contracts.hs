@@ -117,6 +117,12 @@ type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity v
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
+type GetContractsDetails = "contracts"
+  :> "contract"
+  :> Capture "contractAddress" Address
+  :> "details"
+  :> Get '[JSON] ContractDetails -- change to HTML
+
 --instance {-# OVERLAPPING #-} ToSchema GetContractsStateResponses where
 --  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
 --    & description ?~ "Response to the Get Cotnracts State route"

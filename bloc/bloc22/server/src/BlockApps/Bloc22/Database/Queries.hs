@@ -165,22 +165,11 @@ contractByAddress contractName contractAddress = proc () -> do
   restrict -< addr .== constant contractAddress
   returnA -< contract
 
-contractByAddressOnly
-    :: Address
-    -> Query
-      ( Column PGInt4
-      , Column PGText
-      , Column PGBytea
-      , Column PGTimestamptz
-      , Column PGBytea
-      , Column PGBytea
-      , Column PGBytea
-      , Column PGBytea
-      )
-contractByAddressOnly contractAddress = proc () -> do
-  contract@(_,_,addr,_,_,_,_,_) <- contractsJoinTable -< ()
+contractNameFromAddress :: Address -> Query (Column PGText)
+contractNameFromAddress contractAddress = proc () -> do
+  (_,name,addr,_,_,_,_,_) <- contractsJoinTable -< ()
   restrict -< addr .== constant contractAddress
-  returnA -< contract
+  returnA -< name
 
 contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGText)
 contractByTxHash txHash = proc () -> do
@@ -361,16 +350,55 @@ getContractsMetaDataIdExhaustive contractName contractAddr = do
     byLatest = blocQuery $ getContractsMetaDataIdByLatestQuery contractName
     bySameName = blocQuery $ getContractsMetaDataIdBySameNameQuery contractName
     addContractMetaDatafromStrato = do
-      msrc <- getSourceFromStrato contractAddr
-      case msrc of
-        Nothing -> return Nothing
-        Just src -> do
+      mSrcHash <- getSourceFromStrato contractAddr
+      case mSrcHash of
+        Nothing -> do
+          return Nothing
+
+        Just (src,codeHash) -> do
           cmIds <- compileContract src
-          return (Map.lookup contractName cmIds)
+          let correctContract = listToMaybe . filter (\cd -> codeHash == (contractdetailsCodeHash $ snd cd)) . map snd . Map.toList $ cmIds
+          return correctContract
     getSourceFromStrato addr = do
       let afp = accountsFilterParams{qaAddress=Just addr}
       mAcc <- listToMaybe <$> blocStrato (getAccountsFilter afp)
-      return (accountSource <$> mAcc)
+      return ((arr accountSource &&& arr accountCodeHash) <$> mAcc)
+
+getContractDetailsByAddressOnly :: Address -> Bloc ContractDetails
+getContractDetailsByAddressOnly contractAddr = do
+  mName <- blocQuery $ contractNameFromAddress contractAddr
+  case mName of
+    [] -> do
+      mDetails <- addContractMetaDatafromStrato
+      case mDetails of
+        Nothing -> throwError $ UserError "getContractsMetaDataIdExhaustive: couldn't find contract metadata id"
+        Just (cmId,details) -> do
+          xs::[Int32] <- blocQuery $ proc () -> do
+            (cmId',_,_,_,_,_,_,_) <- contractByAddress (contractdetailsName details) contractAddr -< ()
+            returnA -< cmId'
+          when (isNothing $ listToMaybe xs) $ do
+            void . blocModify $ \conn -> runInsert conn contractsInstanceTable
+              ( Nothing
+              , constant cmId
+              , constant contractAddr
+              , Nothing
+              )
+          return details{contractdetailsAddress = Just $ Unnamed contractAddr}
+    name:_ -> getContractDetails (ContractName name) (Unnamed contractAddr)
+  where
+    addContractMetaDatafromStrato = do
+      mSrcHash <- getSourceFromStrato contractAddr
+      case mSrcHash of
+        Nothing -> do
+          return Nothing
+
+        Just acct -> do
+          cds <- compileContract (accountSource acct)
+          let correctContract = listToMaybe . filter (\cd -> (accountCodeHash acct) == (contractdetailsCodeHash $ snd cd)) . map snd . Map.toList $ cds
+          return correctContract
+    getSourceFromStrato addr = do
+      let afp = accountsFilterParams{qaAddress=Just addr}
+      listToMaybe <$> blocStrato (getAccountsFilter afp)
 
 insertXabiFunctionArg
   :: Int32
