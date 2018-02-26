@@ -34,20 +34,20 @@ sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m,
            Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff blockNumber blockHash oldRoot newRoot
-  commitSqlDiffs stateDiffs
+  commitSqlDiffs stateDiffs Map.empty
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
-                  StateDiff -> m ()
-commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
+                  StateDiff -> Map.Map Address String -> m ()
+commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} srcMap = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
-    sequence_ $ Map.mapWithKey (createAccount blockNumber) createdAccounts
+    sequence_ $ Map.mapWithKey (createAccount blockNumber srcMap) createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
 createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
-createAccount blockNumber address diff = do
+                 Integer -> Map.Map Address String -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
+createAccount blockNumber srcMap address diff = do
   addrID <- SQL.insert addrRef
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ Map.map makeIncremental $ storage diff
 
@@ -60,7 +60,7 @@ createAccount blockNumber address diff = do
       addressStateRefCode = getField (theError "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefSource = ""
+      addressStateRefSource = maybe "" id (Map.lookup address srcMap)
       }
     makeIncremental (Value x) = Create{newValue = x}
     theError :: String -> a

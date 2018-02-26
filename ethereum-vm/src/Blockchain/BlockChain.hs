@@ -29,7 +29,7 @@ import           Control.Monad.Trans.Either
 import qualified Data.ByteString                         as B
 import qualified Data.ByteString.Base16                  as B16
 import qualified Data.ByteString.Char8                   as BC
-import           Data.Either                             (isRight)
+import           Data.Either                             (isRight, partitionEithers)
 import           Data.IORef                              (newIORef, readIORef, writeIORef)
 import           Data.List
 import qualified Data.Map                                as M
@@ -252,15 +252,16 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
                       $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
                       (theBlock, nbb) <- liftIO (readIORef replacedBest)
                       void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-                      calculateAndEmitStateDiffs theBlock oldStateRoot
-                      forM_ (join ess) $ \er -> do
-                        when (erSuccess er && (isJust $ erNewContractAddress er)) $ do
-                          let isHomestead = blockIsHomestead . blockDataNumber $ erBlockData er
-                              Just contractAddress = erNewContractAddress er
-                          eRes <- getSource False isHomestead (erBlockData er) (erSender er) contractAddress
-                          when (isRight eRes) $ do
-                            let Right src = eRes
-                            updateSource contractAddress src
+                      eMap <- forM (join ess) $ \er -> do
+                        if (erSuccess er && (isJust $ erNewContractAddress er))
+                          then do
+                            let isHomestead = blockIsHomestead . blockDataNumber $ erBlockData er
+                                Just contractAddress = erNewContractAddress er
+                            eRes <- getSource False isHomestead (erBlockData er) (erSender er) contractAddress
+                            return $ (\s -> (contractAddress,s)) <$> eRes
+                          else return . Left $ VMException "Result not successful"
+                      srcs <- return . M.fromList . snd $ partitionEithers eMap
+                      calculateAndEmitStateDiffs theBlock oldStateRoot srcs
 
 
           timerToUse = Just $ if isUnmined then time_vm_block_insertion_unmined else time_vm_block_insertion_mined
@@ -628,7 +629,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
         putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
         when emitStateDiff $ do
             $logInfoS "replaceBestIfBetter/emitStateDiff" "emitStateDiff = true, emitting StateDiff"
-            calculateAndEmitStateDiffs b oldStateRoot
+            calculateAndEmitStateDiffs b oldStateRoot M.empty
 
     -- we're replaying SeqEvents, and need to notify the mempool
     when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
@@ -644,15 +645,16 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> MP.StateRoot
+                           -> M.Map Address String
                            -> ContextM ()
-calculateAndEmitStateDiffs newBlock oldStateRoot = when (flags_sqlDiff || flags_diffPublish) $ do
+calculateAndEmitStateDiffs newBlock oldStateRoot srcMap = when (flags_sqlDiff || flags_diffPublish) $ do
     let newHeader    = blockHeader newBlock
         newHash      = blockHash newBlock
         newStateRoot = MP.StateRoot (blockHeaderStateRoot newHeader)
         newNumber    = blockHeaderBlockNumber newHeader
     $logInfoS "calculateAndEmitStateDiffs" . T.pack $ "Calculating StateDiff from: " ++ show oldStateRoot ++ "\nto: " ++ format newBlock
     diffs <- stateDiff newNumber newHash oldStateRoot newStateRoot
-    when flags_sqlDiff $ commitSqlDiffs diffs
+    when flags_sqlDiff $ commitSqlDiffs diffs srcMap
     when flags_diffPublish $
         let (deletionEvents, creationEvents, updateEvents) = destructStateDiff diffs
          in withKafkaViolently $ do
