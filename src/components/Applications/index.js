@@ -82,10 +82,9 @@ class Applications extends Component {
           }
         </div>
         <Dialog
-          iconName="download"
           isOpen={this.props.isTokenOpen}
           onClose={this.props.closeCLIOverlay}
-          title="How to Deploy an App on STRATO"
+          title="Download CLI Tool"
           className="pt-dark"
         >
           <CLI addApp />

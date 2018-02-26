@@ -10,10 +10,10 @@ class Stepper extends Component {
             <i className={`fa-2x ${this.props.step > 0 ? "fa fa-check-circle" : "fa fa-user-circle"}`} aria-hidden="true"></i>
           </div>
           <div className={`steps-step-2 ${this.props.step === 1 && 'active'}`}>
-            <i className={`fa-2x ${this.props.step > 1 ? "fa fa-check-circle" : "fa fa-user-circle"}`} aria-hidden="true"></i>
+            <i className={`fa-2x ${this.props.step > 1 ? "fa fa-check-circle" : "fa fa-credit-card"}`} aria-hidden="true"></i>
           </div>
           <div className={`steps-step-3 third-final ${this.props.step === 2 && 'active'}`}>
-            <i className={`fa-2x ${this.props.step > 2 ? "fa fa-check-circle" : "fa fa-terminal"}`} aria-hidden="true"></i>
+            <i className={`fa-2x ${this.props.step > 2 ? "fa fa-check-circle" : "fa fa-code"}`} aria-hidden="true"></i>
           </div>
         </div>
       </div>

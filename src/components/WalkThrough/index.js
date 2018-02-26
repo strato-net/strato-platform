@@ -46,14 +46,12 @@ class WalkThrough extends Component {
         <div className="pt-dialog-body">
           <div className="pt-form-group">
             <div className="pt-form-group pt-intent-danger">
-              <div className="pt-form-content">
-                Using and launching apps requires tokens. Please complete the form below to email us your token request.
-              </div>
+              <h4>Use STR Tokens to deploy blockchain applications across platforms immediately.</h4>
             </div>
 
             <div className="pt-form-group pt-intent-danger">
               <label className="pt-label" htmlFor="input-b">
-                What are you building?
+                Using and launching apps requires tokens. Tell us what you are building so we can fund you.
                   </label>
               <div className="pt-form-content">
                 <Field
@@ -119,7 +117,7 @@ class WalkThrough extends Component {
             isOpen={this.props.isWalkThroughOpen}
             onClose={this.props.closeWalkThroughOverlay}
             title={title}
-            className="pt-dark"
+            className="pt-dark dialog"
             canOutsideClickClose={false}
           >
             <Stepper step={this.state.step} />

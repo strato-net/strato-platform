@@ -7,3 +7,29 @@
 .form-width {
   width: 100%;
 }
+
+.create-user h4 {
+  text-align: center;
+}
+
+.side-items {
+	margin: 20px 20px !important;
+	float: left;
+	width: 40%;
+}
+
+.side-items ul {
+	display: table-cell;
+	vertical-align: middle;
+}
+
+.create-user .feature-list, .create-user .feature-list li {
+	list-style: none;
+}
+
+.create-user .feature-list li:before {    
+	font-family: 'FontAwesome';
+	content: '\f00c';
+	margin:0 5px 0 -15px;
+	color: lightgreen;
+}
