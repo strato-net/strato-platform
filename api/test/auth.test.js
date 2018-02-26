@@ -2,6 +2,7 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const assert = chai.assert;
+const fs = require('fs');
 
 const initDb = require('../migrations/init-script/initdb.js');
 const models = require('../models');
@@ -46,13 +47,13 @@ describe('App', function() {
        .send({username: "you", password: "hunter2"})
        .end(function(err, res) {
          assert.equal(res.status, '200');
-        chai.request(app)
-          .post('/login')
-          .send({username: "you", password: "hunter2"})
-          .end(function(err, res) {
-            assert.equal(res.status, '200');
-            done();
-          });
+         chai.request(app)
+           .post('/login')
+           .send({username: "you", password: "hunter2"})
+           .end(function(err, res) {
+             assert.equal(res.status, '200');
+             done();
+           });
        });
     });
     it('doesn\'t log out without creds', function(done) {
@@ -68,14 +69,47 @@ describe('App', function() {
       chai.request(app)
           .post('/dapps')
           .send({username: "dev",
-                password: "hunter3",
-                address: "0x171717171"})
+                 password: "hunter3",
+                 address: "0x171717171"})
           .end(function(err, res) {
             assert.equal(res.status, '400');
+            assert(res.text.includes("wrong params"));
             done();
           });
     });
 
+    it('Accepts a working bundle', function(done) {
+      this.timeout(30000);
+      chai.request(app)
+       .post('/users')
+       .send({username: "dev", password: "hunter3"})
+       .end(function(err, res) {
+         assert.equal(res.status, '200');
+         console.log("Response: " + res.text);
+         address = JSON.parse(res.text).user.accountAddress;
+         assert.notEqual(address, undefined);
+         chai.request("http://localhost")
+           .post('/strato-api/eth/v1.2/faucet')
+           .field('address', address)
+           .end(function(err, res) {
 
+             chai.request(app)
+                 .post('/dapps')
+                 .attach('file',
+                         fs.readFileSync('./test/testdata/testdata.zip'),
+                         'testdata.zip')
+                 .field('username', 'dev')
+                 .field('password', 'hunter3')
+                 .field('address', address)
+                 .end(function(err, res) {
+                   assert.equal(res.status, 200);
+                   assert(res.text.includes("\"url\""));
+                   assert(res.text.includes("\"metadata\""));
+                   assert(res.text.includes("\"nunya\""));
+                   done();
+                 });
+           });
+       });
+    });
   });
 });

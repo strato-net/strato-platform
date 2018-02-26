@@ -20,6 +20,10 @@ coverage
 # nyc test coverage
 .nyc_output
 
+# Prevents bundle collisions in tests
+api/test/testdata/nonce.txt
+api/test/testdata/*zip
+
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
