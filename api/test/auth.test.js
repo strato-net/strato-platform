@@ -2,6 +2,7 @@
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const assert = chai.assert;
+const expect = chai.expect;
 const fs = require('fs');
 
 const initDb = require('../migrations/init-script/initdb.js');
@@ -42,6 +43,7 @@ describe('App', function() {
         });
      });
     it('creates accounts', function(done) {
+      this.timeout(20000);
       chai.request(app)
        .post('/users')
        .send({username: "you", password: "hunter2"})
@@ -79,7 +81,7 @@ describe('App', function() {
     });
 
     it('Accepts a working bundle', function(done) {
-      this.timeout(30000);
+      this.timeout(60000);
       chai.request(app)
        .post('/users')
        .send({username: "dev", password: "hunter3"})
@@ -110,6 +112,19 @@ describe('App', function() {
                  });
            });
        });
+    });
+
+    it("parses initfile.json", function(done) {
+      const got = parseInitfile('./test/testdata/');
+      const want = {
+        'storage': {
+          'contractName': 'SimpleStorage',
+          'contractFilename': 'contracts/SimpleStorage.sol',
+          'args': {}
+        }
+      };
+      expect(got).to.deep.equal(want);
+      done();
     });
   });
 });

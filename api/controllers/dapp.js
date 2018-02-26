@@ -212,7 +212,7 @@ validatePackageStructure = function*(packageFolderPath) {
 /**
  * Parse the initfile object out of the bundle
  * @param packageFolderPath String - the path of the unzipped package
- * @returns Object
+ * @returns Object Matching variable names to (contractName, contractFilename, args)
  */
 parseInitfile = function(packageFolderPath) {
   const initfile = path.join(packageFolderPath, 'initfile.json');
@@ -222,23 +222,24 @@ parseInitfile = function(packageFolderPath) {
   inits = JSON.parse(fs.readFileSync(initfile));
   console.log("Total init: " + JSON.stringify(inits));
   for (var v in inits) {
-    if (inits.hasOwnProperty(v)) {
-      var base = inits[v].contractFilename;
-      var file = path.join(packageFolderPath, base);
-      if (!fs.pathExists(file)) {
-        let err = new Error(
-            `could not find requested contract '${base}' in bundle`);
-        err.status = 400;
-        throw err;
-      }
-      if (inits[v].args.constructor !== {}.constructor) {
-        let err = new Error(`args '${inits[v].args}' is not a map`);
-        err.status = 400;
-        throw err;
-      }
-      // TODO(tim): check that inits[v].contractName is a contract
-      // in the .sol file.
+    if (!inits.hasOwnProperty(v)) {
+      continue;
     }
+    var base = inits[v].contractFilename;
+    var file = path.join(packageFolderPath, base);
+    if (!fs.pathExists(file)) {
+      let err = new Error(
+          `could not find requested contract '${base}' in bundle`);
+      err.status = 400;
+      throw err;
+    }
+    if (inits[v].args.constructor !== {}.constructor) {
+      let err = new Error(`args '${inits[v].args}' is not a map`);
+      err.status = 400;
+      throw err;
+    }
+    // TODO(tim): check that inits[v].contractName is a contract
+    // in the .sol file.
   }
   return inits;
 }
