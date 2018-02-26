@@ -37,6 +37,7 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -907,13 +908,14 @@ runVMM isRunningTests' isHomestead preExistingSuicideList callDepth' env availab
 
 getSource :: Bool
           -> Bool
-          -> BlockData
+          -> BlockData -- TODO: Use default BlockData instance
           -> Address
-          -> Address
-          -> ContextM (Either VMException String)
-getSource isRunningTests' isHomestead b sender contractAddress = do
-  (eRes, vmState'') <- call isRunningTests' isHomestead True S.empty b 0 contractAddress contractAddress sender 0 1 (fst $ B16.decode "ec630643") 1000000000000000000 sender
-  return $ eRes >>= \_ -> return $ fromMaybe "" (returnVal vmState'' >>= return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64)
+          -> ContextM String
+getSource isRunningTests' isHomestead b contractAddress = do
+  (eRes, _) <- call isRunningTests' isHomestead True S.empty b 0 contractAddress contractAddress (Address 0) 0 1 (fst $ B16.decode "ec630643") 1000000000000000000 (Address 0)
+  case eRes of
+    Left _ -> return ""
+    Right ret -> return . BC.unpack . BC.takeWhile (/= '\0') . BC.drop 64 $ ret
 
 create :: Bool
        -> Bool

@@ -147,7 +147,7 @@ initializeGenesisBlock backupType genesisBlockName = do
         deletedAccounts     = Map.empty,
         updatedAccounts     = Map.empty
     }
-    commitSqlDiffs diff Map.empty
+    commitSqlDiffs diff Nothing
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
