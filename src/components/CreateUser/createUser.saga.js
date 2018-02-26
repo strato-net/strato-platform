@@ -49,7 +49,7 @@ export function* createUser(action) {
       // yield put(fetchAccounts(false, false));
       localStorage.setItem('token', JSON.stringify(response.user));
       yield put(loginSuccess(action.username, response.user));
-      yield put(openWalkThroughOverlay());
+      yield put(openWalkThroughOverlay(true));
     }
   }
   catch (err) {

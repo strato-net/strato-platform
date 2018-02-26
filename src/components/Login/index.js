@@ -5,7 +5,7 @@ import { withRouter } from 'react-router-dom';
 import { login, openLoginOverlay, closeLoginOverlay, resetError } from '../User/user.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import validate from './validate.js';
-import { openOverlay } from '../CreateUser/createUser.actions';
+import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './Login.css';
 import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
@@ -117,7 +117,7 @@ class Login extends Component {
                 <Button onClick={() => {
                   mixpanelWrapper.track('create_user_open_click');
                   this.props.closeLoginOverlay();
-                  this.props.openOverlay();
+                  this.props.openWalkThroughOverlay(false);
                 }} text="Create User" className="pt-icon-add" />
                 <Button
                   type="button"
@@ -153,7 +153,7 @@ const connected = connect(
     login,
     openLoginOverlay,
     closeLoginOverlay,
-    openOverlay,
+    openWalkThroughOverlay,
     launchApp,
     resetSelectedApp,
     resetError

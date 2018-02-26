@@ -5,9 +5,10 @@ import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { downloadPDFFile } from '../../lib/fileHandler';
-import cli from '../../cli.pdf';
 import { faucetRequest } from '../Accounts/accounts.actions';
+import CLI from '../CLI';
+import CreateUser from '../CreateUser';
+import Stepper from '../Stepper';
 import './walkThrough.css';
 
 class WalkThrough extends Component {
@@ -15,12 +16,21 @@ class WalkThrough extends Component {
     super(props);
     this.state = {
       isContinue: false,
-      initialModal: 'Faucet'
+      initialModal: 'CreateUser',
+      step: 0,
     }
+    this.handleBackToFaucet = this.handleBackToFaucet.bind(this);
   }
 
   componentDidMount() {
     mixpanelWrapper.track("faucet_loaded");
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (this.state.initialModal !== 'CreateUser' && !nextProps.isLoggedIn)
+      this.setState({ initialModal: 'CreateUser', step: 0 });
+    if (!this.props.isLoggedIn && nextProps.isLoggedIn)
+      this.setState({ initialModal: 'Faucet', step: 1 });
   }
 
   submit = (values) => {
@@ -73,7 +83,7 @@ class WalkThrough extends Component {
               intent={Intent.PRIMARY}
               onClick={() => {
                 mixpanelWrapper.track('faucet_close_click');
-                this.setState({ initialModal: "CLI", isContinue: false });
+                this.setState({ initialModal: "CLI", isContinue: false, step: 2 });
                 // Faucet account using jwt tobe done
                 this.props.faucetRequest(this.props.currentUser.accountAddress);
               }} disabled={!this.state.isContinue} />
@@ -89,56 +99,39 @@ class WalkThrough extends Component {
     )
   }
 
-  CLIContent() {
-    return (
-      <div>
-        <div className="pt-dialog-body">
-          <div className="pt-form-group">
-            <div className="pt-form-group pt-intent-danger">
-              <div className="pt-form-content">
-                <a onClick={() => {
-                  mixpanelWrapper.track('Add_App_click');
-                  downloadPDFFile('cli.pdf', cli)
-                }}> Click here</a> to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
-            <Button text="Back" onClick={() => {
-              mixpanelWrapper.track('faucet_close_click');
-              this.setState({ initialModal: "Faucet" });
-            }} />
-            <Button
-              intent={Intent.PRIMARY}
-              onClick={() => {
-                this.setState({ initialModal: "Faucet" });
-                this.props.closeWalkThroughOverlay();
-              }}
-              text="Finish"
-            />
-          </div>
-        </div>
-      </div>
-    )
+  handleBackToFaucet() {
+    this.setState({ initialModal: "Faucet", step: 1 });
   }
 
   render() {
+    let title;
+    if (this.state.initialModal === "CreateUser")
+      title = 'Create STRATO Developer ID';
+    else if (this.state.initialModal === "Faucet")
+      title = 'Request Tokens';
+    else
+      title = 'Download CLI Tool';
+
     return (
       <div>
         <form>
           <Dialog
             isOpen={this.props.isWalkThroughOpen}
             onClose={this.props.closeWalkThroughOverlay}
-            title={this.state.initialModal === "Faucet" ? "STRATO Token Request Form" : "How to Deploy an App on STRATO"}
+            title={title}
             className="pt-dark"
-            iconName="pt-icon-walk"
+            canOutsideClickClose={false}
           >
+            <Stepper step={this.state.step} />
+            {this.state.initialModal === "CreateUser"
+              ? <CreateUser />
+              : null}
+
             {this.state.initialModal === "Faucet" && this.faucetContent()}
 
-            {this.state.initialModal === "CLI" && this.CLIContent()}
+            {this.state.initialModal === "CLI"
+              ? <CLI handleFinish={this.props.closeWalkThroughOverlay} handleBack={this.handleBackToFaucet} />
+              : null}
 
           </Dialog>
         </form>
@@ -156,6 +149,7 @@ export function mapStateToProps(state) {
   return {
     isWalkThroughOpen: state.walkThrough.isWalkThroughOpen,
     currentUser: state.user.currentUser,
+    isLoggedIn: state.walkThrough.isLoggedIn,
     ...errors
   };
 }

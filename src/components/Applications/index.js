@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter, Link } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { Position, Tooltip, Button } from '@blueprintjs/core';
+import { Position, Tooltip, Button, Dialog } from '@blueprintjs/core';
 
 import { fetchApplications } from '../Applications/applications.actions';
 import { openCLIOverlay } from '../CLI/cli.actions';
@@ -12,6 +12,7 @@ import { canDeployApps } from '../../lib/envChecks';
 import { env } from '../../env';
 import CLI from '../CLI';
 import TokenRequest from '../TokenRequest';
+import { closeCLIOverlay } from '../CLI/cli.actions';
 
 import './application.css'
 
@@ -40,7 +41,7 @@ class Applications extends Component {
       <div className="container-fluid pt-dark">
         <div className="row smd-pad-12">
           <div className="col-sm-6">
-            <h3>Welcome to Launchpad</h3>
+            <h3>My Apps</h3>
           </div>
           <div className="col-sm-6 text-right">
             {this.props.isLoggedIn &&
@@ -80,7 +81,15 @@ class Applications extends Component {
               </div>
           }
         </div>
-        <CLI />
+        <Dialog
+          iconName="download"
+          isOpen={this.props.isTokenOpen}
+          onClose={this.props.closeCLIOverlay}
+          title="How to Deploy an App on STRATO"
+          className="pt-dark"
+        >
+          <CLI addApp />
+        </Dialog>
         <TokenRequest />
       </div>
     );
@@ -91,7 +100,8 @@ class Applications extends Component {
 export function mapStateToProps(state) {
   return {
     applications: state.applications.applications,
-    isLoggedIn: state.user.isLoggedIn
+    isLoggedIn: state.user.isLoggedIn,
+    isTokenOpen: state.cli.isTokenOpen,
   };
 }
 
@@ -100,7 +110,8 @@ export default withRouter(
     {
       fetchApplications,
       openCLIOverlay,
-      openTokenRequestOverlay
+      openTokenRequestOverlay,
+      closeCLIOverlay
     }
   )(Applications)
 );
