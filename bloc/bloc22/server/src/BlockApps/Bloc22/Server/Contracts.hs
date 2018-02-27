@@ -72,8 +72,9 @@ getContractsState :: ContractName
                   -> Maybe Text
                   -> Maybe Int
                   -> Maybe Int
+                  -> Bool
                   -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId mName mLen mStart = do
+getContractsState contract@(ContractName contractName) contractId mName mCount mOffset mLength = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -122,9 +123,11 @@ getContractsState contract@(ContractName contractName) contractId mName mLen mSt
     sliceAndConvert = sliceArray . valueToSolidityValue
     sliceArray = \case
       (SolidityArray vals) ->
-          let len = maybe (length vals) id mLen
-              start = maybe 0 id mStart
-          in SolidityArray (take len . drop start $ vals)
+          let len = maybe (length vals) id mCount
+              start = maybe 0 id mOffset
+          in if mLength
+               then SolidityObject [("length", SolidityValueAsString (Text.pack $ show len))]
+               else SolidityArray (take len . drop start $ vals)
       val -> val
 
 

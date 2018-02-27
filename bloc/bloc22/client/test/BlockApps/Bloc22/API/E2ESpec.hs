@@ -125,6 +125,10 @@ spec =
         (getContractsState
           (ContractName simpleStorageContractName)
           (Unnamed contractAddr)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contractStateEither `shouldSatisfy` isRight
@@ -176,6 +180,10 @@ spec =
         (getContractsState
           (ContractName simpleStorageContractName)
           (Unnamed contractAddr)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contractStateEither' `shouldSatisfy` isRight
@@ -235,6 +243,10 @@ spec =
                                       ( getContractsState
                                         (ContractName ctName)
                                         (Unnamed addr)
+                                        Nothing
+                                        Nothing
+                                        Nothing
+                                        False
                                       )
                                       (ClientEnv mgr blocUrl)
       -- Test --
@@ -312,6 +324,10 @@ spec =
         (getContractsState
           (ContractName simpleStorageAddressContractName)
           (Unnamed contractAddr)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contractStateEither `shouldSatisfy` isRight
@@ -359,7 +375,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr))
+        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -419,6 +435,10 @@ spec =
         (getContractsState
           (ContractName simpleStorageBytes32ArrayContractName)
           (Unnamed contractAddr)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contractStateEither `shouldSatisfy` isRight
@@ -473,7 +493,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr))
+        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl)
       contractStateEither' `shouldSatisfy` isRight
 
@@ -624,6 +644,10 @@ spec =
         (getContractsState
           (ContractName simpleConstructorName)
           (Unnamed contractAddr)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contractStateEither `shouldSatisfy` isRight
@@ -868,6 +892,10 @@ spec =
         (getContractsState
           (ContractName simpleTupleContractName)
           (Unnamed contractAddr)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contractStateEither `shouldSatisfy` isRight
@@ -921,7 +949,7 @@ spec =
       -- get state and verify
 
       contractStateEither' <- runClientM
-        (getContractsState contractName (Unnamed contractAddr))
+        (getContractsState contractName (Unnamed contractAddr) Nothing Nothing Nothing False)
         (ClientEnv mgr blocUrl)
       contractStateEither' `shouldSatisfy` isRight
 

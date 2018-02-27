@@ -112,18 +112,23 @@ type GetContractsState = "contracts"
   :> Capture "contractAddress" (MaybeNamed Address)
   :> "state"
   :> QueryParam "name" Text
-  :> QueryParam "length" Int
-  :> QueryParam "start" Int
+  :> QueryParam "count" Int
+  :> QueryParam "offset" Int
+  :> QueryFlag "length"
   :> Get '[JSON] GetContractsStateResponses -- change to HTML
 
 instance ToParam (QueryParam "name" Text) where
   toParam _ = DocQueryParam "name" ["id","value"] "Names of contract variables" List
 
-instance ToParam (QueryParam "length" Int) where
-  toParam _ = DocQueryParam "length" ["id","value"] "Length of contract array slice" List
+instance ToParam (QueryParam "count" Int) where
+  toParam _ = DocQueryParam "count" ["id","value"] "Length of contract array slice" List
 
-instance ToParam (QueryParam "start" Int) where
-  toParam _ = DocQueryParam "start" ["id","value"] "Starting index of contract array slice" List
+instance ToParam (QueryParam "offset" Int) where
+  toParam _ = DocQueryParam "offset" ["id","value"] "Starting index of contract array slice" List
+
+instance ToParam (QueryFlag "length") where
+  toParam _ =
+    DocQueryParam "length" ["0","1",""] "flag for resolving a transaction result" Flag
 
 type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity values but we have problems with parsing, e.g. FromJSON with the current format
 
