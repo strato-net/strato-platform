@@ -87,7 +87,6 @@ describe('App', function() {
        .send({username: "dev", password: "hunter3"})
        .end(function(err, res) {
          assert.equal(res.status, '200');
-         console.log("Response: " + res.text);
          address = JSON.parse(res.text).user.accountAddress;
          assert.notEqual(address, undefined);
          chai.request("http://localhost")
@@ -126,5 +125,37 @@ describe('App', function() {
       expect(got).to.deep.equal(want);
       done();
     });
+
+    it("can upload init contracts", function(done) {
+      this.timeout(20000);
+      chai.request(app)
+       .post('/users')
+       .send({username: "john_wayne",
+              password: "hunter2"})
+       .end(function(err, res) {
+
+      const address = JSON.parse(res.text).user.accountAddress;
+      chai.request("http://localhost")
+       .post('/strato-api/eth/v1.2/faucet')
+       .field('address', address)
+       .end(async function(err, res) {
+
+      const creds = {name: "john_wayne",
+                    password: "hunter2",
+                    address: address};
+      const inits = {
+        'storage': {
+          'contractName': 'SimpleStorage',
+          'contractFilename': 'contracts/SimpleStorage.sol',
+          'args': {}
+        }
+      };
+      let addrs = await uploadInitContracts('./test/testdata/', creds, inits);
+      expect(addrs.storage).to.match(/[0-9A-Fa-f]{40}/g);
+      done();
+
+      });
+      });
+    })
   });
 });

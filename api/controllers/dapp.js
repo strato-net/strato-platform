@@ -15,6 +15,8 @@ const appMetadata = require('../lib/appMetadata/appMetadata');
 
 const tmpFolder = 'tmp';
 
+const Promise = require('bluebird');
+
 
 /**
  * Parse the solidity source
@@ -220,7 +222,6 @@ parseInitfile = function(packageFolderPath) {
     return {};
   }
   inits = JSON.parse(fs.readFileSync(initfile));
-  console.log("Total init: " + JSON.stringify(inits));
   for (var v in inits) {
     if (!inits.hasOwnProperty(v)) {
       continue;
@@ -242,6 +243,29 @@ parseInitfile = function(packageFolderPath) {
     // in the .sol file.
   }
   return inits;
+}
+
+/**
+ * Instantiate a contract for each entry in inits
+ * @params packageFolderPath String - Directory to start file search.
+ * @params creds Object - username, password, address
+ * @param inits Object - An association between variable names and the
+ *    (contractName, contractFilename, args) necessary to upload a contract
+ * @returns Promise waiting to match variable names to contract addresses
+ */
+uploadInitContracts = function(packageFolderPath, creds, inits) {
+  return new Promise(function(resolve) {
+    co(function*() {
+      const addrs = {};
+      for (var key in inits) {
+        const filename = path.join(packageFolderPath, inits[key].contractFilename);
+        let contract = yield blockappsRest.uploadContract(
+              creds, inits[key].contractName, filename, inits[key].args);
+        addrs[key] = contract.address
+      }
+      resolve(addrs);
+    });
+  });
 }
 
 /**
@@ -351,6 +375,11 @@ upload = function (req, res, next) {
     const username = req.body.username;
     const address = req.body.address;
     const password = req.body.password;
+    const credentials = {
+      name: username,
+      address: address,
+      password: password,
+    };
     const file = req.file;
     if (!file) {
       let err = new Error("wrong params, expected: {username, address, password, file}");
@@ -398,7 +427,7 @@ upload = function (req, res, next) {
       // we can supply the contract addresses to static
       // files on behalf of developers.
       const inits = parseInitfile(packageTmpFolder);
-      // const addrs = yield uploadInitContracts(inits);
+      const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
       // yield injectAddressesJs(packageTmpFolder, inits);
       const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
 
