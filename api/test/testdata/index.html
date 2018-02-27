@@ -4,7 +4,7 @@
     <meta charset='utf-8'>
     <title>Simplest dApp example</title>
     <script src='https://code.jquery.com/jquery-3.2.1.min.js'></script>
-    <script src='addresses.js'></script>
+    <script src='generated/addresses.js' type='text/javascript'></script>
 </head>
 <body>
 
@@ -20,14 +20,11 @@
   <!--STRATO blockchain user password-->
   <input type='text' name='password' placeholder='Password' id='password' required>
   <br/>
-  <!--Type of operation: deploy the contract, set contract's value, get contract's value-->
+  <!--Type of operation: set contract's value, get contract's value-->
   <select form='dapp-form' id='submit-type'>
-    <option value='deploy' selected>Deploy</option>
     <option value='set'>Set value</option>
     <option value='get'>Get value</option>
   </select>
-  <!--Contract address to interact with (only visible for Set/Get operations)-->
-  <input type='text' name='contractAddress' placeholder='Contract address' id='contract-address' style='display: none'>
   <!--Value to set to the contract (only visible for Set operation)-->
   <input type='number' name='setValue' placeholder='New value' id='set-value' style='display: none'>
   <br/>
@@ -43,14 +40,10 @@
   $('#submit-type').change(function() {
     var submitType = $(this).val();
     switch(submitType) {
-      case 'deploy':
-        $('#contract-address, #set-value').hide().prop('required', false);
-        break;
       case 'set':
-        $('#contract-address, #set-value').show().prop('required', true);
+        $('#set-value').show().prop('required', true);
         break;
       case 'get':
-        $('#contract-address').show().prop('required', true);
         $('#set-value').hide().prop('required', false);
         break;
     }
@@ -74,39 +67,9 @@
     var submitType = $('#submit-type').val();
     //The urls to bloc API's upload-contract and call-contract-method endpoints
     var uploadContractUrl = 'http://' + window.location.hostname + '/bloc/v2.2/users/' + username + '/' + userAddress + '/contract?resolve';
-    var callContractMethodUrl = 'http://' + window.location.hostname + '/bloc/v2.2/users/' + username + '/' + userAddress + '/contract/SimpleStorage/' + $('#contract-address').val() + '/call?resolve';
+    var callContractMethodUrl = 'http://' + window.location.hostname + '/bloc/v2.2/users/' + username + '/' + userAddress + '/contract/SimpleStorage/' + addresses.storage + '/call?resolve';
 
     switch(submitType) {
-
-      case 'deploy':
-        $.get('contracts/SimpleStorage.sol')
-          .done(function (contractContent) {
-
-            var uploadContractBody = {
-              password: password,
-              contract: 'SimpleStorage',
-              src: contractContent
-            };
-
-            $.post({
-              url: uploadContractUrl,
-              data: JSON.stringify(uploadContractBody),
-              contentType: 'application/json',
-              dataType: 'json'
-            })
-              .done(function (response) {
-                // Fill-in the contract-address field and show it
-                $('#contract-address').val(response['txResult']['contractsCreated']).show();
-                resultWrapper.text('Contract deployed successfully for the user');
-              })
-              .fail(function(error) {
-                resultWrapper.text('Error: wrong user credentials provided or Bloc API is not reachable');
-              })
-          })
-          .fail(function(error) {
-            resultWrapper.text('Error: contract file not found');
-          });
-        break;
 
       case 'set':
 
