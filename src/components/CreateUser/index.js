@@ -48,9 +48,7 @@ class CreateUser extends Component {
   render() {
     return (
       <form className="create-user">
-        <div className="pt-dialog-body">
-          <h4>STRATO is the best way to build blockchain applications</h4>
-        </div>
+        <h4>STRATO is the best way to build blockchain applications</h4>
         <div className="pt-dialog-body side-items">
           <ul className="feature-list">
             <li>Build dApps in hours, not days</li>
@@ -134,7 +132,7 @@ class CreateUser extends Component {
             <Button
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
-              text="Create User"
+              text="Create STRATO ID"
               disabled={this.props.spinning}
             />
           </div>

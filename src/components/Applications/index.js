@@ -85,7 +85,7 @@ class Applications extends Component {
           isOpen={this.props.isTokenOpen}
           onClose={this.props.closeCLIOverlay}
           title="Download CLI Tool"
-          className="pt-dark"
+          className="pt-dark cli-dialog"
         >
           <CLI addApp />
         </Dialog>

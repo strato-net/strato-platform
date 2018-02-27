@@ -10,6 +10,7 @@ import CLI from '../CLI';
 import CreateUser from '../CreateUser';
 import Stepper from '../Stepper';
 import './walkThrough.css';
+import RequestTokenImage from './faucet.png';
 
 class WalkThrough extends Component {
   constructor(props) {
@@ -43,27 +44,31 @@ class WalkThrough extends Component {
   faucetContent() {
     return (
       <div>
-        <div className="pt-dialog-body">
+        <div className="pt-dialog-body faucet-container">
           <div className="pt-form-group">
-            <div className="pt-form-group pt-intent-danger">
+            <div className="faucet-title">
               <h4>Use STR Tokens to deploy blockchain applications across platforms immediately.</h4>
             </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Using and launching apps requires tokens. Tell us what you are building so we can fund you.
-                  </label>
-              <div className="pt-form-content">
-                <Field
-                  name="building"
-                  component="textarea"
-                  type="text"
-                  placeholder="I am building..."
-                  className="pt-input form-width"
-                  tabIndex="3"
-                  required
-                />
-                <div className="pt-form-helper-text">{this.props.errors && this.props.errors.building}</div>
+            <div className="faucet-body">   
+              <img src={RequestTokenImage} alt="Request Token" className="side-image"/>
+
+              <div className="pt-form-group pt-intent-danger faucet-form">
+                <label className="pt-label" htmlFor="input-b">
+                  Using and launching apps requires tokens. Tell us what you are building so we can fund you.
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="building"
+                    component="textarea"
+                    type="text"
+                    placeholder="I am building..."
+                    className="pt-input form-width"
+                    tabIndex="3"
+                    required
+                  />
+                  <div className="pt-form-helper-text">{this.props.errors && this.props.errors.building}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -115,7 +120,10 @@ class WalkThrough extends Component {
         <form>
           <Dialog
             isOpen={this.props.isWalkThroughOpen}
-            onClose={this.props.closeWalkThroughOverlay}
+            onClose={() => {
+              mixpanelWrapper.track('faucet_close_click');
+              this.props.closeWalkThroughOverlay();
+            }}
             title={title}
             className="pt-dark dialog"
             canOutsideClickClose={false}
@@ -128,7 +136,7 @@ class WalkThrough extends Component {
             {this.state.initialModal === "Faucet" && this.faucetContent()}
 
             {this.state.initialModal === "CLI"
-              ? <CLI handleFinish={this.props.closeWalkThroughOverlay} handleBack={this.handleBackToFaucet} />
+              ? <CLI handleBack={this.handleBackToFaucet} handleFinish={this.props.closeWalkThroughOverlay} />
               : null}
 
           </Dialog>
