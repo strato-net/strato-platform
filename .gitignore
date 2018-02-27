@@ -23,6 +23,7 @@ coverage
 # Prevents bundle collisions in tests
 api/test/testdata/nonce.txt
 api/test/testdata/*zip
+api/test/testdata/generated/
 
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt

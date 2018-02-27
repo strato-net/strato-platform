@@ -127,7 +127,7 @@ describe('App', function() {
     });
 
     it("can upload init contracts", function(done) {
-      this.timeout(20000);
+      this.timeout(30000);
       chai.request(app)
        .post('/users')
        .send({username: "john_wayne",
@@ -156,6 +156,19 @@ describe('App', function() {
 
       });
       });
-    })
+    });
+
+    it("creates addresses.js", function(done) {
+      const addrs = {"storage": "deadbeefdeadbeef"};
+      injectAddressesJs('./test/testdata', addrs);
+      const want =
+`const addresses = {
+  storage = "deadbeefdeadbeef";
+};
+`;
+      const got = fs.readFileSync("./test/testdata/generated/addresses.js", 'utf8');
+      assert.equal(got, want);
+      done();
+    });
   });
 });

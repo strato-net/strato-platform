@@ -269,6 +269,33 @@ uploadInitContracts = function(packageFolderPath, creds, inits) {
 }
 
 /**
+ * Write a javascript module that creates the assocation
+ * between the variable keys and address values of addrs
+ * @params packageFolderPath String location of static files
+ * @params addrs Object a mapping {var_name: contract_addr}
+ */
+injectAddressesJs = function(packageFolderPath, addrs) {
+  const lines = [];
+  lines.push("const addresses = {");
+  Object.keys(addrs).forEach(name => {
+    lines.push(`  ${name}: "${addrs[name]}",`);
+  });
+  lines.push("};\n");
+  const text = lines.join('\n');
+  const gen = path.join(packageFolderPath, "generated");
+  try {
+    fs.mkdirSync(gen);
+  } catch (error) {
+    // Why no mkdir -p, fs?
+    if (error.code != "EEXIST") {
+      throw error;
+    }
+  }
+  fs.writeFileSync(path.join(gen, "addresses.js"), text);
+}
+
+
+/**
  * Remove files or directories if they exist
  * @param paths String|Array - the absolute or relative (to apex/api/) path of the file
  */
@@ -423,12 +450,12 @@ upload = function (req, res, next) {
 
       yield validatePackageStructure(packageTmpFolder);
 
-      // By upload the contracts configured by the initfile,
+      // By uploading the contracts configured by the initfile,
       // we can supply the contract addresses to static
       // files on behalf of developers.
       const inits = parseInitfile(packageTmpFolder);
       const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
-      // yield injectAddressesJs(packageTmpFolder, inits);
+      injectAddressesJs(packageTmpFolder, addrs);
       const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
 
       // check if all contracts from tmp/contracts/ are compile
