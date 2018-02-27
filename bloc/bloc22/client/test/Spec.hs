@@ -93,8 +93,6 @@ setup = do
       }
 
     postCompileRequest1 = PostCompileRequest (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
-    postCompileRequest2 = PostCompileRequest (Just $ testContractName testConfig) (testSrc testConfig)
-    postCompileRequest3 = PostCompileRequest (Just $ simpleMappingContractName testConfig) (simpleMappingSrc testConfig)
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig
