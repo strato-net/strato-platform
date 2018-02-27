@@ -41,8 +41,15 @@ describe('State pagination', function () {
     const arrLength = 5;
     const arrOffset = 5;
     const state = yield rest.getStateVar(contract,'x', arrLength, arrOffset);
+    console.log('State:',state);
     assert.equal(state.x.length, 5, "Variable x was not the correct length");
     assert.equal(state.x[0], 6, "Variable x was not in the correct state");
+    assert.equal(state.y, null, "State path returned more data than expected");
+  })
+  
+  it('should get the length of the array', function * () {
+    const state = yield rest. getState(contract, 'x', null, null, true);
+    assert.equal(state.x.length, 10, "Array length was not returned properly");
     assert.equal(state.y, null, "State path returned more data than expected");
   })
 
