@@ -2,8 +2,8 @@
 
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
+const child_process = require('child_process');
 const co = require('co');
-const cmd = require('node-cmd');
 const download = require('download');
 const fs = require('fs-extra');
 const md5File = require('md5-file/promise');
@@ -371,7 +371,7 @@ zipAddFile = function(filePath, newAddition) {
   // I spent a day trying to replicate this command and
   // continued to receive "Invalid LOC header (bad signature)"
   return new Promise(function (resolve, reject) {
-    cmd.get(`/usr/bin/zip --verbose -uj ${filePath} ${newAddition}`, resolve);
+    child_process.exec(`/usr/bin/zip --verbose -uj ${filePath} ${newAddition}`, resolve);
   });
 }
 
