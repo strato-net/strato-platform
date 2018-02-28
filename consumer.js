@@ -8,6 +8,8 @@ var Promise = require('bluebird'),
  delayPromise = util.delayPromise,
  Consumer = kafka.Consumer;
 
+const toSchemaString = util.toSchemaString;
+
 const postgrestRoot = (process.env["postgrestRoot"] || "http://localhost/cirrus/search");
 const blocRoot       = (process.env["blocRoot"]) || "http://localhost/bloc/v2.2";
 const zookeeperConn = (process.env["zookeeper_conn"] || "kafka");
@@ -59,17 +61,9 @@ function start() {
   }
 }
 
-
-function resetOffset(scope) {
-  const topics = {
-    [scope.kafkaTopic]: [0]
-  };
-  scope.consumer.updateOffsets(topics);
-}
-
 function consume(scope) {
   return (m) => {
-    var localScope = {};
+    var localScope = {pool: scope.pool};
 
     //ignore message if cirrus is inserting
     if(scope.isCirrusInserting) {
@@ -143,16 +137,16 @@ function consume(scope) {
   function getAllStates(accounts) {
     return scope => {
       console.log('created Accounts: ');
-      return getStates(accounts.createdAccounts)
+      return getStates(accounts.createdAccounts)(scope)
         .then(states => {
           scope.createdStates = states;
           console.log('updated Accounts: ');
-          return getStates(accounts.updatedAccounts);
+          return getStates(accounts.updatedAccounts)(scope);
         })
         .then(states => {
           scope.updatedStates = states;
           console.log('deleted Accounts: ');
-          return getStates(accounts.deletedAccounts);
+          return getStates(accounts.deletedAccounts)(scope);
         })
         .then(states => {
           scope.deletedStates = states;
@@ -166,6 +160,7 @@ function consume(scope) {
   }
 
   function getStates(accounts) {
+    return scope => {
       const accountAddrs = Object.keys(accounts);
       // console.log('addresses: ', accountAddrs);
 
@@ -181,9 +176,9 @@ function consume(scope) {
       // END OF DEBUG STATEMENTS
       var accountPromises = accountAddrs
         .map(addr => {
-        return addressToState(accounts, addr)
+        return addressToState(accounts, addr)(scope)
           .then((o) => {
-            // console.log('>>>>>>>>>o',JSON.stringify(o,null,2));
+            console.log('>>>>>>>>>o',JSON.stringify(o));
             return JSON.stringify(o);
           })
           .then(JSON.parse)
@@ -210,6 +205,7 @@ function consume(scope) {
         })
 
     }
+  }
 
   function insertCirrusUpdates() {
     return scope => {
@@ -333,29 +329,87 @@ function retryErrorHandler(fn, errDesc) {
   })
 }
 
-function addressToState(accounts, address) {
-
-  let codeHash = removeHexPrefix(accounts[address].codeHash);
-      addressFormatted = removeHexPrefix(address);
-
-  if(global.contractMap[codeHash] === undefined) {
-    return Promise.reject(new Error("No table found"));
+function getContractDetails(address) {
+  return scope => {
+      const options = {
+        method: 'GET',
+        url: blocRoot + '/contracts/contract/' + address + '/details',
+        headers: {
+          'cache-control': 'no-cache',
+          'content-type': 'application/json',
+          'accept': 'application/json'
+        },
+        json: true
+      };
+      return rp(options);
   }
-  const name = global.contractMap[codeHash].name;
+}
 
-  const options = {
-    method: 'GET',
-    url: blocRoot + '/contracts/' + name + '/' + addressFormatted + '/state',
-    headers: {
-      'cache-control': 'no-cache',
-      'content-type': 'application/json',
-      'accept': 'application/json'
-    },
-    json: true
-  };
+function getContractState(name, address) {
+  return scope => {
 
-  return rp(options);
+      const options = {
+        method: 'GET',
+        url: blocRoot + '/contracts/' + name + '/' + address + '/state',
+        headers: {
+          'cache-control': 'no-cache',
+          'content-type': 'application/json',
+          'accept': 'application/json'
+        },
+        json: true
+      };
+      return rp(options);
+  }
+}
 
+function addressToState(accounts, address) {
+  return scope => {
+    let codeHash = removeHexPrefix(accounts[address].codeHash);
+        addressFormatted = removeHexPrefix(address);
+  
+    let name;
+    if(global.contractMap[codeHash] === undefined) {
+      console.log('Codehash undefined. Retrieving contract details.'); 
+      return getContractDetails(addressFormatted)(scope)
+  	    .then(v => {name = v.name; return addContract(v, (s) => {})(scope)})
+	    .then(() => {console.log('Name:',name); return getContractState(name, addressFormatted)(scope)})
+  	    .catch(err => {
+  	      throw new Error('No table found')
+  	    });
+    }
+    else {
+  
+      const name = global.contractMap[codeHash].name;
+  
+      return getContractState(name, addressFormatted)(scope);
+    }
+  }
+}
+
+function addContract(contractDetails, callback) {
+  return scope => {
+    // incase the binaries are attached, remove them so we don't store
+    delete contractDetails["bin"];
+    delete contractDetails["bin-runtime"];
+   
+    var schema = toSchemaString(contractDetails);
+    var pool = scope.pool;
+   
+    global.contractMap[contractDetails.codeHash] = contractDetails;
+    console.log("global.contractMap: " + JSON.stringify(global.contractMap));
+    console.log("Schema: " + schema)
+   
+    pool.query(schema)
+      .then(_ => {
+        console.log("done creating new table for contract")
+        console.log('Resetting the offset for kafka');
+        callback(schema);
+      })
+      .catch(err => {
+        console.log(err);
+        throw new Error(err);
+      })
+  }
 }
 
 // cleanState :: Object -> [{key: value}]
@@ -378,5 +432,5 @@ function removeHexPrefix(str) {
 
 module.exports = {
   start:start,
-  resetOffset:resetOffset,
+  addContract:addContract,
 };

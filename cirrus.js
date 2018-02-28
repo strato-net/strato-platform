@@ -33,30 +33,9 @@ function startCirrus() {
       }
 
       app.post(['/', '/contract'], function (req, res, next) {
-        var contractMetaData = req.body;
+	const cb = (schema) => { res.send(schema); next() };
 
-        // incase the binaries are attached, remove them so we don't store
-        delete contractMetaData["bin"];
-        delete contractMetaData["bin-runtime"];
-
-        var schema = toSchemaString(contractMetaData);
-
-        global.contractMap[req.body.codeHash] = contractMetaData;
-        console.log("global.contractMap: " + JSON.stringify(global.contractMap));
-        console.log("Schema: " + schema)
-
-        pool.query(schema)
-          .then(_ => {
-            console.log("done creating new table for contract")
-            console.log('Resetting the offset for kafka');
-            consumer.resetOffset(scope);
-            res.send(schema)
-            next();
-          })
-          .catch(err => {
-            console.log(err);
-            throw new Error(err);
-          })
+        return consumer.addContract(req.body, cb)(scope);
       });
 
       app.get('/', function (req, res, next) {
