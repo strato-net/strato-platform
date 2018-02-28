@@ -66,6 +66,7 @@ pipeline {
             CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
             APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
             STRATO_GS_MODE=1 \
+            SINGLE_NODE=true \
             docker-compose up -d
           docker ps
           # Few quick tests
