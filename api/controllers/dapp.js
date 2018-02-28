@@ -370,7 +370,9 @@ zipAddFile = function(filePath, newAddition) {
   // Why does this use the system zip instead of adm-zip? Because
   // I spent a day trying to replicate this command and
   // continued to receive "Invalid LOC header (bad signature)"
-  cmd.run(`/usr/bin/zip -uj ${filePath} ${newAddition}`);
+  return new Promise(function (resolve, reject) {
+    cmd.get(`/usr/bin/zip --verbose -uj ${filePath} ${newAddition}`, resolve);
+  });
 }
 
 /**
@@ -462,7 +464,7 @@ upload = function (req, res, next) {
         fs.renameSync(file.path, file.path + ".zip");
         file.path = file.path + ".zip";
         tempPaths.push(file.path);
-        zipAddFile(file.path, name);
+        yield zipAddFile(file.path, name);
       }
 
       const zipHash = yield getFileHash(file.path);
@@ -520,6 +522,7 @@ upload = function (req, res, next) {
       // Replace the dapp folder with the new one (all older files will be removed)
       yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
       res.status(200).json({metadata: packageMetadata, url: dappUrl});
+      file.path = '';
       // removePathsIfExist(tempPaths);
     }).catch(err => {
         // removePathsIfExist(tempPaths);
