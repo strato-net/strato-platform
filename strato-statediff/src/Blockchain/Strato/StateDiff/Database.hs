@@ -23,6 +23,7 @@ import           Blockchain.ExtWord
 import           Blockchain.SHA
 import           Blockchain.Util
 
+import           Control.Monad.Trans.Class                   (lift)
 import           Control.Monad.Trans.Resource
 import qualified Data.Map                                    as Map
 
@@ -34,25 +35,28 @@ sqlDiff :: (HasSQLDB m, HasCodeDB m, HasStateDB m, HasHashDB m, MonadResource m,
            Integer -> SHA -> StateRoot -> StateRoot -> m ()
 sqlDiff blockNumber blockHash oldRoot newRoot = do
   stateDiffs <- stateDiff blockNumber blockHash oldRoot newRoot
-  commitSqlDiffs stateDiffs
+  commitSqlDiffs stateDiffs Nothing
 
 commitSqlDiffs :: (HasStateDB m, HasHashDB m, HasCodeDB m, HasSQLDB m, MonadResource m, MonadBaseControl IO m)=>
-                  StateDiff -> m ()
-commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
+                  StateDiff -> Maybe (Address -> m String) -> m ()
+commitSqlDiffs StateDiff{blockNumber, createdAccounts, deletedAccounts, updatedAccounts} addressSource = do
   pool <- getSQLDB
   flip SQL.runSqlPool pool $ do
-    sequence_ $ Map.mapWithKey (createAccount blockNumber) createdAccounts
+    sequence_ $ Map.mapWithKey (createAccount blockNumber addressSource) createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts
 
 createAccount :: (HasStateDB m, HasHashDB m, HasCodeDB m, MonadResource m, MonadBaseControl IO m) =>
-                 Integer -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
-createAccount blockNumber address diff = do
-  addrID <- SQL.insert addrRef
+                 Integer -> Maybe (Address -> m String) -> Address -> AccountDiff 'Eventual -> SQL.SqlPersistT m ()
+createAccount blockNumber addressSource address diff = do
+  src <- case addressSource of
+    Nothing -> return ""
+    Just f -> lift $ f address
+  addrID <- SQL.insert (addrRef src)
   sequence_ $ Map.mapWithKey (commitStorage addrID) $ Map.map makeIncremental $ storage diff
 
   where
-    addrRef = AddressStateRef{
+    addrRef source = AddressStateRef{
       addressStateRefAddress = address,
       addressStateRefNonce = getField (theError "nonce") $ nonce diff,
       addressStateRefBalance = getField (theError "balance") $ balance diff,
@@ -60,7 +64,7 @@ createAccount blockNumber address diff = do
       addressStateRefCode = getField (theError "code") $ code diff,
       addressStateRefCodeHash = codeHash diff,
       addressStateRefLatestBlockDataRefNumber = blockNumber,
-      addressStateRefSource = ""
+      addressStateRefSource = source
       }
     makeIncremental (Value x) = Create{newValue = x}
     theError :: String -> a
