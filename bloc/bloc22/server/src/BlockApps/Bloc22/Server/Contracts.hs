@@ -97,7 +97,8 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
-  storage' <- blocStrato $ getStorage $ Just address
+  storage' <- blocStrato $ getStorage
+    storageFilterParams{qsAddress = Just address}
 
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
@@ -177,7 +178,8 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
               Named somethingElse -> blocError $ UserError $
                                      "Expected address or \"Latest\": saw " <> somethingElse
 
-  storage' <- blocStrato $ getStorage $ Just address
+  storage' <- blocStrato $ getStorage
+    storageFilterParams{qsAddress = Just address}
 
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
