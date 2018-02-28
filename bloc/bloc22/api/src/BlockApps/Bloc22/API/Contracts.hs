@@ -117,6 +117,12 @@ type GetContractsStateResponses = Map Text SolidityValue -- Should be solidity v
 
 instance ToSample GetContractsStateResponses where toSamples _ = noSamples
 
+type GetContractsDetails = "contracts"
+  :> "contract"
+  :> Capture "contractAddress" Address
+  :> "details"
+  :> Get '[JSON] ContractDetails -- change to HTML
+
 --instance {-# OVERLAPPING #-} ToSchema GetContractsStateResponses where
 --  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
 --    & description ?~ "Response to the Get Cotnracts State route"
@@ -257,8 +263,7 @@ type PostContractsCompile = "contracts"
   :> Post '[JSON] [PostCompileResponse]
 
 data PostCompileRequest = PostCompileRequest
-  { postcompilerequestSearchable   :: Maybe [Text]
-  , postcompilerequestContractName :: Maybe Text
+  { postcompilerequestContractName :: Maybe Text
   , postcompilerequestSource       :: Text
   } deriving (Eq,Show,Generic)
 
@@ -280,8 +285,7 @@ instance ToSchema PostCompileRequest where
     where
       ex :: PostCompileRequest
       ex = PostCompileRequest
-        { postcompilerequestSearchable = Just ["searchable", "tags"]
-        , postcompilerequestContractName = Just "MySampleContract"
+        { postcompilerequestContractName = Just "MySampleContract"
         , postcompilerequestSource = "contract MySampleContract { ...} "
         }
 

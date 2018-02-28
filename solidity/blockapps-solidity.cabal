@@ -92,7 +92,9 @@ test-suite blockapps-solidity-test
                , bytestring
                , containers
                , hspec
+               , largeword
                , parsec
+               , QuickCheck
                , raw-strings-qq
                , text
 

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module BlockApps.SoliditySpec where
 
 import Test.Hspec
@@ -5,6 +7,8 @@ import Data.Aeson
 import Data.Either
 import qualified Data.ByteString.Lazy as ByteString
 import BlockApps.Solidity.Xabi
+import BlockApps.SolidityVarReader
+import Test.QuickCheck
 
 spec :: Spec
 spec =
@@ -20,6 +24,9 @@ spec =
 
     it "should decode xabi json with enums correctly" $
       decodeXabi "test/BlockApps/Fixtures/example6.json"
+
+    it "should convert a Bytestring to and from Word256" $ do
+      quickCheck (\bs -> (word256ToByteString $ byteStringToWord256 bs) == bs)
 
 decodeXabi :: FilePath -> Expectation
 decodeXabi filePath = do

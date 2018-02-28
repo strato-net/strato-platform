@@ -105,6 +105,12 @@ getContractsState contract@(ContractName contractName) contractId = do
 
   return $ Map.fromList ret
 
+getContractsDetails :: Address -> Bloc ContractDetails
+getContractsDetails contractAddress = do
+  toUserError
+    (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
+      $ getContractDetailsByAddressOnly contractAddress
+
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
   metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
@@ -181,18 +187,17 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
   where
     compileOneContract PostCompileRequest{..} = do
       idsAndDetails <- compileContract postcompilerequestSource
-      for_ (fromMaybe [] postcompilerequestSearchable) $ \ contractName -> do
+      for (toList idsAndDetails) $ \ (_,details) -> do
         contractDetails <-
-          getContractsContract (ContractName contractName) (Named "Latest")
+          getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")
         let eBlockappsjsXabi =
               xabiToBlockappsjsXabi . contractdetailsXabi $ contractDetails
         case eBlockappsjsXabi of
           Left msg -> throwError $
-                    AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
+            AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
           Right blockappsjsXabi ->
-            blocCirrus $ postContract contractDetails{contractdetailsXabi=blockappsjsXabi}
-      for (toList idsAndDetails) $ \ (_,ContractDetails{..}) ->
-        return $ PostCompileResponse contractdetailsName contractdetailsCodeHash
+            void . blocCirrus $ postContract contractDetails{contractdetailsXabi=blockappsjsXabi}
+        return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
 
 xabiToBlockappsjsXabi :: Xabi -> Either String Xabi
 xabiToBlockappsjsXabi xabi = do

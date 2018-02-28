@@ -6,6 +6,7 @@ module BlockApps.Bloc22.API.ContractsSpec where
 
 import           Data.Either
 import qualified Data.Map.Strict              as Map
+import           Control.Monad.IO.Class
 import           Servant.Client
 import           Test.Hspec
 
@@ -18,16 +19,23 @@ import           BlockApps.Solidity.Xabi
 
 spec :: SpecWith TestConfig
 spec = do
-  describe "postContractsCompile" $
+  describe "postContractsCompile" $ do
     it "compiles a contract" $ \ TestConfig {..} -> do
       let
         postCompileRequest = PostCompileRequest
-          (Just [])
           (Just simpleStorageContractName)
           simpleStorageSrc
       Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       contracts `shouldSatisfy` any
         (\ (PostCompileResponse name _) -> name == simpleStorageContractName)
+    it "compiles a Solidity file with two contracts in it" $ \ TestConfig {..} -> do
+      let
+        postCompileRequest = PostCompileRequest
+          (Just twoContractsContractName)
+          twoContractsSrc
+      Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
+      liftIO . putStrLn $ show contracts
+      contracts `shouldSatisfy` (== 2) . length
   describe "getContracts" $
     it "gets a list of contracts" $ \ TestConfig {..} -> do
       Right (GetContractsResponse contracts) <- runClientM getContracts (ClientEnv mgr blocUrl)
