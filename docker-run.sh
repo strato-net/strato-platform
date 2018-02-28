@@ -4,6 +4,7 @@ set -x
 
 SINGLE_NODE=${SINGLE_NODE:-false}
 STRATO_GS_MODE=${STRATO_GS_MODE:-0}
+ssl=${ssl:-false}
 
 sed -i "s|__NODE_NAME__|$NODE_NAME|g" build/index.html
 sed -i "s|__BLOC_URL__|$BLOC_URL|g" build/index.html
