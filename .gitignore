@@ -20,7 +20,7 @@ coverage
 # nyc test coverage
 .nyc_output
 
-# Prevents bundle collisions in tests
+# Will change during test runs
 api/test/testdata/*zip
 api/test/testdata/addresses.js
 

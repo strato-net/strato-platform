@@ -295,7 +295,6 @@ injectAddressesJs = async function(packageFolderPath, addrs) {
  * @param paths String|Array - the absolute or relative (to apex/api/) path of the file
  */
 removePathsIfExist = function(paths) {
-  return;
   if (typeof paths === 'string') {
     paths = [paths];
   }
@@ -523,9 +522,9 @@ upload = function (req, res, next) {
       yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
       res.status(200).json({metadata: packageMetadata, url: dappUrl});
       file.path = '';
-      // removePathsIfExist(tempPaths);
+      removePathsIfExist(tempPaths);
     }).catch(err => {
-        // removePathsIfExist(tempPaths);
+        removePathsIfExist(tempPaths);
         return next(err);
     });
   });
