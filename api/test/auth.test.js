@@ -160,13 +160,14 @@ describe('App', function() {
 
     it("creates addresses.js", function(done) {
       const addrs = {"storage": "deadbeefdeadbeef"};
-      injectAddressesJs('./test/testdata', addrs);
+      const name = injectAddressesJs('./test/testdata', addrs);
+      assert.equal(name, 'test/testdata/generated/addresses.js');
       const want =
 `const addresses = {
-  storage = "deadbeefdeadbeef";
+  storage: "deadbeefdeadbeef",
 };
 `;
-      const got = fs.readFileSync("./test/testdata/generated/addresses.js", 'utf8');
+      const got = fs.readFileSync(name, 'utf8');
       assert.equal(got, want);
       done();
     });

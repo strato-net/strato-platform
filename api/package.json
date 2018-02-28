@@ -8,7 +8,7 @@
     "start:dev": "PORT=${PORT:-3001} NODE_HOST=${NODE_HOST:-localhost} node $NODE_DEBUG_OPTION ./bin/www --config config-local.yaml",
     "node-ping": "# DELAY=5000 RETENTION=1 node node-ping/index.js",
     "migrate": "# sequelize db:migrate",
-    "test": "cd test/testdata; rm -rf generated/; openssl rand -base64 256 > nonce.txt; zip -r testdata.zip .; cd -; SINGLE_NODE=true NODE_HOST=localhost NODE_ENV=test stratoRoot=http://localhost/strato-api/eth/v1.2/ mocha --config=config-local.yaml test/",
+    "test": "cd test/testdata; rm -rf testdata.zip generated/; openssl rand -base64 256 > nonce.txt; zip -r testdata.zip .; cd -; SINGLE_NODE=true NODE_HOST=localhost NODE_ENV=test stratoRoot=http://localhost/strato-api/eth/v1.2/ mocha --config=config-local.yaml test/",
     "test:app-metadata:local": "mocha --config=config-local.yaml lib/appMetadata/test/appMetadata.test.js --api-debug"
   },
   "dependencies": {
@@ -35,6 +35,7 @@
     "moment": "^2.18.1",
     "morgan": "1.9.0",
     "multer": "1.3.0",
+    "node-cmd": "3.0.0",
     "path": "0.12.7",
     "pg": "7.3.0",
     "pg-hstore": "2.3.2",

@@ -3,6 +3,7 @@
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
+const cmd = require('node-cmd');
 const download = require('download');
 const fs = require('fs-extra');
 const md5File = require('md5-file/promise');
@@ -273,6 +274,7 @@ uploadInitContracts = function(packageFolderPath, creds, inits) {
  * between the variable keys and address values of addrs
  * @params packageFolderPath String location of static files
  * @params addrs Object a mapping {var_name: contract_addr}
+ * @returns String the filename of the inserted file
  */
 injectAddressesJs = function(packageFolderPath, addrs) {
   const lines = [];
@@ -283,15 +285,10 @@ injectAddressesJs = function(packageFolderPath, addrs) {
   lines.push("};\n");
   const text = lines.join('\n');
   const gen = path.join(packageFolderPath, "generated");
-  try {
-    fs.mkdirSync(gen);
-  } catch (error) {
-    // Why no mkdir -p, fs?
-    if (error.code != "EEXIST") {
-      throw error;
-    }
-  }
-  fs.writeFileSync(path.join(gen, "addresses.js"), text);
+  fs.ensureDirSync(gen);
+  const name = path.join(gen, "addresses.js");
+  fs.writeFileSync(name, text);
+  return name;
 }
 
 
@@ -300,6 +297,7 @@ injectAddressesJs = function(packageFolderPath, addrs) {
  * @param paths String|Array - the absolute or relative (to apex/api/) path of the file
  */
 removePathsIfExist = function(paths) {
+  return;
   if (typeof paths === 'string') {
     paths = [paths];
   }
@@ -366,6 +364,18 @@ unzip = function(filePath, destination, overwrite) {
 };
 
 /**
+ * Adds a file to a zip archive
+ * @param filePath String file name of the archive
+ * @param newAddition String file name to be zipped
+ */
+zipAddFile = function(filePath, newAddition) {
+  // Why does this use the system zip instead of adm-zip? Because
+  // I spent a day trying to replicate this command and
+  // continued to receive "Invalid LOC header (bad signature)"
+  cmd.run(`/usr/bin/zip -ur ${filePath} ${newAddition}`);
+}
+
+/**
  * ExpressJS route controller to upload the dApp
  * @param req
  * @param res
@@ -427,14 +437,6 @@ upload = function (req, res, next) {
     // bloc.
 
     co(function* () {
-      const zipHash = yield getFileHash(file.path);
-      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
-      if (appsMetadataArray.length) {
-        removePathsIfExist(tempPaths);
-        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
-        err.status = 409;
-        return next(err);
-      }
       // unpack files to tmp folder
       const packageTmpFolder = path.join(tmpFolder,file.filename);
       try {
@@ -454,8 +456,20 @@ upload = function (req, res, next) {
       // we can supply the contract addresses to static
       // files on behalf of developers.
       const inits = parseInitfile(packageTmpFolder);
-      const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
-      injectAddressesJs(packageTmpFolder, addrs);
+      if (Object.keys(inits).length > 0) {
+        const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
+        const name = injectAddressesJs(packageTmpFolder, addrs);
+        zipAddFile(file.path, name);
+      }
+
+      const zipHash = yield getFileHash(file.path);
+      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
+      if (appsMetadataArray.length) {
+        removePathsIfExist(tempPaths);
+        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
+        err.status = 409;
+        return next(err);
+      }
       const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
 
       // check if all contracts from tmp/contracts/ are compile
@@ -503,9 +517,9 @@ upload = function (req, res, next) {
       // Replace the dapp folder with the new one (all older files will be removed)
       yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
       res.status(200).json({metadata: packageMetadata, url: dappUrl});
-      removePathsIfExist(tempPaths);
+      // removePathsIfExist(tempPaths);
     }).catch(err => {
-        removePathsIfExist(tempPaths);
+        // removePathsIfExist(tempPaths);
         return next(err);
     });
   });
