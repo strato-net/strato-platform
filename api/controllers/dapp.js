@@ -284,9 +284,7 @@ injectAddressesJs = function(packageFolderPath, addrs) {
   });
   lines.push("};\n");
   const text = lines.join('\n');
-  const gen = path.join(packageFolderPath, "generated");
-  fs.ensureDirSync(gen);
-  const name = path.join(gen, "addresses.js");
+  const name = path.join(packageFolderPath, "addresses.js");
   fs.writeFileSync(name, text);
   return name;
 }
@@ -372,7 +370,7 @@ zipAddFile = function(filePath, newAddition) {
   // Why does this use the system zip instead of adm-zip? Because
   // I spent a day trying to replicate this command and
   // continued to receive "Invalid LOC header (bad signature)"
-  cmd.run(`/usr/bin/zip -ur ${filePath} ${newAddition}`);
+  cmd.run(`/usr/bin/zip -uj ${filePath} ${newAddition}`);
 }
 
 /**
@@ -423,7 +421,7 @@ upload = function (req, res, next) {
       err.status = 400;
       return next(err);
     }
-    tempPaths.push(req.file.path);
+    tempPaths.push(file.path);
     if (!username || !address || !password) {
       removePathsIfExist(tempPaths);
       let err = new Error("wrong params, expected: {username, address, password, file}");
@@ -459,6 +457,11 @@ upload = function (req, res, next) {
       if (Object.keys(inits).length > 0) {
         const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
         const name = injectAddressesJs(packageTmpFolder, addrs);
+        // /usr/bin/zip helpfully adds a .zip extension if you neglected
+        // to add one, meaning that it can't address a file named by naked hash.
+        fs.renameSync(file.path, file.path + ".zip");
+        file.path = file.path + ".zip";
+        tempPaths.push(file.path);
         zipAddFile(file.path, name);
       }
 

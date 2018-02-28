@@ -161,7 +161,7 @@ describe('App', function() {
     it("creates addresses.js", function(done) {
       const addrs = {"storage": "deadbeefdeadbeef"};
       const name = injectAddressesJs('./test/testdata', addrs);
-      assert.equal(name, 'test/testdata/generated/addresses.js');
+      assert.equal(name, 'test/testdata/addresses.js');
       const want =
 `const addresses = {
   storage: "deadbeefdeadbeef",
