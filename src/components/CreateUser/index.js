@@ -1,15 +1,14 @@
 import React, { Component } from 'react';
-import { openOverlay, closeOverlay, createUser } from './createUser.actions';
+import { createUser } from './createUser.actions';
 import { openLoginOverlay } from '../User/user.actions';
-import { Button, Dialog, Intent } from '@blueprintjs/core';
+import { Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 
 import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
-import WalkThrough from '../WalkThrough';
+import { openWalkThroughOverlay, closeWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import { toasts } from "../Toasts";
 
 class CreateUser extends Component {
@@ -48,104 +47,97 @@ class CreateUser extends Component {
 
   render() {
     return (
-      <div>
-        <form>
-          <Dialog
-            iconName="inbox"
-            isOpen={this.props.isOpen}
-            onClose={() => {
-              this.props.reset();
-              this.setState({ errors: null })
-              this.props.closeOverlay();
-            }}
-            title="Create New User"
-            className="pt-dark"
-          >
-            <div className="pt-dialog-body">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
-                    Username
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="username"
-                      component="input"
-                      type="text"
-                      placeholder="Username"
-                      className="pt-input form-width"
-                      tabIndex="1"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.errorMessageFor('username')}</div>
-                  </div>
-                </div>
-
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Password
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="password"
-                      component="input"
-                      type="password"
-                      placeholder="Password"
-                      className="pt-input form-width"
-                      tabIndex="2"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.errorMessageFor('password')}</div>
-                  </div>
-                </div>
-
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Confirm Password
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="confirm_password"
-                      component="input"
-                      type="password"
-                      placeholder="Confirm Password"
-                      className="pt-input form-width"
-                      tabIndex="3"
-                      required
-                    />
-                    <div className="pt-form-helper-text">{this.errorMessageFor('confirm_password')}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
+      <form className="create-user">
+        <h4>STRATO is the best way to build blockchain applications</h4>
+        <div className="pt-dialog-body side-items">
+          <ul className="feature-list">
+            <li>Build dApps in hours, not days</li>
+            <li>Search Queries for smart contracts</li>
+            <li>Easily deploy apps to mobile or desktop seamlessly.</li>
+          </ul>
+        </div>
+        <div className="pt-dialog-body">
+          <div className="pt-form-group">
+            <div className="pt-form-group pt-intent-danger">
+              <label className="pt-label" htmlFor="input-a">
+                Username
+              </label>
+              <div className="pt-form-content">
+                <Field
+                  name="username"
+                  component="input"
+                  type="text"
+                  placeholder="Username"
+                  className="pt-input form-width"
+                  tabIndex="1"
+                  required
+                />
+                <div className="pt-form-helper-text">{this.errorMessageFor('username')}</div>
               </div>
             </div>
 
-            <div className="pt-dialog-footer">
-              <div className="pt-dialog-footer-actions">
-                <Button
-                  text="Already Have An Account?"
-                  onClick={() => {
-                    this.props.closeOverlay();
-                    this.props.openLoginOverlay();
-                  }}
+            <div className="pt-form-group pt-intent-danger">
+              <label className="pt-label" htmlFor="input-b">
+                Password
+              </label>
+              <div className="pt-form-content">
+                <Field
+                  name="password"
+                  component="input"
+                  type="password"
+                  placeholder="Password"
+                  className="pt-input form-width"
+                  tabIndex="2"
+                  required
                 />
-                <Button
-                  intent={Intent.PRIMARY}
-                  onClick={this.props.handleSubmit(this.submit)}
-                  text="Create User"
-                  disabled={this.props.spinning}
-                />
+                <div className="pt-form-helper-text">{this.errorMessageFor('password')}</div>
               </div>
             </div>
-          </Dialog>
-        </form>
-        <WalkThrough />
-      </div>
+
+            <div className="pt-form-group pt-intent-danger">
+              <label className="pt-label" htmlFor="input-b">
+                Confirm Password
+              </label>
+              <div className="pt-form-content">
+                <Field
+                  name="confirm_password"
+                  component="input"
+                  type="password"
+                  placeholder="Confirm Password"
+                  className="pt-input form-width"
+                  tabIndex="3"
+                  required
+                />
+                <div className="pt-form-helper-text">{this.errorMessageFor('confirm_password')}</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="col-sm-3"></div>
+            <div className="col-sm-3"></div>
+            <div className="col-sm-3"></div>
+          </div>
+        </div>
+
+        <div className="pt-dialog-footer">
+          <div className="pt-dialog-footer-actions">
+            <Button
+              text="Already Have An Account?"
+              onClick={() => {
+                this.props.closeWalkThroughOverlay();
+                this.props.openLoginOverlay();
+              }}
+            />
+            <Button
+              intent={Intent.PRIMARY}
+              onClick={this.props.handleSubmit(this.submit)}
+              text="Create STRATO ID"
+              disabled={this.props.spinning}
+            />
+          </div>
+        </div>
+      </form>
     );
   }
 }
@@ -184,10 +176,9 @@ const formed = reduxForm({ form: 'create-user' })(CreateUser);
 const connected = connect(
   mapStateToProps,
   {
-    openOverlay,
-    closeOverlay,
     createUser,
     openWalkThroughOverlay,
+    closeWalkThroughOverlay,
     openLoginOverlay
   }
 )(formed);

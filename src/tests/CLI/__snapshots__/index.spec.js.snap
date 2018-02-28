@@ -20,142 +20,174 @@ ShallowWrapper {
     "key": undefined,
     "nodeType": "host",
     "props": Object {
-      "children": <form>
-        <Blueprint.Dialog
-          canOutsideClickClose={true}
-          className="pt-dark"
-          iconName="download"
-          isOpen={true}
-          onClose={[Function]}
-          title="How to Deploy an App on STRATO"
+      "children": Array [
+        <div
+          className="pt-dialog-body"
         >
-          <div>
+          <div
+            className="pt-form-group"
+          >
             <div
-              className="pt-dialog-body"
+              className="pt-form-group pt-intent-danger"
             >
               <div
-                className="pt-form-group"
+                className="pt-form-content"
               >
-                <div
-                  className="pt-form-group pt-intent-danger"
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
                 >
-                  <div
-                    className="pt-form-content"
-                  >
-                    Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="pt-dialog-footer"
-            >
-              <div
-                className="pt-dialog-footer-actions"
-              >
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Download"
-                />
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
               </div>
             </div>
           </div>
-        </Blueprint.Dialog>
-      </form>,
+        </div>,
+        <div
+          className="pt-dialog-footer"
+        >
+          <div
+            className="pt-dialog-footer-actions"
+          >
+            <Blueprint.Button
+              onClick={[Function]}
+              text="Back"
+            />
+            <Blueprint.Button
+              intent={0}
+              onClick={[Function]}
+              text="Finish"
+            />
+          </div>
+        </div>,
+      ],
     },
     "ref": null,
-    "rendered": Object {
-      "instance": null,
-      "key": undefined,
-      "nodeType": "host",
-      "props": Object {
-        "children": <Blueprint.Dialog
-          canOutsideClickClose={true}
-          className="pt-dark"
-          iconName="download"
-          isOpen={true}
-          onClose={[Function]}
-          title="How to Deploy an App on STRATO"
-        >
-          <div>
-            <div
-              className="pt-dialog-body"
-            >
-              <div
-                className="pt-form-group"
-              >
-                <div
-                  className="pt-form-group pt-intent-danger"
-                >
-                  <div
-                    className="pt-form-content"
-                  >
-                    Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="pt-dialog-footer"
-            >
-              <div
-                className="pt-dialog-footer-actions"
-              >
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Download"
-                />
-              </div>
-            </div>
-          </div>
-        </Blueprint.Dialog>,
-      },
-      "ref": null,
-      "rendered": Object {
+    "rendered": Array [
+      Object {
         "instance": null,
         "key": undefined,
-        "nodeType": "class",
+        "nodeType": "host",
         "props": Object {
-          "canOutsideClickClose": true,
-          "children": <div>
+          "children": <div
+            className="pt-form-group"
+          >
             <div
-              className="pt-dialog-body"
+              className="pt-form-group pt-intent-danger"
             >
               <div
-                className="pt-form-group"
+                className="pt-form-content"
               >
-                <div
-                  className="pt-form-group pt-intent-danger"
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
                 >
-                  <div
-                    className="pt-form-content"
-                  >
-                    Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="pt-dialog-footer"
-            >
-              <div
-                className="pt-dialog-footer-actions"
-              >
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Download"
-                />
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
               </div>
             </div>
           </div>,
-          "className": "pt-dark",
-          "iconName": "download",
-          "isOpen": true,
-          "onClose": [Function],
-          "title": "How to Deploy an App on STRATO",
+          "className": "pt-dialog-body",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="pt-form-group pt-intent-danger"
+            >
+              <div
+                className="pt-form-content"
+              >
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
+                >
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
+              </div>
+            </div>,
+            "className": "pt-form-group",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-form-content"
+              >
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
+                >
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
+              </div>,
+              "className": "pt-form-group pt-intent-danger",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
+                  >
+                    Click here
+                  </a>,
+                  " to learn how you can easily deploy dapps to STRATO",
+                ],
+                "className": "pt-form-content",
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "Click here",
+                    "href": "https://www.npmjs.com/package/strato-cli",
+                  },
+                  "ref": null,
+                  "rendered": "Click here",
+                  "type": "a",
+                },
+                " to learn how you can easily deploy dapps to STRATO",
+              ],
+              "type": "div",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="pt-dialog-footer-actions"
+          >
+            <Blueprint.Button
+              onClick={[Function]}
+              text="Back"
+            />
+            <Blueprint.Button
+              intent={0}
+              onClick={[Function]}
+              text="Finish"
+            />
+          </div>,
+          "className": "pt-dialog-footer",
         },
         "ref": null,
         "rendered": Object {
@@ -164,163 +196,51 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": Array [
-              <div
-                className="pt-dialog-body"
-              >
-                <div
-                  className="pt-form-group"
-                >
-                  <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>,
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
-                </div>
-              </div>,
+              <Blueprint.Button
+                onClick={[Function]}
+                text="Back"
+              />,
+              <Blueprint.Button
+                intent={0}
+                onClick={[Function]}
+                text="Finish"
+              />,
             ],
+            "className": "pt-dialog-footer-actions",
           },
           "ref": null,
           "rendered": Array [
             Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "host",
+              "nodeType": "class",
               "props": Object {
-                "children": <div
-                  className="pt-form-group"
-                >
-                  <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>,
-                "className": "pt-dialog-body",
+                "onClick": [Function],
+                "text": "Back",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>,
-                  "className": "pt-form-group",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>,
-                    "className": "pt-form-group pt-intent-danger",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                      "className": "pt-form-content",
-                    },
-                    "ref": null,
-                    "rendered": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                    "type": "div",
-                  },
-                  "type": "div",
-                },
-                "type": "div",
-              },
-              "type": "div",
+              "rendered": null,
+              "type": [Function],
             },
             Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "host",
+              "nodeType": "class",
               "props": Object {
-                "children": <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
-                </div>,
-                "className": "pt-dialog-footer",
+                "intent": 0,
+                "onClick": [Function],
+                "text": "Finish",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />,
-                  "className": "pt-dialog-footer-actions",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "intent": 0,
-                    "onClick": [Function],
-                    "text": "Download",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": "div",
-              },
-              "type": "div",
+              "rendered": null,
+              "type": [Function],
             },
           ],
           "type": "div",
         },
-        "type": [Function],
+        "type": "div",
       },
-      "type": "form",
-    },
+    ],
     "type": "div",
   },
   Symbol(enzyme.__nodes__): Array [
@@ -329,142 +249,174 @@ ShallowWrapper {
       "key": undefined,
       "nodeType": "host",
       "props": Object {
-        "children": <form>
-          <Blueprint.Dialog
-            canOutsideClickClose={true}
-            className="pt-dark"
-            iconName="download"
-            isOpen={true}
-            onClose={[Function]}
-            title="How to Deploy an App on STRATO"
+        "children": Array [
+          <div
+            className="pt-dialog-body"
           >
-            <div>
+            <div
+              className="pt-form-group"
+            >
               <div
-                className="pt-dialog-body"
+                className="pt-form-group pt-intent-danger"
               >
                 <div
-                  className="pt-form-group"
+                  className="pt-form-content"
                 >
-                  <div
-                    className="pt-form-group pt-intent-danger"
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
                   >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
                 </div>
               </div>
             </div>
-          </Blueprint.Dialog>
-        </form>,
+          </div>,
+          <div
+            className="pt-dialog-footer"
+          >
+            <div
+              className="pt-dialog-footer-actions"
+            >
+              <Blueprint.Button
+                onClick={[Function]}
+                text="Back"
+              />
+              <Blueprint.Button
+                intent={0}
+                onClick={[Function]}
+                text="Finish"
+              />
+            </div>
+          </div>,
+        ],
       },
       "ref": null,
-      "rendered": Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "host",
-        "props": Object {
-          "children": <Blueprint.Dialog
-            canOutsideClickClose={true}
-            className="pt-dark"
-            iconName="download"
-            isOpen={true}
-            onClose={[Function]}
-            title="How to Deploy an App on STRATO"
-          >
-            <div>
-              <div
-                className="pt-dialog-body"
-              >
-                <div
-                  className="pt-form-group"
-                >
-                  <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
-                </div>
-              </div>
-            </div>
-          </Blueprint.Dialog>,
-        },
-        "ref": null,
-        "rendered": Object {
+      "rendered": Array [
+        Object {
           "instance": null,
           "key": undefined,
-          "nodeType": "class",
+          "nodeType": "host",
           "props": Object {
-            "canOutsideClickClose": true,
-            "children": <div>
+            "children": <div
+              className="pt-form-group"
+            >
               <div
-                className="pt-dialog-body"
+                className="pt-form-group pt-intent-danger"
               >
                 <div
-                  className="pt-form-group"
+                  className="pt-form-content"
                 >
-                  <div
-                    className="pt-form-group pt-intent-danger"
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
                   >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
                 </div>
               </div>
             </div>,
-            "className": "pt-dark",
-            "iconName": "download",
-            "isOpen": true,
-            "onClose": [Function],
-            "title": "How to Deploy an App on STRATO",
+            "className": "pt-dialog-body",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-form-group pt-intent-danger"
+              >
+                <div
+                  className="pt-form-content"
+                >
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
+                  >
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
+                </div>
+              </div>,
+              "className": "pt-form-group",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <div
+                  className="pt-form-content"
+                >
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
+                  >
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
+                </div>,
+                "className": "pt-form-group pt-intent-danger",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <a
+                      href="https://www.npmjs.com/package/strato-cli"
+                    >
+                      Click here
+                    </a>,
+                    " to learn how you can easily deploy dapps to STRATO",
+                  ],
+                  "className": "pt-form-content",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "Click here",
+                      "href": "https://www.npmjs.com/package/strato-cli",
+                    },
+                    "ref": null,
+                    "rendered": "Click here",
+                    "type": "a",
+                  },
+                  " to learn how you can easily deploy dapps to STRATO",
+                ],
+                "type": "div",
+              },
+              "type": "div",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="pt-dialog-footer-actions"
+            >
+              <Blueprint.Button
+                onClick={[Function]}
+                text="Back"
+              />
+              <Blueprint.Button
+                intent={0}
+                onClick={[Function]}
+                text="Finish"
+              />
+            </div>,
+            "className": "pt-dialog-footer",
           },
           "ref": null,
           "rendered": Object {
@@ -473,163 +425,51 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": Array [
-                <div
-                  className="pt-dialog-body"
-                >
-                  <div
-                    className="pt-form-group"
-                  >
-                    <div
-                      className="pt-form-group pt-intent-danger"
-                    >
-                      <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>
-                    </div>
-                  </div>
-                </div>,
-                <div
-                  className="pt-dialog-footer"
-                >
-                  <div
-                    className="pt-dialog-footer-actions"
-                  >
-                    <Blueprint.Button
-                      intent={0}
-                      onClick={[Function]}
-                      text="Download"
-                    />
-                  </div>
-                </div>,
+                <Blueprint.Button
+                  onClick={[Function]}
+                  text="Back"
+                />,
+                <Blueprint.Button
+                  intent={0}
+                  onClick={[Function]}
+                  text="Finish"
+                />,
               ],
+              "className": "pt-dialog-footer-actions",
             },
             "ref": null,
             "rendered": Array [
               Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "host",
+                "nodeType": "class",
                 "props": Object {
-                  "children": <div
-                    className="pt-form-group"
-                  >
-                    <div
-                      className="pt-form-group pt-intent-danger"
-                    >
-                      <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>
-                    </div>
-                  </div>,
-                  "className": "pt-dialog-body",
+                  "onClick": [Function],
+                  "text": "Back",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <div
-                      className="pt-form-group pt-intent-danger"
-                    >
-                      <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>
-                    </div>,
-                    "className": "pt-form-group",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>,
-                      "className": "pt-form-group pt-intent-danger",
-                    },
-                    "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                        "className": "pt-form-content",
-                      },
-                      "ref": null,
-                      "rendered": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                      "type": "div",
-                    },
-                    "type": "div",
-                  },
-                  "type": "div",
-                },
-                "type": "div",
+                "rendered": null,
+                "type": [Function],
               },
               Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "host",
+                "nodeType": "class",
                 "props": Object {
-                  "children": <div
-                    className="pt-dialog-footer-actions"
-                  >
-                    <Blueprint.Button
-                      intent={0}
-                      onClick={[Function]}
-                      text="Download"
-                    />
-                  </div>,
-                  "className": "pt-dialog-footer",
+                  "intent": 0,
+                  "onClick": [Function],
+                  "text": "Finish",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <Blueprint.Button
-                      intent={0}
-                      onClick={[Function]}
-                      text="Download"
-                    />,
-                    "className": "pt-dialog-footer-actions",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "intent": 0,
-                      "onClick": [Function],
-                      "text": "Download",
-                    },
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
-                  "type": "div",
-                },
-                "type": "div",
+                "rendered": null,
+                "type": [Function],
               },
             ],
             "type": "div",
           },
-          "type": [Function],
+          "type": "div",
         },
-        "type": "form",
-      },
+      ],
       "type": "div",
     },
   ],
@@ -663,142 +503,174 @@ ShallowWrapper {
     "key": undefined,
     "nodeType": "host",
     "props": Object {
-      "children": <form>
-        <Blueprint.Dialog
-          canOutsideClickClose={true}
-          className="pt-dark"
-          iconName="download"
-          isOpen={false}
-          onClose={[Function]}
-          title="How to Deploy an App on STRATO"
+      "children": Array [
+        <div
+          className="pt-dialog-body"
         >
-          <div>
+          <div
+            className="pt-form-group"
+          >
             <div
-              className="pt-dialog-body"
+              className="pt-form-group pt-intent-danger"
             >
               <div
-                className="pt-form-group"
+                className="pt-form-content"
               >
-                <div
-                  className="pt-form-group pt-intent-danger"
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
                 >
-                  <div
-                    className="pt-form-content"
-                  >
-                    Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="pt-dialog-footer"
-            >
-              <div
-                className="pt-dialog-footer-actions"
-              >
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Download"
-                />
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
               </div>
             </div>
           </div>
-        </Blueprint.Dialog>
-      </form>,
+        </div>,
+        <div
+          className="pt-dialog-footer"
+        >
+          <div
+            className="pt-dialog-footer-actions"
+          >
+            <Blueprint.Button
+              onClick={[Function]}
+              text="Back"
+            />
+            <Blueprint.Button
+              intent={0}
+              onClick={[Function]}
+              text="Finish"
+            />
+          </div>
+        </div>,
+      ],
     },
     "ref": null,
-    "rendered": Object {
-      "instance": null,
-      "key": undefined,
-      "nodeType": "host",
-      "props": Object {
-        "children": <Blueprint.Dialog
-          canOutsideClickClose={true}
-          className="pt-dark"
-          iconName="download"
-          isOpen={false}
-          onClose={[Function]}
-          title="How to Deploy an App on STRATO"
-        >
-          <div>
-            <div
-              className="pt-dialog-body"
-            >
-              <div
-                className="pt-form-group"
-              >
-                <div
-                  className="pt-form-group pt-intent-danger"
-                >
-                  <div
-                    className="pt-form-content"
-                  >
-                    Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="pt-dialog-footer"
-            >
-              <div
-                className="pt-dialog-footer-actions"
-              >
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Download"
-                />
-              </div>
-            </div>
-          </div>
-        </Blueprint.Dialog>,
-      },
-      "ref": null,
-      "rendered": Object {
+    "rendered": Array [
+      Object {
         "instance": null,
         "key": undefined,
-        "nodeType": "class",
+        "nodeType": "host",
         "props": Object {
-          "canOutsideClickClose": true,
-          "children": <div>
+          "children": <div
+            className="pt-form-group"
+          >
             <div
-              className="pt-dialog-body"
+              className="pt-form-group pt-intent-danger"
             >
               <div
-                className="pt-form-group"
+                className="pt-form-content"
               >
-                <div
-                  className="pt-form-group pt-intent-danger"
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
                 >
-                  <div
-                    className="pt-form-content"
-                  >
-                    Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div
-              className="pt-dialog-footer"
-            >
-              <div
-                className="pt-dialog-footer-actions"
-              >
-                <Blueprint.Button
-                  intent={0}
-                  onClick={[Function]}
-                  text="Download"
-                />
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
               </div>
             </div>
           </div>,
-          "className": "pt-dark",
-          "iconName": "download",
-          "isOpen": false,
-          "onClose": [Function],
-          "title": "How to Deploy an App on STRATO",
+          "className": "pt-dialog-body",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="pt-form-group pt-intent-danger"
+            >
+              <div
+                className="pt-form-content"
+              >
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
+                >
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
+              </div>
+            </div>,
+            "className": "pt-form-group",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-form-content"
+              >
+                <a
+                  href="https://www.npmjs.com/package/strato-cli"
+                >
+                  Click here
+                </a>
+                 to learn how you can easily deploy dapps to STRATO
+              </div>,
+              "className": "pt-form-group pt-intent-danger",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
+                  >
+                    Click here
+                  </a>,
+                  " to learn how you can easily deploy dapps to STRATO",
+                ],
+                "className": "pt-form-content",
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "Click here",
+                    "href": "https://www.npmjs.com/package/strato-cli",
+                  },
+                  "ref": null,
+                  "rendered": "Click here",
+                  "type": "a",
+                },
+                " to learn how you can easily deploy dapps to STRATO",
+              ],
+              "type": "div",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="pt-dialog-footer-actions"
+          >
+            <Blueprint.Button
+              onClick={[Function]}
+              text="Back"
+            />
+            <Blueprint.Button
+              intent={0}
+              onClick={[Function]}
+              text="Finish"
+            />
+          </div>,
+          "className": "pt-dialog-footer",
         },
         "ref": null,
         "rendered": Object {
@@ -807,163 +679,51 @@ ShallowWrapper {
           "nodeType": "host",
           "props": Object {
             "children": Array [
-              <div
-                className="pt-dialog-body"
-              >
-                <div
-                  className="pt-form-group"
-                >
-                  <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>,
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
-                </div>
-              </div>,
+              <Blueprint.Button
+                onClick={[Function]}
+                text="Back"
+              />,
+              <Blueprint.Button
+                intent={0}
+                onClick={[Function]}
+                text="Finish"
+              />,
             ],
+            "className": "pt-dialog-footer-actions",
           },
           "ref": null,
           "rendered": Array [
             Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "host",
+              "nodeType": "class",
               "props": Object {
-                "children": <div
-                  className="pt-form-group"
-                >
-                  <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>,
-                "className": "pt-dialog-body",
+                "onClick": [Function],
+                "text": "Back",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>,
-                  "className": "pt-form-group",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>,
-                    "className": "pt-form-group pt-intent-danger",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                      "className": "pt-form-content",
-                    },
-                    "ref": null,
-                    "rendered": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                    "type": "div",
-                  },
-                  "type": "div",
-                },
-                "type": "div",
-              },
-              "type": "div",
+              "rendered": null,
+              "type": [Function],
             },
             Object {
               "instance": null,
               "key": undefined,
-              "nodeType": "host",
+              "nodeType": "class",
               "props": Object {
-                "children": <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
-                </div>,
-                "className": "pt-dialog-footer",
+                "intent": 0,
+                "onClick": [Function],
+                "text": "Finish",
               },
               "ref": null,
-              "rendered": Object {
-                "instance": null,
-                "key": undefined,
-                "nodeType": "host",
-                "props": Object {
-                  "children": <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />,
-                  "className": "pt-dialog-footer-actions",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "intent": 0,
-                    "onClick": [Function],
-                    "text": "Download",
-                  },
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                "type": "div",
-              },
-              "type": "div",
+              "rendered": null,
+              "type": [Function],
             },
           ],
           "type": "div",
         },
-        "type": [Function],
+        "type": "div",
       },
-      "type": "form",
-    },
+    ],
     "type": "div",
   },
   Symbol(enzyme.__nodes__): Array [
@@ -972,142 +732,174 @@ ShallowWrapper {
       "key": undefined,
       "nodeType": "host",
       "props": Object {
-        "children": <form>
-          <Blueprint.Dialog
-            canOutsideClickClose={true}
-            className="pt-dark"
-            iconName="download"
-            isOpen={false}
-            onClose={[Function]}
-            title="How to Deploy an App on STRATO"
+        "children": Array [
+          <div
+            className="pt-dialog-body"
           >
-            <div>
+            <div
+              className="pt-form-group"
+            >
               <div
-                className="pt-dialog-body"
+                className="pt-form-group pt-intent-danger"
               >
                 <div
-                  className="pt-form-group"
+                  className="pt-form-content"
                 >
-                  <div
-                    className="pt-form-group pt-intent-danger"
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
                   >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
                 </div>
               </div>
             </div>
-          </Blueprint.Dialog>
-        </form>,
+          </div>,
+          <div
+            className="pt-dialog-footer"
+          >
+            <div
+              className="pt-dialog-footer-actions"
+            >
+              <Blueprint.Button
+                onClick={[Function]}
+                text="Back"
+              />
+              <Blueprint.Button
+                intent={0}
+                onClick={[Function]}
+                text="Finish"
+              />
+            </div>
+          </div>,
+        ],
       },
       "ref": null,
-      "rendered": Object {
-        "instance": null,
-        "key": undefined,
-        "nodeType": "host",
-        "props": Object {
-          "children": <Blueprint.Dialog
-            canOutsideClickClose={true}
-            className="pt-dark"
-            iconName="download"
-            isOpen={false}
-            onClose={[Function]}
-            title="How to Deploy an App on STRATO"
-          >
-            <div>
-              <div
-                className="pt-dialog-body"
-              >
-                <div
-                  className="pt-form-group"
-                >
-                  <div
-                    className="pt-form-group pt-intent-danger"
-                  >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
-                </div>
-              </div>
-            </div>
-          </Blueprint.Dialog>,
-        },
-        "ref": null,
-        "rendered": Object {
+      "rendered": Array [
+        Object {
           "instance": null,
           "key": undefined,
-          "nodeType": "class",
+          "nodeType": "host",
           "props": Object {
-            "canOutsideClickClose": true,
-            "children": <div>
+            "children": <div
+              className="pt-form-group"
+            >
               <div
-                className="pt-dialog-body"
+                className="pt-form-group pt-intent-danger"
               >
                 <div
-                  className="pt-form-group"
+                  className="pt-form-content"
                 >
-                  <div
-                    className="pt-form-group pt-intent-danger"
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
                   >
-                    <div
-                      className="pt-form-content"
-                    >
-                      Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                className="pt-dialog-footer"
-              >
-                <div
-                  className="pt-dialog-footer-actions"
-                >
-                  <Blueprint.Button
-                    intent={0}
-                    onClick={[Function]}
-                    text="Download"
-                  />
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
                 </div>
               </div>
             </div>,
-            "className": "pt-dark",
-            "iconName": "download",
-            "isOpen": false,
-            "onClose": [Function],
-            "title": "How to Deploy an App on STRATO",
+            "className": "pt-dialog-body",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <div
+                className="pt-form-group pt-intent-danger"
+              >
+                <div
+                  className="pt-form-content"
+                >
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
+                  >
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
+                </div>
+              </div>,
+              "className": "pt-form-group",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <div
+                  className="pt-form-content"
+                >
+                  <a
+                    href="https://www.npmjs.com/package/strato-cli"
+                  >
+                    Click here
+                  </a>
+                   to learn how you can easily deploy dapps to STRATO
+                </div>,
+                "className": "pt-form-group pt-intent-danger",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <a
+                      href="https://www.npmjs.com/package/strato-cli"
+                    >
+                      Click here
+                    </a>,
+                    " to learn how you can easily deploy dapps to STRATO",
+                  ],
+                  "className": "pt-form-content",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "Click here",
+                      "href": "https://www.npmjs.com/package/strato-cli",
+                    },
+                    "ref": null,
+                    "rendered": "Click here",
+                    "type": "a",
+                  },
+                  " to learn how you can easily deploy dapps to STRATO",
+                ],
+                "type": "div",
+              },
+              "type": "div",
+            },
+            "type": "div",
+          },
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="pt-dialog-footer-actions"
+            >
+              <Blueprint.Button
+                onClick={[Function]}
+                text="Back"
+              />
+              <Blueprint.Button
+                intent={0}
+                onClick={[Function]}
+                text="Finish"
+              />
+            </div>,
+            "className": "pt-dialog-footer",
           },
           "ref": null,
           "rendered": Object {
@@ -1116,163 +908,51 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": Array [
-                <div
-                  className="pt-dialog-body"
-                >
-                  <div
-                    className="pt-form-group"
-                  >
-                    <div
-                      className="pt-form-group pt-intent-danger"
-                    >
-                      <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>
-                    </div>
-                  </div>
-                </div>,
-                <div
-                  className="pt-dialog-footer"
-                >
-                  <div
-                    className="pt-dialog-footer-actions"
-                  >
-                    <Blueprint.Button
-                      intent={0}
-                      onClick={[Function]}
-                      text="Download"
-                    />
-                  </div>
-                </div>,
+                <Blueprint.Button
+                  onClick={[Function]}
+                  text="Back"
+                />,
+                <Blueprint.Button
+                  intent={0}
+                  onClick={[Function]}
+                  text="Finish"
+                />,
               ],
+              "className": "pt-dialog-footer-actions",
             },
             "ref": null,
             "rendered": Array [
               Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "host",
+                "nodeType": "class",
                 "props": Object {
-                  "children": <div
-                    className="pt-form-group"
-                  >
-                    <div
-                      className="pt-form-group pt-intent-danger"
-                    >
-                      <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>
-                    </div>
-                  </div>,
-                  "className": "pt-dialog-body",
+                  "onClick": [Function],
+                  "text": "Back",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <div
-                      className="pt-form-group pt-intent-danger"
-                    >
-                      <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>
-                    </div>,
-                    "className": "pt-form-group",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": <div
-                        className="pt-form-content"
-                      >
-                        Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-                      </div>,
-                      "className": "pt-form-group pt-intent-danger",
-                    },
-                    "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                        "className": "pt-form-content",
-                      },
-                      "ref": null,
-                      "rendered": "Click the button below to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.",
-                      "type": "div",
-                    },
-                    "type": "div",
-                  },
-                  "type": "div",
-                },
-                "type": "div",
+                "rendered": null,
+                "type": [Function],
               },
               Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "host",
+                "nodeType": "class",
                 "props": Object {
-                  "children": <div
-                    className="pt-dialog-footer-actions"
-                  >
-                    <Blueprint.Button
-                      intent={0}
-                      onClick={[Function]}
-                      text="Download"
-                    />
-                  </div>,
-                  "className": "pt-dialog-footer",
+                  "intent": 0,
+                  "onClick": [Function],
+                  "text": "Finish",
                 },
                 "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "host",
-                  "props": Object {
-                    "children": <Blueprint.Button
-                      intent={0}
-                      onClick={[Function]}
-                      text="Download"
-                    />,
-                    "className": "pt-dialog-footer-actions",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "intent": 0,
-                      "onClick": [Function],
-                      "text": "Download",
-                    },
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
-                  "type": "div",
-                },
-                "type": "div",
+                "rendered": null,
+                "type": [Function],
               },
             ],
             "type": "div",
           },
-          "type": [Function],
+          "type": "div",
         },
-        "type": "form",
-      },
+      ],
       "type": "div",
     },
   ],

@@ -5,6 +5,7 @@ import {
 
 const initialState = {
   isWalkThroughOpen: false,
+  isLoggedIn: false
 };
 
 const reducer = function (state = initialState, action) {
@@ -12,10 +13,12 @@ const reducer = function (state = initialState, action) {
     case OPEN_OVERLAY:
       return {
         isWalkThroughOpen: true,
+        isLoggedIn: action.isLoggedIn
       };
     case CLOSE_OVERLAY:
       return {
-        isWalkThroughOpen: false
+        isWalkThroughOpen: false,
+        isLoggedIn: state.isLoggedIn
       };
     default:
       return state;

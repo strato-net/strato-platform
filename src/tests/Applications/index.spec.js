@@ -51,6 +51,9 @@ describe('Applications: index', () => {
       },
       user: {
         isLoggedIn: false
+      },
+      cli: {
+        isTokenOpen: false
       }
     }
     expect(mapStateToProps(state)).toMatchSnapshot();

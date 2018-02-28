@@ -7,9 +7,9 @@ import logo from './blockapps-cube-color-430x500.png';
 import { env } from '../../env';
 import { logout, openLoginOverlay } from '../User/user.actions';
 import Login from '../Login';
-import CreateUser from '../CreateUser';
+import WalkThrough from '../WalkThrough';
 import { Button } from '@blueprintjs/core';
-import { openOverlay } from '../CreateUser/createUser.actions';
+import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 
 class MenuBar extends Component {
 
@@ -33,7 +33,7 @@ class MenuBar extends Component {
       return (
         <Button onClick={() => {
           this.props.openLoginOverlay();
-        }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'For Developers'} />
+        }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'Login'} />
       );
     }
   }
@@ -43,7 +43,7 @@ class MenuBar extends Component {
       return (
         <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
-          this.props.openOverlay();
+          this.props.openWalkThroughOverlay(false);
         }} text="Sign Up" className="pt-button pt-minimal pt-small menubar-button" />
       )
     }
@@ -82,7 +82,7 @@ class MenuBar extends Component {
           {this.afterLoggedIn()}
         </div>
         <Login />
-        <CreateUser />
+        <WalkThrough />
       </nav>
     );
   }
@@ -98,5 +98,5 @@ export function mapStateToProps(state) {
 export default connect(mapStateToProps, {
   logout,
   openLoginOverlay,
-  openOverlay
+  openWalkThroughOverlay
 })(MenuBar);

@@ -5,22 +5,33 @@ import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { downloadPDFFile } from '../../lib/fileHandler';
-import cli from '../../cli.pdf';
 import { faucetRequest } from '../Accounts/accounts.actions';
+import CLI from '../CLI';
+import CreateUser from '../CreateUser';
+import Stepper from '../Stepper';
 import './walkThrough.css';
+import RequestTokenImage from './faucet.png';
 
 class WalkThrough extends Component {
   constructor(props) {
     super(props);
     this.state = {
       isContinue: false,
-      initialModal: 'Faucet'
+      initialModal: 'CreateUser',
+      step: 0,
     }
+    this.handleBackToFaucet = this.handleBackToFaucet.bind(this);
   }
 
   componentDidMount() {
     mixpanelWrapper.track("faucet_loaded");
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (this.state.initialModal !== 'CreateUser' && !nextProps.isLoggedIn)
+      this.setState({ initialModal: 'CreateUser', step: 0 });
+    if (!this.props.isLoggedIn && nextProps.isLoggedIn)
+      this.setState({ initialModal: 'Faucet', step: 1 });
   }
 
   submit = (values) => {
@@ -33,29 +44,31 @@ class WalkThrough extends Component {
   faucetContent() {
     return (
       <div>
-        <div className="pt-dialog-body">
+        <div className="pt-dialog-body faucet-container">
           <div className="pt-form-group">
-            <div className="pt-form-group pt-intent-danger">
-              <div className="pt-form-content">
-                Using and launching apps requires tokens. Please complete the form below to email us your token request.
-              </div>
+            <div className="faucet-title">
+              <h4>Use STR Tokens to deploy blockchain applications across platforms immediately.</h4>
             </div>
 
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                What are you building?
-                  </label>
-              <div className="pt-form-content">
-                <Field
-                  name="building"
-                  component="textarea"
-                  type="text"
-                  placeholder="I am building..."
-                  className="pt-input form-width"
-                  tabIndex="3"
-                  required
-                />
-                <div className="pt-form-helper-text">{this.props.errors && this.props.errors.building}</div>
+            <div className="faucet-body">   
+              <img src={RequestTokenImage} alt="Request Token" className="side-image"/>
+
+              <div className="pt-form-group pt-intent-danger faucet-form">
+                <label className="pt-label" htmlFor="input-b">
+                  Using and launching apps requires tokens. Tell us what you are building so we can fund you.
+                </label>
+                <div className="pt-form-content">
+                  <Field
+                    name="building"
+                    component="textarea"
+                    type="text"
+                    placeholder="I am building..."
+                    className="pt-input form-width"
+                    tabIndex="3"
+                    required
+                  />
+                  <div className="pt-form-helper-text">{this.props.errors && this.props.errors.building}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -73,7 +86,7 @@ class WalkThrough extends Component {
               intent={Intent.PRIMARY}
               onClick={() => {
                 mixpanelWrapper.track('faucet_close_click');
-                this.setState({ initialModal: "CLI", isContinue: false });
+                this.setState({ initialModal: "CLI", isContinue: false, step: 2 });
                 // Faucet account using jwt tobe done
                 this.props.faucetRequest(this.props.currentUser.accountAddress);
               }} disabled={!this.state.isContinue} />
@@ -89,56 +102,42 @@ class WalkThrough extends Component {
     )
   }
 
-  CLIContent() {
-    return (
-      <div>
-        <div className="pt-dialog-body">
-          <div className="pt-form-group">
-            <div className="pt-form-group pt-intent-danger">
-              <div className="pt-form-content">
-                <a onClick={() => {
-                  mixpanelWrapper.track('Add_App_click');
-                  downloadPDFFile('cli.pdf', cli)
-                }}> Click here</a> to download the document containing the instructions to setup and begin developing applications on the STRATO Blockchain on your machine.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
-            <Button text="Back" onClick={() => {
-              mixpanelWrapper.track('faucet_close_click');
-              this.setState({ initialModal: "Faucet" });
-            }} />
-            <Button
-              intent={Intent.PRIMARY}
-              onClick={() => {
-                this.setState({ initialModal: "Faucet" });
-                this.props.closeWalkThroughOverlay();
-              }}
-              text="Finish"
-            />
-          </div>
-        </div>
-      </div>
-    )
+  handleBackToFaucet() {
+    this.setState({ initialModal: "Faucet", step: 1 });
   }
 
   render() {
+    let title;
+    if (this.state.initialModal === "CreateUser")
+      title = 'Create STRATO Developer ID';
+    else if (this.state.initialModal === "Faucet")
+      title = 'Request Tokens';
+    else
+      title = 'Download CLI Tool';
+
     return (
       <div>
         <form>
           <Dialog
             isOpen={this.props.isWalkThroughOpen}
-            onClose={this.props.closeWalkThroughOverlay}
-            title={this.state.initialModal === "Faucet" ? "STRATO Token Request Form" : "How to Deploy an App on STRATO"}
-            className="pt-dark"
-            iconName="pt-icon-walk"
+            onClose={() => {
+              mixpanelWrapper.track('faucet_close_click');
+              this.props.closeWalkThroughOverlay();
+            }}
+            title={title}
+            className="pt-dark dialog"
+            canOutsideClickClose={false}
           >
+            <Stepper step={this.state.step} />
+            {this.state.initialModal === "CreateUser"
+              ? <CreateUser />
+              : null}
+
             {this.state.initialModal === "Faucet" && this.faucetContent()}
 
-            {this.state.initialModal === "CLI" && this.CLIContent()}
+            {this.state.initialModal === "CLI"
+              ? <CLI handleBack={this.handleBackToFaucet} handleFinish={this.props.closeWalkThroughOverlay} />
+              : null}
 
           </Dialog>
         </form>
@@ -156,6 +155,7 @@ export function mapStateToProps(state) {
   return {
     isWalkThroughOpen: state.walkThrough.isWalkThroughOpen,
     currentUser: state.user.currentUser,
+    isLoggedIn: state.walkThrough.isLoggedIn,
     ...errors
   };
 }

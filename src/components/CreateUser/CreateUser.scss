@@ -1,9 +1,46 @@
 .input {
-  padding: 1%;
-  margin-top: 1%;
-  margin-left: 10%;
+	padding: 1%;
+	margin-top: 1%;
+	margin-left: 10%;
 }
 
 .form-width {
-  width: 100%;
+	width: 100%;
+}
+
+.create-user h4 {
+	text-align: center;
+	margin-bottom: 30px;
+}
+
+.create-user .pt-dialog-body .side-items {
+	display: table-cell;
+	vertical-align: middle;
+}
+
+.side-items {
+	margin: 20px 20px !important;
+	float: left;
+	width: 44%;
+}
+
+.side-items .feature-list {
+	display: table-cell;
+	vertical-align: middle;
+}
+
+.create-user .feature-list,
+.create-user .feature-list li {
+	list-style: none;
+}
+
+.side-items .feature-list li {
+	padding-bottom: 40px;
+}
+
+.create-user .feature-list li:before {
+	font-family: 'FontAwesome';
+	content: '\f00c';
+	margin: 0 5px 0 -15px;
+	color: lightgreen;
 }
