@@ -276,7 +276,7 @@ uploadInitContracts = function(packageFolderPath, creds, inits) {
  * @params addrs Object a mapping {var_name: contract_addr}
  * @returns String the filename of the inserted file
  */
-injectAddressesJs = function(packageFolderPath, addrs) {
+injectAddressesJs = async function(packageFolderPath, addrs) {
   const lines = [];
   lines.push("const addresses = {");
   Object.keys(addrs).forEach(name => {
@@ -285,7 +285,7 @@ injectAddressesJs = function(packageFolderPath, addrs) {
   lines.push("};\n");
   const text = lines.join('\n');
   const name = path.join(packageFolderPath, "addresses.js");
-  fs.writeFileSync(name, text);
+  await fs.writeFileSync(name, text);
   return name;
 }
 
@@ -458,10 +458,10 @@ upload = function (req, res, next) {
       const inits = parseInitfile(packageTmpFolder);
       if (Object.keys(inits).length > 0) {
         const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
-        const name = injectAddressesJs(packageTmpFolder, addrs);
+        const name = yield injectAddressesJs(packageTmpFolder, addrs);
         // /usr/bin/zip helpfully adds a .zip extension if you neglected
         // to add one, meaning that it can't address a file named by naked hash.
-        fs.renameSync(file.path, file.path + ".zip");
+        yield fs.rename(file.path, file.path + ".zip");
         file.path = file.path + ".zip";
         tempPaths.push(file.path);
         yield zipAddFile(file.path, name);

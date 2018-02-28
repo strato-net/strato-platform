@@ -158,9 +158,9 @@ describe('App', function() {
       });
     });
 
-    it("creates addresses.js", function(done) {
+    it("creates addresses.js", async function() {
       const addrs = {"storage": "deadbeefdeadbeef"};
-      const name = injectAddressesJs('./test/testdata', addrs);
+      const name = await injectAddressesJs('./test/testdata', addrs);
       assert.equal(name, 'test/testdata/addresses.js');
       const want =
 `const addresses = {
@@ -169,7 +169,6 @@ describe('App', function() {
 `;
       const got = fs.readFileSync(name, 'utf8');
       assert.equal(got, want);
-      done();
     });
   });
 });
