@@ -51,9 +51,9 @@ class CreateUser extends Component {
         <h4>STRATO is the best way to build blockchain applications</h4>
         <div className="pt-dialog-body side-items">
           <ul className="feature-list">
-            <li>Build dApps in hours, not days</li>
-            <li>Search Queries for smart contracts</li>
-            <li>Easily deploy apps to mobile or desktop seamlessly.</li>
+            <li>Deploy dApps in 5 minutes</li>
+            <li>Query the blockchain directly </li>
+            <li>Host your app on desktop or mobile</li>
           </ul>
         </div>
         <div className="pt-dialog-body">

@@ -40,6 +40,9 @@ class Login extends Component {
   }
 
   componentWillReceiveProps(newProps) {
+    if (!this.props.isOpen && newProps.isOpen)
+      this.props.reset();
+
     if (newProps.isLoggedIn && newProps.selectedApp) {
       newProps.launchApp(newProps.selectedApp.address, newProps.selectedApp.url)
       newProps.resetSelectedApp();

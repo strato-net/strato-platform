@@ -9,6 +9,7 @@ import { faucetRequest } from '../Accounts/accounts.actions';
 import CLI from '../CLI';
 import CreateUser from '../CreateUser';
 import Stepper from '../Stepper';
+import Congrats from '../Congrats';
 import './walkThrough.css';
 import RequestTokenImage from './faucet.png';
 
@@ -17,7 +18,7 @@ class WalkThrough extends Component {
     super(props);
     this.state = {
       isContinue: false,
-      initialModal: 'CreateUser',
+      currentModal: 'CreateUser',
       step: 0,
     }
     this.handleBackToFaucet = this.handleBackToFaucet.bind(this);
@@ -28,10 +29,10 @@ class WalkThrough extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (this.state.initialModal !== 'CreateUser' && !nextProps.isLoggedIn)
-      this.setState({ initialModal: 'CreateUser', step: 0 });
+    if (this.state.currentModal !== 'CreateUser' && !nextProps.isLoggedIn)
+      this.setState({ currentModal: 'CreateUser', step: 0 });
     if (!this.props.isLoggedIn && nextProps.isLoggedIn)
-      this.setState({ initialModal: 'Faucet', step: 1 });
+      this.setState({ currentModal: 'Faucet', step: 1 });
   }
 
   submit = (values) => {
@@ -47,7 +48,7 @@ class WalkThrough extends Component {
         <div className="pt-dialog-body faucet-container">
           <div className="pt-form-group">
             <div className="faucet-title">
-              <h4>Use STR Tokens to deploy blockchain applications across platforms immediately.</h4>
+              <h4>Request STRATO tokens to use and launch apps.</h4>
             </div>
 
             <div className="faucet-body">   
@@ -82,20 +83,20 @@ class WalkThrough extends Component {
 
         <div className="pt-dialog-footer">
           <div className="pt-dialog-footer-actions">
-            <Button text="Continue"
-              intent={Intent.PRIMARY}
-              onClick={() => {
-                mixpanelWrapper.track('faucet_close_click');
-                this.setState({ initialModal: "CLI", isContinue: false, step: 2 });
-                // Faucet account using jwt tobe done
-                this.props.faucetRequest(this.props.currentUser.accountAddress);
-              }} disabled={!this.state.isContinue} />
             <Button
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
-              text="Submit"
+              text="SEND PRE-GENERATED EMAIL"
               disabled={this.props.submitting}
             />
+            <Button text="EMAIL SENT?"
+              intent={Intent.PRIMARY}
+              onClick={() => {
+                mixpanelWrapper.track('faucet_close_click');
+                this.setState({ currentModal: "CLI", isContinue: false, step: 2 });
+                // Faucet account using jwt tobe done
+                this.props.faucetRequest(this.props.currentUser.accountAddress);
+              }} disabled={!this.state.isContinue} />
           </div>
         </div>
       </div>
@@ -103,14 +104,14 @@ class WalkThrough extends Component {
   }
 
   handleBackToFaucet() {
-    this.setState({ initialModal: "Faucet", step: 1 });
+    this.setState({ currentModal: "Faucet", step: 1 });
   }
 
   render() {
     let title;
-    if (this.state.initialModal === "CreateUser")
+    if (this.state.currentModal === "CreateUser")
       title = 'Create STRATO Developer ID';
-    else if (this.state.initialModal === "Faucet")
+    else if (this.state.currentModal === "Faucet")
       title = 'Request Tokens';
     else
       title = 'Download CLI Tool';
@@ -127,17 +128,20 @@ class WalkThrough extends Component {
             title={title}
             className="pt-dark dialog"
             canOutsideClickClose={false}
+            canEscapeKeyClose={this.state.currentModal === "CreateUser"}
+            isCloseButtonShown={this.state.currentModal === "CreateUser"}
           >
             <Stepper step={this.state.step} />
-            {this.state.initialModal === "CreateUser"
-              ? <CreateUser />
-              : null}
+            {this.state.currentModal === "CreateUser" && <CreateUser />}
 
-            {this.state.initialModal === "Faucet" && this.faucetContent()}
+            {this.state.currentModal === "Faucet" && this.faucetContent()}
 
-            {this.state.initialModal === "CLI"
-              ? <CLI handleBack={this.handleBackToFaucet} handleFinish={this.props.closeWalkThroughOverlay} />
-              : null}
+            {this.state.currentModal === "CLI" && <CLI handleBack={this.handleBackToFaucet} handleContinue={
+                () => this.setState({ currentModal: "Completed", step: 3 })} />}
+
+            {this.state.currentModal === "Completed" &&
+              <Congrats closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} handleBack={
+                () => this.setState({ currentModal: "CLI", step: 2 })} />}
 
           </Dialog>
         </form>

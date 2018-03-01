@@ -33,7 +33,7 @@ class MenuBar extends Component {
       return (
         <Button onClick={() => {
           this.props.openLoginOverlay();
-        }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'Login'} />
+        }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'For Developers'} />
       );
     }
   }

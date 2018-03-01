@@ -112,8 +112,8 @@ describe('MenuBar: index', () => {
       const props = {
         currentUser: { username: 'tanuj44' },
         isLoggedIn: false,
-        openOverlay: jest.fn(),
-        openLoginOverlay: jest.fn()
+        openLoginOverlay: jest.fn(),
+        openWalkThroughOverlay: jest.fn()
       }
 
       let wrapper = shallow(
@@ -126,7 +126,7 @@ describe('MenuBar: index', () => {
 
       wrapper.find('Button').last().simulate('click');
       expect(wrapper.find('Button').get(1)).toMatchSnapshot();
-      expect(props.openOverlay).toHaveBeenCalled();
+      expect(props.openWalkThroughOverlay).toHaveBeenCalled();
     });
   });
 
