@@ -178,7 +178,7 @@ isDynamic = \case
   ValueContract{}      -> False
   ValueFunction{}      -> False
   ValueEnum{}          -> False
-  ValueStruct{}        -> True -- Is this really True?
+  ValueStruct fs       -> any (isDynamic . snd) fs
 
 simpleIsDynamic :: SimpleValue -> Bool
 simpleIsDynamic = \case

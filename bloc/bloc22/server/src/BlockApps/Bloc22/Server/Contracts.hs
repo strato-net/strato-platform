@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Control.Monad.Trans.State.Lazy
 import           Data.Foldable
 import           Data.Int
 import qualified Data.Map.Strict                 as Map
@@ -97,8 +98,20 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
-  storage' <- blocStrato $ getStorage
-    storageFilterParams{qsAddress = Just address}
+  storage' <- case mName of
+    Nothing -> blocStrato $ getStorage
+      storageFilterParams{qsAddress = Just address}
+    Just name -> flip (doWhileM isJust) undefined $ StateT $ \_ -> do
+      let asdf = decodeStorageKey (typeDefs contract') (mainStruct contract') [name] 0
+      case asdf of
+        Nothing -> return ([], Nothing)
+        Just (ofs, cnt) -> do
+          keys <- blocStrato $ getStorage
+           storageFilterParams{ qsAddress = Just address
+                              , qsMinKey = Just (fromIntegral ofs)
+                              , qsMaxKey = Just $ fromIntegral (ofs + cnt - 1)
+                              }
+          return (keys, Nothing)
 
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
@@ -130,8 +143,10 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
                then SolidityObject [("length", SolidityValueAsString (Text.pack $ show len))]
                else SolidityArray (take len . drop start $ vals)
       val -> val
-
-
+    doWhileM :: Monad m => (s -> Bool) -> StateT s m a -> s -> m a
+    doWhileM p st s = runStateT st s >>= \(a, s') -> if p s'
+                        then doWhileM p st s'
+                        else return a
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
