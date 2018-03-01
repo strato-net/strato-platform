@@ -14,7 +14,7 @@ pipeline {
         '''
        }
     }
-    
+
     stage('Build') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
@@ -66,6 +66,17 @@ pipeline {
             sleep 1
           done
           echo "cirrus is available"
+        '''
+      }
+    }
+
+    stage('unit-tests') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          echo "Running apex unit tests"
+          APEX_CONTAINER=$(docker ps --format '{{.Names}}' | grep apex_1)
+          docker exec -t -e NODE_ENV=test "$APEX_CONTAINER" ./run-tests.sh
         '''
       }
     }
