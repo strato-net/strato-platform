@@ -6,6 +6,7 @@ set -e
 MIN_TIMEOUT=60
 authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
+sslCertFileType=${sslCertFileType:-crt}
 
 if [ -z "$uiPassword" ]
 then
@@ -16,6 +17,11 @@ else
 fi
 
 ln -sf nginx-$(${ssl:-false} || echo "no")ssl.conf /etc/nginx/nginx.conf
+
+if [ "$ssl" = true ] ; then
+	cp -r /tmp/ssl/* /etc/ssl/
+	sed -i 's/<SSL_CERT_FILE_TYPE>/'"$sslCertFileType"'/g' /etc/nginx/nginx.conf
+fi
 
 BLOC_TIMEOUT=$((blockTime * 5))
 if [ ${BLOC_TIMEOUT} -lt ${MIN_TIMEOUT} ]
