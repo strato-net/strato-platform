@@ -4,7 +4,7 @@ set -x
 set -e
 
 MIN_TIMEOUT=60
-authBasic=${authBasic:-true}
+authBasic=${authBasic:-false}
 blockTime=${blockTime:-13} # keep default the same as strato
 
 if [ -z "$uiPassword" ]
