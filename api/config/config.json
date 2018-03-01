@@ -4,15 +4,15 @@
     "password": "api",
     "database": "apex_dev",
     "host": "localhost",
-    "port": "5432",
+    "port": "9090",
     "dialect": "postgres"
   },
   "test": {
     "username": "postgres",
     "password": "api",
     "database": "apex_test",
-    "host": "127.0.0.1",
-    "port": "9090",
+    "host": "postgres",
+    "port": "5432",
     "dialect": "postgres"
   },
   "production" : {

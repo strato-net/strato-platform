@@ -8,36 +8,43 @@ rm -rf testdata.zip addresses.js
 zip -r testdata.zip .
 cd -
 
-# Set environment variables
-export SINGLE_NODE=true
-export NODE_HOST=localhost
-export NODE_ENV=test
-export stratoRoot=http://localhost/strato-api/eth/v1.2/
+if [ "$NODE_ENV" == development ]; then
+  # Set environment variables
+  export SINGLE_NODE=true
+  export NODE_HOST=localhost
+  export stratoRoot=http://localhost/strato-api/eth/v1.2/
 
-export PG_HOST=localhost
-export PG_PORT=9090
-export PG_USER=postgres
-# Different syntax because this is read by psql
-export PGPASSWORD=api
+  export PG_HOST=localhost
+  export PG_PORT=9090
+  export PG_USER=postgres
+  # Different syntax because this is read by psql
+  export PGPASSWORD=api
 
-POSTGRES_NAME=apex_tests_postgres
-trap "docker rm -f ${POSTGRES_NAME}" EXIT
-docker run -d -p 9090:5432 --name="${POSTGRES_NAME}" \
-	-e POSTGRES_PASSWORD=api \
-  -e POSTGRES_DB=cirrus \
-	-v "/var/lib/postgresql/data" \
-	postgres:9.6
+  POSTGRES_NAME=apex_tests_postgres
+  trap "docker rm -f ${POSTGRES_NAME}" EXIT
+  docker run -d -p 9090:5432 --name="${POSTGRES_NAME}" \
+    -e POSTGRES_PASSWORD=api \
+    -e POSTGRES_DB=cirrus \
+    -v "/var/lib/postgresql/data" \
+    postgres:9.6
 
-until psql -h "${PG_HOST}" \
-           -p "${PG_PORT}" \
-           -U "${PG_USER}" \
-           -c "SELECT 1;" \
-           >/dev/null \
-           2>/dev/null
-do
-  echo 'Waiting for postgres to be available...'
-    sleep 1
-done
-echo 'postgres is available'
+  until psql -h "${PG_HOST}" \
+             -p "${PG_PORT}" \
+             -U "${PG_USER}" \
+             -c "SELECT 1;" \
+             >/dev/null \
+             2>/dev/null
+  do
+    echo 'Waiting for postgres to be available...'
+      sleep 1
+  done
+  echo 'postgres is available'
 
-./node_modules/mocha/bin/mocha --config=config-local.yaml test/
+  ./node_modules/mocha/bin/mocha --config=config-local.yaml test/
+fi
+
+# For jenkins, we expect a running environment
+if [ "$NODE_ENV" == test ]; then
+  export stratoRoot="http://${stratoHost}/eth/v1.2"
+  ./node_modules/mocha/bin/mocha --config=config-prod.yaml test/
+fi
