@@ -36,6 +36,7 @@ deployments:
         APEX_URL: "${APEX_URL}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
         SINGLE_NODE: "${SINGLE_NODE}"
+        ssl: "${ssl:-false}"
 
   - name: apex
     repo: https://github.com/blockapps/apex.git
@@ -198,6 +199,7 @@ deployments:
       restart: always
       ports:
         - "80:80"
+        - "443:443"
       depends_on:
         - bloch
         - cirrus
@@ -207,9 +209,12 @@ deployments:
         - apex
       environment:
         ssl: "${ssl:-false}"
+        sslCertFileType: "${sslCertFileType:-crt}"
         authBasic: "${authBasic}"
         uiPassword: "${uiPassword}"
         blockTime: "${blockTime}"
+      volumes:
+        - ./ssl:/tmp/ssl:ro
 
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
