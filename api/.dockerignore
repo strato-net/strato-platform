@@ -3,9 +3,9 @@ node_modules
 *.log
 *.md
 
-apps
-tmp
-uploads
+apps/*
+tmp/*
+uploads/*
 
 test/testdata/addresses.js
 test/testdata/testdata.zip
