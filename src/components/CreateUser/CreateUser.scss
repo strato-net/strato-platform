@@ -29,18 +29,24 @@
 	vertical-align: middle;
 }
 
+.feature-list {
+	padding-left: 20px !important;
+}
+
 .create-user .feature-list,
 .create-user .feature-list li {
 	list-style: none;
 }
 
 .side-items .feature-list li {
-	padding-bottom: 40px;
+	padding-top: 10px;
+	padding-bottom: 30px;
 }
 
 .create-user .feature-list li:before {
 	font-family: 'FontAwesome';
-	content: '\f00c';
-	margin: 0 5px 0 -15px;
+	content: '\F00C';
+	margin: 0 10px 0 0px;
 	color: lightgreen;
+	font-size: 20px;
 }
