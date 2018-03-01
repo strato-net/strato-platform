@@ -16,7 +16,14 @@ chai.use(chaiHttp);
 describe('App', function() {
   this.timeout(10000);
   before(async function() {
-    await initDb.dropdb();
+    try {
+      await initDb.dropdb();
+    } catch (error) {
+      // Ignore errors about dropping nonexistent dbs.
+      if (error.name != 'invalid_catalog_name') {
+        throw error;
+      }
+    }
     await initDb();
     await models.sequelize.sync();
     await createInitialData();
