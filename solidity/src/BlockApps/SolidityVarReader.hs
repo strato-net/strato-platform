@@ -179,47 +179,43 @@ word256ToByteString=BL.toStrict . encode
 byteStringToWord256::ByteString->Word256
 byteStringToWord256 x = sum $ map (\(shiftBits, v) -> v `shiftL` (shiftBits*8)) $ zip [31,30..0] $ map fromIntegral $ ByteString.unpack x
 
-{-
-data Type
-  = SimpleType SimpleType
-  | TypeArrayDynamic Type
-  | TypeArrayFixed Word Type
-  | TypeMapping SimpleType Type
-  | TypeFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
-  | TypeStruct Text
-  | TypeEnum Text
-  | TypeContract Text
-  deriving (Show)
+getArrayStartingKey :: Word256 -> Word256
+getArrayStartingKey = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256 . word256ToByteString
 
--}
 decodeStorageKey
-  :: TypeDefs
+  :: MonadIO m
+  => TypeDefs
   -> Struct
   -> [Text]
   -> Word256
-  -> Maybe (Word256, Word256)
-decodeStorageKey _ _ [] _ = Nothing
-decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' =
+  -> ((Word256, Word256) -> m Storage)
+  -> m (Maybe [(Word256, Word256)]) -- this feels very hacky
+decodeStorageKey _ _ [] _ _ = return Nothing
+decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' getStorage =
   case Map.lookup varName (fields struct') of
-    Nothing -> Nothing
+    Nothing -> return Nothing
     Just (Storage.Position{..}, theType) ->
       case theType of
-        SimpleType _ -> Just (offset, fromIntegral (1 :: Int))
-        TypeArrayDynamic _ -> undefined
-        TypeArrayFixed n _ -> Just (offset, fromIntegral n) -- probably wrong
+        SimpleType _ -> return $ Just [(offset, 1)] -- TODO: add decodeStorageKeySimple to handle bytes and strings
+        TypeArrayDynamic _ -> do
+          arrayStorage <- getStorage (offset, 1)
+          let len = arrayStorage offset
+              startingKey = getArrayStartingKey offset
+          return $ Just [(offset, 1),(startingKey, len)]
+        TypeArrayFixed n _ -> do
+          return $ Just [(offset, fromIntegral n)]
         TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
         TypeFunction name _ _ -> error $ "Cannot retrieve "
                                        ++ show (ByteString.unpack name)
                                        ++ ": Functions are not kept in storage"
         TypeStruct name ->
--- data Struct = Struct { fields::Map Text (Storage.Position, Type) , size::Word256 } deriving (Show)
           case Map.lookup name structDefs of
             Nothing -> error ""
             Just theStruct -> case vs of
-              [] -> Just (offset, size theStruct)
-              vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset')
-        TypeEnum _ -> Just (offset, fromIntegral (1 :: Int))
-        TypeContract _ -> Just (offset, fromIntegral (1 :: Int))
+              [] -> return $ Just [(offset, size theStruct)]
+              vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') getStorage
+        TypeEnum _ -> return $ Just [(offset, 1)]
+        TypeContract _ -> return $ Just [(offset, 1)]
 
 decodeValues
   :: TypeDefs

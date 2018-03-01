@@ -10,9 +10,9 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
-import           Control.Monad.Trans.State.Lazy
 import           Data.Foldable
 import           Data.Int
+import           Data.LargeWord                  (Word256)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -34,8 +34,9 @@ import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.Solidity.SolidityValue
 import           BlockApps.SolidityVarReader
+import           BlockApps.Storage               as S
 import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types
+import           BlockApps.Strato.Types          as T
 import           BlockApps.XAbiConverter
 
 getContracts :: Bloc GetContractsResponse
@@ -67,6 +68,12 @@ getContractsData (ContractName contractName) = blocTransaction $ do
 
 getContractsContract :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
 getContractsContract = getContractDetails
+
+translateStorageMap :: [T.Storage] -> S.Storage
+translateStorageMap storage' =
+  let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+      storage k = fromMaybe 0 $ Map.lookup k storageMap
+  in storage
 
 getContractsState :: ContractName
                   -> MaybeNamed Address
@@ -101,20 +108,20 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
   storage' <- case mName of
     Nothing -> blocStrato $ getStorage
       storageFilterParams{qsAddress = Just address}
-    Just name -> flip (doWhileM isJust) undefined $ StateT $ \_ -> do
-      let asdf = decodeStorageKey (typeDefs contract') (mainStruct contract') [name] 0
-      case asdf of
-        Nothing -> return ([], Nothing)
-        Just (ofs, cnt) -> do
-          keys <- blocStrato $ getStorage
-           storageFilterParams{ qsAddress = Just address
-                              , qsMinKey = Just (fromIntegral ofs)
-                              , qsMaxKey = Just $ fromIntegral (ofs + cnt - 1)
-                              }
-          return (keys, Nothing)
+    Just name -> do
+      mRanges <- decodeStorageKey
+               (typeDefs contract')
+               (mainStruct contract')
+               [name]
+               0
+               (\oc -> getStorageRange address oc >>= return . translateStorageMap)
+      case mRanges of
+        Nothing -> return []
+        Just ranges -> do
+          storageMaps <- mapM (getStorageRange address) ranges
+          return $ concat storageMaps
 
-  let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-      storage k = fromMaybe 0 $ Map.lookup k storageMap
+  let storage = translateStorageMap storage'
 
   ret <- case mName of
         Nothing ->
@@ -128,7 +135,7 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
 
   logWith logNotice $ Text.unlines
     [ "Storage:"
-    , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
     , "End of storage"
     ]
 
@@ -143,10 +150,14 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
                then SolidityObject [("length", SolidityValueAsString (Text.pack $ show len))]
                else SolidityArray (take len . drop start $ vals)
       val -> val
-    doWhileM :: Monad m => (s -> Bool) -> StateT s m a -> s -> m a
-    doWhileM p st s = runStateT st s >>= \(a, s') -> if p s'
-                        then doWhileM p st s'
-                        else return a
+    getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
+    getStorageRange a (o,c) = do
+      blocStrato $ getStorage
+        storageFilterParams{ qsAddress = Just a
+                           , qsMinKey = Just . fromInteger $ toInteger o
+                           , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
+                           }
+
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
@@ -196,7 +207,7 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
   storage' <- blocStrato $ getStorage
     storageFilterParams{qsAddress = Just address}
 
-  let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+  let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
       ret = valueToSolidityValue <$> decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
