@@ -26,6 +26,7 @@ import qualified Data.ByteString.Lazy             as BL
 import           Data.LargeWord
 import           Data.List
 import qualified Data.Map                         as Map
+import           Data.Maybe                       (maybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
 import qualified Data.Text.Encoding               as Text
@@ -183,27 +184,31 @@ getArrayStartingKey :: Word256 -> Word256
 getArrayStartingKey = byteStringToWord256 . ByteArray.convert . digestKeccak256 . keccak256 . word256ToByteString
 
 decodeStorageKey
-  :: MonadIO m
-  => TypeDefs
+  :: TypeDefs
   -> Struct
   -> [Text]
   -> Word256
-  -> ((Word256, Word256) -> m Storage)
-  -> m (Maybe [(Word256, Word256)]) -- this feels very hacky
-decodeStorageKey _ _ [] _ _ = return Nothing
-decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' getStorage =
+  -> Maybe Int
+  -> Maybe Int
+  -> Bool
+  -> Maybe (Word256, Word256) -- this feels very hacky
+decodeStorageKey _ _ [] _ _ _ _ = Nothing
+decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' mOffset mCount len =
   case Map.lookup varName (fields struct') of
-    Nothing -> return Nothing
+    Nothing -> Nothing
     Just (Storage.Position{..}, theType) ->
       case theType of
-        SimpleType _ -> return $ Just [(offset, 1)] -- TODO: add decodeStorageKeySimple to handle bytes and strings
+        SimpleType _ -> Just (offset, 1) -- TODO: add decodeStorageKeySimple to handle bytes and strings
         TypeArrayDynamic _ -> do
-          arrayStorage <- getStorage (offset, 1)
-          let len = arrayStorage offset
-              startingKey = getArrayStartingKey offset
-          return $ Just [(offset, 1),(startingKey, len)]
+          if len
+            then Just (offset, 1)
+            else
+              let startingKey = getArrayStartingKey offset
+                  ofs = fromIntegral $ maybe 0 id mOffset
+                  cnt = fromIntegral $ maybe 100 id mCount -- Default to page size of 100 entries
+              in Just (startingKey + ofs, cnt)
         TypeArrayFixed n _ -> do
-          return $ Just [(offset, fromIntegral n)]
+          Just (offset, fromIntegral n)
         TypeMapping _ _ -> undefined -- TODO: The only way to get the offset of a mapping is by supplying the key
         TypeFunction name _ _ -> error $ "Cannot retrieve "
                                        ++ show (ByteString.unpack name)
@@ -212,10 +217,10 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' getStorage 
           case Map.lookup name structDefs of
             Nothing -> error ""
             Just theStruct -> case vs of
-              [] -> return $ Just [(offset, size theStruct)]
-              vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') getStorage
-        TypeEnum _ -> return $ Just [(offset, 1)]
-        TypeContract _ -> return $ Just [(offset, 1)]
+              [] -> Just (offset, size theStruct)
+              vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
+        TypeEnum _ -> Just (offset, 1)
+        TypeContract _ -> Just (offset, 1)
 
 decodeValues
   :: TypeDefs
@@ -224,17 +229,20 @@ decodeValues
   -> Word256
   -> [(Text, Value)]
 decodeValues typeDefs' struct'@Struct{..} storage offset =
-  decodeValuesFromList typeDefs' struct' storage offset (Map.keys fields)
+  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (Map.keys fields)
 
 decodeValuesFromList
   :: TypeDefs
   -> Struct
   -> Storage
   -> Word256
+  -> Maybe Int
+  -> Maybe Int
+  -> Bool
   -> [Text]
   -> [(Text, Value)]
-decodeValuesFromList typeDefs' struct'@Struct{..} storage offset varNames =
-  flip zipMaybe varNames (decodeValue typeDefs' storage offset struct')
+decodeValuesFromList typeDefs' struct'@Struct{..} storage offset ofs cnt len varNames =
+  flip zipMaybe varNames (decodeValue typeDefs' storage offset struct' ofs cnt len)
   where
     zipMaybe :: (a -> Maybe b) -> [a] -> [(a,b)]
     zipMaybe _ [] = []
@@ -247,28 +255,34 @@ decodeValue
   -> Storage
   -> Word256
   -> Struct
+  -> Maybe Int
+  -> Maybe Int
+  -> Bool
   -> Text
   -> Maybe Value
-decodeValue typeDefs' storage offset Struct{..} varName = case Map.lookup varName fields of
+decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case Map.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
-     Just $ decodeValue' typeDefs' storage (position `Storage.addOffset` fromIntegral offset) theType
+     Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
 
 
 decodeValue'
   :: TypeDefs
   -> Storage
+  -> Maybe Int
+  -> Maybe Int
+  -> Bool
   -> Storage.Position
   -> Type
   -> Value
-decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \case
+decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Position{..} = \case
   SimpleType TypeBool ->
     let
-      SimpleValue (ValueInt8 word8) = decodeValue' typeDefs' storage position (SimpleType TypeInt8)
+      SimpleValue (ValueInt8 word8) = decodeValue' typeDefs' storage ofs cnt len position (SimpleType TypeInt8)
     in
      SimpleValue $ ValueBool $ word8 /= 0
 
-  SimpleType TypeUInt -> decodeValue' typeDefs' storage position $ SimpleType TypeUInt256
+  SimpleType TypeUInt -> decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeUInt256
 
 
   SimpleType TypeInt8 -> decodeInt storage offset byte ValueInt8
@@ -349,16 +363,16 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
 
 
 
-  SimpleType TypeInt -> decodeValue' typeDefs' storage position $ SimpleType TypeInt256
+  SimpleType TypeInt -> decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeInt256
 
   SimpleType TypeAddress ->
     let
-      SimpleValue (ValueUInt160 addr) = decodeValue' typeDefs' storage position $ SimpleType TypeUInt160
+      SimpleValue (ValueUInt160 addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeUInt160
     in
       SimpleValue . ValueAddress . Address $ fromIntegral addr
   TypeContract _ ->
     let
-      SimpleValue (ValueAddress addr) = decodeValue' typeDefs' storage position $ SimpleType TypeAddress
+      SimpleValue (ValueAddress addr) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAddress
     in
       ValueContract addr
 
@@ -415,34 +429,40 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
 
   SimpleType TypeBytes | storage offset `testBit` 0 -> --large string, 32+ bytes
     let
-      len = storage offset `div` 2
+      len' = storage offset `div` 2
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
-    in SimpleValue $ ValueBytes $ ByteString.pack $ take (fromIntegral len) $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
+    in SimpleValue $ ValueBytes $ ByteString.pack $ take (fromIntegral len') $ concatMap (ByteString.unpack . word256ToByteString . storage . (startingKey+)) [0..]
 
   SimpleType TypeBytes -> --small string, less than 32 bytes
     let
-      len = storage offset .&. 0xfe `div` 2
+      len' = storage offset .&. 0xfe `div` 2
     in
-      SimpleValue $ ValueBytes $ ByteString.take (fromIntegral len) $ word256ToByteString $ storage offset
+      SimpleValue $ ValueBytes $ ByteString.take (fromIntegral len') $ word256ToByteString $ storage offset
 
   SimpleType TypeString ->
     let
-      SimpleValue (ValueBytes bytes) = decodeValue' typeDefs' storage position $ SimpleType TypeBytes
+      SimpleValue (ValueBytes bytes) = decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeBytes
     in
       SimpleValue $ ValueString $ Text.decodeUtf8 bytes
 
   TypeFunction selector args returns -> ValueFunction selector args returns
 
-  TypeArrayFixed size ty -> ValueArrayFixed size theList
+  TypeArrayFixed size ty -> if len
+    then SimpleValue $ ValueUInt $ fromIntegral size
+    else ValueArrayFixed size theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
-      theList = map (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [0..fromIntegral size - 1]
+      theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [0..fromIntegral size - 1]
 
-  TypeArrayDynamic ty -> ValueArrayDynamic theList
+  TypeArrayDynamic ty -> if len
+    then SimpleValue $ ValueUInt (storage offset)
+    else ValueArrayDynamic theList
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
-      theList = (flip (decodeValue' typeDefs' storage) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [0..fromIntegral (storage offset-1)::Int]
+      ofs' = maybe 0 id ofs
+      cnt' = maybe 100 id cnt
+      theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..cnt']
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
   TypeMapping tyk tyv -> SimpleValue $ ValueString $ Text.pack $ "mapping (" ++ formatSimpleType tyk ++ " => " ++ formatType tyv ++ ")"
@@ -452,8 +472,8 @@ decodeValue' typeDefs'@TypeDefs{..} storage position@Storage.Position{..} = \cas
      Nothing -> error $ "Solidity contract is using a missing enum: " ++ show name
      Just enumset ->
        let
-         len = fromIntegral $ Bimap.size enumset `shiftR` 8 + 1
-         val = fromIntegral $ (.&. ((1 `shiftL` 8*len) - 1)) $ (`shiftR` (byte*8)) $ storage offset
+         len' = fromIntegral $ Bimap.size enumset `shiftR` 8 + 1
+         val = fromIntegral $ (.&. ((1 `shiftL` 8*len') - 1)) $ (`shiftR` (byte*8)) $ storage offset
        in
         case Bimap.lookup val enumset of
          Nothing -> error "bad enum value"
@@ -501,7 +521,7 @@ decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
       getValPosition _ _ _ = Storage.positionAt valPositionInt  --TODO fill in this dummy stub
       valPosition = getValPosition fromType keyName position
 
-  let val = decodeValue' typeDefs' storage valPosition toType
+  let val = decodeValue' typeDefs' storage Nothing Nothing False valPosition toType
 
   return val
 
