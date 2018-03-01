@@ -16,8 +16,6 @@ const appMetadata = require('../lib/appMetadata/appMetadata');
 
 const tmpFolder = 'tmp';
 
-const Promise = require('bluebird');
-
 
 /**
  * Parse the solidity source

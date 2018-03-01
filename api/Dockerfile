@@ -1,4 +1,4 @@
-FROM node:9.6.1
+FROM node:9-slim
 
 RUN apt-get update && \
     apt-get install -y git postgresql-client zip && \
