@@ -36,7 +36,7 @@ describe('CreateUser: saga', () => {
         expect(gen.next().value).toEqual(call(createUserApiCall, formData.username, formData.password));
         expect(gen.next({ user: mockResponse }).value).toEqual(put(createUserSuccess(mockResponse)));
         expect(gen.next().value).toEqual(put(loginSuccess(formData.username, mockResponse)));
-        expect(gen.next().value).toEqual(put(openWalkThroughOverlay()));
+        expect(gen.next().value).toEqual(put(openWalkThroughOverlay(true)));
         expect(gen.throw(error).value).toEqual(put(createUserFailure(error)));
         expect(gen.next().done).toBe(true);
       });
