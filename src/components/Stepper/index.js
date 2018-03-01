@@ -17,9 +17,11 @@ const Stepper = (props) => {
     step1LogoSrc = stepCompletedLogo;
     step2LogoSrc = step2LogoActive;
     step3LogoSrc = step3Logo;
-  } else {
+  } else if (props.step === 2) {
     step1LogoSrc = step2LogoSrc = stepCompletedLogo;
     step3LogoSrc = step3LogoActive;
+  } else {
+    step1LogoSrc = step2LogoSrc = step3LogoSrc = stepCompletedLogo;
   }
   return (
     <div className="steps-form">
