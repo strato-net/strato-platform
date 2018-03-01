@@ -75,8 +75,9 @@ app.use(function(err, req, res, next) {
       status: res.status,
     },
   };
-  // Including error stack in development mode only
-  if (req.app.get('env') === 'development') {
+  // Including error stack when not in production
+  const env = req.app.get('env');
+  if (env === 'development' || env === 'test') {
     errorRespObj.error.stack = err.stack
   }
 

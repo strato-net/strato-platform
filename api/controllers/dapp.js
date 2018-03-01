@@ -1,5 +1,8 @@
+/* jshint esnext: true */
+
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
+const child_process = require('child_process');
 const co = require('co');
 const download = require('download');
 const fs = require('fs-extra');
@@ -19,11 +22,11 @@ const tmpFolder = 'tmp';
  * @param data {string}
  * @returns {Promise}
  */
-parseContractData = function*(data) {
+parseContractData = function(data) {
   // todo: find another way (using solc.js) or change bloc endpoint to have an option to make ALL contracts searchable instead of listing by one
   const options = {
     method: 'POST',
-    uri: `${process.env['stratoRoot']}/extabi`,
+    uri: `${process.env.stratoRoot}/extabi`,
     headers: {
       'content-type': 'application/x-www-form-urlencoded'
     },
@@ -31,7 +34,7 @@ parseContractData = function*(data) {
     json: true
   };
 
-  return rp(options)
+  return rp(options);
 };
 
 /**
@@ -67,9 +70,9 @@ checkFileCompiles = function(directory, fileName) {
         // could not compile one of the contracts
         console.log('could not compile contract', fileName, error);
         return reject(fileName);
-      })
-    })
-  })
+      });
+    });
+  });
 };
 
 /**
@@ -84,10 +87,10 @@ checkFileCompiles = function(directory, fileName) {
  */
 registerDapp = function*(username, address, password, packageMetadata, hash, host) {
   const args = {
-    _appName: packageMetadata['name'],
-    _version: packageMetadata['version'],
-    _description: packageMetadata['description'],
-    _maintainer: packageMetadata['maintainer'],
+    _appName: packageMetadata.name,
+    _version: packageMetadata.version,
+    _description: packageMetadata.description,
+    _maintainer: packageMetadata.maintainer,
     _hash: hash,
     _host: host,
   };
@@ -110,21 +113,21 @@ registerDapp = function*(username, address, password, packageMetadata, hash, hos
       case 400:
         if (error.data === 'incorrect password') {
           err.message += ': incorrect password';
-          err.status = 401
+          err.status = 401;
         } else if (error.data.includes('no user found with name')) {
           err.message += ': user does not exist on the node';
-          err.status = 401
+          err.status = 401;
         } else if (error.data.includes('address does not exist for user')) {
           err.message += ': wrong address provided for the user';
-          err.status = 401
+          err.status = 401;
         } else if (error.data === 'strato error: failed to find account') {
           err.message += ': account does not have any ether';
-          err.status = 400
+          err.status = 400;
         }
         // TODO: check if user has not enough ether (e.g. just few wei)
         break;
     }
-    throw(err)
+    throw(err);
   }
 };
 
@@ -147,7 +150,7 @@ parsePackageMetadata = function(packageTmpFolder) {
         } catch (error) {
           let err = new Error('could not parse metadata.json: ' + error);
           err.status = 400;
-          return reject(err)
+          return reject(err);
         }
       });
     } catch(err) {
@@ -162,11 +165,11 @@ parsePackageMetadata = function(packageTmpFolder) {
  * @param metadata Object - the parsed JSON object of metadata.json contents
  */
 validatePackageMetadata = function(metadata) {
-  if (!metadata['name'] || !metadata['version'] || !metadata['description'] || !metadata['maintainer']) {
-    throw 'wrong params, expected: {name, version, description, maintainer}'
+  if (!metadata.name || !metadata.version || !metadata.description || !metadata.maintainer) {
+    throw 'wrong params, expected: {name, version, description, maintainer}';
   }
   const appNameRegexp = /^[^|;,!@#$()<>\/\\"'`~{}\[\]=&^]+$/;
-  if(appNameRegexp.exec(metadata['name']) === null) {
+  if(appNameRegexp.exec(metadata.name) === null) {
     throw "application name can not contain characters: invalid characters in application name";
   }
 };
@@ -204,8 +207,86 @@ validatePackageStructure = function*(packageFolderPath) {
       err.status = 400;
       throw err;
     }
-  })
+  });
 };
+
+/**
+ * Parse the initfile object out of the bundle
+ * @param packageFolderPath String - the path of the unzipped package
+ * @returns Object Matching variable names to (contractName, contractFilename, args)
+ */
+parseInitfile = function(packageFolderPath) {
+  const initfile = path.join(packageFolderPath, 'initfile.json');
+  if (!fs.pathExists(initfile)) {
+    return {};
+  }
+  inits = JSON.parse(fs.readFileSync(initfile));
+  for (var v in inits) {
+    if (!inits.hasOwnProperty(v)) {
+      continue;
+    }
+    var base = inits[v].contractFilename;
+    var file = path.join(packageFolderPath, base);
+    if (!fs.pathExists(file)) {
+      let err = new Error(
+          `could not find requested contract '${base}' in bundle`);
+      err.status = 400;
+      throw err;
+    }
+    if (inits[v].args.constructor !== {}.constructor) {
+      let err = new Error(`args '${inits[v].args}' is not a map`);
+      err.status = 400;
+      throw err;
+    }
+    // TODO(tim): check that inits[v].contractName is a contract
+    // in the .sol file.
+  }
+  return inits;
+}
+
+/**
+ * Instantiate a contract for each entry in inits
+ * @params packageFolderPath String - Directory to start file search.
+ * @params creds Object - username, password, address
+ * @param inits Object - An association between variable names and the
+ *    (contractName, contractFilename, args) necessary to upload a contract
+ * @returns Promise waiting to match variable names to contract addresses
+ */
+uploadInitContracts = function(packageFolderPath, creds, inits) {
+  return new Promise(function(resolve) {
+    co(function*() {
+      const addrs = {};
+      for (var key in inits) {
+        const filename = path.join(packageFolderPath, inits[key].contractFilename);
+        let contract = yield blockappsRest.uploadContract(
+              creds, inits[key].contractName, filename, inits[key].args);
+        addrs[key] = contract.address
+      }
+      resolve(addrs);
+    });
+  });
+}
+
+/**
+ * Write a javascript module that creates the assocation
+ * between the variable keys and address values of addrs
+ * @params packageFolderPath String location of static files
+ * @params addrs Object a mapping {var_name: contract_addr}
+ * @returns String the filename of the inserted file
+ */
+injectAddressesJs = async function(packageFolderPath, addrs) {
+  const lines = [];
+  lines.push("const addresses = {");
+  Object.keys(addrs).forEach(name => {
+    lines.push(`  ${name}: "${addrs[name]}",`);
+  });
+  lines.push("};\n");
+  const text = lines.join('\n');
+  const name = path.join(packageFolderPath, "addresses.js");
+  await fs.writeFileSync(name, text);
+  return name;
+}
+
 
 /**
  * Remove files or directories if they exist
@@ -218,11 +299,11 @@ removePathsIfExist = function(paths) {
   paths.forEach(path => {
     fs.remove(path)
       .then(() => {
-        console.log(`path ${path} is successfully removed or did not exist`)
+        console.log(`path ${path} is successfully removed or did not exist`);
       })
       .catch(err => {
-        console.error(`could not remove path: ${path}`, err)
-      })
+        console.error(`could not remove path: ${path}`, err);
+      });
   });
 };
 
@@ -240,7 +321,7 @@ getFileHash = function(filePath) {
  * @param externalHost, string
  */
 validateExternalHost = function(externalHost) {
-  if (process.env['SINGLE_NODE'] !== "true" && externalHost === 'localhost') {
+  if (process.env.SINGLE_NODE !== "true" && externalHost === 'localhost') {
     let err = new Error(`cannot deploy the dApp from localhost when running multinode - please provide external node host when running your STRATO instance`);
     err.status = 400;
     throw err;
@@ -278,6 +359,20 @@ unzip = function(filePath, destination, overwrite) {
 };
 
 /**
+ * Adds a file to a zip archive
+ * @param filePath String file name of the archive
+ * @param newAddition String file name to be zipped
+ */
+zipAddFile = function(filePath, newAddition) {
+  // Why does this use the system zip instead of adm-zip? Because
+  // I spent a day trying to replicate this command and
+  // continued to receive "Invalid LOC header (bad signature)"
+  return new Promise(function (resolve, reject) {
+    child_process.exec(`/usr/bin/zip --verbose -uj ${filePath} ${newAddition}`, resolve);
+  });
+}
+
+/**
  * ExpressJS route controller to upload the dApp
  * @param req
  * @param res
@@ -310,31 +405,35 @@ upload = function (req, res, next) {
       err.status = 400;
       return next(err);
     }
-    tempPaths.push(req.file.path);
 
     const username = req.body.username;
     const address = req.body.address;
     const password = req.body.password;
+    const credentials = {
+      name: username,
+      address: address,
+      password: password,
+    };
     const file = req.file;
-
-    if (!username || !address || !password || !file) {
+    if (!file) {
+      let err = new Error("wrong params, expected: {username, address, password, file}");
+      err.status = 400;
+      return next(err);
+    }
+    tempPaths.push(file.path);
+    if (!username || !address || !password) {
       removePathsIfExist(tempPaths);
       let err = new Error("wrong params, expected: {username, address, password, file}");
       err.status = 400;
       return next(err);
     }
 
-    // TODO: check if there are any ways to validate username-address-password bunch for validity before processing the package and compiling contracts from it - currently we can only validate when we compile contracts with bloc
+    // TODO: check if there are any ways to validate username-address-password
+    // bunch for validity before processing the package and compiling contracts
+    // from it - currently we can only validate when we compile contracts with
+    // bloc.
 
     co(function* () {
-      const zipHash = yield getFileHash(file.path);
-      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
-      if (appsMetadataArray.length) {
-        removePathsIfExist(tempPaths);
-        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
-        err.status = 409;
-        return next(err);
-      }
       // unpack files to tmp folder
       const packageTmpFolder = path.join(tmpFolder,file.filename);
       try {
@@ -349,6 +448,30 @@ upload = function (req, res, next) {
       tempPaths.push(packageTmpFolder);
 
       yield validatePackageStructure(packageTmpFolder);
+
+      // By uploading the contracts configured by the initfile,
+      // we can supply the contract addresses to static
+      // files on behalf of developers.
+      const inits = parseInitfile(packageTmpFolder);
+      if (Object.keys(inits).length > 0) {
+        const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
+        const name = yield injectAddressesJs(packageTmpFolder, addrs);
+        // /usr/bin/zip helpfully adds a .zip extension if you neglected
+        // to add one, meaning that it can't address a file named by naked hash.
+        yield fs.rename(file.path, file.path + ".zip");
+        file.path = file.path + ".zip";
+        tempPaths.push(file.path);
+        yield zipAddFile(file.path, name);
+      }
+
+      const zipHash = yield getFileHash(file.path);
+      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
+      if (appsMetadataArray.length) {
+        removePathsIfExist(tempPaths);
+        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
+        err.status = 409;
+        return next(err);
+      }
       const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
 
       // check if all contracts from tmp/contracts/ are compile
@@ -371,7 +494,7 @@ upload = function (req, res, next) {
       // TODO: refactor: collect all contracts in single array with one bloc call instead
       // files compilation order is random (no cross-file import statement support)
       try {
-        yield Promise.all(compilationPromises) // returns [solFiles[contractsInFile{codeHash, contractName},],]
+        yield Promise.all(compilationPromises); // returns [solFiles[contractsInFile{codeHash, contractName},],]
       } catch(error) {
         removePathsIfExist(tempPaths);
         let err = new Error('unable to compile contract: ' + error);
@@ -382,7 +505,7 @@ upload = function (req, res, next) {
         appConfig.apps.directory,
         zipHash,
       ];
-      const currentHost = process.env['NODE_HOST'];
+      const currentHost = process.env.NODE_HOST;
       validateExternalHost(currentHost);
 
       const dappUrl = `http://${currentHost}/${dappPathArray.join('/')}`;
@@ -396,12 +519,13 @@ upload = function (req, res, next) {
       // Replace the dapp folder with the new one (all older files will be removed)
       yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
       res.status(200).json({metadata: packageMetadata, url: dappUrl});
+      file.path = '';
       removePathsIfExist(tempPaths);
     }).catch(err => {
         removePathsIfExist(tempPaths);
         return next(err);
-    })
-  })
+    });
+  });
 };
 
 /**
@@ -443,7 +567,7 @@ acquireDapp = function(req, res, next) {
         delete acquiresInProgress[appHash];
         removePathsIfExist([`uploads/cross-node/${appHash}.zip`]);
       }
-    })
+    });
   }
 };
 

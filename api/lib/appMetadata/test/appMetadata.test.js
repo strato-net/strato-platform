@@ -1,3 +1,4 @@
+/* jshint esnext: true */
 require('co-mocha');
 const ba = require('blockapps-rest');
 const rest = ba.rest;
@@ -11,7 +12,7 @@ const adminName = util.uid('Admin');
 const adminPassword = '1234';
 
 
-const timeout = 30000;
+const timeout = 60000;
 
 describe('AppMetadata tests', function() {
   this.timeout(timeout);
@@ -48,17 +49,17 @@ describe('AppMetadata tests', function() {
       assert.equal(appMetadata.description, description, 'description');
       assert.equal(appMetadata.maintainer, maintainer, 'maintainer');
       assert.equal(appMetadata.hash, hash, 'hash');
-      assert.equal(appMetadata.host, host, 'host')
+      assert.equal(appMetadata.host, host, 'host');
     }
     // query
     {
-      const appMetadata = yield appMetadataJs.getAppMetadata(contract.address);
-      assert.equal(appMetadata.appName, appName, 'appName');
-      assert.equal(appMetadata.version, version, 'version');
-      assert.equal(appMetadata.description, description, 'description');
-      assert.equal(appMetadata.maintainer, maintainer, 'maintainer');
-      assert.equal(appMetadata.hash, hash, 'hash');
-      assert.equal(appMetadata.host, host, 'host');
+      const appMetadata2 = yield appMetadataJs.getAppMetadata(contract.address);
+      assert.equal(appMetadata2.appName, appName, 'appName');
+      assert.equal(appMetadata2.version, version, 'version');
+      assert.equal(appMetadata2.description, description, 'description');
+      assert.equal(appMetadata2.maintainer, maintainer, 'maintainer');
+      assert.equal(appMetadata2.hash, hash, 'hash');
+      assert.equal(appMetadata2.host, host, 'host');
     }
   });
 

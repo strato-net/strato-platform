@@ -1,3 +1,4 @@
+/* jshint esnext: true */
 const blockappsRest = require('blockapps-rest').rest;
 
 /**

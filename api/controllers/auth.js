@@ -1,3 +1,4 @@
+/* jshint esnext: true */
 const bcrypt = require('bcrypt');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
@@ -56,14 +57,14 @@ module.exports = {
         err.status = 401;
         return next(err);
       } else {
-        bcrypt.compare(password, user['passwordHash'], function (err, passIsCorrect) {
+        bcrypt.compare(password, user.passwordHash, function (err, passIsCorrect) {
           if (err) {
             return next(err);
           } else {
             if (!passIsCorrect) {
-              let err = new Error(authErrorText);
-              err.status = 401;
-              return next(err);
+              let err2 = new Error(authErrorText);
+              err2.status = 401;
+              return next(err2);
             } else {
               sendLoginResponse(res, user);
             }
@@ -127,7 +128,7 @@ module.exports = {
 
       // Add developer role to new user
       yield newUser.addRole(developerRole);
-      newUser['Roles'] = [developerRole]; // dirty trick to prevent .toJson() error; todo: refactor
+      newUser.Roles = [developerRole]; // dirty trick to prevent .toJson() error; todo: refactor
 
       // Create blockchain user in bloc
       let blocUser;
@@ -146,6 +147,6 @@ module.exports = {
       yield newUser.save({fields: ['accountAddress']});
 
       sendLoginResponse(res, newUser);
-    })
+    });
   }
 };
