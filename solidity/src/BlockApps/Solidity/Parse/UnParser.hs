@@ -14,8 +14,6 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
 
-import           Debug.Trace
-
 import           BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Xabi.Type
 import qualified BlockApps.Solidity.Xabi.Def as Xabi
@@ -26,7 +24,7 @@ sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
 unparse :: [(Text, (Xabi, [Text]))] -> String
-unparse contracts = List.concat $ List.map (traceShowId . unparseContract) contracts
+unparse contracts = List.concat $ List.map unparseContract contracts
 
 unparseContract :: (Text, (Xabi, [Text])) -> String
 unparseContract (name, (contract,inherited)) =
