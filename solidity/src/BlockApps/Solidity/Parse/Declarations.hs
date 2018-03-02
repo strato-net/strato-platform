@@ -14,6 +14,7 @@ import           Data.Maybe
 import           Data.Text                            (Text)
 import qualified Data.Text                            as Text
 --import           Data.Char
+import           Debug.Trace
 
 import           Text.Parsec
 -- import           Text.Parsec.Perm
@@ -44,7 +45,7 @@ solidityContract = do
       consArgs <- option "" parensCode
       return (name, consArgs)
   declarations <-
-    braces (many solidityDeclaration)
+    braces (many solidityDeclaration >>= return . traceShowId)
 
   let allFunctions = Map.fromList
                      [ (Text.pack n, f) | (n, FuncDeclaration f) <- declarations]

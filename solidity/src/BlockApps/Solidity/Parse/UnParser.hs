@@ -14,6 +14,8 @@ import           Data.Map                   ()
 import qualified Data.Map                   as Map
 import Data.Monoid ((<>))
 
+import           Debug.Trace
+
 import           BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Xabi.Type
 import qualified BlockApps.Solidity.Xabi.Def as Xabi
@@ -24,7 +26,7 @@ sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = List.sortBy (\x y -> f x `compare` f y)
 
 unparse :: [(Text, (Xabi, [Text]))] -> String
-unparse contracts = List.concat $ List.map unparseContract contracts
+unparse contracts = List.concat $ List.map (traceShowId . unparseContract) contracts
 
 unparseContract :: (Text, (Xabi, [Text])) -> String
 unparseContract (name, (contract,inherited)) =
@@ -118,12 +120,22 @@ unparseModifier (name, Modifier{..}) = Text.unpack $
   <> "\n    }"
 
 unparseTypes :: (Text, Xabi.Def) -> String
-unparseTypes (name, Xabi.Enum {names=names'}) = 
+unparseTypes (name, Xabi.Enum {names=names'}) =
   Text.unpack $ "enum "
              <> name
              <> " {\n      "
              <> Text.intercalate ",\n      " names'
              <> "\n    }"
+unparseTypes (name, Xabi.Struct {fields=fields'}) =
+  Text.unpack $ "struct "
+             <> name
+             <> " {\n      "
+             <> Text.intercalate "\n      " (map unparseField $ Map.toList fields')
+             <> "\n    }"
+  where unparseField (fieldName, fieldType) = (Text.pack . unparseVarType $ fieldTypeType fieldType)
+                                           <> " "
+                                           <> fieldName
+                                           <> ";"
 unparseTypes (_name, _def) = ""
 
 unparseArgs :: (Text, IndexedType) -> Text
@@ -138,9 +150,12 @@ unparseVals (name, theType) =
 
 unparseIndexedType :: IndexedType -> Text
 -- unparseIndexedType IndexedType{indexedTypeType = Int True size} = "int" <> show size
-unparseIndexedType IndexedType{indexedTypeType = Int (Just True) _} = "int"
-unparseIndexedType IndexedType{indexedTypeType = Int (Just False) _} = "uint"
-unparseIndexedType IndexedType{indexedTypeType = Int Nothing _} = "uint"
+unparseIndexedType IndexedType{indexedTypeType = Int (Just True) (Just n)} = Text.pack $ "int" <> show (8*n)
+unparseIndexedType IndexedType{indexedTypeType = Int (Just True) Nothing} = "int"
+unparseIndexedType IndexedType{indexedTypeType = Int (Just False) (Just n)} = Text.pack $ "uint" <> show (8*n)
+unparseIndexedType IndexedType{indexedTypeType = Int (Just False) Nothing} = "uint"
+unparseIndexedType IndexedType{indexedTypeType = Int Nothing (Just n)} = Text.pack $ "uint" <> show (8*n)
+unparseIndexedType IndexedType{indexedTypeType = Int Nothing Nothing} = "uint"
 unparseIndexedType IndexedType{indexedTypeType = Bool} = "bool"
 unparseIndexedType IndexedType{indexedTypeType = String _} = "string"
 unparseIndexedType IndexedType{indexedTypeType = Address} = "address"
@@ -149,6 +164,13 @@ unparseIndexedType IndexedType{indexedTypeType = Bytes Nothing (Just bytes) } =
   "bytes" <> (Text.pack . show $ bytes)
 unparseIndexedType IndexedType{indexedTypeType = Label str} = Text.pack str
 unparseIndexedType IndexedType{indexedTypeType = Enum _ name _} = name
+unparseIndexedType IndexedType{indexedTypeType = Array (Just True) _ t} = (unparseIndexedType (IndexedType undefined t))
+                                                                       <> "[]"
+unparseIndexedType IndexedType{indexedTypeType = Array (Just False) (Just n) t} = (unparseIndexedType (IndexedType undefined t))
+                                                                               <> Text.pack ("[" <> show n <> "]")
+unparseIndexedType IndexedType{indexedTypeType = Array Nothing _ t} = (unparseIndexedType (IndexedType undefined t))
+                                                                   <> "[]"
+unparseIndexedType IndexedType{indexedTypeType = Contract contractName} = contractName
 unparseIndexedType _ = "TYPE_NOT_IMPLEMENED"
 
 addFunction :: (Text, String) -> Xabi -> Xabi
