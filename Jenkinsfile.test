@@ -99,6 +99,7 @@ pipeline {
     stage('bloch-tests') {
       steps {
         sh '''#!/bin/bash -le
+          set -x
           echo 'Running BlockApps Haskell tests to verify the build to be healthy'
           # Optimized flow to not rebuild stack each time from the scratch
           if [ ! -d blockapps-haskell ]; then
