@@ -37,6 +37,7 @@ bloc = getHomepage
   :<|> getContractsData
   :<|> getContractsContract
   :<|> getContractsState
+  :<|> getContractsDetails
   :<|> getContractsFunctions
   :<|> getContractsSymbols
   :<|> getContractsStateMapping

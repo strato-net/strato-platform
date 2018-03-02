@@ -404,7 +404,6 @@ spec =
         params1 = accountsFilterParams {qaAddress = Just addr1}
         simpleStorageBytes32ArrayContractName = "SimpleStorageBytes32Array"
         postCompileRequest = PostCompileRequest
-          (Just [simpleStorageBytes32ArrayContractName])
           (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
@@ -539,7 +538,6 @@ spec =
           , ("c" , ArgString "Account Data should be able to be as long as you want ideally 12343432442431")
           ]
         postCompileRequest = PostCompileRequest
-          (Just [simpleStorageBytes32ArrayContractName])
           (Just simpleStorageBytes32ArrayContractName)
           simpleStorageBytes32ArraySrc
         postUsersContractRequest = PostUsersContractRequest
@@ -1157,7 +1155,6 @@ spec =
         paramsIAM = accountsFilterParams {qaAddress = Just iamUserAddr}
         iamName = "IdentityAccessManager"
         postCompileRequest = PostCompileRequest
-          (Just [iamName, "StorageBlob"])
           (Just iamName)
           iamBlob
         postUsersContractRequest = PostUsersContractRequest

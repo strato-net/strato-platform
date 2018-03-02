@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Client
   , getContractsData
   , getContractsContract
   , getContractsState
+  , getContractsDetails
   , getContractsFunctions
   , getContractsSymbols
   , getContractsStateMapping
@@ -64,6 +65,10 @@ getContractsContract = client (Proxy @ GetContractsContract)
 getContractsState
   :: ContractName -> MaybeNamed Address -> Maybe Text -> Maybe Int -> Maybe Int -> Bool -> ClientM (Map Text SolidityValue)
 getContractsState = client (Proxy @ GetContractsState)
+
+getContractsDetails
+  :: Address -> ClientM ContractDetails
+getContractsDetails = client (Proxy @ GetContractsDetails)
 
 getContractsFunctions
   :: ContractName -> MaybeNamed Address -> ClientM [FunctionName]
