@@ -106,6 +106,7 @@ pipeline {
             git clone https://github.com/blockapps/blockapps-haskell.git
           fi
           cd blockapps-haskell
+          git remote update origin --prune
           git checkout $(cd ../repos/blockapps-haskell && git rev-parse --abbrev-ref HEAD) # use same branch as Basilfile
           git pull
           stack test blockapps-bloc22-server

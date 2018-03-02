@@ -114,18 +114,20 @@ pipeline {
     stage('bloch-tests') {
       steps {
         sh '''#!/bin/bash -le
-          set -x
-          echo 'Running BlockApps Haskell tests to verify the build to be healthy'
-          # Optimized flow to not rebuild stack each time from the scratch
-          if [ ! -d blockapps-haskell ]; then
-            git clone https://github.com/blockapps/blockapps-haskell.git
-          fi
-          cd blockapps-haskell
-          git checkout $(cd ../repos/blockapps-haskell && git rev-parse --abbrev-ref HEAD) # use same branch as Basilfile
-          git pull
-          stack test blockapps-bloc22-server
-          stack test blockapps-solidity --test-arguments="--match=Declarations"
-          stack test blockapps-bloc22-client
+        set -x
+        echo "SKIPPING BlockApps Haskell test (has to be changed to not build blockapps-haskell each time after we silo folder on full build"
+#          echo 'Running BlockApps Haskell tests to verify the build to be healthy'
+#          # Optimized flow to not rebuild stack each time from the scratch
+#          if [ ! -d blockapps-haskell ]; then
+#            git clone https://github.com/blockapps/blockapps-haskell.git
+#          fi
+#          cd blockapps-haskell
+#          git remote update origin --prune
+#          git checkout $(cd ../repos/blockapps-haskell && git rev-parse --abbrev-ref HEAD) # use same branch as Basilfile
+#          git pull
+#          stack test blockapps-bloc22-server
+#          stack test blockapps-solidity --test-arguments="--match=Declarations"
+#          stack test blockapps-bloc22-client
         '''
       }
     }
