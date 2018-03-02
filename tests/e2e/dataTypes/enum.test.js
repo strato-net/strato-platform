@@ -29,7 +29,7 @@ describe('enum data type: positive case:', function () {
 
   it('should upload the storage contract with constructor arguments', function* () {
     const state = yield rest.getState(contract);
-    state.storedData = ErrorCodes[util.parseEnum(state.storedData)]; //
+    state.storedData = state.storedData;
     assert.equal(state.storedData, constructorArgs._storedData, 'storedData');
     assert.equal(state.storedDatum.length, 0, 'storedDatum');
   });
@@ -46,16 +46,15 @@ describe('enum data type: positive case:', function () {
     const args = {value: ErrorCodes.EXISTS};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
+    state.storedData = state.storedData;
     assert.equal(state.storedData, args.value, 'enum returned from get()');
   });
 
   it('set (enum) string', function* () {
     const methodName = 'set';
-    const args = {value: ' ' + ErrorCodes.EXISTS};
+    const args = {value: ErrorCodes.EXISTS};
     const returnsArray = yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    state.storedData = ErrorCodes[util.parseEnum(state.storedData)];
     assert.equal(state.storedData, args.value, 'enum returned from get()');
   });
 
@@ -65,9 +64,7 @@ describe('enum data type: positive case:', function () {
     const args = {values: [ErrorCodes.SUCCESS, ErrorCodes.ERROR, ErrorCodes.EXISTS]};
     yield rest.callMethod(adminUser, contract, methodName, args);
     const state = yield rest.getState(contract);
-    const storedDatum = state.storedDatum.map(function(member) {
-      return ErrorCodes[util.parseEnum(member)];
-    });
+    const storedDatum = parseIntArray(state.storedDatum);
     assert.deepEqual(storedDatum, args.values, 'after calling setArray (enum[])');
     // get array
     const returnsArray = yield rest.callMethod(adminUser, contract, 'getArray');
@@ -93,10 +90,8 @@ describe('enum data type: positive case:', function () {
     assert.deepEqual(parseIntArray(returnsArray[1]), args.values);
     // check the struct state
     const state = yield rest.getState(contract);
-    const value = ErrorCodes[util.parseEnum(state.storedStruct.value)];
-    const values = state.storedStruct.values.map(function(member) {
-      return ErrorCodes[util.parseEnum(member)];
-    });
+    const value = state.storedStruct.value;
+    const values = parseIntArray(state.storedStruct.values);
     assert.equal(value, args.value);
     assert.deepEqual(values, args.values);
   });
@@ -113,11 +108,9 @@ describe('enum data type: positive case:', function () {
     const state = yield rest.getState(contract);
     assert.equal(state.storedStructs.length, args.count, 'count');
     state.storedStructs.map(function(storedStruct) {
-      const value = ErrorCodes[util.parseEnum(storedStruct.value)];
+      const value = storedStruct.value;
       assert.equal(value, args.value, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
-      const values = storedStruct.values.map(function(member) {
-        return ErrorCodes[util.parseEnum(member)];
-      });
+      const values = parseIntArray(storedStruct.values);
       assert.deepEqual(values, args.values, 'Struct Array - See issue API-8 (https://blockapps.atlassian.net/browse/API-8)');
     })
   });
