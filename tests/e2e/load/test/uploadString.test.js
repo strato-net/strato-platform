@@ -42,6 +42,38 @@ describe('LOAD TEST: Upload from string', function() {
     const results = rest.query(`${contractName}?address=eq.${contract.address}`);
   });
 
+  it.only(`Stack Depth 1:`, function * () {
+    const uid = util.uid();
+    const contractName = 'StackDepth';
+    const contractFilename = `${config.libPath}/contracts/StackDepth.sol`;
+
+    const args = {
+      _s0: 's0_' + uid,
+      _s1: 's1_' + uid,
+      _s2: 's2_' + uid,
+      _s3: 's3_' + uid,
+      _s4: 's4_' + uid,
+      _s5: 's5_' + uid,
+      _s6: 's6_' + uid,
+      _s7: 's7_' + uid,
+      _s8: 's8_' + uid,
+      _s9: 's9_' + uid,
+      _u0: 1000,
+      _u1: 1001,
+      _u2: 1002,
+      _u3: 1003,
+      _u4: 1004,
+      _u5: 1005,
+      _u6: 1006,
+      _u7: 1007,
+      _u8: 1008,
+      _u9: 1009,
+    };
+    const contract = yield rest.uploadContract(admin, contractName, contractFilename, args);
+    const state = yield rest.getState(contract);
+    const results = rest.query(`${contractName}?address=eq.${contract.address}`);
+  });
+
   it.skip(`Upload simple - from string:`, function * () {
     const uid = util.uid();
     const contractName = 'TitleCA';
@@ -114,7 +146,7 @@ describe('LOAD TEST: Upload from string', function() {
     printTiming(startTime, batchCount, batchSize);
   });
 
-  it.only(`Upload from json array: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
+  it(`Upload from json array: with NONCE:  Batch size: ${batchSize}, Batch count ${batchCount}`, function * () {
     const uid = util.uid();
     const titlesJsonArray = createTitlesJsonArray(batchSize, batchCount);
     console.log('titlesJsonArray', titlesJsonArray);
@@ -132,7 +164,7 @@ describe('LOAD TEST: Upload from string', function() {
       const titleJson = titlesJsonArray[i];
       const contractName = 'Title_' + uid;
       const contractString = createContractStringFromJson(contractName, titleJson);
-      console.log(contractString);
+      // console.log(contractString);
 
       const args = {vin: titleJson.vin};
       const txParams = {nonce: nonce+i};
@@ -145,7 +177,7 @@ describe('LOAD TEST: Upload from string', function() {
   });
 });
 
-function createTitlesJsonArray(count) {
+function createTitlesJsonArray(fields, count) {
   const jsonArray = [];
   for (var i = 0; i < count; i++) {
     const json = {
@@ -161,11 +193,13 @@ function createTitlesJsonArray(count) {
 }
 
 function getTemplate() {
-  const template = ''+
-  'contract _contractName_ { \n' +
-  '  string public vin; \n'+
+  const template = '\n'+
+  'contract TitleMT { \n' +
   '  uint public amount; \n'+
   '  string public name; \n'+
+  '} \n' +
+  'contract _contractName_ is TitleMT{ \n' +
+  '  string public vin; \n'+
   '  function _contractName_(string _vin) public { \n'+
   '    vin = _vin; \n'+
   '  } \n'+
@@ -177,7 +211,7 @@ function createContractStringFromJson(contractName, titlesJson) {
   var template = getTemplate();
   template = template.replace(new RegExp('_contractName_', 'g'), contractName);
   for (field in titlesJson.data) {
-    console.log(field, titlesJson.data[field]);
+    // console.log(field, titlesJson.data[field]);
     template = template.replace(` ${field};`, ` ${field} = ${titlesJson.data[field]};`);
   }
   return template;
