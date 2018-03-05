@@ -74,7 +74,7 @@ describe('App', function() {
         });
     });
 
-    it('400s when missing an arg', function(done) {
+    xit('400s when missing an arg', function(done) {
       chai.request(app)
           .post('/dapps')
           .send({username: "dev",
