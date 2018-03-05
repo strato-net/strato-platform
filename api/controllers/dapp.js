@@ -253,17 +253,21 @@ parseInitfile = function(packageFolderPath) {
  * @returns Promise waiting to match variable names to contract addresses
  */
 uploadInitContracts = function(packageFolderPath, creds, inits) {
-  return new Promise(function(resolve) {
-    co(function*() {
-      const addrs = {};
-      for (var key in inits) {
-        const filename = path.join(packageFolderPath, inits[key].contractFilename);
-        let contract = yield blockappsRest.uploadContract(
-              creds, inits[key].contractName, filename, inits[key].args);
-        addrs[key] = contract.address
-      }
-      resolve(addrs);
-    });
+  return new Promise(function(resolve, reject) {
+    try {
+      co(function*() {
+        const addrs = {};
+        for (var key in inits) {
+          const filename = path.join(packageFolderPath, inits[key].contractFilename);
+          let contract = yield blockappsRest.uploadContract(
+                creds, inits[key].contractName, filename, inits[key].args);
+          addrs[key] = contract.address
+        }
+        resolve(addrs);
+      });
+    catch (error) {
+      reject(error);
+    }
   });
 }
 
