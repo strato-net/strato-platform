@@ -133,7 +133,7 @@ module.exports = {
       // Create blockchain user in bloc
       let blocUser;
       try {
-        blocUser = yield blockappsRest.createUser(username, password);
+        blocUser = yield blockappsRest.createUser(username, password, true);
       } catch(blocError) {
         newUser.destroy();
         // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
