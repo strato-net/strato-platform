@@ -19,13 +19,15 @@ import './application.css'
 
 class Applications extends Component {
 
-  componentDidMount() {
+  componentWillMount() {
     // I am really sorry for this. But time.
     const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
     if(!this.props.isLoggedIn && !developerSignIn) {
       window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
     }
+  }
 
+  componentDidMount() {
     mixpanelWrapper.track('launchpad_load');
     this.props.fetchApplications();
     this.startPoll();
