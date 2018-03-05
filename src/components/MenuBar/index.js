@@ -34,7 +34,7 @@ class MenuBar extends Component {
         <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
           this.props.openWalkThroughOverlay(false);
-        }} text="For Developers" className="pt-button pt-minimal pt-small menubar-button" />
+        }} text="Sign up" className="pt-button pt-minimal pt-small menubar-button" />
       )
     }
   }

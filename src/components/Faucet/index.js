@@ -73,7 +73,7 @@ class Faucet extends Component {
             />
             {this.props.isWalkThrough ?
               <Button
-                text="Email sent?"
+                text="Email sent"
                 intent={Intent.PRIMARY}
                 onClick={this.props.handleEmailSentClick}
                 disabled={this.state.disabled}
