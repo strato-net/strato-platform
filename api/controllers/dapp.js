@@ -76,6 +76,38 @@ checkFileCompiles = function(directory, fileName) {
 };
 
 /**
+ * Rewrite the error message in the case of an upload failure.
+ * @param loc String a description of where inboundErr was caught
+ * @param inboundErr Error an error caught from
+ * @returns Error
+ */
+uploadFailure = function(loc, inboundErr) {
+    const outboundErr = new Error(loc);
+    switch (inboundErr.status) {
+      case 404:
+        outboundErr.message += ': wrong username or address';
+        outboundErr.status = 401;
+        break;
+      case 400:
+        if (inboundErr.data === 'incorrect password') {
+          outboundErr.message += ': incorrect password';
+          outboundErr.status = 401;
+        } else if (inboundErr.data.includes('no user found with name')) {
+          outboundErr.message += ': user does not exist on the node';
+          outboundErr.status = 401;
+        } else if (inboundErr.data.includes('address does not exist for user')) {
+          outboundErr.message += ': wrong address provided for the user';
+          outboundErr.status = 401;
+        } else if (inboundErr.data === 'strato error: failed to find account') {
+          outboundErr.message += ': account does not have any ether';
+          outboundErr.status = 400;
+        }
+        // TODO: check if user has not enough ether (e.g. just few wei)
+        break;
+    }
+    return outboundErr;
+}
+/**
  * Register the dapp on the blockchain
  * @param username String
  * @param address String
@@ -103,31 +135,8 @@ registerDapp = function*(username, address, password, packageMetadata, hash, hos
     return yield appMetadata.uploadContract(userCredentials, args);
   } catch (error) {
     console.warn('appMetadata contract upload error:', error);
-    let err = new Error('could not register application on the blockchain');
-    // the only possible error handling for current bloc errors
-    switch (error.status) {
-      case 404:
-        err.message += ': wrong username or address';
-        err.status = 401;
-        break;
-      case 400:
-        if (error.data === 'incorrect password') {
-          err.message += ': incorrect password';
-          err.status = 401;
-        } else if (error.data.includes('no user found with name')) {
-          err.message += ': user does not exist on the node';
-          err.status = 401;
-        } else if (error.data.includes('address does not exist for user')) {
-          err.message += ': wrong address provided for the user';
-          err.status = 401;
-        } else if (error.data === 'strato error: failed to find account') {
-          err.message += ': account does not have any ether';
-          err.status = 400;
-        }
-        // TODO: check if user has not enough ether (e.g. just few wei)
-        break;
-    }
-    throw(err);
+
+    throw uploadFailure('could not register application on the blockchain', error);
   }
 };
 
@@ -265,8 +274,8 @@ uploadInitContracts = function(packageFolderPath, creds, inits) {
         }
         resolve(addrs);
       });
-    catch (error) {
-      reject(error);
+    } catch (error) {
+      reject(uploadFailure("could not initialize contracts", error));
     }
   });
 }
