@@ -12,6 +12,7 @@ sed -i -e 's|__blocUrl__|'"${blocRoot}"'|g' config-prod.yaml
 sed -i -e 's|__searchUrl__|'"${cirrusRoot}"'|g' config-prod.yaml
 
 export STRATO_GS_MODE=${STRATO_GS_MODE} # to be available from js
+export PROD_DEV_MODE=${PROD_DEV_MODE:-false} # to be available from js
 
 echo 'Waiting for bloc to be available...'
 until curl --silent --output /dev/null --fail --location ${blocRoot}
