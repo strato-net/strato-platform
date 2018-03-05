@@ -19,7 +19,7 @@ class WalkThrough extends Component {
     this.state = {
       currentModal: 'CreateUser',
       step: 0,
-      isBackClicked: false, 
+      isBackClicked: false,
     }
     this.handleBackToFaucet = this.handleBackToFaucet.bind(this);
     this.handleEmailSentClick = this.handleEmailSentClick.bind(this);
@@ -88,7 +88,7 @@ class WalkThrough extends Component {
             />}
 
             {this.state.currentModal === "CLI" && <CLI handleBack={this.handleBackToFaucet} handleContinue={
-                () => this.setState({ currentModal: "Completed", step: 3 })} />}
+              () => this.setState({ currentModal: "Completed", step: 3 })} />}
 
             {this.state.currentModal === "Completed" &&
               <Congrats closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} handleBack={
