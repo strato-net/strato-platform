@@ -9,14 +9,7 @@ exports[`MenuBar: index button execute block api 1`] = `
 </button>
 `;
 
-exports[`MenuBar: index button execute for developer 1`] = `
-<Blueprint.Button
-  className="pt-button pt-minimal pt-small menubar-button"
-  id="Login-button"
-  onClick={[Function]}
-  text="For Developers"
-/>
-`;
+exports[`MenuBar: index button execute for developer 1`] = `null`;
 
 exports[`MenuBar: index button execute logout 1`] = `
 <button
@@ -25,14 +18,6 @@ exports[`MenuBar: index button execute logout 1`] = `
 >
   Logout
 </button>
-`;
-
-exports[`MenuBar: index button execute signup 1`] = `
-<Blueprint.Button
-  className="pt-button pt-minimal pt-small menubar-button"
-  onClick={[Function]}
-  text="Sign Up"
-/>
 `;
 
 exports[`MenuBar: index button execute stato api 1`] = `
