@@ -74,10 +74,8 @@ class Dashboard extends Component {
           title="DApps"
           actions={
             <div>
-              {!this.checkAuth() ?
-                <Button raised onClick={() => this.navigate('/login')} className="developers-button">For Developers</Button>
-                : <Button icon onClick={() => this.navigate('/profile')}><FontIcon iconClassName="fa fa-user-circle" /></Button>
-              }
+              <Button raised onClick={() => this.navigate(`${window.location.protocol}//${window.location.hostname}/apps?developer`)} className="developers-button">For Developers</Button>
+              <Button icon onClick={() => this.navigate('/profile')}><FontIcon iconClassName="fa fa-user-circle" /></Button>
             </div>
           }
         />
