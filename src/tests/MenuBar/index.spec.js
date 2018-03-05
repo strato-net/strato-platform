@@ -91,27 +91,6 @@ describe('MenuBar: index', () => {
       const props = {
         currentUser: { username: 'tanuj44' },
         isLoggedIn: false,
-        openOverlay: jest.fn(),
-        openLoginOverlay: jest.fn()
-      }
-
-      let wrapper = shallow(
-        <Provider store={store}>
-          <MemoryRouter>
-            <MenuBar.WrappedComponent {...props} />
-          </MemoryRouter>
-        </Provider>
-      ).dive().dive().dive();
-
-      wrapper.find('Button').first().simulate('click');
-      expect(wrapper.find('Button').get(0)).toMatchSnapshot();
-      expect(props.openLoginOverlay).toHaveBeenCalled();
-    });
-
-    test('execute signup', () => {
-      const props = {
-        currentUser: { username: 'tanuj44' },
-        isLoggedIn: false,
         openLoginOverlay: jest.fn(),
         openWalkThroughOverlay: jest.fn()
       }
