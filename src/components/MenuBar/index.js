@@ -32,19 +32,9 @@ class MenuBar extends Component {
     if (!this.props.isLoggedIn) {
       return (
         <Button onClick={() => {
-          this.props.openLoginOverlay();
-        }} className="pt-button pt-minimal pt-small menubar-button" id="Login-button" text={'For Developers'} />
-      );
-    }
-  }
-
-  renderSignup() {
-    if (!this.props.isLoggedIn) {
-      return (
-        <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
           this.props.openWalkThroughOverlay(false);
-        }} text="Sign Up" className="pt-button pt-minimal pt-small menubar-button" />
+        }} text="For Developers" className="pt-button pt-minimal pt-small menubar-button" />
       )
     }
   }
@@ -69,7 +59,6 @@ class MenuBar extends Component {
         </div>
         <div className="pt-navbar-group pt-align-right">
           {this.renderDeveloperButton()}
-          {this.renderSignup()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">v{process.env.REACT_APP_VERSION} </small>
           <span className="pt-navbar-divider" />
