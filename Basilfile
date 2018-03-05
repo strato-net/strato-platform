@@ -54,6 +54,7 @@ deployments:
         NODE_HOST: "${NODE_HOST}"
         SINGLE_NODE: "${SINGLE_NODE}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
+        PROD_DEV_MODE: "${PROD_ENV_MODE:-false}"
         blocHost: "bloch:8000"
         cirrusHost: "cirrus:3333"
         stratoHost: "strato:3000"
