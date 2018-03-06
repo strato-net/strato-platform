@@ -298,7 +298,7 @@ injectAddressesJs = async function(packageFolderPath, addrs) {
   lines.push("};\n");
   const text = lines.join('\n');
   const name = path.join(packageFolderPath, "addresses.js");
-  await fs.writeFileSync(name, text);
+  await fs.writeFile(name, text);
   return name;
 }
 
