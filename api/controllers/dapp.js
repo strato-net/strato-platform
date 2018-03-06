@@ -467,16 +467,29 @@ upload = function (req, res, next) {
       // By uploading the contracts configured by the initfile,
       // we can supply the contract addresses to static
       // files on behalf of developers.
-      const inits = yield parseInitfile(packageTmpFolder);
+      let inits = {};
+      try {
+        inits = yield parseInitfile(packageTmpFolder);
+      } catch (error) {
+        let err = new Error('initfile.json parsing failed:' + error);
+        err.status = 400;
+        return next(err);
+      }
       if (Object.keys(inits).length > 0) {
-        const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
-        const name = yield injectAddressesJs(packageTmpFolder, addrs);
-        // /usr/bin/zip helpfully adds a .zip extension if you neglected
-        // to add one, meaning that it can't address a file named by naked hash.
-        yield fs.rename(file.path, file.path + ".zip");
-        file.path = file.path + ".zip";
-        tempPaths.push(file.path);
-        yield zipAddFile(file.path, name);
+        try {
+          const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
+          const name = yield injectAddressesJs(packageTmpFolder, addrs);
+          // /usr/bin/zip helpfully adds a .zip extension if you neglected
+          // to add one, meaning that it can't address a file named by naked hash.
+          yield fs.rename(file.path, file.path + ".zip");
+          file.path = file.path + ".zip";
+          tempPaths.push(file.path);
+          yield zipAddFile(file.path, name);
+        } catch (error) {
+          let err = new Error('initfile.json upload failed: ' + error);
+          err.status = 500;
+          return next(err);
+        }
       }
 
       const zipHash = yield getFileHash(file.path);
