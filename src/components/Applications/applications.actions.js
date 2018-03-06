@@ -4,6 +4,8 @@ export const FETCH_APPLICATIONS_FAILURE = 'FETCH_APPLICATIONS_FAILURE';
 export const LAUNCH_APP = 'LAUNCH_APP';
 export const LAUNCH_APP_SUCCESSFUL = 'LAUNCH_APP_SUCCESSFUL';
 export const LAUNCH_APP_FAILURE = 'LAUNCH_APP_FAILURE';
+export const SELECT_APP = 'SELECT_APP'
+export const RESET_SELECTED_APP = 'RESET_SELECTED_APP'
 
 export const fetchApplications = () => {
   return {
@@ -44,5 +46,18 @@ export const launchAppFailure = (error) => {
   return {
     type: LAUNCH_APP_FAILURE,
     error
+  }
+}
+
+export const selectApp = (app) => {
+  return {
+    type: SELECT_APP,
+    app
+  }
+}
+
+export const resetSelectedApp = () => {
+  return {
+    type: RESET_SELECTED_APP,
   }
 }

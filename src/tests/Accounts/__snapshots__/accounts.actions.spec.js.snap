@@ -103,7 +103,6 @@ Object {
 exports[`Accounts: action fetch faucet request 1`] = `
 Object {
   "address": "76a3192ce9aa0531fe7e0e3489a469018c0bff03",
-  "name": "tanuj",
   "type": "FAUCET_REQUEST",
 }
 `;

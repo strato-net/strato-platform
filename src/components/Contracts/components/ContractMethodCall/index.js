@@ -41,7 +41,7 @@ class ContractMethodCall extends Component {
   }
 
   submit = (values) => {
-    
+
     const payload = {
       contractName: this.props.contractName,
       contractAddress: this.props.contractAddress,
@@ -61,7 +61,7 @@ class ContractMethodCall extends Component {
   }
 
   handleUsernameChange = (e) => {
-    this.props.fetchUserAddresses(e.target.value,false)
+    this.props.fetchUserAddresses(e.target.value, false)
   };
 
   render() {
@@ -70,9 +70,9 @@ class ContractMethodCall extends Component {
 
     const users = Object.getOwnPropertyNames(this.props.accounts);
 
-    const userAddresses = this.props.accounts && this.props.modalUsername ?
-      Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
-      : null;
+    // const userAddresses = this.props.accounts && this.props.modalUsername ?
+    //   Object.getOwnPropertyNames(this.props.accounts[this.props.modalUsername])
+    //   : null;
 
     if (this.props.modal.args && Object.getOwnPropertyNames(this.props.modal.args).length > 0) {
       const args = Object.getOwnPropertyNames(this.props.modal.args);
@@ -138,8 +138,9 @@ class ContractMethodCall extends Component {
                       className="pt-input"
                       name="modalUsername"
                       component="select"
-                      onChange = {this.handleUsernameChange}
+                      onChange={this.handleUsernameChange}
                       validate={required}
+                      disabled
                       required
                     >
                       <option />
@@ -167,10 +168,11 @@ class ContractMethodCall extends Component {
                       component="select"
                       name="modalAddress"
                       validate={required}
+                      disabled
                       required
                     >
-                      <option />
-                      {
+                      <option value={this.props.currentUser.accountAddress}>{this.props.currentUser.accountAddress}</option>
+                      {/* {
                         userAddresses ?
                           userAddresses.map((address, i) => {
                             return (
@@ -178,7 +180,7 @@ class ContractMethodCall extends Component {
                             )
                           })
                           : ''
-                      }
+                      } */}
                     </Field>
                   </div>
                 </div>
@@ -283,12 +285,17 @@ export function mapStateToProps(state, ownProps) {
       && state.methodCall.modals[ownProps.lookup] ?
       state.methodCall.modals[ownProps.lookup] : {},
     accounts: state.accounts.accounts,
+    currentUser: state.user.currentUser,
+    initialValues: {
+      modalUsername: state.user.currentUser.username,
+      modalAddress: state.user.currentUser.accountAddress
+    },
     modalUsername: selector(state, 'modalUsername')
   };
 }
 
 
-const formed = reduxForm({ form: 'contract-method-call', validate})(ContractMethodCall);
+const formed = reduxForm({ form: 'contract-method-call', validate })(ContractMethodCall);
 const connected = connect(
   mapStateToProps,
   {

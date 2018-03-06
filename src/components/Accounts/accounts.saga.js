@@ -23,7 +23,6 @@ import {
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
-import { delay } from 'redux-saga'
 
 const accountDataUrl = env.STRATO_URL + "/account?address=:address";
 const addressUrl = env.BLOC_URL + '/users/:user';
@@ -148,8 +147,8 @@ export function* faucetAccount(action) {
   try {
     yield call(postFaucet, action.address);
     yield put(faucetSuccess());
-    yield call(delay, 100)
-    yield put(fetchAccountDetail(action.name, action.address));
+    // yield call(delay, 100)
+    // yield put(fetchAccountDetail(action.name, action.address));
   }
   catch (err) {
     yield put(faucetFailure(err))

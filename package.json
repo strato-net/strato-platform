@@ -1,6 +1,6 @@
 {
   "name": "smd-ui",
-  "version": "0.4.5",
+  "version": "0.5.0",
   "private": true,
   "homepage": "/dashboard/",
   "dependencies": {
@@ -13,6 +13,7 @@
     "moment": "2.18.1",
     "moment-timezone": "^0.5.14",
     "plottable": "3.1.1",
+    "query-string": "^5.1.0",
     "react": "^15.5.4",
     "react-addons-css-transition-group": "15.5.2",
     "react-copy-to-clipboard": "^5.0.1",
@@ -71,7 +72,7 @@
     ],
     "verbose": true,
     "moduleNameMapper": {
-      "\\.(css|less|png)$": "identity-obj-proxy"
+      "\\.(css|less|png|pdf)$": "identity-obj-proxy"
     }
   }
 }

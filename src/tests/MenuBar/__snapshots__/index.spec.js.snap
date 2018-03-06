@@ -9,6 +9,17 @@ exports[`MenuBar: index button execute block api 1`] = `
 </button>
 `;
 
+exports[`MenuBar: index button execute for developer 1`] = `null`;
+
+exports[`MenuBar: index button execute logout 1`] = `
+<button
+  className="pt-button pt-minimal pt-small"
+  onClick={[Function]}
+>
+  Logout
+</button>
+`;
+
 exports[`MenuBar: index button execute stato api 1`] = `
 <button
   className="pt-button pt-minimal pt-small"
@@ -18,7 +29,16 @@ exports[`MenuBar: index button execute stato api 1`] = `
 </button>
 `;
 
-exports[`MenuBar: index mapStateToProps 1`] = `Object {}`;
+exports[`MenuBar: index mapStateToProps 1`] = `
+Object {
+  "currentUser": Object {
+    "address": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "id": 6,
+    "username": "tanuj41",
+  },
+  "isLoggedIn": true,
+}
+`;
 
 exports[`MenuBar: index render component 1`] = `
 "<nav className=\\"pt-navbar pt-dark smd-menu-bar\\">
@@ -35,6 +55,7 @@ exports[`MenuBar: index render component 1`] = `
     </div>
   </div>
   <div className=\\"pt-navbar-group pt-align-right\\">
+    <span className=\\"pt-navbar-divider\\" />
     <small className=\\"pt-text-muted\\">
       v
        
@@ -50,6 +71,22 @@ exports[`MenuBar: index render component 1`] = `
         STRATO API
       </button>
     </a>
+    <div>
+      <span className=\\"pt-navbar-divider\\" />
+      <small className=\\"pt-text-muted welcome-user\\">
+         Welcome, 
+        tanuj44
+         
+      </small>
+      <span className=\\"pt-navbar-divider\\" />
+      <a target=\\"_blank\\" rel=\\"noopener noreferrer\\">
+        <button className=\\"pt-button pt-minimal pt-small\\" onClick={[Function: onClick]}>
+          Logout
+        </button>
+      </a>
+    </div>
   </div>
+  <withRouter(Connect(ReduxForm)) />
+  <withRouter(Connect(ReduxForm)) />
 </nav>"
 `;

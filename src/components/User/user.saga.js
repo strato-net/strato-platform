@@ -1,0 +1,86 @@
+import {
+  takeEvery,
+  put,
+  call
+} from 'redux-saga/effects';
+import {
+  LOGIN_REQUEST,
+  LOGOUT_REQUEST,
+  loginSuccess,
+  loginFailure,
+  logoutSuccess
+} from './user.actions';
+import { env } from '../../env';
+
+const loginUrl = env.APEX_URL + "/login";
+const logoutUrl = env.APEX_URL + "/logout";
+
+function loginRequest(username, password) {
+  return fetch(
+    loginUrl,
+    {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
+function logoutAccount() {
+  return fetch(
+    logoutUrl,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    })
+}
+
+function* login(action) {
+  try {
+    const response = yield call(loginRequest, action.username, action.password);
+    if (!response.error) {
+      yield put(loginSuccess(action.username, response.user));
+      localStorage.setItem('token', JSON.stringify(response.user));
+    } else {
+      yield put(loginFailure(action.username, response.error.message));
+    }
+  } catch (err) {
+    yield put(loginFailure(action.username, err));
+  }
+}
+
+function* logout() {
+  try {
+    yield call(logoutAccount);
+    localStorage.removeItem('token');
+    yield put(logoutSuccess());
+  } catch (err) {
+    // Handle when you have error on logout
+  }
+}
+
+export default function* watchFetchUser() {
+  yield [
+    takeEvery(LOGIN_REQUEST, login),
+    takeEvery(LOGOUT_REQUEST, logout)
+  ];
+}

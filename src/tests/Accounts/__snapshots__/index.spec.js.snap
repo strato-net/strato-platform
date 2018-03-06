@@ -193,7 +193,6 @@ ShallowWrapper {
               className="pt-button-group"
             >
               <withRouter(Connect(ReduxForm)) />
-              <withRouter(Connect(ReduxForm)) />
             </div>
           </div>
         </div>,
@@ -304,7 +303,6 @@ ShallowWrapper {
                 className="pt-button-group"
               >
                 <withRouter(Connect(ReduxForm)) />
-                <withRouter(Connect(ReduxForm)) />
               </div>
             </div>,
           ],
@@ -345,7 +343,6 @@ ShallowWrapper {
                 className="pt-button-group"
               >
                 <withRouter(Connect(ReduxForm)) />
-                <withRouter(Connect(ReduxForm)) />
               </div>,
               "className": "col-sm-8 text-right",
             },
@@ -355,33 +352,19 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": Array [
-                  <withRouter(Connect(ReduxForm)) />,
-                  <withRouter(Connect(ReduxForm)) />,
-                ],
+                "children": <withRouter(Connect(ReduxForm)) />,
                 "className": "pt-button-group",
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {},
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {},
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-              ],
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {},
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
             "type": "div",
@@ -770,7 +753,6 @@ ShallowWrapper {
                 className="pt-button-group"
               >
                 <withRouter(Connect(ReduxForm)) />
-                <withRouter(Connect(ReduxForm)) />
               </div>
             </div>
           </div>,
@@ -881,7 +863,6 @@ ShallowWrapper {
                   className="pt-button-group"
                 >
                   <withRouter(Connect(ReduxForm)) />
-                  <withRouter(Connect(ReduxForm)) />
                 </div>
               </div>,
             ],
@@ -922,7 +903,6 @@ ShallowWrapper {
                   className="pt-button-group"
                 >
                   <withRouter(Connect(ReduxForm)) />
-                  <withRouter(Connect(ReduxForm)) />
                 </div>,
                 "className": "col-sm-8 text-right",
               },
@@ -932,33 +912,19 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": Array [
-                    <withRouter(Connect(ReduxForm)) />,
-                    <withRouter(Connect(ReduxForm)) />,
-                  ],
+                  "children": <withRouter(Connect(ReduxForm)) />,
                   "className": "pt-button-group",
                 },
                 "ref": null,
-                "rendered": Array [
-                  Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "function",
-                    "props": Object {},
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
-                  Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "function",
-                    "props": Object {},
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
-                ],
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "function",
+                  "props": Object {},
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
+                },
                 "type": "div",
               },
               "type": "div",
@@ -1505,7 +1471,6 @@ ShallowWrapper {
             <div
               className="pt-button-group"
             >
-              <withRouter(Connect(ReduxForm)) />
               <withRouter(Connect(ReduxForm)) />
             </div>
           </div>
@@ -2153,7 +2118,6 @@ ShallowWrapper {
                 className="pt-button-group"
               >
                 <withRouter(Connect(ReduxForm)) />
-                <withRouter(Connect(ReduxForm)) />
               </div>
             </div>,
           ],
@@ -2194,7 +2158,6 @@ ShallowWrapper {
                 className="pt-button-group"
               >
                 <withRouter(Connect(ReduxForm)) />
-                <withRouter(Connect(ReduxForm)) />
               </div>,
               "className": "col-sm-8 text-right",
             },
@@ -2204,33 +2167,19 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": Array [
-                  <withRouter(Connect(ReduxForm)) />,
-                  <withRouter(Connect(ReduxForm)) />,
-                ],
+                "children": <withRouter(Connect(ReduxForm)) />,
                 "className": "pt-button-group",
               },
               "ref": null,
-              "rendered": Array [
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {},
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-                Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "function",
-                  "props": Object {},
-                  "ref": null,
-                  "rendered": null,
-                  "type": [Function],
-                },
-              ],
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "function",
+                "props": Object {},
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
             "type": "div",
@@ -7187,7 +7136,6 @@ ShallowWrapper {
                 className="pt-button-group"
               >
                 <withRouter(Connect(ReduxForm)) />
-                <withRouter(Connect(ReduxForm)) />
               </div>
             </div>
           </div>,
@@ -7834,7 +7782,6 @@ ShallowWrapper {
                   className="pt-button-group"
                 >
                   <withRouter(Connect(ReduxForm)) />
-                  <withRouter(Connect(ReduxForm)) />
                 </div>
               </div>,
             ],
@@ -7875,7 +7822,6 @@ ShallowWrapper {
                   className="pt-button-group"
                 >
                   <withRouter(Connect(ReduxForm)) />
-                  <withRouter(Connect(ReduxForm)) />
                 </div>,
                 "className": "col-sm-8 text-right",
               },
@@ -7885,33 +7831,19 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": Array [
-                    <withRouter(Connect(ReduxForm)) />,
-                    <withRouter(Connect(ReduxForm)) />,
-                  ],
+                  "children": <withRouter(Connect(ReduxForm)) />,
                   "className": "pt-button-group",
                 },
                 "ref": null,
-                "rendered": Array [
-                  Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "function",
-                    "props": Object {},
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
-                  Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "function",
-                    "props": Object {},
-                    "ref": null,
-                    "rendered": null,
-                    "type": [Function],
-                  },
-                ],
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "function",
+                  "props": Object {},
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
+                },
                 "type": "div",
               },
               "type": "div",

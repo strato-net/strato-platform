@@ -111,11 +111,8 @@ describe('Accounts: action', () => {
   describe('fetch faucet', () => {
 
     test('request', () => {
-      let data = {
-        name: 'tanuj',
-        address: '76a3192ce9aa0531fe7e0e3489a469018c0bff03'
-      };
-      expect(faucetRequest(data.name, data.address)).toMatchSnapshot();
+      let address = '76a3192ce9aa0531fe7e0e3489a469018c0bff03';
+      expect(faucetRequest(address)).toMatchSnapshot();
     });
 
     test('success', () => {

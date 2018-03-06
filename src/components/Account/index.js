@@ -1,7 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { Button } from '@blueprintjs/core';
 import HexText from '../HexText';
 import { faucetRequest } from '../Accounts/accounts.actions';
 
@@ -9,13 +8,13 @@ class Account extends Component {
   //TODO: add an option to faucet the account. Tell user to faucet if account does not exist.
   render() {
     const {
-      name,
+      // name,
       address,
       account
     } = this.props;
 
     return (
-      < div className="pt-card address-margin-bottom" key={address}>
+      <div className="pt-card address-margin-bottom" key={address}>
         <div className="row smd-pad-2 smd-margin-4 smd-vertical-center">
           <div className="col-sm-10">
             <h4>
@@ -23,7 +22,7 @@ class Account extends Component {
             </h4>
           </div>
           <div className="col-sm-2 text-right">
-            <Button
+            {/* <Button
               className="pt-button pt-intent-primary pt-small"
               onClick={(e) => {
                 e.preventDefault();
@@ -31,7 +30,7 @@ class Account extends Component {
                 this.props.faucetRequest(name, address);
               }}>
                 Faucet
-              </Button>
+              </Button> */}
           </div>
         </div>
 

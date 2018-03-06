@@ -3,6 +3,15 @@
 exports[`Launchpad: index mapStateToProps with default state 1`] = `
 Object {
   "accounts": undefined,
+  "currentUser": Object {
+    "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "id": 6,
+    "username": "tanuj41",
+  },
+  "initialValues": Object {
+    "appUserAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+    "appUsername": "tanuj41",
+  },
   "launchPad": Object {
     "appPackage": null,
     "error": "",
@@ -45,6 +54,11 @@ ShallowWrapper {
     clearAsyncError={[Function]}
     clearSubmit={[Function]}
     clearSubmitErrors={[Function]}
+    currentUser={
+      Object {
+        "accountAddress": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+      }
+    }
     destroy={[Function]}
     dirty={false}
     dispatch={[Function]}
@@ -223,6 +237,7 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="appUsername"
                         onChange={[Function]}
                         required={true}
@@ -255,12 +270,17 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="appUserAddress"
                         required={true}
                         validate={[Function]}
                       >
-                        <option />
-                        
+                        <option
+                          value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                        >
+                          86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                        </option>
+                        }
                       </Field>
                     </div>
                   </div>
@@ -565,6 +585,7 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="appUsername"
                         onChange={[Function]}
                         required={true}
@@ -597,12 +618,17 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="appUserAddress"
                         required={true}
                         validate={[Function]}
                       >
-                        <option />
-                        
+                        <option
+                          value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                        >
+                          86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                        </option>
+                        }
                       </Field>
                     </div>
                   </div>
@@ -754,6 +780,7 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="appUsername"
                         onChange={[Function]}
                         required={true}
@@ -786,12 +813,17 @@ ShallowWrapper {
                       <Field
                         className="pt-input"
                         component="select"
+                        disabled={true}
                         name="appUserAddress"
                         required={true}
                         validate={[Function]}
                       >
-                        <option />
-                        
+                        <option
+                          value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                        >
+                          86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                        </option>
+                        }
                       </Field>
                     </div>
                   </div>
@@ -940,6 +972,7 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUsername"
                           onChange={[Function]}
                           required={true}
@@ -972,12 +1005,17 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUserAddress"
                           required={true}
                           validate={[Function]}
                         >
-                          <option />
-                          
+                          <option
+                            value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                          >
+                            86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                          </option>
+                          }
                         </Field>
                       </div>
                     </div>
@@ -1249,6 +1287,7 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="appUsername"
                             onChange={[Function]}
                             required={true}
@@ -1281,12 +1320,17 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="appUserAddress"
                             required={true}
                             validate={[Function]}
                           >
-                            <option />
-                            
+                            <option
+                              value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                            >
+                              86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                            </option>
+                            }
                           </Field>
                         </div>
                       </div>
@@ -1398,6 +1442,7 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUsername"
                               onChange={[Function]}
                               required={true}
@@ -1452,6 +1497,7 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUsername"
                               onChange={[Function]}
                               required={true}
@@ -1471,6 +1517,7 @@ ShallowWrapper {
                             "children": <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUsername"
                               onChange={[Function]}
                               required={true}
@@ -1492,6 +1539,7 @@ ShallowWrapper {
                               ],
                               "className": "pt-input",
                               "component": "select",
+                              "disabled": true,
                               "name": "appUsername",
                               "onChange": [Function],
                               "required": true,
@@ -1543,12 +1591,17 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUserAddress"
                               required={true}
                               validate={[Function]}
                             >
-                              <option />
-                              
+                              <option
+                                value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                              >
+                                86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                              </option>
+                              }
                             </Field>
                           </div>
                         </div>,
@@ -1597,12 +1650,17 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUserAddress"
                               required={true}
                               validate={[Function]}
                             >
-                              <option />
-                              
+                              <option
+                                value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                              >
+                                86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                              </option>
+                              }
                             </Field>
                           </div>,
                           "className": "col-sm-10",
@@ -1616,12 +1674,17 @@ ShallowWrapper {
                             "children": <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUserAddress"
                               required={true}
                               validate={[Function]}
                             >
-                              <option />
-                              
+                              <option
+                                value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                              >
+                                86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                              </option>
+                              }
                             </Field>,
                             "className": "pt-select",
                           },
@@ -1632,11 +1695,16 @@ ShallowWrapper {
                             "nodeType": "class",
                             "props": Object {
                               "children": Array [
-                                <option />,
-                                "",
+                                <option
+                                  value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                                >
+                                  86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                                </option>,
+                                "}",
                               ],
                               "className": "pt-input",
                               "component": "select",
+                              "disabled": true,
                               "name": "appUserAddress",
                               "required": true,
                               "validate": [Function],
@@ -1647,12 +1715,15 @@ ShallowWrapper {
                                 "instance": null,
                                 "key": undefined,
                                 "nodeType": "host",
-                                "props": Object {},
+                                "props": Object {
+                                  "children": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+                                  "value": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+                                },
                                 "ref": null,
-                                "rendered": null,
+                                "rendered": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
                                 "type": "option",
                               },
-                              "",
+                              "}",
                             ],
                             "type": [Function],
                           },
@@ -2074,6 +2145,7 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUsername"
                           onChange={[Function]}
                           required={true}
@@ -2106,12 +2178,17 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUserAddress"
                           required={true}
                           validate={[Function]}
                         >
-                          <option />
-                          
+                          <option
+                            value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                          >
+                            86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                          </option>
+                          }
                         </Field>
                       </div>
                     </div>
@@ -2416,6 +2493,7 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUsername"
                           onChange={[Function]}
                           required={true}
@@ -2448,12 +2526,17 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUserAddress"
                           required={true}
                           validate={[Function]}
                         >
-                          <option />
-                          
+                          <option
+                            value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                          >
+                            86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                          </option>
+                          }
                         </Field>
                       </div>
                     </div>
@@ -2605,6 +2688,7 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUsername"
                           onChange={[Function]}
                           required={true}
@@ -2637,12 +2721,17 @@ ShallowWrapper {
                         <Field
                           className="pt-input"
                           component="select"
+                          disabled={true}
                           name="appUserAddress"
                           required={true}
                           validate={[Function]}
                         >
-                          <option />
-                          
+                          <option
+                            value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                          >
+                            86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                          </option>
+                          }
                         </Field>
                       </div>
                     </div>
@@ -2791,6 +2880,7 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="appUsername"
                             onChange={[Function]}
                             required={true}
@@ -2823,12 +2913,17 @@ ShallowWrapper {
                           <Field
                             className="pt-input"
                             component="select"
+                            disabled={true}
                             name="appUserAddress"
                             required={true}
                             validate={[Function]}
                           >
-                            <option />
-                            
+                            <option
+                              value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                            >
+                              86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                            </option>
+                            }
                           </Field>
                         </div>
                       </div>
@@ -3100,6 +3195,7 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUsername"
                               onChange={[Function]}
                               required={true}
@@ -3132,12 +3228,17 @@ ShallowWrapper {
                             <Field
                               className="pt-input"
                               component="select"
+                              disabled={true}
                               name="appUserAddress"
                               required={true}
                               validate={[Function]}
                             >
-                              <option />
-                              
+                              <option
+                                value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                              >
+                                86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                              </option>
+                              }
                             </Field>
                           </div>
                         </div>
@@ -3249,6 +3350,7 @@ ShallowWrapper {
                               <Field
                                 className="pt-input"
                                 component="select"
+                                disabled={true}
                                 name="appUsername"
                                 onChange={[Function]}
                                 required={true}
@@ -3303,6 +3405,7 @@ ShallowWrapper {
                               <Field
                                 className="pt-input"
                                 component="select"
+                                disabled={true}
                                 name="appUsername"
                                 onChange={[Function]}
                                 required={true}
@@ -3322,6 +3425,7 @@ ShallowWrapper {
                               "children": <Field
                                 className="pt-input"
                                 component="select"
+                                disabled={true}
                                 name="appUsername"
                                 onChange={[Function]}
                                 required={true}
@@ -3343,6 +3447,7 @@ ShallowWrapper {
                                 ],
                                 "className": "pt-input",
                                 "component": "select",
+                                "disabled": true,
                                 "name": "appUsername",
                                 "onChange": [Function],
                                 "required": true,
@@ -3394,12 +3499,17 @@ ShallowWrapper {
                               <Field
                                 className="pt-input"
                                 component="select"
+                                disabled={true}
                                 name="appUserAddress"
                                 required={true}
                                 validate={[Function]}
                               >
-                                <option />
-                                
+                                <option
+                                  value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                                >
+                                  86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                                </option>
+                                }
                               </Field>
                             </div>
                           </div>,
@@ -3448,12 +3558,17 @@ ShallowWrapper {
                               <Field
                                 className="pt-input"
                                 component="select"
+                                disabled={true}
                                 name="appUserAddress"
                                 required={true}
                                 validate={[Function]}
                               >
-                                <option />
-                                
+                                <option
+                                  value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                                >
+                                  86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                                </option>
+                                }
                               </Field>
                             </div>,
                             "className": "col-sm-10",
@@ -3467,12 +3582,17 @@ ShallowWrapper {
                               "children": <Field
                                 className="pt-input"
                                 component="select"
+                                disabled={true}
                                 name="appUserAddress"
                                 required={true}
                                 validate={[Function]}
                               >
-                                <option />
-                                
+                                <option
+                                  value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                                >
+                                  86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                                </option>
+                                }
                               </Field>,
                               "className": "pt-select",
                             },
@@ -3483,11 +3603,16 @@ ShallowWrapper {
                               "nodeType": "class",
                               "props": Object {
                                 "children": Array [
-                                  <option />,
-                                  "",
+                                  <option
+                                    value="86ee0c9644611495c0a1b1074e40d4e6db2f6b26"
+                                  >
+                                    86ee0c9644611495c0a1b1074e40d4e6db2f6b26
+                                  </option>,
+                                  "}",
                                 ],
                                 "className": "pt-input",
                                 "component": "select",
+                                "disabled": true,
                                 "name": "appUserAddress",
                                 "required": true,
                                 "validate": [Function],
@@ -3498,12 +3623,15 @@ ShallowWrapper {
                                   "instance": null,
                                   "key": undefined,
                                   "nodeType": "host",
-                                  "props": Object {},
+                                  "props": Object {
+                                    "children": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+                                    "value": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
+                                  },
                                   "ref": null,
-                                  "rendered": null,
+                                  "rendered": "86ee0c9644611495c0a1b1074e40d4e6db2f6b26",
                                   "type": "option",
                                 },
-                                "",
+                                "}",
                               ],
                               "type": [Function],
                             },

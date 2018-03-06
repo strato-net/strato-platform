@@ -17,6 +17,8 @@ import {
 import { expectSaga } from 'redux-saga-test-plan';
 import { fetchAccounts } from '../../components/Accounts/accounts.actions';
 import { formData, mockResponse, error } from './createUserMock';
+import { loginSuccess } from '../../components/User/user.actions';
+import { openWalkThroughOverlay } from '../../components/WalkThrough/walkThrough.actions';
 
 describe('CreateUser: saga', () => {
 
@@ -28,16 +30,26 @@ describe('CreateUser: saga', () => {
 
   describe('createUser generator', () => {
 
-    test('inspection', () => {
-      const gen = createUser({ type: CREATE_USER_REQUEST, ...formData });
-      expect(gen.next().value).toEqual(call(createUserApiCall, formData.username, formData.password));
-      expect(gen.next(mockResponse).value).toEqual(put(createUserSuccess(mockResponse)));
-      expect(gen.next().value).toEqual(put(fetchAccounts(false, false)));
-      expect(gen.throw(error).value).toEqual(put(createUserFailure(error)));
-      expect(gen.next().done).toBe(true);
+    describe('inspection', () => {
+      test('Without Error', () => {
+        const gen = createUser({ type: CREATE_USER_REQUEST, ...formData });
+        expect(gen.next().value).toEqual(call(createUserApiCall, formData.username, formData.password));
+        expect(gen.next({ user: mockResponse }).value).toEqual(put(createUserSuccess(mockResponse)));
+        expect(gen.next().value).toEqual(put(loginSuccess(formData.username, mockResponse)));
+        expect(gen.next().value).toEqual(put(openWalkThroughOverlay(true)));
+        expect(gen.throw(error).value).toEqual(put(createUserFailure(error)));
+        expect(gen.next().done).toBe(true);
+      });
+
+      test('With Error', () => {
+        const gen = createUser({ type: CREATE_USER_REQUEST, ...formData });
+        expect(gen.next().value).toEqual(call(createUserApiCall, formData.username, formData.password));
+        expect(gen.next({ error: { message: error } }).value).toEqual(put(createUserFailure(error)));
+        expect(gen.next().done).toBe(true);
+      });
     })
 
-    describe('create user', ()=> {
+    describe('create user', () => {
 
       test('success', (done) => {
         fetch.mockResponse(JSON.stringify(mockResponse));
@@ -45,7 +57,7 @@ describe('CreateUser: saga', () => {
           .call.fn(createUserApiCall).put.like({ action: { type: CREATE_USER_SUCCESS } })
           .run().then((result) => { done() });
       });
-  
+
       test('failure', (done) => {
         fetch.mockReject(JSON.stringify(error));
         expectSaga(createUser, formData)

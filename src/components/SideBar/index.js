@@ -14,13 +14,14 @@ class SideBar extends Component {
   render() {
     const navLinksData = (
       [
-        {path: '/home', label: 'Dashboard', id: 'dashboard', icon: "fa-dashboard"},
+        { path: '/apps', label: 'Dashboard', id: 'dashboard', icon: "fa-rocket" },
+        { path: '/home', label: 'Network', id: 'network', icon: "fa-dashboard" },
         //{path: '/nodes', label: 'Nodes', id: 'nodes', icon: "pt-icon-layout-auto"},
-        {path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link"},
-        {path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange"},
-        {path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users"},
-        {path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel"},
-        {path: '/code_editor', label: 'Code Editor', id: 'code_editor', icon: "fa-code"},
+        { path: '/blocks', label: 'Blocks', id: 'blocks', icon: "fa-link" },
+        { path: '/transactions', label: 'Transactions', id: 'transactions', icon: "fa-exchange" },
+        { path: '/accounts', label: 'Accounts', id: 'accounts', icon: "fa-users" },
+        { path: '/contracts', label: 'Contracts', id: 'contracts', icon: "fa-gavel" },
+        { path: '/code_editor', label: 'Code Editor', id: 'code_editor', icon: "fa-code" },
       ]
     );
 
@@ -35,27 +36,15 @@ class SideBar extends Component {
                 to={data.path}
                 className="menu-item"
                 activeClassName="active-menu-item"
-                onClick={() => {mixpanelWrapper.track('nav_link_'+data.id+'_click')}}
+                onClick={() => { mixpanelWrapper.track('nav_link_' + data.id + '_click') }}
               >
-                <i className={ 'fa ' + data.icon }> </i>
+                <i className={'fa ' + data.icon}> </i>
                 <span className="menu-text"> {data.label}</span>
               </NavLink>
             )
           }
         </div>
         <hr />
-        <div className="menu">
-          <NavLink
-            id={'apps'}
-            to={'/apps'}
-            className="menu-item"
-            activeClassName="active-menu-item"
-            onClick={() => {mixpanelWrapper.track('nav_link_contracts_click')}}
-          >
-            <i className='fa fa-rocket'> </i>
-            <span className="menu-text">Apps</span>
-          </NavLink>
-        </div>
         <div>
         </div>
         <div className="smd-sidebar-logo">

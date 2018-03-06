@@ -1,0 +1,21 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SendTokens: validate radio button: address is selected (1st index) 1`] = `
+Object {
+  "value": "Please enter a value",
+}
+`;
+
+exports[`SendTokens: validate radio button: user is selected (0th index) 1`] = `
+Object {
+  "value": "Please enter a value",
+}
+`;
+
+exports[`SendTokens: validate when form has no values 1`] = `
+Object {
+  "value": "Please enter a value",
+}
+`;
+
+exports[`SendTokens: validate when form has values 1`] = `Object {}`;
