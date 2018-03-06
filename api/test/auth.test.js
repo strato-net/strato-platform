@@ -87,7 +87,7 @@ describe('App', function() {
           });
     });
 
-    it('Accepts a working bundle', function(done) {
+    xit('Accepts a working bundle', function(done) {
       this.timeout(60000);
       chai.request(app)
        .post('/users')
@@ -133,7 +133,7 @@ describe('App', function() {
       done();
     });
 
-    it("can upload init contracts", function(done) {
+    xit("can upload init contracts", function(done) {
       this.timeout(30000);
       chai.request(app)
        .post('/users')
@@ -165,7 +165,7 @@ describe('App', function() {
       });
     });
 
-    it("creates addresses.js", async function() {
+    xit("creates addresses.js", async function() {
       const addrs = {"storage": "deadbeefdeadbeef"};
       const name = await injectAddressesJs('./test/testdata', addrs);
       assert.equal(name, 'test/testdata/addresses.js');
