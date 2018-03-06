@@ -35,7 +35,7 @@ pipeline {
             node('stratodev') {
               sh '''#!/bin/bash -le
               set -x
-              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
+              bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh || true #if running the first time
               docker rm -f $(docker ps -aq) || true
               cp -r ../../../../ba_certs/ssl/* strato-getting-started/ssl/
               cd strato-getting-started
