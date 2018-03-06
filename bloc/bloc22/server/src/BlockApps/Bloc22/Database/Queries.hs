@@ -1462,6 +1462,16 @@ getContractXabi (ContractName contractName) contractId = do
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
   getContractXabiByMetadataId metadataId 
 
+getContractXabiAndMetadataId :: HasCallStack =>
+                   ContractName -> MaybeNamed Address -> Bloc (Int32, Xabi)
+getContractXabiAndMetadataId (ContractName contractName) contractId = do
+  -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+  metadataId <- case contractId of
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+  xabi <- getContractXabiByMetadataId metadataId 
+  return (metadataId, xabi)
+
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = blocTransaction $ do
   cmIds_bins <- blocQuery $ proc () -> do
