@@ -107,6 +107,7 @@ uploadFailure = function(loc, inboundErr) {
     }
     return outboundErr;
 }
+
 /**
  * Register the dapp on the blockchain
  * @param username String
@@ -224,19 +225,20 @@ validatePackageStructure = function*(packageFolderPath) {
  * @param packageFolderPath String - the path of the unzipped package
  * @returns Object Matching variable names to (contractName, contractFilename, args)
  */
-parseInitfile = function(packageFolderPath) {
+parseInitfile = async function(packageFolderPath) {
   const initfile = path.join(packageFolderPath, 'initfile.json');
-  if (!fs.pathExists(initfile)) {
+  if (!await fs.pathExists(initfile)) {
     return {};
   }
-  inits = JSON.parse(fs.readFileSync(initfile));
-  for (var v in inits) {
+  const contents = await fs.readFile(initfile);
+  const inits = JSON.parse(contents);
+  for (let v in inits) {
     if (!inits.hasOwnProperty(v)) {
       continue;
     }
-    var base = inits[v].contractFilename;
-    var file = path.join(packageFolderPath, base);
-    if (!fs.pathExists(file)) {
+    let base = inits[v].contractFilename;
+    let file = path.join(packageFolderPath, base);
+    if (!await fs.pathExists(file)) {
       let err = new Error(
           `could not find requested contract '${base}' in bundle`);
       err.status = 400;
@@ -465,7 +467,7 @@ upload = function (req, res, next) {
       // By uploading the contracts configured by the initfile,
       // we can supply the contract addresses to static
       // files on behalf of developers.
-      const inits = parseInitfile(packageTmpFolder);
+      const inits = yield parseInitfile(packageTmpFolder);
       if (Object.keys(inits).length > 0) {
         const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
         const name = yield injectAddressesJs(packageTmpFolder, addrs);
