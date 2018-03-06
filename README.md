@@ -14,12 +14,11 @@ To prepare a completely new (Ubuntu 16.04) machine to use this repo, you must ru
 chmod +x bootstrap
 ./bootstrap <branch>
 ```
-After this is complete, you will have the Haskell Stack and Docker installed and our repo
-management tool `mgit` built and installed.
+After this is complete, you will have the Haskell Stack and Docker installed.
 
-Once this is done you may fetch the entire `silo` meta-repo with
+Once this is done you may fetch the entire `silo` repo with
 ```
-mgit clone https://github.com/blockapps/silo -b <branch>
+git clone https://github.com/blockapps/silo
 ```
 
 ## Building
