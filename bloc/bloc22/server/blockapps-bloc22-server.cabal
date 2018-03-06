@@ -34,7 +34,6 @@ library
                , aeson-casing
                , bimap
                , binary
-               , blockapps-cirrus-client
                , blockapps-ethereum
                , blockapps-solidity
                , blockapps-bloc22-api

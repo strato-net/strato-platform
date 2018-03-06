@@ -12,6 +12,5 @@ pghost=postgres \
 pguser=postgres \
 pgpasswd=api \
 stratourl=http://localhost \
-cirrusurl=http://localhost/cirrus \
 docker-compose up -d
 ```

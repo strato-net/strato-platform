@@ -4,13 +4,10 @@ set -e
 set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
-cirrusRoot=http://${cirrusHost}
 
 echo "Environment variables:
 stratoHost=${stratoHost}
-cirrusHost=${cirrusHost}
 --stratourl=stratoRoot=${stratoRoot}
---cirrusurl=cirrusRoot=${cirrusRoot}
 --pghost=postgres_host=${postgres_host}
 --pgport=postgres_port=${postgres_port}
 --pguser=postgres_user=${postgres_user}
@@ -29,13 +26,6 @@ until curl ${stratoRoot} >& /dev/null; do
 done
 echo "STRATO is available"
 
-# TODO: fix the circuit dependency (cirrus is depending on bloc and won't start until bloc is ready)
-#echo "Waiting for cirrus to be available..."
-#until curl ${cirrusRoot} >& /dev/null; do
-#    sleep 0.5
-#done
-#echo "cirrus is available"
-
 echo 'Waiting for postgres to be available...'
 while true; do
     curl ${postgres_host}:${postgres_port} > /dev/null 2>&1 || EXIT_CODE=$? && true
@@ -48,4 +38,4 @@ done
 $stratoserver &
 
 $blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --cirrusurl="$cirrusRoot" 2>&1
+            --stratourl="$stratoRoot" 2>&1

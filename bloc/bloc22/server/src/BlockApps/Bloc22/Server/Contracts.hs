@@ -26,7 +26,6 @@ import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
@@ -190,16 +189,4 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
       for (toList idsAndDetails) $ \ (_,details) -> do
         contractDetails <-
           getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")
-        let eBlockappsjsXabi =
-              xabiToBlockappsjsXabi . contractdetailsXabi $ contractDetails
-        case eBlockappsjsXabi of
-          Left msg -> throwError $
-            AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
-          Right blockappsjsXabi ->
-            void . blocCirrus $ postContract contractDetails{contractdetailsXabi=blockappsjsXabi}
         return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
-
-xabiToBlockappsjsXabi :: Xabi -> Either String Xabi
-xabiToBlockappsjsXabi xabi = do
-  c <- xAbiToContract xabi
-  return $ contractToXabi c

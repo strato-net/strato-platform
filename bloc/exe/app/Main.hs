@@ -73,10 +73,8 @@ main = do
   pool22 <- createPool (connect dbConnectInfo{connectDatabase="bloc22"}) close 5 3 5
   mgr <- newManager defaultManagerSettings
   stratoUrl <- parseBaseUrl $ resolveStratoURL flags_stratourl
-  cirrusUrl <- parseBaseUrl flags_cirrusurl
-  let blocEnv = Bloc22.BlocEnv stratoUrl cirrusUrl mgr pool22 $ toEnum flags_loglevel
+  let blocEnv = Bloc22.BlocEnv stratoUrl mgr pool22 $ toEnum flags_loglevel
   putStrLn $ "Using Strato URL: " ++ showBaseUrl stratoUrl
-  putStrLn $ "Using Cirrus URL: " ++ showBaseUrl cirrusUrl
   run flags_port (appBloc blocEnv)
 
 dbExistsQuery22 :: Query

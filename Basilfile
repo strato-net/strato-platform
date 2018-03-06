@@ -20,5 +20,4 @@ deployments:
         pghost: "${pghost}"
         pguser: "${pguser}"
         pgpasswd: "${pgpasswd}"
-        cirrusurl: "${cirrusurl}"
         stratourl: "${stratourl}"
