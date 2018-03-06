@@ -38,14 +38,16 @@ describe('Throughput - upload', function () {
     it('Upload List', function * () {
       const txs = factory_createUploadList(batchSize, batchIndex);
 
+      const startTime = moment();
       const doNotResolve = true;
       const uploadReceipts = yield rest_uploadContractList(admin, txs, doNotResolve);
       // wait for the hashes to resolve
       const uploadResults = yield waitResults(uploadReceipts);
-      const startTime = moment();
       // console.log(uploadResults);
       // set the data
-      const setDataResults = yield setData(admin, uploadResults.data, batchIndex);
+      // each call sets 4 fields - do it 2 times
+      const setDataResults1 = yield setData(admin, uploadResults.data, batchIndex);
+      const setDataResults2 = yield setData(admin, uploadResults.data, batchIndex);
       // console.log(uploadResults);
 
       // stop the clock, print timing
