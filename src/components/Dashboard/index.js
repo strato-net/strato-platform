@@ -83,7 +83,7 @@ class Dashboard extends Component {
         <Tour name='dashboard' finalStepSelector='#accounts' nextPage='accounts' steps={tourSteps} />
         <div className="row">
           <div className="col-sm-9 text-left">
-            <h3>Dashboard</h3>
+            <h3>Network</h3>
           </div>
         </div>
         <div className="row">

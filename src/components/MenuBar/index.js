@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Link } from 'react-router-dom';
+import { withRouter, Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import './menubar.css';
@@ -10,13 +10,28 @@ import Login from '../Login';
 import WalkThrough from '../WalkThrough';
 import { Button } from '@blueprintjs/core';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import qs from 'query-string';
 
 class MenuBar extends Component {
+
+  componentDidMount(){
+    const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
+    if(developerSignIn) {
+      this.props.openWalkThroughOverlay(false);
+    }
+  }
 
   afterLoggedIn() {
     if (this.props.isLoggedIn) {
       return (
         <div>
+          <span className="pt-navbar-divider" />
+          <a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">
+            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("bloc_docs_click") }}>Bloc API</button>
+          </a>
+          <a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">
+            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>
+          </a>
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted welcome-user"> Welcome, {this.props.currentUser.username} </small>
           <span className="pt-navbar-divider" />
@@ -34,7 +49,7 @@ class MenuBar extends Component {
         <Button onClick={() => {
           mixpanelWrapper.track('create_user_open_click');
           this.props.openWalkThroughOverlay(false);
-        }} text="Sign up" className="pt-button pt-minimal pt-small menubar-button" />
+        }} text="Developer Sign In" className="pt-button pt-small pt-intent-primary" />
       )
     }
   }
@@ -61,13 +76,7 @@ class MenuBar extends Component {
           {this.renderDeveloperButton()}
           <span className="pt-navbar-divider" />
           <small className="pt-text-muted">v{process.env.REACT_APP_VERSION} </small>
-          <span className="pt-navbar-divider" />
-          <a href={env.BLOC_DOC_URL} target="_blank" rel="noopener noreferrer" id="tour-bloc-api-button">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("bloc_docs_click") }}>Bloc API</button>
-          </a>
-          <a href={env.STRATO_DOC_URL} target="_blank" rel="noopener noreferrer">
-            <button className="pt-button pt-minimal pt-small" onClick={() => { mixpanelWrapper.track("strato_docs_click") }}>STRATO API</button>
-          </a>
+          
           {this.afterLoggedIn()}
         </div>
         <Login />
@@ -84,8 +93,10 @@ export function mapStateToProps(state) {
   };
 }
 
-export default connect(mapStateToProps, {
+const connected = connect(mapStateToProps, {
   logout,
   openLoginOverlay,
   openWalkThroughOverlay
 })(MenuBar);
+
+export default withRouter(connected);

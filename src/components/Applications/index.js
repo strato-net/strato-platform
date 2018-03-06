@@ -13,12 +13,19 @@ import { env } from '../../env';
 import CLI from '../CLI';
 import TokenRequest from '../TokenRequest';
 import { closeCLIOverlay } from '../CLI/cli.actions';
+import qs from 'query-string';
 
 import './application.css'
 
 class Applications extends Component {
 
   componentDidMount() {
+    // I am really sorry for this. But time.
+    const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
+    if(!this.props.isLoggedIn && !developerSignIn) {
+      window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
+    }
+
     mixpanelWrapper.track('launchpad_load');
     this.props.fetchApplications();
     this.startPoll();
@@ -36,7 +43,6 @@ class Applications extends Component {
   }
 
   render() {
-
     return (
       <div className="container-fluid pt-dark">
         <div className="row smd-pad-12">
@@ -100,7 +106,7 @@ export function mapStateToProps(state) {
   return {
     applications: state.applications.applications,
     isLoggedIn: state.user.isLoggedIn,
-    isTokenOpen: state.cli.isTokenOpen,
+    isTokenOpen: state.cli.isTokenOpen
   };
 }
 
