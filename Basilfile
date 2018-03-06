@@ -83,7 +83,6 @@ deployments:
       depends_on:
         - strato
         - postgres
-        # - cirrus # circuit dependency
       environment:
         ssl: "${ssl:-false}"
         stratoHost: "strato:3000"
