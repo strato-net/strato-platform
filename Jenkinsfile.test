@@ -91,6 +91,7 @@ pipeline {
           cd blockapps-ba
           npm i
           SERVER=localhost npm run deploy
+          sleep 5
           SERVER=localhost npm run test
         '''
       }

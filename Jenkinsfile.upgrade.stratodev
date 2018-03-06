@@ -5,8 +5,8 @@ pipeline {
     stage('Prepare to deploy') {
       steps {
         parallel (
-          "testnet3": {
-            node('testnet3') {
+          "stratodev": {
+            node('stratodev') {
               withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
                 withCredentials([usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'), usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER')]) {
                   sh '''#!/bin/bash -le
@@ -31,8 +31,8 @@ pipeline {
     stage('Deploy multinode') {
       steps {
         parallel (
-          "testnet3": {
-            node('testnet3') {
+          "stratodev": {
+            node('stratodev') {
               sh '''#!/bin/bash -le
               set -x
               bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
