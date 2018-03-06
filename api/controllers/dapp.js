@@ -107,6 +107,7 @@ uploadFailure = function(loc, inboundErr) {
     }
     return outboundErr;
 }
+
 /**
  * Register the dapp on the blockchain
  * @param username String
@@ -224,19 +225,20 @@ validatePackageStructure = function*(packageFolderPath) {
  * @param packageFolderPath String - the path of the unzipped package
  * @returns Object Matching variable names to (contractName, contractFilename, args)
  */
-parseInitfile = function(packageFolderPath) {
+parseInitfile = async function(packageFolderPath) {
   const initfile = path.join(packageFolderPath, 'initfile.json');
-  if (!fs.pathExists(initfile)) {
+  if (!await fs.pathExists(initfile)) {
     return {};
   }
-  inits = JSON.parse(fs.readFileSync(initfile));
-  for (var v in inits) {
+  const contents = await fs.readFile(initfile);
+  const inits = JSON.parse(contents);
+  for (let v in inits) {
     if (!inits.hasOwnProperty(v)) {
       continue;
     }
-    var base = inits[v].contractFilename;
-    var file = path.join(packageFolderPath, base);
-    if (!fs.pathExists(file)) {
+    let base = inits[v].contractFilename;
+    let file = path.join(packageFolderPath, base);
+    if (!await fs.pathExists(file)) {
       let err = new Error(
           `could not find requested contract '${base}' in bundle`);
       err.status = 400;
@@ -296,7 +298,7 @@ injectAddressesJs = async function(packageFolderPath, addrs) {
   lines.push("};\n");
   const text = lines.join('\n');
   const name = path.join(packageFolderPath, "addresses.js");
-  await fs.writeFileSync(name, text);
+  await fs.writeFile(name, text);
   return name;
 }
 
@@ -465,16 +467,29 @@ upload = function (req, res, next) {
       // By uploading the contracts configured by the initfile,
       // we can supply the contract addresses to static
       // files on behalf of developers.
-      const inits = parseInitfile(packageTmpFolder);
+      let inits = {};
+      try {
+        inits = yield parseInitfile(packageTmpFolder);
+      } catch (error) {
+        let err = new Error('initfile.json parsing failed:' + error);
+        err.status = 400;
+        return next(err);
+      }
       if (Object.keys(inits).length > 0) {
-        const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
-        const name = yield injectAddressesJs(packageTmpFolder, addrs);
-        // /usr/bin/zip helpfully adds a .zip extension if you neglected
-        // to add one, meaning that it can't address a file named by naked hash.
-        yield fs.rename(file.path, file.path + ".zip");
-        file.path = file.path + ".zip";
-        tempPaths.push(file.path);
-        yield zipAddFile(file.path, name);
+        try {
+          const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
+          const name = yield injectAddressesJs(packageTmpFolder, addrs);
+          // /usr/bin/zip helpfully adds a .zip extension if you neglected
+          // to add one, meaning that it can't address a file named by naked hash.
+          yield fs.rename(file.path, file.path + ".zip");
+          file.path = file.path + ".zip";
+          tempPaths.push(file.path);
+          yield zipAddFile(file.path, name);
+        } catch (error) {
+          let err = new Error('initfile.json upload failed: ' + error);
+          err.status = 500;
+          return next(err);
+        }
       }
 
       const zipHash = yield getFileHash(file.path);

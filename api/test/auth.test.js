@@ -120,8 +120,8 @@ describe('App', function() {
        });
     });
 
-    it("parses initfile.json", function(done) {
-      const got = parseInitfile('./test/testdata/');
+    it("parses initfile.json", async function() {
+      const got = await parseInitfile('./test/testdata/');
       const want = {
         'storage': {
           'contractName': 'SimpleStorage',
@@ -130,7 +130,6 @@ describe('App', function() {
         }
       };
       expect(got).to.deep.equal(want);
-      done();
     });
 
     xit("can upload init contracts", function(done) {
