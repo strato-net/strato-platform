@@ -74,7 +74,7 @@ class Dashboard extends Component {
           title="DApps"
           actions={
             <div>
-              <Button raised onClick={() => { window.location.href = `${window.location.protocol}//${window.location.hostname}/apps?developer`;}} className="developers-button">For Developers</Button>
+              <Button raised onClick={() => { window.location.href = `${window.location.protocol}//${window.location.hostname}/dashboard/#/apps?developer`;}} className="developers-button">For Developers</Button>
               <Button icon onClick={() => this.navigate('/profile')}><FontIcon iconClassName="fa fa-user-circle" /></Button>
             </div>
           }
