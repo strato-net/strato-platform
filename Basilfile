@@ -76,8 +76,8 @@ deployments:
         CIRRUS_URL: "${CIRRUS_URL}"
 
   - name: bloch
-    repo: https://github.com/blockapps/blockapps-haskell.git#bloc-ingestion
-    ref: master
+    repo: https://github.com/blockapps/blockapps-haskell.git
+    ref: bloc-ingestion
     compose:
       restart: always
       depends_on:
@@ -99,8 +99,8 @@ deployments:
       command: redis-server --appendonly yes
 
   - name: cirrus
-    repo: https://github.com/blockapps/cirrus.git#deduce-state-locally
-    ref: master
+    repo: https://github.com/blockapps/cirrus.git
+    ref: deduce-state-locally
     compose:
       restart: always
       depends_on:
