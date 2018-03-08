@@ -2,6 +2,7 @@
 
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
+const child_process = require('child_process');
 const co = require('co');
 const download = require('download');
 const fs = require('fs-extra');
@@ -75,6 +76,39 @@ checkFileCompiles = function(directory, fileName) {
 };
 
 /**
+ * Rewrite the error message in the case of an upload failure.
+ * @param loc String a description of where inboundErr was caught
+ * @param inboundErr Error an error caught from
+ * @returns Error
+ */
+uploadFailure = function(loc, inboundErr) {
+    const outboundErr = new Error(loc);
+    switch (inboundErr.status) {
+      case 404:
+        outboundErr.message += ': wrong username or address';
+        outboundErr.status = 401;
+        break;
+      case 400:
+        if (inboundErr.data === 'incorrect password') {
+          outboundErr.message += ': incorrect password';
+          outboundErr.status = 401;
+        } else if (inboundErr.data.includes('no user found with name')) {
+          outboundErr.message += ': user does not exist on the node';
+          outboundErr.status = 401;
+        } else if (inboundErr.data.includes('address does not exist for user')) {
+          outboundErr.message += ': wrong address provided for the user';
+          outboundErr.status = 401;
+        } else if (inboundErr.data === 'strato error: failed to find account') {
+          outboundErr.message += ': account does not have any ether';
+          outboundErr.status = 400;
+        }
+        // TODO: check if user has not enough ether (e.g. just few wei)
+        break;
+    }
+    return outboundErr;
+}
+
+/**
  * Register the dapp on the blockchain
  * @param username String
  * @param address String
@@ -102,31 +136,8 @@ registerDapp = function*(username, address, password, packageMetadata, hash, hos
     return yield appMetadata.uploadContract(userCredentials, args);
   } catch (error) {
     console.warn('appMetadata contract upload error:', error);
-    let err = new Error('could not register application on the blockchain');
-    // the only possible error handling for current bloc errors
-    switch (error.status) {
-      case 404:
-        err.message += ': wrong username or address';
-        err.status = 401;
-        break;
-      case 400:
-        if (error.data === 'incorrect password') {
-          err.message += ': incorrect password';
-          err.status = 401;
-        } else if (error.data.includes('no user found with name')) {
-          err.message += ': user does not exist on the node';
-          err.status = 401;
-        } else if (error.data.includes('address does not exist for user')) {
-          err.message += ': wrong address provided for the user';
-          err.status = 401;
-        } else if (error.data === 'strato error: failed to find account') {
-          err.message += ': account does not have any ether';
-          err.status = 400;
-        }
-        // TODO: check if user has not enough ether (e.g. just few wei)
-        break;
-    }
-    throw(err);
+
+    throw uploadFailure('could not register application on the blockchain', error);
   }
 };
 
@@ -210,6 +221,89 @@ validatePackageStructure = function*(packageFolderPath) {
 };
 
 /**
+ * Parse the initfile object out of the bundle
+ * @param packageFolderPath String - the path of the unzipped package
+ * @returns Object Matching variable names to (contractName, contractFilename, args)
+ */
+parseInitfile = async function(packageFolderPath) {
+  const initfile = path.join(packageFolderPath, 'initfile.json');
+  if (!await fs.pathExists(initfile)) {
+    return {};
+  }
+  const contents = await fs.readFile(initfile);
+  const inits = JSON.parse(contents);
+  for (let v in inits) {
+    if (!inits.hasOwnProperty(v)) {
+      continue;
+    }
+    let base = inits[v].contractFilename;
+    let file = path.join(packageFolderPath, base);
+    if (!await fs.pathExists(file)) {
+      let err = new Error(
+          `could not find requested contract '${base}' in bundle`);
+      err.status = 400;
+      throw err;
+    }
+    if (inits[v].args.constructor !== {}.constructor) {
+      let err = new Error(`args '${inits[v].args}' is not a map`);
+      err.status = 400;
+      throw err;
+    }
+    // TODO(tim): check that inits[v].contractName is a contract
+    // in the .sol file.
+  }
+  return inits;
+}
+
+/**
+ * Instantiate a contract for each entry in inits
+ * @params packageFolderPath String - Directory to start file search.
+ * @params creds Object - username, password, address
+ * @param inits Object - An association between variable names and the
+ *    (contractName, contractFilename, args) necessary to upload a contract
+ * @returns Promise waiting to match variable names to contract addresses
+ */
+uploadInitContracts = function(packageFolderPath, creds, inits) {
+  return new Promise(function(resolve, reject) {
+    try {
+      co(function*() {
+        const addrs = {};
+        for (var key in inits) {
+          const filename = path.join(packageFolderPath, inits[key].contractFilename);
+          let contract = yield blockappsRest.uploadContract(
+                creds, inits[key].contractName, filename, inits[key].args);
+          addrs[key] = contract.address
+        }
+        resolve(addrs);
+      });
+    } catch (error) {
+      reject(uploadFailure("could not initialize contracts", error));
+    }
+  });
+}
+
+/**
+ * Write a javascript module that creates the assocation
+ * between the variable keys and address values of addrs
+ * @params packageFolderPath String location of static files
+ * @params addrs Object a mapping {var_name: contract_addr}
+ * @returns String the filename of the inserted file
+ */
+injectAddressesJs = async function(packageFolderPath, addrs) {
+  const lines = [];
+  lines.push("const addresses = {");
+  Object.keys(addrs).forEach(name => {
+    lines.push(`  ${name}: "${addrs[name]}",`);
+  });
+  lines.push("};\n");
+  const text = lines.join('\n');
+  const name = path.join(packageFolderPath, "addresses.js");
+  await fs.writeFile(name, text);
+  return name;
+}
+
+
+/**
  * Remove files or directories if they exist
  * @param paths String|Array - the absolute or relative (to apex/api/) path of the file
  */
@@ -280,6 +374,20 @@ unzip = function(filePath, destination, overwrite) {
 };
 
 /**
+ * Adds a file to a zip archive
+ * @param filePath String file name of the archive
+ * @param newAddition String file name to be zipped
+ */
+zipAddFile = function(filePath, newAddition) {
+  // Why does this use the system zip instead of adm-zip? Because
+  // I spent a day trying to replicate this command and
+  // continued to receive "Invalid LOC header (bad signature)"
+  return new Promise(function (resolve, reject) {
+    child_process.exec(`/usr/bin/zip --verbose -uj ${filePath} ${newAddition}`, resolve);
+  });
+}
+
+/**
  * ExpressJS route controller to upload the dApp
  * @param req
  * @param res
@@ -312,14 +420,23 @@ upload = function (req, res, next) {
       err.status = 400;
       return next(err);
     }
-    tempPaths.push(req.file.path);
 
     const username = req.body.username;
     const address = req.body.address;
     const password = req.body.password;
+    const credentials = {
+      name: username,
+      address: address,
+      password: password,
+    };
     const file = req.file;
-
-    if (!username || !address || !password || !file) {
+    if (!file) {
+      let err = new Error("wrong params, expected: {username, address, password, file}");
+      err.status = 400;
+      return next(err);
+    }
+    tempPaths.push(file.path);
+    if (!username || !address || !password) {
       removePathsIfExist(tempPaths);
       let err = new Error("wrong params, expected: {username, address, password, file}");
       err.status = 400;
@@ -332,14 +449,6 @@ upload = function (req, res, next) {
     // bloc.
 
     co(function* () {
-      const zipHash = yield getFileHash(file.path);
-      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
-      if (appsMetadataArray.length) {
-        removePathsIfExist(tempPaths);
-        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
-        err.status = 409;
-        return next(err);
-      }
       // unpack files to tmp folder
       const packageTmpFolder = path.join(tmpFolder,file.filename);
       try {
@@ -354,6 +463,43 @@ upload = function (req, res, next) {
       tempPaths.push(packageTmpFolder);
 
       yield validatePackageStructure(packageTmpFolder);
+
+      // By uploading the contracts configured by the initfile,
+      // we can supply the contract addresses to static
+      // files on behalf of developers.
+      let inits = {};
+      try {
+        inits = yield parseInitfile(packageTmpFolder);
+      } catch (error) {
+        let err = new Error('initfile.json parsing failed:' + error);
+        err.status = 400;
+        return next(err);
+      }
+      if (Object.keys(inits).length > 0) {
+        try {
+          const addrs = yield uploadInitContracts(packageTmpFolder, credentials, inits);
+          const name = yield injectAddressesJs(packageTmpFolder, addrs);
+          // /usr/bin/zip helpfully adds a .zip extension if you neglected
+          // to add one, meaning that it can't address a file named by naked hash.
+          yield fs.rename(file.path, file.path + ".zip");
+          file.path = file.path + ".zip";
+          tempPaths.push(file.path);
+          yield zipAddFile(file.path, name);
+        } catch (error) {
+          let err = new Error('initfile.json upload failed: ' + error);
+          err.status = 500;
+          return next(err);
+        }
+      }
+
+      const zipHash = yield getFileHash(file.path);
+      const appsMetadataArray = yield getAppMetadataByHash(zipHash);
+      if (appsMetadataArray.length) {
+        removePathsIfExist(tempPaths);
+        let err = new Error(`dapp package provided already exists on the blockchain: /apps/${appsMetadataArray[0].hash}`);
+        err.status = 409;
+        return next(err);
+      }
       const packageMetadata = yield parsePackageMetadata(packageTmpFolder);
 
       // check if all contracts from tmp/contracts/ are compile
@@ -401,6 +547,7 @@ upload = function (req, res, next) {
       // Replace the dapp folder with the new one (all older files will be removed)
       yield fs.move(packageTmpFolder, path.join(...dappPathArray), {overwrite: true});
       res.status(200).json({metadata: packageMetadata, url: dappUrl});
+      file.path = '';
       removePathsIfExist(tempPaths);
     }).catch(err => {
         removePathsIfExist(tempPaths);

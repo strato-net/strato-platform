@@ -1,3 +1,5 @@
+/* jshint esnext: true */
+/* jshint node: true */
 // const bcrypt = require('bcrypt');
 // const fs = require('fs');
 // const randToken = require('rand-token');
@@ -42,8 +44,8 @@ const createInitialData = () =>
         //     })
         //   })
         // }
-      })
-    })
+      });
+    });
   });
 
 module.exports = createInitialData;

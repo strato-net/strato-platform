@@ -23,7 +23,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' || process.env.PROD_DEV_MODE === 'true') {
   const corsOptions = {
     origin: function (origin, callback) {
       if(!origin) {
@@ -75,8 +75,9 @@ app.use(function(err, req, res, next) {
       status: res.status,
     },
   };
-  // Including error stack in development mode only
-  if (req.app.get('env') === 'development') {
+  // Including error stack when not in production
+  const env = req.app.get('env');
+  if (env === 'development' || env === 'test') {
     errorRespObj.error.stack = err.stack
   }
 

@@ -20,6 +20,10 @@ coverage
 # nyc test coverage
 .nyc_output
 
+# Will change during test runs
+api/test/testdata/*zip
+api/test/testdata/addresses.js
+
 # Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
