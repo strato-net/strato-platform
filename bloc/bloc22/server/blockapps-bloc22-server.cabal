@@ -84,6 +84,7 @@ library
                , text
                , temporary
                , time
+               , transformers
                , transformers-base
                , unordered-containers
                , wai-cors
