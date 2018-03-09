@@ -18,7 +18,6 @@ import qualified Data.ByteString.Lazy.Char8           as BLC
 import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.BackupBlocks
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Extra
@@ -62,11 +61,11 @@ initializeBlankStateDB = do
     setStateDBStateRoot emptyTriePtr
 
 initializeStateDB :: (HasStateDB m, HasHashDB m)
-                  => [(Address, Integer)]
+                  => [AccountInfo]
                   -> m ()
 initializeStateDB addressInfo = do
     initializeBlankStateDB
-    forM_ addressInfo $ \(address, balance') ->
+    forM_ addressInfo $ \(NonContract address balance') ->
         putAddressState address blankAddressState{addressStateBalance=balance'}
 
 genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m)

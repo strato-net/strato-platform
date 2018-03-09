@@ -32,7 +32,7 @@ genesisBlockSetup n = do
     createDirectory "priv"
     setCurrentDirectory "priv"
     writePrvKeys pairs
-    let pairs' = map (\(_,_,z) -> (z,bigBalance)) pairs
+    let pairs' = map (\(_,_,z) -> NonContract z bigBalance ) pairs
         genesis = defaultGenesisInfo { genesisInfoAccountInfo = pairs' }
 
     B.writeFile "hackathonGenesis.json" $ BL.toStrict $ J.encode genesis
@@ -55,5 +55,3 @@ readPrvKey path = do
 
 retrieveRandomPrivKey :: Int -> IO PrvKey
 retrieveRandomPrivKey n = readPrvKey $ "priv_" ++ (show n)
-
---writeGenesisBlock = undefined

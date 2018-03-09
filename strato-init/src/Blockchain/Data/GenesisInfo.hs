@@ -2,14 +2,17 @@
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TupleSections        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.GenesisInfo (
   GenesisInfo(..),
+  AccountInfo(..),
   defaultGenesisInfo
   ) where
 
 import           Data.Aeson
+import           Data.Aeson.TH                      as AT
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
 import           Data.Time
@@ -19,12 +22,18 @@ import           Blockchain.Data.Address
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.SHA
 
+data AccountInfo = NonContract Address Integer
+                 | Contract Address Integer SHA
+   deriving (Show, Eq)
+
+$(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
+
 data GenesisInfo =
   GenesisInfo {
     genesisInfoParentHash       :: SHA,
     genesisInfoUnclesHash       :: SHA,
     genesisInfoCoinbase         :: Address,
-    genesisInfoAccountInfo      :: [(Address, Integer)],
+    genesisInfoAccountInfo      :: [AccountInfo],
     genesisInfoTransactionsRoot :: StateRoot,
     genesisInfoReceiptsRoot     :: StateRoot,
     genesisInfoLogBloom         :: B.ByteString,
@@ -36,9 +45,11 @@ data GenesisInfo =
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: SHA,
     genesisInfoNonce            :: Word64
-} deriving (Show)
+} deriving (Show, Eq)
 
-
+nullStateRoot :: StateRoot
+nullStateRoot = StateRoot . fst . B16.decode $
+    "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 defaultGenesisInfo :: GenesisInfo
 defaultGenesisInfo =
   GenesisInfo {
@@ -46,8 +57,8 @@ defaultGenesisInfo =
     genesisInfoUnclesHash = SHA 13478047122767188135818125966132228187941283477090363246179690878162135454535,
     genesisInfoCoinbase = Address 0,
     genesisInfoAccountInfo = [],
-    genesisInfoTransactionsRoot = StateRoot . fst . B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    genesisInfoReceiptsRoot = StateRoot . fst . B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    genesisInfoTransactionsRoot = nullStateRoot,
+    genesisInfoReceiptsRoot = nullStateRoot,
     genesisInfoLogBloom = B.replicate 512 0,
     genesisInfoDifficulty = 131072,
     genesisInfoNumber = 0,
