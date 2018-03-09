@@ -13,7 +13,7 @@ import           Control.Arrow
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Log
-import           Control.Monad.Trans.State.Lazy
+import           Control.Monad.Trans.State.Lazy    (StateT(..), get, put, runStateT)
 import           Crypto.Secp256k1
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
@@ -322,6 +322,16 @@ postUsersContractMethod
       )
     getBlocTransactionResult' hash resolve
 
+data BatchState = BatchState
+                  { contractsMap      :: Map.Map Address (Int32, Keccak256, Text, Maybe TransactionResult, Integer)
+                  , functionIdMap     :: Map.Map (Int32, Text) Int32
+                  , functionXabiMap   :: Map.Map Int32 Xabi
+                  , functionReturnMap :: Map.Map Int32 [Type]
+                  }
+
+emptyBatchState :: BatchState
+emptyBatchState = BatchState Map.empty Map.empty Map.empty Map.empty
+
 getBlocTransactionResult' :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult' hash resolve =
   if resolve
@@ -370,19 +380,37 @@ postBlocTransactionResults resolve hashes = do
               recurse res p'
           return $ merge p d sortByIndex
 
-        evalAndReturn list = forStateT (Map.empty) list $
-          \(status, hash, _, mtxr, mtx) -> do
-            case status of
-              Pending -> return $ BlocTransactionResult Pending hash Nothing Nothing
-              Failure -> return $ BlocTransactionResult Failure hash mtxr Nothing
-              Success -> do
-                let Just tx = mtx
-                case T.transactionTransactionType tx of
-                  Transfer -> return $ BlocTransactionResult Success hash mtxr (Just $ Send $ toPostTx tx)
-                  Contract -> contractResult hash mtxr
-                  FunctionCall -> functionResult hash mtxr
+        evalAndReturn list = do
+          (mbtrs,BatchState{..}) <- forStateT emptyBatchState list $
+            \(status, hash, index, mtxr, mtx) -> do
+              case status of
+                Pending -> return . Just $ (BlocTransactionResult Pending hash Nothing Nothing, index)
+                Failure -> return . Just $ (BlocTransactionResult Failure hash mtxr Nothing, index)
+                Success -> do
+                  let Just tx = mtx
+                  case T.transactionTransactionType tx of
+                    Transfer -> return . Just $ (BlocTransactionResult Success hash mtxr (Just $ Send $ toPostTx tx), index)
+                    Contract -> contractResult hash mtxr index
+                    FunctionCall -> functionResult hash mtxr index
+          let jbtrs = [btr | Just btr <- mbtrs]
+          nbtrs <- do
+            let contractsList = Map.toList contractsMap
+            void . blocModify $ \conn -> runInsertMany conn contractsInstanceTable
+              [
+              ( Nothing
+              , constant cmId
+              , constant addr'
+              , Nothing
+              )
+              | (addr', (cmId, _, _, _, _)) <- contractsList
+              ]
+            forM contractsList $ \(addr', (_, hash, name, mtxr, index)) -> do
+              details <- getContractDetails (ContractName name) (Unnamed addr')
+              return $ (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
+          let btrs = map fst $ merge jbtrs nbtrs (\r1 r2 -> snd r1 < snd r2)
+          return btrs
 
-        contractResult hash mtxr = do
+        contractResult hash mtxr index = do
           let
             Just txResult = mtxr
             addressMaybe = do
@@ -403,46 +431,61 @@ postBlocTransactionResults resolve hashes = do
               xs::[Int32] <- lift $ blocQuery $ proc () -> do
                 (cmId',_,_,_,_,_,_,_) <- contractByAddress name addr' -< ()
                 returnA -< cmId'
-              when (isNothing $ listToMaybe xs) $ do
-                void . lift $ blocModify $ \conn -> runInsert conn contractsInstanceTable
-                  ( Nothing
-                  , constant cmId
-                  , constant addr'
-                  , Nothing
-                  )
-              details <- lift $ getContractDetails (ContractName name) (Unnamed addr')
-              return $ BlocTransactionResult Success hash mtxr (Just $ Upload details)
+              if (isNothing $ listToMaybe xs)
+                then do
+                  state <- get
+                  put state{contractsMap = Map.insert addr' (cmId, hash, name, mtxr, index) (contractsMap state)}
+                  return Nothing
+                else do
+                  details <- lift $ getContractDetails (ContractName name) (Unnamed addr')
+                  return $ Just (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
 
-        functionResult hash mtxr = do
+        functionResult hash mtxr index = do
           let Just txResult = mtxr
+          state <- get
           (cmId,funcName)::(Int32,Text) <- lift $ blocQuery1 $ contractByTxHash hash
-          functionId <- lift $ getFunctionId cmId funcName
-          xabi <- lift $ getContractXabiByMetadataId cmId
-          resultXabiTypes <- lift $ getXabiFunctionsReturnValuesQuery functionId
-          let
-            orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
-          orderedResultTypes <- lift $
-            for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
-              either (throwError . UserError . Text.pack) return $
-                xabiTypeToType xabi indexedTypeType
+          (functionId, state') <- case Map.lookup (cmId,funcName) (functionIdMap state) of
+            Just fid -> return (fid, state)
+            Nothing -> do
+              fid <- lift $ getFunctionId cmId funcName
+              return (fid,state{functionIdMap = Map.insert (cmId,funcName) fid (functionIdMap state)})
+          (xabi, state'') <- case Map.lookup cmId (functionXabiMap state') of
+            Just xabi' -> return (xabi', state')
+            Nothing -> do
+              xabi' <- lift $ getContractXabiByMetadataId cmId
+              return (xabi', state'{functionXabiMap = Map.insert cmId xabi' (functionXabiMap state')})
+          (mappedResultTypes, state''') <- case Map.lookup functionId (functionReturnMap state'') of
+            Just types -> return (types, state'')
+            Nothing -> do
+              resultXabiTypes <- lift $ getXabiFunctionsReturnValuesQuery functionId
+              let
+                orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex resultXabiTypes
+              orderedResultTypes <- lift $
+                for orderedResultIndexedXT $ \Xabi.IndexedType{..} ->
+                  either (throwError . UserError . Text.pack) return $
+                    xabiTypeToType xabi indexedTypeType
+              let
+                types' = map convertEnumTypeToInt orderedResultTypes
+              return (types', state''{functionReturnMap = Map.insert functionId types' (functionReturnMap state'')})
           let
             txResp = transactionresultResponse txResult
             -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
             -- workaround for enums
             mFormattedResponse =
-              convertResultResToVals txResp (map convertEnumTypeToInt orderedResultTypes)
+              convertResultResToVals txResp mappedResultTypes
+          put state'''
           case transactionresultMessage txResult of
             "Success!" -> do
               formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
-              return $ BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse)
+              return $ Just (BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse), index)
             stratoMsg  -> lift $ throwError $ UserError stratoMsg
 
-        forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-        forStateT _ [] _ = return []
+        forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
+        forStateT s [] _ = return ([],s)
         forStateT s (a:as) run = do
           (b,s') <- runStateT (run a) s
-          bs <- forStateT s' as run
-          return (b:bs)
+          (bs,s'') <- forStateT s' as run
+          return ((b:bs),s'')
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
