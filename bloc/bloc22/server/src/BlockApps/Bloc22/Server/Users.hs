@@ -66,6 +66,13 @@ data TransactionHeader = TransactionHeader
   , transactionheaderNonceInc :: Int
   }
 
+forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
+forStateT _ [] _ = return []
+forStateT s (a:as) run = do
+  (b,s') <- runStateT (run a) s
+  bs <- forStateT s' as run
+  return (b:bs)
+
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
@@ -151,24 +158,31 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
     else do
       let UploadListContract _ _ mtp _ = head contracts
       txParams <- getAccountTxParams addr mtp
-      namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args _ value,nonceIncr) -> do
-        (bin16,cmId) <- blocQuery1 $ proc () -> do
-          (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
-          returnA -< (bin16,cmId)
-        let
-          (bin,leftOver) = Base16.decode bin16
-        unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-        mFunctionId <- getConstructorId cmId
-        argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
-        tx <- prepareTx sk $
-            TransactionHeader
-              Nothing
-              addr
-              txParams
-              (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-              (bin <> argsBin)
-              nonceIncr
-        return ((name,cmId),tx)
+      namesCmIdsTxs <- forStateT Map.empty (zip contracts [0..]) $
+        \(UploadListContract name args _ value,nonceIncr) -> do
+          state <- get
+          (bin16,cmId) <- case Map.lookup name state of
+            Just binCm -> return binCm
+            Nothing -> do
+              binCm <- lift $ blocQuery1 $ proc () -> do
+                (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,cmId)
+              void $ put (Map.insert name binCm state)
+              return binCm
+          let
+            (bin,leftOver) = Base16.decode bin16
+          unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+          mFunctionId <- lift $ getConstructorId cmId
+          argsBin <- lift $ buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
+          tx <- lift $ prepareTx sk $
+              TransactionHeader
+                Nothing
+                addr
+                txParams
+                (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                (bin <> argsBin)
+                nonceIncr
+          return ((name,cmId),tx)
       let
         txs = map snd namesCmIdsTxs
       hashes <- blocStrato (postTxList txs)
@@ -267,12 +281,6 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
           hashes
           txsCmIdsFuncNames
       forM hashes $ \hash -> getBlocTransactionResult' hash (resolve || postmethodlistrequestResolve)
-  where forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-        forStateT _ [] _ = return []
-        forStateT s (a:as) run = do
-          (b,s') <- runStateT (run a) s
-          bs <- forStateT s' as run
-          return (b:bs)
 
 postUsersContractMethod
   :: UserName
