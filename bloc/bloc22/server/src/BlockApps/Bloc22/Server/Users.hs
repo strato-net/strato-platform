@@ -67,12 +67,12 @@ data TransactionHeader = TransactionHeader
   , transactionheaderNonceInc :: Int
   }
 
-forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
-forStateT _ [] _ = return []
+forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
+forStateT s [] _ = return ([],s)
 forStateT s (a:as) run = do
   (b,s') <- runStateT (run a) s
-  bs <- forStateT s' as run
-  return (b:bs)
+  (bs,s'') <- forStateT s' as run
+  return (b:bs,s'')
 
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
@@ -159,7 +159,7 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
     else do
       let UploadListContract _ _ mtp _ = head contracts
       txParams <- getAccountTxParams addr mtp
-      namesCmIdsTxs <- forStateT Map.empty (zip contracts [0..]) $
+      (namesCmIdsTxs,_) <- forStateT Map.empty (zip contracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
           state <- get
           (bin16,cmId) <- case Map.lookup name state of
@@ -244,7 +244,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
     else do
       let mc = head postmethodlistrequestTxs
       txParams <- getAccountTxParams userAddr $ methodcallTxParams mc
-      txsCmIdsFuncNames <- forStateT Map.empty (zip postmethodlistrequestTxs [0..]) $
+      (txsCmIdsFuncNames,_) <- forStateT Map.empty (zip postmethodlistrequestTxs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
           let mapKey = methodcallContractAddress
           state <- get
@@ -497,13 +497,6 @@ postBlocTransactionResults resolve hashes = do
               formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> txResp) mFormattedResponse
               return $ Just (BlocTransactionResult Success hash mtxr (Just $ Call formattedResponse), index)
             stratoMsg  -> lift $ throwError $ UserError stratoMsg
-
-        forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m ([b],s)
-        forStateT s [] _ = return ([],s)
-        forStateT s (a:as) run = do
-          (b,s') <- runStateT (run a) s
-          (bs,s'') <- forStateT s' as run
-          return ((b:bs),s'')
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
