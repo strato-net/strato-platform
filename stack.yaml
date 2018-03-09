@@ -63,12 +63,17 @@ extra-deps:
 - dequeue-0.1.12
 - directory-1.2.7.1
 - aeson-diff-1.1.0.4
+- aeson-extra-0.4.1.0
 - edit-distance-vector-1.0.0.4
 - hspec-2.3.2
 - hspec-core-2.3.2
 - hspec-discover-2.3.2
 - hspec-expectations-0.8.2
 - quickcheck-io-0.1.4
+- attoparsec-iso8601-1.0.0.0
+- recursion-schemes-5.0.2
+- these-0.7.4
+- QuickCheck-2.10.1
 
 
 resolver: lts-7.18
