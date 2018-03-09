@@ -67,6 +67,13 @@ data TransactionHeader = TransactionHeader
   , transactionheaderNonceInc :: Int
   }
 
+forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
+forStateT _ [] _ = return []
+forStateT s (a:as) run = do
+  (b,s') <- runStateT (run a) s
+  bs <- forStateT s' as run
+  return (b:bs)
+
 getUsers :: Bloc [UserName]
 getUsers = blocTransaction $ map UserName <$> blocQuery getUsersQuery
 
@@ -152,24 +159,31 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
     else do
       let UploadListContract _ _ mtp _ = head contracts
       txParams <- getAccountTxParams addr mtp
-      namesCmIdsTxs <- for (zip contracts [0..]) $ \ (UploadListContract name args _ value,nonceIncr) -> do
-        (bin16,cmId) <- blocQuery1 $ proc () -> do
-          (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
-          returnA -< (bin16,cmId)
-        let
-          (bin,leftOver) = Base16.decode bin16
-        unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-        mFunctionId <- getConstructorId cmId
-        argsBin <- buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
-        tx <- prepareTx sk $
-            TransactionHeader
-              Nothing
-              addr
-              txParams
-              (Wei (maybe 0 fromIntegral $ fmap unStrung value))
-              (bin <> argsBin)
-              nonceIncr
-        return ((name,cmId),tx)
+      namesCmIdsTxs <- forStateT Map.empty (zip contracts [0..]) $
+        \(UploadListContract name args _ value,nonceIncr) -> do
+          state <- get
+          (bin16,cmId) <- case Map.lookup name state of
+            Just binCm -> return binCm
+            Nothing -> do
+              binCm <- lift $ blocQuery1 $ proc () -> do
+                (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,cmId)
+              void $ put (Map.insert name binCm state)
+              return binCm
+          let
+            (bin,leftOver) = Base16.decode bin16
+          unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+          mFunctionId <- lift $ getConstructorId cmId
+          argsBin <- lift $ buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
+          tx <- lift $ prepareTx sk $
+              TransactionHeader
+                Nothing
+                addr
+                txParams
+                (Wei (maybe 0 fromIntegral $ fmap unStrung value))
+                (bin <> argsBin)
+                nonceIncr
+          return ((name,cmId),tx)
       let
         txs = map snd namesCmIdsTxs
       hashes <- blocStrato (postTxList txs)
@@ -230,25 +244,29 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
     else do
       let mc = head postmethodlistrequestTxs
       txParams <- getAccountTxParams userAddr $ methodcallTxParams mc
-      txsCmIdsFuncNames <- for (zip postmethodlistrequestTxs [0..]) $
+      txsCmIdsFuncNames <- forStateT Map.empty (zip postmethodlistrequestTxs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
-          cmId <- getContractsMetaDataIdExhaustive methodcallContractName methodcallContractAddress
-          xabi <- getContractXabi (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
-          let eitherErrorOrContract = xAbiToContract xabi
-
-          contract' <-
-            either (throwError . UserError . Text.pack) return eitherErrorOrContract
-
+          let mapKey = methodcallContractAddress
+          state <- get
+          (cmId, contract') <- case Map.lookup mapKey state of
+            Just entry -> return entry
+            Nothing -> do
+              (cmId', xabi') <- lift $ getContractXabiAndMetadataId (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+              let eitherErrorOrContract = xAbiToContract xabi'
+              contract'' <- lift $ either (throwError . UserError . Text.pack) return eitherErrorOrContract
+              let mapValue = (cmId', contract'')
+              put (Map.insert mapKey mapValue state)
+              return mapValue
           let maybeFunc = Map.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
           sel <-
             case maybeFunc of
              Just (_, TypeFunction selector _ _) -> return selector
-             _ -> throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
+             _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
-          functionId <- getFunctionId cmId methodcallMethodName
-          argsBin <- buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
-          tx <- prepareTx sk $
+          functionId <- lift $ getFunctionId cmId methodcallMethodName
+          argsBin <- lift $ buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
+          tx <- lift $ prepareTx sk $
             TransactionHeader
               (Just methodcallContractAddress)
               userAddr
