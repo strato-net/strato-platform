@@ -5,7 +5,8 @@
 {-# LANGUAGE TemplateHaskell            #-}
 module Blockchain.Strato.Model.Address
     ( Address(..),
-      prvKey2Address, pubKey2Address
+      prvKey2Address, pubKey2Address,
+      formatAddress
     ) where
 
 import           Control.Monad
@@ -22,6 +23,7 @@ import           Blockchain.Strato.Model.Util
 
 import qualified Data.Aeson                           as AS
 import           Data.Aeson.Types
+import qualified Data.Aeson.Encoding                  as Enc
 
 import           Data.Binary
 import qualified Data.ByteString                      as B
@@ -73,14 +75,22 @@ instance PathPiece Address where
     where
       ((wd160, _):_) = readHex $ T.unpack $ t ::  [(Word160,String)]
 
+
+formatAddress :: Address -> String
+formatAddress (Address x) = padZeros 40 $ showHex x ""
 {-
  make into a string rather than an object
 -}
 instance AS.ToJSON Address where
-  toJSON (Address x) = String $ T.pack $ padZeros 40 $ showHex x ""
+  toJSON = String . T.pack . formatAddress
+
+instance AS.ToJSONKey Address where
+  toJSONKey = ToJSONKeyText f (Enc.text . f)
+          where f = T.pack . formatAddress
 
 instance AS.FromJSON Address where
--- TODO- put this tighter definition back in again....  I needed to loosten the definition because genesis.json breaks some of the format.
+-- TODO- put this tighter definition back in again....  I needed to loosten the
+-- definition because genesis.json breaks some of the format.
 --  parseJSON (String s)
 --    | not (all (`elem` ("abcdefABCDEF0123456789"::String)) $ T.unpack s) ||
 --      not (T.length s == 40) =
@@ -89,10 +99,10 @@ instance AS.FromJSON Address where
   parseJSON _          = mzero
 
 instance Lei.Pretty Address where
-  pretty (Address x) = Lei.text $ CL.yellow $ padZeros 40 $ showHex x ""
+  pretty = Lei.text . CL.yellow . formatAddress
 
 instance Format Address where
-  format (Address x) = CL.yellow $ padZeros 40 $ showHex x ""
+  format = CL.yellow . formatAddress
 
 instance Binary Address where
   put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x

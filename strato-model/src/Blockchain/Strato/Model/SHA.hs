@@ -6,11 +6,14 @@ import           Blockchain.Strato.Model.ExtendedWord (Word256, word256ToBytes)
 import           Blockchain.Strato.Model.Util
 import           Control.Monad                        (replicateM)
 import qualified Crypto.Hash.SHA3                     as SuperProprietaryWrongFuckingHash
+import qualified Data.Aeson                           as Ae
+import qualified Data.Aeson.Encoding                  as Enc
 import           Data.Binary
 import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Base16               as B16
 import qualified Data.ByteString.Char8                as S8
 import qualified Data.ByteString.Lazy                 as BL
+import qualified Data.Text                            as T
 import           GHC.Generics
 import           Numeric                              (readHex, showHex)
 
@@ -28,6 +31,14 @@ instance RLPSerializable SHA where
     rlpDecode x             = error ("Missing case in rlpDecode for SHA: " ++ show x)
     --rlpEncode (SHA 0) = RLPNumber 0
     rlpEncode (SHA val) = RLPString $ fst $ B16.decode $ S8.pack $ padZeros 64 $ showHex val ""
+
+instance Ae.ToJSON SHA where
+  toJSON = Ae.String . T.pack . shaToHex
+instance Ae.FromJSON SHA where
+
+instance Ae.ToJSONKey SHA where
+  toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
+      where f = T.pack . shaToHex
 
 shaToHex :: SHA -> String
 shaToHex (SHA sha) = replicate (64 - length hex) '0' ++ hex

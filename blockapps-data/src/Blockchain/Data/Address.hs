@@ -46,4 +46,4 @@ addressFromNibbleString::N.NibbleString->Address
 addressFromNibbleString = Address . decode . BL.fromStrict . nibbleString2ByteString
 
 formatAddressWithoutColor::Address->String
-formatAddressWithoutColor (Address x) = padZeros 40 $ showHex x ""
+formatAddressWithoutColor = formatAddress

@@ -53,15 +53,6 @@ data StateDiff =
     }
     deriving (Generic)
 
-instance (ToJSON a) => ToJSON (Map Address a) where
-  toJSON = toJSON . Map.mapKeys formatAddressWithoutColor
-
-instance (ToJSON a) => ToJSON (Map Word256 a) where
-  toJSON = toJSON . Map.mapKeys format
-
-instance (ToJSON a) => ToJSON (Map SHA a) where
-  toJSON = toJSON . Map.mapKeys formatSHAWithoutColor
-
 instance ToJSON StateDiff
 
 -- | Describes all the changes to a particular account.  The address is not

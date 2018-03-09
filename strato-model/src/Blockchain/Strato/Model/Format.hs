@@ -11,7 +11,6 @@ import qualified Data.ByteString.Char8  as BC
 import qualified Data.NibbleString      as N
 
 import           Numeric
-import           Blockchain.Strato.Model.ExtendedWord
 
 class Format a where
   format::a->String
@@ -22,7 +21,3 @@ instance Format B.ByteString where
 instance Format N.NibbleString where
   format (N.EvenNibbleString bs)  = format bs
   format (N.OddNibbleString n bs) = showHex n "" ++ format bs
-
-instance Format Word256 where
-  format x = BC.unpack $ B16.encode $ B.pack $ word256ToBytes x
-

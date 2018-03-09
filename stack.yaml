@@ -74,6 +74,7 @@ extra-deps:
 - recursion-schemes-5.0.2
 - these-0.7.4
 - QuickCheck-2.10.1
+- aeson-1.0.0.0
 
 
 resolver: lts-7.18
