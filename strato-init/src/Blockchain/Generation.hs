@@ -18,12 +18,9 @@ insertContracts code start count gi =
       (decoded, extra) = B16.decode code
       codeHash = if extra /= ""
                    then error "bytecode not encoded in base16"
-                   -- else (ByteArray.convert $ hash decoded :: Digest Keccak_256) :: ByteString
                    else superProprietaryStratoSHAHash decoded
       rng = [toInteger start..(toInteger start) + count - 1]
+      mkContract addr = Contract addr 0 codeHash
       range = map fromInteger rng
-  in gi {genesisInfoAccountInfo = initialAccounts ++ map (mkContract codeHash) range,
+  in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract range,
          genesisInfoCodeInfo = initialCode ++ [code]}
-
-mkContract :: SHA -> Address -> AccountInfo
-mkContract code addr = Contract addr 0 code
