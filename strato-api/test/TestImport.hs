@@ -54,7 +54,6 @@ wipeDB app = do
     runDBWithApp app $ do
         tables <- getTables
         sqlBackend <- ask
-
         let escapedTables = map (connEscapeName sqlBackend . DBName) tables
             query = "TRUNCATE TABLE " ++ (intercalate ", " escapedTables)
         rawExecute query []
