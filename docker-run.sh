@@ -36,7 +36,7 @@ if [ "$authBasic" != true ] ; then
 fi
 
 echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://apex:3001/health-check
+until curl --silent --output /dev/null --fail --location http://apex:3001/_ping
 do
   sleep 0.5
 done
