@@ -147,12 +147,14 @@ library
     ghc-options: -Wall -O2 -threaded
     build-depends: base
                  , aeson
+                 , base16-bytestring
                  , blockapps-data
                  , blockapps-util
                  , bytestring
-                 , base16-bytestring
-                 , strato-model
+                 , cryptonite
+                 , memory
                  , merkle-patricia-db
+                 , strato-model
                  , time
 
 executable generate-genesis
@@ -164,10 +166,15 @@ executable generate-genesis
     build-depends: base
                  , aeson
                  , aeson-extra
+                 , base16-bytestring
+                 , blockapps-data
+                 , blockapps-util
                  , bytestring
                  , hflags
+                 , merkle-patricia-db
                  , strato-init
                  , strato-model
+                 , time
 
 test-suite strato-init-test
     type: exitcode-stdio-1.0
