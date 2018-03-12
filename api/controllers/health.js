@@ -1,5 +1,5 @@
 module.exports = {
-  healthCheck: function (req, res) {
+  ping: function (req, res) {
     res.status(200).send('pong');
   }
 };

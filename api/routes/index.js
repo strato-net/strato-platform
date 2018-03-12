@@ -27,6 +27,6 @@ router.post('/logout', authHandler.validateRequest(), authController.logout);
 
 router.get('/_track', trackHandler._track);
 
-router.get('/health-check', healthHandler.healthCheck);
+router.get('/ping', healthHandler.ping);
 
 module.exports = router;
