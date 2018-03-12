@@ -12,6 +12,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Data.Aeson
+import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
 
@@ -65,14 +66,23 @@ initializeStateDB :: (HasStateDB m, HasHashDB m)
                   -> m ()
 initializeStateDB addressInfo = do
     initializeBlankStateDB
-    forM_ addressInfo $ \(NonContract address balance') ->
-        putAddressState address blankAddressState{addressStateBalance=balance'}
+    let putAccount acc = case acc of
+                              NonContract address balance' ->
+                                putAddressState address blankAddressState{addressStateBalance=balance'}
+                              Contract address balance' codeHash' ->
+                                putAddressState address blankAddressState{addressStateBalance=balance',
+                                                                          addressStateCodeHash=codeHash'}
+    mapM_ putAccount addressInfo
 
-genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m)
+initializeCodeDB :: (HasCodeDB m, MonadResource m) => [B.ByteString] -> m ()
+initializeCodeDB = mapM_ addCode
+
+genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m, HasCodeDB m)
                           => GenesisInfo
                           -> m Block
 genesisInfoToGenesisBlock gi = do
     initializeStateDB $ genesisInfoAccountInfo gi
+    initializeCodeDB $ genesisInfoCodeInfo gi
     db <- getStateDB
     return Block {
         blockBlockData = BlockData {
@@ -96,7 +106,7 @@ genesisInfoToGenesisBlock gi = do
         blockBlockUncles         = []
     }
 
-getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasStateDB m, HasHashDB m)
+getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasStateDB m, HasHashDB m, HasCodeDB m)
                                      => String
                                      -> m Block
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
