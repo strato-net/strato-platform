@@ -13,7 +13,8 @@ import Blockchain.Data.GenesisInfo
 
 insertContracts :: ByteString -> Address -> Integer -> GenesisInfo -> GenesisInfo
 insertContracts code start count gi =
-  let initial = genesisInfoAccountInfo gi
+  let initialAccounts = genesisInfoAccountInfo gi
+      initialCode = genesisInfoCodeInfo gi
       (decoded, extra) = B16.decode code
       codeHash = if extra /= ""
                    then error "bytecode not encoded in base16"
@@ -21,7 +22,8 @@ insertContracts code start count gi =
                    else superProprietaryStratoSHAHash decoded
       rng = [toInteger start..(toInteger start) + count - 1]
       range = map fromInteger rng
-  in gi {genesisInfoAccountInfo = initial ++ map (mkContract codeHash) range}
+  in gi {genesisInfoAccountInfo = initialAccounts ++ map (mkContract codeHash) range,
+         genesisInfoCodeInfo = initialCode ++ [code]}
 
 mkContract :: SHA -> Address -> AccountInfo
 mkContract code addr = Contract addr 0 code

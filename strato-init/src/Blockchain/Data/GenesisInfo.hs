@@ -34,6 +34,7 @@ data GenesisInfo =
     genesisInfoUnclesHash       :: SHA,
     genesisInfoCoinbase         :: Address,
     genesisInfoAccountInfo      :: [AccountInfo],
+    genesisInfoCodeInfo         :: [B.ByteString],
     genesisInfoTransactionsRoot :: StateRoot,
     genesisInfoReceiptsRoot     :: StateRoot,
     genesisInfoLogBloom         :: B.ByteString,
@@ -57,6 +58,7 @@ defaultGenesisInfo =
     genesisInfoUnclesHash = SHA 13478047122767188135818125966132228187941283477090363246179690878162135454535,
     genesisInfoCoinbase = Address 0,
     genesisInfoAccountInfo = [],
+    genesisInfoCodeInfo = [],
     genesisInfoTransactionsRoot = nullStateRoot,
     genesisInfoReceiptsRoot = nullStateRoot,
     genesisInfoLogBloom = B.replicate 512 0,
@@ -77,6 +79,7 @@ instance FromJSON GenesisInfo where
     o .: "unclesHash" <*>
     o .: "coinbase" <*>
     o .: "accountInfo" <*>
+    o .:? "codeInfo" .!= [] <*>
     o .: "transactionRoot" <*>
     o .: "receiptsRoot" <*>
     o .: "logBloom" <*>
@@ -97,6 +100,7 @@ instance ToJSON GenesisInfo where
       "unclesHash" .= genesisInfoUnclesHash x,
       "coinbase" .= genesisInfoCoinbase x,
       "accountInfo" .= genesisInfoAccountInfo x,
+      "codeInfo" .= genesisInfoCodeInfo x,
       "transactionRoot" .= genesisInfoTransactionsRoot x,
       "receiptsRoot" .= genesisInfoReceiptsRoot x,
       "logBloom" .= genesisInfoLogBloom x,

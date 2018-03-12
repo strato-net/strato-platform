@@ -20,7 +20,6 @@ emptyHash = SHA 0x6ee829aad0ec74494a6cf1433f563bbbe7e556a2a067d6ecd596dda0aecd82
 
 sharedStart :: Address
 sharedStart = Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a
--- sharedStart = Address 0x17
 
 spec :: Spec
 spec = do
@@ -43,3 +42,9 @@ spec = do
           want = map (\n -> Contract (sharedStart + fromIntegral n) 0 emptyHash) [0..total-1]
           got = insertContracts emptyContract sharedStart total input
       in genesisInfoAccountInfo got `shouldBe` want
+
+    it "should add emptyContract to the contractInfo" $
+      let input = defaultGenesisInfo
+          want = [emptyContract]
+          got = insertContracts emptyContract sharedStart 10 input
+      in genesisInfoCodeInfo got `shouldBe` want

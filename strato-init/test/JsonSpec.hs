@@ -72,6 +72,7 @@ spec = do
               Contract (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
                        9000
                        (SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)],
+            genesisInfoCodeInfo = [],
             genesisInfoTransactionsRoot = StateRoot . fst . B16.decode $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
             genesisInfoReceiptsRoot =  StateRoot . fst . B16.decode $
