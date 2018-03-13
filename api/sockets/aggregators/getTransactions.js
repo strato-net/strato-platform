@@ -3,7 +3,7 @@ const { GET_TRANSACTIONS } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 var rp = require('request-promise');
 const config = require('../../config/app.config')
-const Transaction= require('../models/eth/transaction')
+const Transaction= require('../../models/strato/eth/transaction');
 
 let transactions
 

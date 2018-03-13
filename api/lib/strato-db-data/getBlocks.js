@@ -29,7 +29,7 @@ function getBlocks() {
         }, 
         raw: true, 
         limit: 15, 
-        order: [['number', 'DESC']] 
+        order: [['number', 'DESC']]
       }
     ).then(blocks => {
       // New block. Emit some information
@@ -133,30 +133,6 @@ function calculatePropagation(prevBlock, currentBlock) {
   
 }
 
-
-getBlocks()
-setInterval(getBlocks, config.webSockets.dbPollFrequency)
-
-function initialHydrateDifficulty(socket) {
-  socket.emit(`PRELOAD_${BLOCKS_DIFFICULTY}`, difficulty)
-}
-
-function initialHydrateTransactionCount(socket) {
-  socket.emit(`PRELOAD_${TRANSACTIONS_COUNT}`, txCount)
-}
-
-function initalHydrateBlockPropagation(socket) {
-  socket.emit(`PRELOAD_${BLOCKS_PROPAGATION}`, propagationDelay)
-}
-
-function initialHydrateLastBlock(socket) {
-  socket.emit(`PRELOAD_${LAST_BLOCK_NUMBER}`, lastBlockNumber);
-}
-
 module.exports = {
-  initialHydrateDifficulty,
-  initialHydrateLastBlock,
-  initialHydrateTransactionCount,
-  initalHydrateBlockPropagation
+  getBlocks: getBlocks,
 }
-

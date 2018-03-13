@@ -25,8 +25,10 @@ router.post('/logout', authHandler.validateRequest(), authController.logout);
 // router.get('/tokens', authHandler.validateRequest(), tokenController.list);
 // router.delete('/tokens', authHandler.validateRequest(), tokenController.revoke);
 
-router.get('/_track', trackHandler._track);
+router.get('/status', healthHandler.nodeStatus);
 
 router.get('/_ping', healthHandler.ping);
+
+router.get('/_track', trackHandler._track);
 
 module.exports = router;
