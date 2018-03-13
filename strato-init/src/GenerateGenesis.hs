@@ -6,20 +6,21 @@ import System.Exit        (die)
 import System.IO (withFile, IOMode(..))
 
 import Control.Monad (when)
-import Data.Aeson (eitherDecodeStrict)
-import Data.Aeson.Extra (encodeStrict)
-import Data.ByteString (hGetContents, hPut, ByteString)
+import Data.Aeson.Encode.Pretty (encodePretty)
+import Data.Aeson.Extra (eitherDecodeStrict)
+import Data.ByteString (hGetContents, ByteString)
+import Data.ByteString.Lazy (hPut)
 import Data.List (intercalate)
 
 import Blockchain.Generation (insertContracts)
-import Blockchain.Strato.Model.Address (Address(..))
+import Blockchain.Strato.Model.Address ()
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
+defineFlag "s:start" (0xfeb1989bbbea7000000000000000000000000000 :: Integer) "Starting address for seeding contract"
 defineFlag "b:bytecode_file" ("" :: String) "Filename pointing to the contract definition"
 defineFlag "n:number" (0 :: Integer) "Number of copies to seed"
 defineFlag "o:output_file" ("genesisWithContracts.json" :: String) "Name of output file to write"
-defineEQFlag "s:start" [| Address 0xfeb1989bbbea7000000000000000000000000000 :: Address |]
-    "ADDRESS" "Starting address for seeded contract"
+defineFlag "f:fake_flag" (0:: Integer) "Hflags will ignore this flag."
 
 
 usage :: IO ()
@@ -45,7 +46,7 @@ main = do
                     Right g -> g
                     Left err -> error ("couldn't parse genesis: " ++ err)
 
-  let output = insertContracts bytes flags_start flags_number genesis
+  let output = insertContracts bytes (fromInteger flags_start) flags_number genesis
 
-  let outputText = encodeStrict output
+  let outputText = encodePretty output
   withFile flags_output_file WriteMode (flip hPut $ outputText)

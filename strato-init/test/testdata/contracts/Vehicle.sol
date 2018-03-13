@@ -2,7 +2,6 @@ contract Vehicle {
   uint timestamp;
   string public vin;
   string public s0;
-  string public s1;
 
   function vin() public returns (string) {
     return vin;

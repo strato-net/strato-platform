@@ -64,6 +64,7 @@ extra-deps:
 - directory-1.2.7.1
 - aeson-diff-1.1.0.4
 - aeson-extra-0.4.1.0
+- aeson-pretty-0.8.5
 - edit-distance-vector-1.0.0.4
 - hspec-2.3.2
 - hspec-core-2.3.2

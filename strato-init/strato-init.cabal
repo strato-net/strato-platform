@@ -166,6 +166,7 @@ executable generate-genesis
     build-depends: base
                  , aeson
                  , aeson-extra
+                 , aeson-pretty
                  , base16-bytestring
                  , blockapps-data
                  , blockapps-util
