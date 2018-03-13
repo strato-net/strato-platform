@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TupleSections        #-}
@@ -11,10 +12,12 @@ module Blockchain.Data.GenesisInfo (
   defaultGenesisInfo
   ) where
 
+import           GHC.Generics (Generic)
 import           Data.Aeson
 import           Data.Aeson.TH                      as AT
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
+import           Data.Monoid ((<>))
 import           Data.Time
 import           Data.Word
 
@@ -46,7 +49,7 @@ data GenesisInfo =
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: SHA,
     genesisInfoNonce            :: Word64
-} deriving (Show, Eq)
+} deriving (Show, Eq, Generic)
 
 nullStateRoot :: StateRoot
 nullStateRoot = StateRoot . fst . B16.decode $
@@ -94,22 +97,21 @@ instance FromJSON GenesisInfo where
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
-  toJSON x =
-    object [
-      "parentHash" .= genesisInfoParentHash x,
-      "unclesHash" .= genesisInfoUnclesHash x,
-      "coinbase" .= genesisInfoCoinbase x,
-      "accountInfo" .= genesisInfoAccountInfo x,
-      "codeInfo" .= genesisInfoCodeInfo x,
-      "transactionRoot" .= genesisInfoTransactionsRoot x,
-      "receiptsRoot" .= genesisInfoReceiptsRoot x,
-      "logBloom" .= genesisInfoLogBloom x,
-      "difficulty" .= genesisInfoDifficulty x,
-      "number" .= genesisInfoNumber x,
-      "gasLimit" .= genesisInfoGasLimit x,
-      "gasUsed" .= genesisInfoGasUsed x,
-      "timestamp" .= genesisInfoTimestamp x,
-      "extraData" .= genesisInfoExtraData x,
-      "mixHash" .= genesisInfoMixHash x,
-      "nonce" .= genesisInfoNonce x
-      ]
+  toEncoding x = pairs (
+      "parentHash" .= genesisInfoParentHash x <>
+      "unclesHash" .= genesisInfoUnclesHash x <>
+      "coinbase" .= genesisInfoCoinbase x <>
+      "codeInfo" .= genesisInfoCodeInfo x <>
+      "transactionRoot" .= genesisInfoTransactionsRoot x <>
+      "receiptsRoot" .= genesisInfoReceiptsRoot x <>
+      "logBloom" .= genesisInfoLogBloom x <>
+      "difficulty" .= genesisInfoDifficulty x <>
+      "number" .= genesisInfoNumber x <>
+      "gasLimit" .= genesisInfoGasLimit x <>
+      "gasUsed" .= genesisInfoGasUsed x <>
+      "timestamp" .= genesisInfoTimestamp x <>
+      "extraData" .= genesisInfoExtraData x <>
+      "mixHash" .= genesisInfoMixHash x <>
+      "nonce" .= genesisInfoNonce x <>
+      "accountInfo" .= genesisInfoAccountInfo x
+    )
