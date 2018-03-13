@@ -15,6 +15,14 @@ const dbConfig = {
     port: '5432',
     dialect: 'postgres',
   },
+  test: {
+    username: 'postgres',
+    password: 'api',
+    database: 'eth_' + nodeUUID,
+    host: 'postgres',
+    port: '5432',
+    dialect: 'postgres',
+  },
   production: {
     username: 'postgres',
     password: 'api',
