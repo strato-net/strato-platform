@@ -12,7 +12,6 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Resource
 import           Data.Aeson
-import qualified Data.ByteString                      as B
 import qualified Data.ByteString.Char8                as C8
 import qualified Data.ByteString.Lazy.Char8           as BLC
 
@@ -74,17 +73,23 @@ initializeStateDB addressInfo = do
                                                                           addressStateCodeHash=codeHash'}
     mapM_ putAccount addressInfo
 
-initializeCodeDB :: (HasCodeDB m, MonadResource m) => [B.ByteString] -> m ()
-initializeCodeDB = mapM_ addCode
+initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
+initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _) -> bin))
 
 genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m, HasCodeDB m)
                           => GenesisInfo
-                          -> m Block
+                          -> m ([(AccountInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
-    initializeCodeDB $ genesisInfoCodeInfo gi
-    initializeStateDB $ genesisInfoAccountInfo gi
+    let codes = genesisInfoCodeInfo gi
+    let accounts = genesisInfoAccountInfo gi
+    let sourceInfo = case codes of
+                    [] -> []
+                    [c] -> zip accounts (repeat c)
+                    _ -> error "not equipped to seed for multiple contract types"
+    initializeCodeDB codes
+    initializeStateDB accounts
     db <- getStateDB
-    return Block {
+    return (sourceInfo, Block {
         blockBlockData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
             blockDataUnclesHash = genesisInfoUnclesHash gi,
@@ -104,11 +109,11 @@ genesisInfoToGenesisBlock gi = do
         },
         blockReceiptTransactions = [],
         blockBlockUncles         = []
-    }
+    })
 
 getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasStateDB m, HasHashDB m, HasCodeDB m)
                                      => String
-                                     -> m Block
+                                     -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let theJSON = either error id (eitherDecode theJSONString)
@@ -127,21 +132,21 @@ initializeGenesisBlock :: ( MonadResource m
                        -> String
                        -> m ()
 initializeGenesisBlock backupType genesisBlockName = do
-    (genesisBlock, obGB) <-
+    (srcInfo, genesisBlock, obGB) <-
         case backupType of
             NoBackup -> do
-                gb <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
                 _ <- produceVMEvents [ChainBlock gb]
                 obGB <- liftIO $ bootstrapSequencer gb
                 putGenesisHash $ blockHash gb
-                return (gb, obGB)
+                return (si, gb, obGB)
             BlockBackup -> do
-                gb <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
                 _ <- produceVMEvents [ChainBlock gb]
                 obGB <- liftIO $ bootstrapSequencer gb
                 backupBlocks
                 putGenesisHash $ blockHash gb
-                return (gb, obGB)
+                return (si, gb, obGB)
             MPBackup -> error "MPBackup called"
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
@@ -157,6 +162,10 @@ initializeGenesisBlock backupType genesisBlockName = do
         updatedAccounts     = Map.empty
     }
     commitSqlDiffs diff
+    let writeSource (account, CodeInfo _ src) = case account of
+                                                    NonContract _ _ -> return ()
+                                                    Contract addr _ _ -> updateSource addr src
+    forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)

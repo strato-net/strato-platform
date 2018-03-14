@@ -11,8 +11,8 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.SHA
 import Blockchain.Data.GenesisInfo
 
-insertContracts :: ByteString -> Address -> Integer -> GenesisInfo -> GenesisInfo
-insertContracts code start count gi =
+insertContracts :: String -> ByteString -> Address -> Integer -> GenesisInfo -> GenesisInfo
+insertContracts src code start count gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi
       (decoded, extra) = B16.decode code
@@ -23,4 +23,4 @@ insertContracts code start count gi =
       mkContract addr = Contract addr 0 codeHash
       range = map fromInteger rng
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract range,
-         genesisInfoCodeInfo = initialCode ++ [decoded]}
+         genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src]}

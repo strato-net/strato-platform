@@ -9,6 +9,7 @@
 module Blockchain.Data.GenesisInfo (
   GenesisInfo(..),
   AccountInfo(..),
+  CodeInfo(..),
   defaultGenesisInfo
   ) where
 
@@ -25,6 +26,11 @@ import           Blockchain.Data.Address
 import           Blockchain.Database.MerklePatricia
 import           Blockchain.SHA
 
+data CodeInfo = CodeInfo B.ByteString String
+  deriving (Show, Eq, Generic)
+
+$(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
+
 data AccountInfo = NonContract Address Integer
                  | Contract Address Integer SHA
    deriving (Show, Eq)
@@ -37,7 +43,7 @@ data GenesisInfo =
     genesisInfoUnclesHash       :: SHA,
     genesisInfoCoinbase         :: Address,
     genesisInfoAccountInfo      :: [AccountInfo],
-    genesisInfoCodeInfo         :: [B.ByteString],
+    genesisInfoCodeInfo         :: [CodeInfo],
     genesisInfoTransactionsRoot :: StateRoot,
     genesisInfoReceiptsRoot     :: StateRoot,
     genesisInfoLogBloom         :: B.ByteString,
