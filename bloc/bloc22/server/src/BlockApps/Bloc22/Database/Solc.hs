@@ -219,7 +219,8 @@ addGetSourceFuncToSource src = do
   where
     addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
     formatSrc = replace "\"" "\\\""
-              . replace "\n" "\\n" 
+              . replace "\n" "\\n"
+              . replace "'" "\\'"
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines
