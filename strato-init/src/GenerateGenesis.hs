@@ -7,7 +7,6 @@ import System.IO (withFile, IOMode(..))
 
 import Control.Monad (when)
 import Data.Aeson (encode)
-import Data.Aeson.Encode.Pretty (encodePretty)
 import Data.Aeson.Extra (eitherDecodeStrict)
 import Data.ByteString (hGetContents, ByteString)
 import Data.ByteString.Lazy (hPut)
@@ -49,9 +48,5 @@ main = do
 
   let output = insertContracts bytes (fromInteger flags_start) flags_number genesis
 
-  -- encodePretty looks a lot nicer, but for a large number of accounts will
-  -- run out of memory with the intermediate Aeson.Value.
-  let outputText = if flags_number <= 10000000
-                      then encodePretty output
-                      else encode output
+  let outputText = encode output
   withFile flags_output_file WriteMode (flip hPut $ outputText)
