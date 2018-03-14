@@ -16,11 +16,11 @@ insertContracts code start count gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi
       (decoded, extra) = B16.decode code
-      codeHash = if extra /= ""
-                   then error "bytecode not encoded in base16"
+      codeHash = if extra /= "" && extra /= "\n"
+                   then error ("bytecode not encoded in base16:" ++ show code)
                    else superProprietaryStratoSHAHash decoded
       rng = [toInteger start..(toInteger start) + count - 1]
       mkContract addr = Contract addr 0 codeHash
       range = map fromInteger rng
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract range,
-         genesisInfoCodeInfo = initialCode ++ [code]}
+         genesisInfoCodeInfo = initialCode ++ [decoded]}
