@@ -38,8 +38,4 @@ done
 $stratoserver &
 
 $blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-           --stratourl="$stratoRoot" 2>&1
-
-# while true; do
-# 	sleep 1.0
-# done
+            --stratourl="$stratoRoot" 2>&1

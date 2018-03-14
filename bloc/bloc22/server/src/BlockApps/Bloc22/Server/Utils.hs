@@ -7,9 +7,11 @@
 module BlockApps.Bloc22.Server.Utils where
 
 import           Control.Concurrent
+import           Control.Monad          (forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
 import qualified Data.ByteString.Base16 as BS16
+import qualified Data.Map.Strict        as Map
 import           Data.Maybe
 import qualified Data.Text                as Text
 import qualified Data.Text.Encoding               as Text
@@ -43,6 +45,15 @@ waitNewBlock = do
 maybeTxResult :: Keccak256 -> Bloc (Maybe TransactionResult)
 maybeTxResult hash = listToMaybe <$> blocStrato (getTxResult hash)
 
+maybeTxBatchResult :: [Keccak256] -> Bloc [Maybe TransactionResult]
+maybeTxBatchResult hashes = maybeHeads <$> (blocStrato (postTxResultBatch hashes))
+  where maybeHeads btxr =
+          let list = map (flip Map.lookup $ unBatchTransactionResult btxr) hashes
+          in flip map list $ \mtrs -> case mtrs of
+            Nothing -> Nothing
+            Just trs -> listToMaybe trs
+
+
 maybeTx :: Keccak256 -> Bloc (Maybe Transaction)
 maybeTx hash = do
   mtx <- blocStrato $ listToMaybe <$> getTxsFilter txsFilterParams{qtHash = Just hash}
@@ -59,6 +70,21 @@ getBlocTxStatus hash = do
       case transactionresultMessage txr of
         "Success!" -> return (Success,mtxr)
         _          -> return (Failure,mtxr)
+
+getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe Transaction, Maybe TransactionResult)]
+getBatchBlocTxStatus hashes = do
+  hmtxrs <- zip hashes <$> maybeTxBatchResult hashes
+  forM hmtxrs $ \(hash,mtxr) ->
+    case mtxr of
+      Nothing -> return (Pending, Nothing, mtxr)
+      Just txr -> do
+        case transactionresultMessage txr of
+          "Success!" -> do
+            mtx <- maybeTx hash
+            case mtx of
+              Nothing -> return (Pending, Nothing, mtxr)
+              Just _  -> return (Success, mtx, mtxr)
+          _           -> return (Failure, Nothing, mtxr)
 
 emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing

@@ -171,6 +171,12 @@ type GetBlocTransactionResult = "transactions"
   :> QueryFlag "resolve"
   :> Get '[JSON] BlocTransactionResult
 
+type PostBlocTransactionResults = "transactions"
+  :> "results"
+  :> QueryFlag "resolve"
+  :> ReqBody '[JSON] [Keccak256]
+  :> Post '[JSON] [BlocTransactionResult]
+
 type GetUsers = "users" :> Get '[JSON] [UserName]
 
 type GetUsersUser = "users"
