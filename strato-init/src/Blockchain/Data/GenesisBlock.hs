@@ -81,8 +81,8 @@ genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m, HasCodeDB m)
                           => GenesisInfo
                           -> m Block
 genesisInfoToGenesisBlock gi = do
-    initializeStateDB $ genesisInfoAccountInfo gi
     initializeCodeDB $ genesisInfoCodeInfo gi
+    initializeStateDB $ genesisInfoAccountInfo gi
     db <- getStateDB
     return Block {
         blockBlockData = BlockData {
