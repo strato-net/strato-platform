@@ -4,6 +4,7 @@ const chaiHttp = require('chai-http');
 const assert = chai.assert;
 const expect = chai.expect;
 const fs = require('fs');
+const process = require('process');
 
 const initDb = require('../migrations/init-script/initdb.js');
 const models = require('../models');
@@ -30,94 +31,95 @@ describe('App', function() {
   });
 
   describe('post /login', function() {
-    it('replies Bad Request without un/pw', function(done) {
+    it('replies Bad Request without un/pw', async function() {
       chai.request(app)
         .post('/login')
-        .end(function(err, res) {
+        .catch((err) => {
+          const res = err.response;
           assert(res.text.includes("wrong params"));
           assert.equal(res.status, '400');
-          done();
         });
     });
-    it('replies 401 with incorrect un/pw', function(done) {
+    it('replies 401 with incorrect un/pw', async function() {
       chai.request(app)
         .post('/login')
         .send({username: "me", password: "hunter2"})
-        .end(function(err, res) {
+        .catch((err) => {
+          const res = err.response;
           assert(res.text.includes("does not exist"));
           assert.equal(res.status, '401');
-          done();
         });
      });
-    it('creates accounts', function(done) {
+    it('creates accounts', async function() {
       this.timeout(20000);
-      chai.request(app)
-       .post('/users')
-       .send({username: "you", password: "hunter2"})
-       .end(function(err, res) {
-         assert.equal(res.status, '200');
-         chai.request(app)
+      const res1 = await chai.request(app)
+          .post('/users')
+          .send({username: "you", password: "hunter2"})
+      assert.equal(res1.status, '200');
+      const res2 = await chai.request(app)
            .post('/login')
            .send({username: "you", password: "hunter2"})
-           .end(function(err, res) {
-             assert.equal(res.status, '200');
-             done();
-           });
-       });
+      assert.equal(res2.status, '200');
     });
-    it('doesn\'t log out without creds', function(done) {
-      chai.request(app)
+    it('doesn\'t log out without creds', async function() {
+      await chai.request(app)
         .post('/logout')
-        .end(function(err, res) {
-          assert.equal(res.status, '401');
-          done();
+        .catch((err) => {
+            assert.equal(err.status, '401');
         });
     });
 
-    it('400s when missing an arg', function(done) {
-      chai.request(app)
+    it('400s when missing an arg', async function() {
+      await chai.request(app)
           .post('/dapps')
           .send({username: "dev",
                  password: "hunter3",
                  address: "0x171717171"})
-          .end(function(err, res) {
-            assert.equal(res.status, '400');
-            assert(res.text.includes("wrong params"));
-            done();
+          .catch((err) => {
+              const res = err.response;
+              assert.equal(res.status, '400');
+              assert(res.text.includes("wrong params"));
           });
     });
 
-    xit('Accepts a working bundle', function(done) {
+    it('Accepts a working bundle', async function() {
       this.timeout(60000);
-      chai.request(app)
-       .post('/users')
-       .send({username: "dev", password: "hunter3"})
-       .end(function(err, res) {
-         assert.equal(res.status, '200');
-         address = JSON.parse(res.text).user.accountAddress;
-         assert.notEqual(address, undefined);
-         chai.request("http://localhost")
-           .post('/strato-api/eth/v1.2/faucet')
-           .field('address', address)
-           .end(function(err, res) {
+      const res1 = await chai.request(app)
+         .post('/users')
+         .send({username: "dev", password: "hunter3"})
+      assert.equal(res1.status, '200');
+      const address = JSON.parse(res1.text).user.accountAddress;
+      assert.notEqual(address, undefined);
 
-             chai.request(app)
-                 .post('/dapps')
-                 .attach('file',
-                         fs.readFileSync('./test/testdata/testdata.zip'),
-                         'testdata.zip')
-                 .field('username', 'dev')
-                 .field('password', 'hunter3')
-                 .field('address', address)
-                 .end(function(err, res) {
-                   assert.equal(res.status, 200);
-                   assert(res.text.includes("\"url\""));
-                   assert(res.text.includes("\"metadata\""));
-                   assert(res.text.includes("\"nunya\""));
-                   done();
-                 });
-           });
-       });
+
+      const res2 = await chai.request(process.env.stratoRoot)
+         .post('/faucet')
+         .field('address', address)
+      assert.equal(res2.status, '200');
+
+      let text = "[]";
+      do {
+        let res = await chai.request(process.env.stratoRoot)
+          .get('/account')
+          .query({'address': address})
+          .catch((err) => {
+             throw err;
+          });
+        text = res.text;
+      } while (text === "[]");
+
+      const res3 = await chai.request(app)
+         .post('/dapps')
+         .attach('file',
+                 fs.readFileSync('./test/testdata/testdata.zip'),
+                 'testdata.zip')
+         .field('username', 'dev')
+         .field('password', 'hunter3')
+         .field('address', address)
+       assert.equal(res3.status, 200);
+       assert(res3.text.includes("\"url\""));
+       assert(res3.text.includes("\"metadata\""));
+       assert(res3.text.includes("\"nunya\""));
     });
 
     it("parses initfile.json", async function() {
@@ -132,19 +134,18 @@ describe('App', function() {
       expect(got).to.deep.equal(want);
     });
 
-    xit("can upload init contracts", function(done) {
+    it("can upload init contracts", async function() {
       this.timeout(30000);
-      chai.request(app)
+      const res1 = await chai.request(app)
        .post('/users')
        .send({username: "john_wayne",
-              password: "hunter2"})
-       .end(function(err, res) {
+              password: "hunter2"});
 
-      const address = JSON.parse(res.text).user.accountAddress;
-      chai.request("http://localhost")
-       .post('/strato-api/eth/v1.2/faucet')
-       .field('address', address)
-       .end(async function(err, res) {
+      const address = JSON.parse(res1.text).user.accountAddress;
+      const res2 = await chai.request(process.env.stratoRoot)
+       .post('/faucet')
+       .field('address', address);
+      assert.equal(res2.status, '200');
 
       const creds = {name: "john_wayne",
                     password: "hunter2",
@@ -156,12 +157,9 @@ describe('App', function() {
           'args': {}
         }
       };
-      let addrs = await uploadInitContracts('./test/testdata/', creds, inits);
+      const addrs = await uploadInitContracts('./test/testdata/', creds, inits);
       expect(addrs.storage).to.match(/[0-9A-Fa-f]{40}/g);
-      done();
 
-      });
-      });
     });
 
     it("creates addresses.js", async function() {
