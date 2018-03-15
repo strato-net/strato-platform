@@ -263,23 +263,20 @@ parseInitfile = async function(packageFolderPath) {
  *    (contractName, contractFilename, args) necessary to upload a contract
  * @returns Promise waiting to match variable names to contract addresses
  */
-uploadInitContracts = function(packageFolderPath, creds, inits) {
-  return new Promise(function(resolve, reject) {
-    try {
-      co(function*() {
-        const addrs = {};
-        for (var key in inits) {
+uploadInitContracts = async function(packageFolderPath, creds, inits) {
+  const addrs = {};
+  try {
+    const keys = Object.keys(inits);
+    await Promise.all(keys.map(async (key) => {
           const filename = path.join(packageFolderPath, inits[key].contractFilename);
-          let contract = yield blockappsRest.uploadContract(
+          let contract = await co.wrap(blockappsRest.uploadContract)(
                 creds, inits[key].contractName, filename, inits[key].args);
-          addrs[key] = contract.address
-        }
-        resolve(addrs);
-      });
-    } catch (error) {
-      reject(uploadFailure("could not initialize contracts", error));
-    }
-  });
+          addrs[key] = contract.address;
+    }));
+  } catch (error) {
+      throw uploadFailure("could not initialize contracts", error);
+  }
+  return addrs;
 }
 
 /**

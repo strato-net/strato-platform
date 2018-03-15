@@ -74,7 +74,7 @@ describe('App', function() {
         });
     });
 
-    xit('400s when missing an arg', function(done) {
+    it('400s when missing an arg', function(done) {
       chai.request(app)
           .post('/dapps')
           .send({username: "dev",
@@ -164,7 +164,7 @@ describe('App', function() {
       });
     });
 
-    xit("creates addresses.js", async function() {
+    it("creates addresses.js", async function() {
       const addrs = {"storage": "deadbeefdeadbeef"};
       const name = await injectAddressesJs('./test/testdata', addrs);
       assert.equal(name, 'test/testdata/addresses.js');
