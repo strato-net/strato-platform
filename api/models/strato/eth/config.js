@@ -13,7 +13,15 @@ const dbConfig = {
     database: 'eth_' + nodeUUID,
     host: 'localhost',
     port: '5432',
-    dialect: 'postgres'
+    dialect: 'postgres',
+  },
+  test: {
+    username: 'postgres',
+    password: 'api',
+    database: 'eth_' + nodeUUID,
+    host: 'postgres',
+    port: '5432',
+    dialect: 'postgres',
   },
   production: {
     username: 'postgres',
@@ -21,8 +29,9 @@ const dbConfig = {
     database: 'eth_' + nodeUUID,
     host: 'postgres',
     port: '5432',
-    dialect: 'postgres'
-  }
+    dialect: 'postgres',
+    logging: false,
+  },
 };
 
 module.exports = {dbConfig};
