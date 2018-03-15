@@ -71,20 +71,16 @@ getBlocTxStatus hash = do
         "Success!" -> return (Success,mtxr)
         _          -> return (Failure,mtxr)
 
-getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe Transaction, Maybe TransactionResult)]
+getBatchBlocTxStatus :: [Keccak256] -> Bloc [(BlocTransactionStatus, Maybe TransactionResult)]
 getBatchBlocTxStatus hashes = do
-  hmtxrs <- zip hashes <$> maybeTxBatchResult hashes
-  forM hmtxrs $ \(hash,mtxr) ->
+  mtxrs <- maybeTxBatchResult hashes
+  forM mtxrs $ \mtxr ->
     case mtxr of
-      Nothing -> return (Pending, Nothing, mtxr)
+      Nothing -> return (Pending, mtxr)
       Just txr -> do
         case transactionresultMessage txr of
-          "Success!" -> do
-            mtx <- maybeTx hash
-            case mtx of
-              Nothing -> return (Pending, Nothing, mtxr)
-              Just _  -> return (Success, mtx, mtxr)
-          _           -> return (Failure, Nothing, mtxr)
+          "Success!" -> return (Success, mtxr)
+          _          -> return (Failure, mtxr)
 
 emptyTxParams :: TxParams
 emptyTxParams = TxParams Nothing Nothing Nothing

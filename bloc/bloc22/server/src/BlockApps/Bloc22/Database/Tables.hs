@@ -49,17 +49,20 @@ hashNameTable :: Table
   ( Maybe (Column PGInt4)
   , Column PGBytea
   , Column PGInt4
+  , Column PGInt4
   , Column PGText
   )
   ( Column PGInt4
   , Column PGBytea
   , Column PGInt4
+  , Column PGInt4
   , Column PGText
   )
-hashNameTable = Table "hash_name" $ p4
+hashNameTable = Table "hash_name" $ p5
   ( optional "id"
   , required "hash"
   , required "contract_metadata_id"
+  , required "transaction_type"
   , required "data_string"
   )
 

@@ -15,8 +15,10 @@ import           Control.Monad.Except
 import           Control.Monad.Log
 import           Control.Monad.Trans.State.Lazy    (StateT(..), get, put, runStateT)
 import           Crypto.Secp256k1
+import qualified Data.Aeson                        as Aeson
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString                   as ByteString
+import qualified Data.ByteString.Lazy              as BL
 import qualified Data.ByteString.Base16            as Base16
 import           Data.Either
 import           Data.Foldable
@@ -55,7 +57,6 @@ import qualified BlockApps.Solidity.Xabi.Type      as Xabi
 import           BlockApps.SolidityVarReader
 import           BlockApps.Strato.Client
 import           BlockApps.Strato.Types            hiding (Transaction (..))
-import qualified BlockApps.Strato.Types            as T
 import           BlockApps.XAbiConverter
 
 data TransactionHeader = TransactionHeader
@@ -108,6 +109,13 @@ postUsersSend userName addr resolve
         ByteString.empty
         0
     hash <- blocStrato $ postTx tx
+    void . blocModify $ \conn -> runInsert conn hashNameTable
+      ( Nothing
+      , constant hash
+      , constant (0 :: Int32)
+      , constant (0 :: Int32)
+      , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
+      )
     getBlocTransactionResult' hash resolve
 
 postUsersContract :: UserName -> Address -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
@@ -147,6 +155,7 @@ postUsersContract userName addr resolve
       ( Nothing
       , constant hash
       , constant cmId
+      , constant (1 :: Int32)
       , constant contractdetailsName
       )
     getBlocTransactionResult' hash resolve
@@ -191,6 +200,7 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
         [( Nothing
         , constant hash
         , constant cmId
+        , constant (1 :: Int32)
         , constant name
         )
         | (hash,(name,cmId)) <- zip hashes (map fst namesCmIdsTxs)
@@ -217,6 +227,15 @@ postUsersSendList userName addr resolve (PostSendListRequest pw resolve' txs) = 
         ) txs [0..]
       txs' <- mapM (prepareTx sk) txHeaders
       hashes <- blocStrato $ postTxList txs'
+      void . blocModify $ \conn -> runInsertMany conn hashNameTable
+        [( Nothing
+        , constant hash
+        , constant (0 :: Int32)
+        , constant (0 :: Int32)
+        , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode tx)
+        )
+        | (tx,hash) <- zip txs' hashes
+        ]
       getBatchBlocTransactionResult' hashes (resolve || resolve')
 
 ensureMostRecentSuccessfulTx
@@ -283,6 +302,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
         [( Nothing
         , constant hash
         , constant cmId
+        , constant (2 :: Int32)
         , constant funcName
         )
         | (hash,(_,cmId, funcName)) <- zip hashes txsCmIdsFuncNames
@@ -336,6 +356,7 @@ postUsersContractMethod
       ( Nothing
       , constant hash
       , constant cmId
+      , constant (2 :: Int32)
       , constant funcName
       )
     getBlocTransactionResult' hash resolve
@@ -368,11 +389,11 @@ getBatchBlocTransactionResult' hashes resolve = do
 
 postBlocTransactionResults :: Bool -> [Keccak256] -> Bloc [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = do
-  let shirts' = map (\(h,i) -> (Pending, h, i, Nothing, Nothing)) (zip hashes ([0..] :: [Integer])) -- setup initial list
-  shirts <- recurse resolve shirts' -- recursively batch resolve transactions
-  evalAndReturn shirts -- evaluate transaction results
+  let shirs' = map (\(h,i) -> (Pending, h, i, Nothing)) (zip hashes ([0..] :: [Integer])) -- setup initial list
+  shirs <- recurse resolve shirs' -- recursively batch resolve transactions
+  evalAndReturn shirs -- evaluate transaction results
 
-  where sortByIndex = (\(_,_,i,_,_) (_,_,j,_,_) -> i < j)
+  where sortByIndex = (\(_,_,i,_) (_,_,j,_) -> i < j)
 
         merge [] ps _ = ps
         merge ds [] _ = ds
@@ -382,14 +403,14 @@ postBlocTransactionResults resolve hashes = do
             else (p : merge (d:ds) ps c)
 
         recurse res list = do
-          let his = [(h,i) | (_,h,i,_,_) <- list]
+          let his = [(h,i) | (_,h,i,_) <- list]
           statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)
           let (p',d) = partitionEithers $
                           flip map statusAndMtxrs
-                            (\((s,t,r),(h,i)) ->
+                            (\((s,r),(h,i)) ->
                                if s == Pending
-                                 then Left (s,h,i,r,t)
-                                 else Right (s,h,i,r,t))
+                                 then Left (s,h,i,r)
+                                 else Right (s,h,i,r))
           p <- if not res || null p'
             then return p'
             else do
@@ -400,16 +421,17 @@ postBlocTransactionResults resolve hashes = do
 
         evalAndReturn list = do
           (mbtrs,BatchState{..}) <- forStateT emptyBatchState list $
-            \(status, hash, index, mtxr, mtx) -> do
+            \(status, hash, index, mtxr) -> do
               case status of
                 Pending -> return . Just $ (BlocTransactionResult Pending hash Nothing Nothing, index)
                 Failure -> return . Just $ (BlocTransactionResult Failure hash mtxr Nothing, index)
                 Success -> do
-                  let Just tx = mtx
-                  case T.transactionTransactionType tx of
-                    Transfer -> return . Just $ (BlocTransactionResult Success hash mtxr (Just $ Send $ toPostTx tx), index)
-                    Contract -> contractResult hash mtxr index
-                    FunctionCall -> functionResult hash mtxr index
+                  (cmId,ttype,tdata)::(Int32,Int32,Text) <- lift $ blocQuery1 $ contractByTxHash hash
+                  case ttype of
+                    0 -> return . Just $ (BlocTransactionResult Success hash mtxr (Just . Send . fromJust . Aeson.decode . BL.fromStrict $ Text.encodeUtf8 tdata), index)
+                    1 -> contractResult hash mtxr cmId tdata index
+                    2 -> functionResult hash mtxr cmId tdata index
+                    _ -> error $ "Unexpected transaction type: got" ++ show ttype
           let jbtrs = [btr | Just btr <- mbtrs]
           nbtrs <- do
             let contractsList = Map.toList contractsMap
@@ -428,7 +450,7 @@ postBlocTransactionResults resolve hashes = do
           let btrs = map fst $ merge jbtrs nbtrs (\r1 r2 -> snd r1 < snd r2)
           return btrs
 
-        contractResult hash mtxr index = do
+        contractResult hash mtxr cmId name index = do
           let
             Just txResult = mtxr
             addressMaybe = do
@@ -445,7 +467,6 @@ postBlocTransactionResults resolve hashes = do
                   Nothing -> lift $ throwError $ UserError "Transaction succeeded, but contract was neither created, nor destroyed"
               stratoMsg  -> lift $ throwError $ UserError stratoMsg
             Just addr' -> do
-              (cmId,name)::(Int32,Text) <- lift $ blocQuery1 $ contractByTxHash hash
               xs::[Int32] <- lift $ blocQuery $ proc () -> do
                 (cmId',_,_,_,_,_,_,_) <- contractByAddress name addr' -< ()
                 returnA -< cmId'
@@ -458,10 +479,9 @@ postBlocTransactionResults resolve hashes = do
                   details <- lift $ getContractDetails (ContractName name) (Unnamed addr')
                   return $ Just (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
 
-        functionResult hash mtxr index = do
+        functionResult hash mtxr cmId funcName index = do
           let Just txResult = mtxr
           state <- get
-          (cmId,funcName)::(Int32,Text) <- lift $ blocQuery1 $ contractByTxHash hash
           (functionId, state') <- case Map.lookup (cmId,funcName) (functionIdMap state) of
             Just fid -> return (fid, state)
             Nothing -> do

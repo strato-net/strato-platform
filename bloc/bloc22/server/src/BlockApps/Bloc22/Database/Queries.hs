@@ -171,11 +171,11 @@ contractNameFromAddress contractAddress = proc () -> do
   restrict -< addr .== constant contractAddress
   returnA -< name
 
-contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGText)
+contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
 contractByTxHash txHash = proc () -> do
-  (_,tx_hash,cmId,name) <- queryTable hashNameTable -< ()
+  (_,tx_hash,cmId,ttype,name) <- queryTable hashNameTable -< ()
   restrict -< tx_hash .== constant txHash
-  returnA -< (cmId,name)
+  returnA -< (cmId,ttype,name)
 
 linkedContractsJoinTable :: Query
   ( Column PGBytea
