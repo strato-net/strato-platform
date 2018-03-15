@@ -2,7 +2,7 @@ const _ = require('underscore');
 const { TRANSACTIONS_TYPE } = require('../rooms');
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker');
 const config = require('../../config/app.config');
-const Block= require('../models/eth/block');
+const Block= require('../../models/strato/eth/block');
 
 let transactionsTypes;
 

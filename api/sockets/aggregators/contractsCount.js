@@ -1,6 +1,6 @@
 const { CONTRACTS_COUNT } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
-const ContractInstance = require('../models/block22/contractsInstance')
+const ContractInstance = require('../../models/strato/bloc22/contractsInstance');
 const config = require('../../config/app.config')
 
 let contractsCount

@@ -1,6 +1,6 @@
 const { GET_PEERS } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
-const Peer = require('../models/eth/peer')
+const Peer = require('../../models/strato/eth/peer');
 const config = require('../../config/app.config')
 const _ = require('underscore');
 

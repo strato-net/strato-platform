@@ -7,12 +7,21 @@
     "port": "5432",
     "dialect": "postgres"
   },
-  "production": {
+  "test": {
     "username": "postgres",
     "password": "api",
     "database": "bloc22",
     "host": "postgres",
     "port": "5432",
     "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "api",
+    "database": "bloc22",
+    "host": "postgres",
+    "port": "5432",
+    "dialect": "postgres",
+    "logging": false
   }
 }
