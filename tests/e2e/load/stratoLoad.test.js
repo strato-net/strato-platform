@@ -27,6 +27,7 @@ describe('Strato Load Test', function() {
   before(function * () {
     console.log(`Creating admin user and contract`);
     admin = yield rest.createUser(adminName, adminPassword);
+    console.log(`User: ${admin.name} @ ${admin.address}`);
     yield rest.compileSearch([contractName], contractName, contractFilename);
   });
 
