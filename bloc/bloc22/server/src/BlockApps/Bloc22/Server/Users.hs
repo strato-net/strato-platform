@@ -396,8 +396,8 @@ getBatchBlocTransactionResult' hashes resolve = do
 
 postBlocTransactionResults :: Bool -> [Keccak256] -> Bloc [BlocTransactionResult]
 postBlocTransactionResults resolve hashes = do
-  let shirs' = map (\(h,i) -> (Pending, h, i, Nothing)) (zip hashes ([0..] :: [Integer])) -- setup initial list
-  shirs <- recurse resolve shirs' -- recursively batch resolve transactions
+  let shirs' = map (\(h,i) -> (Pending, h, i, Nothing)) (zip hashes [0..])
+  shirs <- recurse (0 :: Int) resolve shirs' -- recursively batch resolve transactions
   evalAndReturn shirs -- evaluate transaction results
 
   where sortByIndex = (\(_,_,i,_) (_,_,j,_) -> i < j)
@@ -409,7 +409,7 @@ postBlocTransactionResults resolve hashes = do
             then (d : merge ds (p:ps) c)
             else (p : merge (d:ds) ps c)
 
-        recurse res list = do
+        recurse num res list = do
           let his = [(h,i) | (_,h,i,_) <- list]
           statusAndMtxrs <- flip zip his <$> getBatchBlocTxStatus (map fst his)
           let (p',d) = partitionEithers $
@@ -420,10 +420,13 @@ postBlocTransactionResults resolve hashes = do
                                  else Right (s,h,i,r))
           p <- if not res || null p'
             then return p'
-            else do
-              logWith logNotice . Text.pack $ "Polling BlocTransactionStatus for transaction hashes: " ++ show p'
-              void . liftIO $ threadDelay 1000000
-              recurse res p'
+            else
+              if num >= 60
+                then return p'
+                else do
+                  logWith logNotice . Text.pack $ "Polling BlocTransactionStatus for transaction hashes: " ++ show p'
+                  void . liftIO $ threadDelay 1000000
+                  recurse (num + 1) res p'
           return $ merge p d sortByIndex
 
         evalAndReturn list = do
