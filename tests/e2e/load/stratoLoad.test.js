@@ -92,7 +92,6 @@ function isObject(val) {
 function factory_createUploadList(batchSize, batchIndex) {
   for (var i = 0; i < batchSize; i++) {
     // function Vehicle(string _vin, string _s0, string _s1, string _s2, string _s3) public
-    console.log(`nonce ${batchSize * batchIndex + i}`)
     txs.push({
       contractName: contractName,
       args: {
