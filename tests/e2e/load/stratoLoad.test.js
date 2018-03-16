@@ -62,9 +62,16 @@ function * waitResult(hash) {
   let result = yield api.strato.transactionResult(hash);
   while(!(result.length == 1 && result[0].status == 'success')) {
     if(result.length == 1) {
-      console.log(`Current status for hash '${hash}' is '${result[0].status}`);
+      const status = result[0].status;
+      if(isObject(status)) {
+        throw new Error(result[0].message);
+      }
+      console.log(`Current status for hash '${hash}' is '${status}`);
     }
-    yield promiseTimeout(200);
+    else {
+      console.log('Pending');
+    }
+    yield promiseTimeout(300);
     result = yield api.strato.transactionResult(hash);
   }
 }
@@ -77,9 +84,15 @@ function promiseTimeout(timeout) {
   });
 }
 
+function isObject(val) {
+  if (val === null) { return false;}
+  return ( (typeof val === 'function') || (typeof val === 'object') );
+}
+
 function factory_createUploadList(batchSize, batchIndex) {
   for (var i = 0; i < batchSize; i++) {
     // function Vehicle(string _vin, string _s0, string _s1, string _s2, string _s3) public
+    console.log(`nonce ${batchSize * batchIndex + i}`)
     txs.push({
       contractName: contractName,
       args: {
@@ -90,7 +103,7 @@ function factory_createUploadList(batchSize, batchIndex) {
         _s3: `s3_${batchIndex}_${i}`,
       },
       txParams: {
-        gasLimit: 10000000000,
+        gasLimit: 10000000,
         gasPrice: 1,
         nonce: batchSize * batchIndex + i
       }
