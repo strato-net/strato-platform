@@ -23,6 +23,8 @@ describe('Strato Load Test', function() {
 
   const batchSize = util.getArgInt('--batchSize', 1);
   const batchCount = util.getArgInt('--batchCount', 1);
+  const batchDelay = util.getArgInt('--batchDelay', 0);
+  
 
   before(function * () {
     console.log(`Creating admin user and contract`);
@@ -43,7 +45,9 @@ describe('Strato Load Test', function() {
       }, admin.name, admin.address, false);
       console.log(`Received ${results.length} receipts`);
       txResults = txResults.concat(results);
-      yield promiseTimeout(5000);
+      if(batchDelay > 100) {
+        yield promiseTimeout(batchDelay);
+      }
     }
 
     const lastHash = txResults[txResults.length -1].hash;
