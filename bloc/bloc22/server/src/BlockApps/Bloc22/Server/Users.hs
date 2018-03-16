@@ -93,6 +93,13 @@ postUsersFill :: UserName  -> Address -> Bool-> Bloc BlocTransactionResult
 postUsersFill _ addr resolve = blocTransaction $ do
   when resolve (logWith logNotice "Waiting for faucet transaction to be mined")
   hash <- blocStrato $ postFaucet addr
+  void . blocModify $ \conn -> runInsert conn hashNameTable
+    ( Nothing
+    , constant hash
+    , constant (0 :: Int32)
+    , constant (0 :: Int32)
+    , constant (Text.decodeUtf8 . BL.toStrict $ Aeson.encode defaultPostTx{posttransactionTo = Just addr})
+    )
   getBlocTransactionResult' hash resolve
 
 postUsersSend :: UserName -> Address -> Bool -> PostSendParameters -> Bloc BlocTransactionResult

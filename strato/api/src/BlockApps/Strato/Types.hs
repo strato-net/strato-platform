@@ -24,6 +24,7 @@ module BlockApps.Strato.Types
   , TransactionResult (..)
   , BatchTransactionResult (..)
   , PostTransaction (..)
+  , defaultPostTx
   , toPostTx
   , BlockData (..)
   , Block (..)
@@ -298,6 +299,21 @@ instance Arbitrary PostTransaction where
 
 instance ToSample PostTransaction where
   toSamples _ = singleSample PostTransaction
+    { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
+    , posttransactionGasLimit = 21000
+    , posttransactionCodeOrData = ""
+    , posttransactionGasPrice = 50000000000
+    , posttransactionTo = Just $ Address 0xdeadbeef
+    , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
+    , posttransactionValue = Strung 10000000000000000000
+    , posttransactionR = Hex 1 -- make valid examples
+    , posttransactionS = Hex 1 -- make valid examples
+    , posttransactionV = Hex 0x1c
+    , posttransactionNonce = 0
+    }
+
+defaultPostTx :: PostTransaction -- TODO: Make this a real default
+defaultPostTx = PostTransaction
     { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
     , posttransactionGasLimit = 21000
     , posttransactionCodeOrData = ""
