@@ -42,7 +42,7 @@ describe('Strato Load Test', function() {
       }, admin.name, admin.address, false);
       console.log(`Received ${results.length} receipts`);
       txResults = txResults.concat(results);
-    
+      yield promiseTimeout(5000);
     }
 
     const lastHash = txResults[txResults.length -1].hash;
