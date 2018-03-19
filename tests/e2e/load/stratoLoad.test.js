@@ -37,7 +37,7 @@ describe('Strato Load Test', function() {
 
   it('Upload contracts', function * () {
     const startTime = moment();
-    const blocTime = 0;
+    let blocTime = 0;
     for(let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
       factory_createUploadList(batchSize, i);
