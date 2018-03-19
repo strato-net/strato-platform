@@ -1,3 +1,5 @@
+'use strict'
+
 const ba = require('blockapps-rest');
 const co = require('co');
 require('co-mocha');
