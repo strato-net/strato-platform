@@ -44,11 +44,17 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
 
+  export $minLogLevel = "LevelInfo"
+  if $evmDebugMode
+  then
+   export $minLogLevel = "LevelDebug"
+  fi
+
   echo "Starting ethereum-vm"
   runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
                          --diffPublish=true --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --trace=$evmTraceMode --debug=$evmDebugMode >> logs/ethereum-vm 2>&1
+                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel >> logs/ethereum-vm 2>&1
 
   echo "Configuring log maintenance"
   runForever cleanupLogs
