@@ -44,10 +44,9 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
 
-  export $minLogLevel = "LevelInfo"
-  if $evmDebugMode
-  then
-   export $minLogLevel = "LevelDebug"
+  minLogLevel=LevelInfo
+  if [ "${evmDebugMode}" = true ] ; then
+      minLogLevel=LevelDebug
   fi
 
   echo "Starting ethereum-vm"
