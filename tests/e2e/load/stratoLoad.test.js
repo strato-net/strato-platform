@@ -37,14 +37,18 @@ describe('Strato Load Test', function() {
 
   it('Upload contracts', function * () {
     const startTime = moment();
+    const blocTime = 0;
     for(let i = 0; i < batchCount; i++) {
       console.log(`Creating ${batchSize} transactions for count ${i}`);
       factory_createUploadList(batchSize, i);
+      const blocStartTime = moment();
       const results = yield api.bloc.uploadList({
         password: adminPassword,
         contracts: txs.slice(batchSize * i, batchSize * i + batchSize),
         resolve: false 
       }, admin.name, admin.address, false);
+      const blocEndTime = moment();
+      blocTime += blocEndTime.diff(blocStartTime, 'seconds');
       console.log(`Received ${results.length} receipts`);
       txResults = txResults.concat(results);
       if(batchDelay > 100) {
@@ -59,7 +63,7 @@ describe('Strato Load Test', function() {
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
-    console.log(`Total:  seconds: ${seconds},  TPS ${batchSize * batchCount/seconds}`);    
+    console.log(`Total seconds: ${seconds}, Bloc Submission Time: ${blocTime}  TPS ${batchSize * batchCount/seconds}`);    
 
   });
   
