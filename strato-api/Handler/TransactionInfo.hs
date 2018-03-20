@@ -85,9 +85,9 @@ postTransactionListR = do
           let num' = P.length $ P.filter (not . success) $ P.zip hs txs
           $logDebug $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
           insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
-          ecRecoverTime <- do
-            a <- insertTX Log API Nothing (fmap snd txr)
-            return a
+        --   ecRecoverTime <- do
+        --     a <- insertTX Log API Nothing (fmap snd txr)
+        --     return a
           $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
@@ -97,7 +97,7 @@ postTransactionListR = do
                         , insertTXStart - txHashStart
                         , sendResponseStart - insertTXStart
                         ]
-                      ) P.++ [ecRecoverTime]
+                      ) --P.++ [ecRecoverTime]
           $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
           sendResponseStatus status200 $ toJSON (fmap transactionHash txs) -- hs --times -- This is for debugging
        _ -> invalidArgs ["couldn't decode transactions"]
