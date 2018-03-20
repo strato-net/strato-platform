@@ -11,6 +11,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
+import qualified Data.Map                              as M
 import qualified Data.ByteString                       as BS
 import qualified Network.Kafka                         as K
 import qualified Network.Kafka.Consumer                as KC
@@ -34,6 +35,7 @@ import           Executable.EVMCheckpoint
 import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
+import qualified Blockchain.Bagger.BaggerState         as B
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
@@ -83,7 +85,10 @@ ethereumVM = void . execContextM $ do
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
-        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs))
+        state <- Bagger.getBaggerState
+        let pending = B.pending state
+        let queued = B.queued state
+        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending) || not (M.null queued))
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
