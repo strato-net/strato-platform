@@ -279,7 +279,7 @@ promoteExecutables = do
 
         let !(readyToMine, state''') = B.popSequentialFromQueued address addressNonce state''
         putBaggerState state'''
-        forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address addressNonce
+        forM_ readyToMine $ logReady "promoteExecutables Ready-to-mine!" address
 
         calcFee <- B.calculateIntrinsicTxFee <$> getBaggerState
         -- todo callback per promotion call instead of per-address?
