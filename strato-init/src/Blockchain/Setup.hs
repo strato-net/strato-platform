@@ -43,8 +43,10 @@ import           Blockchain.Data.GenesisBlock
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
@@ -101,10 +103,15 @@ instance HasStateDB SetupDBM where
     cxt <- get
     put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
 
-{-instance HasStorageDB SetupDBM where
-  getStorageDB = do
-    cxt <- get
-    return $ MPDB.ldb $ setupDBStateDB cxt --storage and states use the same database!-}
+instance HasStorageDB SetupDBM where
+  getStorageDB = undefined
+    -- cxt <- get
+    -- return $ MPDB.ldb $ setupDBStateDB cxt --storage and states use the same database!
+  putStorageMap = undefined
+
+instance HasMemAddressStateDB SetupDBM where
+  getAddressStateDBMap = undefined
+  putAddressStateDBMap = undefined
 
 instance HasHashDB SetupDBM where
   getHashDB = fmap hashDB get

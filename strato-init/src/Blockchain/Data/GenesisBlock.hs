@@ -25,8 +25,10 @@ import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
+import qualified Blockchain.DB.MemAddressStateDB as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
@@ -51,6 +53,7 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.Model.Address      as Ad
 import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
@@ -62,11 +65,13 @@ initializeBlankStateDB = do
     liftIO . runResourceT $ initializeBlank db
     setStateDBStateRoot emptyTriePtr
 
--- TODO(tim): Write this
-putStorageTrie :: (Monad m) => [(Ext.Word256, Ext.Word256)] -> m StateRoot
-putStorageTrie = const $ return blankStateRoot
+putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
+                  Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
+putStorageTrie address slots = do
+    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
+    flushMemStorageDB
 
-initializeStateDB :: (HasStateDB m, HasHashDB m)
+initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                   => [AccountInfo]
                   -> m ()
 initializeStateDB addressInfo = do
@@ -75,16 +80,15 @@ initializeStateDB addressInfo = do
                               NonContract address balance' ->
                                 putAddressState address blankAddressState{addressStateBalance=balance'}
                               Contract address balance' codeHash' slots -> do
-                                storageRoot <- putStorageTrie slots
                                 putAddressState address blankAddressState{addressStateBalance=balance',
-                                                                          addressStateCodeHash=codeHash',
-                                                                          addressStateContractRoot=storageRoot}
+                                                                          addressStateCodeHash=codeHash'}
+                                putStorageTrie address slots
     mapM_ putAccount addressInfo
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
 initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _) -> bin))
 
-genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m, HasCodeDB m)
+genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
                           -> m ([(AccountInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
@@ -119,7 +123,8 @@ genesisInfoToGenesisBlock gi = do
         blockBlockUncles         = []
     })
 
-getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasStateDB m, HasHashDB m, HasCodeDB m)
+getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
+                                         HasStateDB m, HasStorageDB m)
                                      => String
                                      -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
@@ -130,11 +135,13 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
 data BackupType = NoBackup | BlockBackup | MPBackup
 
 initializeGenesisBlock :: ( MonadResource m
-                          , HasStateDB m
                           , HasCodeDB m
-                          , HasSQLDB m
                           , HasHashDB m
+                          , Mem.HasMemAddressStateDB m
                           , RBDB.HasRedisBlockDB m
+                          , HasSQLDB m
+                          , HasStateDB m
+                          , HasStorageDB m
                           )
                        => BackupType
                        -> String
