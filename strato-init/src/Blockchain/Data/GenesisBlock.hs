@@ -51,6 +51,7 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
 import           Network.Kafka.Consumer               (commitSingleOffset)
@@ -61,6 +62,10 @@ initializeBlankStateDB = do
     liftIO . runResourceT $ initializeBlank db
     setStateDBStateRoot emptyTriePtr
 
+-- TODO(tim): Write this
+putStorageTrie :: (Monad m) => [(Ext.Word256, Ext.Word256)] -> m StateRoot
+putStorageTrie = const $ return blankStateRoot
+
 initializeStateDB :: (HasStateDB m, HasHashDB m)
                   => [AccountInfo]
                   -> m ()
@@ -69,9 +74,11 @@ initializeStateDB addressInfo = do
     let putAccount acc = case acc of
                               NonContract address balance' ->
                                 putAddressState address blankAddressState{addressStateBalance=balance'}
-                              Contract address balance' codeHash' ->
+                              Contract address balance' codeHash' slots -> do
+                                storageRoot <- putStorageTrie slots
                                 putAddressState address blankAddressState{addressStateBalance=balance',
-                                                                          addressStateCodeHash=codeHash'}
+                                                                          addressStateCodeHash=codeHash',
+                                                                          addressStateContractRoot=storageRoot}
     mapM_ putAccount addressInfo
 
 initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
@@ -165,7 +172,7 @@ initializeGenesisBlock backupType genesisBlockName = do
     commitSqlDiffs diff
     let writeSource (account, CodeInfo _ src) = case account of
                                                     NonContract _ _ -> return ()
-                                                    Contract addr _ _ -> updateSource addr src
+                                                    Contract addr _ _ _ -> updateSource addr src
     forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo

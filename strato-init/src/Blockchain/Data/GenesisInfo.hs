@@ -24,6 +24,7 @@ import           Data.Word
 
 import           Blockchain.Data.Address
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.ExtWord
 import           Blockchain.SHA
 
 data CodeInfo = CodeInfo B.ByteString String
@@ -32,7 +33,7 @@ data CodeInfo = CodeInfo B.ByteString String
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
 
 data AccountInfo = NonContract Address Integer
-                 | Contract Address Integer SHA
+                 | Contract Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq)
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)

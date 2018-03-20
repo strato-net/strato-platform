@@ -20,7 +20,8 @@ insertContracts src code start count gi =
                    then error ("bytecode not encoded in base16:" ++ show code)
                    else superProprietaryStratoSHAHash decoded
       rng = [toInteger start..(toInteger start) + count - 1]
-      mkContract addr = Contract addr 0 codeHash
+      -- TODO(tim): populate the initial storage
+      mkContract addr = Contract addr 0 codeHash []
       range = map fromInteger rng
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract range,
          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src]}

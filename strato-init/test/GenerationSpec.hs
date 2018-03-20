@@ -64,14 +64,14 @@ spec = do
 
     it "should insert 1 contract" $
       let input = defaultGenesisInfo
-          want = [Contract sharedStart 0 emptyHash]
+          want = [Contract sharedStart 0 emptyHash []]
           got = insertContracts emptySource emptyContractB16 sharedStart 1 input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should insert 1m contracts" $
       let total = 1000000 :: Integer
           input = defaultGenesisInfo
-          want = map (\n -> Contract (sharedStart + fromIntegral n) 0 emptyHash) [0..total-1]
+          want = map (\n -> Contract (sharedStart + fromIntegral n) 0 emptyHash []) [0..total-1]
           got = insertContracts emptySource emptyContractB16 sharedStart total input
       in genesisInfoAccountInfo got `shouldBe` want
 

@@ -48,6 +48,7 @@ executable strato-setup
                  , time
                  , transformers
                  , yaml
+                 , strato-model
                  , strato-statediff
                  , split
     other-modules: Blockchain.BackupBlocks
