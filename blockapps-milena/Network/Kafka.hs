@@ -128,9 +128,9 @@ defaultRequestTimeout = 10000
 defaultMinBytes :: MinBytes
 defaultMinBytes = MinBytes 0
 
--- | Default: @1024 * 1024@
+-- | Default: @32 * 1024 * 1024@
 defaultMaxBytes :: MaxBytes
-defaultMaxBytes = 1024 * 1024
+defaultMaxBytes = 32 * 1024 * 1024
 
 -- | Default: @0@
 defaultMaxWaitTime :: MaxWaitTime
