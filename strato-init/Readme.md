@@ -7,15 +7,17 @@ any storage until a method call has been made: the constructor must be essential
 empty and the fields of the contract cannot have an initial value.
 
 The second is that both the bin-runtime (encoded in base16) and the source must
-be provided as flags to `generate-genesis`.  To retrieve the bin-runtime,
-running `solc --bin-runtime <file>.sol` will generate it.  The caveat here is
-that contracts uploaded through bloch will have additional functions inserted
-into it (e.g. `__getSource__`), which means that they will have different
-binaries corresponding codehashes. To get a modified version of the contract
-source, you might want to look at the [bloc tests](
-https://github.com/blockapps/blockapps-haskell/blob/master/bloc/bloc22/server/test/Database/Spec.hs),
-where a function called `writeAugment` can generate the source that bloc would
-generate.
+be provided as flags to `generate-genesis`. The most reliable way to generate the
+correct source and bin-runtime pair is to post the source to bloch's
+/users/{user}/{address}/contract?resolve=true endpoint. `solc --runtime-bin` is not
+sufficient, because bloch inserts self describing functions into the contract
+like `__getSource__`. Someone clever might think that it's enough to just use
+a contract that already has an accurate `__getSource__` and compile that with
+solc, but then when bloch compiles that contract it will insert a new
+`__getSource__` that has the old `__getSource__`, changing the code (and
+necessarily the codehash) again. Once the codehashes mismatch between
+what bloch computes it to be and what strato is initialized with, all queries
+will fail.
 
 # Timing
 | Size | Generation Time | Upload Time |
