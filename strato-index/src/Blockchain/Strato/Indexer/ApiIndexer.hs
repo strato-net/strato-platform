@@ -33,9 +33,9 @@ import           Data.Ord
 import           Database.Persist.Sql
 
 apiIndexer :: LoggingT IO ()
-apiIndexer = do
-    oldBestBlock <- newEmptyMVar
-    runIContextM "strato-api-indexer" . forever $ do
+apiIndexer =  runIContextM "strato-api-indexer" $ do
+    oldBestBlock <- liftIO $ newEmptyMVar
+    forever $ do
         $logInfoS "apiIndexer" "About to fetch blocks"
         (offset, idxEvents, bbi) <- getUnprocessedIndexEvents
         startTime <- liftIO $ getTime Realtime
@@ -66,9 +66,9 @@ apiIndexer = do
             let (num', bid) = maximumBy (comparing fst) $ zip nums bids
             zipTime <- liftIO $ getTime Realtime
             if (num' > num || num' == 0) then do 
+                liftIO $ putMVar oldBestBlock num'
                 putIndexerBestBlockInfo (IndexerBestBlockInfo bid)
-                putMVar oldBestBlock num'
-            else putMVar oldBestBlock num
+            else liftIO $ putMVar oldBestBlock num
             putTime <- liftIO $ getTime Realtime
             return ([
                     resultsTime - insertStartTime
