@@ -49,6 +49,7 @@ library
                , blockapps-util
                , bytestring
                , blockapps-milena
+               , clock
                , monad-logger
                , persistent-postgresql
                , resourcet
