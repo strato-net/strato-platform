@@ -152,11 +152,14 @@ library
                  , blockapps-data
                  , blockapps-util
                  , bytestring
+                 , containers
                  , cryptonite
                  , memory
                  , merkle-patricia-db
+                 , split
                  , strato-model
                  , time
+                 , utf8-string
 
 executable generate-genesis
     main-is: GenerateGenesis.hs
@@ -172,11 +175,14 @@ executable generate-genesis
                  , blockapps-data
                  , blockapps-util
                  , bytestring
+                 , containers
                  , hflags
                  , merkle-patricia-db
+                 , split
                  , strato-init
                  , strato-model
                  , time
+                 , utf8-string
 
 test-suite strato-init-test
     type: exitcode-stdio-1.0
@@ -188,10 +194,13 @@ test-suite strato-init-test
                  , base16-bytestring
                  , blockapps-data
                  , bytestring
+                 , containers
                  , hspec
                  , merkle-patricia-db
+                 , split
                  , strato-init
                  , strato-model
                  , time
+                 , utf8-string
     ghc-options: -Wall
     default-language: Haskell2010

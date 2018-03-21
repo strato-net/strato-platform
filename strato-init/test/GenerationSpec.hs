@@ -1,12 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 module GenerationSpec where
+
+import qualified Data.Aeson as Ae
+import Data.Bits
 import qualified Data.ByteString as BS
+import qualified Data.Map as Map
 import Test.Hspec
 
 import Blockchain.Data.GenesisInfo
 import Blockchain.Generation
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.SHA
+
+-- Data.Either does not export fromRight???
+fromRight :: b -> Either a b -> b
+fromRight _ (Right b) = b
+fromRight b _ = b
 
 start :: GenesisInfo
 start = defaultGenesisInfo
@@ -88,4 +98,47 @@ spec = do
                 map (\(CodeInfo bin _) -> bin) .
                 genesisInfoCodeInfo .
                 insertContracts vehicleSource vehicleContractB16 sharedStart 10 $ input
+      in got `shouldBe` want
+
+  describe "Parsing storage values" $ do
+    it "Should accept a CSV of strings and ints" $
+      let input = "4,\"the universe\",-90909"
+          want = Map.fromList [(0, Number 4),
+                               (1, Stryng "the universe"),
+                               (2, Number (-90909))]
+          got = parseTypes input
+      in got `shouldBe` want
+
+  describe "Encoding storage values" $ do
+    it "Should encode nonegative integers" $
+      let input = Map.fromList [(0, Number 0xfffffff), (1, Number 0)]
+          want = [(0, 0xfffffff), (1, 0)]
+          got = fromRight [] $ encodeAllTypes input
+      in got `shouldBe` want
+
+    it "Should encode short strings" $
+      let input = Map.singleton 0 $ Stryng "\x30\x31\x42"
+          want = [(0, 0x303142 `shiftL` (29 * 8) .|. 3 `shiftL` 1)] :: [(Word256, Word256)]
+          got = fromRight [] $ encodeAllTypes input
+      -- Compare in JSON domain just so things are formatted in hex
+      in Ae.encode got `shouldBe` Ae.encode want
+
+    it "Should encode UTF8 strings of 31 bytes" $
+      let input = Map.singleton 0 $ Stryng "¯|_(ツ)_/¯筋ランキンxyz"
+          -- Tip: $ printf "¯|_(ツ)_/¯筋ランキンxyz" | xxd
+          want = [(0, 0xc2af7c5f28e38384295f2fc2afe7ad8be383a9e383b3e382ade383b378797a00
+                      .|. 31 `shiftL` 1)] :: [(Word256, Word256)]
+          got = fromRight [] $ encodeAllTypes input
+      in Ae.encode got `shouldBe` Ae.encode want
+
+    it "Should refuse 32 byte strings" $
+      let input = Map.singleton 0 $ Stryng "12345678901234567890123456789012"
+          want = Left "unimplemented for strings > 31 bytes"
+          got = encodeAllTypes input
+      in got `shouldBe` want
+
+    it "Should refuse negative numbers" $
+      let input = Map.singleton 0 $ Number (-3)
+          want = Left "unimplemented for negative numbers"
+          got = encodeAllTypes input
       in got `shouldBe` want
