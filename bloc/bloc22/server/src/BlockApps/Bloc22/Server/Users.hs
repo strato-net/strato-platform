@@ -270,19 +270,24 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
     else do
       let mc = head postmethodlistrequestTxs
       txParams <- getAccountTxParams userAddr $ methodcallTxParams mc
-      (txsCmIdsFuncNames,_) <- forStateT Map.empty (zip postmethodlistrequestTxs [0..]) $
+      (txsCmIdsFuncNames,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip postmethodlistrequestTxs [0..]) $
         \ (MethodCall{..},nonceIncr) -> do
-          let mapKey = methodcallContractAddress
-          state <- get
-          (cmId, contract') <- case Map.lookup mapKey state of
-            Just entry -> return entry
+          (names, cmIds, fIds) <- get
+          (mapKey, names') <- case Map.lookup methodcallContractName names of
+            Just cmId -> return (cmId, names)
             Nothing -> do
-              (cmId', xabi') <- lift $ getContractXabiAndMetadataId (ContractName methodcallContractName) (Unnamed methodcallContractAddress)
+              (mapKey' :: Int32) <- lift $ blocQuery1 $ proc () -> do
+                (_,_,_,_,_,cmId) <- getContractsContractLatestQuery methodcallContractName -< ()
+                returnA -< cmId
+              return (mapKey', Map.insert methodcallContractName mapKey' names)
+          (contract', cmIds') <- case Map.lookup mapKey cmIds of
+            Just entry -> return (entry, cmIds)
+            Nothing -> do
+              xabi' <- lift $ getContractXabiByMetadataId mapKey
               let eitherErrorOrContract = xAbiToContract xabi'
               contract'' <- lift $ either (throwError . UserError . Text.pack) return eitherErrorOrContract
-              let mapValue = (cmId', contract'')
-              put (Map.insert mapKey mapValue state)
-              return mapValue
+              let mapValue = contract''
+              return (mapValue, Map.insert mapKey mapValue cmIds)
           let maybeFunc = Map.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
           sel <-
@@ -290,8 +295,13 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
              Just (_, TypeFunction selector _ _) -> return selector
              _ -> lift $ throwError . UserError $ "Contract doesn't have a method named '" <> methodcallMethodName <> "'"
 
-          functionId <- lift $ getFunctionId cmId methodcallMethodName
-          argsBin <- lift $ buildArgumentByteString (Just (fmap argValueToText methodcallArgs)) (Just functionId)
+          functionId <- lift $ getFunctionId mapKey methodcallMethodName
+          (xabiArgs, fIds') <- case Map.lookup functionId fIds of
+            Just xabiArgs' -> return (xabiArgs', fIds)
+            Nothing -> do
+              zxcv <- lift $ getXabiFunctionsArgsQuery functionId
+              return (zxcv, Map.insert functionId zxcv fIds)
+          argsBin <- lift $ constructArgValues (Just (fmap argValueToText methodcallArgs)) xabiArgs
           tx <- lift $ prepareTx sk $
             TransactionHeader
               (Just methodcallContractAddress)
@@ -300,9 +310,10 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
               (Wei (fromIntegral $ unStrung methodcallValue))
               (sel <> argsBin)
               nonceIncr
+          put (names', cmIds', fIds')
           -- resultXabiTypes <- getXabiFunctionsReturnValuesQuery functionId
-          return (tx,cmId,methodcallMethodName)
-      txs <- for txsCmIdsFuncNames $ \(tx,_,_) -> return tx
+          return (tx,mapKey,methodcallMethodName)
+      let txs = [tx | (tx,_,_) <- txsCmIdsFuncNames]
       mapM_ (logWith logNotice . (<>) "txs are: " . Text.pack . show) txs
       hashes <- blocStrato $ postTxList txs
       void . blocModify $ \conn -> runInsertMany conn hashNameTable
@@ -545,6 +556,10 @@ buildArgumentByteString args mFunctionId = case mFunctionId of
   Nothing -> return ByteString.empty
   Just functionId -> do
     argNamesTypes <- getXabiFunctionsArgsQuery functionId
+    constructArgValues args argNamesTypes
+
+constructArgValues :: Maybe (Map Text Text) -> Map Text Xabi.IndexedType -> Bloc ByteString
+constructArgValues args argNamesTypes = do
     let
       determineValue valStr (Xabi.IndexedType ix xabiType) =
         let
