@@ -33,6 +33,7 @@ import           Blockchain.Stream.VMEvent
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (blockHash))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (blockHash))
 import           Blockchain.Strato.StateDiff.Database
+import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.Output                    (printLogMsg)
@@ -172,6 +173,13 @@ initializeGenesisBlock backupType genesisBlockName = do
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)
     liftIO (bootstrapIndexer genBId obGB)
+    mErr <- liftIO . runKafkaConfigured "strato-init" $ do
+      assertTopicCreation
+      splitWriteStateDiffs [diff]
+    case filterResponse <$> mErr of
+       Right [] -> return ()
+       Right errs -> error . show $ errs
+       Left err -> error . show $ err
 
 bootstrapIndexer :: SQL.Key Block -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =
