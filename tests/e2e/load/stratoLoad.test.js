@@ -69,12 +69,12 @@ describe('Strato Load Test', function() {
   
 });
 
-function * waitResult(address) {
+function * waitResult(address, batchSize, batchCount) {
   let result = yield api.strato.account(address);
   while(result[0].nonce < batchSize*batchCount) {
     console.log(`Current Nonce is: ${result[0].nonce}`)
     yield promiseTimeout(500);
-    result = yield yield api.strato.account(address);
+    result = yield api.strato.account(address);
   }
 }
 
