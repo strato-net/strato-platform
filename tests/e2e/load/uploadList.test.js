@@ -35,7 +35,7 @@ describe('Throughput - upload', function () {
   });
 
   for(var index = 0; index < batchCount; index++) {
-    it('Upload List', function * () {
+    it.skip('Upload List: the old way (api.bloc.result)', function * () {
       const txs = factory_createUploadList(batchSize, batchIndex);
 
       const startTime = moment();
@@ -62,6 +62,33 @@ describe('Throughput - upload', function () {
       }
     });
   }
+
+  it.only('Upload List: getBlocResults', function * () {
+    const txs = factory_createUploadList(batchSize, batchIndex);
+
+    const startTime = moment();
+    const doNotResolve = true;
+    const uploadReceipts = yield rest_uploadContractList(admin, txs, doNotResolve);
+    // wait for the hashes to resolve
+    const uploadResults = yield getBlocResults(uploadReceipts);
+    // console.log(uploadResults);
+    // set the data
+    // each call sets 4 fields - do it 2 times
+    const setDataResults1 = yield setData(admin, uploadResults.data, batchIndex);
+    const setDataResults2 = yield setData(admin, uploadResults.data, batchIndex);
+    // console.log(uploadResults);
+
+    // stop the clock, print timing
+    printTiming(startTime, batchCount, batchSize, index);
+    batchIndex++ ; // batch is done
+
+    if (search != 0) {
+      const addresses = uploadResults.data.map(r => {return r.address} );
+      const csv = util.toCsv(addresses); // generate csv string
+      const searchResult = yield rest.query(`${contractName}?address=in.${csv}`);
+      console.log(JSON.stringify(searchResult, null, 2));
+    }
+  });
 });
 
 function factory_createUploadList(batchSize, batchIndex) {
@@ -116,6 +143,30 @@ function* waitResults(uploadReceipts) {
       data.push({index:i, uploadReceipt: uploadReceipt, address: txResult.data.contents.address});
     } else {
       errors.push({index:i, uploadReceipt: uploadReceipt, txResult:txResult});
+    }
+  }
+  return {errors: errors, data: data};
+}
+
+function* getBlocResults(uploadReceipts) {
+  // extract the hases
+  const hashes = uploadReceipts.map(receipt => {
+    console.log('receipt', receipt.status, receipt.hash);
+    return receipt.hash;
+  });
+  const resolve = true;
+  const results = yield api.bloc.results(hashes, resolve);
+
+  const errors = [];
+  const data = [];
+  for (var i = 0 ; i < results.length; i++) {
+    const result = results[i];
+    const uploadReceipt = uploadReceipts[i];
+    console.log(i, result.status);
+    if (result.status == 'Success') {
+      data.push({index:i, uploadReceipt: uploadReceipt, address: result.data.contents.address});
+    } else {
+      errors.push({index:i, uploadReceipt: uploadReceipt, txResult:result});
     }
   }
   return {errors: errors, data: data};
