@@ -65,11 +65,17 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
             numTime <- liftIO $ getTime Realtime
             let (num', bid) = maximumBy (comparing fst) $ zip nums bids
             zipTime <- liftIO $ getTime Realtime
+            $logInfoS "apiIndexer" . T.pack $ "Old number: " ++ show num ++ " New Number: " ++ show num'
             if (num' > num || num' == 0) then do 
                 liftIO $ putMVar oldBestBlock num'
                 putIndexerBestBlockInfo (IndexerBestBlockInfo bid)
             else liftIO $ putMVar oldBestBlock num
             putTime <- liftIO $ getTime Realtime
+            $logInfoS "apiIndexer" . T.pack $ "put blocks into Postgres: " ++ show (resultsTime - insertStartTime) 
+            $logInfoS "apiIndexer" . T.pack $ "get IndexerBestBlockInfo: " ++ show (bestBidTime - resultsTime) 
+            $logInfoS "apiIndexer" . T.pack $ "query for best bid:       " ++ show (numTime - bestBidTime) 
+            $logInfoS "apiIndexer" . T.pack $ "get new best bid:         " ++ show (zipTime - numTime) 
+            $logInfoS "apiIndexer" . T.pack $ "put new best bid:         " ++ show (putTime - zipTime) 
             return ([
                     resultsTime - insertStartTime
                     , bestBidTime - resultsTime
