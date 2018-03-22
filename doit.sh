@@ -35,14 +35,14 @@ function newnode {
   echo "Starting strato-sequencer"
   runForever strato-sequencer >> logs/strato-sequencer 2>&1
 
-  echo "Starting strato-api-indexer"
-  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
+  # echo "Starting strato-api-indexer"
+  # runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
 
-  echo "Starting strato-p2p-indexer"
-  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
+  # echo "Starting strato-p2p-indexer"
+  # runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
-  echo "Starting strato-txr-indexer"
-  runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
+  # echo "Starting strato-txr-indexer"
+  # runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
 
   minLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
@@ -51,12 +51,12 @@ function newnode {
 
   echo "Starting ethereum-vm"
   runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
-                         --diffPublish=true --createTransactionResults=true \
+                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel >> logs/ethereum-vm 2>&1
 
-  echo "Configuring log maintenance"
-  runForever cleanupLogs
+  # echo "Configuring log maintenance"
+  # runForever cleanupLogs
 
   echo "Becoming strato-api"
    HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
@@ -160,6 +160,9 @@ setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
+
+setEnv sqlDiff true
+setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
 
