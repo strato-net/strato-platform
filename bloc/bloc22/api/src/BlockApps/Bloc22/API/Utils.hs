@@ -46,7 +46,7 @@ instance FromJSON Homepage
 
 --------------------------------------------------------------------------------
 
-newtype ContractName = ContractName Text deriving (Eq,Show,Generic)
+newtype ContractName = ContractName Text deriving (Eq,Ord,Show,Generic)
 
 instance IsString ContractName where
   fromString = ContractName . Text.pack

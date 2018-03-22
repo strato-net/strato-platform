@@ -175,22 +175,31 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
     else do
       let UploadListContract _ _ mtp _ = head contracts
       txParams <- getAccountTxParams addr mtp
-      (namesCmIdsTxs,_) <- forStateT Map.empty (zip contracts [0..]) $
+      (namesCmIdsTxs,_) <- forStateT (Map.empty, Map.empty, Map.empty) (zip contracts [0..]) $
         \(UploadListContract name args _ value,nonceIncr) -> do
-          state <- get
-          (bin16,cmId) <- case Map.lookup name state of
-            Just binCm -> return binCm
+          (names, cmIds, fIds) <- get
+          (bin, cmId, names') <- case Map.lookup name names of
+            Just (b, cm) -> return (b, cm, names)
             Nothing -> do
-              binCm <- lift $ blocQuery1 $ proc () -> do
-                (bin16,_,_,_,_,cmId) <- getContractsContractLatestQuery name -< ()
-                returnA -< (bin16,cmId)
-              void $ put (Map.insert name binCm state)
-              return binCm
-          let
-            (bin,leftOver) = Base16.decode bin16
-          unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
-          mFunctionId <- lift $ getConstructorId cmId
-          argsBin <- lift $ buildArgumentByteString (Just (fmap argValueToText args)) mFunctionId
+              (b16,cm) <- lift $ blocQuery1 $ proc () -> do
+                (bin16,_,_,_,_,cmId') <- getContractsContractLatestQuery name -< ()
+                returnA -< (bin16,cmId')
+              let (b, leftOver) = Base16.decode b16
+              unless (ByteString.null leftOver) $ throwError $ AnError "Couldn't decode binary"
+              return (b, cm, Map.insert name (b, cm) names)
+          (mFunctionId, cmIds') <- case Map.lookup cmId cmIds of
+            Just fId -> return (fId, cmIds)
+            Nothing -> do
+              fId <- lift $ getConstructorId cmId
+              return (fId, Map.insert cmId fId cmIds)
+          (xabiArgs, fIds') <- case mFunctionId of
+            Nothing -> return (Map.empty, fIds)
+            Just functionId -> case Map.lookup functionId fIds of
+              Just xabiArgs' -> return (xabiArgs', fIds)
+              Nothing -> do
+                xabiArgs' <- lift $ getXabiFunctionsArgsQuery functionId
+                return (xabiArgs', Map.insert functionId xabiArgs' fIds)
+          argsBin <- lift $ constructArgValues (Just (fmap argValueToText args)) xabiArgs
           tx <- lift $ prepareTx sk $
               TransactionHeader
                 Nothing
@@ -199,6 +208,7 @@ postUsersUploadList userName addr resolve (UploadListRequest pw contracts _resol
                 (Wei (maybe 0 fromIntegral $ fmap unStrung value))
                 (bin <> argsBin)
                 nonceIncr
+          put (names', cmIds', fIds')
           return ((name,cmId),tx)
       let
         txs = map snd namesCmIdsTxs
@@ -379,15 +389,24 @@ postUsersContractMethod
       )
     getBlocTransactionResult' hash resolve
 
+data ContractCreationData = ContractCreationData
+                            { metadataId :: Int32
+                            , transactionHash :: Keccak256
+                            , contractName :: ContractName
+                            , transactionResult :: Maybe TransactionResult
+                            , batchIndex :: Integer
+                            }
+
 data BatchState = BatchState
-                  { contractsMap      :: Map.Map Address (Int32, Keccak256, Text, Maybe TransactionResult, Integer)
-                  , functionIdMap     :: Map.Map (Int32, Text) Int32
-                  , functionXabiMap   :: Map.Map Int32 Xabi
-                  , functionReturnMap :: Map.Map Int32 [Type]
+                  { contractsMap       :: Map.Map Address ContractCreationData
+                  , contractDetailsMap :: Map.Map ContractName ContractDetails
+                  , functionIdMap      :: Map.Map (Int32, Text) Int32
+                  , functionXabiMap    :: Map.Map Int32 Xabi
+                  , functionReturnMap  :: Map.Map Int32 [Type]
                   }
 
 emptyBatchState :: BatchState
-emptyBatchState = BatchState Map.empty Map.empty Map.empty Map.empty
+emptyBatchState = BatchState Map.empty Map.empty Map.empty Map.empty Map.empty
 
 getBlocTransactionResult' :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult' hash resolve =
@@ -441,7 +460,7 @@ postBlocTransactionResults resolve hashes = do
           return $ merge p d sortByIndex
 
         evalAndReturn list = do
-          (mbtrs,BatchState{..}) <- forStateT emptyBatchState list $
+          (mbtrs,state) <- forStateT emptyBatchState list $
             \(status, hash, index, mtxr) -> do
               case status of
                 Pending -> return . Just $ (BlocTransactionResult Pending hash Nothing Nothing, index)
@@ -454,8 +473,8 @@ postBlocTransactionResults resolve hashes = do
                     2 -> functionResult hash mtxr cmId tdata index
                     _ -> error $ "Unexpected transaction type: got" ++ show ttype
           let jbtrs = [btr | Just btr <- mbtrs]
-          nbtrs <- do
-            let contractsList = Map.toList contractsMap
+          (nbtrs,_) <- do
+            let contractsList = Map.toList (contractsMap state)
             void . blocModify $ \conn -> runInsertMany conn contractsInstanceTable
               [
               ( Nothing
@@ -463,11 +482,19 @@ postBlocTransactionResults resolve hashes = do
               , constant addr'
               , Nothing
               )
-              | (addr', (cmId, _, _, _, _)) <- contractsList
+              | (addr', ContractCreationData cmId _ _ _ _) <- contractsList
               ]
-            forM contractsList $ \(addr', (_, hash, name, mtxr, index)) -> do
-              details <- getContractDetails (ContractName name) (Unnamed addr')
-              return $ (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
+            forStateT state contractsList $
+              \(addr', ContractCreationData _ hash name mtxr index) -> do
+                st <- get
+                let cds = contractDetailsMap st
+                (details, cds') <- case Map.lookup name cds of
+                  Just details' -> return (details', cds)
+                  Nothing -> do
+                    details' <- lift $ getContractDetails name (Unnamed addr')
+                    return (details', Map.insert name details' cds)
+                put st{contractDetailsMap = cds'}
+                return $ (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
           let btrs = map fst $ merge jbtrs nbtrs (\r1 r2 -> snd r1 < snd r2)
           return btrs
 
@@ -493,11 +520,19 @@ postBlocTransactionResults resolve hashes = do
                 returnA -< cmId'
               if (isNothing $ listToMaybe xs)
                 then do
-                  state <- get
-                  put state{contractsMap = Map.insert addr' (cmId, hash, name, mtxr, index) (contractsMap state)}
+                  st <- get
+                  put st{contractsMap = Map.insert addr' (ContractCreationData cmId hash (ContractName name) mtxr index) (contractsMap st)}
                   return Nothing
                 else do
-                  details <- lift $ getContractDetails (ContractName name) (Unnamed addr')
+                  st <- get
+                  let cds = contractDetailsMap st
+                      cn  = ContractName name
+                  (details, cds') <- case Map.lookup cn cds of
+                    Just details' -> return (details', cds)
+                    Nothing -> do
+                      details' <- lift $ getContractDetails cn (Unnamed addr')
+                      return (details', Map.insert cn details' cds)
+                  put st{contractDetailsMap = cds'}
                   return $ Just (BlocTransactionResult Success hash mtxr (Just $ Upload details), index)
 
         functionResult hash mtxr cmId funcName index = do
