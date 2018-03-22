@@ -73,6 +73,7 @@ postTransactionListR = do
 
    parserStart <- liftIO $ getTime Realtime
    tx <- parseJsonBody :: Handler (Result [RawTransaction'])
+   $logError "Finished JSON parser"
    case tx of
        (Success raws) -> do
           txHashStart <- raws `deepseq` (liftIO $ getTime Realtime)
@@ -91,11 +92,12 @@ postTransactionListR = do
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
           let times = (P.map toNanoSecs $
-                [parserStart - handlerStart,
-                 txHashStart - parserStart,
-                 insertTXStart - txHashStart,
-                 sendResponseStart - insertTXStart
-                ]) P.++ [ecRecoverTime]
+                        [ parserStart - handlerStart
+                        , txHashStart - parserStart
+                        , insertTXStart - txHashStart
+                        , sendResponseStart - insertTXStart
+                        ]
+                      ) P.++ [ecRecoverTime]
           $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
           sendResponseStatus status200 $ toJSON (fmap transactionHash txs) -- hs --times -- This is for debugging
        _ -> invalidArgs ["couldn't decode transactions"]

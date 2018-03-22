@@ -2,12 +2,13 @@
 
 module Blockchain.Generation (
   encodeAllTypes,
+  insertContractsCount,
+  insertContractsCSV,
   insertContracts,
   parseTypes,
   Type(..)
 ) where
 
-import Data.Bifunctor (bimap)
 import Data.Bits
 import Data.ByteString hiding (map, count, zip, concat, length, replicate)
 import qualified Data.ByteString as BS
@@ -25,21 +26,21 @@ import Blockchain.Data.GenesisInfo
 data Type = Number Integer | Stryng String
   deriving (Eq, Show)
 
-parseType :: String -> Type
+parseType :: String -> Either String Type
 parseType inp = case readMaybe inp :: Maybe Integer of
-                    Just n -> Number n
+                    Just n -> Right $ Number n
                     _ -> case readMaybe inp :: Maybe String of
-                            Just s -> Stryng s
-                            _ -> error $ "invalid type: " ++ inp
+                            Just s -> Right $ Stryng s
+                            _ -> Left $ "invalid type: " ++ inp
 
-parseTypes :: String -> Map.Map Int Type
-parseTypes = Map.fromList . zip [0..] . map parseType . splitOn ","
-
-convert :: (Integral a, Integral b) => (a, b) -> (Word256, Word256)
-convert = bimap fromIntegral fromIntegral
+parseTypes :: String -> Either String (Map.Map Int Type)
+parseTypes line = do
+  let wyrds = splitOn "," line
+  types <- mapM parseType wyrds
+  return . Map.fromList . zip [0..] $ types
 
 encodeType :: Int -> Type -> Either String [(Word256, Word256)]
-encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = Right [convert (k, n)]
+encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = Right [(fromIntegral k, fromIntegral n)]
                         | otherwise = Left "unimplemented for negative numbers"
 encodeType k (Stryng s) =
     let upper = BS.unpack . U8.fromString $ s
@@ -52,17 +53,26 @@ encodeType k (Stryng s) =
 encodeAllTypes :: Map.Map Int Type -> Either String [(Word256, Word256)]
 encodeAllTypes i = concat <$> (sequence . Map.foldWithKey (\k a ws -> encodeType k a : ws) [] $ i)
 
-insertContracts :: String -> ByteString -> Address -> Integer -> GenesisInfo -> GenesisInfo
-insertContracts src code start count gi =
+
+insertContractsCount :: Int -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsCount n src code start gi = return $ insertContracts (replicate n []) src code start gi
+
+insertContractsCSV :: [String] -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsCSV lynes src code start gi = do
+  types <- mapM parseTypes lynes
+  recs <- mapM encodeAllTypes types
+  return $ insertContracts recs src code start gi
+
+insertContracts :: [[(Word256, Word256)]] -> String -> ByteString -> Address -> GenesisInfo -> GenesisInfo
+insertContracts recs src code start gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi
       (decoded, extra) = B16.decode code
       codeHash = if extra /= "" && extra /= "\n"
                    then error ("bytecode not encoded in base16:" ++ show code)
                    else superProprietaryStratoSHAHash decoded
-      rng = [toInteger start..(toInteger start) + count - 1]
-      -- TODO(tim): populate the initial storage
-      mkContract addr = Contract addr 0 codeHash []
-      range = map fromInteger rng
-  in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract range,
+      mkContract (addr, slots) = Contract addr 0 codeHash slots
+      addrs = map (start+) [0..]
+      addrsAndSlots = zip addrs recs
+  in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src]}

@@ -12,15 +12,21 @@ import Data.ByteString (hGetContents, ByteString)
 import Data.ByteString.Lazy (hPut)
 import Data.List (intercalate)
 
-import Blockchain.Generation (insertContracts)
+import Blockchain.Generation (insertContractsCount, insertContractsCSV)
 import Blockchain.Strato.Model.Address ()
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
 defineFlag "s:start" (0xfeb1989bbbea7000000000000000000000000000 :: Integer) "Starting address for seeding contract"
 defineFlag "b:bytecode_file" ("" :: String) "Filename pointing to the contract bytecode"
 defineFlag "source_file" ("" :: String) "Filename pointing to the contract source"
-defineFlag "n:number" (0 :: Integer) "Number of copies to seed"
+defineFlag "n:number" (0 :: Int) "Number of copies to seed"
 defineFlag "o:output_file" ("genesisWithContracts.json" :: String) "Name of output file to write"
+defineFlag "r:records_file" ("" :: String) "Filename containing CSV records of data to insert.\
+                                           \Only ints and strings are accepted (for now only \
+                                           \ small strings as well). Little validation is \
+                                           \ performed. Rows with fewer columns will \
+                                           \ have fewer columns inserted."
+
 defineFlag "f:fake_flag" (0:: Integer) "Hflags will ignore this flag."
 
 
@@ -43,6 +49,11 @@ readS path = do
   when (null path) usage
   readFile path
 
+readLines :: FilePath -> IO [String]
+readLines path = if (null path)
+                    then return []
+                    else lines <$> readFile path
+
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup Genesis Generation flags"
@@ -53,7 +64,11 @@ main = do
                     Right g -> g
                     Left err -> error ("couldn't parse genesis: " ++ err)
 
-  let output = insertContracts src bytes (fromInteger flags_start) flags_number genesis
+  recs <- readLines flags_records_file
+  let insert = if null recs
+                  then insertContractsCount flags_number
+                  else insertContractsCSV recs
+  let output = insert src bytes (fromInteger flags_start) genesis
 
   let outputText = encode output
   withFile flags_output_file WriteMode (flip hPut $ outputText)

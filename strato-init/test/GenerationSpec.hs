@@ -69,43 +69,46 @@ spec = do
     it "should insert no contracts" $
       let input = defaultGenesisInfo
           want = []
-          got = insertContracts emptySource emptyContractB16 sharedStart 0 input
+          got = insertContracts [] emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should insert 1 contract" $
       let input = defaultGenesisInfo
           want = [Contract sharedStart 0 emptyHash []]
-          got = insertContracts emptySource emptyContractB16 sharedStart 1 input
+          got = insertContracts [[]] emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should insert 1m contracts" $
-      let total = 1000000 :: Integer
+      let total = 1000000 :: Int
+          slots = replicate total []
           input = defaultGenesisInfo
           want = map (\n -> Contract (sharedStart + fromIntegral n) 0 emptyHash []) [0..total-1]
-          got = insertContracts emptySource emptyContractB16 sharedStart total input
+          got = insertContracts slots emptySource emptyContractB16 sharedStart input
       in genesisInfoAccountInfo got `shouldBe` want
 
     it "should add emptyContract to the contractInfo" $
       let input = defaultGenesisInfo
           want = [CodeInfo emptyContract emptySource]
-          got = insertContracts emptySource emptyContractB16 sharedStart 10 input
+          slots = replicate 10 []
+          got = insertContracts slots emptySource emptyContractB16 sharedStart input
       in genesisInfoCodeInfo got `shouldBe` want
 
     it "should have the right vehicle hash" $
       let input = defaultGenesisInfo
           want = [vehicleHash]
+          slots = replicate 10 []
           got = map superProprietaryStratoSHAHash .
                 map (\(CodeInfo bin _) -> bin) .
                 genesisInfoCodeInfo .
-                insertContracts vehicleSource vehicleContractB16 sharedStart 10 $ input
+                insertContracts slots vehicleSource vehicleContractB16 sharedStart $ input
       in got `shouldBe` want
 
   describe "Parsing storage values" $ do
     it "Should accept a CSV of strings and ints" $
       let input = "4,\"the universe\",-90909"
-          want = Map.fromList [(0, Number 4),
-                               (1, Stryng "the universe"),
-                               (2, Number (-90909))]
+          want = Right $ Map.fromList [(0, Number 4),
+                                       (1, Stryng "the universe"),
+                                       (2, Number (-90909))]
           got = parseTypes input
       in got `shouldBe` want
 

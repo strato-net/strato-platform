@@ -54,7 +54,7 @@ function newnode {
   runForever cleanupLogs
 
   echo "Becoming strato-api"
-  HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
+   HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api
 }
 
 function cleanupDB {
@@ -100,7 +100,7 @@ function cleanupLogs {
   while true
   do
     sleep 900 ;
-    find $PWD/logs/ -type f -size +10M -exec /bin/cp -rf {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
+    find $PWD/logs/ -maxdepth 1 -type f -size +10M -exec /bin/cp -rf {} $PWD/logs/rotation/ \; -exec truncate -s 0 {} \;
   done
 }
 
