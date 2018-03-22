@@ -58,8 +58,8 @@ describe('Strato Load Test', function() {
 
     const lastHash = txResults[txResults.length -1].hash;
 
-    console.log(`Waiting on hash '${lastHash}' to resolve`);
-    yield waitResult(lastHash);
+    console.log(`Waiting on address '${admin.address}' to reach nonce ${batchSize*batchCount}`);
+    yield waitResult(admin.address, batchSize, batchCount);
 
     const endTime = moment();
     const seconds = endTime.diff(startTime, 'seconds');
@@ -69,21 +69,12 @@ describe('Strato Load Test', function() {
   
 });
 
-function * waitResult(hash) {
-  let result = yield api.strato.transactionResult(hash);
-  while(!(result.length == 1 && result[0].status == 'success')) {
-    if(result.length == 1) {
-      const status = result[0].status;
-      if(isObject(status)) {
-        throw new Error(result[0].message);
-      }
-      console.log(`Current status for hash '${hash}' is '${status}`);
-    }
-    else {
-      console.log('Pending');
-    }
-    yield promiseTimeout(300);
-    result = yield api.strato.transactionResult(hash);
+function * waitResult(address) {
+  let result = yield api.strato.account(address);
+  while(result[0].nonce < batchSize*batchCount) {
+    console.log(`Current Nonce is: ${result[0].nonce}`)
+    yield promiseTimeout(500);
+    result = yield yield api.strato.account(address);
   }
 }
 
