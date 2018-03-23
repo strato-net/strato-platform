@@ -70,6 +70,7 @@ putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasSto
 putStorageTrie address slots = do
     mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
     flushMemStorageDB
+    Mem.flushMemAddressStateDB
 
 initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                   => [AccountInfo]
