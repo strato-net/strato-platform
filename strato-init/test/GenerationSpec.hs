@@ -105,7 +105,7 @@ spec = do
 
   describe "Parsing storage values" $ do
     it "Should accept a CSV of strings and ints" $
-      let input = ["4","\"life, the universe, everything\"","-90909"]
+      let input = ["4","life, \"the universe,\" everything","-90909"]
           want = Right $ Map.fromList [(0, Number 4),
                                        (1, Stryng "life, the universe, everything"),
                                        (2, Number (-90909))]
@@ -145,3 +145,13 @@ spec = do
           want = Left "unimplemented for negative numbers"
           got = encodeAllTypes input
       in got `shouldBe` want
+    it "Should encode a CSV" $
+      let input = "9876,\"This is text\"\n200,\"More text!\""
+          want = Right [[(0, 9876),
+                         (1, 0x546869732069732074657874 `shiftL` (20 * 8) .|. 12 `shiftL` 1)],
+                        [(0, 200),
+                         (1, 0x4d6f7265207465787421 `shiftL` (22 * 8) .|. 10 `shiftL` 1)]]
+                        :: Either String [[(Word256, Word256)]]
+          got = encodeCSV input
+      in got `shouldBe` want
+

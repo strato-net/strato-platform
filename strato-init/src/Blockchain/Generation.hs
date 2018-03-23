@@ -2,6 +2,7 @@
 
 module Blockchain.Generation (
   encodeAllTypes,
+  encodeCSV,
   insertContractsCount,
   insertContractsCSV,
   insertContracts,
@@ -24,19 +25,22 @@ import Blockchain.Strato.Model.SHA
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Data.GenesisInfo
 
+import Debug.Trace
+
 data Type = Number Integer | Stryng String
   deriving (Eq, Show)
 
 parseType :: String -> Either String Type
 parseType inp = case readMaybe inp :: Maybe Integer of
                     Just n -> Right $ Number n
-                    _ -> case readMaybe inp :: Maybe String of
-                            Just s -> Right $ Stryng s
-                            _ -> Left $ "invalid type: " ++ inp
+                    Nothing -> case readMaybe inp :: Maybe String of
+                                   Just s -> Right $ Stryng s
+                                   _ -> Left $ "invalid type: " ++ inp
 
 parseTypes :: Record -> Either String (Map.Map Int Type)
 parseTypes fields = do
-  types <- mapM parseType fields
+  let fs = trace (show fields) fields
+  types <- mapM parseType fs
   return . Map.fromList . zip [0..] $ types
 
 encodeType :: Int -> Type -> Either String [(Word256, Word256)]
@@ -53,14 +57,19 @@ encodeType k (Stryng s) =
 encodeAllTypes :: Map.Map Int Type -> Either String [(Word256, Word256)]
 encodeAllTypes i = concat <$> (sequence . Map.foldWithKey (\k a ws -> encodeType k a : ws) [] $ i)
 
+encodeCSV :: String -> Either String [[(Word256, Word256)]]
+encodeCSV rawCSV = do
+  recs <- first show . parseCSV "__records_file" $ rawCSV
+  types <- trace (show recs) $ mapM parseTypes recs
+  mapM encodeAllTypes . trace (show types) $ types
+
 insertContractsCount :: Int -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
 insertContractsCount n src code start gi = return $ insertContracts (replicate n []) src code start gi
 
+
 insertContractsCSV :: String -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
 insertContractsCSV rawCSV src code start gi = do
-  recs <- first show . parseCSV "__records_file" $ rawCSV
-  types <- mapM parseTypes recs
-  slotss <- mapM encodeAllTypes types
+  slotss <- encodeCSV rawCSV
   return $ insertContracts slotss src code start gi
 
 insertContracts :: [[(Word256, Word256)]] -> String -> ByteString -> Address -> GenesisInfo -> GenesisInfo
