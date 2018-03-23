@@ -17,6 +17,9 @@ import           Blockchain.KafkaTopics     (lookupTopic)
 import           Blockchain.Sequencer.Event
 import           Blockchain.Stream.Raw
 
+import           Control.Monad.IO.Class     (liftIO)
+import           System.Clock
+
 import qualified Data.ByteString.Lazy       as BL
 import qualified Network.Kafka              as K
 import qualified Network.Kafka.Producer     as KW
@@ -56,6 +59,12 @@ writeSeqEvents events = KW.produceMessages $
     (K.TopicAndMessage seqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 readFromTopic' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]
-readFromTopic' topic offset = setDefaultKafkaState >>
-    map (decode . BL.fromStrict) <$> fetchBytes topic offset
+readFromTopic' topic offset = do
+  _ <- setDefaultKafkaState
+  t0 <- liftIO $ getTime Realtime
+  bytes <- fetchBytes topic offset
+  t1 <- liftIO $ getTime Realtime
+  _ <- liftIO . putStrLn $ "fetchBytes took: " ++ show (toNanoSecs $ t1 - t0)
+  return $ map (decode . BL.fromStrict) bytes
+  --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}

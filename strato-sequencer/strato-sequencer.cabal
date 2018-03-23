@@ -30,6 +30,7 @@ library
                      , blockapps-data
                      , blockapps-util
                      , strato-conf
+                     , clock
                      , containers
                      , directory
                      , mtl
