@@ -62,7 +62,6 @@ export function userAddressAPICall(username) {
 export function* validateUser(action) {
   try {
     let addresses = yield call(userAddressAPICall, action.username)
-    console.log(addresses)
     if (addresses && addresses.length === 0) { throw new Error(['Incorrect username or password']); }
     let response = yield call(
       validateUserAPICall,

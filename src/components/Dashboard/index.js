@@ -7,25 +7,26 @@ import Apps from '../Apps';
 import Updates from '../Updates/index';
 import Search from '../Search/index';
 import { env } from '../../env';
+import './dashboard.css';
 
 const links = [{
   label: 'DApps',
   icon: <FontIcon iconClassName="fa fa-th-large" />,
   style: { color: 'white' }
-}, 
-// {
-//   label: 'Dapps Store',
-//   icon: <FontIcon iconClassName="fa fa-rocket" />,
-//   style: { color: 'white' }
-// }, {
-//   label: 'Updates',
-//   icon: <FontIcon iconClassName="fa fa-download" />,
-//   style: { color: 'white' }
-// }, {
-//   label: 'Search',
-//   icon: <FontIcon iconClassName="fa fa-search" />,
-//   style: { color: 'white' }
-// }
+},
+  // {
+  //   label: 'Dapps Store',
+  //   icon: <FontIcon iconClassName="fa fa-rocket" />,
+  //   style: { color: 'white' }
+  // }, {
+  //   label: 'Updates',
+  //   icon: <FontIcon iconClassName="fa fa-download" />,
+  //   style: { color: 'white' }
+  // }, {
+  //   label: 'Search',
+  //   icon: <FontIcon iconClassName="fa fa-search" />,
+  //   style: { color: 'white' }
+  // }
 ];
 
 
@@ -52,23 +53,33 @@ class Dashboard extends Component {
     this.setState({ title, children });
   };
 
-  navigate() {
+  navigate(path) {
+    let { history } = this.props;
+    history.push(path);
+  }
+
+  checkAuth() {
     const user = localStorage.getItem(env.USERKEY)
     const data = JSON.parse(user)
 
-    let { history } = this.props;
-    data && data.username ? history.push('/profile') : history.push('/login');
+    return data && data.username;
   }
 
   render() {
     const { children } = this.state;
-
     return (
       <div>
-        <Toolbar 
+        <Toolbar
           colored
           title="DApps"
-          actions={<Button icon onClick={this.navigate.bind(this)}><FontIcon iconClassName="fa fa-user-circle" /></Button>}
+          actions={
+            <div>
+              {!this.checkAuth() ?
+                <Button raised onClick={() => this.navigate('/login')} className="developers-button">For Developers</Button>
+                : <Button icon onClick={() => this.navigate('/profile')}><FontIcon iconClassName="fa fa-user-circle" /></Button>
+              }
+            </div>
+          }
         />
         <div>
           {children}
