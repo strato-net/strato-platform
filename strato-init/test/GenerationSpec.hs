@@ -4,6 +4,7 @@ module GenerationSpec where
 import qualified Data.Aeson as Ae
 import Data.Bits
 import qualified Data.ByteString as BS
+import qualified Data.Text as T
 import Test.Hspec
 
 import Blockchain.Data.GenesisInfo
@@ -133,11 +134,21 @@ spec = do
           got = fromRight [] $ encodeAllTypes input
       in Ae.encode got `shouldBe` Ae.encode want
 
-    it "Should refuse 32 byte strings" $
-      let input = Records [[Stryng "12345678901234567890123456789012"]]
-          want = Left "unimplemented for strings > 31 bytes"
-          got = encodeAllTypes input
-      in got `shouldBe` want
+    it "Should encode long strings properly" $
+      let input = Records [[Number 10, Number 13, Stryng . T.replicate 100 $ "D"]]
+          -- keccak256(uint256(2)) = 0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5ACE
+          want = [[(0, 10), (1, 13), (2, 201),
+                   (0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5ACE,
+                    0x4444444444444444444444444444444444444444444444444444444444444444),
+                   (0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5ACF,
+                    0x4444444444444444444444444444444444444444444444444444444444444444),
+                   (0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5AD0,
+                    0x4444444444444444444444444444444444444444444444444444444444444444),
+                   (0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5AD1,
+                    0x4444444400000000000000000000000000000000000000000000000000000000)]]
+                 :: [[(Word256, Word256)]]
+          got = fromRight [] $ encodeAllTypes input
+      in Ae.encode got `shouldBe` Ae.encode want
 
     it "Should refuse negative numbers" $
       let input = Records [[Number (-3)]]

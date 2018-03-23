@@ -19,6 +19,7 @@ import qualified Data.ByteString.Base16 as B16
 import Data.Scientific (floatingOrInteger)
 import qualified Data.Text as T
 import Data.Text.Encoding
+import Data.Word
 import GHC.Generics
 
 import Blockchain.Strato.Model.Address
@@ -40,16 +41,26 @@ newtype Records = Records [[Type]] deriving (Eq, Show, Generic)
 
 instance Ae.FromJSON Records
 
+equalChunksOf :: Int -> [Word8] -> [[Word8]]
+equalChunksOf n ws | length ws == 0 = []
+                   | length ws <= n = [ws ++ replicate (n - length ws) 0]
+                   | otherwise = let (car, cdr) = splitAt n ws
+                                 in car : (equalChunksOf n cdr)
+
 encodeType :: Int -> Type -> Either String [(Word256, Word256)]
 encodeType k (Number n) | n >= 0 && n <= (2 ^ (256 :: Integer)) = Right [(fromIntegral k, fromIntegral n)]
                         | otherwise = Left "unimplemented for negative numbers"
 encodeType k (Stryng s) =
-    let upper = BS.unpack . encodeUtf8 $ s
-        mid = replicate (31 - length upper) 0
-        low = [fromIntegral $ length upper `shiftL` 1]
-    in if length upper > 31
-          then Left "unimplemented for strings > 31 bytes"
-          else Right [(fromIntegral k, bytesToWord256 $ upper ++ mid ++ low)]
+  if length payload < 32
+      then let pad = replicate (31 - length payload) 0
+               size = [fromIntegral $ length payload `shiftL` 1]
+           in Right [(fromIntegral k, bytesToWord256 $ payload ++ pad ++ size)]
+      else let size = fromIntegral $ (length payload `shiftL` 1) .|. 1
+               pointer = (fromIntegral k, size)
+               SHA start = superProprietaryStratoSHAHash . BS.pack . word256ToBytes . fromIntegral $ k
+               packets = zip (map (start+) [0..]) . map bytesToWord256 . equalChunksOf 32 $ payload
+           in Right $ pointer:packets
+  where payload = BS.unpack . encodeUtf8 $ s
 
 encodeAllTypes :: Records -> Either String [[(Word256, Word256)]]
 encodeAllTypes (Records recs) = mapM (liftM concat . sequence . zipWith encodeType [0..]) recs
