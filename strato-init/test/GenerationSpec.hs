@@ -4,7 +4,6 @@ module GenerationSpec where
 import qualified Data.Aeson as Ae
 import Data.Bits
 import qualified Data.ByteString as BS
-import qualified Data.Map as Map
 import Test.Hspec
 
 import Blockchain.Data.GenesisInfo
@@ -104,54 +103,54 @@ spec = do
       in got `shouldBe` want
 
   describe "Parsing storage values" $ do
-    it "Should accept a CSV of strings and ints" $
-      let input = ["4","life, \"the universe,\" everything","-90909"]
-          want = Right $ Map.fromList [(0, Number 4),
-                                       (1, Stryng "life, the universe, everything"),
-                                       (2, Number (-90909))]
-          got = parseTypes input
+    it "Should accept JSON of strings and ints" $
+      let input = "[[4, \"life, \\\"the universe,\\\" everything\", -90909], \
+                  \ [\"one string on this line\"]]"
+          want = Right [[Number 4, Stryng "life, \"the universe,\" everything", Number (-90909)],
+                        [Stryng "one string on this line"]]
+          got = Ae.eitherDecode input
       in got `shouldBe` want
 
   describe "Encoding storage values" $ do
     it "Should encode nonegative integers" $
-      let input = Map.fromList [(0, Number 0xfffffff), (1, Number 0)]
-          want = [(0, 0xfffffff), (1, 0)]
+      let input = Records [[Number 0xfffffff, Number 0]]
+          want = [[(0, 0xfffffff), (1, 0)]]
           got = fromRight [] $ encodeAllTypes input
       in got `shouldBe` want
 
     it "Should encode short strings" $
-      let input = Map.singleton 0 $ Stryng "\x30\x31\x42"
-          want = [(0, 0x303142 `shiftL` (29 * 8) .|. 3 `shiftL` 1)] :: [(Word256, Word256)]
+      let input = Records [[Stryng "\x30\x31\x42"]]
+          want = [[(0, 0x303142 `shiftL` (29 * 8) .|. 3 `shiftL` 1)] :: [(Word256, Word256)]]
           got = fromRight [] $ encodeAllTypes input
       -- Compare in JSON domain just so things are formatted in hex
       in Ae.encode got `shouldBe` Ae.encode want
 
     it "Should encode UTF8 strings of 31 bytes" $
-      let input = Map.singleton 0 $ Stryng "¯|_(ツ)_/¯筋ランキンxyz"
+      let input = Records [[Stryng "¯|_(ツ)_/¯筋ランキンxyz"]]
           -- Tip: $ printf "¯|_(ツ)_/¯筋ランキンxyz" | xxd
-          want = [(0, 0xc2af7c5f28e38384295f2fc2afe7ad8be383a9e383b3e382ade383b378797a00
-                      .|. 31 `shiftL` 1)] :: [(Word256, Word256)]
+          want = [[(0, 0xc2af7c5f28e38384295f2fc2afe7ad8be383a9e383b3e382ade383b378797a00
+                       .|. 31 `shiftL` 1)]] :: [[(Word256, Word256)]]
           got = fromRight [] $ encodeAllTypes input
       in Ae.encode got `shouldBe` Ae.encode want
 
     it "Should refuse 32 byte strings" $
-      let input = Map.singleton 0 $ Stryng "12345678901234567890123456789012"
+      let input = Records [[Stryng "12345678901234567890123456789012"]]
           want = Left "unimplemented for strings > 31 bytes"
           got = encodeAllTypes input
       in got `shouldBe` want
 
     it "Should refuse negative numbers" $
-      let input = Map.singleton 0 $ Number (-3)
+      let input = Records [[Number (-3)]]
           want = Left "unimplemented for negative numbers"
           got = encodeAllTypes input
       in got `shouldBe` want
-    it "Should encode a CSV" $
-      let input = "9876,\"This is text\"\n200,\"More text!\""
+    it "Should encode JSON into storage slots" $
+      let input = "[[9876,\"This is text\"],\n[200,\n\"More text!\"]]"
           want = Right [[(0, 9876),
                          (1, 0x546869732069732074657874 `shiftL` (20 * 8) .|. 12 `shiftL` 1)],
                         [(0, 200),
                          (1, 0x4d6f7265207465787421 `shiftL` (22 * 8) .|. 10 `shiftL` 1)]]
                         :: Either String [[(Word256, Word256)]]
-          got = encodeCSV input
+          got = encodeJSON input
       in got `shouldBe` want
 

@@ -12,7 +12,7 @@ import Data.ByteString (hGetContents, ByteString)
 import Data.ByteString.Lazy (hPut)
 import Data.List (intercalate)
 
-import Blockchain.Generation (insertContractsCount, insertContractsCSV)
+import Blockchain.Generation (insertContractsCount, insertContractsJSON)
 import Blockchain.Strato.Model.Address ()
 
 defineFlag "g:genesis_file" ("" :: String) "Filename containing pre-modifications genesis block"
@@ -49,11 +49,6 @@ readS path = do
   when (null path) usage
   readFile path
 
-readRecs :: FilePath -> IO String
-readRecs path = if (null path)
-                  then return ""
-                  else readFile path
-
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup Genesis Generation flags"
@@ -64,10 +59,11 @@ main = do
                     Right g -> g
                     Left err -> error ("couldn't parse genesis: " ++ err)
 
-  recs <- readRecs flags_records_file
-  let insert = if null recs
-                  then insertContractsCount flags_number
-                  else insertContractsCSV recs
+  insert <- if null flags_records_file
+              then return $ insertContractsCount flags_number
+              else do
+                  json <- readBS flags_records_file
+                  return $ insertContractsJSON json
   let output = insert src bytes (fromInteger flags_start) genesis
 
   case output of

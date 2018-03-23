@@ -115,6 +115,7 @@ executable genesis-setup
                  , merkle-patricia-db
                  , time
     other-modules: Blockchain.GenesisBlockSetup
+                   Blockchain.Data.GenesisInfo
     buildable: True
     main-is: GenesisSetup.hs
     hs-source-dirs: src
@@ -157,8 +158,10 @@ library
                  , csv
                  , memory
                  , merkle-patricia-db
+                 , scientific
                  , split
                  , strato-model
+                 , text
                  , time
                  , utf8-string
 
@@ -168,6 +171,8 @@ executable generate-genesis
     default-language: Haskell2010
     buildable: True
     ghc-options: -Wall -O2 -threaded
+    other-modules: Blockchain.Data.GenesisInfo
+                   Blockchain.Generation
     build-depends: base
                  , aeson
                  , aeson-extra
@@ -180,8 +185,10 @@ executable generate-genesis
                  , csv
                  , hflags
                  , merkle-patricia-db
+                 , scientific
                  , strato-init
                  , strato-model
+                 , text
                  , time
                  , utf8-string
 
@@ -189,6 +196,9 @@ test-suite strato-init-test
     type: exitcode-stdio-1.0
     hs-source-dirs: test
     main-is: Main.hs
+    other-modules: GenerationSpec
+                   JsonSpec
+                   Spec
     build-depends: aeson
                  , aeson-diff
                  , base
@@ -198,8 +208,10 @@ test-suite strato-init-test
                  , containers
                  , hspec
                  , merkle-patricia-db
+                 , scientific
                  , strato-init
                  , strato-model
+                 , text
                  , time
                  , utf8-string
     ghc-options: -Wall
