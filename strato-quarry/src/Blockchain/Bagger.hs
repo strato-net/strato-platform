@@ -103,6 +103,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     addTransactionsToMempool :: [OutputTx] -> m ()
     addTransactionsToMempool ts = do
+        $logInfoS "Bagger.addTransactionsToMempool" . T.pack $ "Adding " ++ show length ts ++ " transactions"
         existingStateDbStateRoot <- getStateRoot
         stateRoot <- (B.lastExecutedStateRoot . B.miningCache) <$> getBaggerState
         setStateDBStateRoot stateRoot
