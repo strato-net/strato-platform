@@ -76,7 +76,7 @@ extra-deps:
 - these-0.7.4
 - QuickCheck-2.10.1
 - aeson-1.0.0.0
-
+- csv-0.1.2
 
 resolver: lts-7.18
 compiler: ghc-8.0.2

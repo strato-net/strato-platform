@@ -49,10 +49,10 @@ readS path = do
   when (null path) usage
   readFile path
 
-readLines :: FilePath -> IO [String]
-readLines path = if (null path)
-                    then return []
-                    else lines <$> readFile path
+readRecs :: FilePath -> IO String
+readRecs path = if (null path)
+                  then return ""
+                  else readFile path
 
 main :: IO ()
 main = do
@@ -64,11 +64,14 @@ main = do
                     Right g -> g
                     Left err -> error ("couldn't parse genesis: " ++ err)
 
-  recs <- readLines flags_records_file
+  recs <- readRecs flags_records_file
   let insert = if null recs
                   then insertContractsCount flags_number
                   else insertContractsCSV recs
   let output = insert src bytes (fromInteger flags_start) genesis
 
-  let outputText = encode output
-  withFile flags_output_file WriteMode (flip hPut $ outputText)
+  case output of
+    Left err -> error $ "couldn't generate: " ++ err
+    Right o -> do
+      let outputText = encode o
+      withFile flags_output_file WriteMode (flip hPut $ outputText)

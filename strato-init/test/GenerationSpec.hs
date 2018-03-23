@@ -105,9 +105,9 @@ spec = do
 
   describe "Parsing storage values" $ do
     it "Should accept a CSV of strings and ints" $
-      let input = "4,\"the universe\",-90909"
+      let input = ["4","\"life, the universe, everything\"","-90909"]
           want = Right $ Map.fromList [(0, Number 4),
-                                       (1, Stryng "the universe"),
+                                       (1, Stryng "life, the universe, everything"),
                                        (2, Number (-90909))]
           got = parseTypes input
       in got `shouldBe` want

@@ -9,13 +9,14 @@ module Blockchain.Generation (
   Type(..)
 ) where
 
+import Data.Bifunctor (first)
 import Data.Bits
 import Data.ByteString hiding (map, count, zip, concat, length, replicate)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.UTF8 as U8
 import qualified Data.ByteString.Base16 as B16
-import Data.List.Split (splitOn)
 import qualified Data.Map as Map
+import Text.CSV
 import Text.Read (readMaybe)
 
 import Blockchain.Strato.Model.Address
@@ -33,10 +34,9 @@ parseType inp = case readMaybe inp :: Maybe Integer of
                             Just s -> Right $ Stryng s
                             _ -> Left $ "invalid type: " ++ inp
 
-parseTypes :: String -> Either String (Map.Map Int Type)
-parseTypes line = do
-  let wyrds = splitOn "," line
-  types <- mapM parseType wyrds
+parseTypes :: Record -> Either String (Map.Map Int Type)
+parseTypes fields = do
+  types <- mapM parseType fields
   return . Map.fromList . zip [0..] $ types
 
 encodeType :: Int -> Type -> Either String [(Word256, Word256)]
@@ -53,18 +53,18 @@ encodeType k (Stryng s) =
 encodeAllTypes :: Map.Map Int Type -> Either String [(Word256, Word256)]
 encodeAllTypes i = concat <$> (sequence . Map.foldWithKey (\k a ws -> encodeType k a : ws) [] $ i)
 
-
 insertContractsCount :: Int -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
 insertContractsCount n src code start gi = return $ insertContracts (replicate n []) src code start gi
 
-insertContractsCSV :: [String] -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
-insertContractsCSV lynes src code start gi = do
-  types <- mapM parseTypes lynes
-  recs <- mapM encodeAllTypes types
-  return $ insertContracts recs src code start gi
+insertContractsCSV :: String -> String -> ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsCSV rawCSV src code start gi = do
+  recs <- first show . parseCSV "__records_file" $ rawCSV
+  types <- mapM parseTypes recs
+  slotss <- mapM encodeAllTypes types
+  return $ insertContracts slotss src code start gi
 
 insertContracts :: [[(Word256, Word256)]] -> String -> ByteString -> Address -> GenesisInfo -> GenesisInfo
-insertContracts recs src code start gi =
+insertContracts slotss src code start gi =
   let initialAccounts = genesisInfoAccountInfo gi
       initialCode = genesisInfoCodeInfo gi
       (decoded, extra) = B16.decode code
@@ -73,6 +73,6 @@ insertContracts recs src code start gi =
                    else superProprietaryStratoSHAHash decoded
       mkContract (addr, slots) = Contract addr 0 codeHash slots
       addrs = map (start+) [0..]
-      addrsAndSlots = zip addrs recs
+      addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
          genesisInfoCodeInfo = initialCode ++ [CodeInfo decoded src]}

@@ -154,6 +154,7 @@ library
                  , bytestring
                  , containers
                  , cryptonite
+                 , csv
                  , memory
                  , merkle-patricia-db
                  , split
@@ -176,9 +177,9 @@ executable generate-genesis
                  , blockapps-util
                  , bytestring
                  , containers
+                 , csv
                  , hflags
                  , merkle-patricia-db
-                 , split
                  , strato-init
                  , strato-model
                  , time
@@ -197,7 +198,6 @@ test-suite strato-init-test
                  , containers
                  , hspec
                  , merkle-patricia-db
-                 , split
                  , strato-init
                  , strato-model
                  , time
