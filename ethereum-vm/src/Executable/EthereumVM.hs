@@ -58,7 +58,7 @@ ethereumVM = void . execContextM $ do
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
-
+        
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
