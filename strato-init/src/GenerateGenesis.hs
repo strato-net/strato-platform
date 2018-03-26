@@ -9,7 +9,7 @@ import Control.Monad (when)
 import Data.Aeson (encode)
 import Data.Aeson.Extra (eitherDecodeStrict)
 import Data.ByteString (hGetContents, ByteString)
-import Data.ByteString.Lazy (hPut)
+import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
 
 import Blockchain.Generation (insertContractsCount, insertContractsJSON)
@@ -62,7 +62,7 @@ main = do
   insert <- if null flags_records_file
               then return $ insertContractsCount flags_number
               else do
-                  json <- readBS flags_records_file
+                  json <- L.readFile flags_records_file
                   return $ insertContractsJSON json
   let output = insert src bytes (fromInteger flags_start) genesis
 
@@ -70,4 +70,4 @@ main = do
     Left err -> error $ "couldn't generate: " ++ err
     Right o -> do
       let outputText = encode o
-      withFile flags_output_file WriteMode (flip hPut $ outputText)
+      withFile flags_output_file WriteMode (flip L.hPut $ outputText)

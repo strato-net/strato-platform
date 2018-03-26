@@ -11,9 +11,10 @@ module Blockchain.Generation (
   Type(..)
 ) where
 
-import Control.Monad (liftM)
+import Control.Monad (liftM, (<=<))
 import qualified Data.Aeson as Ae
 import Data.Bits
+import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16 as B16
 import Data.Scientific (floatingOrInteger)
@@ -65,14 +66,14 @@ encodeType k (Stryng s) =
 encodeAllTypes :: Records -> Either String [[(Word256, Word256)]]
 encodeAllTypes (Records recs) = mapM (liftM concat . sequence . zipWith encodeType [0..]) recs
 
-encodeJSON :: BS.ByteString -> Either String [[(Word256, Word256)]]
-encodeJSON rawRecs = encodeAllTypes =<< Ae.eitherDecodeStrict rawRecs
+encodeJSON :: L.ByteString -> Either String [[(Word256, Word256)]]
+encodeJSON = encodeAllTypes <=< Ae.eitherDecode
 
 insertContractsCount :: Int -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
 insertContractsCount n src code start gi = return $ insertContracts (replicate n []) src code start gi
 
 
-insertContractsJSON :: BS.ByteString -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
+insertContractsJSON :: L.ByteString -> String -> BS.ByteString -> Address -> GenesisInfo -> Either String GenesisInfo
 insertContractsJSON rawJSON src code start gi = do
   slotss <- encodeJSON rawJSON
   return $ insertContracts slotss src code start gi
