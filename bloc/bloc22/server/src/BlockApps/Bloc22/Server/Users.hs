@@ -103,11 +103,11 @@ postUsersSend userName addr resolve
 
 postUsersContract :: UserName -> Address -> Bool -> PostUsersContractRequest -> Bloc BlocTransactionResult
 postUsersContract userName addr resolve
-  (PostUsersContractRequest src password maybeContract args mTxParams value) = blocTransaction $ do
+  (PostUsersContractRequest src password maybeContract args mTxParams value mImports) = blocTransaction $ do
     sk <- getAccountSecKey userName password addr
     txParams <- getAccountTxParams addr mTxParams
     --TODO: check what happens with mismatching args
-    idsAndDetails <- compileContract src
+    idsAndDetails <- compileContract src $ fromMaybe Map.empty mImports
     logWith logNotice ("constructor arguments: " <> Text.pack (show args))
     (cmId,ContractDetails{..}) <-
       case maybeContract of
