@@ -91,8 +91,8 @@ ethereumVM = void . execContextM $ do
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
         let pending = B.pending state
-        let queued = B.queued state
-        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending) || not (M.null queued))
+        -- let queued = B.queued state
+        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending) 
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
