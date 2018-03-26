@@ -2,11 +2,13 @@
 
 module BlockApps.Solidity.Parse.DeclarationsSpec where
 
+import qualified Data.Text as Text
 import           Test.Hspec
 import           Text.Parsec                          hiding (parse)
 import BlockApps.Solidity.Parse.Parser
 import BlockApps.Solidity.Xabi
 import BlockApps.Solidity.Parse.Declarations
+import BlockApps.Solidity.Parse.UnParser
 import BlockApps.Solidity.Xabi.Type
 
 {-# ANN module ("HLint: ignore Redundant do" :: String) #-}
@@ -98,6 +100,25 @@ spec = do
       let Right (rets, _, _, _, _) = eRes
           expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
       rets `shouldBe` expected
+  describe "Declarations - structDeclaration" $ do
+    it "should parse and unparse a struct with two fields" $ do
+      let structString = "struct SampleStruct {\n      uint _field1;\n      string _field2;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with three fields" $ do
+      let structString = "struct SampleStruct {\n      uint _field1;\n      string _field2;\n      address _field3;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
 
 printLeft :: Either String a -> IO ()
 printLeft (Left msg) = putStrLn msg
