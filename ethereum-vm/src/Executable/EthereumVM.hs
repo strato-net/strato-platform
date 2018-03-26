@@ -18,6 +18,7 @@ import qualified Network.Kafka.Consumer                as KC
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
+import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -74,7 +75,10 @@ ethereumVM = void . execContextM $ do
 
         let blocks = [b | OEBlock b <- seqEvents]
         $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
-        forM_ blocks $ \b ->
+        forM_ blocks $ \b -> do
+            let number = blockDataNumber . obBlockData $ b
+                txCount = length . obReceiptTransactions $ b
+            $logInfoS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks False blocks
 
