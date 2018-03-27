@@ -6,9 +6,12 @@ import {
 import {
   LOGIN_REQUEST,
   LOGOUT_REQUEST,
+  FIRST_TIME_LOGIN_REQUEST,
   loginSuccess,
   loginFailure,
-  logoutSuccess
+  logoutSuccess,
+  firstTimeLoginSuccess,
+  firstTimeLoginFailure,
 } from './user.actions';
 import { env } from '../../env';
 
@@ -54,6 +57,25 @@ function logoutAccount() {
     })
 }
 
+function firstTimeLoginRequest(email) {
+  // TODO: call first time login API && check that the BlocH user isn't created already.
+  return new Promise(function(resolve) {
+    resolve({ exists: false })
+  });
+}
+
+function* firstTimeLogin(action) {
+  try {
+    const response = yield call(firstTimeLoginRequest, action.email);
+    if (response.exists)
+      yield put(firstTimeLoginSuccess(action.email));
+    else
+      yield put(firstTimeLoginFailure(action.email, 'The user does not exist'));
+  } catch (err) {
+    yield put(firstTimeLoginFailure(action.username, err));
+  }
+}
+
 function* login(action) {
   try {
     const response = yield call(loginRequest, action.username, action.password);
@@ -81,6 +103,7 @@ function* logout() {
 export default function* watchFetchUser() {
   yield [
     takeEvery(LOGIN_REQUEST, login),
-    takeEvery(LOGOUT_REQUEST, logout)
+    takeEvery(LOGOUT_REQUEST, logout),
+    takeEvery(FIRST_TIME_LOGIN_REQUEST, firstTimeLogin)
   ];
 }

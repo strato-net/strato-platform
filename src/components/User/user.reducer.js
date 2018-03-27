@@ -6,7 +6,10 @@ import {
   SET_CURRENT_USER,
   OPEN_LOGIN_OVERLAY,
   CLOSE_LOGIN_OVERLAY,
-  RESET_ERROR
+  RESET_ERROR,
+  FIRST_TIME_LOGIN_REQUEST,
+  FIRST_TIME_LOGIN_REQUEST_SUCCESS,
+  FIRST_TIME_LOGIN_REQUEST_FAILURE,
 } from './user.actions';
 import { currentUser } from '../../lib/localStorage';
 
@@ -16,7 +19,8 @@ const initialState = {
   isLoggedIn: JSON.stringify(currentUser()) !== JSON.stringify({}) ? true : false,
   error: null,
   isOpen: false,
-  spinning: false
+  spinning: false,
+  firstTimeUser: null,
 };
 
 const reducer = function (state = initialState, action) {
@@ -73,6 +77,27 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         error: null
+      }
+    case FIRST_TIME_LOGIN_REQUEST:
+      return {
+        ...state,
+        spinning: true
+      }
+    case FIRST_TIME_LOGIN_REQUEST_SUCCESS:
+      return {
+        ...state,
+        spinning: false,
+        firstTimeUser: action.email,
+        error: null,
+        isOpen: false
+      }
+    case FIRST_TIME_LOGIN_REQUEST_FAILURE:
+      return {
+        ...state,
+        spinning: false,
+        firstTimeUser: null,
+        error: action.error,
+        isOpen: true
       }
     default:
       return state;

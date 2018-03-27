@@ -1,48 +1,26 @@
 import React, { Component } from 'react';
-import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { login, openLoginOverlay, closeLoginOverlay, resetError } from '../User/user.actions';
-import { Button, Dialog } from '@blueprintjs/core';
-import validate from './validate.js';
-import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+import { Dialog, Tabs2, Tab2 } from '@blueprintjs/core';
 import './Login.css';
 import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
 import { toasts } from "../Toasts";
+import ExistingUser from './components/ExistingUser';
+import FirstTimeUser from './components/FirstTimeUser';
 
 class Login extends Component {
 
   constructor() {
     super();
-    this.state = { errors: null }
-  }
-
-  submit = (values) => {
-    let errors = validate(values);
-    this.setState({ errors });
-
-    if (JSON.stringify(errors) === JSON.stringify({})) {
-      const payload = {
-        username: values.username,
-        password: values.password
-      };
-
-      this.props.login(payload);
-    }
-  }
-
-  errorMessageFor(fieldName) {
-    if (this.state.errors && this.state.errors[fieldName]) {
-      return this.state.errors[fieldName];
-    }
-    return null;
+    this.state = {
+      errors: null,
+      navbarTabId: "existingUser",
+    };
+    this.handleNavbarTabChange = this.handleNavbarTabChange.bind(this);
   }
 
   componentWillReceiveProps(newProps) {
-    if (!this.props.isOpen && newProps.isOpen)
-      this.props.reset();
-
     if (newProps.isLoggedIn && newProps.selectedApp) {
       newProps.launchApp(newProps.selectedApp.address, newProps.selectedApp.url)
       newProps.resetSelectedApp();
@@ -54,9 +32,11 @@ class Login extends Component {
     }
   }
 
-  render() {
-    const { handleSubmit } = this.props;
+  handleNavbarTabChange(navbarTabId) {
+    this.setState({ navbarTabId });
+  }
 
+  render() {
     return (
       <div className="smd-pad-16">
         <form>
@@ -64,7 +44,6 @@ class Login extends Component {
             iconName="inbox"
             isOpen={this.props.isOpen}
             onClose={() => {
-              this.props.reset()
               this.setState({ errors: null })
               this.props.resetSelectedApp()
               this.props.closeLoginOverlay()
@@ -72,65 +51,20 @@ class Login extends Component {
             title="Login"
             className="pt-dark"
           >
-            <div className="pt-dialog-body">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
-                    Username
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="username"
-                      className="pt-input form-width smd-full-width"
-                      placeholder="Username"
-                      component="input"
-                      type="input"
-                      required
-                    /> <br />
-                    <span className="error-text">{this.errorMessageFor('username')}</span>
-                  </div>
-                </div>
-
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Password
-                  </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="password"
-                      className="pt-input form-width"
-                      placeholder="Password"
-                      component="input"
-                      type="password"
-                      required
-                    /> <br />
-                    <span className="error-text">{this.errorMessageFor('password')}</span>
-                  </div>
-                </div>
-              </div>
-              <div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-                <div className="col-sm-3"></div>
-              </div>
+            <div className="pt-dialog-header login-tabs-header">
+              <Tabs2
+                animate
+                className="login-tabs"
+                onChange={this.handleNavbarTabChange}
+                selectedTabId={this.state.navbarTabId}
+              >
+                <Tab2 id="existingUser" title="Existing User" />
+                <Tab2 id="firstTimeUser" title="First-time User" />
+              </Tabs2>
             </div>
-
-            <div className="pt-dialog-footer text-center">
-              <div className="pt-dialog-footer-actions">
-                <Button onClick={() => {
-                  mixpanelWrapper.track('create_user_open_click');
-                  this.props.closeLoginOverlay();
-                  this.props.openWalkThroughOverlay(false);
-                }} text="Create User" className="pt-icon-add" />
-                <Button
-                  type="button"
-                  onClick={handleSubmit(this.submit)}
-                  text={'Login'}
-                  disabled={this.props.spinning}
-                  className="pt-intent-primary pt-icon-log-in"
-                />
-              </div>
-            </div>
+            {this.state.navbarTabId === "existingUser"
+              ? <ExistingUser closeLoginOverlay={this.props.closeLoginOverlay} />
+              : <FirstTimeUser closeLoginOverlay={this.props.closeLoginOverlay} />}
           </Dialog>
         </form>
       </div>
@@ -145,22 +79,19 @@ function mapStateToProps(state) {
     isOpen: state.user.isOpen,
     selectedApp: state.applications.selectedApp,
     serverError: state.user.error,
-    spinning: state.user.spinning
   };
 }
 
-const formed = reduxForm({ form: 'login' })(Login);
 const connected = connect(
   mapStateToProps,
   {
     login,
     openLoginOverlay,
     closeLoginOverlay,
-    openWalkThroughOverlay,
     launchApp,
     resetSelectedApp,
     resetError
   }
-)(formed);
+)(Login);
 
 export default withRouter(connected);
