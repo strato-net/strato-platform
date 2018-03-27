@@ -265,6 +265,7 @@ type PostContractsCompile = "contracts"
 data PostCompileRequest = PostCompileRequest
   { postcompilerequestContractName :: Maybe Text
   , postcompilerequestSource       :: Text
+  , postcompilerequestImports      :: Maybe (Map Text Text) -- filename -> contents
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostCompileRequest where arbitrary = genericArbitrary uniform
@@ -286,7 +287,8 @@ instance ToSchema PostCompileRequest where
       ex :: PostCompileRequest
       ex = PostCompileRequest
         { postcompilerequestContractName = Just "MySampleContract"
-        , postcompilerequestSource = "contract MySampleContract { ...} "
+        , postcompilerequestSource = "import \"con.sol\";\n contract MySampleContract { } "
+        , postcompilerequestImports = Just $ Map.singleton "con.sol" "contract Con {}"
         }
 
 

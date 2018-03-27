@@ -356,7 +356,8 @@ getContractsMetaDataIdExhaustive contractName contractAddr = do
           return Nothing
 
         Just (src,codeHash) -> do
-          cmIds <- compileContract src
+          --TODO(tim): Supply imports from strato
+          cmIds <- compileContract src Map.empty
           let correctContract = listToMaybe . filter (\cd -> codeHash == (contractdetailsCodeHash $ snd cd)) . map snd . Map.toList $ cmIds
           return correctContract
     getSourceFromStrato addr = do
@@ -393,7 +394,8 @@ getContractDetailsByAddressOnly contractAddr = do
           return Nothing
 
         Just acct -> do
-          cds <- compileContract (accountSource acct)
+          -- TODO(tim): supply imports from strato
+          cds <- compileContract (accountSource acct) Map.empty
           let correctContract = listToMaybe . filter (\cd -> (accountCodeHash acct) == (contractdetailsCodeHash $ snd cd)) . map snd . Map.toList $ cds
           return correctContract
     getSourceFromStrato addr = do
@@ -770,7 +772,7 @@ getXabiFunctionsArgsQuery funcId = do
   for argsWithIds $ \ (index,tyid) -> do
     ty <- getXabiType tyid
     return $ Xabi.IndexedType index ty
-    
+
 {- |
 SELECT
   (CASE WHEN XFR.name IS NULL THEN '#' + CAST(XFR.index AS VARCHAR(20)) ELSE XFR.name END) as name
@@ -1058,12 +1060,12 @@ insertContract parentContr contr bin binRuntime xabi = do
   insertXabi metadataId parentContr xabi
   return metadataId
 
-compileContract :: Text -> Bloc (Map Text (Int32, ContractDetails))
-compileContract source' = do
+compileContract :: Text -> Map Text Text -> Bloc (Map Text (Int32, ContractDetails))
+compileContract source' imports = do
 --  (ExtabiResponse xabis,SolcResponse abiBins) <- blocStrato $
 --     (,) <$> postExtabi (Src source) <*> postSolc (Src source)
   source <- addGetSourceFuncToSource' source'
-  eabiBins <- fromJSON <$> compileSolc source
+  eabiBins <- fromJSON <$> compileSolc source imports
   abiBins <- case eabiBins of
     Error err -> blocError . AnError . Text.pack $ err
     Success res -> return res
@@ -1460,7 +1462,7 @@ getContractXabi (ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-  getContractXabiByMetadataId metadataId 
+  getContractXabiByMetadataId metadataId
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = blocTransaction $ do
