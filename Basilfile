@@ -124,7 +124,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: mempool-liveness
+    ref: performance-logging
     compose:
       restart: always
       ports:
