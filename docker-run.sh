@@ -4,6 +4,7 @@ set -x
 
 SINGLE_NODE=${SINGLE_NODE:-false}
 STRATO_GS_MODE=${STRATO_GS_MODE:-0}
+ssl=${ssl:-false}
 
 sed -i "s|__NODE_NAME__|$NODE_NAME|g" build/index.html
 sed -i "s|__BLOC_URL__|$BLOC_URL|g" build/index.html
@@ -14,6 +15,7 @@ sed -i "s|__CIRRUS_URL__|$CIRRUS_URL|g" build/index.html
 sed -i "s|__APEX_URL__|$APEX_URL|g" build/index.html
 sed -i "s|__STRATO_GS_MODE__|$STRATO_GS_MODE|g" build/index.html
 sed -i "s|__SINGLE_NODE__|$SINGLE_NODE|g" build/index.html
+sed -i "s|__IS_SSL__|$ssl|g" build/index.html
 
 # Started by non-BA user (smd_container_started)
 if [ "$STRATO_GS_MODE" != "1" ]; then
