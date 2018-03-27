@@ -99,6 +99,7 @@ spec = do
           , postuserscontractrequestArgs = Nothing
           , postuserscontractrequestTxParams = txParams
           , postuserscontractrequestValue = Just $ Strung 0
+          , postuserscontractrequestImports = Nothing
           }
       Right result <- getResolvedTx testConfig $ runClientM (postUsersContract userName userAddress False postUsersContractRequest) (ClientEnv mgr blocUrl)
       result `shouldSatisfy` (== Success) . blocTransactionStatus

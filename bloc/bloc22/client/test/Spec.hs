@@ -54,7 +54,7 @@ setup = do
         return (Just str',Just b')
 
   mgr' <- newManager defaultManagerSettings{managerResponseTimeout=responseTimeoutMicro 60000000}
- 
+
   simpleStorageSource <- readSolFile "SimpleStorage.sol"
   testSource <- readSolFile "Test.sol"
   simpleMappingSource <- readSolFile "SimpleMapping.sol"
@@ -92,7 +92,9 @@ setup = do
           in 6 * second
       }
 
-    postCompileRequest1 = PostCompileRequest (Just $ simpleStorageContractName testConfig) (simpleStorageSrc testConfig)
+    postCompileRequest1 = PostCompileRequest (Just $ simpleStorageContractName testConfig)
+                                             (simpleStorageSrc testConfig)
+                                             Nothing
     -- postUsersContractRequest1 = PostUsersContractRequest simpleStorage pw
     uploadListContract1 = UploadListContract
       { uploadlistcontractContractName = simpleStorageContractName testConfig

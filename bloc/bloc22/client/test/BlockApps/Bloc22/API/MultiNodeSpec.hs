@@ -321,6 +321,7 @@ createContractOnMulti src cn args config@TestConfig{..} = do
       , postuserscontractrequestArgs = args
       , postuserscontractrequestTxParams = txParams
       , postuserscontractrequestValue = Just $ Strung 0
+      , postuserscontractrequestImports = Nothing
       }
   result <- fromEither =<< (getResolvedTxMulti config $ runClientM (postUsersContract userName addr False postUsersContractRequest) blocclient)
   result `shouldSatisfy` (== Success) . blocTransactionStatus
