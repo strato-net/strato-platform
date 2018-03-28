@@ -398,7 +398,7 @@ data ContractCreationData = ContractCreationData
                             }
 
 data BatchState = BatchState
-                  { contractsMap       :: Map.Map Address ContractCreationData
+                  { contractsList      :: [(Address, ContractCreationData)]
                   , contractDetailsMap :: Map.Map ContractName ContractDetails
                   , functionIdMap      :: Map.Map (Int32, Text) Int32
                   , functionXabiMap    :: Map.Map Int32 Xabi
@@ -406,7 +406,7 @@ data BatchState = BatchState
                   }
 
 emptyBatchState :: BatchState
-emptyBatchState = BatchState Map.empty Map.empty Map.empty Map.empty Map.empty
+emptyBatchState = BatchState [] Map.empty Map.empty Map.empty Map.empty
 
 getBlocTransactionResult' :: Keccak256 -> Bool -> Bloc BlocTransactionResult
 getBlocTransactionResult' hash resolve =
@@ -473,8 +473,8 @@ postBlocTransactionResults resolve hashes = do
                     2 -> functionResult hash mtxr cmId tdata index
                     _ -> error $ "Unexpected transaction type: got" ++ show ttype
           let jbtrs = [btr | Just btr <- mbtrs]
+              cl = contractsList state
           (nbtrs,_) <- do
-            let contractsList = Map.toList (contractsMap state)
             void . blocModify $ \conn -> runInsertMany conn contractsInstanceTable
               [
               ( Nothing
@@ -482,14 +482,14 @@ postBlocTransactionResults resolve hashes = do
               , constant addr'
               , Nothing
               )
-              | (addr', ContractCreationData cmId _ _ _ _) <- contractsList
+              | (addr', ContractCreationData cmId _ _ _ _) <- cl
               ]
-            forStateT state contractsList $
+            forStateT state cl $
               \(addr', ContractCreationData _ hash name mtxr index) -> do
                 st <- get
                 let cds = contractDetailsMap st
                 (details, cds') <- case Map.lookup name cds of
-                  Just details' -> return (details', cds)
+                  Just details' -> return (details'{contractdetailsAddress = Just (Unnamed addr')}, cds)
                   Nothing -> do
                     details' <- lift $ getContractDetails name (Unnamed addr')
                     return (details', Map.insert name details' cds)
@@ -521,14 +521,16 @@ postBlocTransactionResults resolve hashes = do
               if (isNothing $ listToMaybe xs)
                 then do
                   st <- get
-                  put st{contractsMap = Map.insert addr' (ContractCreationData cmId hash (ContractName name) mtxr index) (contractsMap st)}
+                  put st{contractsList =
+                          (contractsList st) ++ [(addr', ContractCreationData cmId hash (ContractName name) mtxr index)]
+                        }
                   return Nothing
                 else do
                   st <- get
                   let cds = contractDetailsMap st
                       cn  = ContractName name
                   (details, cds') <- case Map.lookup cn cds of
-                    Just details' -> return (details', cds)
+                    Just details' -> return (details'{contractdetailsAddress = Just (Unnamed addr')}, cds)
                     Nothing -> do
                       details' <- lift $ getContractDetails cn (Unnamed addr')
                       return (details', Map.insert cn details' cds)
