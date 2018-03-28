@@ -42,9 +42,39 @@ class WalkThrough extends Component {
 
   handleEmailSentClick() {
     mixpanelWrapper.track('faucet_close_click');
-    this.setState({ currentModal: "CLI", step: 2, isBackClicked: false });
+    this.setState({ currentModal: "Completed", isBackClicked: false });
     // Faucet account using jwt tobe done
     this.props.faucetRequest(this.props.currentUser.accountAddress);
+  }
+
+  dialogContent() {
+    switch (this.state.currentModal) {
+      case "CreateUser":
+        return <CreateUser />
+        break;
+      case "Faucet":
+        return <Faucet
+          errors={this.props.errors}
+          handleSubmit={this.props.handleSubmit}
+          submitting={this.props.submitting}
+          faucetRequest={this.props.faucetRequest}
+          currentUser={this.props.currentUser}
+          handleEmailSentClick={this.handleEmailSentClick}
+          isWalkThrough={true}
+          isBackClicked={this.state.isBackClicked}
+        />
+        break;
+      case "Completed":
+        return <Congrats
+          handleBack={() => this.setState({ currentModal: "Faucet", step: 1, isBackClicked: true })}
+          handleContinue={() => this.setState({ currentModal: "CLI", step: 2 })} />
+        break;
+      case "CLI":
+        return <CLI
+          handleBack={this.handleBackToFaucet}
+          closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} />
+        break;
+    }
   }
 
   render() {
@@ -74,26 +104,7 @@ class WalkThrough extends Component {
             isCloseButtonShown={this.state.currentModal === "CreateUser"}
           >
             <Stepper step={this.state.step} />
-            {this.state.currentModal === "CreateUser" && <CreateUser />}
-
-            {this.state.currentModal === "Faucet" && <Faucet
-              errors={this.props.errors}
-              handleSubmit={this.props.handleSubmit}
-              submitting={this.props.submitting}
-              faucetRequest={this.props.faucetRequest}
-              currentUser={this.props.currentUser}
-              handleEmailSentClick={this.handleEmailSentClick}
-              isWalkThrough
-              isBackClicked={this.state.isBackClicked}
-            />}
-
-            {this.state.currentModal === "CLI" && <CLI handleBack={this.handleBackToFaucet} handleContinue={
-              () => this.setState({ currentModal: "Completed", step: 3 })} />}
-
-            {this.state.currentModal === "Completed" &&
-              <Congrats closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} handleBack={
-                () => this.setState({ currentModal: "CLI", step: 2 })} />}
-
+            {this.dialogContent()}
           </Dialog>
         </form>
       </div>

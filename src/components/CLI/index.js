@@ -39,9 +39,13 @@ class CLI extends Component {
                   <Button text="Back" onClick={() => {
                     this.props.handleBack();
                   }} />
-                  <Button text="Continue" intent={Intent.PRIMARY} onClick={() => {
-                    this.props.handleContinue();
-                  }} />
+                  <AnchorButton
+                    intent={Intent.PRIMARY}
+                    href="https://developers.blockapps.net/advanced/launch-dapp/"
+                    target="_blank"
+                    onClick={this.props.closeWalkThroughOverlay}
+                    text="Finish"
+                  />
                 </div>
             }
           </div>

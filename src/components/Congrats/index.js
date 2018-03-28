@@ -6,19 +6,15 @@ const Congrats = (props) => {
   return (<div>
     <div className="pt-dialog-body congrats-container">
       <h2>Congratulations!</h2>
-      <p>You’re ready to start building apps - visit our developers website for more information.</p>
+      <p>You’re approved for 1000 STR.</p>
     </div>
     <div className="pt-dialog-footer">
       <div className="pt-dialog-footer-actions">
         <Button text="Back"
           onClick={props.handleBack}
         />
-        <AnchorButton
-          intent={Intent.PRIMARY}
-          href="https://developers.blockapps.net/advanced/launch-dapp/"
-          target="_blank"
-          onClick={props.closeWalkThroughOverlay}
-          text="Get Started"
+        <Button text="Continue"
+          onClick={props.handleContinue}
         />
       </div>
     </div>
