@@ -25,7 +25,6 @@ spec = do
         postCompileRequest = PostCompileRequest
           (Just simpleStorageContractName)
           simpleStorageSrc
-          Nothing
       Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       contracts `shouldSatisfy` any
         (\ (PostCompileResponse name _) -> name == simpleStorageContractName)
@@ -34,7 +33,6 @@ spec = do
         postCompileRequest = PostCompileRequest
           (Just twoContractsContractName)
           twoContractsSrc
-          Nothing
       Right contracts <- runClientM (postContractsCompile [postCompileRequest]) (ClientEnv mgr blocUrl)
       liftIO . putStrLn $ show contracts
       contracts `shouldSatisfy` (== 2) . length

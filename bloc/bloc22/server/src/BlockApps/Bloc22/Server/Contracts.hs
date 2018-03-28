@@ -186,8 +186,7 @@ postContractsCompile :: [PostCompileRequest] -> Bloc [PostCompileResponse]
 postContractsCompile = blocTransaction . fmap concat . traverse compileOneContract
   where
     compileOneContract PostCompileRequest{..} = do
-      let imports = fromMaybe Map.empty postcompilerequestImports
-      idsAndDetails <- compileContract postcompilerequestSource imports
+      idsAndDetails <- compileContract postcompilerequestSource
       for (toList idsAndDetails) $ \ (_,details) -> do
         contractDetails <-
           getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")

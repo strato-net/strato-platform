@@ -48,12 +48,9 @@ import BlockApps.Solidity.Parse.UnParser
 -- This is really hard to understand and highly non-idomatic for json formation or parsing.
 -- It was basically copy/pasted directly from strato-api for expediency, someone should really fix
 -- this if it is something we want to maintain.
-compileSolc :: Text -> Map Text Text -> Bloc Aeson.Value
-compileSolc mainSrc importFiles' = do
-  -- TODO(tim): Pass postParams down here when POSTing a compile
-  let postParams = Map.empty
-      mainFiles = Map.singleton "src" (Text.unpack mainSrc)
-      importFiles = Map.mapKeys Text.unpack . Map.map Text.unpack $ importFiles'
+compileSolc :: Text -> Bloc Aeson.Value
+compileSolc mainSrc = do
+  (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   case eRes of
     Left (err, ExitFailure 1) -> blocError . UserError . Text.pack $ err
@@ -66,9 +63,7 @@ compileSolc mainSrc importFiles' = do
 -- For solc compiling during testing, outside of Bloc monad
 compileSolcIO :: Text -> IO (Either String Aeson.Value)
 compileSolcIO mainSrc = do
-  let postParams = Map.empty
-      importFiles = Map.empty
-      mainFiles = Map.singleton "src" (Text.unpack mainSrc)
+  (postParams, mainFiles, importFiles) <- getSolSrc mainSrc
   eRes <- liftIO . runEitherT $ runSolc postParams mainFiles importFiles
   return $ case eRes of
     Left (err, ExitFailure 1) -> Left err
@@ -189,6 +184,31 @@ aesonDecodeUtf8 x = case Aeson.eitherDecode . BL.fromStrict . Text.encodeUtf8 $ 
   Left err -> Left (err,ExitFailure 0)
   Right y -> Right y
 
+getSolSrc :: MonadIO m => Text -> m (Map String String, Map String String, Map String String)
+getSolSrc src = return (mempty, Map.singleton "src" (Text.unpack src), mempty)
+--  (postParamsAssoc, postFilesAssoc) <- runRequestBody
+--  let postParams = Map.fromList $
+--                   map (\(x,y) -> (Text.unpack x, Text.unpack y))
+--                   postParamsAssoc
+--      postFilesInfo =
+--        Map.fromList $
+--        map (\l -> (P.fst $ P.head l, Map.fromList $ map P.snd l)) $
+--        List.groupBy ((==) `on` fst) $
+--        map (\(a, b) ->
+--          let (a1, a2) = List.break (== ':') $ Text.unpack a
+--              a3 = maybe a2 id $ stripPrefix ":" a2
+--          in (a1, (a3, b))
+--          ) $
+--        postFilesAssoc
+--  mainFiles0 <- maybe (return Map.empty) getFileContents $
+--                Map.lookup "main" postFilesInfo
+--  importFiles <- maybe (return Map.empty) getFileContents $
+--                 Map.lookup "import" postFilesInfo
+--  let mainFiles = maybe mainFiles0 (\s -> Map.insert "src" s mainFiles0) $
+--                  Map.lookup "src" postParams
+--  return (postParams, mainFiles, importFiles)
+
+
 addGetSourceFuncToSource :: Text -> Either String Text
 addGetSourceFuncToSource src = do
   -- Supply empty string for parser as it's only used for error reporting
@@ -199,7 +219,7 @@ addGetSourceFuncToSource src = do
   where
     addF s = addFunction ("__getSource__", "return \"" <> unpack s <> "\";  ")
     formatSrc = replace "\"" "\\\""
-              . replace "\n" "\\n"
+              . replace "\n" "\\n" 
 
 stripLines :: Text -> Text
 stripLines = Text.concat . Text.lines

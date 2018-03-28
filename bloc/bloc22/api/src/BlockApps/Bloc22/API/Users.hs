@@ -256,7 +256,6 @@ data PostUsersContractRequest = PostUsersContractRequest
   , postuserscontractrequestArgs     :: Maybe (Map Text ArgValue)
   , postuserscontractrequestTxParams :: Maybe TxParams
   , postuserscontractrequestValue    :: Maybe (Strung Natural)
-  , postuserscontractrequestImports  :: Maybe (Map Text Text) -- filename -> contents
   } deriving (Eq,Show,Generic)
 
 instance Arbitrary PostUsersContractRequest where arbitrary = genericArbitrary uniform
@@ -270,7 +269,7 @@ instance FromJSON PostUsersContractRequest where
 instance ToSample PostUsersContractRequest where
   toSamples _ = singleSample PostUsersContractRequest
     { postuserscontractrequestSrc =
-      "import \"other.sol\";\n contract SimpleStorage { uint storedData; function set(uint x) \
+      "contract SimpleStorage { uint storedData; function set(uint x) \
       \{ storedData = x; } function get() returns (uint retVal) \
       \{ return storedData; } }"
     , postuserscontractrequestPassword = "securePassword"
@@ -278,7 +277,6 @@ instance ToSample PostUsersContractRequest where
     , postuserscontractrequestArgs = Nothing
     , postuserscontractrequestTxParams = Nothing
     , postuserscontractrequestValue = Just $ Strung 10
-    , postuserscontractrequestImports = Just $ Map.singleton "other.sol" "contract Other {}"
     }
 
 instance ToSchema PostUsersContractRequest where
@@ -313,7 +311,6 @@ instance ToSchema PostUsersContractRequest where
             , postuserscontractrequestArgs = Nothing
             , postuserscontractrequestTxParams = Nothing
             , postuserscontractrequestValue = Nothing
-            , postuserscontractrequestImports = Nothing
             }
       )
 
