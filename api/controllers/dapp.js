@@ -89,7 +89,10 @@ uploadFailure = function(loc, inboundErr) {
         outboundErr.status = 401;
         break;
       case 400:
-        if (inboundErr.data === 'incorrect password') {
+        if (inboundErr.data === undefined) {
+          outboundErr.message += ": " + JSON.stringify(inboundErr);
+          outboundErr.status = 400;
+        } else if (inboundErr.data === 'incorrect password') {
           outboundErr.message += ': incorrect password';
           outboundErr.status = 401;
         } else if (inboundErr.data.includes('no user found with name')) {
