@@ -49,7 +49,7 @@ checkFileCompiles = function(directory, fileName) {
     fs.readFile(filePath, 'utf8', function (error, data) {
       if (error) {
         console.error(error);
-        return next(new Error('could not read the contract file contracts/' + fileName));
+        return reject(new Error('could not read the contract file contracts/' + fileName));
       }
 
       co(function* () {
@@ -273,10 +273,17 @@ uploadInitContracts = async function(packageFolderPath, creds, inits) {
   const addrs = {};
   try {
     const keys = Object.keys(inits);
+    const txparams = {};
+    const account = await co.wrap(blockappsRest.getAccount)(creds.address);
+    let nonce = account[0].nonce;
+    keys.map((key) => {
+      txparams[key] = {"nonce": nonce};
+      nonce++;
+    });
     await Promise.all(keys.map(async (key) => {
           const filename = path.join(packageFolderPath, inits[key].contractFilename);
           let contract = await co.wrap(blockappsRest.uploadContract)(
-                creds, inits[key].contractName, filename, inits[key].args);
+                creds, inits[key].contractName, filename, inits[key].args, false, txparams[key]);
           addrs[key] = contract.address;
     }));
   } catch (error) {
