@@ -828,6 +828,7 @@ getXabiVariableNamesQuery metadataId = proc () -> do
   restrict -< cmid .== constant metadataId
   returnA -< varName
 
+
 getContractDetails :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
 getContractDetails contract@(ContractName contractName) contractId = do
     xabi <- getContractXabi contract contractId

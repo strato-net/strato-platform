@@ -108,7 +108,7 @@ getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
   toUserError
     (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
-      $ getContractDetailsByAddressOnly contractAddress
+    (getContractDetailsByAddressOnly contractAddress >>= return . detailToBlockappsjsDetail)
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
@@ -171,13 +171,6 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
    Left err -> throwError $ UserError $ Text.pack err
    Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
 
-
-
-
-
-
-
-
 getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwError $ Unimplemented "getContractsStates"
 
@@ -190,3 +183,17 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
         contractDetails <-
           getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")
         return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
+
+
+detailToBlockappsjsDetail :: ContractDetails -> ContractDetails
+detailToBlockappsjsDetail cd = 
+  let eXabi = xAbiToContract $ contractdetailsXabi cd in
+  case eXabi of
+    Right xabi -> cd { contractdetailsXabi = contractToXabi xabi } 
+    Left _ -> cd
+  
+  
+xabiToBlockappsjsXabi :: Xabi -> Either String Xabi
+xabiToBlockappsjsXabi xabi = do
+  c <- xAbiToContract xabi
+  return $ contractToXabi c
