@@ -13,6 +13,7 @@ import { env } from '../../env';
 import CLI from '../CLI';
 import TokenRequest from '../TokenRequest';
 import { closeCLIOverlay } from '../CLI/cli.actions';
+import VerifyAccount from '../VerifyAccount'
 import qs from 'query-string';
 
 import './application.css'
@@ -22,7 +23,7 @@ class Applications extends Component {
   componentDidMount() {
     // I am really sorry for this. But time.
     const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if(!this.props.isLoggedIn && !developerSignIn) {
+    if (!this.props.isLoggedIn && !developerSignIn) {
       window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
     }
 
@@ -50,6 +51,7 @@ class Applications extends Component {
             <h3>My Apps</h3>
           </div>
           <div className="col-sm-6 text-right">
+            <VerifyAccount />
             {this.props.isLoggedIn &&
               <Button text="Request Token" onClick={this.props.openTokenRequestOverlay} className="right-align" />}
             {this.props.isLoggedIn &&

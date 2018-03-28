@@ -13,6 +13,7 @@ import {
   firstTimeLoginSuccess,
   firstTimeLoginFailure,
 } from './user.actions';
+import { openVerifyAccountModal } from '../VerifyAccount/verifyAccount.actions';
 import { env } from '../../env';
 
 const loginUrl = env.APEX_URL + "/login";
@@ -59,18 +60,20 @@ function logoutAccount() {
 
 function firstTimeLoginRequest(email) {
   // TODO: call first time login API && check that the BlocH user isn't created already.
-  return new Promise(function(resolve) {
-    resolve({ exists: false })
+  return new Promise(function (resolve) {
+    resolve({ exists: true })
   });
 }
 
 function* firstTimeLogin(action) {
   try {
     const response = yield call(firstTimeLoginRequest, action.email);
-    if (response.exists)
+    if (response.exists) {
       yield put(firstTimeLoginSuccess(action.email));
-    else
+      yield put(openVerifyAccountModal());
+    } else {
       yield put(firstTimeLoginFailure(action.email, 'The user does not exist'));
+    }
   } catch (err) {
     yield put(firstTimeLoginFailure(action.username, err));
   }
