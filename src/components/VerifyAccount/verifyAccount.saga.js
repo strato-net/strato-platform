@@ -6,8 +6,10 @@ import {
 import {
   VERIFY_OTP_REQUEST,
   verifyOTPSuccess,
-  verifyOTPFailure
+  verifyOTPFailure,
+  closeVerifyAccountModal
 } from './verifyAccount.actions';
+import { openCreatePasswordModal } from '../CreatePassword/createPassword.actions';
 
 function verifyOTPRequest(OTP) {
   // TODO will append API later on
@@ -19,8 +21,10 @@ function verifyOTPRequest(OTP) {
 function* verifyOTP(action) {
   try {
     const response = yield call(verifyOTPRequest, action.OTP);
-    if(response.success) {
+    if (response.success) {
       yield put(verifyOTPSuccess());
+      yield put(closeVerifyAccountModal());
+      yield put(openCreatePasswordModal());
     } else {
       yield put(verifyOTPFailure('OTP is incorrect'));
     }

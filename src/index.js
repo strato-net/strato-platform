@@ -33,6 +33,7 @@ import cliReducer from './components/CLI/cli.reducer';
 import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
 import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
+import createPasswordReducer from './components/CreatePassword/createpassword.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -96,7 +97,8 @@ const rootReducer = combineReducers({
   cli: cliReducer,
   walkThrough: walkThroughReducer,
   tokenRequest: tokenRequestReducer,
-  verifyAccount: verifyAccountReducer
+  verifyAccount: verifyAccountReducer,
+  createPassword: createPasswordReducer
 });
 
 const rootSaga = function* startForeman() {
