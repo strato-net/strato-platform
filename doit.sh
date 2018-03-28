@@ -36,13 +36,13 @@ function newnode {
   runForever strato-sequencer >> logs/strato-sequencer 2>&1
 
   # echo "Starting strato-api-indexer"
-  # runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
+  runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
 
   # echo "Starting strato-p2p-indexer"
-  # runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
+  runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
   # echo "Starting strato-txr-indexer"
-  # runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
+  runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
 
   minLogLevel=LevelInfo
   if [ "${evmDebugMode}" = true ] ; then
