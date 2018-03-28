@@ -104,6 +104,9 @@ uploadFailure = function(loc, inboundErr) {
         }
         // TODO: check if user has not enough ether (e.g. just few wei)
         break;
+      default:
+        outboundErr.message += ': ' + inboundErr;
+        outboundErr.status = inboundErr.status;
     }
     return outboundErr;
 }
