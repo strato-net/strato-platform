@@ -34,7 +34,8 @@ data VMException =
   AddressDoesNotExist |
   StackTooLarge |
   CallStackTooDeep |
-  InvalidJump deriving (Show)
+  InvalidJump |
+  InvalidInstruction deriving (Show)
 
 data Memory =
   Memory {

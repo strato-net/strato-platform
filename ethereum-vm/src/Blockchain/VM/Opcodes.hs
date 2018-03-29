@@ -15,10 +15,12 @@ import           Blockchain.Util
 --import Debug.Trace
 
 data Operation =
-    STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG | LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE | SHA3 |
+    STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG |
+    LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE |
+    SHA3 |
     ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY |
-    BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT | POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE |
-    JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
+    BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
+    POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
     PUSH [Word8] |
     DUP1 | DUP2 | DUP3 | DUP4 |
     DUP5 | DUP6 | DUP7 | DUP8 |
@@ -29,7 +31,7 @@ data Operation =
     SWAP9 | SWAP10 | SWAP11 | SWAP12 |
     SWAP13 | SWAP14 | SWAP15 | SWAP16 |
     LOG0 | LOG1 | LOG2 | LOG3 | LOG4 |
-    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | SUICIDE |
+    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | INVALID | SUICIDE |
     --Pseudo Opcodes
     LABEL String | PUSHLABEL String |
     PUSHDIFF String String | DATA B.ByteString |
@@ -156,6 +158,8 @@ opDatas =
     OPData 0xf2 CALLCODE 7 1 "Message-call into this account with alternate account's code.",
     OPData 0xf3 RETURN 2 0 "Halt execution returning output data.",
     OPData 0xf4 DELEGATECALL 7 1 "Message-call into this account with an alternative account’s code, but persisting the current values for sender and value.",
+    -- These α and δ are technically ∅, but rather than risk an undefined exception set to 0.
+    OPData 0xfe INVALID 0 0 "Designated invalid instruction",
     OPData 0xff SUICIDE 1 0 "Halt execution and register account for later deletion."
   ]
 
