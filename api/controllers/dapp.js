@@ -2,6 +2,7 @@
 
 const admZip = require('adm-zip');
 const blockappsRest = require('blockapps-rest').rest;
+const importer = require('blockapps-rest').common.importer;
 const child_process = require('child_process');
 const co = require('co');
 const download = require('download');
@@ -43,36 +44,45 @@ parseContractData = function(data) {
  * @param fileName {string}
  * @returns {Promise}
  */
-checkFileCompiles = function(directory, fileName) {
-  return new Promise(function(resolve, reject) {
-    const filePath = path.join(directory, fileName);
-    fs.readFile(filePath, 'utf8', function (error, data) {
-      if (error) {
-        console.error(error);
-        return next(new Error('could not read the contract file contracts/' + fileName));
-      }
+checkFileCompiles = async function(directory, fileName) {
+  const filePath = path.join(directory, fileName);
+  let data;
+  try {
+    data = await importer.getBlob(filePath);
+  } catch (error) {
+    console.error(error);
+    throw new Error('could not read the contract file contracts/' + fileName +
+                    ': ' + error);
+  }
 
-      co(function* () {
-        const parsedData = yield parseContractData(data);
-        const contractNames = Object.keys(parsedData.src);
-        const compilationResult = yield blockappsRest.compile(
-          [
-            {
-              "contractName": contractNames[0],
-              "searchable": contractNames,
-              "source": data
-            }
-          ]
-        );
-        console.log(compilationResult); // [0 => {codeHash: "<hash>", contractName = "SimpleStorage"}, ...]
-        return resolve(compilationResult);
-      }).catch(error => {
-        // could not compile one of the contracts
-        console.log('could not compile contract', fileName, error);
-        return reject(fileName);
-      });
-    });
-  });
+  let parsedData;
+  try {
+    parsedData = await parseContractData(data);
+  } catch (error) {
+    console.error(error);
+    throw new Error("could not parse contractfile", fileName, error);
+  }
+
+  const contractNames = Object.keys(parsedData.src);
+  try {
+    const compilationResult = await co.wrap(blockappsRest.compile)(
+            [
+              {
+                "contractName": contractNames[0],
+                "searchable": contractNames,
+                "source": data
+              }
+            ]
+          );
+    // [0 => {codeHash: "<hash>", contractName = "SimpleStorage"}, ...]
+    console.log(compilationResult);
+    return compilationResult;
+  } catch (error) {
+      // could not compile one of the contracts
+      var err = new Error('could not compile contract', fileName, error);
+      console.error(err);
+      throw err;
+  }
 };
 
 /**
@@ -89,7 +99,10 @@ uploadFailure = function(loc, inboundErr) {
         outboundErr.status = 401;
         break;
       case 400:
-        if (inboundErr.data === 'incorrect password') {
+        if (inboundErr.data === undefined) {
+          outboundErr.message += ": " + JSON.stringify(inboundErr);
+          outboundErr.status = 400;
+        } else if (inboundErr.data === 'incorrect password') {
           outboundErr.message += ': incorrect password';
           outboundErr.status = 401;
         } else if (inboundErr.data.includes('no user found with name')) {
@@ -104,6 +117,9 @@ uploadFailure = function(loc, inboundErr) {
         }
         // TODO: check if user has not enough ether (e.g. just few wei)
         break;
+      default:
+        outboundErr.message += ': ' + inboundErr;
+        outboundErr.status = inboundErr.status;
     }
     return outboundErr;
 }
@@ -267,10 +283,24 @@ uploadInitContracts = async function(packageFolderPath, creds, inits) {
   const addrs = {};
   try {
     const keys = Object.keys(inits);
+    const txparams = {};
+    let nonce = null;
+    try {
+      const account = await co.wrap(blockappsRest.getAccount)(creds.address);
+      nonce = account[0].nonce;
+      keys.map((key) => {
+        txparams[key] = {"nonce": nonce};
+        nonce++;
+      });
+    } catch (error) {
+      console.error(
+          "could not find account; attempting to upload without specifying nonce...");
+    }
+
     await Promise.all(keys.map(async (key) => {
           const filename = path.join(packageFolderPath, inits[key].contractFilename);
           let contract = await co.wrap(blockappsRest.uploadContract)(
-                creds, inits[key].contractName, filename, inits[key].args);
+                creds, inits[key].contractName, filename, inits[key].args, false, txparams[key]);
           addrs[key] = contract.address;
     }));
   } catch (error) {
@@ -503,6 +533,7 @@ upload = function (req, res, next) {
       const contractsTmpFolder = path.join(packageTmpFolder, 'contracts');
       let files;
       try {
+        // TODO(tim): This doesn't work if contractsTmpFolder has subdirectories
         files = yield fs.readdir(contractsTmpFolder);
       } catch(error) {
         removePathsIfExist(tempPaths);

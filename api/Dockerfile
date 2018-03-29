@@ -12,6 +12,9 @@ COPY package.json /usr/src/app/
 
 RUN npm install
 
+# TODO: remove after https://github.com/blockapps/blockapps-rest/pull/62 is published to NPM
+RUN sed -i 's/txResult.msg/txResult.message/' node_modules/blockapps-rest/lib/rest_5.js
+
 COPY . /usr/src/app
 
 EXPOSE 3001
