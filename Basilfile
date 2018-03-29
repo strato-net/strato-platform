@@ -100,7 +100,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: master
+    ref: cirrus-timing
     compose:
       restart: always
       depends_on:
