@@ -72,7 +72,8 @@ getContractsState contract@(ContractName contractName) contractId = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
-
+  t1 <- liftIO $ getTime Realtime
+    
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
@@ -80,7 +81,8 @@ getContractsState contract@(ContractName contractName) contractId = do
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
 
-
+  t2 <- liftIO $ getTime Realtime
+  
   address <- case contractId of
     Unnamed addr -> return addr
     Named "Latest" -> blocQuery1 $ proc () -> do
@@ -92,21 +94,32 @@ getContractsState contract@(ContractName contractName) contractId = do
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
+  t3 <- liftIO $ getTime Realtime
+  
   storage' <- blocStrato $ getStorage $ Just address
-
+  
+  t4 <- liftIO $ getTime Realtime
+  
   let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
 
 
       ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
   
+  t5 <- liftIO $ getTime Realtime
+  
   logWith logNotice $ Text.unlines
     [ "Storage:"
     , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     , "End of storage"
     ]
-  t1 <- liftIO $ getTime Realtime
-  logWith logError $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t1 - t0))
+  logWith logError $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
+  logWith logError $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
+  logWith logError $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
+  logWith logError $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
+  logWith logError $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
+  logWith logError $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
+  
   return $ Map.fromList ret
 
 getContractsDetails :: Address -> Bloc ContractDetails
