@@ -284,12 +284,19 @@ uploadInitContracts = async function(packageFolderPath, creds, inits) {
   try {
     const keys = Object.keys(inits);
     const txparams = {};
-    const account = await co.wrap(blockappsRest.getAccount)(creds.address);
-    let nonce = account[0].nonce;
-    keys.map((key) => {
-      txparams[key] = {"nonce": nonce};
-      nonce++;
-    });
+    let nonce = null;
+    try {
+      const account = await co.wrap(blockappsRest.getAccount)(creds.address);
+      nonce = account[0].nonce;
+      keys.map((key) => {
+        txparams[key] = {"nonce": nonce};
+        nonce++;
+      });
+    } catch (error) {
+      console.error(
+          "could not find account; attempting to upload without specifying nonce...");
+    }
+
     await Promise.all(keys.map(async (key) => {
           const filename = path.join(packageFolderPath, inits[key].contractFilename);
           let contract = await co.wrap(blockappsRest.uploadContract)(

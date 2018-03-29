@@ -136,12 +136,15 @@ describe('App', function() {
 
     it("can upload init contracts", async function() {
       this.timeout(30000);
+      console.log("about to create user");
       const res1 = await chai.request(app)
        .post('/users')
        .send({username: "john_wayne",
               password: "hunter2"});
+      assert.equal(res1.status, '200');
 
       const address = JSON.parse(res1.text).user.accountAddress;
+      console.log("about to faucet user");
       const res2 = await chai.request(process.env.stratoRoot)
        .post('/faucet')
        .field('address', address);
@@ -157,6 +160,7 @@ describe('App', function() {
           'args': {}
         }
       };
+      console.log("about it uploadInitContracts");
       const addrs = await uploadInitContracts('./test/testdata/', creds, inits);
       expect(addrs.storage).to.match(/[0-9A-Fa-f]{40}/g);
 
