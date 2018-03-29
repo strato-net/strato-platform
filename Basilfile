@@ -100,7 +100,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: cirrus-timing
+    ref: deduce-state-locally
     compose:
       restart: always
       depends_on:
