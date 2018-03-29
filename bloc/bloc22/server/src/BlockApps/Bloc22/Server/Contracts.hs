@@ -9,6 +9,7 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Control.Monad.IO.Class             (liftIO)
 import           Data.Foldable
 import           Data.Int
 import qualified Data.Map.Strict                 as Map
@@ -20,6 +21,7 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import           Numeric
 import           Opaleye
+import           System.Clock
 
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
@@ -66,6 +68,7 @@ getContractsContract = getContractDetails
 
 getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
 getContractsState contract@(ContractName contractName) contractId = do
+  t0 <- liftIO $ getTime Realtime
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
@@ -76,6 +79,7 @@ getContractsState contract@(ContractName contractName) contractId = do
   metadataId <- case contractId of
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+
 
   address <- case contractId of
     Unnamed addr -> return addr
@@ -95,13 +99,14 @@ getContractsState contract@(ContractName contractName) contractId = do
 
 
       ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
-
+  
   logWith logNotice $ Text.unlines
     [ "Storage:"
     , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     , "End of storage"
     ]
-
+  t1 <- liftIO $ getTime Realtime
+  logWith logError $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t1 - t0))
   return $ Map.fromList ret
 
 getContractsDetails :: Address -> Bloc ContractDetails

@@ -39,6 +39,7 @@ library
                , blockapps-bloc22-api
                , blockapps-strato-api
                , blockapps-strato-client
+               , clock
                , containers
                , contravariant
                , cryptonite
