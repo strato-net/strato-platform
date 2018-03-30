@@ -112,6 +112,13 @@ pop = do
                 return $ fromWord256 val
     _ -> left StackTooSmallException
 
+localState :: (VMState -> VMState) -> VMM a -> VMM a
+localState f mv = do
+  state' <- lift get
+  lift . put . f $ state'
+  x <- mv
+  lift . put $ state'
+  return x
 
 getStackItem::Word256Storable a=>Int->VMM a
 getStackItem i = do

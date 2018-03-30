@@ -96,6 +96,7 @@ pushVMStateVar f = do
 
 logN::Int->VMM ()
 logN n = do
+  guardStorage
   offset <- pop
   theSize <- pop
   owner <- getEnvVar envOwner
@@ -104,6 +105,10 @@ logN n = do
   theData <- mLoadByteString offset theSize
   addLog Log{address=owner, bloom=0, logData=theData, topics=topics'}
 
+guardStorage :: VMM ()
+guardStorage = do
+  w <- lift $ writable <$> get
+  when (not w) (left WriteProtection)
 
 
 dupN::Int->VMM ()
@@ -380,6 +385,7 @@ runOperation SLOAD = do
   push val
 
 runOperation SSTORE = do
+  guardStorage
   p <- pop
   val <- pop::VMM Word256
 
@@ -452,6 +458,7 @@ runOperation SWAP15 = swapn 15
 runOperation SWAP16 = swapn 16
 
 runOperation CREATE = do
+  guardStorage
   value <- pop::VMM Word256
   input <- pop
   size <- pop
@@ -494,6 +501,7 @@ runOperation CALL = do
   gas <- pop::VMM Word256
   to <- pop
   value <- pop::VMM Word256
+  when (value /= 0) guardStorage
   inOffset <- pop
   inSize <- pop
   outOffset <- pop
@@ -666,9 +674,18 @@ runOperation DELEGATECALL = do
       when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
       left MalformedOpcodeException
 
+runOperation STATICCALL = do
+  gas <- pop :: VMM Word256
+  to <- pop :: VMM Word256
+  push (0 :: Word256)
+  push to
+  push gas
+  localState (\vms -> vms {writable=False}) $ runOperation CALL
+
 runOperation INVALID = left InvalidInstruction
 
 runOperation SUICIDE = do
+  guardStorage
   address' <- pop
   owner <- getEnvVar envOwner
   addressState <- getAddressState $ owner
