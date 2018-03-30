@@ -112,9 +112,8 @@ pop = do
                 return $ fromWord256 val
     _ -> left StackTooSmallException
 
--- Shouldn't there be some way to lift withStateT?
-with :: (VMState -> VMState) -> VMM a -> VMM a
-with f mv = do
+localState :: (VMState -> VMState) -> VMM a -> VMM a
+localState f mv = do
   state' <- lift get
   lift . put . f $ state'
   x <- mv

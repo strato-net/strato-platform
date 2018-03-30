@@ -678,7 +678,7 @@ runOperation STATICCALL = do
   push (0 :: Word256)
   push to
   push gas
-  with (\vms -> vms {writable=False}) $ runOperation CALL
+  localState (\vms -> vms {writable=False}) $ runOperation CALL
 
 runOperation INVALID = left InvalidInstruction
 
