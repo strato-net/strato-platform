@@ -38,11 +38,11 @@ emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
 emitKafkaTransactions txs = do
     ts <- liftIO $ getCurrentMicrotime
     let ingestTxs = (\t -> (IETx ts (IngestTx API t))) <$> txs
-    $logInfoS "writeUnseqEventsBegin" . T.pack $ "Writing " P.++ (show $ P.length ingestTxs) P.++ " tx(s) to unseqevents"        
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " P.++ (show $ P.length ingestTxs) P.++ " tx(s) to unseqevents"        
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
     case rets of
         Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ (T.pack $ show e)
-        Right resps -> $logInfo $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
+        Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
     return ()
 
 postTransactionR :: Handler ()

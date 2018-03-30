@@ -78,7 +78,7 @@ ethereumVM = void . execContextM $ do
         forM_ blocks $ \b -> do
             let number = blockDataNumber . obBlockData $ b
                 txCount = length . obReceiptTransactions $ b
-            $logInfoS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
+            $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks False blocks
 
@@ -92,8 +92,8 @@ ethereumVM = void . execContextM $ do
         state <- Bagger.getBaggerState
         let pending = B.pending state
         let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
-        $logInfoS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
-        $logInfoS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
+        $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
+        $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock

@@ -113,7 +113,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
     processNewBestBlock blockHash bd txShas = do
-        $logInfoS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
+        $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
         existingStateDbStateRoot <- getStateRoot
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
@@ -143,7 +143,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
         if noCachedTxsCulled then do
-            $logInfoS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
+            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
             if null $ B.promotedTransactions cache then do
                     $logDebugS "Bagger.makeNewBlock" "null $ B.promotedTransactions cache = True"
                     !build <- buildFromMiningCache
@@ -184,7 +184,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     !build <- buildFromMiningCache
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
-            $logInfoS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
+            $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"
             let sha    = B.bestBlockSHA cache
             let header = B.bestBlockHeader cache
             let txShas = B.bestBlockTxHashes cache

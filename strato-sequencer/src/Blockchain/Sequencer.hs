@@ -38,7 +38,6 @@ import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
-    $logInfoS "sequencer" . T.pack $ "Attempting to read unseq events"    
     inEvents <- readUnseqEvents'        
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
