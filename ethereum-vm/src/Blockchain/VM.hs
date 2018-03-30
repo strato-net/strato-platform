@@ -357,11 +357,11 @@ runOperation POP = do
   _ <- pop::VMM Word256
   return ()
 
-runOperation LOG0 = logN 0
-runOperation LOG1 = logN 1
-runOperation LOG2 = logN 2
-runOperation LOG3 = logN 3
-runOperation LOG4 = logN 4
+runOperation LOG0 = guardStorage >> logN 0
+runOperation LOG1 = guardStorage >> logN 1
+runOperation LOG2 = guardStorage >> logN 2
+runOperation LOG3 = guardStorage >> logN 3
+runOperation LOG4 = guardStorage >> logN 4
 
 runOperation MLOAD = do
   p <- pop
@@ -384,6 +384,7 @@ runOperation SLOAD = do
   push val
 
 runOperation SSTORE = do
+  guardStorage
   p <- pop
   val <- pop::VMM Word256
 
@@ -683,6 +684,7 @@ runOperation STATICCALL = do
 runOperation INVALID = left InvalidInstruction
 
 runOperation SUICIDE = do
+  guardStorage
   address' <- pop
   owner <- getEnvVar envOwner
   addressState <- getAddressState $ owner
@@ -708,23 +710,18 @@ runOperation x = error $ "Missing case in runOperation: " ++ show x
 opGasPriceAndRefund :: Operation -> VMM (Integer, Integer)
 
 opGasPriceAndRefund LOG0 = do
-  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG1 = do
-  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG2 = do
-  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + 2*gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG3 = do
-  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + 3*gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG4 = do
-  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + 4*gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 
@@ -794,7 +791,6 @@ opGasPriceAndRefund EXTCODECOPY = do
     size <- getStackItem 3::VMM Word256
     return (gEXTCODECOPYBASE + gCOPYWORD * ceiling (fromIntegral size / (32::Double)), 0)
 opGasPriceAndRefund SSTORE = do
-  guardStorage
   p <- getStackItem 0
   val <- getStackItem 1
   oldVal <- getStorageKeyVal p
@@ -803,7 +799,6 @@ opGasPriceAndRefund SSTORE = do
       (x, 0) | x /= 0 -> return (5000, 15000)
       _      -> return (5000, 0)
 opGasPriceAndRefund SUICIDE = do
-    guardStorage
     owner <- getEnvVar envOwner
     currentSuicideList <- fmap suicideList $ lift get
     if owner `S.member` currentSuicideList
