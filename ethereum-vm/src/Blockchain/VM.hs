@@ -199,9 +199,7 @@ getBlockHashWithNumber num b = do
 --The code would simplify greatly, but I don't feel motivated to make the change now since things work.
 
 runOperation::Operation->VMM ()
-runOperation STOP = do
-  vmState <- lift get
-  lift $ put vmState{done=True}
+runOperation STOP = setDone True
 
 runOperation ADD = binaryAction (+)
 runOperation MUL = binaryAction (*)
@@ -681,6 +679,8 @@ runOperation STATICCALL = do
   push to
   push gas
   with (\vms -> vms {writable=False}) $ runOperation CALL
+
+runOperation INVALID = left InvalidInstruction
 
 runOperation SUICIDE = do
   address' <- pop

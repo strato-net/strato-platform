@@ -93,6 +93,7 @@ opGasPrice CREATE              = 32000
 opGasPrice CALLCODE            = 40
 opGasPrice RETURN              = 0
 opGasPrice STOP                = 0
+opGasPrice INVALID             = 0
 opGasPrice SUICIDE             = 0
 
 opGasPrice (MalformedOpcode _) = 0 --gonna fail anyway, just put something arbitrary here

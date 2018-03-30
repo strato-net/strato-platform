@@ -35,6 +35,7 @@ data VMException =
   StackTooLarge |
   CallStackTooDeep |
   InvalidJump |
+  InvalidInstruction |
   WriteProtection deriving (Show)
 
 data Memory =
