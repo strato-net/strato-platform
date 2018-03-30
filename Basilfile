@@ -100,7 +100,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: deduce-state-locally
+    ref: master
     compose:
       restart: always
       depends_on:
@@ -124,7 +124,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: performance-logging
+    ref: performance
     compose:
       restart: always
       ports:
