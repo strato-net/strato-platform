@@ -29,7 +29,7 @@ data Operation =
     SWAP9 | SWAP10 | SWAP11 | SWAP12 |
     SWAP13 | SWAP14 | SWAP15 | SWAP16 |
     LOG0 | LOG1 | LOG2 | LOG3 | LOG4 |
-    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | SUICIDE |
+    CREATE | CALL | CALLCODE | RETURN | DELEGATECALL | STATICCALL | SUICIDE |
     --Pseudo Opcodes
     LABEL String | PUSHLABEL String |
     PUSHDIFF String String | DATA B.ByteString |
@@ -155,7 +155,9 @@ opDatas =
     OPData 0xf1 CALL 7 1 "Message-call into an account.",
     OPData 0xf2 CALLCODE 7 1 "Message-call into this account with alternate account's code.",
     OPData 0xf3 RETURN 2 0 "Halt execution returning output data.",
-    OPData 0xf4 DELEGATECALL 7 1 "Message-call into this account with an alternative account’s code, but persisting the current values for sender and value.",
+    OPData 0xf4 DELEGATECALL 6 1 "Message-call into this account with an alternative account’s code, but persisting the current values for sender and value.",
+    OPData 0xfa STATICCALL 6 1 "Static message-call into an account. Attempted storage writes \
+                               \will throw an exception.",
     OPData 0xff SUICIDE 1 0 "Halt execution and register account for later deletion."
   ]
 

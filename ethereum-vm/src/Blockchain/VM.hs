@@ -104,6 +104,10 @@ logN n = do
   theData <- mLoadByteString offset theSize
   addLog Log{address=owner, bloom=0, logData=theData, topics=topics'}
 
+guardStorage :: VMM ()
+guardStorage = do
+  w <- lift $ writable <$> get
+  when (not w) (left WriteProtection)
 
 
 dupN::Int->VMM ()
@@ -454,6 +458,7 @@ runOperation SWAP15 = swapn 15
 runOperation SWAP16 = swapn 16
 
 runOperation CREATE = do
+  guardStorage
   value <- pop::VMM Word256
   input <- pop
   size <- pop
@@ -496,6 +501,7 @@ runOperation CALL = do
   gas <- pop::VMM Word256
   to <- pop
   value <- pop::VMM Word256
+  when (value /= 0) guardStorage
   inOffset <- pop
   inSize <- pop
   outOffset <- pop
@@ -668,6 +674,13 @@ runOperation DELEGATECALL = do
       when flags_debug $ lift $ $logInfoS "runOp/DELEGATECALL" . T.pack $ CL.red ("Malformed Opcode: " ++ showHex opcode "")
       left MalformedOpcodeException
 
+runOperation STATICCALL = do
+  gas <- pop :: VMM Word256
+  to <- pop :: VMM Word256
+  push (0 :: Word256)
+  push to
+  push gas
+  with (\vms -> vms {writable=False}) $ runOperation CALL
 
 runOperation SUICIDE = do
   address' <- pop
@@ -695,18 +708,23 @@ runOperation x = error $ "Missing case in runOperation: " ++ show x
 opGasPriceAndRefund :: Operation -> VMM (Integer, Integer)
 
 opGasPriceAndRefund LOG0 = do
+  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG1 = do
+  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG2 = do
+  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + 2*gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG3 = do
+  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + 3*gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 opGasPriceAndRefund LOG4 = do
+  guardStorage
   size <- getStackItem 1::VMM Word256
   return (gLOG + 4*gLOGTOPIC + gLOGDATA * fromIntegral size, 0)
 
@@ -776,6 +794,7 @@ opGasPriceAndRefund EXTCODECOPY = do
     size <- getStackItem 3::VMM Word256
     return (gEXTCODECOPYBASE + gCOPYWORD * ceiling (fromIntegral size / (32::Double)), 0)
 opGasPriceAndRefund SSTORE = do
+  guardStorage
   p <- getStackItem 0
   val <- getStackItem 1
   oldVal <- getStorageKeyVal p
@@ -784,6 +803,7 @@ opGasPriceAndRefund SSTORE = do
       (x, 0) | x /= 0 -> return (5000, 15000)
       _      -> return (5000, 0)
 opGasPriceAndRefund SUICIDE = do
+    guardStorage
     owner <- getEnvVar envOwner
     currentSuicideList <- fmap suicideList $ lift get
     if owner `S.member` currentSuicideList

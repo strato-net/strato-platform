@@ -34,7 +34,8 @@ data VMException =
   AddressDoesNotExist |
   StackTooLarge |
   CallStackTooDeep |
-  InvalidJump deriving (Show)
+  InvalidJump |
+  WriteProtection deriving (Show)
 
 data Memory =
   Memory {
@@ -80,6 +81,8 @@ data VMState =
 
     vmException      :: Maybe VMException,
 
+    writable         :: Bool, -- Whether to throw on attempted changes to storage
+
     --These last two variable are only used for the Ethereum tests.
     isRunningTests   :: Bool,
     debugCallCreates :: Maybe [DebugCallCreate]
@@ -105,6 +108,7 @@ startingState isRunningTests' isHomestead env dbs' = do
                done=False,
                returnVal=Nothing,
                vmException=Nothing,
+               writable=True,
                vmGasRemaining=0,
                stack=[],
                memory=m,
