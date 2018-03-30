@@ -18,6 +18,7 @@ import qualified Network.Kafka.Consumer                as KC
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
+import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -58,7 +59,7 @@ ethereumVM = void . execContextM $ do
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
-
+        
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
@@ -74,7 +75,10 @@ ethereumVM = void . execContextM $ do
 
         let blocks = [b | OEBlock b <- seqEvents]
         $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
-        forM_ blocks $ \b ->
+        forM_ blocks $ \b -> do
+            let number = blockDataNumber . obBlockData $ b
+                txCount = length . obReceiptTransactions $ b
+            $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks False blocks
 
@@ -87,8 +91,9 @@ ethereumVM = void . execContextM $ do
         isCaughtUp <- shouldProcessNewTransactions
         state <- Bagger.getBaggerState
         let pending = B.pending state
-        let queued = B.queued state
-        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending) || not (M.null queued))
+        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
+        $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
+        $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock

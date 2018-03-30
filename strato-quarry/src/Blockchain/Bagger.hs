@@ -113,6 +113,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     processNewBestBlock :: SHA -> DD.BlockData -> [SHA] -> m ()
     processNewBestBlock blockHash bd txShas = do
+        $logDebugS "Bagger.processNewBestBlock" . T.pack $ "called with " ++ show (length txShas) ++ " txs"
         existingStateDbStateRoot <- getStateRoot
         let thisStateRoot = DD.blockDataStateRoot bd
         state <- getBaggerState
@@ -415,6 +416,7 @@ buildFromMiningCache = do
     rewardedStateRoot <- rewardCoinbases stateRoot ourCoinbase uncles (parentNum + 1)
     $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "post-reward :: (" ++ format rewardedStateRoot ++ ")"
     setStateDBStateRoot previousStateRoot
+    $logInfoS "Bagger.buildFromMiningCache" . T.pack $ "Building block " ++ show (parentNum + 1) ++ " with " ++ show (length txs) ++ " txs"
     return OutputBlock { obOrigin = TO.Quarry
                        , obTotalDifficulty = parentDiff + nextDiff
                        , obBlockUncles = uncles

@@ -38,7 +38,7 @@ import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
-    inEvents <- readUnseqEvents'
+    inEvents <- readUnseqEvents'        
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
         t0 <- liftIO $ getTime Realtime

@@ -63,11 +63,15 @@ doBlock minerNumber n newNonce = do
         theMinedBlock = n{blockBlockData = theblockData}
         coinbase = format . blockDataCoinbase . blockBlockData $ n
         theHash = blockHash theMinedBlock
+        number = blockDataNumber . blockBlockData $ n
+        txLength = length . blockReceiptTransactions $ n
     toLog "doBlock" minerNumber $ "Coinbase " ++ coinbase ++ " success for " ++ format (blockHash n) ++ " -> " ++ show newNonce
     toLog "doBlock" minerNumber $ "New block hash is " ++ format theHash ++ "!"
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
     _ <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
+    $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"  
     return ()
 
 mineBlock :: TMVar Block -> Integer -> Integer -> (Miner, Int) -> AditM ()
