@@ -96,6 +96,7 @@ pushVMStateVar f = do
 
 logN::Int->VMM ()
 logN n = do
+  guardStorage
   offset <- pop
   theSize <- pop
   owner <- getEnvVar envOwner
@@ -357,11 +358,11 @@ runOperation POP = do
   _ <- pop::VMM Word256
   return ()
 
-runOperation LOG0 = guardStorage >> logN 0
-runOperation LOG1 = guardStorage >> logN 1
-runOperation LOG2 = guardStorage >> logN 2
-runOperation LOG3 = guardStorage >> logN 3
-runOperation LOG4 = guardStorage >> logN 4
+runOperation LOG0 = logN 0
+runOperation LOG1 = logN 1
+runOperation LOG2 = logN 2
+runOperation LOG3 = logN 3
+runOperation LOG4 = logN 4
 
 runOperation MLOAD = do
   p <- pop
