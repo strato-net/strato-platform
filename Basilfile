@@ -18,7 +18,7 @@ volumes:
 deployments:
   - name: smd-ui
     repo: https://github.com/blockapps/smd-ui.git
-    ref: master
+    ref: release/v0.4.5
     compose:
       restart: always
       depends_on:
@@ -36,6 +36,7 @@ deployments:
         APEX_URL: "${APEX_URL}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
         SINGLE_NODE: "${SINGLE_NODE}"
+        ssl: "${ssl:-false}"
 
   - name: apex
     repo: https://github.com/blockapps/apex.git
@@ -53,6 +54,7 @@ deployments:
         NODE_HOST: "${NODE_HOST}"
         SINGLE_NODE: "${SINGLE_NODE}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
+        PROD_DEV_MODE: "${PROD_ENV_MODE:-false}"
         blocHost: "bloch:8000"
         cirrusHost: "cirrus:3333"
         stratoHost: "strato:3000"
@@ -75,13 +77,12 @@ deployments:
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: bloc-performance
+    ref: bloc-ingestion
     compose:
       restart: always
       depends_on:
         - strato
         - postgres
-        # - cirrus # circuit dependency
       environment:
         ssl: "${ssl:-false}"
         stratoHost: "strato:3000"
@@ -123,7 +124,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: strato-bottleneck
+    ref: performance
     compose:
       restart: always
       ports:
@@ -198,6 +199,7 @@ deployments:
       restart: always
       ports:
         - "80:80"
+        - "443:443"
       depends_on:
         - bloch
         - cirrus
@@ -207,9 +209,12 @@ deployments:
         - apex
       environment:
         ssl: "${ssl:-false}"
+        sslCertFileType: "${sslCertFileType:-crt}"
         authBasic: "${authBasic}"
         uiPassword: "${uiPassword}"
         blockTime: "${blockTime}"
+      volumes:
+        - ./ssl:/tmp/ssl:ro
 
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
@@ -221,6 +226,7 @@ deployments:
 
   - name: kafka
     compose:
+      command: /bin/bash -c 'printf "\noffset.metadata.max.bytes=1048576\nmax.request.size=33554432\nmessage.max.bytes=33554432\n" >> opt/kafka_2.11-0.10.1.0/config/server.properties && supervisord -n'
       image: spotify/kafka:latest
       restart: always
       environment:

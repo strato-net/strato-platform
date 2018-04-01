@@ -79,7 +79,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true
               cd strato-getting-started
               # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
-              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=stratodemo1.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              BOOT_NODE_HOST=52.179.13.55 NODE_HOST=stratodemo1.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
               docker rmi $(docker images -aq) || true #removing unused images only
               docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
               docker ps
@@ -94,7 +94,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true
               cd strato-getting-started
               # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
-              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=stratodemo2.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              BOOT_NODE_HOST=52.179.13.55 NODE_HOST=stratodemo2.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
               docker rmi $(docker images -aq) || true #removing unused images only
               docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
               docker ps
@@ -109,7 +109,7 @@ pipeline {
               docker rm -f $(docker ps -aq) || true
               cd strato-getting-started
               # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
-              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=stratodemo3.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              BOOT_NODE_HOST=52.179.13.55 NODE_HOST=stratodemo3.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
               docker rmi $(docker images -aq) || true #removing unused images only
               docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
               docker ps
