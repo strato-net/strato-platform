@@ -10,14 +10,8 @@ import Data.LargeWord (LargeKey(..))
 import qualified Data.ByteString.Lazy as ByteString
 import BlockApps.Solidity.Xabi
 import BlockApps.SolidityVarReader
+import BlockApps.Strato.Types()
 import Test.QuickCheck
-
-instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
-  arbitrary = do
-    a <- arbitrary
-    b <- arbitrary
-    return $ LargeKey a b
-
 
 spec :: Spec
 spec =
