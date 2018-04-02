@@ -18,6 +18,7 @@ import { env } from '../../env';
 
 const loginUrl = env.APEX_URL + "/login";
 const logoutUrl = env.APEX_URL + "/logout";
+const verifyUrl = env.APEX_URL + "/verify";
 
 function loginRequest(username, password) {
   return fetch(
@@ -59,10 +60,23 @@ function logoutAccount() {
 }
 
 function firstTimeLoginRequest(email) {
-  // TODO: call first time login API && check that the BlocH user isn't created already.
-  return new Promise(function (resolve) {
-    resolve({ exists: true })
-  });
+  return fetch(
+    verifyUrl,
+    {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
 }
 
 function* firstTimeLogin(action) {
