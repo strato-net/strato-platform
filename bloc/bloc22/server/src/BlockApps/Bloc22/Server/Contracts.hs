@@ -113,12 +113,12 @@ getContractsState contract@(ContractName contractName) contractId = do
     , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     , "End of storage"
     ]
-  logWith logError $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
-  logWith logError $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
-  logWith logError $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
-  logWith logError $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
-  logWith logError $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
-  logWith logError $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
+  logWith logDebug $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
+  logWith logDebug $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
+  logWith logDebug $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
+  logWith logDebug $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
+  logWith logDebug $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
+  logWith logDebug $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
   
   return $ Map.fromList ret
 
@@ -126,7 +126,7 @@ getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
   toUserError
     (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
-    (getContractDetailsByAddressOnly contractAddress >>= return . detailToBlockappsjsDetail)
+    (getContractDetailsByAddressOnly contractAddress >>= return . completeContractDetailXabi)
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
@@ -203,15 +203,15 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
         return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
 
 
-detailToBlockappsjsDetail :: ContractDetails -> ContractDetails
-detailToBlockappsjsDetail cd = 
+completeContractDetailXabi :: ContractDetails -> ContractDetails
+completeContractDetailXabi cd = 
   let eXabi = xAbiToContract $ contractdetailsXabi cd in
   case eXabi of
     Right xabi -> cd { contractdetailsXabi = contractToXabi xabi } 
     Left _ -> cd
   
   
-xabiToBlockappsjsXabi :: Xabi -> Either String Xabi
-xabiToBlockappsjsXabi xabi = do
+completeXabi :: Xabi -> Either String Xabi
+completeXabi xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi c

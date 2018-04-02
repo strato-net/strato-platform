@@ -12,6 +12,7 @@ stratoHost=${stratoHost}
 --pgport=postgres_port=${postgres_port}
 --pguser=postgres_user=${postgres_user}
 --password=postgres_password=${postgres_password}
+--loglevel=loglevel=${loglevel:-4}
 "
 
 blocserver="/usr/bin/blockapps-bloc"
@@ -38,4 +39,4 @@ done
 $stratoserver &
 
 $blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" 2>&1
+            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" 2>&1
