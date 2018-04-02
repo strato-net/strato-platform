@@ -24,6 +24,7 @@ module BlockApps.Strato.Types
   , TransactionResult (..)
   , BatchTransactionResult (..)
   , PostTransaction (..)
+  , defaultPostTx
   , toPostTx
   , BlockData (..)
   , Block (..)
@@ -311,6 +312,21 @@ instance ToSample PostTransaction where
     , posttransactionNonce = 0
     }
 
+defaultPostTx :: PostTransaction -- TODO: Make this a real default
+defaultPostTx = PostTransaction
+    { posttransactionHash = keccak256lazy (Binary.encode @ Integer 1)
+    , posttransactionGasLimit = 21000
+    , posttransactionCodeOrData = ""
+    , posttransactionGasPrice = 50000000000
+    , posttransactionTo = Just $ Address 0xdeadbeef
+    , posttransactionFrom = Address 0x111dec89c25cbda1c12d67621ee3c10ddb8196bf
+    , posttransactionValue = Strung 10000000000000000000
+    , posttransactionR = Hex 1 -- make valid examples
+    , posttransactionS = Hex 1 -- make valid examples
+    , posttransactionV = Hex 0x1c
+    , posttransactionNonce = 0
+    }
+
 instance ToSchema PostTransaction where
   declareNamedSchema proxy = genericDeclareNamedSchema stratoSchemaOptions proxy
     & mapped.schema.description ?~ "Post Transaction"
@@ -523,6 +539,21 @@ instance Arbitrary TransactionResult where
 
 instance ToJSON TransactionResult where
   toJSON = genericToJSON (aesonPrefix camelCase)
+
+-- The toJSON instance without Word256 values (their conversion is extremely slow)
+  -- toJSON TransactionResult{..} = object
+  --   [ "blockHash" .= transactionresultBlockHash
+  --   , "transactionHash" .= transactionresultTransactionHash
+  --   , "message" .= transactionresultMessage
+  --   , "response" .= transactionresultResponse
+  --   , "trace" .= transactionresultTrace
+  --   , "contractsCreated" .= transactionresultContractsCreated
+  --   , "contractsDeleted" .= transactionresultContractsDeleted
+  --   , "stateDiff" .= transactionresultStateDiff
+  --   , "time" .= transactionresultTime
+  --   , "newStorage" .= transactionresultNewStorage
+  --   , "deletedStorage" .= transactionresultDeletedStorage
+  --   ]
 
 instance FromJSON TransactionResult where
   parseJSON = genericParseJSON (aesonPrefix camelCase)

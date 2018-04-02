@@ -107,6 +107,10 @@ solcSpec =
         let solPath = "./test/contracts/BlockAppsBABlob.sol"
             expectedPath = "./test/contracts/BlockAppsBABlobGetSource.sol"
         testAugment solPath expectedPath
+      it "should augment SimpleString code with single quotes" $ do
+        let solPath = "./test/contracts/SimpleStringSingleQuotes.sol"
+            expectedPath = "./test/contracts/SimpleStringSingleQuotesGetSource.sol"
+        testAugment solPath expectedPath
 
       -- TODO: Move this test to a more appropriate location
       it "should parse a modifier declaration" $ do
