@@ -131,7 +131,7 @@ unparseTypes (name, Xabi.Struct {fields=fields'}) =
              <> (Text.intercalate "\n      "
                 . map unparseField
                 . List.sortOn (\(_, FieldType i _) -> i)
-                $ Map.toList fields'
+                $ fields'
                 )
              <> "\n    }"
   where unparseField (fieldName, fieldType) = (Text.pack . unparseVarType $ fieldTypeType fieldType)

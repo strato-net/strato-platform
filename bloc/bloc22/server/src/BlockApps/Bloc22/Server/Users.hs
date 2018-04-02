@@ -26,6 +26,7 @@ import           Data.Int                          (Int32)
 import           Data.List                         (sortOn)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
+import qualified Data.Map.Ordered                  as OMap
 import           Data.Maybe
 import           Data.Monoid
 import           Data.RLP
@@ -298,7 +299,7 @@ postUsersContractMethodList userName userAddr resolve PostMethodListRequest{..} 
               contract'' <- lift $ either (throwError . UserError . Text.pack) return eitherErrorOrContract
               let mapValue = contract''
               return (mapValue, Map.insert mapKey mapValue cmIds)
-          let maybeFunc = Map.lookup methodcallMethodName (fields $ C.mainStruct contract')
+          let maybeFunc = OMap.lookup methodcallMethodName (fields $ C.mainStruct contract')
 
           sel <-
             case maybeFunc of
@@ -362,7 +363,7 @@ postUsersContractMethod
     contract' <-
       either (throwError . UserError . Text.pack) return eitherErrorOrContract
 
-    let maybeFunc = Map.lookup funcName (fields $ C.mainStruct contract')
+    let maybeFunc = OMap.lookup funcName (fields $ C.mainStruct contract')
 
     sel <-
       case maybeFunc of

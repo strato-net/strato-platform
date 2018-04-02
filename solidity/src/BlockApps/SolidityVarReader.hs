@@ -29,6 +29,7 @@ import qualified Data.ByteString.Lazy             as BL
 import           Data.LargeWord
 import           Data.List
 import qualified Data.Map                         as Map
+import qualified Data.Map.Ordered                 as OMap
 import           Data.Maybe
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
@@ -199,7 +200,7 @@ decodeValues
   -> [(Text, Value)]
 decodeValues typeDefs' struct'@Struct{..} storage offset =
   let
-    varNames = Map.keys fields
+    varNames = (map fst . OMap.assocs) fields
   in
    --catMaybes will return all items, since a Nothing can only result from a varnamea that isn't in the map, but varNames is the keys of the map
    zip varNames $ mapMaybe (decodeValue typeDefs' storage offset struct') varNames
@@ -211,7 +212,7 @@ decodeValue
   -> Struct
   -> Text
   -> Maybe Value
-decodeValue typeDefs' storage offset Struct{..} varName = case Map.lookup varName fields of
+decodeValue typeDefs' storage offset Struct{..} varName = case OMap.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
      Just $ decodeValue' typeDefs' storage (position `Storage.addOffset` fromIntegral offset) theType
@@ -442,7 +443,7 @@ decodeMapValue
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
 decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
-  (position, maybeMappingType) <- Map.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
+  (position, maybeMappingType) <- OMap.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
 
   (fromType, toType) <-
     case maybeMappingType of
