@@ -538,20 +538,22 @@ instance Arbitrary TransactionResult where
   arbitrary = genericArbitrary uniform
 
 instance ToJSON TransactionResult where
-  toJSON TransactionResult{..} = object
-    [ "blockHash" .= transactionresultBlockHash
-    , "transactionHash" .= transactionresultTransactionHash
-    , "message" .= transactionresultMessage
-    , "response" .= transactionresultResponse
-    , "trace" .= transactionresultTrace
-    , "contractsCreated" .= transactionresultContractsCreated
-    , "contractsDeleted" .= transactionresultContractsDeleted
-    , "stateDiff" .= transactionresultStateDiff
-    , "time" .= transactionresultTime
-    , "newStorage" .= transactionresultNewStorage
-    , "deletedStorage" .= transactionresultDeletedStorage
-    ]
-  -- toJSON = genericToJSON (aesonPrefix camelCase)
+  toJSON = genericToJSON (aesonPrefix camelCase)
+
+-- The toJSON instance without Word256 values (their conversion is extremely slow)
+  -- toJSON TransactionResult{..} = object
+  --   [ "blockHash" .= transactionresultBlockHash
+  --   , "transactionHash" .= transactionresultTransactionHash
+  --   , "message" .= transactionresultMessage
+  --   , "response" .= transactionresultResponse
+  --   , "trace" .= transactionresultTrace
+  --   , "contractsCreated" .= transactionresultContractsCreated
+  --   , "contractsDeleted" .= transactionresultContractsDeleted
+  --   , "stateDiff" .= transactionresultStateDiff
+  --   , "time" .= transactionresultTime
+  --   , "newStorage" .= transactionresultNewStorage
+  --   , "deletedStorage" .= transactionresultDeletedStorage
+  --   ]
 
 instance FromJSON TransactionResult where
   parseJSON = genericParseJSON (aesonPrefix camelCase)
