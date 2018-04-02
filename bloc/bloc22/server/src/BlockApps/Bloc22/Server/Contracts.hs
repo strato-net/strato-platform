@@ -113,12 +113,12 @@ getContractsState contract@(ContractName contractName) contractId = do
     , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
     , "End of storage"
     ]
-  logWith logError $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
-  logWith logError $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
-  logWith logError $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
-  logWith logError $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
-  logWith logError $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
-  logWith logError $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
+  logWith logDebug $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
+  logWith logDebug $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
+  logWith logDebug $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
+  logWith logDebug $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
+  logWith logDebug $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
+  logWith logDebug $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
   
   return $ Map.fromList ret
 
