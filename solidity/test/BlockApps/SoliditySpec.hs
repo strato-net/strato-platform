@@ -1,14 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.SoliditySpec where
 
 import Test.Hspec
 import Data.Aeson
 import Data.Either
+import Data.LargeWord (LargeKey(..))
 import qualified Data.ByteString.Lazy as ByteString
 import BlockApps.Solidity.Xabi
 import BlockApps.SolidityVarReader
 import Test.QuickCheck
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
+  arbitrary = do
+    a <- arbitrary
+    b <- arbitrary
+    return $ LargeKey a b
+
 
 spec :: Spec
 spec =
@@ -26,7 +35,7 @@ spec =
       decodeXabi "test/BlockApps/Fixtures/example6.json"
 
     it "should convert a Bytestring to and from Word256" $ do
-      quickCheck (\bs -> (word256ToByteString $ byteStringToWord256 bs) == bs)
+      quickCheck (\w256 -> (byteStringToWord256 $ word256ToByteString w256) == w256)
 
 decodeXabi :: FilePath -> Expectation
 decodeXabi filePath = do

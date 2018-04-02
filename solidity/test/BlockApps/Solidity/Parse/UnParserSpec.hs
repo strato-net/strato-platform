@@ -24,7 +24,7 @@ spec = do
                       Nothing
                       Nothing
       let ret = unparseFunc ("test", func)
-          expected = "function test() returns (int, uint) { }"
+          expected = "function test() returns (int, uint) {\n        \n    }"
       ret `shouldBe` expected
     it "should unparse a function that returns a pair 'returns (ErrorCodes, uint)'" $ do
       let func = Func Map.empty
@@ -35,7 +35,7 @@ spec = do
                       Nothing
                       Nothing
       let ret = unparseFunc ("test2", func)
-          expected = "function test2() returns (ErrorCodes, uint) { }"
+          expected = "function test2() returns (ErrorCodes, uint) {\n        \n    }"
       ret `shouldBe` expected
     it "should unparse a function that returns a pair 'returns (ErrorCodes, ProjectState)'" $ do
       let func = Func Map.empty
@@ -46,7 +46,7 @@ spec = do
                       Nothing
                       Nothing
       let ret = unparseFunc ("fsm", func)
-          expected = "function fsm() returns (ErrorCodes, ProjectState) { }"
+          expected = "function fsm() returns (ErrorCodes, ProjectState) {\n        \n    }"
       ret `shouldBe` expected
 
 

@@ -110,8 +110,62 @@ spec = do
       unparsedStruct `shouldBe` structString
       structName' `shouldBe` structName
       struct' `shouldBe` struct
+    it "should parse and unparse a struct with two fields (arg names flipped)" $ do
+      let structString = "struct SampleStruct {\n      uint _field2;\n      string _field1;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with two fields (types flipped)" $ do
+      let structString = "struct SampleStruct {\n      string _field1;\n      uint _field2;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with two fields (fields flipped)" $ do
+      let structString = "struct SampleStruct {\n      string _field2;\n      uint _field1;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
     it "should parse and unparse a struct with three fields" $ do
       let structString = "struct SampleStruct {\n      uint _field1;\n      string _field2;\n      address _field3;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with three fields (arg names rotated)" $ do
+      let structString = "struct SampleStruct {\n      uint _field2;\n      string _field3;\n      address _field1;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with three fields (types rotated)" $ do
+      let structString = "struct SampleStruct {\n      string _field1;\n      address _field2;\n      uint _field3;\n    }"
+          eRes = showError $ runParser structDeclaration "" "" structString
+          Right (structName, StructDeclaration struct) = eRes
+          unparsedStruct = unparseTypes (Text.pack structName, struct)
+          Right (structName', StructDeclaration struct') = showError $ runParser structDeclaration "" "" unparsedStruct
+      unparsedStruct `shouldBe` structString
+      structName' `shouldBe` structName
+      struct' `shouldBe` struct
+    it "should parse and unparse a struct with three fields (fields rotated)" $ do
+      let structString = "struct SampleStruct {\n      string _field2;\n      address _field3;\n      uint _field1;\n    }"
           eRes = showError $ runParser structDeclaration "" "" structString
           Right (structName, StructDeclaration struct) = eRes
           unparsedStruct = unparseTypes (Text.pack structName, struct)
