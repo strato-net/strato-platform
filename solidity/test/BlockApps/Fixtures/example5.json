@@ -28,18 +28,18 @@
       "Well": {
         "type": "Struct",
         "bytes": 96,
-        "fields": {
-          "name": {
+        "fields": [
+		["name", {
             "atBytes": 0,
             "dynamic": true,
             "type": "String"
-          },
-          "wellHeadBUID": {
+		}],
+		["wellHeadBUID", {
             "atBytes": 32,
             "dynamic": true,
-            "type": "String"
-          },
-          "internalEvent": {
+            "type": "String"}
+		],
+		["internalEvent", {
             "atBytes": 96,
             "typedef": "AnalysisEventEnum",
             "type": "Enum",
@@ -49,14 +49,15 @@
               "PLAN",
               "UPLOAD",
               "FINALIZE"
-            ]
-          },
-          "boreHoleBUID": {
+            ]}
+		],
+		["boreHoleBUID", {
             "atBytes": 64,
             "dynamic": true,
             "type": "String"
-          }
-        }
+		}
+		]
+	]
       }
     },
     "vars": {
