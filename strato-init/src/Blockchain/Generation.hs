@@ -86,7 +86,7 @@ insertContracts slotss src code start gi =
       codeHash = if extra /= "" && extra /= "\n"
                    then error ("bytecode not encoded in base16:" ++ show code)
                    else superProprietaryStratoSHAHash decoded
-      mkContract (addr, slots) = Contract addr 0 codeHash slots
+      mkContract (addr, slots) = ContractWithStorage addr 0 codeHash slots
       addrs = map (start+) [0..]
       addrsAndSlots = zip addrs slotss
   in gi {genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,

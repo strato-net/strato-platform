@@ -33,7 +33,8 @@ data CodeInfo = CodeInfo B.ByteString String
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
 
 data AccountInfo = NonContract Address Integer
-                 | Contract Address Integer SHA [(Word256, Word256)]
+                 | ContractNoStorage Address Integer SHA
+                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
    deriving (Show, Eq)
 
 $(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)

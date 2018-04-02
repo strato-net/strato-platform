@@ -29,13 +29,11 @@ spec = do
     it "parses augmented accountinfo correctly" $
       let input = "[\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\"\
                    \,1809251394333065553493296640760748560207343510400633813116524750123642650624\
-                   \,\"ed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1\"\
-                   \,[]]"
-          want = Right $ Contract
+                   \,\"ed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1\"]"
+          want = Right $ ContractNoStorage
               (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
               1809251394333065553493296640760748560207343510400633813116524750123642650624
               (SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
-              []
           got = eitherDecode input
       in got `shouldBe` want
 
@@ -47,7 +45,7 @@ spec = do
                    \  ,\"0a94fd1bcabfd728d386de8b2e1d94f4cbce9b8d0286105239acb929d8a298fd\"] \
                    \ ,[\"2663ad8b7c4a0cf2bff889181d195381a043c512716163b62ef42cc6c956bc23\"  \
                    \  ,\"ba58d1f405cbbc25c28b14da5e0946f6b9f908b2813d956a4d74513f532fafc9\"]]]"
-          want = Right $ Contract
+          want = Right $ ContractWithStorage
               (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
               909090909090909090
               (SHA 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
@@ -67,7 +65,7 @@ spec = do
 \            [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\"\
 \              ,1809251394333065553493296640760748560207343510400633813116524750123642650624],\
 \            [\"692a70d2e424a56d2c6c27aa97d1a86395877b3a\",9000\
-\             ,\"ed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1\", []]],\
+\             ,\"ed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1\"]],\
 \          \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\",\
 \          \"extraData\":0,\
 \          \"gasUsed\":0,\
@@ -90,10 +88,10 @@ spec = do
               NonContract
                   (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
                   1809251394333065553493296640760748560207343510400633813116524750123642650624,
-              Contract (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
+              ContractNoStorage (Address 0x692a70d2e424a56d2c6c27aa97d1a86395877b3a)
                        9000
                        (SHA 0xed92eeba73797150099ef9035b92e3bc3a3cd3b18da36f51385910726606e1f1)
-                       []],
+              ],
             genesisInfoCodeInfo = [],
             genesisInfoTransactionsRoot = StateRoot . fst . B16.decode $
               "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",

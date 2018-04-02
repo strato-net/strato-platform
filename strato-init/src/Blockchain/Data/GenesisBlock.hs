@@ -80,7 +80,10 @@ initializeStateDB addressInfo = do
     let putAccount acc = case acc of
                               NonContract address balance' ->
                                 putAddressState address blankAddressState{addressStateBalance=balance'}
-                              Contract address balance' codeHash' slots -> do
+                              ContractNoStorage address balance' codeHash' -> do
+                                putAddressState address blankAddressState{addressStateBalance=balance',
+                                                                          addressStateCodeHash=codeHash'}
+                              ContractWithStorage address balance' codeHash' slots -> do
                                 putAddressState address blankAddressState{addressStateBalance=balance',
                                                                           addressStateCodeHash=codeHash'}
                                 putStorageTrie address slots
@@ -180,7 +183,9 @@ initializeGenesisBlock backupType genesisBlockName = do
     commitSqlDiffs diff Nothing
     let writeSource (account, CodeInfo _ src) = case account of
                                                     NonContract _ _ -> return ()
-                                                    Contract addr _ _ _ -> updateSource addr src
+                                                    ContractNoStorage addr _ _ -> updateSource addr src
+                                                    ContractWithStorage addr _ _ _ -> updateSource addr src
+
     forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
