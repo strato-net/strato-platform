@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
 const moment = require('moment');
+var rp = require('request-promise');
 
 const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
@@ -147,6 +148,60 @@ module.exports = {
       yield newUser.save({fields: ['accountAddress']});
 
       sendLoginResponse(res, newUser);
+    });
+  },
+
+  verify: function(req, res, next) {
+    co(function* () {
+      const email = req.body.email;
+      if (!email) {
+        let err = new Error("wrong params, expected: {email, nodeIP}");
+        err.status = 400;
+        return next(err);
+      }
+
+      const user = yield models.User.findOne({ where: { username: email } });
+      if (user) {
+        const authErrorText = "User already exists";
+        let err = new Error(authErrorText);
+        err.status = 401;
+        return next(err);
+      }
+
+      const options = {
+        method: 'POST',
+        uri: `${appConfig.signup}/verify`,
+        body: {
+          email,
+          nodeIP: 'test' //TODO: get node IP
+        },
+        json: true
+      };
+      rp(options)
+        .then(response => {
+          let newOTP;
+          if (!response.hash) {
+            const authErrorText = "The email does not exist";
+            let err = new Error(authErrorText);
+            err.status = 401;
+            return next(err);
+          }
+          return models.Otp.create({ email: email, otp: response.hash })
+            .then(otp => res.status(200).json({ exists: true }))
+            .catch(error => {
+              if (error.name === "SequelizeUniqueConstraintError") {
+                return models.Otp.update({ opt: response.hash }, { where: { email } })
+                  .then(otp => res.status(200).json({ exists: true }))
+                  .catch(updateError => { throw updateError })
+              }
+              throw error;
+            })
+        })
+        .catch(error => {
+          let err = new Error('Could not verify user');
+          err.status = 500;
+          return next(err);
+        })
     });
   }
 };
