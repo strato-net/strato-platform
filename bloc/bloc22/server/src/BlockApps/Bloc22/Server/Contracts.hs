@@ -126,7 +126,7 @@ getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
   toUserError
     (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
-    (getContractDetailsByAddressOnly contractAddress >>= return . detailToBlockappsjsDetail)
+    (getContractDetailsByAddressOnly contractAddress >>= return . completeContractDetailXabi)
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
@@ -203,15 +203,15 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
         return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
 
 
-detailToBlockappsjsDetail :: ContractDetails -> ContractDetails
-detailToBlockappsjsDetail cd = 
+completeContractDetailXabi :: ContractDetails -> ContractDetails
+completeContractDetailXabi cd = 
   let eXabi = xAbiToContract $ contractdetailsXabi cd in
   case eXabi of
     Right xabi -> cd { contractdetailsXabi = contractToXabi xabi } 
     Left _ -> cd
   
   
-xabiToBlockappsjsXabi :: Xabi -> Either String Xabi
-xabiToBlockappsjsXabi xabi = do
+completeXabi :: Xabi -> Either String Xabi
+completeXabi xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi c
