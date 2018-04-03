@@ -16,8 +16,9 @@ import {
 import { env } from '../../env';
 import { loginSuccess } from '../User/user.actions';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import { closeCreatePasswordModal } from '../CreatePassword/createPassword.actions';
 
-const url = env.APEX_URL + "/users"
+const url = env.APEX_URL + "/users";
 
 export function createUserApiCall(username, password) {
   return fetch(
@@ -49,6 +50,7 @@ export function* createUser(action) {
       // yield put(fetchAccounts(false, false));
       localStorage.setItem('token', JSON.stringify(response.user));
       yield put(loginSuccess(action.username, response.user));
+      yield put(closeCreatePasswordModal());
       yield put(openWalkThroughOverlay(true));
     }
   }

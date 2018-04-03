@@ -4,6 +4,7 @@ import {
   CREATE_USER_REQUEST,
   CREATE_USER_FAILURE,
   CREATE_USER_SUCCESS,
+  RESET_ERROR
 } from './createUser.actions';
 
 const initialState = {
@@ -41,6 +42,11 @@ const reducer = function (state = initialState, action) {
         response: action.response,
         error: false,
       };
+    case RESET_ERROR: 
+      return {
+        ...state,
+        error: null
+      }
     default:
       return state;
   }

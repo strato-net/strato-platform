@@ -5,6 +5,8 @@ import { withRouter } from 'react-router-dom';
 import { Button, Dialog } from '@blueprintjs/core';
 import { validate } from './validate';
 import { closeCreatePasswordModal } from './createPassword.actions';
+import { createUser, resetError } from '../CreateUser/createUser.actions';
+import { toasts } from "../Toasts";
 
 class CreatePassword extends Component {
 
@@ -13,13 +15,19 @@ class CreatePassword extends Component {
     this.state = { errors: null }
   }
 
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.serverError) {
+      toasts.show({ message: nextProps.serverError });
+      this.props.resetError();
+    }
+  }
+
   submit = (values) => {
     const errors = validate(values);
     this.setState({ errors });
 
     if (JSON.stringify(errors) === JSON.stringify({})) {
-      // TODO call action that create user in bloc 
-      this.props.closeCreatePasswordModal();
+      this.props.createUser(this.props.email, values.password);
     }
   }
 
@@ -101,6 +109,8 @@ class CreatePassword extends Component {
 function mapStateToProps(state) {
   return {
     isOpen: state.createPassword.isOpen,
+    serverError: state.createUser.error,
+    email: state.user.firstTimeUser
   };
 }
 
@@ -108,7 +118,9 @@ const formed = reduxForm({ form: 'createPassword' })(CreatePassword);
 const connected = connect(
   mapStateToProps,
   {
-    closeCreatePasswordModal
+    closeCreatePasswordModal,
+    createUser,
+    resetError
   }
 )(formed);
 
