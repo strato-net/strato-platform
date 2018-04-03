@@ -173,7 +173,7 @@ module.exports = {
         uri: `${appConfig.signup}/verify-email`,
         body: {
           email,
-          nodeIP: 'test' //TODO: get node IP
+          nodeIP: process.env.NODE_HOST
         },
         json: true
       };
