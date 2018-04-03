@@ -1,8 +1,9 @@
 import {
   OPEN_VERIFY_ACCOUNT_MODAL,
   CLOSE_VERIFY_ACCOUNT_MODAL,
-  VERIFY_OTP_FAILURE,
-  VERIFY_OTP_SUCCESS
+  VERIFY_TEMPORARY_PASSWORD_SUCCESS,
+  VERIFY_TEMPORARY_PASSWORD_FAILURE,
+  RESET_ERROR
 } from '../VerifyAccount/verifyAccount.actions';
 
 const initialState = {
@@ -23,17 +24,22 @@ const reducer = function (state = initialState, action) {
         ...state,
         isOpen: false
       }
-    case VERIFY_OTP_SUCCESS:
+    case VERIFY_TEMPORARY_PASSWORD_SUCCESS:
       return {
         ...state,
-        isOTPVerified: action.isOTPVerified,
+        isTempPasswordVerified: action.isTempPasswordVerified,
         error: null
       }
-    case VERIFY_OTP_FAILURE:
+    case VERIFY_TEMPORARY_PASSWORD_FAILURE:
       return {
         ...state,
-        isOTPVerified: action.isOTPVerified,
+        isTempPasswordVerified: false,
         error: action.error
+      }
+    case RESET_ERROR:
+      return {
+        ...state,
+        error: null
       }
     default:
       return state;

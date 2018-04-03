@@ -4,7 +4,8 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Dialog } from '@blueprintjs/core';
 import { validate } from './validate';
-import { closeVerifyAccountModal, verifyOTP } from '../VerifyAccount/verifyAccount.actions';
+import { closeVerifyAccountModal, verifyTempPassword, resetError } from '../VerifyAccount/verifyAccount.actions';
+import { toasts } from "../Toasts";
 
 class VerifyAccount extends Component {
 
@@ -13,11 +14,18 @@ class VerifyAccount extends Component {
     this.state = { errors: null }
   }
 
+  componentWillReceiveProps(newProps) {
+    if (newProps.serverError) {
+      toasts.show({ message: newProps.serverError });
+      this.props.resetError();
+    }
+  }
+
   submit = (values) => {
     const errors = validate(values);
     this.setState({ errors });
     if (JSON.stringify(errors) === JSON.stringify({})) {
-      this.props.verifyOTP(values);
+      this.props.verifyTempPassword(values, this.props.email);
     }
   }
 
@@ -30,14 +38,13 @@ class VerifyAccount extends Component {
 
   render() {
     const { handleSubmit } = this.props;
-
     return (
       <div className="smd-pad-16">
         <form>
           <Dialog
             iconName="key"
             isOpen={this.props.isOpen}
-            title="OTP verification"
+            title="Temporary Password verification"
             className="pt-dark"
             canOutsideClickClose={false}
             canEscapeKeyClose={false}
@@ -45,21 +52,21 @@ class VerifyAccount extends Component {
           >
             <div className="pt-dialog-body">
               <div className="pt-form-group">
-                <h5> Alert: a temporary password has been sent to your email address </h5>
+                <h5> Alert: A temporary password has been sent to your email address </h5>
                 <div className="pt-form-group pt-intent-danger">
                   <label className="pt-label" htmlFor="input-a">
-                    Enter OTP
+                    Enter temporary password
                   </label>
                   <div className="pt-form-content">
                     <Field
-                      name="OTP"
+                      name="tempPassword"
                       className="pt-input form-width smd-full-width"
-                      placeholder="OTP"
+                      placeholder="Your temporary password"
                       component="input"
                       type="password"
                       required
                     /> <br />
-                    <span className="error-text">{this.errorMessageFor('password')}</span>
+                    <span className="error-text">{this.errorMessageFor('tempPassword')}</span>
                   </div>
                 </div>
               </div>
@@ -79,6 +86,7 @@ class VerifyAccount extends Component {
 function mapStateToProps(state) {
   return {
     isOpen: state.verifyAccount.isOpen,
+    serverError: state.verifyAccount.error,
     email: state.user.firstTimeUser
   };
 }
@@ -88,7 +96,8 @@ const connected = connect(
   mapStateToProps,
   {
     closeVerifyAccountModal,
-    verifyOTP
+    verifyTempPassword,
+    resetError
   }
 )(formed);
 

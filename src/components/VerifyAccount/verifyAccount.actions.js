@@ -1,8 +1,9 @@
 export const OPEN_VERIFY_ACCOUNT_MODAL = 'OPEN_VERIFY_ACCOUNT_MODAL';
 export const CLOSE_VERIFY_ACCOUNT_MODAL = 'CLOSE_VERIFY_ACCOUNT_MODAL';
-export const VERIFY_OTP_REQUEST = 'VERIFY_OTP_REQUEST';
-export const VERIFY_OTP_SUCCESS = 'VERIFY_OTP_SUCCESS';
-export const VERIFY_OTP_FAILURE = 'VERIFY_OTP_FAILURE';
+export const VERIFY_TEMPORARY_PASSWORD_REQUEST = 'VERIFY_TEMPORARY_PASSWORD_REQUEST';
+export const VERIFY_TEMPORARY_PASSWORD_SUCCESS = 'VERIFY_TEMPORARY_PASSWORD_SUCCESS';
+export const VERIFY_TEMPORARY_PASSWORD_FAILURE = 'VERIFY_TEMPORARY_PASSWORD_FAILURE';
+export const RESET_ERROR = 'RESET_ERROR';
 
 export const openVerifyAccountModal = function () {
   return {
@@ -16,24 +17,30 @@ export const closeVerifyAccountModal = function () {
   }
 }
 
-export const verifyOTP = function (data) {
+export const verifyTempPassword = function (data, email) {
   return {
-    type: VERIFY_OTP_REQUEST,
-    OTP: data.OTP
+    type: VERIFY_TEMPORARY_PASSWORD_REQUEST,
+    tempPassword: data.tempPassword,
+    email
   }
 }
 
-export const verifyOTPSuccess = function () {
+export const verifyTempPasswordSuccess = function (data) {
   return {
-    type: VERIFY_OTP_SUCCESS,
-    isOTPVerified: true
+    type: VERIFY_TEMPORARY_PASSWORD_SUCCESS,
+    isTempPasswordVerified: data
   }
 }
 
-export const verifyOTPFailure = function (error) {
+export const verifyTempPasswordFailure = function (error) {
   return {
-    type: VERIFY_OTP_FAILURE,
-    isOTPVerified: false,
+    type: VERIFY_TEMPORARY_PASSWORD_FAILURE,
     error
+  }
+}
+
+export const resetError = function (error) {
+  return {
+    type: RESET_ERROR
   }
 }
