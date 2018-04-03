@@ -17,6 +17,7 @@ router.post('/login', authController.login);
 router.post('/users', authController.create);
 router.post('/logout', authHandler.validateRequest(), authController.logout);
 router.post('/verify-email', authController.verify);
+router.post('/verify-temporary-password', authController.verifyTemporaryPassword);
 
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);

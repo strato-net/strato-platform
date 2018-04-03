@@ -10,12 +10,12 @@ const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 
 
-const sendLoginResponse = function(res, user) {
+const sendLoginResponse = function (res, user) {
   let tokenData;
   try {
     tokenData = authHandler.issue(user);
   }
-  catch(err) {
+  catch (err) {
     return next(err);
   }
 
@@ -30,7 +30,7 @@ const sendLoginResponse = function(res, user) {
     }
   );
 
-  res.status(200).json({user: user.toJson()});
+  res.status(200).json({ user: user.toJson() });
 };
 
 module.exports = {
@@ -47,7 +47,7 @@ module.exports = {
 
     // Check if password provided for the user is correct
     models.User.findOne({
-      where: {username: username},
+      where: { username: username },
       include: [{
         model: models.Role,
       }]
@@ -82,7 +82,7 @@ module.exports = {
     });
   },
 
-  create: function(req, res, next) {
+  create: function (req, res, next) {
     co(function* () {
       const username = req.body.username;
       const password = req.body.password;
@@ -135,7 +135,7 @@ module.exports = {
       let blocUser;
       try {
         blocUser = yield blockappsRest.createUser(username, password, true);
-      } catch(blocError) {
+      } catch (blocError) {
         newUser.destroy();
         // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
         let err = new Error('could not create bloc account: ', blocError);
@@ -145,13 +145,13 @@ module.exports = {
 
       // Set the account address to user in db
       newUser.accountAddress = blocUser.address;
-      yield newUser.save({fields: ['accountAddress']});
+      yield newUser.save({ fields: ['accountAddress'] });
 
       sendLoginResponse(res, newUser);
     });
   },
 
-  verify: function(req, res, next) {
+  verify: function (req, res, next) {
     co(function* () {
       const email = req.body.email;
       if (!email) {
@@ -202,6 +202,30 @@ module.exports = {
           err.status = 500;
           return next(err);
         })
+    });
+  },
+
+  verifyTemporaryPassword: function (req, res, next) {
+    co(function* () {
+      const email = req.body.email;
+      const password = req.body.tempPassword;
+
+      if (!email || !password) {
+        res.status(400).json({ success: false, error: 'wrong params, expected: {email, password}' });
+      }
+
+      try {
+        let user = yield models.temp_user.find({ where: { email: email, password: password } });
+
+        if (user) {
+          res.status(200).json({ success: true, error: null });
+        }
+        else {
+          res.status(200).json({ success: false, error: 'Your temporary password is incorrect' });
+        }
+      } catch (error) {
+        res.status(500).json({ success: false, error: 'Your temporary password is incorrect' });
+      }
     });
   }
 };
