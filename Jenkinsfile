@@ -9,6 +9,7 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
+          echo "Old flow merge test"
           set -x
           docker rm -f $(docker ps -aq) || true;
           if [ "$BUILD_TYPE" == "quick" ]; then
