@@ -35,13 +35,13 @@ function newnode {
   echo "Starting strato-sequencer"
   runForever strato-sequencer >> logs/strato-sequencer 2>&1
 
-  # echo "Starting strato-api-indexer"
+  echo "Starting strato-api-indexer"
   runForever strato-api-indexer >> logs/strato-api-indexer 2>&1
 
-  # echo "Starting strato-p2p-indexer"
+  echo "Starting strato-p2p-indexer"
   runForever strato-p2p-indexer >> logs/strato-p2p-indexer 2>&1
 
-  # echo "Starting strato-txr-indexer"
+  echo "Starting strato-txr-indexer"
   runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
 
   minLogLevel=LevelInfo
@@ -55,8 +55,8 @@ function newnode {
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
                          --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel >> logs/ethereum-vm 2>&1
 
-  # echo "Configuring log maintenance"
-  # runForever cleanupLogs
+  echo "Configuring log maintenance"
+  runForever cleanupLogs
 
   echo "Becoming strato-api"
    HOST=0.0.0.0 PORT=3000 APPROOT="" FETCH_LIMIT=2000 exec strato-api 2>&1 | tee -a logs/strato-api

@@ -101,8 +101,8 @@ apiIndexer =  runIContextM "strato-api-indexer" $ do
             tags = [ "put IndexerBestBlockInfo: "
                 , "get RanBlocks:            "
                 ] ++ icMsgs ++ ["insert to Kafka:          "]
-        $logError "----- apiIndexer -----"
-        $logError . T.pack . unlines $ zipWith (\s t -> "Time to " ++ s ++ n2s t) tags times
+        $logDebug "----- apiIndexer -----"
+        $logDebug . T.pack . unlines $ zipWith (\s t -> "Time to " ++ s ++ n2s t) tags times
 
 n2s :: Integer -> String
 n2s i =

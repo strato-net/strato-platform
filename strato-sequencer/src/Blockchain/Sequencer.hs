@@ -44,7 +44,7 @@ sequencer = forever $ do
         t0 <- liftIO $ getTime Realtime
         (emittedLDBWrites, outEv) <- transformEvents [inEv]
         t1 <- liftIO $ getTime Realtime
-        _ <- liftIO . putStrLn $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
+        $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
         let pendingLDBWrites = catMaybes emittedLDBWrites
             lenOutEv         = length outEv
         $logInfoS "sequencer" . T.pack $ "Have " ++ show (length pendingLDBWrites) ++ " pending LDB writes and " ++ show lenOutEv ++ " output events"
@@ -117,13 +117,13 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                 t0 <- liftIO $ getTime Realtime
                 readyToEmit <- enqueueIfParentNotEmitted b
                 t1 <- liftIO $ getTime Realtime
-                _ <- liftIO . putStrLn $ "enqueueIfParentNotEmitted took: " ++ show (toNanoSecs $ t1 - t0)
+                $logDebug . T.pack $ "enqueueIfParentNotEmitted took: " ++ show (toNanoSecs $ t1 - t0)
                 case readyToEmit of
                     (ReadyToEmit totalPastDifficulty) -> do
                         t2 <- liftIO $ getTime Realtime
                         chain <- buildEmissionChain b totalPastDifficulty
                         t3 <- liftIO $ getTime Realtime
-                        _ <- liftIO . putStrLn $ "buildEmissionChain took: " ++ show (toNanoSecs $ t3 - t2)
+                        $logDebug . T.pack $ "buildEmissionChain took: " ++ show (toNanoSecs $ t3 - t2)
                         tickBy (length chain) ctr_sequencer_blocks_released
                         if (chain /= [])
                           then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit! Emitting it and chain of dependents."
