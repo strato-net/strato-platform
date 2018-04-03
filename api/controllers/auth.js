@@ -93,8 +93,8 @@ module.exports = {
         return next(err);
       }
 
-      if (username.length < 2 || username.length > 15) {
-        let err = new Error("Username must be at least 2 characters and 15 characters max");
+      if (username.length < 2 || username.length > 320) {
+        let err = new Error("Username must be at least 2 characters and 320 characters max");
         err.status = 400;
         return next(err);
       }
