@@ -3,8 +3,8 @@ export const loginValidate = (values) => {
 
   if (!values.username) {
     errors.username = 'Please enter a username';
-  } else if (values.username.length < 2 || values.username.length > 15) {
-    errors.username = "Username must be at least 2 characters and 15 characters max";
+  } else if (values.username.length < 2 || values.username.length > 320) {
+    errors.username = "Username must be at least 2 characters and 320 characters max";
   }
   if (!values.password) {
     errors.password = 'Please enter a password';
