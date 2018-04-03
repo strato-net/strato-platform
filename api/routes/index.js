@@ -16,7 +16,7 @@ router.post('/dapps', dappController.upload);
 router.post('/login', authController.login);
 router.post('/users', authController.create);
 router.post('/logout', authHandler.validateRequest(), authController.logout);
-router.post('/verify', authController.verify);
+router.post('/verify-email', authController.verify);
 
 // Node governance (for future)
 // router.get('/nodes', authHandler.validateRequest(), nodeController.list);

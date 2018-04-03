@@ -170,7 +170,7 @@ module.exports = {
 
       const options = {
         method: 'POST',
-        uri: `${appConfig.signup}/verify`,
+        uri: `${appConfig.signup}/verify-email`,
         body: {
           email,
           nodeIP: 'test' //TODO: get node IP
