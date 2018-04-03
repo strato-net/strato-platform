@@ -10,7 +10,8 @@ module Executable.StratoAdit (
   stratoAdit
 ) where
 
-import           Control.Concurrent.Lifted      hiding (yield)
+import           Control.Concurrent.Lifted      hiding (yield, takeMVar, putMVar, newEmptyMVar)
+import           Control.Concurrent.MVar
 import           Control.Concurrent.STM
 import           Control.Monad
 import           Control.Monad.Logger
@@ -62,11 +63,15 @@ doBlock minerNumber n newNonce = do
         theMinedBlock = n{blockBlockData = theblockData}
         coinbase = format . blockDataCoinbase . blockBlockData $ n
         theHash = blockHash theMinedBlock
+        number = blockDataNumber . blockBlockData $ n
+        txLength = length . blockReceiptTransactions $ n
     toLog "doBlock" minerNumber $ "Coinbase " ++ coinbase ++ " success for " ++ format (blockHash n) ++ " -> " ++ show newNonce
     toLog "doBlock" minerNumber $ "New block hash is " ++ format theHash ++ "!"
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"
         -- TODO update hash too!
         -- this used to happen through setting the matching blockDataRefHash to blockHash $ theMinedBlock
     _ <- withKafkaViolently $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry theMinedBlock]
+    $logDebugS "writeUnseqEventsEnd" . T.pack $ "Wrote block number " ++ show number ++ " with " ++ show txLength ++ " txs to unseqevents"  
     return ()
 
 mineBlock :: TMVar Block -> Integer -> Integer -> (Miner, Int) -> AditM ()
@@ -86,19 +91,28 @@ mineBlock mv t i (m@Miner{miner = theMiner}, mi) =
       !nnnow <- liftIO getCPUTime
       mineBlock mv nnnow 0 (m,mi)
 
-doConsume :: Offset -> TMVar Block -> AditM ()
-doConsume offset c = do
+doConsume :: Offset -> TMVar Block -> MVar Integer -> AditM ()
+doConsume offset c lastBlkNumber = do
     $logInfoS "doConsume" . T.pack $ "Starting fetching blocks " ++ show offset
     blocks <- withKafkaViolently $ setDefaultKafkaState >> fetchUnminedBlocks offset
     numPeers <- liftIO $ getActivePeers >>= return . length
+    
     forM_ blocks $ \b -> do
+        lastNumber <- liftIO $ takeMVar lastBlkNumber
+        let currentNumber = blockDataNumber $ blockBlockData b
         if flags_useSyncMode
-          then
+        then
             if numPeers < flags_minQuorumSize
-              then $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ (show numPeers) ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
-              else doMineThingy b
-          else doMineThingy b
-    doConsume (offset + fromIntegral (length blocks)) c
+            then $logInfoS "doConsume" . T.pack $ "Not mining because # of client peers " ++ (show numPeers) ++ " is less than min quorum size (" ++ show flags_minQuorumSize ++ ")"
+            else doMineThingy b
+        -- ignore this block if this number has already been processed
+        -- Only when running in single node instance
+        else case currentNumber > lastNumber of
+            True -> do 
+                        doMineThingy b
+                        liftIO $ putMVar lastBlkNumber currentNumber
+            False -> liftIO $ putMVar lastBlkNumber lastNumber  
+    doConsume (offset + fromIntegral (length blocks)) c lastBlkNumber
     where doMineThingy b = do
             liftIO . atomically $ tryTakeTMVar c >> putTMVar c b
             $logInfoS "doConsume" . T.pack $ "putTMVar w/ block #" ++ (show . blockDataNumber $ blockBlockData b)
@@ -109,6 +123,8 @@ stratoAdit = runAditT $ do
     $logInfoS "stratoAdit" "Before STM op in mining loop"
 
     c <- liftIO $ atomically newEmptyTMVar
+    lastBlockNumber <- liftIO $ newEmptyMVar
+    liftIO $ putMVar lastBlockNumber 0
 
     $logInfoS "stratoAdit" . T.pack $ "Dispatching " ++ show (length miners) ++ " miners"
 
@@ -121,4 +137,4 @@ stratoAdit = runAditT $ do
     offset <- withKafkaViolently $ getLastOffset LatestTime 0 (lookupTopic "unminedblock")
     $logInfoS "stratoAdit" . T.pack $ "Will mine starting at " ++ show offset
 
-    doConsume (max (offset - 1) 0) c
+    doConsume (max (offset - 1) 0) c lastBlockNumber

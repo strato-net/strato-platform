@@ -56,6 +56,9 @@ writeSeqEvents events = KW.produceMessages $
     (K.TopicAndMessage seqEventsTopicName . KW.makeMessage . BL.toStrict . encode) <$> events
 
 readFromTopic' :: (Binary b, K.Kafka k) => KP.TopicName -> KP.Offset -> k [b]
-readFromTopic' topic offset = setDefaultKafkaState >>
-    map (decode . BL.fromStrict) <$> fetchBytes topic offset
+readFromTopic' topic offset = do
+  _ <- setDefaultKafkaState
+  bytes <- fetchBytes topic offset
+  return $ map (decode . BL.fromStrict) bytes
+  --  map (decode . BL.fromStrict) <$> fetchBytes topic offset
 {-# INLINE readFromTopic' #-}

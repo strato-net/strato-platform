@@ -8,6 +8,8 @@ module Blockchain.Sequencer where
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Stats                       hiding (prefix)
+import           Control.Monad.IO.Class                    (liftIO)
+import           System.Clock
 
 import           Data.Function                             ((&))
 import           Data.Maybe                                (catMaybes, fromMaybe)
@@ -36,10 +38,13 @@ import qualified Network.Kafka.Protocol                    as KP
 
 sequencer :: SequencerM ()
 sequencer = forever $ do
-    inEvents <- readUnseqEvents'
+    inEvents <- readUnseqEvents'        
     $logInfoS "sequencer" . T.pack $ "Fetched " ++ show (length inEvents) ++ " events)"
     forM_ inEvents $ \(ofs, inEv) -> do
+        t0 <- liftIO $ getTime Realtime
         (emittedLDBWrites, outEv) <- transformEvents [inEv]
+        t1 <- liftIO $ getTime Realtime
+        $logDebug . T.pack $ "transformEvents took: " ++ show (toNanoSecs $ t1 - t0)
         let pendingLDBWrites = catMaybes emittedLDBWrites
             lenOutEv         = length outEv
         $logInfoS "sequencer" . T.pack $ "Have " ++ show (length pendingLDBWrites) ++ " pending LDB writes and " ++ show lenOutEv ++ " output events"
@@ -109,10 +114,16 @@ transformEvents input = unzip . join <$> forM input unboxAndTransform
                 tick ctr_sequencer_blocks_ecrfail
                 return [] -- couldnt ecrecover some transactions in this block. block is likely garbage
             Just b  -> do
+                t0 <- liftIO $ getTime Realtime
                 readyToEmit <- enqueueIfParentNotEmitted b
+                t1 <- liftIO $ getTime Realtime
+                $logDebug . T.pack $ "enqueueIfParentNotEmitted took: " ++ show (toNanoSecs $ t1 - t0)
                 case readyToEmit of
                     (ReadyToEmit totalPastDifficulty) -> do
+                        t2 <- liftIO $ getTime Realtime
                         chain <- buildEmissionChain b totalPastDifficulty
+                        t3 <- liftIO $ getTime Realtime
+                        $logDebug . T.pack $ "buildEmissionChain took: " ++ show (toNanoSecs $ t3 - t2)
                         tickBy (length chain) ctr_sequencer_blocks_released
                         if (chain /= [])
                           then $logInfoS "transformEvents/emitBlocks" . T.pack $ prettyBlock bk ++ " is ready to emit! Emitting it and chain of dependents."

@@ -11,12 +11,14 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.Text                             as T
+import qualified Data.Map                              as M
 import qualified Data.ByteString                       as BS
 import qualified Network.Kafka                         as K
 import qualified Network.Kafka.Consumer                as KC
 import qualified Network.Kafka.Protocol                as KP
 
 import           Blockchain.BlockChain
+import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
 import           Blockchain.Data.TransactionResult
@@ -34,6 +36,7 @@ import           Executable.EVMCheckpoint
 import           Executable.EVMFlags
 
 import qualified Blockchain.Bagger                     as Bagger
+import qualified Blockchain.Bagger.BaggerState         as B
 import qualified Blockchain.Strato.RedisBlockDB        as RBDB
 import           Blockchain.Strato.RedisBlockDB.Models
 
@@ -56,7 +59,7 @@ ethereumVM = void . execContextM $ do
         cpOffset <- getCheckpointNoMetadata
         $logInfoS "evm/loop" "Getting Blocks/Txs"
         seqEvents <- getUnprocessedKafkaEvents cpOffset
-
+        
         !currentMicrotime <- liftIO getCurrentMicrotime
         $logInfoS "evm/loop" $ T.pack $ "currentMicrotime :: " ++ show currentMicrotime
 
@@ -72,7 +75,10 @@ ethereumVM = void . execContextM $ do
 
         let blocks = [b | OEBlock b <- seqEvents]
         $logInfoS "evm/loop" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
-        forM_ blocks $ \b ->
+        forM_ blocks $ \b -> do
+            let number = blockDataNumber . obBlockData $ b
+                txCount = length . obReceiptTransactions $ b
+            $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks False blocks
 
@@ -83,7 +89,11 @@ ethereumVM = void . execContextM $ do
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
-        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs))
+        state <- Bagger.getBaggerState
+        let pending = B.pending state
+        let shouldOutputBlocks = isCaughtUp && (not makeLazyBlocks || not (null poolableNewTxs) || not (M.null pending))
+        $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show (length poolableNewTxs)
+        $logDebugS "evm/loop/newBlock" $ T.pack $ "Pending: " ++ show (length pending)
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock

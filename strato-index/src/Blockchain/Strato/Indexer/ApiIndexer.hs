@@ -7,7 +7,9 @@ module Blockchain.Strato.Indexer.ApiIndexer
     , kafkaClientIds
     ) where
 
+import           Control.Concurrent.MVar
 import           Control.Monad
+import           Control.Monad.IO.Class             (liftIO)
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8              as S8
 import           Data.List                          hiding (group)
@@ -15,6 +17,7 @@ import qualified Data.Text                          as T
 import           Network.Kafka
 import           Network.Kafka.Consumer
 import           Network.Kafka.Protocol
+import           System.Clock
 
 import           Blockchain.Data.BlockDB
 import           Blockchain.DB.SQLDB
@@ -30,25 +33,85 @@ import           Data.Ord
 import           Database.Persist.Sql
 
 apiIndexer :: LoggingT IO ()
-apiIndexer = runIContextM "strato-api-indexer" . forever $ do
-    $logInfoS "apiIndexer" "About to fetch blocks"
-    (offset, idxEvents, bbi) <- getUnprocessedIndexEvents
-    putIndexerBestBlockInfo bbi
-    $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
-    let blocks = [b | RanBlock b <- idxEvents]
-    let nums = map (blockDataNumber . obBlockData) blocks
-        nextOffset' = offset + fromIntegral (length idxEvents)
-        insertCount = length blocks
-    $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
-    when (insertCount > 0) $ do
-        $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
-        results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
-        let bids = fst <$> results
-        IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
-        num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
-        let (num', bid) = maximumBy (comparing fst) $ zip nums bids
-        when (num' > num || num' == 0) $ putIndexerBestBlockInfo (IndexerBestBlockInfo bid)
-    setKafkaCheckpoint nextOffset' =<< getIndexerBestBlockInfo
+apiIndexer =  runIContextM "strato-api-indexer" $ do
+    oldBestBlock <- liftIO $ newEmptyMVar
+    forever $ do
+        $logInfoS "apiIndexer" "About to fetch blocks"
+        (offset, idxEvents, bbi) <- getUnprocessedIndexEvents
+        startTime <- liftIO $ getTime Realtime
+        putIndexerBestBlockInfo bbi
+        putIndexerBestBlockInfoTime <- liftIO $ getTime Realtime
+        $logInfoS "apiIndexer" . T.pack $ "Fetched " ++ show (length idxEvents) ++ " events starting from " ++ show offset
+        let blocks = [b | RanBlock b <- idxEvents]
+        blocksTime <- liftIO $ getTime Realtime
+        let nums = map (blockDataNumber . obBlockData) blocks
+            nextOffset' = offset + fromIntegral (length idxEvents)
+            insertCount = length blocks
+        $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
+        (icTimes, icMsgs) <- if (insertCount > 0)
+        then do
+            insertStartTime <- liftIO $ getTime Realtime
+            $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
+            results <- putBlocks [(SHA 0, 0)] (outputBlockToBlock <$> blocks) False
+            resultsTime <- liftIO $ getTime Realtime
+            let bids = fst <$> results
+            IndexerBestBlockInfo bestBid <- getIndexerBestBlockInfo
+            bestBidTime <- liftIO $ getTime Realtime
+            maybeOldBestBlock <- liftIO $ tryTakeMVar oldBestBlock
+            num <- case maybeOldBestBlock of
+                Just x -> return x
+                Nothing -> blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
+            --num <- blockDataNumber . blockBlockData <$> sqlQuery (getJust bestBid)
+            numTime <- liftIO $ getTime Realtime
+            let (num', bid) = maximumBy (comparing fst) $ zip nums bids
+            zipTime <- liftIO $ getTime Realtime
+            $logInfoS "apiIndexer" . T.pack $ "Old number: " ++ show num ++ " New Number: " ++ show num'
+            if (num' > num || num' == 0) then do 
+                liftIO $ putMVar oldBestBlock num'
+                putIndexerBestBlockInfo (IndexerBestBlockInfo bid)
+            else liftIO $ putMVar oldBestBlock num
+            putTime <- liftIO $ getTime Realtime
+            $logInfoS "apiIndexer" . T.pack $ "put blocks into Postgres: " ++ show (resultsTime - insertStartTime) 
+            $logInfoS "apiIndexer" . T.pack $ "get IndexerBestBlockInfo: " ++ show (bestBidTime - resultsTime) 
+            $logInfoS "apiIndexer" . T.pack $ "query for best bid:       " ++ show (numTime - bestBidTime) 
+            $logInfoS "apiIndexer" . T.pack $ "get new best bid:         " ++ show (zipTime - numTime) 
+            $logInfoS "apiIndexer" . T.pack $ "put new best bid:         " ++ show (putTime - zipTime) 
+            return ([
+                    resultsTime - insertStartTime
+                    , bestBidTime - resultsTime
+                    , numTime - bestBidTime
+                    , zipTime - numTime
+                    , putTime - zipTime
+                    ]
+                ,[
+                    "put blocks into Postgres: "
+                    , "get IndexerBestBlockInfo: "
+                    , "query for best bid:       "
+                    , "get new best bid:         "
+                    , "put new best bid:         "
+                    ])
+        else return ([],[])
+        startKafkaTime <- liftIO $ getTime Realtime
+        setKafkaCheckpoint nextOffset' =<< getIndexerBestBlockInfo
+        stopKafkaTime <- liftIO $ getTime Realtime
+        let times = map toNanoSecs $
+                    ([ putIndexerBestBlockInfoTime - startTime
+                    , blocksTime - putIndexerBestBlockInfoTime
+                    ] ++ icTimes ++ [stopKafkaTime - startKafkaTime])
+            tags = [ "put IndexerBestBlockInfo: "
+                , "get RanBlocks:            "
+                ] ++ icMsgs ++ ["insert to Kafka:          "]
+        $logDebug "----- apiIndexer -----"
+        $logDebug . T.pack . unlines $ zipWith (\s t -> "Time to " ++ s ++ n2s t) tags times
+
+n2s :: Integer -> String
+n2s i =
+  let s = show i
+      l = length s
+  in if l <= 9
+       then "0." ++ (replicate (9-l) '0') ++ s ++ " seconds"
+       else take (l-9) s ++ "." ++ drop (l-9) s ++ " seconds"
+
 
 kafkaClientIds :: (KafkaClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", lookupConsumerGroup "strato-api-indexer")

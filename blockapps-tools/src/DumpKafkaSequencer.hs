@@ -7,7 +7,6 @@ import           Control.Monad.IO.Class
 import           Network.Kafka.Protocol
 
 import           Blockchain.EthConf
-import           Blockchain.Format
 import           Blockchain.Sequencer.Kafka
 import           Blockchain.Stream.Raw      (setDefaultKafkaState)
 
@@ -21,5 +20,5 @@ dumpKafkaSequencer startingBlock = do
     doConsume' offset = do
       setDefaultKafkaState
       seqEvents <- readSeqEvents offset
-      liftIO . putStrLn . unlines $ format <$> seqEvents
+      liftIO . putStrLn . unlines $ show <$> seqEvents
       doConsume' (offset + fromIntegral (length seqEvents))

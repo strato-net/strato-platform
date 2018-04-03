@@ -38,10 +38,11 @@ emitKafkaTransactions :: (MonadIO m, MonadLogger m) => [Transaction] -> m ()
 emitKafkaTransactions txs = do
     ts <- liftIO $ getCurrentMicrotime
     let ingestTxs = (\t -> (IETx ts (IngestTx API t))) <$> txs
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " P.++ (show $ P.length ingestTxs) P.++ " tx(s) to unseqevents"        
     rets <- liftIO $ runKafkaConfigured "strato-api" $ writeUnseqEvents ingestTxs
     case rets of
         Left e      -> $logError $ "Could not write txs to Kafka: " Import.++ (T.pack $ show e)
-        Right resps -> $logDebug $ "Kafka commit: " Import.++ (T.pack $ show resps)
+        Right resps -> $logDebug $ "writeUnseqEventsEnd Kafka commit: " Import.++ (T.pack $ show resps)
     return ()
 
 postTransactionR :: Handler ()
@@ -85,9 +86,9 @@ postTransactionListR = do
           let num' = P.length $ P.filter (not . success) $ P.zip hs txs
           $logDebug $ "Inserted " Import.++ (T.pack $ show (num - num')) Import.++ " of the transactions"
           insertTXStart <- txr `deepseq` (liftIO $ getTime Realtime)
-          ecRecoverTime <- do
-            a <- insertTX Log API Nothing (fmap snd txr)
-            return a
+        --   ecRecoverTime <- do
+        --     a <- insertTX Log API Nothing (fmap snd txr)
+        --     return a
           $logDebug $ "Kafkaing txs: \n" Import.++ (T.pack $ Import.unlines $ format <$> ((transactionHash . snd) <$> txr))
           emitKafkaTransactions $ snd <$> txr
           sendResponseStart <- liftIO $ getTime Realtime
@@ -97,7 +98,7 @@ postTransactionListR = do
                         , insertTXStart - txHashStart
                         , sendResponseStart - insertTXStart
                         ]
-                      ) P.++ [ecRecoverTime]
+                      ) --P.++ [ecRecoverTime]
           $logDebug $ "Timings in nanoseconds: " Import.++ (T.pack $ show times)
           sendResponseStatus status200 $ toJSON (fmap transactionHash txs) -- hs --times -- This is for debugging
        _ -> invalidArgs ["couldn't decode transactions"]

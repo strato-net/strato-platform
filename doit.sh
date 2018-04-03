@@ -44,11 +44,16 @@ function newnode {
   echo "Starting strato-txr-indexer"
   runForever strato-txr-indexer >> logs/strato-txr-indexer 2>&1
 
+  minLogLevel=LevelInfo
+  if [ "${evmDebugMode}" = true ] ; then
+      minLogLevel=LevelDebug
+  fi
+
   echo "Starting ethereum-vm"
   runForever ethereum-vm --useSyncMode=$useSyncMode --miner=$miningAlgorithm \
-                         --diffPublish=true --createTransactionResults=true \
+                         --diffPublish=$diffPublish --sqlDiff=$sqlDiff --createTransactionResults=true \
                          --miningVerification=$verifyBlocks --difficultyBomb=$difficultyBomb \
-                         --trace=$evmTraceMode --debug=$evmDebugMode >> logs/ethereum-vm 2>&1
+                         --trace=$evmTraceMode --debug=$evmDebugMode --minLogLevel=$minLogLevel >> logs/ethereum-vm 2>&1
 
   echo "Configuring log maintenance"
   runForever cleanupLogs
@@ -155,6 +160,9 @@ setEnv useSyncMode false
 setEnv minQuorumSize 1
 setEnv maxConn 20
 setEnv difficultyBomb false
+
+setEnv sqlDiff true
+setEnv diffPublish true
 
 setEnv backupLocation /var/lib/strato/backup_strato_block
 
