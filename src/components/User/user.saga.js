@@ -18,7 +18,7 @@ import { env } from '../../env';
 
 const loginUrl = env.APEX_URL + "/login";
 const logoutUrl = env.APEX_URL + "/logout";
-const verifyUrl = env.APEX_URL + "/verify";
+const verifyEmailUrl = env.APEX_URL + "/verify-email";
 
 function loginRequest(username, password) {
   return fetch(
@@ -61,7 +61,7 @@ function logoutAccount() {
 
 function firstTimeLoginRequest(email) {
   return fetch(
-    verifyUrl,
+    verifyEmailUrl,
     {
       method: 'POST',
       credentials: "include",
