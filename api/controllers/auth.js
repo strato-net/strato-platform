@@ -151,7 +151,7 @@ module.exports = {
     });
   },
 
-  verify: function (req, res, next) {
+  verifyEmail: function (req, res, next) {
     co(function* () {
       const email = req.body.email;
       if (!email) {
@@ -179,19 +179,18 @@ module.exports = {
       };
       rp(options)
         .then(response => {
-          let newOTP;
           if (!response.hash) {
             const authErrorText = "The email does not exist";
             let err = new Error(authErrorText);
             err.status = 401;
             return next(err);
           }
-          return models.Otp.create({ email: email, otp: response.hash })
-            .then(otp => res.status(200).json({ exists: true }))
+          return models.temp_user.create({ email: email, password: response.hash })
+            .then(password => res.status(200).json({ exists: true }))
             .catch(error => {
               if (error.name === "SequelizeUniqueConstraintError") {
-                return models.Otp.update({ opt: response.hash }, { where: { email } })
-                  .then(otp => res.status(200).json({ exists: true }))
+                return models.temp_user.update({ password: response.hash }, { where: { email } })
+                  .then(password => res.status(200).json({ exists: true }))
                   .catch(updateError => { throw updateError })
               }
               throw error;
@@ -211,20 +210,26 @@ module.exports = {
       const password = req.body.tempPassword;
 
       if (!email || !password) {
-        res.status(400).json({ success: false, error: 'wrong params, expected: {email, password}' });
+        return res.status(400).json({ success: false, error: 'wrong params, expected: {email, password}' });
       }
 
       try {
-        let user = yield models.temp_user.find({ where: { email: email, password: password } });
+        let user = yield models.temp_user.find({ where: { email: email } });
 
         if (user) {
-          res.status(200).json({ success: true, error: null });
+          return bcrypt.compare(password, user.password, function(err, response) {
+            if (err)
+              return res.status(500).json({ success: false, error: 'Your temporary password is incorrect' });
+            if (response)
+              return res.status(200).json({ success: true, error: null });
+            return res.status(401).json({ success: false, error: 'Your temporary password is incorrect' });
+          });
         }
         else {
-          res.status(200).json({ success: false, error: 'Your temporary password is incorrect' });
+          return res.status(401).json({ success: false, error: 'Your temporary password is incorrect' });
         }
       } catch (error) {
-        res.status(500).json({ success: false, error: 'Your temporary password is incorrect' });
+        return res.status(500).json({ success: false, error: 'Your temporary password is incorrect' });
       }
     });
   }
