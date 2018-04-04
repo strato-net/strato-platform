@@ -10,6 +10,7 @@ const initDb = require('../migrations/init-script/initdb.js');
 const models = require('../models');
 const createInitialData = require('../migrations/init-script/init');
 const app = require('../app');
+const registerAppMetadata = require('../migrations/init-script/registerAppMetadata');
 
 
 chai.use(chaiHttp);
@@ -19,6 +20,7 @@ describe('App', function() {
   before(async function() {
     try {
       await initDb.dropdb();
+      await registerAppMetadata();
     } catch (error) {
       // Ignore errors about dropping nonexistent dbs.
       if (error.name != 'invalid_catalog_name') {
@@ -160,7 +162,7 @@ describe('App', function() {
           'args': {}
         }
       };
-      console.log("about it uploadInitContracts");
+      console.log("about to uploadInitContracts");
       const addrs = await uploadInitContracts('./test/testdata/', creds, inits);
       expect(addrs.storage).to.match(/[0-9A-Fa-f]{40}/g);
 
