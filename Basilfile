@@ -18,7 +18,7 @@ volumes:
 deployments:
   - name: smd-ui
     repo: https://github.com/blockapps/smd-ui.git
-    ref: release/v0.4.5
+    ref: release/v0.4.6
     compose:
       restart: always
       depends_on:
@@ -124,7 +124,7 @@ deployments:
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
-    ref: performance
+    ref: master
     compose:
       restart: always
       ports:
