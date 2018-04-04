@@ -103,6 +103,24 @@ pipeline {
       }
     }
 
+    stage('Monstrato tests') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          echo "Running monstrato unit tests"
+          if [ ! -d monstrato ]; then
+            git clone https://github.com/blockapps/monstrato
+          fi
+          cd monstrato
+          git remote update origin --prune
+          git checkout $(cd ../repos/monstrato && git rev-parse --abbrev-ref HEAD)
+          git pull
+          stack test strato-init blockapps-data
+          # TODO: We have a running environment, so stack test strato-api should work
+        '''
+      }
+    }
+
     stage('bloch-tests') {
       steps {
         sh '''#!/bin/bash -le
