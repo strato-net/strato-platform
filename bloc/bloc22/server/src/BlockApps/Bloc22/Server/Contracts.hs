@@ -10,6 +10,7 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
+import           Control.Monad.IO.Class             (liftIO)
 import           Data.Foldable
 import           Data.Int
 import           Data.LargeWord                  (Word256)
@@ -22,13 +23,13 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import           Numeric
 import           Opaleye
+import           System.Clock
 
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
 import           BlockApps.Bloc22.Database.Queries
 import           BlockApps.Bloc22.Database.Tables
 import           BlockApps.Bloc22.Monad
-import           BlockApps.Cirrus.Client
 import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
@@ -85,7 +86,7 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
-
+    
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
@@ -137,7 +138,13 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
     , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
     , "End of storage"
     ]
-
+  logWith logDebug $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
+  logWith logDebug $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
+  logWith logDebug $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
+  logWith logDebug $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
+  logWith logDebug $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
+  logWith logDebug $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
+  
   return $ Map.fromList ret
   where
     getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
@@ -153,7 +160,7 @@ getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
   toUserError
     (Text.pack $ "Couldn't get contract details for address " ++ show contractAddress)
-      $ getContractDetailsByAddressOnly contractAddress
+    (getContractDetailsByAddressOnly contractAddress >>= return . completeContractDetailXabi)
 
 getContractsFunctions :: ContractName -> MaybeNamed Address -> Bloc [FunctionName]
 getContractsFunctions (ContractName contractName) contractId = blocTransaction $ do
@@ -217,13 +224,6 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
    Left err -> throwError $ UserError $ Text.pack err
    Right val -> return $ Map.fromList [(mappingName, Map.fromList [(keyName, val)])]
 
-
-
-
-
-
-
-
 getContractsStates :: ContractName -> Bloc [GetContractsStatesResponse] -- state-translation
 getContractsStates _ = throwError $ Unimplemented "getContractsStates"
 
@@ -235,16 +235,18 @@ postContractsCompile = blocTransaction . fmap concat . traverse compileOneContra
       for (toList idsAndDetails) $ \ (_,details) -> do
         contractDetails <-
           getContractsContract (ContractName $ contractdetailsName details) (Named "Latest")
-        let eBlockappsjsXabi =
-              xabiToBlockappsjsXabi . contractdetailsXabi $ contractDetails
-        case eBlockappsjsXabi of
-          Left msg -> throwError $
-            AnError (Text.append "Xabi conversion to Blockapps-js Xabi failed, "  (Text.pack msg))
-          Right blockappsjsXabi ->
-            void . blocCirrus $ postContract contractDetails{contractdetailsXabi=blockappsjsXabi}
         return $ PostCompileResponse (contractdetailsName contractDetails) (contractdetailsCodeHash contractDetails)
 
-xabiToBlockappsjsXabi :: Xabi -> Either String Xabi
-xabiToBlockappsjsXabi xabi = do
+
+completeContractDetailXabi :: ContractDetails -> ContractDetails
+completeContractDetailXabi cd = 
+  let eXabi = xAbiToContract $ contractdetailsXabi cd in
+  case eXabi of
+    Right xabi -> cd { contractdetailsXabi = contractToXabi xabi } 
+    Left _ -> cd
+  
+  
+completeXabi :: Xabi -> Either String Xabi
+completeXabi xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi c

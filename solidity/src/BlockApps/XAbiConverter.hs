@@ -279,6 +279,7 @@ typeToXabiType typeDefs (TypeEnum enumName) =
 typeToXabiType _ (TypeContract contractName) = Xabi.Contract contractName
 typeToXabiType _ TypeFunction{} = error "typeToXabiType was called with function type, which isn't allowed"
 
+
 simpleTypeToXabiType::SimpleType->Xabi.Type
 simpleTypeToXabiType TypeBool = Xabi.Bool
 simpleTypeToXabiType TypeInt8 = Xabi.Int (Just True) $ Just 1

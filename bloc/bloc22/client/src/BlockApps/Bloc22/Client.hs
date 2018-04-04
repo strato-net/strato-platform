@@ -30,6 +30,7 @@ module BlockApps.Bloc22.Client
   , postUsersSendList
   , postUsersContractMethodList
   , getBlocTransactionResult
+  , postBlocTransactionResults
   ) where
 
 import           Data.Map.Strict                  (Map)
@@ -158,3 +159,6 @@ postUsersContractMethodList = client (Proxy @ PostUsersContractMethodList)
 
 getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @ GetBlocTransactionResult)
+
+postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults = client (Proxy @ PostBlocTransactionResults)

@@ -171,11 +171,11 @@ contractNameFromAddress contractAddress = proc () -> do
   restrict -< addr .== constant contractAddress
   returnA -< name
 
-contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGText)
+contractByTxHash :: Keccak256 -> Query (Column PGInt4, Column PGInt4, Column PGText)
 contractByTxHash txHash = proc () -> do
-  (_,tx_hash,cmId,name) <- queryTable hashNameTable -< ()
+  (_,tx_hash,cmId,ttype,name) <- queryTable hashNameTable -< ()
   restrict -< tx_hash .== constant txHash
-  returnA -< (cmId,name)
+  returnA -< (cmId,ttype,name)
 
 linkedContractsJoinTable :: Query
   ( Column PGBytea
@@ -828,6 +828,7 @@ getXabiVariableNamesQuery metadataId = proc () -> do
   restrict -< cmid .== constant metadataId
   returnA -< varName
 
+
 getContractDetails :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
 getContractDetails contract@(ContractName contractName) contractId = do
     xabi <- getContractXabi contract contractId
@@ -1461,6 +1462,16 @@ getContractXabi (ContractName contractName) contractId = do
     Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
     Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
   getContractXabiByMetadataId metadataId 
+
+getContractXabiAndMetadataId :: HasCallStack =>
+                   ContractName -> MaybeNamed Address -> Bloc (Int32, Xabi)
+getContractXabiAndMetadataId (ContractName contractName) contractId = do
+  -- metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+  metadataId <- case contractId of
+    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
+    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
+  xabi <- getContractXabiByMetadataId metadataId 
+  return (metadataId, xabi)
 
 getContractMetadataAndBin :: Text -> Bloc (Int32, ByteString)
 getContractMetadataAndBin contract = blocTransaction $ do
