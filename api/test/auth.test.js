@@ -134,7 +134,7 @@ describe('App', function() {
       expect(got).to.deep.equal(want);
     });
 
-    it("can upload init contracts", async function() {
+    xit("can upload init contracts", async function() {
       this.timeout(30000);
       console.log("about to create user");
       const res1 = await chai.request(app)
