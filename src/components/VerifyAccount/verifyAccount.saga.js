@@ -37,7 +37,7 @@ function* verifyTempPassword(action) {
       yield put(closeVerifyAccountModal());
       yield put(openCreatePasswordModal());
     } else {
-      yield put(verifyTempPasswordFailure(response.error));
+      yield put(verifyTempPasswordFailure(response.error.message));
     }
   } catch (err) {
     yield put(verifyTempPasswordFailure(err));

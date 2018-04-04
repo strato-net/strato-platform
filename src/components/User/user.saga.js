@@ -86,7 +86,7 @@ function* firstTimeLogin(action) {
       yield put(firstTimeLoginSuccess(action.email));
       yield put(openVerifyAccountModal());
     } else {
-      yield put(firstTimeLoginFailure(action.email, 'The user does not exist'));
+      yield put(firstTimeLoginFailure(action.email, response.error.message));
     }
   } catch (err) {
     yield put(firstTimeLoginFailure(action.username, err));
