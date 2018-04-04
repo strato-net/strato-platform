@@ -210,26 +210,38 @@ module.exports = {
       const password = req.body.tempPassword;
 
       if (!email || !password) {
-        return res.status(400).json({ success: false, error: 'wrong params, expected: {email, password}' });
+        let err = new Error('wrong params, expected: {email, password}');
+        err.status = 400;
+        return next(err);
       }
 
       try {
         let user = yield models.temp_user.find({ where: { email: email } });
 
         if (user) {
-          return bcrypt.compare(password, user.password, function(err, response) {
-            if (err)
-              return res.status(500).json({ success: false, error: 'Your temporary password is incorrect' });
+          return bcrypt.compare(password, user.password, function (err, response) {
+            if (err) {
+              let err = new Error('Your temporary password is incorrect');
+              err.status = 500;
+              return next(err);
+            }
             if (response)
               return res.status(200).json({ success: true, error: null });
-            return res.status(401).json({ success: false, error: 'Your temporary password is incorrect' });
+
+            let error = new Error('Your temporary password is incorrect');
+            error.status = 401;
+            return next(error);
           });
         }
         else {
-          return res.status(401).json({ success: false, error: 'Your temporary password is incorrect' });
+          let err = new Error("Couldn't find user");
+          err.status = 401;
+          return next(err);
         }
       } catch (error) {
-        return res.status(500).json({ success: false, error: 'Your temporary password is incorrect' });
+        let err = new Error('Your temporary password is incorrect');
+        err.status = 401;
+        return next(err);
       }
     });
   }
