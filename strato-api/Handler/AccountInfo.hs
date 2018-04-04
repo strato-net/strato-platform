@@ -62,8 +62,3 @@ getAccountInfoR :: Handler Value
 getAccountInfoR = do
         getParameters <- reqGetParams <$> getRequest
         accountInfo getParameters
-
-postAccountCodeR :: Handler Value
-postAccountCodeR = do
-        (postParams, _) <- runRequestBody
-        accountInfo postParams

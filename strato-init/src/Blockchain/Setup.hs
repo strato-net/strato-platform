@@ -43,14 +43,18 @@ import           Blockchain.Data.GenesisBlock
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
 import           Blockchain.EthConf
 import           Blockchain.KafkaTopics
 import           Blockchain.Output
 import           Blockchain.PrivateKeyConf
 import           Blockchain.StatsConf               (defaultStatsConf)
 import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
 
 import qualified Executable.EthDiscoverySetup       as EthDiscovery
 
@@ -89,7 +93,9 @@ data SetupDBs =
     hashDB  :: HashDB,
     codeDB  :: CodeDB,
     sqlDB   :: SQLDB,
-    redisDB :: Redis.Connection
+    redisDB :: Redis.Connection,
+    localStorage :: Map.Map (Address, Word256) Word256,
+    localAddressState :: Map.Map Address AddressStateModification
     }
 
 type SetupDBM = StateT SetupDBs (ResourceT IO)
@@ -101,10 +107,19 @@ instance HasStateDB SetupDBM where
     cxt <- get
     put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
 
-{-instance HasStorageDB SetupDBM where
+instance HasStorageDB SetupDBM where
   getStorageDB = do
+    cxt <- get --storage and states use the same database!
+    return (MP.ldb . stateDB $ cxt, localStorage cxt)
+  putStorageMap theMap = do
     cxt <- get
-    return $ MPDB.ldb $ setupDBStateDB cxt --storage and states use the same database!-}
+    put cxt{localStorage=theMap}
+
+instance HasMemAddressStateDB SetupDBM where
+  getAddressStateDBMap = localAddressState <$> get
+  putAddressStateDBMap theMap = do
+    cxt <- get
+    put cxt{localAddressState=theMap}
 
 instance HasHashDB SetupDBM where
   getHashDB = fmap hashDB get
@@ -439,7 +454,7 @@ oneTimeSetup genesisBlockName = do
 
          redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
 
-         void $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool) $ do
+         void $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
            addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
            liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
            case (flags_backupmp, flags_backupblocks) of

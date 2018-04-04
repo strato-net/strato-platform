@@ -4,6 +4,7 @@ module Handler.BatchTransactionResult where
 
 import           Blockchain.SHA
 import           Data.Aeson
+import           Data.Aeson.Encoding
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
 import           Handler.Common
@@ -23,10 +24,9 @@ instance FromJSON StrungSHA where
 instance ToJSON StrungSHA where
     toJSON = String . T.pack . formatSHAWithoutColor . unStrungSHA
 
-instance (ToJSON v) => ToJSON (Map StrungSHA v) where
-    toJSON = object . fmap toPairs . M.toList
-        where asKey x = let (String s) = toJSON x in s
-              toPairs (k, v) = asKey k .= toJSON v
+instance ToJSONKey StrungSHA where
+    toJSONKey = ToJSONKeyText f (text . f)
+      where f = T.pack . formatSHAWithoutColor . unStrungSHA
 
 postBatchTransactionResultR :: Handler Value
 postBatchTransactionResultR = do

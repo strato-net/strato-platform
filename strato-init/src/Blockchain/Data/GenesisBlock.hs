@@ -18,7 +18,6 @@ import qualified Data.ByteString.Lazy.Char8           as BLC
 import           Blockchain.Database.MerklePatricia
 
 import           Blockchain.BackupBlocks
-import           Blockchain.Data.Address
 import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.Extra
@@ -26,14 +25,17 @@ import           Blockchain.Data.GenesisInfo
 import           Blockchain.DB.AddressStateDB
 import           Blockchain.DB.CodeDB
 import           Blockchain.DB.HashDB
+import qualified Blockchain.DB.MemAddressStateDB as Mem
 import           Blockchain.DB.SQLDB
 import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
 import           Blockchain.SHA
 import           Blockchain.Stream.VMEvent
 
 import           Blockchain.Strato.StateDiff          hiding (StateDiff (blockHash))
 import qualified Blockchain.Strato.StateDiff          as StateDiff (StateDiff (blockHash))
 import           Blockchain.Strato.StateDiff.Database
+import           Blockchain.Strato.StateDiff.Kafka    (filterResponse, splitWriteStateDiffs, assertTopicCreation)
 
 import           Blockchain.Constants                 (dbDir, sequencerDependentBlockDBPath)
 import           Blockchain.Output                    (printLogMsg)
@@ -51,6 +53,8 @@ import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.IContext   as IContext
 import qualified Blockchain.Strato.Indexer.Kafka      as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model      as IdxModel
+import qualified Blockchain.Strato.Model.Address      as Ad
+import qualified Blockchain.Strato.Model.ExtendedWord as Ext
 import qualified Blockchain.Strato.RedisBlockDB       as RBDB
 import qualified Database.Persist.Postgresql          as SQL
 import           Network.Kafka.Consumer               (commitSingleOffset)
@@ -61,21 +65,47 @@ initializeBlankStateDB = do
     liftIO . runResourceT $ initializeBlank db
     setStateDBStateRoot emptyTriePtr
 
-initializeStateDB :: (HasStateDB m, HasHashDB m)
-                  => [(Address, Integer)]
+putStorageTrie :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m) =>
+                  Ad.Address -> [(Ext.Word256, Ext.Word256)] -> m ()
+putStorageTrie address slots = do
+    mapM_ (\(k, v) -> putStorageKeyVal' address k v) slots
+    flushMemStorageDB
+    Mem.flushMemAddressStateDB
+
+initializeStateDB :: (HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
+                  => [AccountInfo]
                   -> m ()
 initializeStateDB addressInfo = do
     initializeBlankStateDB
-    forM_ addressInfo $ \(address, balance') ->
-        putAddressState address blankAddressState{addressStateBalance=balance'}
+    let putAccount acc = case acc of
+                              NonContract address balance' ->
+                                putAddressState address blankAddressState{addressStateBalance=balance'}
+                              ContractNoStorage address balance' codeHash' -> do
+                                putAddressState address blankAddressState{addressStateBalance=balance',
+                                                                          addressStateCodeHash=codeHash'}
+                              ContractWithStorage address balance' codeHash' slots -> do
+                                putAddressState address blankAddressState{addressStateBalance=balance',
+                                                                          addressStateCodeHash=codeHash'}
+                                putStorageTrie address slots
+    mapM_ putAccount addressInfo
 
-genesisInfoToGenesisBlock :: (HasStateDB m, HasHashDB m)
+initializeCodeDB :: (HasCodeDB m, MonadResource m) => [CodeInfo] -> m ()
+initializeCodeDB = mapM_ (addCode . (\(CodeInfo bin _) -> bin))
+
+genesisInfoToGenesisBlock :: (HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m, HasStateDB m, HasStorageDB m)
                           => GenesisInfo
-                          -> m Block
+                          -> m ([(AccountInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
-    initializeStateDB $ genesisInfoAccountInfo gi
+    let codes = genesisInfoCodeInfo gi
+    let accounts = genesisInfoAccountInfo gi
+    let sourceInfo = case codes of
+                    [] -> []
+                    [c] -> zip accounts (repeat c)
+                    _ -> error "not equipped to seed for multiple contract types"
+    initializeCodeDB codes
+    initializeStateDB accounts
     db <- getStateDB
-    return Block {
+    return (sourceInfo, Block {
         blockBlockData = BlockData {
             blockDataParentHash = genesisInfoParentHash gi,
             blockDataUnclesHash = genesisInfoUnclesHash gi,
@@ -95,11 +125,12 @@ genesisInfoToGenesisBlock gi = do
         },
         blockReceiptTransactions = [],
         blockBlockUncles         = []
-    }
+    })
 
-getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasStateDB m, HasHashDB m)
+getGenesisBlockAndPopulateInitialMPs :: (MonadIO m, HasCodeDB m, HasHashDB m, Mem.HasMemAddressStateDB m,
+                                         HasStateDB m, HasStorageDB m)
                                      => String
-                                     -> m Block
+                                     -> m ([(AccountInfo, CodeInfo)], Block)
 getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
     theJSONString <- liftIO . BLC.readFile $ genesisBlockName ++ "Genesis.json"
     let theJSON = either error id (eitherDecode theJSONString)
@@ -108,31 +139,33 @@ getGenesisBlockAndPopulateInitialMPs genesisBlockName = do
 data BackupType = NoBackup | BlockBackup | MPBackup
 
 initializeGenesisBlock :: ( MonadResource m
-                          , HasStateDB m
                           , HasCodeDB m
-                          , HasSQLDB m
                           , HasHashDB m
+                          , Mem.HasMemAddressStateDB m
                           , RBDB.HasRedisBlockDB m
+                          , HasSQLDB m
+                          , HasStateDB m
+                          , HasStorageDB m
                           )
                        => BackupType
                        -> String
                        -> m ()
 initializeGenesisBlock backupType genesisBlockName = do
-    (genesisBlock, obGB) <-
+    (srcInfo, genesisBlock, obGB) <-
         case backupType of
             NoBackup -> do
-                gb <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
                 _ <- produceVMEvents [ChainBlock gb]
                 obGB <- liftIO $ bootstrapSequencer gb
                 putGenesisHash $ blockHash gb
-                return (gb, obGB)
+                return (si, gb, obGB)
             BlockBackup -> do
-                gb <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
+                (si, gb) <- getGenesisBlockAndPopulateInitialMPs genesisBlockName
                 _ <- produceVMEvents [ChainBlock gb]
                 obGB <- liftIO $ bootstrapSequencer gb
                 backupBlocks
                 putGenesisHash $ blockHash gb
-                return (gb, obGB)
+                return (si, gb, obGB)
             MPBackup -> error "MPBackup called"
             --    gb <- backupMP
             --    setStateDBStateRoot $ blockDataStateRoot $ blockBlockData gb
@@ -148,12 +181,25 @@ initializeGenesisBlock backupType genesisBlockName = do
         updatedAccounts     = Map.empty
     }
     commitSqlDiffs diff Nothing
+    let writeSource (account, CodeInfo _ src) = case account of
+                                                    NonContract _ _ -> return ()
+                                                    ContractNoStorage addr _ _ -> updateSource addr src
+                                                    ContractWithStorage addr _ _ _ -> updateSource addr src
+
+    forM_ srcInfo writeSource
     -- $logInfoS "Inserting genesis block into RedisDB"
     void . RBDB.withRedisBlockDB $ RBDB.forceBestBlockInfo
         (blockHash genesisBlock)
         (blockDataNumber . blockBlockData $ genesisBlock)
         (blockDataDifficulty . blockBlockData $ genesisBlock)
     liftIO (bootstrapIndexer genBId obGB)
+    mErr <- liftIO . runKafkaConfigured "strato-init" $ do
+      assertTopicCreation
+      splitWriteStateDiffs [diff]
+    case filterResponse <$> mErr of
+       Right [] -> return ()
+       Right errs -> error . show $ errs
+       Left err -> error . show $ err
 
 bootstrapIndexer :: SQL.Key Block -> OutputBlock -> IO ()
 bootstrapIndexer key obGB =

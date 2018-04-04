@@ -38,8 +38,6 @@ formatSHAWithoutColor s@(SHA x)
 instance Format SHA where
   format = CL.yellow . formatSHAWithoutColor
 
-instance JSON.FromJSON SHA where
-instance JSON.ToJSON SHA where
 
 -- I think we want this first definition, but the API already uses the second one!
 -- Someday we should fix this, but it will probably change our external (API) behavior.

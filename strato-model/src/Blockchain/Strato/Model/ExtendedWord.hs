@@ -11,14 +11,20 @@ module Blockchain.Strato.Model.ExtendedWord
     word512ToBytes, bytesToWord512
  ) where
 
+import qualified Data.Aeson                as Ae
+import qualified Data.Aeson.Encoding       as Enc
 import           Data.Binary
 import           Data.Bits
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Lazy      as BL
+import qualified Data.ByteString.Base16    as B16
+import qualified Data.ByteString.Char8     as BC
 import           Data.Ix
+import qualified Data.Text                 as T
 import           Network.Haskoin.Internals (Word128, Word160, Word256, Word512)
 
 import           Blockchain.Data.RLP
+import           Blockchain.Strato.Model.Format
 
 word64ToBytes :: Word64 -> [Word8]
 word64ToBytes word = map (fromIntegral . (word `shiftR`)) [64-8, 64-16..0]
@@ -100,3 +106,10 @@ instance RLPSerializable Word16 where
     rlpDecode (RLPString s) | B.null s = 0
     rlpDecode (RLPString s) | B.length s <= 2 = decode $ BL.fromStrict s
     rlpDecode x             = error ("Missing case in rlp2Word16: " ++ show x)
+
+instance Format Word256 where
+  format x = BC.unpack $ B16.encode $ B.pack $ word256ToBytes x
+
+instance Ae.ToJSONKey Word256 where
+  toJSONKey = Ae.ToJSONKeyText f (Enc.text . f)
+    where f = T.pack . format

@@ -1,30 +1,51 @@
+{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TupleSections        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Data.GenesisInfo (
   GenesisInfo(..),
+  AccountInfo(..),
+  CodeInfo(..),
   defaultGenesisInfo
   ) where
 
+import           GHC.Generics (Generic)
 import           Data.Aeson
+import           Data.Aeson.TH                      as AT
 import qualified Data.ByteString                    as B
 import qualified Data.ByteString.Base16             as B16
+import           Data.Monoid ((<>))
 import           Data.Time
 import           Data.Word
 
 import           Blockchain.Data.Address
 import           Blockchain.Database.MerklePatricia
+import           Blockchain.ExtWord
 import           Blockchain.SHA
+
+data CodeInfo = CodeInfo B.ByteString String
+  deriving (Show, Eq, Generic)
+
+$(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''CodeInfo)
+
+data AccountInfo = NonContract Address Integer
+                 | ContractNoStorage Address Integer SHA
+                 | ContractWithStorage Address Integer SHA [(Word256, Word256)]
+   deriving (Show, Eq)
+
+$(deriveJSON defaultOptions{sumEncoding = AT.UntaggedValue} ''AccountInfo)
 
 data GenesisInfo =
   GenesisInfo {
     genesisInfoParentHash       :: SHA,
     genesisInfoUnclesHash       :: SHA,
     genesisInfoCoinbase         :: Address,
-    genesisInfoAccountInfo      :: [(Address, Integer)],
+    genesisInfoAccountInfo      :: [AccountInfo],
+    genesisInfoCodeInfo         :: [CodeInfo],
     genesisInfoTransactionsRoot :: StateRoot,
     genesisInfoReceiptsRoot     :: StateRoot,
     genesisInfoLogBloom         :: B.ByteString,
@@ -36,9 +57,11 @@ data GenesisInfo =
     genesisInfoExtraData        :: Integer,
     genesisInfoMixHash          :: SHA,
     genesisInfoNonce            :: Word64
-} deriving (Show)
+} deriving (Show, Eq, Generic)
 
-
+nullStateRoot :: StateRoot
+nullStateRoot = StateRoot . fst . B16.decode $
+    "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 defaultGenesisInfo :: GenesisInfo
 defaultGenesisInfo =
   GenesisInfo {
@@ -46,8 +69,9 @@ defaultGenesisInfo =
     genesisInfoUnclesHash = SHA 13478047122767188135818125966132228187941283477090363246179690878162135454535,
     genesisInfoCoinbase = Address 0,
     genesisInfoAccountInfo = [],
-    genesisInfoTransactionsRoot = StateRoot . fst . B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
-    genesisInfoReceiptsRoot = StateRoot . fst . B16.decode $ "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+    genesisInfoCodeInfo = [],
+    genesisInfoTransactionsRoot = nullStateRoot,
+    genesisInfoReceiptsRoot = nullStateRoot,
     genesisInfoLogBloom = B.replicate 512 0,
     genesisInfoDifficulty = 131072,
     genesisInfoNumber = 0,
@@ -66,6 +90,7 @@ instance FromJSON GenesisInfo where
     o .: "unclesHash" <*>
     o .: "coinbase" <*>
     o .: "accountInfo" <*>
+    o .:? "codeInfo" .!= [] <*>
     o .: "transactionRoot" <*>
     o .: "receiptsRoot" <*>
     o .: "logBloom" <*>
@@ -80,21 +105,21 @@ instance FromJSON GenesisInfo where
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
-  toJSON x =
-    object [
-      "parentHash" .= genesisInfoParentHash x,
-      "unclesHash" .= genesisInfoUnclesHash x,
-      "coinbase" .= genesisInfoCoinbase x,
-      "accountInfo" .= genesisInfoAccountInfo x,
-      "transactionRoot" .= genesisInfoTransactionsRoot x,
-      "receiptsRoot" .= genesisInfoReceiptsRoot x,
-      "logBloom" .= genesisInfoLogBloom x,
-      "difficulty" .= genesisInfoDifficulty x,
-      "number" .= genesisInfoNumber x,
-      "gasLimit" .= genesisInfoGasLimit x,
-      "gasUsed" .= genesisInfoGasUsed x,
-      "timestamp" .= genesisInfoTimestamp x,
-      "extraData" .= genesisInfoExtraData x,
-      "mixHash" .= genesisInfoMixHash x,
-      "nonce" .= genesisInfoNonce x
-      ]
+  toEncoding x = pairs (
+      "parentHash" .= genesisInfoParentHash x <>
+      "unclesHash" .= genesisInfoUnclesHash x <>
+      "coinbase" .= genesisInfoCoinbase x <>
+      "codeInfo" .= genesisInfoCodeInfo x <>
+      "transactionRoot" .= genesisInfoTransactionsRoot x <>
+      "receiptsRoot" .= genesisInfoReceiptsRoot x <>
+      "logBloom" .= genesisInfoLogBloom x <>
+      "difficulty" .= genesisInfoDifficulty x <>
+      "number" .= genesisInfoNumber x <>
+      "gasLimit" .= genesisInfoGasLimit x <>
+      "gasUsed" .= genesisInfoGasUsed x <>
+      "timestamp" .= genesisInfoTimestamp x <>
+      "extraData" .= genesisInfoExtraData x <>
+      "mixHash" .= genesisInfoMixHash x <>
+      "nonce" .= genesisInfoNonce x <>
+      "accountInfo" .= genesisInfoAccountInfo x
+    )
