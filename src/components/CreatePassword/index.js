@@ -2,9 +2,8 @@ import React, { Component } from 'react';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import { Button, Dialog } from '@blueprintjs/core';
+import { Button } from '@blueprintjs/core';
 import { validate } from './validate';
-import { closeCreatePasswordModal } from './createPassword.actions';
 import { createUser, resetError } from '../CreateUser/createUser.actions';
 import { toasts } from "../Toasts";
 
@@ -44,62 +43,48 @@ class CreatePassword extends Component {
     return (
       <div className="smd-pad-16">
         <form>
-          <Dialog
-            iconName="key"
-            isOpen={this.props.isOpen}
-            onClose={() => {
-              this.props.reset();
-              this.props.closeCreatePasswordModal();
-            }}
-            title="Create Password"
-            className="pt-dark"
-            canOutsideClickClose={false}
-            canEscapeKeyClose={false}
-            isCloseButtonShown={false}
-          >
-            <div className="pt-dialog-body">
-              <div className="pt-form-group">
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-a">
-                    Password
+          <div className="pt-dialog-body">
+            <div className="pt-form-group">
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-a">
+                  Password
                   </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="password"
-                      className="pt-input form-width smd-full-width"
-                      placeholder="Password"
-                      component="input"
-                      type="password"
-                      required
-                    /> <br />
-                    <span className="error-text">{this.errorMessageFor('password')}</span>
-                  </div>
+                <div className="pt-form-content">
+                  <Field
+                    name="password"
+                    className="pt-input form-width smd-full-width"
+                    placeholder="Password"
+                    component="input"
+                    type="password"
+                    required
+                  /> <br />
+                  <span className="error-text">{this.errorMessageFor('password')}</span>
                 </div>
+              </div>
 
-                <div className="pt-form-group pt-intent-danger">
-                  <label className="pt-label" htmlFor="input-b">
-                    Confirm Password
+              <div className="pt-form-group pt-intent-danger">
+                <label className="pt-label" htmlFor="input-b">
+                  Confirm Password
                   </label>
-                  <div className="pt-form-content">
-                    <Field
-                      name="confirmPassword"
-                      className="pt-input form-width"
-                      placeholder="Confirm Password"
-                      component="input"
-                      type="password"
-                      required
-                    /> <br />
-                    <span className="error-text">{this.errorMessageFor('confirmPassword')}</span>
-                  </div>
+                <div className="pt-form-content">
+                  <Field
+                    name="confirmPassword"
+                    className="pt-input form-width"
+                    placeholder="Confirm Password"
+                    component="input"
+                    type="password"
+                    required
+                  /> <br />
+                  <span className="error-text">{this.errorMessageFor('confirmPassword')}</span>
                 </div>
               </div>
             </div>
-            <div className="pt-dialog-footer text-center">
-              <div className="pt-dialog-footer-actions">
-                <Button onClick={handleSubmit(this.submit)} text="Submit" />
-              </div>
+          </div>
+          <div className="pt-dialog-footer text-center">
+            <div className="pt-dialog-footer-actions">
+              <Button onClick={handleSubmit(this.submit)} text="Submit" />
             </div>
-          </Dialog>
+          </div>
         </form>
       </div>
     );
@@ -108,7 +93,6 @@ class CreatePassword extends Component {
 
 function mapStateToProps(state) {
   return {
-    isOpen: state.createPassword.isOpen,
     serverError: state.createUser.error,
     email: state.user.firstTimeUser
   };
@@ -118,7 +102,6 @@ const formed = reduxForm({ form: 'createPassword' })(CreatePassword);
 const connected = connect(
   mapStateToProps,
   {
-    closeCreatePasswordModal,
     createUser,
     resetError
   }

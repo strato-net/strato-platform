@@ -5,12 +5,12 @@ import { reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { faucetRequest } from '../Accounts/accounts.actions';
 import CLI from '../CLI';
 import CreateUser from '../CreateUser';
 import Stepper from '../Stepper';
 import Congrats from '../Congrats';
-import Faucet from '../Faucet';
+import VerifyAccount from '../VerifyAccount';
+import CreatePassword from '../CreatePassword';
 import './walkThrough.css';
 
 class WalkThrough extends Component {
@@ -18,11 +18,8 @@ class WalkThrough extends Component {
     super(props);
     this.state = {
       currentModal: 'CreateUser',
-      step: 0,
-      isBackClicked: false,
+      step: 0
     }
-    this.handleBackToFaucet = this.handleBackToFaucet.bind(this);
-    this.handleEmailSentClick = this.handleEmailSentClick.bind(this);
   }
 
   componentDidMount() {
@@ -32,57 +29,39 @@ class WalkThrough extends Component {
   componentWillReceiveProps(nextProps) {
     if (this.state.currentModal !== 'CreateUser' && !nextProps.isLoggedIn)
       this.setState({ currentModal: 'CreateUser', step: 0 });
+    if (nextProps.firstTimeUser)
+      this.setState({ currentModal: 'VerifyAccount', step: 1 });
+    if (nextProps.isTempPasswordVerified)
+      this.setState({ currentModal: 'CreatePassword', step: 2 });
     if (!this.props.isLoggedIn && nextProps.isLoggedIn)
-      this.setState({ currentModal: 'Faucet', step: 1 });
-  }
-
-  handleBackToFaucet() {
-    this.setState({ currentModal: "Faucet", step: 1, isBackClicked: true });
-  }
-
-  handleEmailSentClick() {
-    mixpanelWrapper.track('faucet_close_click');
-    this.setState({ currentModal: "Completed", isBackClicked: false });
-    // Faucet account using jwt tobe done
-    this.props.faucetRequest(this.props.currentUser.accountAddress);
+      this.setState({ currentModal: 'Completed' });
   }
 
   dialogContent() {
     switch (this.state.currentModal) {
       case "CreateUser":
         return <CreateUser />
-        break;
-      case "Faucet":
-        return <Faucet
-          errors={this.props.errors}
-          handleSubmit={this.props.handleSubmit}
-          submitting={this.props.submitting}
-          faucetRequest={this.props.faucetRequest}
-          currentUser={this.props.currentUser}
-          handleEmailSentClick={this.handleEmailSentClick}
-          isWalkThrough={true}
-          isBackClicked={this.state.isBackClicked}
-        />
-        break;
-      case "Completed":
-        return <Congrats
-          handleBack={() => this.setState({ currentModal: "Faucet", step: 1, isBackClicked: true })}
-          handleContinue={() => this.setState({ currentModal: "CLI", step: 2 })} />
-        break;
+      case "VerifyAccount":
+        return <VerifyAccount />
+      case "CreatePassword":
+        return <CreatePassword />
       case "CLI":
         return <CLI
-          handleBack={this.handleBackToFaucet}
           closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} />
-        break;
+      default:
+        return <Congrats
+          handleContinue={() => this.setState({ currentModal: "CLI", step: 2 })} />
     }
   }
 
   render() {
     let title;
     if (this.state.currentModal === "CreateUser")
-      title = 'Create STRATO Developer ID';
-    else if (this.state.currentModal === "Faucet")
-      title = 'Request Tokens';
+      title = 'Create STRATO Developer Email';
+    else if (this.state.currentModal === "VerifyAccount")
+      title = 'Password Verification';
+    else if (this.state.currentModal === "CreatePassword")
+      title = 'Set Permanent Password'
     else if (this.state.currentModal === "CLI")
       title = 'Download CLI Tool';
     else
@@ -122,6 +101,8 @@ export function mapStateToProps(state) {
     isWalkThroughOpen: state.walkThrough.isWalkThroughOpen,
     currentUser: state.user.currentUser,
     isLoggedIn: state.walkThrough.isLoggedIn,
+    firstTimeUser: state.user.firstTimeUser,
+    isTempPasswordVerified: state.verifyAccount.isTempPasswordVerified,
     ...errors
   };
 }
@@ -140,8 +121,7 @@ const connected = connect(
   mapStateToProps,
   {
     openWalkThroughOverlay,
-    closeWalkThroughOverlay,
-    faucetRequest
+    closeWalkThroughOverlay
   }
 )(formed);
 

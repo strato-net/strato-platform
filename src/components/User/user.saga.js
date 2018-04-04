@@ -13,7 +13,6 @@ import {
   firstTimeLoginSuccess,
   firstTimeLoginFailure,
 } from './user.actions';
-import { openVerifyAccountModal } from '../VerifyAccount/verifyAccount.actions';
 import { env } from '../../env';
 
 const loginUrl = env.APEX_URL + "/login";
@@ -84,7 +83,6 @@ function* firstTimeLogin(action) {
     const response = yield call(firstTimeLoginRequest, action.email);
     if (response.exists) {
       yield put(firstTimeLoginSuccess(action.email));
-      yield put(openVerifyAccountModal());
     } else {
       yield put(firstTimeLoginFailure(action.email, response.error.message));
     }

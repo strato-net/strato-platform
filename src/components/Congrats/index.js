@@ -1,5 +1,5 @@
 import React from 'react';
-import { AnchorButton, Button, Intent } from '@blueprintjs/core';
+import { Button } from '@blueprintjs/core';
 import './congrats.css'
 
 const Congrats = (props) => {
@@ -10,9 +10,6 @@ const Congrats = (props) => {
     </div>
     <div className="pt-dialog-footer">
       <div className="pt-dialog-footer-actions">
-        <Button text="Back"
-          onClick={props.handleBack}
-        />
         <Button text="Continue"
           onClick={props.handleContinue}
         />

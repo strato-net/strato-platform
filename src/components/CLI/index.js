@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { AnchorButton, Button, Intent } from '@blueprintjs/core';
+import { AnchorButton, Intent } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 
@@ -36,9 +36,6 @@ class CLI extends Component {
                 className="read-docs-btn"
               /> 
               : <div>
-                  <Button text="Back" onClick={() => {
-                    this.props.handleBack();
-                  }} />
                   <AnchorButton
                     intent={Intent.PRIMARY}
                     href="https://developers.blockapps.net/advanced/launch-dapp/"

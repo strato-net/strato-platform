@@ -6,10 +6,8 @@ import {
 import {
   VERIFY_TEMPORARY_PASSWORD_REQUEST,
   verifyTempPasswordSuccess,
-  verifyTempPasswordFailure,
-  closeVerifyAccountModal
+  verifyTempPasswordFailure
 } from './verifyAccount.actions';
-import { openCreatePasswordModal } from '../CreatePassword/createPassword.actions';
 import { env } from '../../env';
 
 const verify = env.APEX_URL + '/verify-temporary-password';
@@ -34,8 +32,6 @@ function* verifyTempPassword(action) {
 
     if (response.success) {
       yield put(verifyTempPasswordSuccess(response.success));
-      yield put(closeVerifyAccountModal());
-      yield put(openCreatePasswordModal());
     } else {
       yield put(verifyTempPasswordFailure(response.error.message));
     }

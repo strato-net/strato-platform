@@ -13,8 +13,6 @@ import { env } from '../../env';
 import CLI from '../CLI';
 import TokenRequest from '../TokenRequest';
 import { closeCLIOverlay } from '../CLI/cli.actions';
-import VerifyAccount from '../VerifyAccount'
-import CreatePassword from '../CreatePassword'
 import qs from 'query-string';
 
 import './application.css'
@@ -52,8 +50,6 @@ class Applications extends Component {
             <h3>My Apps</h3>
           </div>
           <div className="col-sm-6 text-right">
-            <VerifyAccount />
-            <CreatePassword />
             {this.props.isLoggedIn &&
               <Button text="Request Token" onClick={this.props.openTokenRequestOverlay} className="right-align" />}
             {this.props.isLoggedIn &&
@@ -97,7 +93,7 @@ class Applications extends Component {
           title="Download CLI Tool"
           className="pt-dark cli-dialog"
         >
-          <CLI addApp />
+        <CLI addApp />
         </Dialog>
         <TokenRequest />
       </div>
