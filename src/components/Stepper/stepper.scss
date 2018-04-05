@@ -6,6 +6,7 @@
     padding-left: 15px;
     padding-right: 15px;
     overflow: hidden;
+    margin-left: 103px;
 }
 
 .steps-form .steps-step-1,
@@ -26,15 +27,15 @@
 }
 
 .steps-step-4 img {
-    right: -46px;
+    right: -35px;
 }
 
 .steps-step-3 img {
-    right: 3px;
+    right: 17px;
 }
 
 .steps-step-2 img {
-    right: 18px;
+    right: 29px;
 }
 
 .steps-form .steps-row img {
@@ -52,7 +53,7 @@
 .steps-form .steps-row .steps-step-2:after,
 .steps-form .steps-row .steps-step-3:after {
     position: absolute;
-    content: "......";
+    content: "........";
     letter-spacing: 7px;
     font-size: 25px;
     font-weight: 900;
@@ -62,6 +63,10 @@
 
 .steps-form .steps-row .steps-step-2:after {
     right: -33px;
+}
+
+.steps-form .steps-row .steps-step-3:after {
+    right: -45px;
 }
 
 .steps-form .steps-row .steps-step-1.completed:after,

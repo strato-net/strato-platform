@@ -18,9 +18,12 @@ const Stepper = (props) => {
     step2LogoSrc = step2and3LogoActive;
     step3LogoSrc = step2and3Logo;
     step4LogoSrc = step4Logo;
-  } else if (props.step === 2 || props.step === 3) {
+  } else if (props.step === 2) {
     step1LogoSrc = step2LogoSrc = stepCompletedLogo;
     step3LogoSrc = step2and3LogoActive;
+    step4LogoSrc = step4Logo;
+  } else if (props.step === 3) {
+    step1LogoSrc = step2LogoSrc = step3LogoSrc = stepCompletedLogo;
     step4LogoSrc = step4Logo;
   } else if (props.step === 4) {
     step1LogoSrc = step2LogoSrc = step3LogoSrc = stepCompletedLogo;

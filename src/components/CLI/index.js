@@ -42,6 +42,7 @@ class CLI extends Component {
                   target="_blank"
                   onClick={this.props.closeWalkThroughOverlay}
                   text="Upload an App"
+                  className="read-docs-btn"
                 />
               </div>
             }

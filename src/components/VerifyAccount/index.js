@@ -6,6 +6,7 @@ import { Button } from '@blueprintjs/core';
 import { validate } from './validate';
 import { verifyTempPassword, resetError } from '../VerifyAccount/verifyAccount.actions';
 import { toasts } from "../Toasts";
+import './VerifyAccount.css';
 
 class VerifyAccount extends Component {
 
@@ -39,9 +40,9 @@ class VerifyAccount extends Component {
   render() {
     const { handleSubmit } = this.props;
     return (
-      <div className="smd-pad-16">
+      <div className="account-body">
         <form>
-          <div className="pt-dialog-body">
+          <div className="account-content">
             <div className="pt-form-group">
               <center><h5 style={{color: '#00AE52'}}> A temporary password has been sent to your email address </h5></center>
               <div className="pt-form-group pt-intent-danger">

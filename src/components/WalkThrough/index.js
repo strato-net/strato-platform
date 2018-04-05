@@ -34,7 +34,7 @@ class WalkThrough extends Component {
     if (nextProps.isTempPasswordVerified)
       this.setState({ currentModal: 'CreatePassword', step: 2 });
     if (!this.props.isLoggedIn && nextProps.isLoggedIn)
-      this.setState({ currentModal: 'Completed' });
+      this.setState({ currentModal: 'Completed', step: 3 });
   }
 
   dialogContent() {
