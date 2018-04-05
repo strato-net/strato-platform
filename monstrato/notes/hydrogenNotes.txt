@@ -1,0 +1,113 @@
+
+1. "strato-setup" and init/backup related execs have been given their own repository, rather than just sitting in blockapps-data.  The name of the repository is "strato-init".
+
+-----------------------------------------------
+
+2. strato-setup automatically installs livenetGenesis.json, stablenetGenesis.json, testnetGenesis.json if chosen (uses the useful cabal "Data-Files:" field, see http://neilmitchell.blogspot.com/2008/02/adding-data-files-using-cabal.html for a description).  Other genesis blocks still need to be supplied as before.
+
+Here is a sample of the new usage:
+
+    ~/> mkdir testNode
+    ~/> cd testNode/
+    ~/testNode> strato-setup -p <password> testnet
+     <.......output from strato-setup>
+     
+    ~/testNode> ls
+    certs  config  testnetGenesis.json  static
+
+-----------------------------------------------
+
+NOTE- the block backup feature described in 3. is probably not the one you want....  Most of the time you will want to use the snapshot feature described in 4.
+
+3. The full blockchain can be backed up using a new executable (doesn't include saving the MP state, so you will need to run ethereum-vm from the genesis block).  This backup can be restored using strato-setup.
+
+You can backup and restore blocks as follows:
+
+    ~/testNode> strato-block-backup > allBlocks
+
+(NOTE- there is a known bug here....  this command hangs waiting for new blocks, so you will have to monitor and hit ctrl-c when done)
+
+Then restore using "strato-setup":
+
+    ~/> mkdir testNode2
+    ~/> cd testNode2/
+    ~/> cp ~/testNode/allBlocks .
+    ~/testNode2> cat allBlocks | strato-setup -p <password> --backupblocks
+     <.......output from strato-setup, takes about a minute to finish>
+
+You can immediately run ethereum-vm at this point....
+
+    ~/> ethereum-vm --miningVerification=false
+    
+
+
+-----------------------------------------------
+
+4. You can also take a system "snapshot" (includes MP, almost everything, but loses historical info).
+
+Here is a sample of the new usage:
+
+    ~/testNode> strato-backup 1960000 > backup.1960000
+
+Then restore using "strato-setup":
+
+    ~/> mkdir testNode2
+    ~/> cd testNode2/
+    ~/> cp ~/testNode/backup.196000 .
+    ~/testNode2> cat backup.1960000 | strato-setup -p <password> --backupmp
+     <.......output from strato-setup, takes about 10 minutes to finish>
+
+(most of the restore time seems to be in populating the SQL DB with the mp-diff info).
+
+You can now run strato-p2p-client, ethereum-vm as usual, although both will start all of their work from the snapshot block (#1960000 in this example).
+
+If you bz2 compress the backup file ("strato-backup 90000 | bzip2 -9 > backup.1960000", and use bzcat instead of cat in the example above), the resulting file for the current livenet blockchain is less than 200MB.
+
+You can "clone a clone" (ie- rerun "strato-backup" in a restored node), but beware that the parameter to strato-backup is kafka offset, which doesn't include the original chain, so the resulting blockchain number can be confusing
+
+    ~/testNode2> strato-backup 10000 > backup.1970000 # the 10000th offset is block 1970000
+
+
+
+NOTE- "strato-setup --backupblocks" and "strato-setup --backupmp" are mutually exclusive for the time being.
+
+-----------------------------------------------
+
+5. Peer discovery is much more automated than before.  "strato-p2p-client" pauses and waits for "ethereum-discover" to insert new peers.  "Broken" peers are disabled for varying times (depending on the nature of the failure), so we don't repeatedly waste time trying to reconnect to them.  Even with successful peers we limit reconnection attempts to one per minute so as to not hammer a peer.  "ethereum-discover" adds new peers when the number of available ones sinks below a threshold (currently 100).
+
+To use, first start "strato-p2p-client --sqlPeers" in one xterm:
+
+    ~/testNode> strato-p2p-client --sqlPeers
+    No available peers, I will try to find available peers again in 10 seconds
+    No available peers, I will try to find available peers again in 10 seconds
+    ....etc....
+
+then run "ethereum-discover" in another xterm (same directory, though)
+
+    ~/testNode> ethereum-discover 
+    Bootstrap address: 52.16.188.185:30303
+    Starting Discovery daemon
+    ....etc....
+
+This will, so-to-speak, "fill the peer gas tank", and after a few seconds, strato-p2p-client will come to life and start connecting to peers.  Bad peers will be disabled, and "ethereum-discover" will keep supplying.
+
+-----------------------------------------------
+
+6. "queryStrato" introduced a faster way to dump a MP DB, called "frawmp" (which works exactly the same as "rawmp", but is just faster....  "rawmp" will eventually be deprecated).
+
+-----------------------------------------------
+
+7. Added code to make the DAO hard fork a reality
+
+-----------------------------------------------
+
+8. Fixed a fork at block #1878713
+
+-----------------------------------------------
+
+9. UNTESTED CHANGE- Added code to let a strato node be a bootstrap server, allowing us to build networks without using peers.yaml.
+
+-----------------------------------------------
+
+10. IMPORTANT- I changed the way strato-setup calls kafka-topics.  It now expects it to be in the path.  If you set up kafka using my .deb package, this will be the case.
+

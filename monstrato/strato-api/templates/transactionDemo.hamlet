@@ -1,0 +1,95 @@
+
+<details>
+  <summary>Advanced Options:
+  <form action="">
+     <table>
+       <tr>
+         <td class="labelCell"><label for="nonce">Nonce:
+         <td><input type="number" id="nonce" name="nonce" value=0>
+       <tr>
+         <td class="labelCell"><label for="nonce">Gas Price:
+         <td><input type="number" id="gasPrice" name="gasPrice" value=100>
+       <tr>
+         <td class="labelCell"><label for="gasLimit">Gas Limit:
+         <td><input type="number" id="gasLimit" name="gasLimit" value=3141591>
+       <tr>
+         <td class="labelCell"><label for="dataField">Data:
+         <td><input type="text" id="dataField" name="dataField" value=0x00>
+       <tr>
+         <td class="labelCell"><label for="to">To Address:
+         <td><input type="text" id="to" name="to" value=#{contractAddress}>
+       <tr>
+         <td class="labelCell"><label for="value">Value:
+         <td><input type="number" id="value" name="value" value=0>
+       <tr>
+         <td class="labelCell"><label for="privKey">Private Key:
+         <td><input type="text" id="privKey" name="privKey" value=1dd885a423f4e212740f116afa66d40aafdbb3a381079150371801871d9ea281><br>
+
+
+<button onclick="submitTransaction()">Press here to submit transaction
+    
+<p>
+      Function invocation is slightly tricky. We've pre-loaded the ABI output from the solidity compiler for you. 
+      Input the function name and a list of arguments, then click below to have the data payload for the transaction appear in the (possibly hidden) data field. You can then submit the transaction.
+
+<button onclick="dataField.value=invokeFunction()">Prepare Function Invocation
+
+<form action="">
+  <table>
+    <tr>
+      <td class="labelCell"><label for="register">Function Name:
+      <td><input type="text" id="funcName" name="funcName" value="register">
+    <tr>
+      <td class="labelCell"><label for="args">Args:
+      <td><input type="text" name="args" id="args" value=[123]><br>
+    <tr>
+      <td class="labelCell"><label for="args">ABI:
+      <td><textarea readonly name="ABI" id="ABI" style="width: 100%; height: 100%; border: none; font-size: 20px;">#{abi}</textarea><br>
+
+<p> 
+   By now you've submitted a contract and invoked one of its methods. How can you see the result of your contracts operation? You can query its storage. At present, this requires 
+   <ul>
+     <li> knowing which variable you are interested in, including its type, 
+     <li> knowing its position in the solidity program (starting from zero). 
+
+   All storage is shown, by default.
+
+   Elementary variables are numbered from zero on up. Try it below - see the index field.
+   
+   Map lookups require you to additionally input the key, in hex. The default values below will work
+   if you register [123] with the demo contract (0x7B = 123 is the key, index is 2).
+
+   If you want to simulate the functionality of a solidity getter, look at sample contract from the
+   contract submission page. Having registered a key, call getOwner after that. You should see the return
+   value at index 0 of elementary storage.
+ 
+   You'll see the result of the getter in storage as an elementary type, associated with storage key
+   zero, or, confusingly, solidity program index zero.
+
+   Of course this is possible by just looking the function up in the map. 
+      
+   
+<select id="lookupType" onchange="switchLookup()">
+  <option value="all">All Storage
+  <option value="elem">Elementary Variable
+  <option value="map">Map
+  <option value="array">Array<br>
+
+<button id="lookupButton" onclick="calculateLookup()">Lookup<br>
+
+<form action="">
+  <table>
+    <tr>
+      <td class="labelCell"><label for="key">Key (for maps):
+      <td><textarea name="key" id="key" style="width: 100%; height: 100%; border: none; font-size: 20px;">000000000000000000000000000000000000000000000000000000000000007B</textarea>
+    <tr>
+      <td class="labelCell"><label for="index">Index (pos. in sol. program):
+      <td><textarea name="index" id="index" style="width: 100%; height: 100%; border: none; font-size: 20px;">0000000000000000000000000000000000000000000000000000000000000002</textarea>
+    <tr>
+      <td class="labelCell"><label for="address">Address:
+      <td><textarea name="address" id="address" style="width: 100%; height: 100%; border: none; font-size: 20px;">#{contractAddress}</textarea><br>
+    <tr>
+       <td class="labelCell"><label for="lookup">Storage:
+       <td><textarea name="lookup" id="lookup" style="width: 100%; height: 100%; border: none; font-size: 20px;">0000000000000000000000000000000000000000000000000000000000000000</textarea><br>
+    
+

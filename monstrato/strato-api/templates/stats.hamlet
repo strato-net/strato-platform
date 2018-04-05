@@ -1,0 +1,46 @@
+<script src=/static/js/jquery-2.1.4.min.js>
+<script src=/static/js/Chart.js>
+
+<h1>BlockApps.net stats
+
+<div class="row">
+  <div class="col-md-3">
+    Transaction count
+    <canvas id="myChart1" width="200" height="100">
+  <div class="col-md-3">
+    Gas price
+    <canvas id="myChart2" width="200" height="100">
+  <div class="col-md-3">
+    Uncle count
+    <canvas id="myChart3" width="200" height="100">
+  <div class="col-md-3">
+    Block propagation
+    <canvas id="myChart4" width="200" height="100">
+
+<div class="row">
+  <div class="col-md-3">
+    Last block
+    <div id="blockNumber" class="col-md-12">
+  <div class="col-md-3">
+    Timestamp
+    <div id="blockTime" class="col-md-12">
+  <div class="col-md-3">
+    Total difficulty
+    <div id="totDiff" class="col-md-12">       
+  <div class="col-md-3">
+    Total nr. transactions
+    <div id="totTx" class="col-md-12">  
+
+
+<div class="container">  
+<h3 class="sub-header">Build info</h2>
+<div class="table-responsive">
+  <table class="table table-striped" id="version-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Version</th>
+        <th>Branch</th>
+        <th>Status</th>
+    <tbody>   
+  

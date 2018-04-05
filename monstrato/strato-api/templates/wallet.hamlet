@@ -1,0 +1,5 @@
+  <div id="walletDiv">
+    <label for="walletaddress">Your Address
+    <input class="form-control col-md-12" name="walletaddress" id="walletaddress" readonly />
+    <label for="walletbalance">Balance
+    <input class="form-control col-md-12" name="walletbalance" id="walletbalance" readonly />

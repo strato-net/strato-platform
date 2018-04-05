@@ -1,0 +1,54 @@
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+
+module Blockchain.Data.RawTransaction (
+  RawTransaction(..),
+  insertRawTX,
+  insertRawTX',
+  insertRawTXIfNew,
+  insertRawTXIfNew'
+  ) where
+
+
+import           Control.Exception.Lifted
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import qualified Database.Persist.Postgresql  as SQL
+
+import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+
+
+insertRawTXIfNew::HasSQLDB m=>[RawTransaction]->m ()
+insertRawTXIfNew = insertRawTX Fail
+
+insertRawTXIfNew'::(MonadBaseControl IO m, MonadIO m)=>
+                   [RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
+insertRawTXIfNew' = insertRawTX' Fail
+
+insertRawTX :: HasSQLDB m=>DebugMode->[RawTransaction]->m ()
+insertRawTX m rawTXs= do
+  db <- getSQLDB
+  runResourceT $ SQL.runSqlPool (insertRawTX' m rawTXs) db
+
+
+insertRawTX'::(MonadBaseControl IO m, MonadIO m)=>
+             DebugMode->[RawTransaction]->ReaderT (SQL.PersistEntityBackend RawTransaction) m ()
+insertRawTX' mode rawTXs= do
+  forM_ rawTXs $ \rawTX -> do
+    ret <- try $ SQL.insertBy rawTX
+    case ret of
+     Left e -> liftIO $ (if mode == Log then putStrLn else error) $ "TX already inserted: " ++ show (e::SomeException)
+     Right _ -> return ()

@@ -1,0 +1,464 @@
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
+module Blockchain.Setup (
+  oneTimeSetup
+  ) where
+
+import           Control.Concurrent
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.State
+import qualified Data.ByteString                    as B
+import qualified Data.ByteString.Base16             as B16
+import qualified Data.ByteString.Char8              as C
+import           Data.FileEmbed
+import           Data.List.Split                    (splitWhen)
+import qualified Data.Map                           as Map
+import           Data.Maybe
+import           Data.String
+import qualified Data.Text                          as T
+import           Data.Yaml
+import qualified Database.LevelDB                   as DB
+import           Database.Persist.Postgresql        hiding (get)
+import qualified Database.Redis                     as Redis hiding (get)
+import           Network.Kafka
+import           Network.Kafka.Protocol
+import           System.Directory
+import           System.Entropy
+import           System.FilePath
+
+import           Blockchain.APIFiles
+import qualified Blockchain.Colors                  as CL
+import           Blockchain.Constants
+import           Blockchain.Data.Blockchain         as Blockchain
+import qualified Blockchain.Data.DataDefs           as DataDefs
+import           Blockchain.Data.GenesisBlock
+import qualified Blockchain.Database.MerklePatricia as MP
+import           Blockchain.DB.CodeDB
+import           Blockchain.DB.HashDB
+import           Blockchain.DB.MemAddressStateDB
+import           Blockchain.DB.SQLDB
+import           Blockchain.DB.StateDB
+import           Blockchain.DB.StorageDB
+import           Blockchain.EthConf
+import           Blockchain.KafkaTopics
+import           Blockchain.Output
+import           Blockchain.PrivateKeyConf
+import           Blockchain.StatsConf               (defaultStatsConf)
+import qualified Blockchain.Strato.RedisBlockDB     as RBDB
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.ExtendedWord
+
+import qualified Executable.EthDiscoverySetup       as EthDiscovery
+
+import           HFlags
+
+defineFlag "u:pguser" (""  ::  String) "Postgres user"
+defineFlag "P:pghost" (""  ::  String) "Postgres hostname"
+defineFlag "p:password" (""  ::  String) "Postgres password"
+defineFlag "K:kafkahost" (""  ::  String) "Kafka hostname"
+defineFlag "z:zkhost" ("localhost"  ::  String) "Zookeeper hostname"
+defineFlag "z:lazyblocks" (False  ::  Bool) "Don't mine empty blocks"
+defineFlag "backupmp" False "backup the MP database from STDIN"
+defineFlag "backupblocks" False "backup the block DB from STDIN"
+defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
+defineCustomFlag "stratoBootnode" [| []  ::  [String] |] "STRING_LIST"
+     [| \s -> if any (==',') s then splitWhen (==',') s else [s] |]
+  [| show |]
+  "Replaces the default set of public boot nodes with the provided ip address(es), considered as the address of a strato node(s)"
+
+defineFlag "blockTime" (13  ::  Integer) "Blocktime"
+defineFlag "minBlockDifficulty" (131072  ::  Integer) "Minimum block difficulty"
+defineFlag "R:redisHost" ("localhost"  ::  String) "Redis BlockDB hostname"
+defineFlag "redisPort" (6379  ::  Int) "Redis BlockDB port"
+defineFlag "redisDBNumber" (0  ::  Integer) "Redis database number"
+
+defineFlag "statsEnable" True "Enable DogStatsD reporting"
+defineFlag "statsHost" ("telegraf"  ::  String) "Hostname/address of DogStatsD server"
+defineFlag "statsPort" (8125  ::  Int) "Port of DogStatsD server"
+defineFlag "statsFlush" (1000  ::  Int) "DogStatsD flush interval in ms"
+defineFlag "statsPrefix" (""  ::  String) "Prefix all metrics with a string"
+defineFlag "statsSuffix" (""  ::  String) "Suffix all metrics with a string"
+
+data SetupDBs =
+  SetupDBs {
+    stateDB :: StateDB,
+    hashDB  :: HashDB,
+    codeDB  :: CodeDB,
+    sqlDB   :: SQLDB,
+    redisDB :: Redis.Connection,
+    localStorage :: Map.Map (Address, Word256) Word256,
+    localAddressState :: Map.Map Address AddressStateModification
+    }
+
+type SetupDBM = StateT SetupDBs (ResourceT IO)
+instance HasStateDB SetupDBM where
+  getStateDB = do
+    cxt <- get
+    return $ stateDB cxt
+  setStateDBStateRoot sr = do
+    cxt <- get
+    put cxt{stateDB=(stateDB cxt){MP.stateRoot=sr}}
+
+instance HasStorageDB SetupDBM where
+  getStorageDB = do
+    cxt <- get --storage and states use the same database!
+    return (MP.ldb . stateDB $ cxt, localStorage cxt)
+  putStorageMap theMap = do
+    cxt <- get
+    put cxt{localStorage=theMap}
+
+instance HasMemAddressStateDB SetupDBM where
+  getAddressStateDBMap = localAddressState <$> get
+  putAddressStateDBMap theMap = do
+    cxt <- get
+    put cxt{localAddressState=theMap}
+
+instance HasHashDB SetupDBM where
+  getHashDB = fmap hashDB get
+
+instance HasCodeDB SetupDBM where
+  getCodeDB = fmap codeDB get
+
+instance HasSQLDB SetupDBM where
+  getSQLDB = fmap sqlDB get
+
+instance RBDB.HasRedisBlockDB SetupDBM where
+  getRedisBlockDB = fmap redisDB get
+
+{-
+connStr :: ConnectionString
+connStr = "host=localhost dbname=eth user=postgres password=api port=5432"
+-}
+
+defaultSqlConfig  ::  SqlConf
+defaultSqlConfig =
+    SqlConf {
+      user = "postgres",
+      password = "api",
+      host = "localhost",
+      port = 5432,
+      database = "eth",
+      poolsize = 10
+    }
+
+defaultKafkaConfig  ::  KafkaConf
+defaultKafkaConfig = KafkaConf {
+  kafkaHost = "localhost",
+  kafkaPort = 9092
+  }
+
+defaultLevelDBConfig  ::  LevelDBConf
+defaultLevelDBConfig =
+    LevelDBConf {
+      table = "",
+      path = ""
+    }
+
+defaultBlockConfig  ::  BlockConf
+defaultBlockConfig =
+    BlockConf {
+      blockTime = 13,
+      minBlockDifficulty = 131072
+    }
+
+defaultPrivKey  ::  PrivKey
+defaultPrivKey = PrivKey 0
+
+defaultEthUniqueId  ::  EthUniqueId
+defaultEthUniqueId =
+    EthUniqueId {
+      peerId = "",
+      genesisHash = "",
+      networkId = 0
+    }
+
+defaultQuarryConfig  ::  QuarryConf
+defaultQuarryConfig =
+    QuarryConf {
+      coinbaseAddress = "ab",
+      lazyBlocks = False
+    }
+
+
+defaultDiscoveryConfig  ::  DiscoveryConf
+defaultDiscoveryConfig =
+    DiscoveryConf {
+      discoveryPort=30303,
+      minAvailablePeers=100
+    }
+
+defaultRedisBlockDBConfig  ::  RedisBlockDBConf
+defaultRedisBlockDBConfig = RedisBlockDBConf {
+    redisHost           = flags_redisHost,
+    redisPort           = flags_redisPort,
+    redisAuth           = Nothing,
+    redisDBNumber       = flags_redisDBNumber,
+    redisMaxConnections = 10,
+    redisMaxIdleTime    = 30
+    }
+
+defaultConfig  ::  EthConf
+defaultConfig =
+    EthConf {
+      ethUniqueId        = defaultEthUniqueId,
+      privKey            = defaultPrivKey,
+      sqlConfig          = defaultSqlConfig,
+      redisBlockDBConfig = defaultRedisBlockDBConfig,
+      levelDBConfig      = defaultLevelDBConfig,
+      kafkaConfig        = defaultKafkaConfig,
+      blockConfig        = defaultBlockConfig,
+      quarryConfig       = defaultQuarryConfig,
+      discoveryConfig    = defaultDiscoveryConfig,
+      statsConfig        = statsConfig'
+    }
+
+    where statsConfig' = if flags_statsEnable
+                         then Just (defaultStatsConf { statsHost          = flags_statsHost
+                                                     , statsPort          = flags_statsPort
+                                                     , statsFlushInterval = flags_statsFlush
+                                                     , statsPrefix        = flags_statsPrefix
+                                                     , statsSuffix        = flags_statsSuffix
+                                                     })
+                         else Nothing
+
+defaultPeers :: [(String,Int)]
+defaultPeers =
+  [
+    --("127.0.0.1", 30303),
+    --("52.87.251.111", 30303)   -- stratodev.blockapps.net
+  ]
+
+createKafkaTopic  ::  TopicName -> IO ()
+createKafkaTopic topic = do
+  result <- runKafka (mkKafkaState "strato-setup" (fromString flags_kafkahost, 9092)) $ updateMetadata topic
+  case result of
+   Left err -> error $ "error connecting to kafka at host '" ++ flags_kafkahost ++ "': " ++ show err
+   _        -> return ()
+
+topics  ::  [String]
+topics = [ "unminedblock"
+         , "statediff"
+         , "seqevents"
+         , "unseqevents"
+         , "jsonrpcresponse"
+         , "indexevents"
+         , "block" -- todo: delet this.
+         ]
+
+genesisFiles :: [(FilePath, B.ByteString)]
+genesisFiles = $(embedDir "genesisBlocks")
+
+addStandardGenesisBlockIfNeeded :: String->IO ()
+addStandardGenesisBlockIfNeeded genesisBlockName = do
+  let genesisFileName = genesisBlockName ++ "Genesis.json"
+
+      maybeContents = lookup genesisFileName genesisFiles
+
+  exists <- doesFileExist genesisFileName
+
+  case (exists, maybeContents) of
+   (True, _) -> return ()
+   (_, Just contents) -> B.writeFile genesisFileName contents
+   _ -> error $ "Search for genesis file has failed.  You need to supply a file named '" ++ genesisFileName ++ "'"
+
+{-
+  CONFIG:
+
+  oneTimeSetup now creates .ethereumH and moves config files into it.
+  It then creates the databases namespaced by UUIDs. We could probably use local paths here,
+  but those strings might get annoyingly long.
+
+  To be safe, this operation should be idempotent. Thus we check for the presence of ~/.ethereumH.
+
+  Preconditions: installed LevelDB, Postgres, Kafka, Redis.
+-}
+
+oneTimeSetup  ::  String -> IO ()
+oneTimeSetup genesisBlockName = do
+  dirExists <- doesDirectoryExist ".ethereumH"
+
+  if dirExists
+    then do
+        putStrLn ".ethereumH exists, unsafe to run setup"
+        return ()
+    else do
+      let bootnodes = case (flags_addBootnodes, flags_stratoBootnode) of
+                     (False, _)      -> Nothing
+                     (True, [])      -> Just []
+                     (True, [""])    -> Just []
+                     (True, ipAddrs) -> Just ipAddrs
+      liftIO $ putStrLn $ CL.red ">>>> Bootnodes: " ++ show bootnodes
+
+     {- CONFIG create default config files -}
+
+      addStandardGenesisBlockIfNeeded genesisBlockName
+
+      putStrLn "writing config"
+
+      maybePGuser <- case flags_pguser of
+             "" -> do putStrLn "using default postgres user: postgres"
+                      return (Just "postgres")
+             user' -> return (Just user')
+
+      maybePGhost <- case flags_pghost of
+             "" -> do putStrLn "using default postgres host: localhost"
+                      return (Just "localhost")
+             host' -> return (Just host')
+
+      maybePGpass <- case flags_password of
+             ""   -> error "specify password for postgres user: "
+             pass -> return (Just pass)
+
+      kafkaHostFlag <- case flags_kafkahost of
+             "" -> do putStrLn "using default kafka host: localhost"
+                      return "localhost"
+             host' -> return host'
+
+      bytes <- getEntropy 20
+
+      createDirectoryIfMissing True $ dbDir "h"
+
+
+
+      let user'' =  case maybePGuser of
+                        Nothing  -> "postgres"
+                        Just ""  -> "postgres"
+                        Just usr -> usr
+
+          cfg = defaultConfig {
+                    sqlConfig = defaultSqlConfig {
+                        user     = user'',
+                        host     = fromMaybe "localhost" maybePGhost,
+                        password = fromMaybe "" maybePGpass
+                    },
+                    blockConfig = defaultBlockConfig {
+                        blockTime          = flags_blockTime,
+                        minBlockDifficulty = flags_minBlockDifficulty
+                    },
+                    quarryConfig = defaultQuarryConfig {
+                        lazyBlocks = flags_lazyblocks
+                    }
+                }
+
+     {- CONFIG: create database and write default config files, including strato-api -}
+
+      randomPrivKey <- generatePrivKey
+      let uniqueString = C.unpack . B16.encode $ bytes
+          pgCfg = sqlConfig cfg
+          pgCfg' = pgCfg { database = "" }
+          db = database pgCfg
+          db' = db ++ "_" ++ uniqueString
+          pgCfg'' = pgCfg { database = db' }
+          pgConn' = postgreSQLConnectionString pgCfg'
+          pgConnGlobal = postgreSQLConnectionString pgCfg { database = "blockchain" }
+          kafkaCfg = defaultKafkaConfig { kafkaHost = kafkaHostFlag }
+
+          cfg' = cfg {
+                   privKey = randomPrivKey,
+                   sqlConfig = pgCfg'',
+                   kafkaConfig = kafkaCfg,
+                   ethUniqueId = defaultEthUniqueId {
+                     peerId = uniqueString
+                   }
+                 }
+
+      inflateDir stratoAPICerts
+      inflateDir stratoAPIStaticDir
+      inflateDir stratoAPIConfigDir
+
+      putStrLn $ CL.red "WARNING: the private key for this strato node is being written to the file .ethereumH/ethconf.yaml.  Please keep it secure; anyone who reads it will become you."
+      encodeFile (".ethereumH" </> "ethconf.yaml") cfg'
+      encodeFile (".ethereumH" </> "peers.yaml") defaultPeers
+
+      {- CONFIG: register this blockchain with the global database -}
+
+      currPath <- getCurrentDirectory
+
+      Blockchain.migrateDB pgConnGlobal
+      _ <- insertBlockchain pgConnGlobal currPath uniqueString
+
+      {- CONFIG: Create the local database -}
+
+      liftIO $ putStrLn $ CL.yellow ">>>> Creating Database " ++ db'
+      liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show pgConn'
+
+      let query = T.pack $ "CREATE DATABASE " ++ show db' ++ ";"
+
+      runNoLoggingT $ withPostgresqlConn pgConn' $ runReaderT $ rawExecute query []
+
+      {- CONFIG: create kafka topics -}
+
+      let uniqueTopicMap = Map.fromList [(topic, topic ++ "_" ++ uniqueString) | topic <- topics]
+      encodeFile (".ethereumH" </> "topics.yaml") uniqueTopicMap
+
+      {- kafkaTopics implicitly defined by ethconf.yaml above & unsafePerformIO -}
+
+      forM_ kafkaTopics $ createKafkaTopic . fromString
+
+      liftIO $ threadDelay 1000000 --Kafka needs this delay after creating topics!  Without this, when we send a message the program will crash for a short duration.  The choice of 1 second is empirically determined, if we are unlucky the number may need to be higher on other machines.
+
+     {- CONFIG: define tables and indices -}
+     {- connStr implicitly defined by ethconf.yaml above, & unsafePerformIO -}
+
+      flip runLoggingT printLogMsg $ withPostgresqlConn connStr $ runReaderT $ do
+         liftIO $ putStrLn $ CL.yellow ">>>> Migrating SQL DB"
+         liftIO $ putStrLn $ CL.blue $ "  connection is " ++ show connStr
+
+         runMigration DataDefs.migrateAll
+
+         EthDiscovery.setup bootnodes
+
+         liftIO $ putStrLn $ CL.yellow ">>>> Creating SQL Indexes"
+         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (block_id);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (number);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (hash);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (parent_hash);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (coinbase);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON block_data_ref (total_difficulty);" []
+
+         rawExecute "CREATE INDEX CONCURRENTLY ON address_state_ref (address);" []
+
+         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (from_address);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (to_address);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (block_number);" []
+         rawExecute "CREATE INDEX CONCURRENTLY ON raw_transaction (tx_hash);" []
+
+         rawExecute "CREATE INDEX CONCURRENTLY ON storage (key);" []
+
+         rawExecute "CREATE INDEX CONCURRENTLY ON transaction_result (transaction_hash);" []
+
+     {- create directory and dbs -}
+
+      void . runResourceT $ do
+         liftIO $ putStrLn $ CL.yellow ">>>> Setting UP DB handles"
+
+     {- CONFIG: localized -}
+
+         sdb <- DB.open (dbDir "h" ++ stateDBPath)
+                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+         hdb <- DB.open (dbDir "h" ++ hashDBPath)
+                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+         cdb <- DB.open (dbDir "h" ++ codeDBPath)
+                DB.defaultOptions{DB.createIfMissing=True, DB.cacheSize=1024}
+         let smpdb = MP.MPDB{MP.ldb=sdb, MP.stateRoot=error "stateRoot not defined in oneTimeSetup"}
+
+         pool <- runNoLoggingT $ createPostgresqlPool connStr 20
+
+         redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+
+         void $ flip runStateT (SetupDBs smpdb hdb cdb pool redisBDBPool Map.empty Map.empty) $ do
+           addCode B.empty --blank code is the default for Accounts, but gets added nowhere else.
+           liftIO $ putStrLn $ CL.yellow ">>>> Initializing Genesis Block"
+           case (flags_backupmp, flags_backupblocks) of
+             (False, False) -> initializeGenesisBlock NoBackup genesisBlockName
+             (True, True)   -> error "You can't choose --backupmp and --backupblocks at the same time"
+             (False, True)  -> initializeGenesisBlock BlockBackup genesisBlockName
+             (True, False)  -> initializeGenesisBlock MPBackup genesisBlockName
