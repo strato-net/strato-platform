@@ -24,13 +24,16 @@
 	width: 44%;
 }
 
-.side-items .feature-list {
-	display: table-cell;
-	vertical-align: middle;
+.create-user-form{
+	padding: 0px 16px 0px 16px;
 }
 
 .feature-list {
 	padding-left: 20px !important;
+	display: inline-block;
+	margin: 10px 0px;
+	padding: 0px 0px 15px !important;
+	border-bottom: 1px solid rgba(255,255,255,.3);
 }
 
 .create-user .feature-list,
@@ -38,9 +41,13 @@
 	list-style: none;
 }
 
-.side-items .feature-list li {
-	padding-top: 10px;
-	padding-bottom: 30px;
+
+.create-user .feature-list li {
+	display: block;
+	position: relative;
+	float: left;
+	text-align: center;
+	margin-left: 15px;
 }
 
 .create-user .feature-list li:before {
@@ -50,3 +57,4 @@
 	color: lightgreen;
 	font-size: 20px;
 }
+	

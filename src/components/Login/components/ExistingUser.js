@@ -82,7 +82,7 @@ class ExistingUser extends Component {
           </div>
         </div>
 
-        <div className="pt-dialog-footer text-center">
+        <div className="pt-dialog-footer">
           <div className="pt-dialog-footer-actions">
             <Button onClick={() => {
               mixpanelWrapper.track('create_user_open_click');

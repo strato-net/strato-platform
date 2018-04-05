@@ -43,7 +43,7 @@ class VerifyAccount extends Component {
         <form>
           <div className="pt-dialog-body">
             <div className="pt-form-group">
-              <h5> Alert: A temporary password has been sent to your email address </h5>
+              <center><h5 style={{color: '#00AE52'}}> A temporary password has been sent to your email address </h5></center>
               <div className="pt-form-group pt-intent-danger">
                 <label className="pt-label" htmlFor="input-a">
                   Enter temporary password
@@ -62,8 +62,8 @@ class VerifyAccount extends Component {
               </div>
             </div>
           </div>
-          <div className="pt-dialog-footer text-center">
-            <div className="pt-dialog-footer-actions">
+          <div className="pt-dialog-footer">
+            <div className="pt-dialog-footer-actions button-center">
               <Button onClick={handleSubmit(this.submit)} text="Submit" />
             </div>
           </div>

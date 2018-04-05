@@ -49,7 +49,7 @@ class CreateUser extends Component {
     return (
       <form className="create-user">
         <h4>STRATO is the best way to build blockchain applications</h4>
-        <div className="pt-dialog-body side-items">
+        <div className="pt-dialog-body">
           <ul className="feature-list">
             <li>Deploy dApps in 5 minutes</li>
             <li>Query the blockchain directly </li>
@@ -57,7 +57,7 @@ class CreateUser extends Component {
           </ul>
         </div>
         <div className="pt-dialog-body">
-          <div className="pt-form-group">
+          <div className="pt-form-group create-user-form">
             <div className="pt-form-group pt-intent-danger">
               <label className="pt-label" htmlFor="input-a">
                 Email Address
@@ -84,7 +84,7 @@ class CreateUser extends Component {
         </div>
 
         <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
+          <div className="pt-dialog-footer-actions button-center">
             <Button
               text="Already Have An Account?"
               onClick={() => {

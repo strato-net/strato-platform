@@ -77,6 +77,7 @@ class WalkThrough extends Component {
               this.props.closeWalkThroughOverlay();
             }}
             title={title}
+            style={{width: '768px'}}
             className="pt-dark dialog"
             canOutsideClickClose={false}
             canEscapeKeyClose={this.state.currentModal === "CreateUser"}
