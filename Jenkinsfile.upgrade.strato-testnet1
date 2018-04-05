@@ -37,9 +37,10 @@ pipeline {
               set -x
               bash ./silo/dev-scripts/postgres-backup-restore/backup_dbs.sh
               docker rm -f $(docker ps -aq) || true
+              cp -r ../../../../ba_certs/ssl/* strato-getting-started/ssl/
               cd strato-getting-started
               # BOOT_NODE_HOST is `stratodev.blockapps.net` node here:
-              BOOT_NODE_HOST=52.232.191.102 NODE_HOST=strato-testnet1.eastus2.cloudapp.azure.com authBasic=false ./strato-multinode-run.sh --stable
+              BOOT_NODE_HOST=52.179.13.55 NODE_HOST=testnet1.blockapps.net authBasic=false ssl=true sslCertFileType=pem ./strato-multinode-run.sh --stable
               docker rmi $(docker images -aq) || true #removing unused images only
               docker system prune -f #NOT PRUNING VOLUMES HERE (--volumes)
               docker ps
