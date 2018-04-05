@@ -3,18 +3,19 @@ const bcrypt = require('bcrypt');
 const blockappsRest = require('blockapps-rest').rest;
 const co = require('co');
 const moment = require('moment');
+var rp = require('request-promise');
 
 const appConfig = require('../config/app.config');
 const authHandler = require('../middlewares/authHandler.js');
 const models = require('../models');
 
 
-const sendLoginResponse = function(res, user) {
+const sendLoginResponse = function (res, user) {
   let tokenData;
   try {
     tokenData = authHandler.issue(user);
   }
-  catch(err) {
+  catch (err) {
     return next(err);
   }
 
@@ -29,7 +30,7 @@ const sendLoginResponse = function(res, user) {
     }
   );
 
-  res.status(200).json({user: user.toJson()});
+  res.status(200).json({ user: user.toJson() });
 };
 
 module.exports = {
@@ -46,7 +47,7 @@ module.exports = {
 
     // Check if password provided for the user is correct
     models.User.findOne({
-      where: {username: username},
+      where: { username: username },
       include: [{
         model: models.Role,
       }]
@@ -81,7 +82,7 @@ module.exports = {
     });
   },
 
-  create: function(req, res, next) {
+  create: function (req, res, next) {
     co(function* () {
       const username = req.body.username;
       const password = req.body.password;
@@ -92,8 +93,8 @@ module.exports = {
         return next(err);
       }
 
-      if (username.length < 2 || username.length > 15) {
-        let err = new Error("Username must be at least 2 characters and 15 characters max");
+      if (username.length < 2 || username.length > 320) {
+        let err = new Error("Username must be at least 2 characters and 320 characters max");
         err.status = 400;
         return next(err);
       }
@@ -134,7 +135,7 @@ module.exports = {
       let blocUser;
       try {
         blocUser = yield blockappsRest.createUser(username, password, true);
-      } catch(blocError) {
+      } catch (blocError) {
         newUser.destroy();
         // TODO: check error type (some of them might be expected - not 500) - see Bloc errors.
         let err = new Error('could not create bloc account: ', blocError);
@@ -144,9 +145,104 @@ module.exports = {
 
       // Set the account address to user in db
       newUser.accountAddress = blocUser.address;
-      yield newUser.save({fields: ['accountAddress']});
+      yield newUser.save({ fields: ['accountAddress'] });
 
       sendLoginResponse(res, newUser);
+    });
+  },
+
+  verifyEmail: function (req, res, next) {
+    co(function* () {
+      const email = req.body.email;
+      if (!email) {
+        let err = new Error("wrong params, expected: {email, nodeIP}");
+        err.status = 400;
+        return next(err);
+      }
+
+      const user = yield models.User.findOne({ where: { username: email } });
+      if (user) {
+        const authErrorText = "User already exists";
+        let err = new Error(authErrorText);
+        err.status = 401;
+        return next(err);
+      }
+
+      const options = {
+        method: 'POST',
+        uri: `${appConfig.signup}/verify-email`,
+        body: {
+          email,
+          nodeIP: process.env.NODE_HOST
+        },
+        json: true
+      };
+      rp(options)
+        .then(response => {
+          if (!response.hash) {
+            const authErrorText = "The email does not exist";
+            let err = new Error(authErrorText);
+            err.status = 401;
+            return next(err);
+          }
+          return models.temp_user.create({ email: email, password: response.hash })
+            .then(password => res.status(200).json({ exists: true }))
+            .catch(error => {
+              if (error.name === "SequelizeUniqueConstraintError") {
+                return models.temp_user.update({ password: response.hash }, { where: { email } })
+                  .then(password => res.status(200).json({ exists: true }))
+                  .catch(updateError => { throw updateError })
+              }
+              throw error;
+            })
+        })
+        .catch(error => {
+          let err = new Error('Could not verify user');
+          err.status = 500;
+          return next(err);
+        })
+    });
+  },
+
+  verifyTemporaryPassword: function (req, res, next) {
+    co(function* () {
+      const email = req.body.email;
+      const password = req.body.tempPassword;
+
+      if (!email || !password) {
+        let err = new Error('wrong params, expected: {email, password}');
+        err.status = 400;
+        return next(err);
+      }
+
+      try {
+        let user = yield models.temp_user.find({ where: { email: email } });
+
+        if (user) {
+          return bcrypt.compare(password, user.password, function (err, response) {
+            if (err) {
+              let err = new Error('Your temporary password is incorrect');
+              err.status = 500;
+              return next(err);
+            }
+            if (response)
+              return res.status(200).json({ success: true, error: null });
+
+            let error = new Error('Your temporary password is incorrect');
+            error.status = 401;
+            return next(error);
+          });
+        }
+        else {
+          let err = new Error("Couldn't find user");
+          err.status = 401;
+          return next(err);
+        }
+      } catch (error) {
+        let err = new Error('Your temporary password is incorrect');
+        err.status = 401;
+        return next(err);
+      }
     });
   }
 };
