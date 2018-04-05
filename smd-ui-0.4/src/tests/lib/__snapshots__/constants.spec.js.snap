@@ -1,0 +1,12 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lib: constants have proper structure 1`] = `
+Object {
+  "babbage": "1000000",
+  "einstein": "1000000000000000000000",
+  "ether": "1000000000000000000",
+  "finney": "1000000000000000",
+  "szabo": "1000000000000",
+  "wei": "1",
+}
+`;

@@ -62,7 +62,7 @@ postgrest:
 
 smd:
 	@echo building smd...
-	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui-0.4/ --file=Basilbuild
 
 docker-compose:
 	@echo Now generating docker-compose yml files...

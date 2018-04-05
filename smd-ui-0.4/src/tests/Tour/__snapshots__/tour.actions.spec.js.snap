@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Tour: actions end all tours 1`] = `
+Object {
+  "type": "END_ALL_TOURS",
+}
+`;
+
+exports[`Tour: actions end tour 1`] = `
+Object {
+  "name": "dashboard",
+  "type": "END_TOUR",
+}
+`;
+
+exports[`Tour: actions stop all tours from autostarting 1`] = `
+Object {
+  "type": "STOP_ALL_TOUR_AUTOSTARTS",
+}
+`;
+
+exports[`Tour: actions stop auto tour start 1`] = `
+Object {
+  "name": "dashboard",
+  "type": "STOP_TOUR_AUTOSTART",
+}
+`;
