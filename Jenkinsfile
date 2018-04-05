@@ -102,7 +102,13 @@ pipeline {
     stage('E2E-Test') {
       steps {
         sh '''#!/bin/bash -le
+<<<<<<< HEAD
+          echo 'Running e2e tests from silo/tests'
+          ./test-instance.sh
+
+=======
           set -x
+>>>>>>> master
           echo 'Running BlockApps BA deploy script and tests to verify the build to be healthy'
           rm -rf blockapps-ba
           git clone https://github.com/blockapps/blockapps-ba.git

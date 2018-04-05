@@ -77,7 +77,7 @@ deployments:
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
-    ref: master
+    ref: tsm-master
     compose:
       restart: always
       depends_on:
@@ -100,7 +100,7 @@ deployments:
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
-    ref: master
+    ref: transaction-state-management
     compose:
       restart: always
       depends_on:

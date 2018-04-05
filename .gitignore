@@ -10,3 +10,4 @@ repos/
 storage/
 mgit/
 node_modules/
+npm-debug.log
