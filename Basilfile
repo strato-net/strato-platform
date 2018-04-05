@@ -226,6 +226,7 @@ deployments:
 
   - name: kafka
     compose:
+      command: /bin/bash -c 'printf "\noffset.metadata.max.bytes=1048576\nmax.request.size=33554432\nmessage.max.bytes=33554432\n" >> opt/kafka_2.11-0.10.1.0/config/server.properties && supervisord -n'
       image: spotify/kafka:latest
       restart: always
       environment:
