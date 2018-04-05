@@ -32,6 +32,7 @@ import launchPadReducer from './components/LaunchPad/launchPad.reducer';
 import cliReducer from './components/CLI/cli.reducer';
 import walkThroughReducer from './components/WalkThrough/walkThrough.reducer';
 import tokenRequestReducer from './components/TokenRequest/tokenRequest.reducer';
+import verifyAccountReducer from './components/VerifyAccount/verifyAccount.reducer';
 
 import { watchCommunicateOverSocket } from './sockets/socket.saga'
 import watchFetchBlockData from './components/BlockData/block-data.saga'
@@ -57,6 +58,7 @@ import { watchQueryCirrus, watchQueryCirrusVars } from './components/ContractQue
 import watchSendTokens from './components/Accounts/components/SendTokens/sendTokens.saga';
 import watchFetchApplications from './components/Applications/applications.saga';
 import watchAppUpload from './components/LaunchPad/launchPad.saga';
+import watchVerifyAccount from './components/VerifyAccount/verifyAccount.saga';
 
 import { CREATE_USER_SUCCESS } from './components/CreateUser/createUser.actions';
 
@@ -93,7 +95,8 @@ const rootReducer = combineReducers({
   dashboard: dashboardReducer,
   cli: cliReducer,
   walkThrough: walkThroughReducer,
-  tokenRequest: tokenRequestReducer
+  tokenRequest: tokenRequestReducer,
+  verifyAccount: verifyAccountReducer
 });
 
 const rootSaga = function* startForeman() {
@@ -118,7 +121,8 @@ const rootSaga = function* startForeman() {
     fork(watchFetchApplications),
     fork(watchAppUpload),
     fork(watchCommunicateOverSocket),
-    fork(watchFetchUser)
+    fork(watchFetchUser),
+    fork(watchVerifyAccount)
   ])
 };
 

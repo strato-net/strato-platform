@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { createUser } from './createUser.actions';
-import { openLoginOverlay } from '../User/user.actions';
+import { openLoginOverlay, firstTimeLogin } from '../User/user.actions';
 import { Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -30,11 +30,11 @@ class CreateUser extends Component {
   }
 
   submit = (values) => {
-    const errors = validate(values);
-    this.setState({ errors, serverError: null });
+    let errors = validate(values);
+    this.setState({ errors });
+
     if (JSON.stringify(errors) === JSON.stringify({})) {
-      mixpanelWrapper.track('create_user_submit_click');
-      this.props.createUser(values.username, values.password);
+      this.props.firstTimeLogin(values.email);
     }
   }
 
@@ -49,7 +49,7 @@ class CreateUser extends Component {
     return (
       <form className="create-user">
         <h4>STRATO is the best way to build blockchain applications</h4>
-        <div className="pt-dialog-body side-items">
+        <div className="pt-dialog-body">
           <ul className="feature-list">
             <li>Deploy dApps in 5 minutes</li>
             <li>Query the blockchain directly </li>
@@ -57,58 +57,21 @@ class CreateUser extends Component {
           </ul>
         </div>
         <div className="pt-dialog-body">
-          <div className="pt-form-group">
+          <div className="pt-form-group create-user-form">
             <div className="pt-form-group pt-intent-danger">
               <label className="pt-label" htmlFor="input-a">
-                Username
+                Email Address
               </label>
               <div className="pt-form-content">
                 <Field
-                  name="username"
+                  name="email"
+                  className="pt-input form-width smd-full-width"
+                  placeholder="Email Address"
                   component="input"
-                  type="text"
-                  placeholder="Username"
-                  className="pt-input form-width"
-                  tabIndex="1"
+                  type="email"
                   required
-                />
-                <div className="pt-form-helper-text">{this.errorMessageFor('username')}</div>
-              </div>
-            </div>
-
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Password
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="password"
-                  component="input"
-                  type="password"
-                  placeholder="Password"
-                  className="pt-input form-width"
-                  tabIndex="2"
-                  required
-                />
-                <div className="pt-form-helper-text">{this.errorMessageFor('password')}</div>
-              </div>
-            </div>
-
-            <div className="pt-form-group pt-intent-danger">
-              <label className="pt-label" htmlFor="input-b">
-                Confirm Password
-              </label>
-              <div className="pt-form-content">
-                <Field
-                  name="confirm_password"
-                  component="input"
-                  type="password"
-                  placeholder="Confirm Password"
-                  className="pt-input form-width"
-                  tabIndex="3"
-                  required
-                />
-                <div className="pt-form-helper-text">{this.errorMessageFor('confirm_password')}</div>
+                /> <br />
+                <span className="error-text">{this.errorMessageFor('email')}</span>
               </div>
             </div>
           </div>
@@ -121,7 +84,7 @@ class CreateUser extends Component {
         </div>
 
         <div className="pt-dialog-footer">
-          <div className="pt-dialog-footer-actions">
+          <div className="pt-dialog-footer-actions button-center">
             <Button
               text="Already Have An Account?"
               onClick={() => {
@@ -132,7 +95,8 @@ class CreateUser extends Component {
             <Button
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
-              text="Create STRATO ID"
+              text="Submit"
+              type="submit"
               disabled={this.props.spinning}
             />
           </div>
@@ -153,22 +117,12 @@ export function mapStateToProps(state) {
 
 export function validate(values) {
   const errors = {};
-  if (!values.username) {
-    errors.username = "Username Required";
-  } else if (values.username.length < 2 || values.username.length > 15) {
-    errors.username = "Username must be at least 2 characters and 15 characters max";
+  if (!values.email) {
+    errors.email = 'Please enter a email address';
+  } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(values.email)) {
+    errors.email = 'Please enter a valid email address';
   }
-  if (!values.password) {
-    errors.password = "Password Required";
-  } else if (values.password.length < 6) {
-    errors.password = "Password must be at least 6 characters";
-  }
-  if (!values.confirm_password) {
-    errors.confirm_password = "Must Confirm Password";
-  }
-  if (values.password !== values.confirm_password) {
-    errors.confirm_password = "Passwords Do Not Match";
-  }
+
   return errors;
 }
 
@@ -179,7 +133,8 @@ const connected = connect(
     createUser,
     openWalkThroughOverlay,
     closeWalkThroughOverlay,
-    openLoginOverlay
+    openLoginOverlay,
+    firstTimeLogin
   }
 )(formed);
 

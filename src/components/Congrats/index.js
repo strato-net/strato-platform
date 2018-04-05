@@ -1,24 +1,17 @@
 import React from 'react';
-import { AnchorButton, Button, Intent } from '@blueprintjs/core';
+import { Button } from '@blueprintjs/core';
 import './congrats.css'
 
 const Congrats = (props) => {
   return (<div>
     <div className="pt-dialog-body congrats-container">
-      <h2>Congratulations!</h2>
-      <p>You’re ready to start building apps - visit our developers website for more information.</p>
+      <h2>Great work!</h2>
+      <p>Your account has been funded with 1000 STRATO tokens.</p>
     </div>
     <div className="pt-dialog-footer">
-      <div className="pt-dialog-footer-actions">
-        <Button text="Back"
-          onClick={props.handleBack}
-        />
-        <AnchorButton
-          intent={Intent.PRIMARY}
-          href="https://developers.blockapps.net/advanced/launch-dapp/"
-          target="_blank"
-          onClick={props.closeWalkThroughOverlay}
-          text="Get Started"
+      <div className="pt-dialog-footer-actions button-center">
+        <Button text="Continue"
+          onClick={props.handleContinue}
         />
       </div>
     </div>

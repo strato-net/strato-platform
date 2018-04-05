@@ -5,24 +5,22 @@ import { reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { faucetRequest } from '../Accounts/accounts.actions';
 import CLI from '../CLI';
 import CreateUser from '../CreateUser';
 import Stepper from '../Stepper';
 import Congrats from '../Congrats';
-import Faucet from '../Faucet';
+import VerifyAccount from '../VerifyAccount';
+import CreatePassword from '../CreatePassword';
 import './walkThrough.css';
+import { faucetRequest } from '../Accounts/accounts.actions';
 
 class WalkThrough extends Component {
   constructor(props) {
     super(props);
     this.state = {
       currentModal: 'CreateUser',
-      step: 0,
-      isBackClicked: false,
+      step: 0
     }
-    this.handleBackToFaucet = this.handleBackToFaucet.bind(this);
-    this.handleEmailSentClick = this.handleEmailSentClick.bind(this);
   }
 
   componentDidMount() {
@@ -32,27 +30,42 @@ class WalkThrough extends Component {
   componentWillReceiveProps(nextProps) {
     if (this.state.currentModal !== 'CreateUser' && !nextProps.isLoggedIn)
       this.setState({ currentModal: 'CreateUser', step: 0 });
+    if (nextProps.firstTimeUser)
+      this.setState({ currentModal: 'VerifyAccount', step: 1 });
+    if (nextProps.isTempPasswordVerified)
+      this.setState({ currentModal: 'CreatePassword', step: 2 });
     if (!this.props.isLoggedIn && nextProps.isLoggedIn)
-      this.setState({ currentModal: 'Faucet', step: 1 });
+      this.setState({ currentModal: 'Completed', step: 3 });
   }
 
-  handleBackToFaucet() {
-    this.setState({ currentModal: "Faucet", step: 1, isBackClicked: true });
-  }
-
-  handleEmailSentClick() {
-    mixpanelWrapper.track('faucet_close_click');
-    this.setState({ currentModal: "CLI", step: 2, isBackClicked: false });
-    // Faucet account using jwt tobe done
-    this.props.faucetRequest(this.props.currentUser.accountAddress);
+  dialogContent() {
+    switch (this.state.currentModal) {
+      case "CreateUser":
+        return <CreateUser />
+      case "VerifyAccount":
+        return <VerifyAccount />
+      case "CreatePassword":
+        return <CreatePassword />
+      case "CLI":
+        return <CLI
+          closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} />
+      default:
+        return <Congrats
+          handleContinue={() => {
+            this.setState({ currentModal: "CLI", step: 4 })
+            this.props.faucetRequest(this.props.currentUser.accountAddress);
+          }} />
+    }
   }
 
   render() {
     let title;
     if (this.state.currentModal === "CreateUser")
-      title = 'Create STRATO Developer ID';
-    else if (this.state.currentModal === "Faucet")
-      title = 'Request Tokens';
+      title = 'Create STRATO Developer Email';
+    else if (this.state.currentModal === "VerifyAccount")
+      title = 'Password Verification';
+    else if (this.state.currentModal === "CreatePassword")
+      title = 'Set Permanent Password'
     else if (this.state.currentModal === "CLI")
       title = 'Download CLI Tool';
     else
@@ -68,32 +81,14 @@ class WalkThrough extends Component {
               this.props.closeWalkThroughOverlay();
             }}
             title={title}
+            style={{ width: '768px' }}
             className="pt-dark dialog"
             canOutsideClickClose={false}
             canEscapeKeyClose={this.state.currentModal === "CreateUser"}
             isCloseButtonShown={this.state.currentModal === "CreateUser"}
           >
             <Stepper step={this.state.step} />
-            {this.state.currentModal === "CreateUser" && <CreateUser />}
-
-            {this.state.currentModal === "Faucet" && <Faucet
-              errors={this.props.errors}
-              handleSubmit={this.props.handleSubmit}
-              submitting={this.props.submitting}
-              faucetRequest={this.props.faucetRequest}
-              currentUser={this.props.currentUser}
-              handleEmailSentClick={this.handleEmailSentClick}
-              isWalkThrough
-              isBackClicked={this.state.isBackClicked}
-            />}
-
-            {this.state.currentModal === "CLI" && <CLI handleBack={this.handleBackToFaucet} handleContinue={
-              () => this.setState({ currentModal: "Completed", step: 3 })} />}
-
-            {this.state.currentModal === "Completed" &&
-              <Congrats closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} handleBack={
-                () => this.setState({ currentModal: "CLI", step: 2 })} />}
-
+            {this.dialogContent()}
           </Dialog>
         </form>
       </div>
@@ -111,6 +106,8 @@ export function mapStateToProps(state) {
     isWalkThroughOpen: state.walkThrough.isWalkThroughOpen,
     currentUser: state.user.currentUser,
     isLoggedIn: state.walkThrough.isLoggedIn,
+    firstTimeUser: state.user.firstTimeUser,
+    isTempPasswordVerified: state.verifyAccount.isTempPasswordVerified,
     ...errors
   };
 }
