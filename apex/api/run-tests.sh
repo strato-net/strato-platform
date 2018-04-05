@@ -13,7 +13,6 @@ if [ "$NODE_ENV" == development ]; then
   export SINGLE_NODE=true
   export NODE_HOST=localhost
   export stratoRoot=http://localhost/strato-api/eth/v1.2/
-  export cirrusRoot=http://localhost/cirrus
 
   export PG_HOST=localhost
   export PG_PORT=9090
@@ -46,9 +45,6 @@ fi
 
 # For jenkins, we expect a running environment
 if [ "$NODE_ENV" == test ]; then
-  echo "stratoRoot is ${stratoRoot}"
   export stratoRoot="http://${stratoHost}/eth/v1.2"
-  echo "stratoRoot and now is ${stratoRoot}"
-  echo "cirrusRoot and now is ${cirrusRoot}"
   ./node_modules/mocha/bin/mocha --config=config-prod.yaml test/
 fi
