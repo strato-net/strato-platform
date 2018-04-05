@@ -4,9 +4,11 @@ set -e
 set -x
 
 stratoRoot=http://${stratoHost}/eth/v1.2
+cirrusRoot=http://${cirrusHost}
 
 echo "Environment variables:
 stratoHost=${stratoHost}
+cirrusHost=${cirrusHost}
 --stratourl=stratoRoot=${stratoRoot}
 --pghost=postgres_host=${postgres_host}
 --pgport=postgres_port=${postgres_port}
@@ -39,4 +41,4 @@ done
 $stratoserver &
 
 $blocserver --pghost="$postgres_host" --pgport="$postgres_port" --pguser="$postgres_user" --password="$postgres_password" \
-            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" 2>&1
+            --stratourl="$stratoRoot" --loglevel="${loglevel:-4}" --cirrusurl="$cirrusRoot" 2>&1
