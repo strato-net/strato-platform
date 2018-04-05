@@ -82,7 +82,7 @@ class CreatePassword extends Component {
           </div>
           <div className="pt-dialog-footer text-center">
             <div className="pt-dialog-footer-actions button-center">
-              <Button onClick={handleSubmit(this.submit)} text="Submit" />
+              <Button onClick={handleSubmit(this.submit)} text="Submit" type="submit" />
             </div>
           </div>
         </form>

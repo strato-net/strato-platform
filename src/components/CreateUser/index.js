@@ -96,6 +96,7 @@ class CreateUser extends Component {
               intent={Intent.PRIMARY}
               onClick={this.props.handleSubmit(this.submit)}
               text="Submit"
+              type="submit"
               disabled={this.props.spinning}
             />
           </div>
