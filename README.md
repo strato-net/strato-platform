@@ -15,7 +15,7 @@ curl -sSL https://get.haskellstack.org/ | sh
 #### Ubuntu/debian:
 
 ```
-sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf
+sudo apt-get install cmake libboost-all-dev libpq-dev libsodium-dev autoconf libleveldb-dev
 ```
 
 #### Mac people:
