@@ -1,12 +1,12 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module BlockApps.Solidity.Xabi.Def where
 
 import           Control.Lens                 (mapped, (&), (?~))
 import           Data.Aeson
 import           Data.Aeson.TH
-import           Data.Map.Strict              (Map)
 import           Data.Swagger
 import           Data.Text                    (Text)
 import           Generic.Random.Generic
@@ -21,7 +21,7 @@ defAesonOptions :: Options
 defAesonOptions = defaultOptions{sumEncoding=defaultTaggedObject{tagFieldName="type"}}
 
 data Def = Enum { names::[Text], bytes::Word }
-         | Struct { fields::Map Text Xabi.FieldType, bytes::Word }
+         | Struct { fields::[(Text, Xabi.FieldType)], bytes::Word }
          | Contract { bytes::Word }
          deriving (Eq, Show, Generic)
 

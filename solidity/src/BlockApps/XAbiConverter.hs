@@ -8,6 +8,7 @@ module BlockApps.XAbiConverter where
 import qualified Data.Bimap                        as Bimap
 import           Data.List
 import qualified Data.Map                          as Map
+import qualified Data.Map.Ordered                  as OMap
 import           Data.Maybe
 import           Data.Text                         (Text)
 import qualified Data.Text                         as Text
@@ -34,7 +35,7 @@ fieldsToStruct typeDefs' vars =
                                  $ map snd vars
   in
    Struct {
-     fields=Map.fromList
+     fields=OMap.fromList
             $ zipWith (\(n, t) p -> (n, (p, t))) vars positions,
      size = fromIntegral $ 32 * Storage.offset positionAfter + fromIntegral (Storage.byte positionAfter)
      }
@@ -191,7 +192,7 @@ xabiToTypeDefs typeDefs' xabi@Xabi{..} = do
   let
     xabiEnums = [(enumName, names) |
                  (enumName, XabiDef.Enum{..}) <- Map.toList xabiTypes]
-    xabiStructs = [(structName, Map.toList fields) |
+    xabiStructs = [(structName, fields) |
                    (structName, XabiDef.Struct{..}) <- Map.toList xabiTypes]::[(Text, [(Text, Xabi.FieldType)])]
 
 
@@ -246,9 +247,9 @@ contractToXabi Contract{..} =
                         }
                         
           )
-        | (name, (_, TypeFunction _ args rets)) <- Map.toList $ fields mainStruct
+        | (name, (_, TypeFunction _ args rets)) <- OMap.assocs $ fields mainStruct
         ]
-    vars = filter (not . isFunction . snd . snd) $ Map.toList $ fields mainStruct::[(Text, (Storage.Position, Type))]
+    vars = filter (not . isFunction . snd . snd) $ OMap.assocs $ fields mainStruct::[(Text, (Storage.Position, Type))]
     isFunction::Type->Bool
     isFunction TypeFunction{} = True
     isFunction _ = False

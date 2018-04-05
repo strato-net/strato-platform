@@ -121,7 +121,7 @@ structDeclaration = do
       structName,
       StructDeclaration Xabi.Struct{
         Xabi.fields =
-           Map.fromList $ zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
+           zipWith (\(n, v) i -> (Text.pack n, Xabitype.FieldType i v)) structFields [0..],
         Xabi.bytes = 0
         }
     )

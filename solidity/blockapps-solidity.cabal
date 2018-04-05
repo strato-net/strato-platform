@@ -60,6 +60,7 @@ library
                , logging-effect
                , memory
                , mtl
+               , ordered-containers
                , parsec
                , parsec3-numbers
                , QuickCheck
