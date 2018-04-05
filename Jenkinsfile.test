@@ -53,10 +53,16 @@ pipeline {
             STRATO_GS_MODE=1 \
             docker-compose up -d
           docker ps
+          counter=0
           # Few quick tests
           until curl --silent --output /dev/null --fail --location ${NODE_HOST}/bloc/v2.2/users/
           do
+            if [[ "$counter" -gt 300 ]]; then
+              echo "bloc took longer than 5 minutes to initialize! aborting."
+              exit 73
+            fi
             echo "waiting for bloc to be available through nginx"
+            counter=$((counter+1))
             sleep 1
           done
           echo "bloc is available"
@@ -93,6 +99,24 @@ pipeline {
           #SERVER=localhost npm run deploy
           #sleep 5
           #SERVER=localhost npm run test
+        '''
+      }
+    }
+
+    stage('Monstrato tests') {
+      steps {
+        sh '''#!/bin/bash -le
+          set -x
+          echo "Running monstrato unit tests"
+          if [ ! -d monstrato ]; then
+            git clone https://github.com/blockapps/monstrato
+          fi
+          cd monstrato
+          git remote update origin --prune
+          git checkout $(cd ../repos/monstrato && git rev-parse --abbrev-ref HEAD)
+          git pull
+          stack test strato-init blockapps-data
+          # TODO: We have a running environment, so stack test strato-api should work
         '''
       }
     }

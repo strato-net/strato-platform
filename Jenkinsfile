@@ -9,10 +9,13 @@ pipeline {
     stage('Prepare') {
       steps {
         sh '''#!/bin/bash -le
+          echo "Old flow merge test"
           set -x
           docker rm -f $(docker ps -aq) || true;
           if [ "$BUILD_TYPE" == "quick" ]; then
             docker system prune -f
+            cd silo
+            git pull
           else
             docker system prune -fa
             sudo rm -rf silo

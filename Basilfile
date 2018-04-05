@@ -86,7 +86,7 @@ deployments:
       environment:
         ssl: "${ssl:-false}"
         stratoHost: "strato:3000"
-        cirrusHost: "cirrus:3333"
+        cirrusHost: "cirrus:3333" # to be deleted once the cirrus dependency is fully removed from bloch
         postgres_host: "postgres"
         postgres_port: "5432"
         postgres_user: "postgres"
