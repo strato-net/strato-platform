@@ -28,6 +28,7 @@ packages:
   extra-dep: true
 extra-deps:
   - hflags-0.4.2
+  - ordered-containers-0.1.0
   - saltine-0.0.0.4
   - servant-options-0.1.0.0
   - parsec3-numbers-0.1.0

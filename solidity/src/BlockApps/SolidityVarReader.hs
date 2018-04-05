@@ -31,6 +31,7 @@ import qualified Data.ByteString.Lazy             as BL
 import           Data.LargeWord
 import           Data.List
 import qualified Data.Map                         as Map
+import qualified Data.Map.Ordered                 as OMap
 import           Data.Maybe                       (maybe)
 import           Data.Text                        (Text)
 import qualified Data.Text                        as Text
@@ -253,7 +254,7 @@ decodeValues
   -> Word256
   -> [(Text, Value)]
 decodeValues typeDefs' struct'@Struct{..} storage offset =
-  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (Map.keys fields)
+  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (map (fst . OMap.assocs) fields)
 
 decodeValuesFromList
   :: TypeDefs
@@ -284,7 +285,7 @@ decodeValue
   -> Bool
   -> Text
   -> Maybe Value
-decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case Map.lookup varName fields of
+decodeValue typeDefs' storage offset Struct{..} ofs cnt len varName = case OMap.lookup varName fields of
    Nothing -> Nothing
    Just (position, theType) ->
      Just $ decodeValue' typeDefs' storage ofs cnt len (position `Storage.addOffset` fromIntegral offset) theType
@@ -526,7 +527,7 @@ decodeMapValue
 --decodeMapValue typeDefs' Struct{..} storage mappingName keyName =
 --  undefined typeDefs' storage mappingName keyName
 decodeMapValue typeDefs' Struct{..} storage mappingName keyName = do
-  (position, maybeMappingType) <- Map.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
+  (position, maybeMappingType) <- OMap.lookup mappingName fields `orFail` ("There is no mapping in the contract named '" ++ Text.unpack mappingName ++ "'")
 
   (fromType, toType) <-
     case maybeMappingType of

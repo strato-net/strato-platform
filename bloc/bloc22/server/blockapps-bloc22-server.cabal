@@ -64,6 +64,7 @@ library
                , mtl
                , network
                , opaleye
+               , ordered-containers
                , postgresql-simple
                , process
                , product-profunctors

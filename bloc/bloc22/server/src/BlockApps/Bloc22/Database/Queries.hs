@@ -1356,22 +1356,22 @@ getXabiType typeId = do
       return $ Xabi.Label $ Text.unpack xttd'
     _ -> throwError $ DBError "Could not match type"
 
-getXabiStructFields :: Int32 -> Bloc (Map Text Xabi.FieldType)
+getXabiStructFields :: Int32 -> Bloc [(Text, Xabi.FieldType)]
 getXabiStructFields typeDefId = do
-  fieldsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
+  fieldsWithIds <- blocQuery $ proc () -> do
     (_,name,atbytes,tdid,ftid)
       <- queryTable xabiStructFieldsTable -< ()
     restrict -< tdid .== constant typeDefId
     returnA -< (name,(atbytes,ftid))
-  for fieldsWithIds $ \ (atbytes,ftid) -> do
+  for fieldsWithIds $ \ (name,(atbytes,ftid)) -> do
     ty <- getXabiType ftid
-    return $ Xabi.FieldType atbytes ty
+    return (name, Xabi.FieldType atbytes ty)
 
-insertXabiStructFields :: Int32 ->  Map Text Xabi.FieldType -> Bloc Int64
+insertXabiStructFields :: Int32 ->  [(Text, Xabi.FieldType)] -> Bloc Int64
 insertXabiStructFields typeDefId fields = do
-  fieldsWithIds <- for fields $ \ (Xabi.FieldType atBytes xt) -> do
+  fieldsWithIds <- for fields $ \ (name,(Xabi.FieldType atBytes xt)) -> do
     xtid <- insertXabiType xt
-    return (atBytes,xtid)
+    return (name,(atBytes,xtid))
   blocModify $ \ conn ->
     runInsertMany conn xabiStructFieldsTable
       [ ( Nothing
@@ -1380,7 +1380,7 @@ insertXabiStructFields typeDefId fields = do
         , constant typeDefId
         , constant xtid
         )
-      | (name,(atBytes,xtid)) <- Map.toList fieldsWithIds
+      | (name,(atBytes,xtid)) <- fieldsWithIds
       ]
 
 getXabiEnumNames :: Int32 -> Bloc [Text]
