@@ -10,7 +10,6 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
-import           Control.Monad.IO.Class             (liftIO)
 import           Data.Foldable
 import           Data.Int
 import           Data.LargeWord                  (Word256)
@@ -23,7 +22,6 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import           Numeric
 import           Opaleye
-import           System.Clock
 
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
@@ -86,22 +84,20 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
-    
+
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
-  metadataId <- case contractId of
-    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-
   address <- case contractId of
     Unnamed addr -> return addr
-    Named "Latest" -> blocQuery1 $ proc () -> do
-      (_,cmId',addr,_) <-
-        (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
-          (queryTable contractsInstanceTable) -< ()
-      restrict -< cmId' .== constant (metadataId::Int32)
-      returnA -< addr
+    Named "Latest" -> do
+      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+      blocQuery1 $ proc () -> do
+        (_,cmId',addr,_) <-
+          (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+            (queryTable contractsInstanceTable) -< ()
+        restrict -< cmId' .== constant (metadataId::Int32)
+        returnA -< addr
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
@@ -109,7 +105,7 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
     Nothing -> blocStrato $ getStorage
       storageFilterParams{qsAddress = Just address}
     Just name ->
-      let mRange = decodeStorageKey
+      let ranges = decodeStorageKey
                (typeDefs contract')
                (mainStruct contract')
                [name]
@@ -117,34 +113,25 @@ getContractsState contract@(ContractName contractName) contractId mName mCount m
                mOffset
                mCount
                mLength
-      in case mRange of
-        Nothing -> return []
-        Just range -> getStorageRange address range
+      in join <$> mapM (getStorageRange address) ranges
 
   let storage = translateStorageMap storage'
 
   ret <- case mName of
-        Nothing ->
-          let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
-              solVals = map (fmap valueToSolidityValue) vals
-          in return solVals
-        Just name ->
-          let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
-              solVals = map (fmap valueToSolidityValue) vals
-          in return solVals
+    Nothing ->
+      let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
+          solVals = map (fmap valueToSolidityValue) vals
+      in return solVals
+    Just name ->
+      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
+          solVals = map (fmap valueToSolidityValue) vals
+      in return solVals
 
   logWith logNotice $ Text.unlines
     [ "Storage:"
     , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
     , "End of storage"
     ]
-  logWith logDebug $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
-  logWith logDebug $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
-  logWith logDebug $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
-  logWith logDebug $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
-  logWith logDebug $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
-  logWith logDebug $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
-  
   return $ Map.fromList ret
   where
     getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
