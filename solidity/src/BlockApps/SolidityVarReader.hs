@@ -213,7 +213,7 @@ decodeStorageKey
   -> [(Word256, Word256)]
 decodeStorageKey _ _ [] _ _ _ _ = []
 decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len =
-  case Map.lookup varName (fields struct') of
+  case OMap.lookup varName (fields struct') of
     Nothing -> []
     Just (Storage.Position{..}, theType) ->
       case theType of
@@ -254,7 +254,7 @@ decodeValues
   -> Word256
   -> [(Text, Value)]
 decodeValues typeDefs' struct'@Struct{..} storage offset =
-  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (map (fst . OMap.assocs) fields)
+  decodeValuesFromList typeDefs' struct' storage offset Nothing Nothing False (map fst $ OMap.assocs fields)
 
 decodeValuesFromList
   :: TypeDefs
