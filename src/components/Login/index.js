@@ -2,12 +2,11 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { login, openLoginOverlay, closeLoginOverlay, resetError } from '../User/user.actions';
-import { Dialog, Tabs2, Tab2 } from '@blueprintjs/core';
+import { Dialog } from '@blueprintjs/core';
 import './Login.css';
 import { launchApp, resetSelectedApp } from '../Applications/applications.actions';
 import { toasts } from "../Toasts";
 import ExistingUser from './components/ExistingUser';
-import FirstTimeUser from './components/FirstTimeUser';
 
 class Login extends Component {
 
@@ -51,20 +50,7 @@ class Login extends Component {
             title="Login"
             className="pt-dark"
           >
-            <div className="pt-dialog-header login-tabs-header">
-              <Tabs2
-                animate
-                className="login-tabs"
-                onChange={this.handleNavbarTabChange}
-                selectedTabId={this.state.navbarTabId}
-              >
-                <Tab2 id="existingUser" title="Existing User" />
-                <Tab2 id="firstTimeUser" title="First-time User" />
-              </Tabs2>
-            </div>
-            {this.state.navbarTabId === "existingUser"
-              ? <ExistingUser closeLoginOverlay={this.props.closeLoginOverlay} />
-              : <FirstTimeUser closeLoginOverlay={this.props.closeLoginOverlay} />}
+            <ExistingUser closeLoginOverlay={this.props.closeLoginOverlay} />
           </Dialog>
         </form>
       </div>
@@ -75,7 +61,6 @@ class Login extends Component {
 function mapStateToProps(state) {
   return {
     isLoggedIn: state.user.isLoggedIn,
-    from: state.user.from,
     isOpen: state.user.isOpen,
     selectedApp: state.applications.selectedApp,
     serverError: state.user.error,

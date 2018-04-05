@@ -36,7 +36,7 @@ class ExistingUser extends Component {
     }
   }
 
-  render () {
+  render() {
     return (
       <div>
         <div className="pt-dialog-body">

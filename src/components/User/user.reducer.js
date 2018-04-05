@@ -89,16 +89,14 @@ const reducer = function (state = initialState, action) {
         ...state,
         spinning: false,
         firstTimeUser: action.email,
-        error: null,
-        isOpen: false
+        error: null
       }
     case FIRST_TIME_LOGIN_REQUEST_FAILURE:
       return {
         ...state,
         spinning: false,
         firstTimeUser: null,
-        error: action.error,
-        isOpen: true
+        error: action.error
       }
     case RESET_FIRST_TIME_USER:
       return {
