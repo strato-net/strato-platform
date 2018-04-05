@@ -37,7 +37,6 @@ import           Blockchain.Data.AddressStateDB
 import           Blockchain.Data.BlockDB
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.Code
-import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Log
 import qualified Blockchain.Database.MerklePatricia as MP
 import           Blockchain.DB.BlockSummaryDB
@@ -682,6 +681,15 @@ runOperation STATICCALL = do
   push gas
   localState (\vms -> vms {writable=False}) $ runOperation CALL
 
+runOperation REVERT = do
+  address' <- pop
+  size <- pop
+
+  retVal <- unsafeSliceByteString address' size
+
+  setReturnVal $ Just retVal
+  left RevertException
+
 runOperation INVALID = left InvalidInstruction
 
 runOperation SUICIDE = do
@@ -1185,6 +1193,13 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress (Address address') sen
           useGas (- vmGasRemaining finalVMState)
           addToRefund (refund finalVMState)
           return (1, Just retVal)
+        Left RevertException -> do
+          state' <- lift get
+          useGas (- vmGasRemaining finalVMState)
+          when flags_debug $
+            lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ "Reverting, retval: " ++ show (returnVal finalVMState)
+          addToRefund (refund finalVMState)
+          return (0, returnVal finalVMState)
         Left e -> do
           when flags_debug $ lift $ $logInfoS "nestedRun_debugWrapper" $ T.pack $ CL.red $ show e
           return (0, Nothing)
