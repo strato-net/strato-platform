@@ -398,6 +398,10 @@ getStateLocal addr cn TestConfig{..} =
   ( getContractsState
     (ContractName cn)
     (Unnamed addr)
+    Nothing
+    Nothing
+    Nothing
+    False
   )
   (ClientEnv mgr blocUrl)
 

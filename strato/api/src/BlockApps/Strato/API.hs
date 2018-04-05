@@ -83,6 +83,12 @@ type API =
     :> Get '[JSON] TxCount
   :<|> "storage"
     :> QueryParam "address" Address
+    :> QueryParam "key" Natural
+    :> QueryParam "minkey" Natural
+    :> QueryParam "maxkey" Natural
+    :> QueryParam "value" Natural
+    :> QueryParam "minvalue" Natural
+    :> QueryParam "maxvalue" Natural
     :> Get '[JSON] [Storage]
   :<|> "faucet"
     :> ReqBody '[FormUrlEncoded] Address

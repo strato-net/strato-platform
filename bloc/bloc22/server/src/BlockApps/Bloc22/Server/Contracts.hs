@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,9 +10,9 @@ module BlockApps.Bloc22.Server.Contracts where
 import           Control.Arrow
 import           Control.Monad.Except
 import           Control.Monad.Log
-import           Control.Monad.IO.Class             (liftIO)
 import           Data.Foldable
 import           Data.Int
+import           Data.LargeWord                  (Word256)
 import qualified Data.Map.Strict                 as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -21,7 +22,6 @@ import           Data.Time.Clock.POSIX
 import           Data.Traversable
 import           Numeric
 import           Opaleye
-import           System.Clock
 
 import           BlockApps.Bloc22.API.Contracts
 import           BlockApps.Bloc22.API.Utils
@@ -32,8 +32,9 @@ import           BlockApps.Ethereum
 import           BlockApps.Solidity.Contract
 import           BlockApps.Solidity.Xabi
 import           BlockApps.SolidityVarReader
+import           BlockApps.Storage               as S
 import           BlockApps.Strato.Client
-import           BlockApps.Strato.Types
+import           BlockApps.Strato.Types          as T
 import           BlockApps.XAbiConverter
 
 getContracts :: Bloc GetContractsResponse
@@ -66,61 +67,81 @@ getContractsData (ContractName contractName) = blocTransaction $ do
 getContractsContract :: ContractName -> MaybeNamed Address -> Bloc ContractDetails
 getContractsContract = getContractDetails
 
-getContractsState :: ContractName -> MaybeNamed Address -> Bloc GetContractsStateResponses -- state-translation
-getContractsState contract@(ContractName contractName) contractId = do
-  t0 <- liftIO $ getTime Realtime
+translateStorageMap :: [T.Storage] -> S.Storage
+translateStorageMap storage' =
+  let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+      storage k = fromMaybe 0 $ Map.lookup k storageMap
+  in storage
+
+getContractsState :: ContractName
+                  -> MaybeNamed Address
+                  -> Maybe Text
+                  -> Maybe Int
+                  -> Maybe Int
+                  -> Bool
+                  -> Bloc GetContractsStateResponses -- state-translation
+getContractsState contract@(ContractName contractName) contractId mName mCount mOffset mLength = do
   eitherErrorOrContract' <- toUserError
     (Text.pack $ "Couldn't find " ++ Text.unpack contractName ++ " with ID " ++ show contractId)
       $ xAbiToContract <$> getContractXabi contract contractId
-  t1 <- liftIO $ getTime Realtime
-    
+
   contract' <-
     either (throwError . UserError . Text.pack) return eitherErrorOrContract'
 
-  metadataId <- case contractId of
-    Named _ -> blocQuery1 $ getContractsMetaDataId contractName contractId
-    Unnamed contractAddr -> getContractsMetaDataIdExhaustive contractName contractAddr
-
-  t2 <- liftIO $ getTime Realtime
-  
   address <- case contractId of
     Unnamed addr -> return addr
-    Named "Latest" -> blocQuery1 $ proc () -> do
-      (_,cmId',addr,_) <-
-        (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
-          (queryTable contractsInstanceTable) -< ()
-      restrict -< cmId' .== constant (metadataId::Int32)
-      returnA -< addr
+    Named "Latest" -> do
+      metadataId <- blocQuery1 $ getContractsMetaDataId contractName contractId
+      blocQuery1 $ proc () -> do
+        (_,cmId',addr,_) <-
+          (limit 1 . orderBy (desc (\(_,_,_,time) -> time)))
+            (queryTable contractsInstanceTable) -< ()
+        restrict -< cmId' .== constant (metadataId::Int32)
+        returnA -< addr
     Named somethingElse -> blocError $ UserError $
       "Expected address or \"Latest\": saw " <> somethingElse
 
-  t3 <- liftIO $ getTime Realtime
-  
-  storage' <- blocStrato $ getStorage $ Just address
-  
-  t4 <- liftIO $ getTime Realtime
-  
-  let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
-      storage k = fromMaybe 0 $ Map.lookup k storageMap
+  storage' <- case mName of
+    Nothing -> blocStrato $ getStorage
+      storageFilterParams{qsAddress = Just address}
+    Just name ->
+      let ranges = decodeStorageKey
+               (typeDefs contract')
+               (mainStruct contract')
+               [name]
+               0
+               mOffset
+               mCount
+               mLength
+      in join <$> mapM (getStorageRange address) ranges
 
+  let storage = translateStorageMap storage'
 
-      ret = map (fmap valueToSolidityValue) $ decodeValues (typeDefs contract') (mainStruct contract') storage 0
-  
-  t5 <- liftIO $ getTime Realtime
-  
+  ret <- case mName of
+    Nothing ->
+      let vals = decodeValues (typeDefs contract') (mainStruct contract') storage 0
+          solVals = map (fmap valueToSolidityValue) vals
+      in return solVals
+    Just name ->
+      let vals = decodeValuesFromList (typeDefs contract') (mainStruct contract') storage 0 mOffset mCount mLength [name]
+          solVals = map (fmap valueToSolidityValue) vals
+      in return solVals
+
   logWith logNotice $ Text.unlines
     [ "Storage:"
-    , Text.pack $ unlines $ map (\(k, v) -> "  " ++ show k ++ ":" ++ showHex v "") $ Map.toList storageMap
+    , Text.pack $ unlines $ map (\Storage{..} -> "  " ++ show (unHex storageKey) ++ ":" ++ show storageValue) $ storage'
     , "End of storage"
     ]
-  logWith logDebug $ (Text.pack $ "Total time for getState: "  ++ show (toNanoSecs $ t0 - t5))
-  logWith logDebug $ (Text.pack $ "      time for get xabi: "  ++ show (toNanoSecs $ t0 - t1))
-  logWith logDebug $ (Text.pack $ "      time for metadata: "  ++ show (toNanoSecs $ t1 - t2))
-  logWith logDebug $ (Text.pack $ "      time get address : "  ++ show (toNanoSecs $ t2 - t3))
-  logWith logDebug $ (Text.pack $ "      time get storage : "  ++ show (toNanoSecs $ t3 - t4))
-  logWith logDebug $ (Text.pack $ "  time convert storage : "  ++ show (toNanoSecs $ t4 - t5))
-  
   return $ Map.fromList ret
+  where
+    getStorageRange :: Address -> (Word256, Word256) -> Bloc [T.Storage]
+    getStorageRange a (o,c) = do
+      blocStrato $ getStorage
+        storageFilterParams{ qsAddress = Just a
+                           , qsMinKey = Just . fromInteger $ toInteger o
+                           , qsMaxKey = Just . fromInteger $ toInteger (o + c - 1)
+                           }
+
 
 getContractsDetails :: Address -> Bloc ContractDetails
 getContractsDetails contractAddress = do
@@ -173,9 +194,10 @@ getContractsStateMapping contract@(ContractName contractName) contractId (Symbol
               Named somethingElse -> blocError $ UserError $
                                      "Expected address or \"Latest\": saw " <> somethingElse
 
-  storage' <- blocStrato $ getStorage $ Just address
+  storage' <- blocStrato $ getStorage
+    storageFilterParams{qsAddress = Just address}
 
-  let storageMap = Map.fromList $ map (\Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
+  let storageMap = Map.fromList $ map (\T.Storage{..} -> (unHex storageKey, unHex storageValue)) storage'
       storage k = fromMaybe 0 $ Map.lookup k storageMap
       ret = valueToSolidityValue <$> decodeMapValue (typeDefs contract') (mainStruct contract') storage mappingName keyName
 

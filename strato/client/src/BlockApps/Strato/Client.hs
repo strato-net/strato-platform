@@ -9,6 +9,8 @@ module BlockApps.Strato.Client
   , blocksFilterParams
   , AccountsFilterParams (..)
   , accountsFilterParams
+  , StorageFilterParams (..)
+  , storageFilterParams
   , getTxsFilter
   , getTxsLast
   , postTx
@@ -95,6 +97,20 @@ accountsFilterParams :: AccountsFilterParams
 accountsFilterParams = AccountsFilterParams
   Nothing Nothing Nothing Nothing Nothing Nothing Nothing
 
+data StorageFilterParams = StorageFilterParams
+  { qsAddress  :: Maybe Address
+  , qsKey      :: Maybe Natural
+  , qsMinKey   :: Maybe Natural
+  , qsMaxKey   :: Maybe Natural
+  , qsValue    :: Maybe Natural
+  , qsMinValue :: Maybe Natural
+  , qsMaxValue :: Maybe Natural
+  }
+
+storageFilterParams :: StorageFilterParams
+storageFilterParams = StorageFilterParams
+  Nothing Nothing Nothing Nothing Nothing Nothing Nothing
+
 getTxsFilter :: TxsFilterParams -> ClientM [WithNext Transaction]
 getTxsLast :: Natural -> ClientM [WithNext Transaction]
 postTx :: PostTransaction -> ClientM Keccak256
@@ -106,7 +122,7 @@ getBlocksLast :: Natural -> ClientM [WithNext Block]
 getAccountsFilter :: AccountsFilterParams -> ClientM [Account]
 getDifficulty :: ClientM Difficulty
 getTotalTx :: ClientM TxCount
-getStorage :: Maybe Address -> ClientM [Storage]
+getStorage :: StorageFilterParams -> ClientM [Storage]
 postFaucet :: Address -> ClientM Keccak256
 postSolc :: Src -> ClientM SolcResponse
 postExtabi :: Src -> ClientM ExtabiResponse
@@ -136,7 +152,7 @@ getTxsFilter
     :<|> uncurryAccountsFilterParams getAccountsFilter'
     :<|> getDifficulty'
     :<|> getTotalTx'
-    :<|> getStorage'
+    :<|> uncurryStorageFilterParams getStorage'
     :<|> postFaucet'
     :<|> postSolc'
     :<|> postExtabi'
@@ -168,3 +184,6 @@ getTxsFilter
     uncurryAccountsFilterParams f AccountsFilterParams{..} = f
       qaAddress qaBalance qaMinBalance qaMaxBalance
       qaNonce qaMinNonce qaMaxNonce
+    uncurryStorageFilterParams f StorageFilterParams{..} = f
+      qsAddress qsKey qsMinKey qsMaxKey
+      qsValue qsMinValue qsMaxValue

@@ -85,6 +85,10 @@ spec = do
         (getContractsState
           (ContractName simpleStorageContractName)
           (Unnamed simpleStorageContractAddress)
+          Nothing
+          Nothing
+          Nothing
+          False
         )
         (ClientEnv mgr blocUrl)
       contracts `shouldBe` Map.fromList
