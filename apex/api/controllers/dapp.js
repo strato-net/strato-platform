@@ -293,7 +293,6 @@ uploadInitContracts = async function(packageFolderPath, creds, inits) {
         nonce++;
       });
     } catch (error) {
-      console.error("getAccount: " + JSON.stringify(error));
       console.error(
           "could not find account; attempting to upload without specifying nonce...");
     }
