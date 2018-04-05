@@ -50,7 +50,7 @@ class WalkThrough extends Component {
           closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} />
       default:
         return <Congrats
-          handleContinue={() => this.setState({ currentModal: "CLI", step: 2 })} />
+          handleContinue={() => this.setState({ currentModal: "CLI", step: 4 })} />
     }
   }
 
