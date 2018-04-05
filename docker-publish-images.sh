@@ -34,9 +34,7 @@ done
 echo 'creating docker-compose.STRATO-GS.latest.yml'
 cp docker-compose.yml docker-compose.STRATO-GS.latest.yml
 sed -i 's|image: silo-|image: '"$target_dtr"'/'"$project"'/silo-|g' docker-compose.STRATO-GS.latest.yml
-cleanYamlSection docker-compose.STRATO-GS.latest.yml volumes:
 
 echo 'creating docker-compose.STRATO-GS.release.yml'
 cp docker-compose.release.yml docker-compose.STRATO-GS.release.yml
 sed -i 's|/silo-|/'"$project"'/silo-|g' docker-compose.STRATO-GS.release.yml
-cleanYamlSection docker-compose.STRATO-GS.release.yml volumes:

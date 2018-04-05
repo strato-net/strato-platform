@@ -9,6 +9,12 @@ metadata:
   hooks:
     init: "#include basil_extensions.js"
 
+volumes:
+  dapps:
+    driver: local
+  pgdata:
+    driver: local
+
 deployments:
   - name: smd-ui
     repo: https://github.com/blockapps/smd-ui.git
@@ -16,8 +22,10 @@ deployments:
     compose:
       restart: always
       depends_on:
-        - strato
+        - apex
         - bloch
+        - cirrus
+        - strato
       environment:
         NODE_NAME: "${NODE_NAME}"
         BLOC_URL: "${BLOC_URL}"
@@ -25,7 +33,45 @@ deployments:
         STRATO_URL: "${STRATO_URL}"
         STRATO_DOC_URL: "${STRATO_DOC_URL}"
         CIRRUS_URL: "${CIRRUS_URL}"
+        APEX_URL: "${APEX_URL}"
         STRATO_GS_MODE: "${STRATO_GS_MODE}"
+        SINGLE_NODE: "${SINGLE_NODE}"
+
+  - name: apex
+    repo: https://github.com/blockapps/apex.git
+    ref: master
+    compose:
+      restart: always
+      depends_on:
+        - bloch
+        - cirrus
+        - postgres
+        - strato
+      volumes:
+        - dapps:/usr/src/app/apps
+      environment:
+        NODE_HOST: "${NODE_HOST}"
+        SINGLE_NODE: "${SINGLE_NODE}"
+        STRATO_GS_MODE: "${STRATO_GS_MODE}"
+        blocHost: "bloch:8000"
+        cirrusHost: "cirrus:3333"
+        stratoHost: "strato:3000"
+        postgres_host: "postgres"
+        postgres_port: "5432"
+
+  - name: dapp-store
+    repo: https://github.com/blockapps/dapp-store.git
+    ref: master
+    compose:
+      restart: always
+      depends_on:
+        - bloch
+        - cirrus
+        - strato
+      environment:
+        BLOC_URL: "${BLOC_URL}"
+        STRATO_URL: "${STRATO_URL}"
+        CIRRUS_URL: "${CIRRUS_URL}"
 
   - name: bloch
     repo: https://github.com/blockapps/blockapps-haskell.git
@@ -35,42 +81,45 @@ deployments:
       depends_on:
         - strato
         - postgres
-      ports:
-        - "10001:8000"
+        # - cirrus # circuit dependency
       environment:
-        ssl: "${ssl}"
-        stratoHost: "${stratoHost}"
-        stratourl: "${stratourl}"
-        cirrusurl: "${cirrusurl}"
-        pguser: "${pguser}"
-        pgpasswd: "${pgpasswd}"
-        pghost: "${pghost}"
+        ssl: "${ssl:-false}"
+        stratoHost: "strato:3000"
+        cirrusHost: "cirrus:3333"
+        postgres_host: "postgres"
+        postgres_port: "5432"
+        postgres_user: "postgres"
+        postgres_password: "${postgres_password:-api}"
 
   - name: redis
     compose:
       image: redis:3.2
       restart: always
       command: redis-server --appendonly yes
-      ports:
-       - "6379:6379"
 
   - name: cirrus
     repo: https://github.com/blockapps/cirrus.git
     ref: transaction-state-management
     compose:
       restart: always
-      links:
-        - strato:strato
-        - postgres-cirrus:postgres
+      depends_on:
+        - strato
+        - postgres
+        - postgrest
+        - kafka
+        - bloch
       environment:
-        stratourl: "${stratourl}"
-        zookeeper_conn: "${cirrus_zookeeper_conn}"
-        postgres_db: "${cirrus_pg_db:-cirrus}"
-        postgres_user: "${cirrus_pg_user:-postgres}"
-        postgres_password: "${cirrus_pg_password}"
-        postgres_host: "${cirrus_pg_host:-postgres}"
-        postgres_port: "${cirrus_pg_port:-5432}"
-        stateDiffTopic: "${stateDiffTopic}" 
+        blocHost: "bloch:8000"
+        stratoHost: "strato:3000"
+        postgrestHost: "postgrest:3001"
+        zookeeper_conn: "kafka"
+        postgres_host: "postgres"
+        postgres_port: "5432"
+        postgres_db: "cirrus"
+        postgres_user: "postgres"
+        postgres_password: "${postgres_password:-api}"
+        stateDiffTopic: "${stateDiffTopic}"
+        SINGLE_NODE: "${SINGLE_NODE}"
 
   - name: strato
     repo: https://github.com/blockapps/monstrato.git
@@ -80,7 +129,6 @@ deployments:
       ports:
         - "30303:30303"
         - "30303:30303/udp"
-        - "33000:3000"
       environment:
         networkID : "${networkID}"
         genesis: "${genesis}"
@@ -104,29 +152,20 @@ deployments:
         statsFlush: "${statsFlush}"
         statsPrefix: "${statsPrefix}"
         statsSuffix: "${statsSuffix}"
-        noMinPeers: "${noMinPeers:-false}"
+        numMinPeers: "${numMinPeers}"
         mineBlocks: "${mineBlocks:-true}"
-      links:
-        - zookeeper
-        - kafka
-        - postgres
-        - redis
+        kafkaHost: "kafka"
+        zkHost: "kafka"
+        redisHost: "redis"
+        redisPort: "6379"
+        postgres_user: "postgres"
+        postgres_password: "${postgres_password:-api}"
+        postgres_host: "postgres"
+        #postgres_port: "5432" (not used)
       depends_on:
-        - zookeeper
         - kafka
         - postgres
         - redis
-
-  - name: postgres-cirrus
-    compose:
-      image: postgres:9.6
-      environment:
-        POSTGRES_DB: cirrus
-        POSTGRES_USER: postgres
-        PG_ENV_POSTGRES_DB: cirrus
-        PG_ENV_POSTGRES_USER: postgres
-      ports:
-        - '5434:5432'
 
   - name: postgrest
     repo: https://github.com/blockapps/postgrest-packager.git
@@ -134,30 +173,30 @@ deployments:
     compose:
       restart: always
       environment:
-        PG_ENV_POSTGRES_DB: cirrus
-        PG_ENV_POSTGRES_USER: postgres
-        PG_ENV_POSTGRES_PASSWORD: ""
-        PG_ENV_POSTGRES_HOST: "postgres-cirrus"
+        PG_ENV_POSTGRES_DB: "cirrus"
+        PG_ENV_POSTGRES_USER: "postgres"
+        PG_ENV_POSTGRES_PASSWORD: "${postgres_password:-api}"
+        PG_ENV_POSTGRES_HOST: "postgres"
         PG_PORT_5432_TCP_PORT: "5432"
-      ports:
-        - '3001:3001'
+      depends_on:
+        - postgres
 
   - name: postgres
-    repo: https://github.com/blockapps/postgres-packager.git
-    ref: master
     compose:
+      image: postgres:9.6
       restart: always
+      volumes:
+      - pgdata:/var/lib/postgresql/data
+      environment:
+        POSTGRES_PASSWORD: "${postgres_password:-api}"
+        POSTGRES_DB: "cirrus"
 
   - name: nginx
     repo: https://github.com/blockapps/nginx-packager.git
     ref: master
     compose:
       restart: always
-      volumes:
-        - /etc/ssl/private:/etc/ssl/private
-        - /etc/ssl/certs:/etc/ssl/certs
       ports:
-        - "443:443"
         - "80:80"
       depends_on:
         - bloch
@@ -165,20 +204,12 @@ deployments:
         - postgrest
         - smd-ui
         - strato
+        - apex
       environment:
-        ssl: "${ssl}"
+        ssl: "${ssl:-false}"
         authBasic: "${authBasic}"
         uiPassword: "${uiPassword}"
         blockTime: "${blockTime}"
-
-  - name: zookeeper
-    compose:
-      image: zookeeper:3.4.9
-      restart: always
-      environment:
-        ZOO_MY_ID: "1"
-      ports:
-        - "2181:2181"
 
   - name: blockapps-docs
     repo: https://github.com/blockapps/blockapps-swagger.git
@@ -187,22 +218,12 @@ deployments:
       restart: always
       environment:
         API_URL: "/strato-api/eth/v1.2/swagger.json"
-      ports:
-        - "8080:8080"
 
   - name: kafka
-    repo: https://github.com/blockapps/kafka-packager.git
-    ref: master
     compose:
+      image: spotify/kafka:latest
       restart: always
-      links:
-        - zookeeper
       environment:
-        KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-        KAFKA_ADVERTISED_HOST_NAME: "kafka"
-        KAFKA_ADVERTISED_PORT: "9092"
-        KAFKA_DELETE_TOPIC_ENABLE: "true"
-        KAFKA_LOG_CLEANER_ENABLE: "false"
-        KAFKA_LOG_RETENTION_HOURS: "2147483647"
-      ports:
-        - "9092:9092"
+        ADVERTISED_HOST: "kafka"
+        ADVERTISED_PORT: "9092"
+        # AUTO_CREATE_TOPICS: "true"
