@@ -9,10 +9,10 @@ module.exports = registerAppMetadata = async function() {
   const contract = await blockappsRest.compileSearch(['AppMetadata'],
                                                      'AppMetadata',
                                                      'lib/appMetadata/contracts/AppMetadata.sol');
-  console.error("The contract looks like: " + JSON.stringify(contract));
+  console.log("The contract looks like: " + JSON.stringify(contract));
   const options = {
     method: 'POST',
-    uri: `${process.env.cirrusRoot}/contract/`,
+    uri: `${process.env.cirrusRoot}/contracts`,
     body: JSON.stringify(contract),
   }
   await rp(options);
