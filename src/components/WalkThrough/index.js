@@ -12,6 +12,7 @@ import Congrats from '../Congrats';
 import VerifyAccount from '../VerifyAccount';
 import CreatePassword from '../CreatePassword';
 import './walkThrough.css';
+import { faucetRequest } from '../Accounts/accounts.actions';
 
 class WalkThrough extends Component {
   constructor(props) {
@@ -50,7 +51,10 @@ class WalkThrough extends Component {
           closeWalkThroughOverlay={this.props.closeWalkThroughOverlay} />
       default:
         return <Congrats
-          handleContinue={() => this.setState({ currentModal: "CLI", step: 4 })} />
+          handleContinue={() => {
+            this.setState({ currentModal: "CLI", step: 4 })
+            this.props.faucetRequest(this.props.currentUser.accountAddress);
+          }} />
     }
   }
 
@@ -77,7 +81,7 @@ class WalkThrough extends Component {
               this.props.closeWalkThroughOverlay();
             }}
             title={title}
-            style={{width: '768px'}}
+            style={{ width: '768px' }}
             className="pt-dark dialog"
             canOutsideClickClose={false}
             canEscapeKeyClose={this.state.currentModal === "CreateUser"}
@@ -122,7 +126,8 @@ const connected = connect(
   mapStateToProps,
   {
     openWalkThroughOverlay,
-    closeWalkThroughOverlay
+    closeWalkThroughOverlay,
+    faucetRequest
   }
 )(formed);
 
