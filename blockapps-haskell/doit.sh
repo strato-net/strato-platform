@@ -8,7 +8,7 @@ cirrusRoot=http://${cirrusHost}
 
 echo "Environment variables:
 stratoHost=${stratoHost}
-cirrusHost=${cirrusHost}
+--cirrusurl=cirrusHost=${cirrusHost}
 --stratourl=stratoRoot=${stratoRoot}
 --pghost=postgres_host=${postgres_host}
 --pgport=postgres_port=${postgres_port}
