@@ -3,14 +3,16 @@
     width: 80%;
     position: relative;
     margin: 20px auto 23px auto;
-    padding-left: 20px;
-    padding-right: 20px;
+    padding-left: 15px;
+    padding-right: 15px;
     overflow: hidden;
+    margin-left: 103px;
 }
 
 .steps-form .steps-step-1,
 .steps-form .steps-step-2,
-.steps-form .steps-step-3 {
+.steps-form .steps-step-3,
+.steps-form .steps-step-4 {
     position: relative;
 }
 
@@ -24,12 +26,16 @@
     top: 0px;
 }
 
+.steps-step-4 img {
+    right: -35px;
+}
+
 .steps-step-3 img {
-    right: -99px;
+    right: 17px;
 }
 
 .steps-step-2 img {
-    right: 1px;
+    right: 29px;
 }
 
 .steps-form .steps-row img {
@@ -44,22 +50,32 @@
 }
 
 .steps-form .steps-row .steps-step-1:after,
-.steps-form .steps-row .steps-step-2:after {
+.steps-form .steps-row .steps-step-2:after,
+.steps-form .steps-row .steps-step-3:after {
     position: absolute;
-    content: "..........";
-    letter-spacing: 9px;
+    content: "........";
+    letter-spacing: 7px;
     font-size: 25px;
     font-weight: 900;
     top: -3px;
     color: #626B72;
 }
 
+.steps-form .steps-row .steps-step-2:after {
+    right: -33px;
+}
+
+.steps-form .steps-row .steps-step-3:after {
+    right: -45px;
+}
+
 .steps-form .steps-row .steps-step-1.completed:after,
-.steps-form .steps-row .steps-step-2.completed:after {
+.steps-form .steps-row .steps-step-2.completed:after,
+.steps-form .steps-row .steps-step-3.completed:after {
     color: white;
 }
 
-.steps-form .steps-row .steps-step-2 {
+.steps-form .steps-row .steps-step-2, .steps-form .steps-row .steps-step-3 {
     display: table-cell;
     text-align: center;
     position: relative;

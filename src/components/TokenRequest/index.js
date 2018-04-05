@@ -17,7 +17,13 @@ class TokenRequest extends Component {
         title="Request Tokens"
         className="pt-dark token-request-dialog"
       >
-        <Faucet errors={this.props.errors} handleSubmit={this.props.handleSubmit} submitting={this.props.submitting} currentUser={this.props.currentUser} />
+        <Faucet 
+          errors={this.props.errors} 
+          handleSubmit={this.props.handleSubmit} 
+          submitting={this.props.submitting} 
+          currentUser={this.props.currentUser} 
+          faucetRequest={this.props.faucetRequest}
+          accountAddress={this.props.currentUser.accountAddress} />
       </Dialog>
     );
   }

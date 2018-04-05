@@ -17,7 +17,7 @@ import { env } from '../../env';
 import { loginSuccess } from '../User/user.actions';
 import { openWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 
-const url = env.APEX_URL + "/users"
+const url = env.APEX_URL + "/users";
 
 export function createUserApiCall(username, password) {
   return fetch(

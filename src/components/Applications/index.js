@@ -22,7 +22,7 @@ class Applications extends Component {
   componentDidMount() {
     // I am really sorry for this. But time.
     const developerSignIn = Object.keys(qs.parse(this.props.location.search)).includes('developer');
-    if(!this.props.isLoggedIn && !developerSignIn) {
+    if (!this.props.isLoggedIn && !developerSignIn) {
       window.location.href = `${window.location.protocol}//${window.location.hostname}/dappstore/`;
     }
 
@@ -93,7 +93,7 @@ class Applications extends Component {
           title="Download CLI Tool"
           className="pt-dark cli-dialog"
         >
-          <CLI addApp />
+        <CLI addApp />
         </Dialog>
         <TokenRequest />
       </div>

@@ -18,6 +18,7 @@ class Faucet extends Component {
     mixpanelWrapper.track('faucet_submit_click');
     let mailto = `mailto:product@blockapps.net?subject=Faucet Request&body=${values.building}. My address is ${this.props.currentUser.accountAddress}.`;
     window.location.href = mailto;
+    this.props.faucetRequest(this.props.accountAddress);
     this.setState({ disabled: false, sendEmailBtnClicked: true });
   }
 

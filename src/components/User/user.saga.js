@@ -6,14 +6,20 @@ import {
 import {
   LOGIN_REQUEST,
   LOGOUT_REQUEST,
+  FIRST_TIME_LOGIN_REQUEST,
   loginSuccess,
   loginFailure,
-  logoutSuccess
+  logoutSuccess,
+  firstTimeLoginSuccess,
+  firstTimeLoginFailure,
+  resetFirstTimeUser,
 } from './user.actions';
 import { env } from '../../env';
+import { resetTemporarypassword } from '../VerifyAccount/verifyAccount.actions';
 
 const loginUrl = env.APEX_URL + "/login";
 const logoutUrl = env.APEX_URL + "/logout";
+const verifyEmailUrl = env.APEX_URL + "/verify-email";
 
 function loginRequest(username, password) {
   return fetch(
@@ -54,6 +60,39 @@ function logoutAccount() {
     })
 }
 
+function firstTimeLoginRequest(email) {
+  return fetch(
+    verifyEmailUrl,
+    {
+      method: 'POST',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    })
+    .then(function (response) {
+      return response.json()
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
+function* firstTimeLogin(action) {
+  try {
+    const response = yield call(firstTimeLoginRequest, action.email);
+    if (response.exists) {
+      yield put(firstTimeLoginSuccess(action.email));
+    } else {
+      yield put(firstTimeLoginFailure(action.email, response.error.message));
+    }
+  } catch (err) {
+    yield put(firstTimeLoginFailure(action.username, err));
+  }
+}
+
 function* login(action) {
   try {
     const response = yield call(loginRequest, action.username, action.password);
@@ -72,6 +111,8 @@ function* logout() {
   try {
     yield call(logoutAccount);
     localStorage.removeItem('token');
+    yield put(resetTemporarypassword());
+    yield put(resetFirstTimeUser());
     yield put(logoutSuccess());
   } catch (err) {
     // Handle when you have error on logout
@@ -81,6 +122,7 @@ function* logout() {
 export default function* watchFetchUser() {
   yield [
     takeEvery(LOGIN_REQUEST, login),
-    takeEvery(LOGOUT_REQUEST, logout)
+    takeEvery(LOGOUT_REQUEST, logout),
+    takeEvery(FIRST_TIME_LOGIN_REQUEST, firstTimeLogin)
   ];
 }
