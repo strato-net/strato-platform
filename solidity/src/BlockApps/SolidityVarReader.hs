@@ -211,7 +211,7 @@ decodeStorageKey
   -> Bool
   -> [(Word256, Word256)]
 decodeStorageKey _ _ [] _ _ _ _ = []
-decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' mOffset mCount len =
+decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:_) _ mOffset mCount len =
   case Map.lookup varName (fields struct') of
     Nothing -> []
     Just (Storage.Position{..}, theType) ->
@@ -239,9 +239,10 @@ decodeStorageKey typeDefs'@TypeDefs{..} struct' (varName:vs) offset' mOffset mCo
         TypeStruct name ->
           case Map.lookup name structDefs of
             Nothing -> error ""
-            Just theStruct -> case vs of
-              [] -> [(offset, size theStruct)]
-              vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
+            Just theStruct -> [(offset, size theStruct)] -- TODO: support struct field accessors, e.g. vehicle.vin
+              -- case vs of
+              -- [] -> [(offset, size theStruct)]
+              -- vs' -> decodeStorageKey typeDefs' struct' vs' (offset + offset') mOffset mCount len
         TypeEnum _ -> [(offset, 1)]
         TypeContract _ -> [(offset, 1)]
 
