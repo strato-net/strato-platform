@@ -39,6 +39,7 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           export NODE_HOST=${NODE_HOST:-strato-int.centralus.cloudapp.azure.com}
+          # TODO: unify for all pipelines by creating the run script file
           NODE_NAME=${NODE_NAME:-$NODE_HOST} \
             BLOC_URL=${BLOC_URL:-http://$NODE_HOST/bloc/v2.2} \
             BLOC_DOC_URL=${BLOC_DOC_URL:-http://$NODE_HOST/docs/?url=/bloc/v2.2/swagger.json} \
@@ -47,7 +48,7 @@ pipeline {
             CIRRUS_URL=${CIRRUS_URL:-http://$NODE_HOST/cirrus/search} \
             APEX_URL=${APEX_URL:-http://$NODE_HOST/apex-api} \
             STRATO_GS_MODE=1 \
-            docker-compose up -d
+            docker-compose -p strato up -d
           docker ps
           counter=0
           # Few quick tests
