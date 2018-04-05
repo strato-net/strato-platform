@@ -476,7 +476,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
     where
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       ofs' :: Word256 = fromIntegral . toInteger $ maybe 0 id ofs
-      cnt' :: Word256 = min ((storage offset) - ofs') . fromIntegral $ maybe 100 id cnt
+      cnt' :: Word256 = max 0 . min ((fromIntegral size) - ofs') . fromIntegral $ maybe 100 id cnt
       theList = map (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` offset) . arrayPosition elementSize) [ofs' .. (ofs' + cnt' - 1)]
 
   TypeArrayDynamic ty -> if len
@@ -486,7 +486,7 @@ decodeValue' typeDefs'@TypeDefs{..} storage ofs cnt len position@Storage.Positio
       (_, elementSize) = getPositionAndSize typeDefs' (Storage.positionAt 0) ty
       --The double fromIntegral in the definition of theList is terrible but necessary, since the range only works with Int, and we eventually need a range of Word256s
       ofs' = maybe 0 id ofs
-      cnt' = min ((fromIntegral $ storage offset) - ofs') $ maybe 100 id cnt
+      cnt' = max 0 . min ((fromIntegral $ storage offset) - ofs') $ maybe 100 id cnt
       theList = (flip (decodeValue' typeDefs' storage ofs cnt len) ty . (`Storage.addOffset` startingKey) . arrayPosition elementSize . fromIntegral) <$> [ofs'..(ofs' + cnt' - 1)]
       startingKey=byteStringToWord256 $ ByteArray.convert $ digestKeccak256 $ keccak256 $ word256ToByteString offset
 
