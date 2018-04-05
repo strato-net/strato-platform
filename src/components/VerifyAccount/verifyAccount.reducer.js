@@ -1,7 +1,8 @@
 import {
   VERIFY_TEMPORARY_PASSWORD_SUCCESS,
   VERIFY_TEMPORARY_PASSWORD_FAILURE,
-  RESET_ERROR
+  RESET_ERROR,
+  RESET_TEMPORARY_PASSWORD
 } from '../VerifyAccount/verifyAccount.actions';
 
 const initialState = {
@@ -27,6 +28,11 @@ const reducer = function (state = initialState, action) {
       return {
         ...state,
         error: null
+      }
+    case RESET_TEMPORARY_PASSWORD:
+      return {
+        ...state,
+        isTempPasswordVerified: false
       }
     default:
       return state;

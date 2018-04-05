@@ -7,9 +7,10 @@ export const SET_CURRENT_USER = 'SET_CURRENT_USER';
 export const OPEN_LOGIN_OVERLAY = 'OPEN_LOGIN_OVERLAY';
 export const CLOSE_LOGIN_OVERLAY = 'CLOSE_LOGIN_OVERLAY';
 export const RESET_ERROR = 'RESET_ERROR';
-export const FIRST_TIME_LOGIN_REQUEST= 'FIRST_TIME_LOGIN_REQUEST';
-export const FIRST_TIME_LOGIN_REQUEST_SUCCESS= 'FIRST_TIME_LOGIN_REQUEST_SUCCESS';
-export const FIRST_TIME_LOGIN_REQUEST_FAILURE= 'FIRST_TIME_LOGIN_REQUEST_FAILURE';
+export const FIRST_TIME_LOGIN_REQUEST = 'FIRST_TIME_LOGIN_REQUEST';
+export const FIRST_TIME_LOGIN_REQUEST_SUCCESS = 'FIRST_TIME_LOGIN_REQUEST_SUCCESS';
+export const FIRST_TIME_LOGIN_REQUEST_FAILURE = 'FIRST_TIME_LOGIN_REQUEST_FAILURE';
+export const RESET_FIRST_TIME_USER = 'RESET_FIRST_TIME_USER';
 
 export const login = function (payload) {
   return {
@@ -95,3 +96,8 @@ export const firstTimeLoginFailure = function (email, error) {
   }
 }
 
+export const resetFirstTimeUser = function () {
+  return {
+    type: RESET_FIRST_TIME_USER
+  }
+}

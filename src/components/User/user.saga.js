@@ -12,8 +12,10 @@ import {
   logoutSuccess,
   firstTimeLoginSuccess,
   firstTimeLoginFailure,
+  resetFirstTimeUser,
 } from './user.actions';
 import { env } from '../../env';
+import { resetTemporarypassword } from '../VerifyAccount/verifyAccount.actions';
 
 const loginUrl = env.APEX_URL + "/login";
 const logoutUrl = env.APEX_URL + "/logout";
@@ -109,6 +111,8 @@ function* logout() {
   try {
     yield call(logoutAccount);
     localStorage.removeItem('token');
+    yield put(resetTemporarypassword());
+    yield put(resetFirstTimeUser());
     yield put(logoutSuccess());
   } catch (err) {
     // Handle when you have error on logout

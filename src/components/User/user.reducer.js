@@ -10,6 +10,7 @@ import {
   FIRST_TIME_LOGIN_REQUEST,
   FIRST_TIME_LOGIN_REQUEST_SUCCESS,
   FIRST_TIME_LOGIN_REQUEST_FAILURE,
+  RESET_FIRST_TIME_USER,
 } from './user.actions';
 import { currentUser } from '../../lib/localStorage';
 
@@ -98,6 +99,11 @@ const reducer = function (state = initialState, action) {
         firstTimeUser: null,
         error: action.error,
         isOpen: true
+      }
+    case RESET_FIRST_TIME_USER:
+      return {
+        ...state,
+        firstTimeUser: null
       }
     default:
       return state;
