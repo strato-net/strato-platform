@@ -1,0 +1,199 @@
+version: "2.1"
+volumes:
+  dapps:
+    driver: local
+  pgdata:
+    driver: local
+services:
+  smd:
+    depends_on:
+    - apex
+    - bloc
+    - cirrus
+    - strato
+    environment:
+    - APEX_URL=${APEX_URL}
+    - BLOC_DOC_URL=${BLOC_DOC_URL}
+    - BLOC_URL=${BLOC_URL}
+    - CIRRUS_URL=${CIRRUS_URL}
+    - NODE_NAME=${NODE_NAME}
+    - SINGLE_NODE=${SINGLE_NODE}
+    - ssl=${ssl:-false}
+    - STRATO_DOC_URL=${STRATO_DOC_URL}
+    - STRATO_GS_MODE=${STRATO_GS_MODE}
+    - STRATO_URL=${STRATO_URL}
+    build: .
+    image: <REPO_URL>smd:<VERSION>
+    restart: always
+  apex:
+    depends_on:
+    - bloc
+    - cirrus
+    - postgres
+    - strato
+    environment:
+    - blocHost=bloc:8000
+    - cirrusHost=cirrus:3333
+    - NODE_HOST=${NODE_HOST}
+    - postgres_host=postgres
+    - postgres_port=5432
+    - PROD_DEV_MODE=${PROD_ENV_MODE:-false}
+    - SINGLE_NODE=${SINGLE_NODE}
+    - STRATO_GS_MODE=${STRATO_GS_MODE}
+    - stratoHost=strato:3000
+    build: .
+    image: <REPO_URL>apex:<VERSION>
+    volumes:
+    - dapps:/usr/src/app/apps
+    restart: always
+  dappstore:
+    depends_on:
+    - bloc
+    - cirrus
+    - strato
+    environment:
+    - BLOC_URL=${BLOC_URL}
+    - CIRRUS_URL=${CIRRUS_URL}
+    - STRATO_URL=${STRATO_URL}
+    build: .
+    image: <REPO_URL>dappstore:<VERSION>
+    restart: always
+  bloc:
+    depends_on:
+    - strato
+    - postgres
+    environment:
+    - cirrusHost=cirrus:3333
+    - postgres_user=postgres
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - ssl=${ssl:-false}
+    - stratoHost=strato:3000
+    build: .
+    image: <REPO_URL>bloc:<VERSION>
+    restart: always
+  redis:
+    command: [redis-server, --appendonly, "yes"]
+    image: redis:3.2
+    restart: always
+  cirrus:
+    depends_on:
+    - strato
+    - postgres
+    - postgrest
+    - kafka
+    - bloc
+    environment:
+    - blocHost=bloc:8000
+    - postgres_db=cirrus
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_port=5432
+    - postgres_user=postgres
+    - postgrestHost=postgrest:3001
+    - SINGLE_NODE=${SINGLE_NODE}
+    - stateDiffTopic=${stateDiffTopic}
+    - stratoHost=strato:3000
+    - zookeeper_conn=kafka
+    build: .
+    image: <REPO_URL>cirrus:<VERSION>
+    restart: always
+  strato:
+    depends_on:
+    - kafka
+    - postgres
+    - redis
+    environment:
+    - addBootnodes=${addBootnodes}
+    - backupblocks=${backupblocks}
+    - blockTime=${blockTime}
+    - bootnode=${bootnode}
+    - debugFail=${debugFail}
+    - evmDebugMode=${evmDebugMode}
+    - evmTraceMode=${evmTraceMode}
+    - genesis=${genesis}
+    - genesisBlock=${genesisBlock}
+    - kafkaHost=kafka
+    - lazyBlocks=${lazyBlocks}
+    - minBlockDifficulty=${minBlockDifficulty}
+    - mineBlocks=${mineBlocks:-true}
+    - miningAlgorithm=${miningAlgorithm}
+    - miningThreads=${miningThreads}
+    - networkID=${networkID}
+    - numMinPeers=${numMinPeers}
+    - postgres_host=postgres
+    - postgres_password=${postgres_password:-api}
+    - postgres_user=postgres
+    - redisBDBNumber=${redisBDBNumber}
+    - redisHost=redis
+    - redisPort=6379
+    - statsEnable=${statsEnable}
+    - statsFlush=${statsFlush}
+    - statsHost=${statsHost}
+    - statsPort=${statsPort}
+    - statsPrefix=${statsPrefix}
+    - statsSuffix=${statsSuffix}
+    - useSyncMode=${useSyncMode}
+    - zkHost=kafka
+    build: .
+    image: <REPO_URL>strato:<VERSION>
+    ports:
+    - 30303:30303
+    - 30303:30303/udp
+    restart: always
+  postgrest:
+    depends_on:
+    - postgres
+    environment:
+    - PG_ENV_POSTGRES_DB=cirrus
+    - PG_ENV_POSTGRES_HOST=postgres
+    - PG_ENV_POSTGRES_PASSWORD=${postgres_password:-api}
+    - PG_ENV_POSTGRES_USER=postgres
+    - PG_PORT_5432_TCP_PORT=5432
+    build: .
+    image: <REPO_URL>postgrest:<VERSION>
+    restart: always
+  postgres:
+    environment:
+    - POSTGRES_DB=cirrus
+    - POSTGRES_PASSWORD=${postgres_password:-api}
+    image: postgres:9.6
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    restart: always
+  nginx:
+    depends_on:
+    - bloc
+    - cirrus
+    - postgrest
+    - smd
+    - strato
+    - apex
+    environment:
+    - authBasic=${authBasic}
+    - blockTime=${blockTime}
+    - ssl=${ssl:-false}
+    - sslCertFileType=${sslCertFileType:-crt}
+    - uiPassword=${uiPassword}
+    build: .
+    image: <REPO_URL>nginx:<VERSION>
+    ports:
+    - 80:80
+    - 443:443
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: always
+  docs:
+    environment:
+    - API_URL=/strato-api/eth/v1.2/swagger.json
+    build: .
+    image: <REPO_URL>docs:<VERSION>
+    restart: always
+  kafka:
+    environment:
+    - ADVERTISED_HOST=kafka
+    - ADVERTISED_PORT=9092
+    image: spotify/kafka:latest
+    restart: always
+
