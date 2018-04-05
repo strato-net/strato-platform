@@ -1,0 +1,140 @@
+
+var abi=#{rawJS abi}
+var contractAddress="#{rawJS contractAddress}"
+loadAccountInfo()
+calculateLookup()
+switchLookup()
+
+      function submitTransaction() {
+        loadAccountInfo();
+        var nonce = parseInt(document.querySelector('[name="nonce"]').value);
+        var gasPrice = parseInt(document.querySelector('[name="gasPrice"]').value);
+        var gasLimit = parseInt(document.querySelector('[name="gasLimit"]').value);
+        var toAddress = document.querySelector('[name="to"]').value;
+        var value = parseInt(document.querySelector('[name="value"]').value);
+        var data = document.querySelector('[name="dataField"]').value;
+
+        var privateKey = document.querySelector('[name="privKey"]').value;
+      
+        var url = '/includetransaction';
+        var isHex = /^[0-9A-F]+$/i;
+
+        if (isHex.test(toAddress) && (toAddress != "0x0") && (toAddress != "0x00"))
+           api.pushTX(nonce,gasPrice,gasLimit,toAddress,value,data,privateKey,url);
+        else {
+           api.pushTX(nonce,gasPrice,gasLimit,undefined,value,data,privateKey,url);
+        }
+        loadAccountInfo();
+      }
+
+      function invokeFunction() {
+         loadAccountInfo();
+         var fName = document.querySelector('[name="funcName"]').value;
+         var jsonABI = abi;
+         var jsonArgs = JSON.parse(args.value);
+
+         return api.functionNameToData(jsonABI, fName, jsonArgs);
+      }
+  
+      function calculateLookup() {
+         switch (lookupType[lookupType.selectedIndex].value) {
+            case 'elem':
+               calculateLookupElementary();
+               break;
+
+            case 'map':
+               calculateLookupMap();
+               break;
+
+            case 'array':
+               break;           
+
+            case 'all':
+               calculateLookupAll();
+               break;
+ 
+            default:
+               console.log("other");
+         }         
+      }
+
+    function switchLookup() {
+         switch (lookupType[lookupType.selectedIndex].value) {
+            case 'elem':
+               key.style.display = "none";
+               index.style.display = "block";
+               break;
+
+            case 'map':
+               key.style.display = "block";
+               index.style.display = "block";
+               calculateLookupMap();
+               break;
+
+            case 'array':
+               key.style.display = "none";
+               index.style.display = "block";
+               calculateLookupArray();
+               break;           
+
+            case 'all':
+               key.style.display = "none";
+               index.style.display = "none";
+               calculateLookupAll();
+               break;
+ 
+            default:
+               console.log("other");
+         }         
+      }
+
+      function calculateLookupAll() {
+         api.loadVariableFromStorage(address.value, '/query/storage', 
+             function (res) { lookup.value=res; });
+      }
+
+      function calculateLookupMap() {
+         var ikey=api.keyIndexToLookup(key.value, index.value);
+         api.loadVariableFromStorageKey(address.value, ikey, '/query/storage', 
+             function (res) { lookup.value=res; });
+      }
+
+      function calculateLookupArray() {
+         var ikey=api.arrayIndexToLookup(index.value);
+         api.loadVariableFromStorageKey(address.value, ikey, '/query/storage', 
+             function (res) { lookup.value=res; });
+      }
+
+      function calculateLookupElementary() {
+         api.loadVariableFromStorageKey(address.value, index.value, '/query/storage', 
+             function (res) { lookup.value=res; });
+      }
+
+      function loadAccountInfo() {
+         var addr  = '';
+         if (!privKey.value.match(/^[a-f0-9]{64}$/i)) {
+            invalidPrvKeyWarning.style.visibility="visible";
+            return;
+         }
+
+         addr = utils.privateToAddress(new Buffer(privKey.value, 'hex')).toString('hex');
+
+         var oReq = new XMLHttpRequest();
+
+         oReq.open("GET", "/query/account?address=" + addr, true);
+         oReq.onload = function () { 
+            if(oReq.readyState == 4 && oReq.status == 200) {
+	       var responseJSON = JSON.parse(this.responseText);
+            if (responseJSON.length >= 1) {
+	       nonce.value = responseJSON[responseJSON.length - 1].nonce;
+	       if (responseJSON.length > 1) alert("error! too many values in account query, just using the last value.");
+            }
+            else nonce.value = "0";
+          }
+          else { //returned an error, but no biggie, could just be a malformed form item, etc.
+            //output.value = "ERROR in fetching address info!\n" + this.responseText; 
+          }
+         }
+
+        oReq.send();
+      }

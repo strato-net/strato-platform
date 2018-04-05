@@ -1,0 +1,149 @@
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS -fno-warn-orphans #-}
+module Blockchain.Context
+    ( Context(..)
+    , ContextM
+    , initContext
+    , runContextM
+    , getDebugMsg
+    , addDebugMsg
+    , getBlockHeaders
+    , putBlockHeaders
+    , clearDebugMsg
+    , stampActionTimestamp
+    , getActionTimestamp
+    , clearActionTimestamp
+    , addPeer
+    , getPeerByIP
+    ) where
+
+
+import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Trans.Resource
+import qualified Data.Text                             as T
+import           Data.Time.Clock
+
+import           Blockchain.Data.BlockHeader
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.EthConf
+import           Blockchain.Strato.Discovery.Data.Peer
+
+import qualified Blockchain.Strato.RedisBlockDB        as RBDB
+import qualified Database.Persist.Postgresql           as SQL
+import qualified Database.PostgreSQL.Simple            as PS
+import qualified Database.Redis                        as Redis
+import qualified Network.Kafka                         as K
+
+data Context =
+    Context {
+        contextSQLDB        :: SQLDB,
+        contextRedisBlockDB :: Redis.Connection,
+        contextKafkaState   :: K.KafkaState,
+        vmTrace             :: [String],
+        blockHeaders        :: [BlockHeader],
+        actionTimestamp     :: Maybe UTCTime
+    }
+
+type ContextM = StateT Context (ResourceT (LoggingT IO))
+
+instance {-# OVERLAPPING #-} (MonadState Context m) => K.HasKafkaState m where
+    getKafkaState = contextKafkaState <$> get
+    putKafkaState s = do
+      ctx <- get
+      put $ ctx { contextKafkaState = s }
+
+instance (Monad m, MonadState Context m) => RBDB.HasRedisBlockDB m where
+    getRedisBlockDB = contextRedisBlockDB <$> get
+
+instance (MonadResource m, MonadBaseControl IO m, MonadState Context m, MonadIO m) => HasSQLDB m where
+  getSQLDB = contextSQLDB <$> get
+
+getDebugMsg :: MonadState Context m => m String
+getDebugMsg = concat . reverse . vmTrace <$> get
+
+getBlockHeaders :: MonadState Context m => m [BlockHeader]
+getBlockHeaders = blockHeaders <$> get
+
+putBlockHeaders :: MonadState Context m => [BlockHeader]->m ()
+putBlockHeaders headers = do
+    cxt <- get
+    put cxt{blockHeaders=headers}
+
+addDebugMsg :: MonadState Context m => String->m ()
+addDebugMsg msg = do
+    cxt <- get
+    put cxt{vmTrace=msg:vmTrace cxt}
+
+clearDebugMsg :: MonadState Context m => m ()
+clearDebugMsg = do
+    cxt <- get
+    put cxt{vmTrace=[]}
+
+stampActionTimestamp :: (MonadIO m, MonadState Context m) => m ()
+stampActionTimestamp = do
+    cxt <- get
+    ts <- liftIO getCurrentTime
+    put cxt{actionTimestamp=Just ts}
+
+getActionTimestamp :: MonadState Context m => m (Maybe UTCTime)
+getActionTimestamp = actionTimestamp <$> get
+
+clearActionTimestamp :: MonadState Context m => m ()
+clearActionTimestamp = do
+    cxt <- get
+    put cxt{actionTimestamp=Nothing}
+
+instance Show PS.Connection where
+  show _ = "Postgres Simple Connection"
+
+runContextM :: (MonadBaseControl IO m )
+            => s
+            -> StateT s (ResourceT m) a
+            -> m ()
+runContextM s f = void . runResourceT $ runStateT f s
+
+initContext :: (MonadResource m, MonadIO m, MonadBaseControl IO m)
+            => m Context
+initContext = do
+  dbs <- openDBs
+  redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+  return Context { actionTimestamp = Nothing
+                 , contextRedisBlockDB = redisBDBPool
+                 , contextKafkaState = mkConfiguredKafkaState "strato-p2p"
+                 , contextSQLDB = sqlDB' dbs
+                 , blockHeaders=[]
+                 , vmTrace=[]
+                 }
+
+addPeer :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
+        => PPeer
+        -> m (SQL.Key PPeer)
+addPeer peer = do
+  db <- getSQLDB
+  maybePeer <- getPeerByIP (T.unpack $ pPeerIp peer)
+  SQL.runSqlPool (actions maybePeer) db
+  where actions = \case
+            Nothing    -> SQL.insert peer
+            Just peer' -> do
+              SQL.update (SQL.entityKey peer') [PPeerPubkey SQL.=.(pPeerPubkey peer)]
+              return (SQL.entityKey peer')
+
+getPeerByIP :: (HasSQLDB m, MonadResource m, MonadBaseControl IO m, MonadThrow m)
+            => String
+            -> m (Maybe (SQL.Entity PPeer))
+getPeerByIP ip = do
+    db <- getSQLDB
+    (SQL.runSqlPool actions db) >>= \case
+        [] -> return Nothing
+        lst -> return . Just $ head lst
+
+    where actions = SQL.selectList [ PPeerIp SQL.==. T.pack ip ] []
+

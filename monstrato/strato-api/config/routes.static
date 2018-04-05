@@ -1,0 +1,26 @@
+/static StaticR Static appStatic
+
+/favicon.ico FaviconR GET
+/robots.txt RobotsR GET
+
+/ HomeR GET
+
+/eth/v1.2/address-explorer.js AddressExplorerR GET
+/eth/v1.2/address-explorer.css AddressExplorerCSSR GET
+/eth/v1.2/pushtx.js PushTransactionR GET 
+/eth/v1.2/ethlightjs.min.js WalletJSR GET
+
+/eth/v1.2/index.html DemoR GET
+/eth/v1.2/testreport.html TestR GET
+/eth/v1.2/afterSubmission.html AfterSubmissionR POST
+/eth/v1.2/transactionDemo.html TransactionDemoR POST
+/eth/v1.2/example_web.html WalletHtmlR GET
+/eth/v1.2/raml RamlR GET
+
+/eth/v1.2/createapp AppCreateR GET POST
+
+/tutorial TutorialR GET
+/help HelpR GET
+/apidocs ApiDocsR GET
+/version VersionR GET
+/stats StatsR GET

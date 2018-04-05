@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lib: postgrestUtils Query String: generate multiple query string 1`] = `"amount=like.*5678*&state=eq.1"`;
+
+exports[`Lib: postgrestUtils Query String: generate query string 1`] = `"state=eq.1"`;
+
+exports[`Lib: postgrestUtils Query String: generate sub query 1`] = `"state=eq.1"`;
+
+exports[`Lib: postgrestUtils Query String: generate sub query 2`] = `"state=like.*1*"`;
+
+exports[`Lib: postgrestUtils Query String: generate sub query 3`] = `"state=ilike.1"`;

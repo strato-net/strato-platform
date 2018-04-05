@@ -1,0 +1,82 @@
+var blockapps = require("blockapps-js");
+var Promise = require("bluebird");
+
+blockapps.query.serverURI = 'http://hacknet.blockapps.net';
+
+var eth = blockapps.ethbase.Units.unitSchema.ether;
+var globalKeystore;
+
+function genKeyUser() {
+    console.log("moving from keygen to create user");
+    createUserDiv.style.display = "table";
+    keygenDiv.style.display = "none";
+    genKey(keypass.value, function (keystore) {
+        addressCreateUser.value = keystore.addresses[0];
+        enckeyCreateUser.value = keystore.serialize();
+  
+  });
+};
+
+function callFunc(funcName) {
+    console.log("globalKeystore: " + JSON.stringify(globalKeystore));
+
+    var privkey = globalKeystore.exportPrivateKey(
+        walletaddress.value, document.getElementById("walletDecrypt").value);
+    console.log("privkey: " + privkey);
+
+    var args = [];
+    var funcDivElts = document.getElementById(funcName + "Div").children;
+    var len = funcDivElts.length;
+
+    for (var i = 1; i < len-1; ++i) { // Skip the button and the value text input
+        args.push(funcDivElts[i].value);
+    }
+
+    contract.state[funcName].apply(null,args).txParams({value : funcDivElts[len-1].value * eth}).callFrom(privkey).then(afterTX);
+}
+
+function storageAfterTX(result) {
+    var afterTXstring = "TX returned: " +
+        ((result === undefined) ? "(nothing)":result);
+
+    return Promise.props(contract.state).then(function(sVars) {
+        afterTXstring += "\n\n Contract storage state:\n\n";
+        for (name in sVars) {
+            var svar = sVars[name]
+            if (typeof svar === "function") {
+                continue;
+            }
+            afterTXstring += "  " + name + " = " + svar + "\n";
+        };
+      return afterTXstring;  
+    });
+} 
+
+function contractBalanceAfterTX(txString) {
+    return contract.account.balance.then(function(bal) {
+        return txString + "\n Contract balance =  " + (bal / eth) + " ether\n";
+    });
+}
+
+function userBalanceAfterTX(txString) {
+    return blockapps.ethbase.Account(globalKeystore.addresses[0]).balance.then(function(userBal) {
+        return txString + "\n Your balance     =  " + (userBal / eth) + " ether\n";
+    });
+}
+
+function resetTextArea(txString)  {
+    document.getElementById("afterTXarea").textContent = txString;
+}
+
+function afterTX(result) {
+    storageAfterTX(result)
+      .then(function (txStr) { 
+          return contractBalanceAfterTX(txStr);
+        })
+      .then(function (txStr) { 
+          return userBalanceAfterTX(txStr);
+        })
+      .then(function (txStr) { 
+          resetTextArea(txStr);
+      });
+} 

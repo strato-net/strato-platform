@@ -1,0 +1,8 @@
+$doctype 5
+<html>
+  <head>
+    <title>Create a new app
+  <body>
+    <form method=post action=@{AppCreateR} enctype=#{formEnctype}>
+      ^{formWidget}
+      <button>Submit

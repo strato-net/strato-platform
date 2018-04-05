@@ -1,0 +1,1 @@
+    Thanks for registering #{appName}, #{developer}. Redirect to your app:                                         <button onclick="redir();">#{appName}

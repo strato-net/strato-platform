@@ -1,0 +1,25 @@
+
+1. Slowly adding modules to section in stack.yaml that makes them compile pedantic
+
+2. bug fixes- distance function in findnodes was broken.
+
+3. Removing a bunch of duplicate code (UDP.hs in both ethereum-encryption and ethereum-discovery, postgres trigger code in both server, client).
+
+4. Wrote code to make RLPx EIP8 compliant (needed in order to have communication work between Strato and geth).
+
+5. Moved PPeer definition and ownership to ethereum-discovery.
+
+6. Centralized point/byte conversion functions in ethereum-encryption.
+
+7. Began the splitting of strato-setup into individual components managed separately.  So far, I've only separated out ethereum-discovery's setup.
+
+8. Added separate TCP and UDP ports in the PPeer object.
+
+9. Replaced the old bootnode mechanism with something more general.  I used to pass bootnodes in as a special parameter and connect to that hardcoded peer.  Now I just treat bootnodes as regular nodes that get inserted at strato-setup time.  Furthermore, as new peers are added I treat all peers as equals, and can get new nodes from any peer.
+
+10. Added peer bonding, whereby I immediately attempt a ping/pong upon getting the DB, and only consider the peer active once this succeeds.  This has many advantages:
+
+    A. A flood of pings (to different servers) can be sent out immediately, unlike with TCP, so I can rule out nonexistent peers at once.
+    B. Server IDs can be established earlier, removing work from the TCP peer.
+    C. Closes a security hole.
+

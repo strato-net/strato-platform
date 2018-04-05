@@ -1,0 +1,24 @@
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE OverloadedStrings #-}
+module DumpKafkaUnminedBlocks where
+
+import           Control.Monad.IO.Class
+import           Network.Kafka.Protocol
+
+import           Blockchain.EthConf
+import           Blockchain.Format
+import           Blockchain.Stream.Raw          (setDefaultKafkaState)
+import           Blockchain.Stream.UnminedBlock
+
+dumpKafkaUnminedBlocks::Offset->IO ()
+dumpKafkaUnminedBlocks startingBlock = do
+  ret <- runKafkaConfigured "queryStrato" $ doConsume' startingBlock
+  case ret of
+    Left e  -> error $ show e
+    Right _ -> return ()
+  where
+    doConsume' offset = do
+      setDefaultKafkaState
+      blocks <- fetchUnminedBlocks offset
+      liftIO . putStrLn . unlines $ format <$> blocks
+      doConsume' (offset + fromIntegral (length blocks))

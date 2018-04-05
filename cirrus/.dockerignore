@@ -1,0 +1,7 @@
+pkg/
+.git/
+.gitignore
+.gitattributes
+Basilbuild
+Dockerfile
+node_modules/

@@ -1,0 +1,235 @@
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# OPTIONS  -fno-warn-orphans          #-}
+module Blockchain.Data.Transaction (
+{-  Transaction(transactionNonce,
+              transactionGasPrice,
+              transactionGasLimit,
+              transactionTo,
+              transactionValue,
+              transactionData,
+              transactionInit), -}
+  Transaction(..),
+  txAndTime2RawTX,
+  tx2RawTXAndTime,
+  rawTX2TX,
+  insertTX,
+  insertTX',
+  insertTXIfNew,
+  insertTXIfNew',
+  createMessageTX,
+  createContractCreationTX,
+  isMessageTX,
+  isContractCreationTX,
+  whoSignedThisTransaction,
+  transactionHash,
+  partialTransactionHash
+  ) where
+
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Resource
+import qualified Data.ByteString                as B
+import qualified Data.ByteString.Base16         as B16
+import           Data.ByteString.Internal
+import           Data.Maybe
+import           Data.Time.Clock
+import qualified Database.Persist.Postgresql    as SQL
+import           Numeric
+
+import           Blockchain.Data.Address
+import           Blockchain.Data.Code
+import           Blockchain.Data.DataDefs
+import           Blockchain.Data.RawTransaction
+import           Blockchain.Data.RLP
+import           Blockchain.Data.TransactionDef
+import           Blockchain.Data.TXOrigin
+import           Blockchain.DB.SQLDB
+import           Blockchain.DBM
+import           Blockchain.FastECRecover
+import           Blockchain.SHA
+import           Blockchain.Util
+
+import           Blockchain.ExtendedECDSA
+import           Network.Haskoin.Internals      hiding (Address, txHash, txSignature)
+
+import           Control.DeepSeq
+import           System.Clock
+
+import           Blockchain.Strato.Model.Class
+
+instance NFData Address
+instance NFData Code
+instance NFData SHA
+instance NFData TXOrigin
+instance NFData Transaction
+instance NFData RawTransaction
+
+instance TransactionLike Transaction where
+    txHash        = hash . rlpSerialize . rlpEncode
+    txPartialHash = hash . rlpSerialize . partialRLPEncode
+    txSigner      = whoSignedThisTransaction
+    txNonce       = transactionNonce
+    txSignature t = (transactionR t, transactionS t, transactionV t)
+    txValue       = transactionValue
+    txGasPrice    = transactionGasPrice
+    txGasLimit    = transactionGasLimit
+
+    txType MessageTX{}          = Message
+    txType ContractCreationTX{} = ContractCreation
+
+    txDestination MessageTX{..}        = Just transactionTo
+    txDestination ContractCreationTX{} = Nothing
+
+    txCode MessageTX{}            = Nothing
+    txCode ContractCreationTX{..} = Just transactionInit
+
+    txData MessageTX{..}        = Just transactionData
+    txData ContractCreationTX{} = Nothing
+
+    morphTx t = case type' of
+        Message          -> MessageTX n gp gl dest val dat r s v
+        ContractCreation -> ContractCreationTX n gp gl val code r s v
+        where type'     = txType t
+              n         = txNonce t
+              gp        = txGasPrice t
+              gl        = txGasLimit t
+              val       = txValue t
+              dest      = fromJust (txDestination t)
+              dat       = fromJust (txData t)
+              code      = fromJust (txCode t)
+              (r, s, v) = txSignature t
+
+rawTX2TX :: RawTransaction -> Transaction
+rawTX2TX (RawTransaction _ _ nonce' gp gl (Just to') val dat r s v _ _ _) = MessageTX nonce' gp gl to' val dat r s v
+rawTX2TX (RawTransaction _ _ nonce' gp gl Nothing val init' r s v _ _ _) = ContractCreationTX nonce' gp gl val (Code init') r s v
+
+txAndTime2RawTX :: TXOrigin -> Transaction -> Integer -> UTCTime -> RawTransaction
+txAndTime2RawTX origin tx blkNum time =
+  case tx of
+    (MessageTX nonce' gp gl to' val dat r s v) ->
+        RawTransaction time signer nonce' gp gl (Just to') val dat r s v (fromIntegral blkNum) (txHash tx) origin
+    (ContractCreationTX _ _ _ _ (PrecompiledCode _) _ _ _) ->
+        error "Error in call to txAndTime2RawTX: You can't convert a transaction to a raw transaction if the code is a precompiled contract"
+    (ContractCreationTX nonce' gp gl val (Code init') r s v) ->
+        RawTransaction time signer nonce' gp gl Nothing val init' r s v (fromIntegral blkNum) (txHash tx) origin
+  where
+    signer = fromMaybe (Address (-1)) $ whoSignedThisTransaction tx
+
+tx2RawTXAndTime :: (MonadIO m) => TXOrigin -> Transaction -> m RawTransaction
+tx2RawTXAndTime origin tx = do
+  time <- liftIO getCurrentTime
+  return $ txAndTime2RawTX origin tx (-1) time
+
+insertTXIfNew :: HasSQLDB m=>TXOrigin->Maybe Integer->[Transaction]->m Integer
+insertTXIfNew = insertTX Fail
+
+insertTX::HasSQLDB m=>DebugMode->TXOrigin->Maybe Integer->[Transaction]->m Integer
+insertTX mode origin blockNum txs = do
+  time <- liftIO getCurrentTime
+  beforeECRecover <- liftIO $ getTime Realtime
+  let rawTXs =
+        map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
+  afterECRecover <- rawTXs `deepseq` liftIO (getTime Realtime)
+  insertRawTX mode rawTXs
+  return $ toNanoSecs $ afterECRecover - beforeECRecover
+
+insertTXIfNew' ::(MonadBaseControl IO m, MonadIO m)=>
+                 TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
+insertTXIfNew' = insertTX' Fail
+
+insertTX'::(MonadBaseControl IO m, MonadIO m)=>
+           DebugMode->TXOrigin->Maybe Integer->[Transaction]->ReaderT SQL.SqlBackend m ()
+insertTX' mode origin blockNum txs = do
+  time <- liftIO getCurrentTime
+  let rawTXs =
+        map (\tx -> txAndTime2RawTX origin tx (fromMaybe (-1) blockNum) time) txs
+  insertRawTX' mode rawTXs
+
+addLeadingZerosTo64::String->String
+addLeadingZerosTo64 x = replicate (64 - length x) '0' ++ x
+
+createMessageTX::MonadIO m=>Integer->Integer->Integer->Address->Integer->B.ByteString->PrvKey->SecretT m Transaction
+createMessageTX n gp gl to' val theData prvKey = do
+  let unsignedTX = MessageTX {
+                     transactionNonce = n,
+                     transactionGasPrice = gp,
+                     transactionGasLimit = gl,
+                     transactionTo = to',
+                     transactionValue = val,
+                     transactionData = theData,
+                     transactionR = 0,
+                     transactionS = 0,
+                     transactionV = 0
+                   }
+  let SHA theHash = partialTransactionHash unsignedTX
+  ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
+  return
+    unsignedTX {
+      transactionR =
+        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
+          (val', "") -> byteString2Integer val'
+          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
+      transactionS =
+        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
+          (val', "") -> byteString2Integer val'
+          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
+      transactionV = if yIsOdd then 0x1c else 0x1b
+    }
+
+createContractCreationTX::MonadIO m=>Integer->Integer->Integer->Integer->Code->PrvKey->SecretT m Transaction
+createContractCreationTX n gp gl val init' prvKey = do
+  let unsignedTX = ContractCreationTX {
+                     transactionNonce = n,
+                     transactionGasPrice = gp,
+                     transactionGasLimit = gl,
+                     transactionValue = val,
+                     transactionInit = init',
+                     transactionR = 0,
+                     transactionS = 0,
+                     transactionV = 0
+                   }
+
+  let SHA theHash = partialTransactionHash unsignedTX
+  ExtendedSignature signature yIsOdd <- extSignMsg theHash prvKey
+  return
+    unsignedTX {
+      transactionR =
+        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigR signature) "" of
+          (val', "") -> byteString2Integer val'
+          _          -> error ("error: sigR is: " ++ showHex (sigR signature) ""),
+      transactionS =
+        case B16.decode $ B.pack $ map c2w $ addLeadingZerosTo64 $ showHex (sigS signature) "" of
+          (val', "") -> byteString2Integer val'
+          _          -> error ("error: sigS is: " ++ showHex (sigS signature) ""),
+      transactionV = if yIsOdd then 0x1c else 0x1b
+    }
+
+
+{-
+  Switch to Either?
+-}
+whoSignedThisTransaction::Transaction->Maybe Address -- Signatures can be malformed, hence the Maybe
+whoSignedThisTransaction t = pubKey2Address <$> getPubKeyFromSignature_fast xSignature theHash
+        where
+          xSignature = ExtendedSignature (Signature (fromInteger $ transactionR t) (fromInteger $ transactionS t)) (0x1c == transactionV t)
+          SHA theHash = partialTransactionHash t
+
+isMessageTX::Transaction->Bool
+isMessageTX MessageTX{} = True
+isMessageTX _           = False
+
+isContractCreationTX::Transaction->Bool
+isContractCreationTX ContractCreationTX{} = True
+isContractCreationTX _                    = False
+
+transactionHash::Transaction->SHA
+transactionHash = hash . rlpSerialize . rlpEncode
+
+partialTransactionHash::Transaction->SHA
+partialTransactionHash = hash . rlpSerialize . partialRLPEncode

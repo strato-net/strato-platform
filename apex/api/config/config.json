@@ -1,0 +1,27 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "api",
+    "database": "apex_dev",
+    "host": "localhost",
+    "port": "5432",
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "api",
+    "database": "apex_test",
+    "host": "postgres",
+    "port": "5432",
+    "dialect": "postgres"
+  },
+  "production" : {
+    "username": "postgres",
+    "password": "api",
+    "database": "apex_prod",
+    "host": "postgres",
+    "port": "5432",
+    "dialect": "postgres",
+    "logging": false
+  }
+}

@@ -1,0 +1,54 @@
+.banner__wrapper {
+  padding-top: 110px;
+}
+
+.bucket__icon {
+  font-size: 4em;
+}
+
+.banner__logo {
+  max-width: 250px;
+}
+
+.nav > li > a > .nav__logo {
+    max-width: 30px;
+    display: inline-block;
+}
+h1 {
+    text-align: left; 
+}
+h2##{aDomId} {
+    color: #990
+}
+
+hr {
+  margin: 4em auto;
+}
+
+.navbar-inverse {
+  background-color: #223765;
+}
+
+.getting-started {
+  font-size: 1.2em;
+  hr {
+    margin-bottom: 2em;
+  }
+  ol {
+    font-size: 1.1em;
+  }
+}
+
+@media only screen and (max-width : 768px) {
+  div .bucket__icon {
+    display: block;
+    text-align: center;
+  }
+  .nav > li > a > .nav__logo {
+    margin-left: 22px;
+  }
+  .banner__logo {
+    margin: 0 auto;
+    display: block;
+  }
+}

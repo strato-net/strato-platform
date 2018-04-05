@@ -1,0 +1,4 @@
+if(util.OS.Distribution == "Mac OS X") {
+  deployment.Env["USE_DOCKER_BUILD_ENV"] = "1"
+}
+

@@ -1,0 +1,17 @@
+As we discussed:
+
+ - The wrapper accumulates transactions into a new block.
+ - It executes upon notification of a postgres trigger that a new best block was added.
+ - It queries for the best block and forms a new block with it as the parent.
+ - The new block will contain only transactions received by us within a certain time period and that are not yet in any block in the current chain (ancestors of the best block)
+ - Parameter: t_range.  The radius around the parent's timestamp in which to consider new tranactions
+ - To find new transactions, do two queries:
+   - All transactions within t_range time of the parent's timestamp.
+   - All blocks whose timestamp is in the same range.
+ - Walk up the chain from the best block in the second set and remove their transactions from the first step.
+ - The remaining transactions are wrapped into a new block.
+ 
+DB considerations:
+
+ - We must add a timestamp field to RawTransactions
+ - Eventually, we need to normalize the relation between transactions and blocks, which is now many-to-many.

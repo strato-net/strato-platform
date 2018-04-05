@@ -1,0 +1,10 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`TransactionTable: index mapStateToProps with default state 1`] = `
+Object {
+  "query": Object {
+    "last": 15,
+  },
+  "queryResults": undefined,
+}
+`;

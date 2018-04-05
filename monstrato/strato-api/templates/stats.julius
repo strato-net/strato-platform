@@ -1,0 +1,195 @@
+$(document).on("ready", function update() {
+
+  function stats(){
+    myopts = {
+      // Boolean - Whether to animate the chart
+      animation: false,
+      // Boolean - Whether to show labels on the scale
+      scaleShowLabels: false,
+
+      //Boolean - Whether the scale should start at zero, or an order of magnitude down from the lowest value
+      scaleBeginAtZero : true,
+
+      //Boolean - Whether grid lines are shown across the chart
+      scaleShowGridLines : true,
+
+      //String - Colour of the grid lines
+      scaleGridLineColor : "rgba(0,0,0,.05)",
+
+      //Number - Width of the grid lines
+      scaleGridLineWidth : 1,
+
+      //Boolean - Whether to show horizontal lines (except X axis)
+      scaleShowHorizontalLines: true,
+
+      //Boolean - Whether to show vertical lines (except Y axis)
+      scaleShowVerticalLines: true,
+
+      //Boolean - If there is a stroke on each bar
+      barShowStroke : true,
+
+      //Number - Pixel width of the bar stroke
+      barStrokeWidth : 1,
+
+      //Number - Spacing between each of the X value sets
+      barValueSpacing : 1,
+
+      //Number - Spacing between data sets within X values
+      barDatasetSpacing : 1,
+    }
+
+   $.getJSON("/eth/v1.2/block/last/50", function(blockrefs, textStatus, jqXHR) {
+
+      var labels = [];
+      var datas1 = [];
+      var datas2 = [];
+      var datas3 = [];
+      var datas4 = [0];
+      
+      $.map( blockrefs, function( val, i ) {
+          
+        //labels.push("" + val.blockData.number);
+        labels.push("");
+        datas2.push(val.blockData.gasUsed);
+
+        if(i > 0){
+          datas4.push(
+              Math.round(0.001*Math.abs(new Date(blockrefs[i].blockData.timestamp) - new Date(blockrefs[i-1].blockData.timestamp)))
+          );
+        }
+
+        if(val.receiptTransactions != undefined)
+        {
+         datas1.push(val.receiptTransactions.length)
+        }
+        else
+        {
+          datas1.push(0);
+        }
+        if(val.blockUncles != undefined)
+        {
+          datas3.push(val.blockUncles.length)
+        }
+        else 
+        {
+          datas3.push(0);
+        }
+          
+      });
+
+
+      var data1 = {
+          labels: labels,
+          datasets: [
+              {
+                  label: "Transaction count",
+                  fillColor: "rgba(220,0,55,0.5)",
+                  strokeColor: "rgba(55,0,220,0.8)",
+                  highlightFill: "rgba(220,0,220,0.75)",
+                  highlightStroke: "rgba(220,0,220,1)",
+                  data: datas1
+              }
+         ]
+      };
+      var data2 = {
+          labels: labels,
+          datasets: [
+              {
+                  label: "Gas price",
+                  fillColor: "rgba(120,220,220,0.5)",
+                  strokeColor: "rgba(120,220,220,0.8)",
+                  highlightFill: "rgba(120,220,220,0.75)",
+                  highlightStroke: "rgba(120,220,220,1)",
+                  data: datas2
+              }
+          ]
+      };
+
+      var data3 = {
+          labels: labels,
+          datasets: [
+              {
+                  label: "Uncles",
+                  fillColor: "rgba(220,220,20,0.5)",
+                  strokeColor: "rgba(220,220,20,0.8)",
+                  highlightFill: "rgba(220,220,20,0.75)",
+                  highlightStroke: "rgba(220,220,20,1)",
+                  data: datas3
+              }
+          ]
+      };
+
+      var data4 = {
+          labels: labels,
+          datasets: [
+              {
+                  label: "Block propagation",
+                  fillColor: "rgba(20,120,0,0.5)",
+                  strokeColor: "rgba(20,120,0,0.8)",
+                  highlightFill: "rgba(20,120,0,0.75)",
+                  highlightStroke: "rgba(20,120,0,1)",
+                  data: datas4
+              }
+          ]
+      };
+
+      var ctx1 = document.getElementById("myChart1").getContext("2d");
+      var ctx2 = document.getElementById("myChart2").getContext("2d");
+      var ctx3 = document.getElementById("myChart3").getContext("2d");
+      var ctx4 = document.getElementById("myChart4").getContext("2d");
+
+      var myBarChart1 = new Chart(ctx1).Bar(data1, myopts);
+      var myBarChart2 = new Chart(ctx2).Bar(data2, myopts);
+      var myBarChart3 = new Chart(ctx3).Bar(data3, myopts);
+      var myBarChart4 = new Chart(ctx4).Bar(data4, myopts);
+
+    });
+
+    $.getJSON("/eth/v1.2/block/last/1", function(blockrefs, textStatus, jqXHR) {
+      $("#blockNumber").html(blockrefs[0].blockData.number);
+      $("#blockTime").html(new Date(blockrefs[0].blockData.timestamp));
+      $("#totDiff2").html(blockrefs[0].totalDifficulty);
+      console.log("Latest block: " + blockrefs[0].blockData.number);
+      console.log("Latest blocktime: " + new Date(blockrefs[0].blockData.timestamp));
+    });
+
+    $.getJSON("/eth/v1.2/stats/difficulty", function(blockrefs, textStatus, jqXHR) {
+      $("#totDiff").html(blockrefs.difficulty);
+      console.log("Total difficulty: " + blockrefs.difficulty);
+    });  
+
+    $.getJSON("/eth/v1.2/stats/totaltx", function(blockrefs, textStatus, jqXHR) {
+      $("#totTx").html(blockrefs.transactionCount);
+      console.log("Total nr. transaction: " + blockrefs.transactionCount);
+    });  
+  };
+
+  // set version data
+  $.getJSON("/version", function(data, textStatus, jqXHR) {
+    $.each(data, function(i, item){
+      $.getJSON('https://api.github.com/repos/blockapps/'+item.name+'/commits?sha='+item.branch, function(gitdata, stat, jqXHR2){
+        
+        var uptodate = gitdata[0]['sha'] == item.sha;
+
+        var branchStatus = (item.branch === "master"  ? "label label-primary" : 
+                            item.branch === "develop" ? "label label-info" : 
+                                            "label label-warning");
+
+        var uptoDateStatus = (uptodate ? 'label label-success' : 'label label-warning');
+
+        $('#version-table > tbody:last')
+        .append($('<tr>')
+          .append($('<td>').text(item.name),
+                  $('<td>').text(item.sha),
+                  $('<td>').text(item.branch),
+                  $('<td>').text(uptodate ? "Up-to-date" : "Old")
+          )
+        );
+      });
+    });
+  });
+
+  stats();
+  setTimeout( stats, 5000 );
+
+});

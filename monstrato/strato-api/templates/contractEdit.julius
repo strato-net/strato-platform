@@ -1,0 +1,20 @@
+
+console.log("hello contractEdit.julius from #{rawJS contractName}")
+
+var compile#{rawJS contractName} = function () {
+	console.log("hello contractEdit.julius from #{rawJS contractName} - onchange")
+  blockapps.Solidity(#{rawJS contractName}Area.value).then(function(solObj) {
+    document.getElementById("#{rawJS contractName}Compiled").value = solObj.vmCode;
+  }).catch(function(err) {
+  	console.log("hello contractEdit.julius from #{rawJS contractName} - err")
+    document.getElementById("#{rawJS contractName}Compiled").value = err;
+  })
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+   compile#{rawJS contractName}();
+ });
+
+document.getElementById("#{rawJS contractName}Area").onchange = compile#{rawJS contractName};
+document.getElementById("#{rawJS contractName}Area").onkeyup = compile#{rawJS contractName};
+

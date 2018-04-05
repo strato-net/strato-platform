@@ -1,0 +1,33 @@
+<html>
+<meta charset="UTF-8"> <link rel="stylesheet" type="text/css" href="static/css/bootstrap.css">
+<div id="group" class="bg-primary">Handler.Common</div>
+<div id="group" class="bg-primary">robots.txt</div>
+<div id="testcase" class="col-sm-6 bg-success">gives a</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="testcase" class="col-sm-6 bg-success">has correct User-agent</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="group" class="bg-primary">favicon.ico</div>
+<div id="testcase" class="col-sm-6 bg-success">gives a 200</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="group" class="bg-primary">Handler.Home</div>
+<div id="testcase" class="col-sm-6 bg-success">loads the index and checks it looks right</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="testcase" class="col-sm-6 bg-success">check count of h1</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="group" class="bg-primary">Handler.Json</div>
+<div id="group" class="bg-primary">JSON fixed endpoints</div>
+<div id="group" class="bg-primary">Account endpoints</div>
+<div id="testcase" class="col-sm-6 bg-danger">First account</div><div id="testresult" class="col-sm-6 bg-danger">Expected body to contain contractRoot</div>
+<div id="group" class="bg-primary">JSON Query string</div>
+<div id="group" class="bg-primary">Blocks</div>
+<div id="testcase" class="col-sm-6 bg-success">Genesis block</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="testcase" class="col-sm-6 bg-danger">Indexing</div><div id="testresult" class="col-sm-6 bg-danger">Compared JSON contents: 0 and 50</div>
+<div id="testcase" class="col-sm-6 bg-success">Indexing empty</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="testcase" class="col-sm-6 bg-success">First block through inequalities</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="testcase" class="col-sm-6 bg-danger">First 100 blocks through inequaTest suite test: PASS
+lities</div><div id="testresult" class="col-sm-6 bg-danger">Compared JSON contents: 1 and 100</div>
+<div id="testcase" class="col-sm-6 bg-success">Access pattern</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="testcase" class="col-sm-6 bg-success">Content type</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="group" class="bg-primary">Transaction endpoints</div>
+<div id="testcase" class="col-sm-6 bg-success">Transaction from block</div><div id="testresult" class="col-sm-6 bg-success">✔</div>
+<div id="group" class="bg-primary">Complicated endpoints</div>
+<div id="testcase" class="col-sm-6 bg-danger">Last of previous index is one less than next index for blocks</div><div id="testresult" class="col-sm-6 bg-danger">PatternMatchFail (test/Handler/JsonSpec.hs:63:1-43: Non-exhaustive patterns in function mapFirstOnData
+)</div>
+<div id="testcase" class="col-sm-6 bg-danger">Last of previous index is one less than next index for transactions</div><div id="testresult" class="col-sm-6 bg-danger">PatternMatchFail (test/Handler/JsonSpec.hs:63:1-43: Non-exhaustive patterns in function mapFirstOnData
+)</div>
+</html>

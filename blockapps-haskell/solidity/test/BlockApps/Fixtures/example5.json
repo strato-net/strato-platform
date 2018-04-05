@@ -1,0 +1,119 @@
+{
+    "funcs": {
+      "set": {
+        "args": {
+          "x": {
+            "type": "Int",
+            "index": 0,
+            "bytes": 32,
+            "name": "x"
+          }
+        },
+        "selector": "60fe47b1",
+        "vals": {}
+      },
+      "get": {
+        "args": {},
+        "selector": "6d4ce63c",
+        "vals": {
+          "retVal": {
+            "type": "Int",
+            "index": 0,
+            "bytes": 32
+          }
+        }
+      }
+    },
+    "types": {
+      "Well": {
+        "type": "Struct",
+        "bytes": 96,
+        "fields": [
+		["name", {
+            "atBytes": 0,
+            "dynamic": true,
+            "type": "String"
+		}],
+		["wellHeadBUID", {
+            "atBytes": 32,
+            "dynamic": true,
+            "type": "String"}
+		],
+		["internalEvent", {
+            "atBytes": 96,
+            "typedef": "AnalysisEventEnum",
+            "type": "Enum",
+            "bytes": 1,
+            "names": [
+              "NULL",
+              "PLAN",
+              "UPLOAD",
+              "FINALIZE"
+            ]}
+		],
+		["boreHoleBUID", {
+            "atBytes": 64,
+            "dynamic": true,
+            "type": "String"
+		}
+		]
+	]
+      }
+    },
+    "vars": {
+      "bo": {
+        "atBytes": 372,
+        "type": "Bool"
+      },
+      "data": {
+        "atBytes": 448,
+        "dynamic": true,
+        "entry": {
+          "typedef": "Well",
+          "type": "Struct",
+          "bytes": 96
+        },
+        "type": "Array",
+        "public": true
+      },
+      "a": {
+        "atBytes": 352,
+        "type": "Address"
+      },
+      "staticArray": {
+        "atBytes": 0,
+        "length": 10,
+        "entry": {
+          "signed": true,
+          "type": "Int",
+          "bytes": 32
+        },
+        "type": "Array"
+      },
+      "fb": {
+        "atBytes": 416,
+        "type": "Bytes",
+        "bytes": 32
+      },
+      "dynamicArray": {
+        "atBytes": 320,
+        "dynamic": true,
+        "entry": {
+          "signed": true,
+          "type": "Int",
+          "bytes": 32
+        },
+        "type": "Array"
+      },
+      "b": {
+        "atBytes": 384,
+        "dynamic": true,
+        "type": "Bytes"
+      },
+      "storedData": {
+        "atBytes": 512,
+        "type": "Int",
+        "bytes": 32
+      }
+    }
+  }

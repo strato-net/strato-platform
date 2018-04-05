@@ -1,0 +1,254 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Dashboard: actions blockDifficulty: load 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "x": 0,
+      "y": 8192,
+    },
+    Object {
+      "x": 1,
+      "y": 131072,
+    },
+    Object {
+      "x": 2,
+      "y": 131072,
+    },
+    Object {
+      "x": 3,
+      "y": 131072,
+    },
+    Object {
+      "x": 4,
+      "y": 131072,
+    },
+    Object {
+      "x": 5,
+      "y": 131072,
+    },
+    Object {
+      "x": 6,
+      "y": 131072,
+    },
+    Object {
+      "x": 7,
+      "y": 131072,
+    },
+    Object {
+      "x": 8,
+      "y": 131072,
+    },
+    Object {
+      "x": 9,
+      "y": 131072,
+    },
+  ],
+  "type": "PRELOAD_BLOCK_DIFFICULTY",
+}
+`;
+
+exports[`Dashboard: actions blockDifficulty: update 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "x": 0,
+      "y": 5,
+    },
+  ],
+  "type": "UPDATE_BLOCK_DIFFICULTY",
+}
+`;
+
+exports[`Dashboard: actions blockNumber: load 1`] = `
+Object {
+  "data": 9,
+  "type": "PRELOAD_BLOCK_NUMBER",
+}
+`;
+
+exports[`Dashboard: actions blockNumber: update 1`] = `
+Object {
+  "data": 5,
+  "type": "UPDATE_BLOCK_NUMBER",
+}
+`;
+
+exports[`Dashboard: actions blockPropagation: load 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "x": 0,
+      "y": 0,
+    },
+    Object {
+      "x": 1,
+      "y": 1512994588,
+    },
+    Object {
+      "x": 2,
+      "y": 3358,
+    },
+    Object {
+      "x": 3,
+      "y": 19,
+    },
+    Object {
+      "x": 4,
+      "y": 1846,
+    },
+    Object {
+      "x": 5,
+      "y": 301,
+    },
+    Object {
+      "x": 6,
+      "y": 48,
+    },
+    Object {
+      "x": 7,
+      "y": 55429,
+    },
+    Object {
+      "x": 8,
+      "y": 106195,
+    },
+    Object {
+      "x": 9,
+      "y": 58,
+    },
+  ],
+  "type": "PRELOAD_BLOCK_PROPAGATION",
+}
+`;
+
+exports[`Dashboard: actions blockPropagation: update 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "x": 0,
+      "y": 0,
+    },
+    Object {
+      "x": 1,
+      "y": 4,
+    },
+  ],
+  "type": "UPDATE_BLOCK_PROPAGATION",
+}
+`;
+
+exports[`Dashboard: actions contractsCount: load 1`] = `
+Object {
+  "data": 2,
+  "type": "PRELOAD_CONTRACT_COUNT",
+}
+`;
+
+exports[`Dashboard: actions contractsCount: update 1`] = `
+Object {
+  "data": 2,
+  "type": "UPDATE_CONTRACT_COUNT",
+}
+`;
+
+exports[`Dashboard: actions transactionTypes: load 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "type": "FunctionCall",
+      "val": 6,
+    },
+    Object {
+      "type": "Transfer",
+      "val": 1,
+    },
+    Object {
+      "type": "Contract",
+      "val": 2,
+    },
+  ],
+  "type": "PRELOAD_TRANSACTION_TYPES",
+}
+`;
+
+exports[`Dashboard: actions transactionTypes: update 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "type": "FunctionCall",
+      "val": 3,
+    },
+  ],
+  "type": "UPDATE_TRANSACTION_TYPES",
+}
+`;
+
+exports[`Dashboard: actions transactionsCount: load 1`] = `
+Object {
+  "data": Array [
+    Object {
+      "x": 0,
+      "y": 0,
+    },
+    Object {
+      "x": 1,
+      "y": 1,
+    },
+    Object {
+      "x": 2,
+      "y": 1,
+    },
+    Object {
+      "x": 3,
+      "y": 1,
+    },
+    Object {
+      "x": 4,
+      "y": 1,
+    },
+    Object {
+      "x": 5,
+      "y": 1,
+    },
+    Object {
+      "x": 6,
+      "y": 1,
+    },
+    Object {
+      "x": 7,
+      "y": 1,
+    },
+    Object {
+      "x": 8,
+      "y": 1,
+    },
+    Object {
+      "x": 9,
+      "y": 1,
+    },
+  ],
+  "type": "PRELOAD_TRANSACTION_COUNT",
+}
+`;
+
+exports[`Dashboard: actions transactionsCount: update 1`] = `
+Object {
+  "data": 2,
+  "type": "UPDATE_TRANSACTION_COUNT",
+}
+`;
+
+exports[`Dashboard: actions usersCount: load 1`] = `
+Object {
+  "data": 1,
+  "type": "PRELOAD_USERS_COUNT",
+}
+`;
+
+exports[`Dashboard: actions usersCount: update 1`] = `
+Object {
+  "data": 2,
+  "type": "UPDATE_USERS_COUNT",
+}
+`;
