@@ -87,6 +87,7 @@ valueToSolidityValue (SimpleValue (ValueInt232 v)) = SolidityValueAsString $ Tex
 valueToSolidityValue (SimpleValue (ValueInt240 v)) = SolidityValueAsString $ Text.pack $ show v
 valueToSolidityValue (SimpleValue (ValueInt248 v)) = SolidityValueAsString $ Text.pack $ show v
 valueToSolidityValue (SimpleValue (ValueInt256 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueInt v)) = SolidityValueAsString $ Text.pack $ show v
 
 valueToSolidityValue (SimpleValue (ValueUInt8 v)) = SolidityValueAsString $ Text.pack $ show v
 valueToSolidityValue (SimpleValue (ValueUInt16 v)) = SolidityValueAsString $ Text.pack $ show v
@@ -123,6 +124,7 @@ valueToSolidityValue (SimpleValue (ValueUInt232 v)) = SolidityValueAsString $ Te
 valueToSolidityValue (SimpleValue (ValueUInt240 v)) = SolidityValueAsString $ Text.pack $ show v
 valueToSolidityValue (SimpleValue (ValueUInt248 v)) = SolidityValueAsString $ Text.pack $ show v
 valueToSolidityValue (SimpleValue (ValueUInt256 v)) = SolidityValueAsString $ Text.pack $ show v
+valueToSolidityValue (SimpleValue (ValueUInt v)) = SolidityValueAsString $ Text.pack $ show v
 
 
 
