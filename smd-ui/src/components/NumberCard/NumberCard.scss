@@ -1,0 +1,21 @@
+@import "../../../node_modules/@blueprintjs/core/dist/variables.scss";
+
+.danger {
+  color: $vermilion5;
+  border-bottom: 5px solid $vermilion5;
+}
+
+.warning {
+  color: $gold5;
+  border-bottom: 5px solid $gold5;
+}
+
+.success {
+  color: $forest5;
+  border-bottom: 5px solid $forest5;
+}
+
+.neutral {
+  color: $turquoise4;
+  border-bottom: 5px solid $turquoise4;
+}

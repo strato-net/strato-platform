@@ -1,0 +1,1583 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Account: index mapStateToProps with values 1`] = `
+Object {
+  "account": Object {
+    "error": null,
+  },
+}
+`;
+
+exports[`Account: index mapStateToProps without values 1`] = `
+Object {
+  "account": Object {},
+}
+`;
+
+exports[`Account: index render with empty values 1`] = `
+ShallowWrapper {
+  "length": 1,
+  Symbol(enzyme.__root__): [Circular],
+  Symbol(enzyme.__unrendered__): <Account
+    account={
+      Array [
+        Object {
+          "address": "5d04537908d44f458acb24b0f2c863ccd2bd3a13",
+          "balance": "1000000000000000000000",
+          "code": "",
+          "codeHash": "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470",
+          "contractRoot": "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+          "kind": "AddressStateRef",
+          "latestBlockNum": 26,
+          "next": "/eth/v1.2/account?address=5d04537908d44f458acb24b0f2c863ccd2bd3a13&index=18",
+          "nonce": 0,
+          "source": "",
+        },
+      ]
+    }
+    address=""
+    faucetRequest={[Function]}
+    name=""
+  />,
+  Symbol(enzyme.__renderer__): Object {
+    "batchedUpdates": [Function],
+    "getNode": [Function],
+    "render": [Function],
+    "simulateEvent": [Function],
+    "unmount": [Function],
+  },
+  Symbol(enzyme.__node__): Object {
+    "instance": null,
+    "key": undefined,
+    "nodeType": "host",
+    "props": Object {
+      "children": Array [
+        <div
+          className="row smd-pad-2 smd-margin-4 smd-vertical-center"
+        >
+          <div
+            className="col-sm-10"
+          >
+            <h4>
+              Address:    
+              <HexText
+                classes="smd-pad-2"
+                value=""
+              />
+            </h4>
+          </div>
+          <div
+            className="col-sm-2 text-right"
+          />
+        </div>,
+        <table
+          className="pt-table pt-str"
+        >
+          <thead>
+            <tr>
+              <th>
+                Field
+              </th>
+              <th>
+                Value
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <strong>
+                  Contract Root
+                </strong>
+              </td>
+              <td>
+                <HexText
+                  classes="smd-pad-2"
+                  value={undefined}
+                />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Kind
+                </strong>
+              </td>
+              <td />
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Balance
+                </strong>
+              </td>
+              <td />
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Latest Block Number
+                </strong>
+              </td>
+              <td />
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Code Hash
+                </strong>
+              </td>
+              <td>
+                <HexText
+                  classes="smd-pad-2"
+                  value={undefined}
+                />
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <strong>
+                  Nonce
+                </strong>
+              </td>
+              <td />
+            </tr>
+          </tbody>
+        </table>,
+      ],
+      "className": "pt-card address-margin-bottom",
+    },
+    "ref": null,
+    "rendered": Array [
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <div
+              className="col-sm-10"
+            >
+              <h4>
+                Address:    
+                <HexText
+                  classes="smd-pad-2"
+                  value=""
+                />
+              </h4>
+            </div>,
+            <div
+              className="col-sm-2 text-right"
+            />,
+          ],
+          "className": "row smd-pad-2 smd-margin-4 smd-vertical-center",
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <h4>
+                Address:    
+                <HexText
+                  classes="smd-pad-2"
+                  value=""
+                />
+              </h4>,
+              "className": "col-sm-10",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  "Address:    ",
+                  <HexText
+                    classes="smd-pad-2"
+                    value=""
+                  />,
+                ],
+              },
+              "ref": null,
+              "rendered": Array [
+                "Address:    ",
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "classes": "smd-pad-2",
+                    "value": "",
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
+                },
+              ],
+              "type": "h4",
+            },
+            "type": "div",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "className": "col-sm-2 text-right",
+            },
+            "ref": null,
+            "rendered": null,
+            "type": "div",
+          },
+        ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": Array [
+            <thead>
+              <tr>
+                <th>
+                  Field
+                </th>
+                <th>
+                  Value
+                </th>
+              </tr>
+            </thead>,
+            <tbody>
+              <tr>
+                <td>
+                  <strong>
+                    Contract Root
+                  </strong>
+                </td>
+                <td>
+                  <HexText
+                    classes="smd-pad-2"
+                    value={undefined}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Kind
+                  </strong>
+                </td>
+                <td />
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Balance
+                  </strong>
+                </td>
+                <td />
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Latest Block Number
+                  </strong>
+                </td>
+                <td />
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Code Hash
+                  </strong>
+                </td>
+                <td>
+                  <HexText
+                    classes="smd-pad-2"
+                    value={undefined}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Nonce
+                  </strong>
+                </td>
+                <td />
+              </tr>
+            </tbody>,
+          ],
+          "className": "pt-table pt-str",
+        },
+        "ref": null,
+        "rendered": Array [
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <tr>
+                <th>
+                  Field
+                </th>
+                <th>
+                  Value
+                </th>
+              </tr>,
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <th>
+                    Field
+                  </th>,
+                  <th>
+                    Value
+                  </th>,
+                ],
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "Field",
+                  },
+                  "ref": null,
+                  "rendered": "Field",
+                  "type": "th",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "Value",
+                  },
+                  "ref": null,
+                  "rendered": "Value",
+                  "type": "th",
+                },
+              ],
+              "type": "tr",
+            },
+            "type": "thead",
+          },
+          Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": Array [
+                <tr>
+                  <td>
+                    <strong>
+                      Contract Root
+                    </strong>
+                  </td>
+                  <td>
+                    <HexText
+                      classes="smd-pad-2"
+                      value={undefined}
+                    />
+                  </td>
+                </tr>,
+                <tr>
+                  <td>
+                    <strong>
+                      Kind
+                    </strong>
+                  </td>
+                  <td />
+                </tr>,
+                <tr>
+                  <td>
+                    <strong>
+                      Balance
+                    </strong>
+                  </td>
+                  <td />
+                </tr>,
+                <tr>
+                  <td>
+                    <strong>
+                      Latest Block Number
+                    </strong>
+                  </td>
+                  <td />
+                </tr>,
+                <tr>
+                  <td>
+                    <strong>
+                      Code Hash
+                    </strong>
+                  </td>
+                  <td>
+                    <HexText
+                      classes="smd-pad-2"
+                      value={undefined}
+                    />
+                  </td>
+                </tr>,
+                <tr>
+                  <td>
+                    <strong>
+                      Nonce
+                    </strong>
+                  </td>
+                  <td />
+                </tr>,
+              ],
+            },
+            "ref": null,
+            "rendered": Array [
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <td>
+                      <strong>
+                        Contract Root
+                      </strong>
+                    </td>,
+                    <td>
+                      <HexText
+                        classes="smd-pad-2"
+                        value={undefined}
+                      />
+                    </td>,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <strong>
+                        Contract Root
+                      </strong>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "Contract Root",
+                      },
+                      "ref": null,
+                      "rendered": "Contract Root",
+                      "type": "strong",
+                    },
+                    "type": "td",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <HexText
+                        classes="smd-pad-2"
+                        value={undefined}
+                      />,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "classes": "smd-pad-2",
+                        "value": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": "td",
+                  },
+                ],
+                "type": "tr",
+              },
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <td>
+                      <strong>
+                        Kind
+                      </strong>
+                    </td>,
+                    <td />,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <strong>
+                        Kind
+                      </strong>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "Kind",
+                      },
+                      "ref": null,
+                      "rendered": "Kind",
+                      "type": "strong",
+                    },
+                    "type": "td",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": undefined,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": "td",
+                  },
+                ],
+                "type": "tr",
+              },
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <td>
+                      <strong>
+                        Balance
+                      </strong>
+                    </td>,
+                    <td />,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <strong>
+                        Balance
+                      </strong>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "Balance",
+                      },
+                      "ref": null,
+                      "rendered": "Balance",
+                      "type": "strong",
+                    },
+                    "type": "td",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": undefined,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": "td",
+                  },
+                ],
+                "type": "tr",
+              },
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <td>
+                      <strong>
+                        Latest Block Number
+                      </strong>
+                    </td>,
+                    <td />,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <strong>
+                        Latest Block Number
+                      </strong>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "Latest Block Number",
+                      },
+                      "ref": null,
+                      "rendered": "Latest Block Number",
+                      "type": "strong",
+                    },
+                    "type": "td",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": undefined,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": "td",
+                  },
+                ],
+                "type": "tr",
+              },
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <td>
+                      <strong>
+                        Code Hash
+                      </strong>
+                    </td>,
+                    <td>
+                      <HexText
+                        classes="smd-pad-2"
+                        value={undefined}
+                      />
+                    </td>,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <strong>
+                        Code Hash
+                      </strong>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "Code Hash",
+                      },
+                      "ref": null,
+                      "rendered": "Code Hash",
+                      "type": "strong",
+                    },
+                    "type": "td",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <HexText
+                        classes="smd-pad-2"
+                        value={undefined}
+                      />,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "classes": "smd-pad-2",
+                        "value": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": [Function],
+                    },
+                    "type": "td",
+                  },
+                ],
+                "type": "tr",
+              },
+              Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <td>
+                      <strong>
+                        Nonce
+                      </strong>
+                    </td>,
+                    <td />,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": <strong>
+                        Nonce
+                      </strong>,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": "Nonce",
+                      },
+                      "ref": null,
+                      "rendered": "Nonce",
+                      "type": "strong",
+                    },
+                    "type": "td",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": undefined,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": "td",
+                  },
+                ],
+                "type": "tr",
+              },
+            ],
+            "type": "tbody",
+          },
+        ],
+        "type": "table",
+      },
+    ],
+    "type": "div",
+  },
+  Symbol(enzyme.__nodes__): Array [
+    Object {
+      "instance": null,
+      "key": undefined,
+      "nodeType": "host",
+      "props": Object {
+        "children": Array [
+          <div
+            className="row smd-pad-2 smd-margin-4 smd-vertical-center"
+          >
+            <div
+              className="col-sm-10"
+            >
+              <h4>
+                Address:    
+                <HexText
+                  classes="smd-pad-2"
+                  value=""
+                />
+              </h4>
+            </div>
+            <div
+              className="col-sm-2 text-right"
+            />
+          </div>,
+          <table
+            className="pt-table pt-str"
+          >
+            <thead>
+              <tr>
+                <th>
+                  Field
+                </th>
+                <th>
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <strong>
+                    Contract Root
+                  </strong>
+                </td>
+                <td>
+                  <HexText
+                    classes="smd-pad-2"
+                    value={undefined}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Kind
+                  </strong>
+                </td>
+                <td />
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Balance
+                  </strong>
+                </td>
+                <td />
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Latest Block Number
+                  </strong>
+                </td>
+                <td />
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Code Hash
+                  </strong>
+                </td>
+                <td>
+                  <HexText
+                    classes="smd-pad-2"
+                    value={undefined}
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <strong>
+                    Nonce
+                  </strong>
+                </td>
+                <td />
+              </tr>
+            </tbody>
+          </table>,
+        ],
+        "className": "pt-card address-margin-bottom",
+      },
+      "ref": null,
+      "rendered": Array [
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": Array [
+              <div
+                className="col-sm-10"
+              >
+                <h4>
+                  Address:    
+                  <HexText
+                    classes="smd-pad-2"
+                    value=""
+                  />
+                </h4>
+              </div>,
+              <div
+                className="col-sm-2 text-right"
+              />,
+            ],
+            "className": "row smd-pad-2 smd-margin-4 smd-vertical-center",
+          },
+          "ref": null,
+          "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <h4>
+                  Address:    
+                  <HexText
+                    classes="smd-pad-2"
+                    value=""
+                  />
+                </h4>,
+                "className": "col-sm-10",
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    "Address:    ",
+                    <HexText
+                      classes="smd-pad-2"
+                      value=""
+                    />,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  "Address:    ",
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "classes": "smd-pad-2",
+                      "value": "",
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": [Function],
+                  },
+                ],
+                "type": "h4",
+              },
+              "type": "div",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "className": "col-sm-2 text-right",
+              },
+              "ref": null,
+              "rendered": null,
+              "type": "div",
+            },
+          ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": Array [
+              <thead>
+                <tr>
+                  <th>
+                    Field
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>
+              </thead>,
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>
+                      Contract Root
+                    </strong>
+                  </td>
+                  <td>
+                    <HexText
+                      classes="smd-pad-2"
+                      value={undefined}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>
+                      Kind
+                    </strong>
+                  </td>
+                  <td />
+                </tr>
+                <tr>
+                  <td>
+                    <strong>
+                      Balance
+                    </strong>
+                  </td>
+                  <td />
+                </tr>
+                <tr>
+                  <td>
+                    <strong>
+                      Latest Block Number
+                    </strong>
+                  </td>
+                  <td />
+                </tr>
+                <tr>
+                  <td>
+                    <strong>
+                      Code Hash
+                    </strong>
+                  </td>
+                  <td>
+                    <HexText
+                      classes="smd-pad-2"
+                      value={undefined}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>
+                      Nonce
+                    </strong>
+                  </td>
+                  <td />
+                </tr>
+              </tbody>,
+            ],
+            "className": "pt-table pt-str",
+          },
+          "ref": null,
+          "rendered": Array [
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": <tr>
+                  <th>
+                    Field
+                  </th>
+                  <th>
+                    Value
+                  </th>
+                </tr>,
+              },
+              "ref": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "host",
+                "props": Object {
+                  "children": Array [
+                    <th>
+                      Field
+                    </th>,
+                    <th>
+                      Value
+                    </th>,
+                  ],
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "Field",
+                    },
+                    "ref": null,
+                    "rendered": "Field",
+                    "type": "th",
+                  },
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "Value",
+                    },
+                    "ref": null,
+                    "rendered": "Value",
+                    "type": "th",
+                  },
+                ],
+                "type": "tr",
+              },
+              "type": "thead",
+            },
+            Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {
+                "children": Array [
+                  <tr>
+                    <td>
+                      <strong>
+                        Contract Root
+                      </strong>
+                    </td>
+                    <td>
+                      <HexText
+                        classes="smd-pad-2"
+                        value={undefined}
+                      />
+                    </td>
+                  </tr>,
+                  <tr>
+                    <td>
+                      <strong>
+                        Kind
+                      </strong>
+                    </td>
+                    <td />
+                  </tr>,
+                  <tr>
+                    <td>
+                      <strong>
+                        Balance
+                      </strong>
+                    </td>
+                    <td />
+                  </tr>,
+                  <tr>
+                    <td>
+                      <strong>
+                        Latest Block Number
+                      </strong>
+                    </td>
+                    <td />
+                  </tr>,
+                  <tr>
+                    <td>
+                      <strong>
+                        Code Hash
+                      </strong>
+                    </td>
+                    <td>
+                      <HexText
+                        classes="smd-pad-2"
+                        value={undefined}
+                      />
+                    </td>
+                  </tr>,
+                  <tr>
+                    <td>
+                      <strong>
+                        Nonce
+                      </strong>
+                    </td>
+                    <td />
+                  </tr>,
+                ],
+              },
+              "ref": null,
+              "rendered": Array [
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <td>
+                        <strong>
+                          Contract Root
+                        </strong>
+                      </td>,
+                      <td>
+                        <HexText
+                          classes="smd-pad-2"
+                          value={undefined}
+                        />
+                      </td>,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <strong>
+                          Contract Root
+                        </strong>,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Contract Root",
+                        },
+                        "ref": null,
+                        "rendered": "Contract Root",
+                        "type": "strong",
+                      },
+                      "type": "td",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <HexText
+                          classes="smd-pad-2"
+                          value={undefined}
+                        />,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "class",
+                        "props": Object {
+                          "classes": "smd-pad-2",
+                          "value": undefined,
+                        },
+                        "ref": null,
+                        "rendered": null,
+                        "type": [Function],
+                      },
+                      "type": "td",
+                    },
+                  ],
+                  "type": "tr",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <td>
+                        <strong>
+                          Kind
+                        </strong>
+                      </td>,
+                      <td />,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <strong>
+                          Kind
+                        </strong>,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Kind",
+                        },
+                        "ref": null,
+                        "rendered": "Kind",
+                        "type": "strong",
+                      },
+                      "type": "td",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": "td",
+                    },
+                  ],
+                  "type": "tr",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <td>
+                        <strong>
+                          Balance
+                        </strong>
+                      </td>,
+                      <td />,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <strong>
+                          Balance
+                        </strong>,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Balance",
+                        },
+                        "ref": null,
+                        "rendered": "Balance",
+                        "type": "strong",
+                      },
+                      "type": "td",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": "td",
+                    },
+                  ],
+                  "type": "tr",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <td>
+                        <strong>
+                          Latest Block Number
+                        </strong>
+                      </td>,
+                      <td />,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <strong>
+                          Latest Block Number
+                        </strong>,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Latest Block Number",
+                        },
+                        "ref": null,
+                        "rendered": "Latest Block Number",
+                        "type": "strong",
+                      },
+                      "type": "td",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": "td",
+                    },
+                  ],
+                  "type": "tr",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <td>
+                        <strong>
+                          Code Hash
+                        </strong>
+                      </td>,
+                      <td>
+                        <HexText
+                          classes="smd-pad-2"
+                          value={undefined}
+                        />
+                      </td>,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <strong>
+                          Code Hash
+                        </strong>,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Code Hash",
+                        },
+                        "ref": null,
+                        "rendered": "Code Hash",
+                        "type": "strong",
+                      },
+                      "type": "td",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <HexText
+                          classes="smd-pad-2"
+                          value={undefined}
+                        />,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "class",
+                        "props": Object {
+                          "classes": "smd-pad-2",
+                          "value": undefined,
+                        },
+                        "ref": null,
+                        "rendered": null,
+                        "type": [Function],
+                      },
+                      "type": "td",
+                    },
+                  ],
+                  "type": "tr",
+                },
+                Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": Array [
+                      <td>
+                        <strong>
+                          Nonce
+                        </strong>
+                      </td>,
+                      <td />,
+                    ],
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": <strong>
+                          Nonce
+                        </strong>,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": "Nonce",
+                        },
+                        "ref": null,
+                        "rendered": "Nonce",
+                        "type": "strong",
+                      },
+                      "type": "td",
+                    },
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": undefined,
+                      },
+                      "ref": null,
+                      "rendered": null,
+                      "type": "td",
+                    },
+                  ],
+                  "type": "tr",
+                },
+              ],
+              "type": "tbody",
+            },
+          ],
+          "type": "table",
+        },
+      ],
+      "type": "div",
+    },
+  ],
+  Symbol(enzyme.__options__): Object {
+    "adapter": ReactFifteenAdapter {
+      "options": Object {
+        "supportPrevContextArgumentOfComponentDidUpdate": true,
+      },
+    },
+  },
+}
+`;
