@@ -1,0 +1,6 @@
+dist_built
+node_modules
+Dockerfile.buildbase
+.idea
+.git
+Basilbuild
