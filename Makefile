@@ -1,23 +1,27 @@
 REPO_URL ?= EMPTY
 ifeq ($(REPO),local)
-    REPO_URL=
+  REPO_URL=
 endif
 ifeq ($(REPO),private)
-    REPO_URL=registry-aws.blockapps.net:5000/blockapps/
+  REPO_URL=registry-aws.blockapps.net:5000/blockapps/
 endif
 ifeq ($(REPO),public)
-    REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
+  REPO_URL=registry-aws.blockapps.net:5000/blockapps-repo/
 endif
 ifeq ($(REPO_URL),EMPTY)
-    $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
+  $(error REPO not provided or unknown value. Please provide one of the types for REPO var: [local, private, public]. Or custom REPO_URL)
 endif
 $(info REPO_URL is "${REPO_URL}" (${REPO}))
 
 ifndef VERSION
+  ifeq ($(REPO),public)
     VERSION = `cat VERSION`
     $(info Using version tag from VERSION file)
+  else
+    VERSION = `cat VERSION`-`git rev-parse --short HEAD`
+  endif
 else
-    $(info VERSION is "${VERSION}" (overriden with env var))
+  $(info VERSION is "${VERSION}" (overriden with env var))
 endif
 
 $(info )
@@ -70,3 +74,6 @@ docker-compose:
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
+
+test:
+	@echo ${VERSION}
