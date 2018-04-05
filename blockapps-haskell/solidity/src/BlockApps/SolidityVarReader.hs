@@ -178,7 +178,6 @@ valueToSolidityValue (ValueFunction _ paramTypes returnTypes) =
                           ++ ") returns ("
                           ++ intercalate "," (map (formatType . snd) returnTypes)
                           ++ ")"
-valueToSolidityValue x = error $ "missing value in valueToSolidityValue: " ++ show x
 
 
 word256ToByteString::Word256->ByteString
