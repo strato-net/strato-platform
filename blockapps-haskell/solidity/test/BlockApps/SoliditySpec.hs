@@ -6,7 +6,6 @@ module BlockApps.SoliditySpec where
 import Test.Hspec
 import Data.Aeson
 import Data.Either
-import Data.LargeWord (LargeKey(..))
 import qualified Data.ByteString.Lazy as ByteString
 import BlockApps.Solidity.Xabi
 import BlockApps.SolidityVarReader
