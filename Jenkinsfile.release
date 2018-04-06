@@ -3,7 +3,10 @@ pipeline {
     label "strato-integration"
   }
   options { disableConcurrentBuilds() }
-  parameters { string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the test job). DEFAULT: "full"') }
+  parameters {
+    string(name: 'BUILD_TYPE', defaultValue: 'full', description: 'PLEASE USE RESPONSIBLY: Type "quick" if you want to make the quick build (not wiping the existing images, same as does the test job). DEFAULT: "full"')
+    string(name: 'REFSPEC', defaultValue: 'v0.0.0-rc0', description: 'The strato-platform refspec to build as a release candidate. Use `tags/<tag_name>` to build specific tag or origin/<branch_name> to build the branch.')
+  }
   stages {
     stage('Prepare') {
       steps {
