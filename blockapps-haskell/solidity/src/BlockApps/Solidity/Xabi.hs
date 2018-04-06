@@ -89,7 +89,7 @@ data Func = Func
 
   -- These Values are only used for parsing and unparsing solidity.
   -- This data will not be stored in the db and will have no
-  -- relavance when constructing from the db.
+  -- relevance when constructing from the db.
   , funcContents :: Maybe Text
   , funcMutable :: Maybe Bool
   , funcPayable :: Maybe Bool
