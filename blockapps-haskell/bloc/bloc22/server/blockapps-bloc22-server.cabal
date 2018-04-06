@@ -37,6 +37,7 @@ library
                , blockapps-ethereum
                , blockapps-solidity
                , blockapps-bloc22-api
+               , blockapps-cirrus-client
                , blockapps-strato-api
                , blockapps-strato-client
                , clock

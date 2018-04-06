@@ -90,6 +90,7 @@ test-suite blockapps-solidity-test
                , base16-bytestring
                , blockapps-ethereum
                , blockapps-solidity
+               , blockapps-strato-api
                , bytestring
                , containers
                , hspec
