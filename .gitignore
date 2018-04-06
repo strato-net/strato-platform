@@ -1,4 +1,5 @@
 .idea
 .basil-work
+.stack-work
 docker-compose.push.yml
 docker-compose.yml
