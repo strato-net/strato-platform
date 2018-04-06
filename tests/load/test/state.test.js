@@ -43,8 +43,8 @@ describe('LOAD TEST: state', function() {
       assert.equal(length-1, total, 'pushed');
       assert.equal(parseInt(value, 16), total, 'value');
       if (readState) {
-        const state = yield rest.getState(contract);
-        assert.equal(state.titles.length-1, total, 'all created');
+        const state = yield rest.getStateVar(contract, 'titles', null, null, true);
+        assert.equal(state.titles - 1, total, 'all created');
       }
     }
   });
