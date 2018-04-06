@@ -159,10 +159,10 @@ class CreateContract extends Component {
               <td>{contract.constr[arg].type}</td>
               <td>
                 <Field
-                  id="input-b"
+                  id={arg}
                   className="pt-input"
                   component="input"
-                  name={arg}
+                  name={"field" + arg}
                   title="Enter value"
                   type="text"
                   dir="auto"
