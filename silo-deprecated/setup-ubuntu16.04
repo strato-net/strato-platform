@@ -1,0 +1,45 @@
+#!/bin/bash
+
+set -e
+
+if [[ $EUID -ne 0 ]]; then
+  echo >&2 "Must be run as root"
+  exit 1
+fi
+
+echo "Installing docker..."
+apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    software-properties-common
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+
+add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+   
+apt-get update &>/dev/null
+
+apt-get install -y docker-ce
+
+echo "Adding $USER to the docker group..."
+usermod -aG docker $USER &>/dev/null
+chown :$USER /var/run/docker.sock &>/dev/null
+
+echo "You will need to log out and back in to activate your group membership"
+
+echo "Installing docker-compose..."
+curl -L "https://github.com/docker/compose/releases/download/1.13.0/docker-compose-$(uname -s)-$(uname -m)"  -o /usr/local/bin/docker-compose >& /dev/null
+chmod +x /usr/local/bin/docker-compose
+
+echo "Copying certs if present..."
+if [[ -f server.pem ]]; then
+  mv server.pem /etc/ssl/certs
+fi
+
+if [[ -f server.key ]]; then
+  mv server.key /etc/ssl/private
+fi

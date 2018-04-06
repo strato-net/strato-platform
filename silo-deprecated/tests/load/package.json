@@ -1,0 +1,67 @@
+{
+  "name": "vitu",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "swagger": "http-server ext/swagger-editor &",
+    "start": "npm run swagger && node server/index.js",
+    "start:back": "node server/index.js > server/stdout.txt 2> server/stderr.txt &",
+    "start:test-ui": "npm run deploy-ui",
+    "deploy": "mocha server/dapp/dapp.deploy.js --config server/config/${SERVER:-localhost}.config.yaml -b && cp server/config/${SERVER:-localhost}.config.yaml ./config.yaml",
+    "deploy-windows": "mocha server/dapp/dapp.deploy.js --config server/config/%SERVER%.config.yaml -b",
+    "test": "npm run test:user && npm run test:routes && npm run test:unit",
+    "deploy-ui": "mocha tests/v1/deploy/ui.deploy.test.js --config server/config/${SERVER:-localhost}.config.yaml -b && cp server/config/${SERVER:-localhost}.config.yaml ./config.yaml",
+    "test:dealer": "mocha tests/v1/unit/dealer.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:lender": "mocha tests/v1/unit/lender.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:provider": "mocha tests/v1/unit/provider.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:tex": "mocha tests/v1/unit/tex.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:dmv": "mocha tests/v1/unit/dmv.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:sequence": "mocha tests/v1/unit/sequence.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:unit": "npm run test:dealer && npm run test:lender && npm run test:provider && npm run test:tex && npm run test:dmv",
+    "test:integration": "npm run test:uc-1 && npm run test:uc-2",
+    "test:uc-1": "mocha tests/v1/integration/uc01-InitiateTitle.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:uc-2": "mocha tests/v1/integration/uc02-LienRelease.test.js --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:user": "mocha server/lib/user/test/ --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:title": "mocha server/lib/title/test/ --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:finance": "mocha server/lib/finance/test/ --config server/config/${SERVER:-localhost}.config.yaml -b",
+    "test:contracts": "npm run test:user && npm run test:title && npm run test:finance",
+    "test:routes": "mocha tests/v1/ -b",
+    "test-windows": "npm run test-windows:user && npm run test:routes",
+    "test-windows:user": "mocha server/lib/user/test/ --config server/config/%SERVER%.config.yaml -b"
+  },
+  "dependencies": {
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest",
+    "body-parser": "^1.15.2",
+    "chai": "^4.0.2",
+    "co": "^4.6.0",
+    "co-mocha": "^1.2.0",
+    "cors": "^2.8.1",
+    "expect": "latest",
+    "express": "^4.14.0",
+    "express-ws": "^3.0.0",
+    "http-server": "latest",
+    "mocha": "^3.4.2",
+    "moment": "^2.20.1",
+    "request": "latest",
+    "request-promise": "^4.2.2",
+    "socket.io": "^2.0.4",
+    "swagger-ui-express": "latest",
+    "websocket": "^1.0.25",
+    "yamljs": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blockapps/vitu.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/blockapps/vitu/issues"
+  },
+  "homepage": "https://github.com/blockapps/vitu#readme",
+  "devDependencies": {
+    "chai-http": "^3.0.0",
+    "mocha": "^3.3.0"
+  }
+}
