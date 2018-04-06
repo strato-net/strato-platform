@@ -145,10 +145,10 @@ pipeline {
               github-release upload $STRATOGS_RELEASE_DETAILS_LATEST --name "docker-compose.latest.yml" --file ./docker-compose.yml
 
               # Release as stable
-              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag build-$TAG_NAME"
-              github-release delete  $STRATOGS_RELEASE_DETAILS || true
-              github-release release $STRATOGS_RELEASE_DETAILS --name "master @ $RELEASE_DATE"
-              github-release upload $STRATOGS_RELEASE_DETAILS --name "docker-compose.release.yml" --file ./docker-compose.yml
+              STRATOGS_RELEASE_DETAILS_STABLE="--user blockapps --repo strato-getting-started --tag $TAG_NAME"
+              github-release delete $STRATOGS_RELEASE_DETAILS_STABLE || true
+              github-release release $STRATOGS_RELEASE_DETAILS_STABLE --name "$TAG_NAME"
+              github-release upload $STRATOGS_RELEASE_DETAILS_STABLE --name "docker-compose.release.yml" --file ./docker-compose.yml
             '''
           }
         }
