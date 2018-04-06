@@ -94,10 +94,8 @@ pipeline {
         sh '''#!/bin/bash -le
           set -x
           echo "Running monstrato unit tests"
-          # TODO: test and enable
-          #cd monstrato
-          #stack test strato-init blockapps-data
-          ## TODO: We have a running environment, so stack test strato-api should work
+          cd monstrato
+          ./run_unit_tests.sh
         '''
       }
     }
@@ -108,9 +106,7 @@ pipeline {
           set -x
           echo 'Running BlockApps Haskell tests to verify the build to be healthy'
           cd blockapps-haskell
-          stack test blockapps-bloc22-server
-          stack test blockapps-solidity --test-arguments="--match=Declarations"
-          stack test blockapps-bloc22-client
+          ./run_unit_tests.sh
         '''
       }
     }
