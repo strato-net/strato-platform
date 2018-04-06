@@ -105,12 +105,6 @@ instance (Integral n, Show n) => ToHttpApiData (Hex n) where
 instance Arbitrary x => Arbitrary (Hex x) where
   arbitrary = genericArbitrary uniform
 
-instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
-  arbitrary = do
-    a <- arbitrary
-    b <- arbitrary
-    return $ LargeKey a b
-
 instance ToSchema (Hex Word160) where
   declareNamedSchema = const . pure $ named "hex word160" binarySchema
 
