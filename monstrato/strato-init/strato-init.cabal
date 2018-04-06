@@ -163,6 +163,8 @@ library
                  , strato-model
                  , text
                  , time
+                 , unordered-containers
+                 , vector
                  , utf8-string
 
 executable generate-genesis
@@ -171,8 +173,6 @@ executable generate-genesis
     default-language: Haskell2010
     buildable: True
     ghc-options: -Wall -O2 -threaded
-    other-modules: Blockchain.Data.GenesisInfo
-                   Blockchain.Generation
     build-depends: base
                  , aeson
                  , aeson-extra
@@ -190,6 +190,8 @@ executable generate-genesis
                  , strato-model
                  , text
                  , time
+                 , unordered-containers
+                 , vector
                  , utf8-string
 
 test-suite strato-init-test
@@ -213,6 +215,8 @@ test-suite strato-init-test
                  , strato-model
                  , text
                  , time
+                 , vector
+                 , unordered-containers
                  , utf8-string
     ghc-options: -Wall
     default-language: Haskell2010

@@ -155,14 +155,14 @@ module.exports = {
     co(function* () {
       const email = req.body.email;
       if (!email) {
-        let err = new Error("wrong params, expected: {email, nodeIP}");
+        let err = new Error("wrong params, expected: {email}");
         err.status = 400;
         return next(err);
       }
 
       const user = yield models.User.findOne({ where: { username: email } });
       if (user) {
-        const authErrorText = "User already exists";
+        const authErrorText = "User account already exists. Please login with the valid credentials.";
         let err = new Error(authErrorText);
         err.status = 401;
         return next(err);
@@ -180,7 +180,7 @@ module.exports = {
       rp(options)
         .then(response => {
           if (!response.hash) {
-            const authErrorText = "The email does not exist";
+            const authErrorText = "User not found. Register your account on signup.blockapps.net";
             let err = new Error(authErrorText);
             err.status = 401;
             return next(err);
@@ -197,7 +197,7 @@ module.exports = {
             })
         })
         .catch(error => {
-          let err = new Error('Could not verify user');
+          let err = new Error('Unexpected server error. Please try again after sometime.');
           err.status = 500;
           return next(err);
         })

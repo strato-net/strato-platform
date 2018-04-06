@@ -101,6 +101,7 @@ instance MonadBaseControl IO Bloc where
 
 data BlocEnv = BlocEnv
   { urlStrato    :: BaseUrl
+  , urlCirrus    :: BaseUrl
   , httpManager  :: Manager
   , dbPool       :: Pool Connection
   , logLevel     :: Severity
@@ -108,6 +109,7 @@ data BlocEnv = BlocEnv
 
 data BlocError
   = StratoError ServantError
+  | CirrusError ServantError
   | DBError Text
   | UserError Text
   | CouldNotFind Text
@@ -214,6 +216,7 @@ enterBloc env x
                      "Please contact your network administrator to have this problem fixed.",
                      "(More information can be found in the Bloc logs.)"
                    ]}
+          CirrusError err -> err500{errBody = Lazy.Char8.pack (show err)}
           UserError err -> err400{errBody = fromString $ show err}
           CouldNotFind err -> err404{errBody = fromString $ show err}
           AnError _ ->
@@ -326,3 +329,23 @@ blocStrato client' = do
 
 blocMaybe :: Text -> Maybe x -> Bloc x
 blocMaybe msg = maybe (throwError (CouldNotFind msg)) return
+
+blocCirrusFireForget :: HasCallStack => ClientM x -> Bloc Bool
+blocCirrusFireForget client' = do
+  logWithCallStack callStack logNotice "Querying Cirrus"
+  url <- asks urlCirrus
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  case resultEither of
+    Left err -> do 
+      logWith logError (Text.pack $ show err ++ "\n  Cirrus returned an error")
+      return False
+    Right _ -> return True
+
+blocCirrus :: HasCallStack => ClientM x -> Bloc x
+blocCirrus client' = do
+  logWithCallStack callStack logNotice "Querying Cirrus"
+  url <- asks urlCirrus
+  mngr <- asks httpManager
+  resultEither <- liftIO $ runClientM client' (ClientEnv mngr url)
+  either (throwError . CirrusError) return resultEither

@@ -5,6 +5,7 @@ import qualified Data.Aeson as Ae
 import Data.Bits
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
+import qualified Data.Vector as V
 import Test.Hspec
 
 import Blockchain.Data.GenesisInfo
@@ -102,11 +103,15 @@ spec = do
       in got `shouldBe` want
 
   describe "Parsing storage values" $ do
-    it "Should accept JSON of strings and ints" $
+    it "Should accept JSON of strings, ints, and arrays" $
       let input = "[[4, \"life, \\\"the universe,\\\" everything\", -90909], \
-                  \ [\"one string on this line\"]]"
+                  \ [\"one string on this line\"], \
+                  \ [[\"one\", \"fish\"], [\"red\"], [1, 2, 3]]]"
           want = Right [[Number 4, Stryng "life, \"the universe,\" everything", Number (-90909)],
-                        [Stryng "one string on this line"]]
+                        [Stryng "one string on this line"],
+                        [List . V.fromList $ [Stryng "one", Stryng "fish"],
+                         List . V.fromList $ [Stryng "red"],
+                         List . V.fromList $ [Number 1, Number 2, Number 3]]]
           got = Ae.eitherDecode input
       in got `shouldBe` want
 
@@ -114,13 +119,13 @@ spec = do
     it "Should encode nonegative integers" $
       let input = Records [[Number 0xfffffff, Number 0]]
           want = [[(0, 0xfffffff), (1, 0)]]
-          got = fromRight [] $ encodeAllTypes input
+          got = fromRight [] $ encodeAllRecords input
       in got `shouldBe` want
 
     it "Should encode short strings" $
       let input = Records [[Stryng "\x30\x31\x42"]]
           want = [[(0, 0x303142 `shiftL` (29 * 8) .|. 3 `shiftL` 1)] :: [(Word256, Word256)]]
-          got = fromRight [] $ encodeAllTypes input
+          got = fromRight [] $ encodeAllRecords input
       -- Compare in JSON domain just so things are formatted in hex
       in Ae.encode got `shouldBe` Ae.encode want
 
@@ -129,7 +134,7 @@ spec = do
           -- Tip: $ printf "¯|_(ツ)_/¯筋ランキンxyz" | xxd
           want = [[(0, 0xc2af7c5f28e38384295f2fc2afe7ad8be383a9e383b3e382ade383b378797a00
                        .|. 31 `shiftL` 1)]] :: [[(Word256, Word256)]]
-          got = fromRight [] $ encodeAllTypes input
+          got = fromRight [] $ encodeAllRecords input
       in Ae.encode got `shouldBe` Ae.encode want
 
     it "Should encode long strings properly" $
@@ -145,13 +150,13 @@ spec = do
                    (0x405787FA12A823E0F2B7631CC41B3BA8828B3321CA811111FA75CD3AA3BB5AD1,
                     0x4444444400000000000000000000000000000000000000000000000000000000)]]
                  :: [[(Word256, Word256)]]
-          got = fromRight [] $ encodeAllTypes input
+          got = fromRight [] $ encodeAllRecords input
       in Ae.encode got `shouldBe` Ae.encode want
 
     it "Should refuse negative numbers" $
       let input = Records [[Number (-3)]]
           want = Left "unimplemented for negative numbers"
-          got = encodeAllTypes input
+          got = encodeAllRecords input
       in got `shouldBe` want
     it "Should encode JSON into storage slots" $
       let input = "[[9876,\"This is text\"],\n[200,\n\"More text!\"]]"
@@ -163,3 +168,111 @@ spec = do
           got = encodeJSON input
       in got `shouldBe` want
 
+    it "Should encode integer arrays" $
+      let input = "[[[1, 2, 3, 4, 5]]]"
+          -- NB: keccak(uint256(0)) =  0x290...
+          want = Right [[
+              (0x0000000000000000000000000000000000000000000000000000000000000000,
+               0x0000000000000000000000000000000000000000000000000000000000000005),
+              (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563,
+               0x0000000000000000000000000000000000000000000000000000000000000001),
+              (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e564,
+               0x0000000000000000000000000000000000000000000000000000000000000002),
+              (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e565,
+               0x0000000000000000000000000000000000000000000000000000000000000003),
+              (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e566,
+               0x0000000000000000000000000000000000000000000000000000000000000004),
+              (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e567,
+               0x0000000000000000000000000000000000000000000000000000000000000005)
+            ]]
+          got = encodeJSON input
+      in got `shouldBe` want
+
+  it "Should encode arrays of arrays" $
+    let input = "[[7, [[3, 127]]]]"
+        -- NB: keccak(uint256(1)) = 0xb10e2d...
+        -- NB: kecack(keccak(uint256(1))) = 0xb5d9d8...
+        want = Right $ [[
+            (0x0000000000000000000000000000000000000000000000000000000000000000,
+             0x0000000000000000000000000000000000000000000000000000000000000007), -- row[0] = 7
+            (0x0000000000000000000000000000000000000000000000000000000000000001,
+             0x0000000000000000000000000000000000000000000000000000000000000001), -- len(row[1]) = 1
+            (0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6,
+             0x0000000000000000000000000000000000000000000000000000000000000002), -- len(row[1][0]) = 2
+            (0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22,
+             0x0000000000000000000000000000000000000000000000000000000000000003), -- row[1][0] = 3
+            (0xb5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d23,
+             0x000000000000000000000000000000000000000000000000000000000000007f) -- row[1][1] = 127
+          ]]
+        got = encodeJSON input
+    in got `shouldBe` want
+
+  it "Should encode structs" $
+    let input = "[[{\"0\": 255, \"1\": \"unique,newyork\"}]]"
+        want = Right $ [[
+            (0x0000000000000000000000000000000000000000000000000000000000000000,
+             0x00000000000000000000000000000000000000000000000000000000000000ff),
+            (0x0000000000000000000000000000000000000000000000000000000000000001,
+             0x756e697175652c6e6577796f726b00000000000000000000000000000000001c)
+           ]]
+        got = encodeJSON input
+    in got `shouldBe` want
+  it "Should encode integers after structs" $
+    let input = "[[{\"0\": 65535, \"1\": 16777215, \"2\": 4294967295}, 93, 101]]"
+        want = Right $ [[
+            (0x0000000000000000000000000000000000000000000000000000000000000000,
+             0x000000000000000000000000000000000000000000000000000000000000ffff),
+            (0x0000000000000000000000000000000000000000000000000000000000000001,
+             0x0000000000000000000000000000000000000000000000000000000000ffffff),
+            (0x0000000000000000000000000000000000000000000000000000000000000002,
+             0x00000000000000000000000000000000000000000000000000000000ffffffff),
+            (0x0000000000000000000000000000000000000000000000000000000000000003,
+             0x000000000000000000000000000000000000000000000000000000000000005d),
+            (0x0000000000000000000000000000000000000000000000000000000000000004,
+             0x0000000000000000000000000000000000000000000000000000000000000065)
+          ]]
+        got = encodeJSON input
+    in got `shouldBe` want
+
+  it "Should encode structs of structs" $
+    let input = "[[\
+                   \{\"0\": {\"a\": {\"A\": 1,    \
+                   \                 \"B\": 3},   \
+                   \         \"b\": {\"A\": 7,    \
+                   \                 \"B\": 15}}, \
+                   \ \"1\": {\"a\": {\"A\": 31,   \
+                   \                 \"B\": 63},  \
+                   \         \"b\": {\"A\": 127,  \
+                   \                 \"B\": 255}}}\
+                 \]]"
+        want = Right [zip [0..] [1, 3, 7, 15, 31, 63, 127, 255]]
+        got = encodeJSON input
+    in got `shouldBe` want
+
+  it "Should encode lists of structs" $
+    let input = "[[[\
+                    \{\"x\": 15,      \
+                    \ \"y\": 255},    \
+                    \{\"x\": 4095,    \
+                    \ \"y\": 65535},  \
+                    \{\"x\": 1048575, \
+                    \ \"y\": 16777215}\
+                \]]]"
+        want = Right [[
+            (0x0000000000000000000000000000000000000000000000000000000000000000,
+             0x0000000000000000000000000000000000000000000000000000000000000003),
+            (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563,
+             0x000000000000000000000000000000000000000000000000000000000000000f),
+            (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e564,
+             0x00000000000000000000000000000000000000000000000000000000000000ff),
+            (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e565,
+             0x0000000000000000000000000000000000000000000000000000000000000fff),
+            (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e566,
+             0x000000000000000000000000000000000000000000000000000000000000ffff),
+            (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e567,
+             0x00000000000000000000000000000000000000000000000000000000000fffff),
+            (0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e568,
+             0x0000000000000000000000000000000000000000000000000000000000ffffff)
+            ]]
+        got = encodeJSON input
+    in got `shouldBe` want
