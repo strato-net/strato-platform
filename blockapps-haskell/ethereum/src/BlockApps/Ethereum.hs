@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans  #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -47,6 +48,8 @@ module BlockApps.Ethereum
   ) where
 
 import           Control.Lens.Operators
+import           Control.Monad (liftM2)
+import           Control.DeepSeq (NFData, rnf)
 import           Crypto.Hash
 import           Crypto.Random.Entropy
 import           Crypto.Secp256k1
@@ -78,8 +81,16 @@ import           Test.QuickCheck
 import           Text.Read              hiding (String)
 import           Web.FormUrlEncoded     hiding (fieldLabelModifier)
 
+instance (Arbitrary a, Arbitrary b) => Arbitrary (LargeKey a b) where
+  arbitrary = (liftM2 LargeKey) arbitrary arbitrary
+
+instance (NFData a, NFData b) => NFData (LargeKey a b) where
+  rnf (LargeKey a b) = rnf a `seq` rnf b `seq` ()
+
 newtype Address = Address { unAddress :: Word160 }
   deriving (Eq, Ord, Generic, Bounded)
+
+instance NFData Address
 
 instance Show Address where show = addressString
 
@@ -282,6 +293,8 @@ data Transaction = Transaction
   , transactionS          :: Word256
   } deriving (Eq,Show,Generic)
 
+instance NFData Transaction
+
 instance RLPEncodable Transaction where
   rlpEncode Transaction{..} = rlpEncode
     ( transactionNonce
@@ -435,6 +448,7 @@ data BlockHeader = BlockHeader
   } deriving (Eq,Show,Generic)
 
 newtype Nonce = Nonce Word256 deriving (Eq,Show,Generic)
+instance NFData Nonce
 
 instance ToJSON Nonce where
   toJSON (Nonce n) = toJSON $ toInteger n
@@ -463,6 +477,7 @@ incrNonce :: Nonce -> Nonce
 incrNonce (Nonce n) = Nonce (n+1)
 
 newtype Wei = Wei Word256 deriving (Eq,Show,Generic)
+instance NFData Wei
 
 -- --TODO- this might be unsafe, since it could lead to an overflow.  A Word256 * 10^18 certainly can be much higer than a Word256
 -- eth::Word256->Wei
@@ -492,6 +507,8 @@ instance RLPEncodable Wei where
   rlpDecode obj = Wei . fromInteger <$> rlpDecode obj
 
 newtype Gas = Gas Word256 deriving (Eq,Show,Generic)
+
+instance NFData Gas
 
 instance Arbitrary Gas where arbitrary = Gas . fromInteger <$> arbitrary
 

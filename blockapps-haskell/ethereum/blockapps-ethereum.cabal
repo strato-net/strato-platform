@@ -24,6 +24,7 @@ library
     , binary
     , bytestring
     , cryptonite
+    , deepseq
     , hashable
     , http-api-data
     , largeword
@@ -50,6 +51,8 @@ test-suite blockapps-ethereum-test
     , blockapps-ethereum
     , base16-bytestring
     , aeson
+    , clock
+    , deepseq
     , hspec
     , http-api-data
     , QuickCheck
