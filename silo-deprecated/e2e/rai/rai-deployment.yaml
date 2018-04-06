@@ -1,0 +1,38 @@
+admin:
+  name: Admin_14674_2388732622
+  address: 86a610f3404f9be9c852ffed80dab03f6315f9a9
+  password: '1234'
+AdminInterface:
+  address: 7e92945bf0c23f7a7b625195801ea39c225d85b6
+users:
+  - name: Kieren
+    password: '1234'
+    role: VENDOR
+    wells:
+      - well1
+    address: 390cbd103d33acefd6d53ccb6119944c94b5d024
+  - name: Victor
+    password: '1234'
+    role: VENDOR
+    wells:
+      - well2
+      - well3
+    address: c58c45b0495c3970e3d7e30783452eb13c9d9ec9
+  - name: Jim
+    password: '1234'
+    role: VENDOR
+    wells:
+      - well3
+    address: 65291819dce891b4efa64c1f07a1116436fdf961
+  - name: Kris
+    password: '1234'
+    role: OFFICE
+    wells:
+      - well3
+    address: d39de8071fa2d48dea2face6f48e061f8e8dba99
+  - name: Ryan
+    password: '1234'
+    role: OFFICE
+    wells:
+      - well3
+    address: a1ddcaa7697a3a0ab3c6be2e00e08cc47c75ebb6

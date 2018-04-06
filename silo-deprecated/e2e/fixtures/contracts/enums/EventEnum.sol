@@ -1,0 +1,4 @@
+contract EventEnum {
+    enum EventEnum {
+    }
+}

@@ -1,0 +1,198 @@
+pipeline {
+  agent none
+  parameters {string(name: 'SILO_TEST_BUILD_NUMBER', defaultValue: '', description: 'The number of SILO_INT_DEV-build-test build to fetch docker-compose.release.yml from.')}
+  stages {
+    stage('Prepare to deploy') {
+      steps {
+        parallel (
+          "hackathon-1": {
+            node('hackathon-1') {
+              step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  mv /tmp/docker-compose.release.yml docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          },
+          "hackathon-2": {
+            node('hackathon-2') {
+              step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  mv /tmp/docker-compose.release.yml docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          },
+          "hackathon-3": {
+            node('hackathon-3') {
+              step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  mv /tmp/docker-compose.release.yml docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          },
+          "hackathon-4": {
+            node('hackathon-4') {
+              step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  mv /tmp/docker-compose.release.yml docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          },
+          "hackathon-5": {
+            node('hackathon-5') {
+              step ([$class: 'CopyArtifact', filter: 'docker-compos*.yml', fingerprintArtifacts: true, flatten: true, projectName: 'SILO_INT_DEV-build-test', selector: [$class: 'SpecificBuildSelector', buildNumber: '${SILO_TEST_BUILD_NUMBER}'], target: '/tmp/']);
+              withDockerRegistry([credentialsId: 'registry-aws-blockapps', url: 'https://registry-aws.blockapps.net:5000/']) {
+                withCredentials([
+                  usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                  usernamePassword(credentialsId: 'blockapps-cd-github', passwordVariable: 'GH_PASSWD', usernameVariable: 'GH_USER'),
+                  usernamePassword(credentialsId: 'hackathon-vm-password', passwordVariable: 'HACKATHON_VM_PASSWD', usernameVariable: 'HACKATHON_VM_USER')
+                ]) {
+                  sh '''#!/bin/bash -le
+                  set -x
+                  docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
+                  echo ${HACKATHON_VM_PASSWD} | sudo -S rm -rf silo strato-getting-started || true
+                  git config --global credential.helper store
+                  git clone https://$GH_USER:$GH_PASSWD@github.com/blockapps/silo.git
+                  git clone https://github.com/blockapps/strato-getting-started
+                  cd strato-getting-started
+                  mv /tmp/docker-compose.release.yml docker-compose.release.multinode.yml
+                  docker-compose -f docker-compose.release.multinode.yml pull
+                  '''
+                }
+              }
+            }
+          }
+        )
+      }
+    }
+    stage('Deploy multinode') {
+      steps {
+        parallel (
+          "hackathon-1": {
+            node('hackathon-1') {
+              sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              STRATO_GS_MODE="1" NODE_HOST=hackathon-1.centralus.cloudapp.azure.com ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker ps
+              '''
+            }
+          },
+          "hackathon-2": {
+            node('hackathon-2') {
+              sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              STRATO_GS_MODE="1" NODE_HOST=hackathon-2.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker ps
+              '''
+            }
+          },
+          "hackathon-3": {
+            node('hackathon-3') {
+              sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              STRATO_GS_MODE="1" NODE_HOST=hackathon-3.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker ps
+              '''
+            }
+          },
+          "hackathon-4": {
+            node('hackathon-4') {
+              sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              STRATO_GS_MODE="1" NODE_HOST=hackathon-4.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker ps
+              '''
+            }
+          },
+          "hackathon-5": {
+            node('hackathon-5') {
+              sh '''#!/bin/bash -le
+              set -x
+              docker rm -f $(docker ps -aq) || true; docker system prune -f --volumes; docker system prune -f
+              cd strato-getting-started
+              STRATO_GS_MODE="1" NODE_HOST=hackathon-5.centralus.cloudapp.azure.com BOOT_NODE_HOST=40.69.163.183 ./strato-multinode-run.sh --stable
+              docker rmi $(docker images -aq) || true #removing unused images only
+              docker ps
+              '''
+            }
+          }
+        )
+      }
+    }
+  }
+}

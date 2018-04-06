@@ -1,0 +1,17 @@
+{
+  "name": "silo-test",
+  "version": "0.0.1",
+  "description": "platform tests",
+  "scripts": {
+    "test": "node_modules/mocha/bin/mocha --config config.yaml e2e/ -b"
+  },
+  "dependencies": {
+    "blockapps-rest": "git://github.com/blockapps/blockapps-rest.git",
+    "chai": "^4.0.2",
+    "co": "^4.6.0",
+    "co-mocha": "^1.2.0",
+    "json-to-csv": "^1.0.0",
+    "mocha": "^3.4.2",
+    "moment": "^2.18.1"
+  }
+}
