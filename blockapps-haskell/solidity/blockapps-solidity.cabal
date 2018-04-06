@@ -81,6 +81,7 @@ test-suite blockapps-solidity-test
   other-modules:
     BlockApps.SoliditySpec
     BlockApps.Solidity.StorageSpec
+    BlockApps.Solidity.Parse.DeclarationsSpec
     BlockApps.Solidity.Parse.SelectorSpec
     BlockApps.Solidity.Parse.PragmaSpec
     BlockApps.Solidity.Parse.UnParserSpec
