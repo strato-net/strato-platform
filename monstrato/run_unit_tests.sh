@@ -4,7 +4,6 @@ declare -i RESULT=0
 TESTS=(
   strato-init
   blockapps-data
-  strato-api
 )
 
 for tst in ${TESTS[@]}; do
