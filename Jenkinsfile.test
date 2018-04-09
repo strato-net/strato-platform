@@ -62,7 +62,7 @@ pipeline {
       }
     }
 
-    stage('Testing') {
+    stage('Test') {
       steps {
         parallel (
           'Apex tests': {
