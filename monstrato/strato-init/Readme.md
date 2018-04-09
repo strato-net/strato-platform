@@ -38,10 +38,16 @@ The above command will create 118 Element contracts, at addresses 0x400 through
 To initialize contracts with storage, you must first generate an records
 json file. The records file is an array of arrays, where each inner
 array corresponds to one contract initialization. The elements of
-the inner arrays can be strings or numbers, and their order should
+the inner arrays can be strings, numbers, structs, and dynamically
+sized arrays and their order should
 reflect the order the intended contract fields are declared in. If there
 are more contract fields than array entries, the fields will stay initialized
 to the zero element of that type.
+
+Note also a somewhat peculiar format for structs: they are JSON objects, with
+keys denoting the order of the elements of the structs. Keys can be chosen
+arbitrarily, as long as sorting them reflects the proper order of the struct
+definition.
 
 Failure to order columns correctly will result in silently corrupted data.
 For example, consider the following contract:
@@ -50,13 +56,18 @@ For example, consider the following contract:
        string name;
        string symbol;
        uint atomicNumber;
+       struct position {
+        uint x;
+        uint y;
+       }
+       position[] ensemble;
        ...
     }
 
 A working records file would look like
 
     [
-      ["Lithium", "Li", 3],
+      ["Lithium", "Li", 3, [{"0": 99, "1": 307}, {"0": 40, "1": 40}]],
       ["Iridium", "Ir", 77]
     ]
 

@@ -82,7 +82,7 @@ describe('App', function() {
           });
     });
 
-    xit('Accepts a working bundle', async function() {
+    it('Accepts a working bundle', async function() {
       this.timeout(60000);
       const res1 = await chai.request(app)
          .post('/users')

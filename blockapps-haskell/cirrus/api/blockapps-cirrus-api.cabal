@@ -1,0 +1,30 @@
+name: blockapps-cirrus-api
+version: 0.1.0.0
+synopsis: Cirrus microservice
+description: Cirrus microservice API definitions
+homepage: https://github.com/blockapps/blockapps-haskell/cirrus/api
+license-file: LICENSE
+author: Eitan Chatav
+maintainer: eitan@blockapps.net
+copyright: 2016 BlockApps
+category: Web
+build-type: Simple
+cabal-version: >=1.10
+
+library
+  hs-source-dirs: src
+  exposed-modules:
+    BlockApps.Cirrus.API
+  default-language: Haskell2010
+  ghc-options: -Wall -Werror
+  build-depends: base
+    , blockapps-solidity
+    , aeson
+    , QuickCheck
+    , servant
+    , servant-docs
+    , text
+
+source-repository head
+  type: git
+  location: https://github.com/blockapps/blockapps-haskell/cirrus/api

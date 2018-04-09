@@ -24,6 +24,7 @@ library
     , binary
     , bytestring
     , cryptonite
+    , deepseq
     , hashable
     , http-api-data
     , largeword
@@ -46,10 +47,13 @@ test-suite blockapps-ethereum-test
   main-is: Spec.hs
   other-modules:
     BlockApps.EthereumSpec
+    BlockApps.TimingSpec
   build-depends: base >=4 && < 5
     , blockapps-ethereum
     , base16-bytestring
     , aeson
+    , clock
+    , deepseq
     , hspec
     , http-api-data
     , QuickCheck
