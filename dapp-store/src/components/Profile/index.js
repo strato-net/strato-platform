@@ -17,12 +17,13 @@ class Profile extends Component {
 
   componentDidMount() {
     const user = localStorage.getItem(env.USERKEY);
-    if(!user) {
+    if (!user) {
       this.props.history.push('/login');
+    } else {
+      const data = JSON.parse(user);
+      this.setState({ user: data });
+      this.props.fetchAccountDetail(data.address)
     }
-    const data = JSON.parse(user);
-    this.setState({ user: data });
-    this.props.fetchAccountDetail(data.address)
   }
 
   render() {
