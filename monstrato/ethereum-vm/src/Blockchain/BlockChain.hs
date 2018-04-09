@@ -563,8 +563,8 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> Bool -> ContextM (Bool, (SHA, Integer, Integer))
-replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} emitStateDiff = do
+replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer, Integer))
+replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
     let newNumber     = blockDataNumber bd
@@ -586,9 +586,6 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
     when shouldReplace $ do
         Bagger.processNewBestBlock bH bd bTHs
         putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
-        when emitStateDiff $ do
-            $logInfoS "replaceBestIfBetter/emitStateDiff" "emitStateDiff = true, emitting StateDiff"
-            calculateAndEmitStateDiffs b oldStateRoot Nothing Nothing
 
     -- we're replaying SeqEvents, and need to notify the mempool
     when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
@@ -604,8 +601,8 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
                            -> MP.StateRoot
-                           -> Maybe (Address -> ContextM String)
-                           -> Maybe (Address -> ContextM String)
+                           -> (Address -> ContextM String)
+                           -> (Address -> ContextM String)
                            -> ContextM ()
 calculateAndEmitStateDiffs newBlock oldStateRoot addressSource addressContractName = when (flags_sqlDiff || flags_diffPublish) $ do
     let newHeader    = blockHeader newBlock
