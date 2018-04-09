@@ -24,8 +24,13 @@
 	width: 44%;
 }
 
-.create-user-form{
+.create-user-form {
 	padding: 0px 16px 0px 16px;
+	align-items: center;
+}
+
+.create-user-form .email-section {
+	width: 75%;
 }
 
 .feature-list {

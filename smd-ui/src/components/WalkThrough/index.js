@@ -58,19 +58,22 @@ class WalkThrough extends Component {
     }
   }
 
-  render() {
-    let title;
-    if (this.state.currentModal === "CreateUser")
-      title = 'Create STRATO Developer Email';
-    else if (this.state.currentModal === "VerifyAccount")
-      title = 'Password Verification';
-    else if (this.state.currentModal === "CreatePassword")
-      title = 'Set Permanent Password'
-    else if (this.state.currentModal === "CLI")
-      title = 'Download CLI Tool';
-    else
-      title = 'Congratulations!'
+  dialogTitle() {
+    switch (this.state.currentModal) {
+      case "CreateUser":
+        return 'Link Account to STRATO Testnet';
+      case "VerifyAccount":
+        return 'Password Verification';
+      case "CreatePassword":
+        return 'Set Permanent Password'
+      case "CLI":
+        return 'Download CLI Tool';
+      default:
+        return 'Congratulations!'
+    }
+  }
 
+  render() {
     return (
       <div>
         <form>
@@ -80,7 +83,7 @@ class WalkThrough extends Component {
               mixpanelWrapper.track('faucet_close_click');
               this.props.closeWalkThroughOverlay();
             }}
-            title={title}
+            title={this.dialogTitle()}
             style={{ width: '768px' }}
             className="pt-dark dialog"
             canOutsideClickClose={false}
