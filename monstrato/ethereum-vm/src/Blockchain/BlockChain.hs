@@ -211,23 +211,10 @@ timeit message timer f = do
     forM_ timer (time diff)
     return ret
 
-addBlocks :: Bool -> [OutputBlock] -> ContextM ()
-addBlocks _ [] = return ()
-addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else addBlocks_old
-    where addBlocks_old, addBlocks_new :: ContextM ()
-          addBlocks_old = do
-              let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
-              lift . $logInfoS "addBlocks_old" . T.pack $ ("Inserting " ++ show (length blocks) ++ " block starting with " ++
-                                                     (show . blockDataNumber . obBlockData $ head blocks))
-              forM_ blocks' $ timeit "Block insertion" timerToUse . addBlock isUnmined
-              $logInfoS "addBlocks_old" "done inserting, now will replace best if best is among the list"
-              let bestIfBetterCandidate = maximumBy (comparing obTotalDifficulty) blocks'
-              unless isUnmined $ do
-                  void $ withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
-                  (_, nbb) <- replaceBestIfBetter bestIfBetterCandidate True
-                  void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-
-
+addBlocks :: [OutputBlock] -> ContextM ()
+addBlocks [] = return ()
+addBlocks blocks = addBlocks_new
+    where addBlocks_new :: ContextM ()
           addBlocks_new = do
               let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
               lift $ $logInfoS "addBlocks_new" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
@@ -237,32 +224,31 @@ addBlocks isUnmined blocks = if flags_newRBIBBehavior then addBlocks_new else ad
               didReplaceBest <- liftIO (newIORef False)
               replacedBest   <- liftIO (newIORef undefined)
               forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
-                  addBlock isUnmined block
-                  unless isUnmined $ do
-                      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
-                      when didReplaceThisTime . liftIO $ do
-                          writeIORef didReplaceBest True
-                          writeIORef replacedBest (block, replacedBits)
+                  addBlock block
+                  (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
+                  when didReplaceThisTime . liftIO $ do
+                      writeIORef didReplaceBest True
+                      writeIORef replacedBest (block, replacedBits)
               didReplaceBest' <- liftIO (readIORef didReplaceBest)
-              unless isUnmined $ do
-                  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
-                  when didReplaceBest' $ do
-                      $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
-                      (theBlock, nbb) <- liftIO (readIORef replacedBest)
-                      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-                      let b = obBlockData theBlock
-                          addressSource = getSource False b
-                          addressContractName = getContractName False b
-                      calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource) (Just addressContractName)
+              void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+              when didReplaceBest' $ do
+                  $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
+                  (theBlock, nbb) <- liftIO (readIORef replacedBest)
+                  void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+                  let b = obBlockData theBlock
+                      isHomestead = blockIsHomestead $ blockDataNumber b
+                      addressSource = getSource False b
+                      addressContractName = getContractName False b
+                  calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource) (Just addressContractName)
 
 
-          timerToUse = Just $ if isUnmined then time_vm_block_insertion_unmined else time_vm_block_insertion_mined
+          timerToUse = Just time_vm_block_insertion_mined
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
 
-addBlock::Bool->OutputBlock->ContextM () -- change Block to OutputBlock
-addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obBlockUncles=uncles} = do
+addBlock :: OutputBlock -> ContextM () -- change Block to OutputBlock
+addBlock b@OutputBlock{obBlockData=bd, obReceiptTransactions = transactions, obBlockUncles=uncles} = do
     bSum <- BSDB.getBSum (blockDataParentHash bd)
     liftIO $ setTitle $ "Block #" ++ show (blockDataNumber bd)
     lift $ $logInfoS "addBlock" . T.pack $ "Inserting block #" ++ show (blockDataNumber bd) ++ " (" ++ format (outputBlockHash b) ++ ")."
@@ -279,7 +265,7 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
               (blockDataCoinbase uncle)
             ((rewardBase flags_testnet * (8+blockDataNumber uncle - blockDataNumber bd )) `quot` 8)
         unless s3 $ error "addToBalance failed even after a check in addBlock"
-    _ <- addTransactions isUnmined bd (blockDataGasLimit $ obBlockData b) transactions
+    _ <- addTransactions bd (blockDataGasLimit $ obBlockData b) transactions
       --when flags_debug $ liftIO $ putStrLn $ "Removing accounts in suicideList: " ++ intercalate ", " (show . pretty <$> S.toList fullSuicideList)
       --forM_ (S.toList fullSuicideList) deleteAddressState
 
@@ -288,34 +274,25 @@ addBlock isUnmined b@OutputBlock{obBlockData=bd, obReceiptTransactions = transac
 
     db <- getStateDB
 
-    b' <- if isUnmined then do
-            let newBlockData = (obBlockData b){blockDataStateRoot=MP.stateRoot db}
-                newBlock = b{obBlockData = newBlockData}
-            $logInfoS "addBlock/unmined" "Note: block is partial, instead of doing a stateRoot check, I will fill in the stateroot"
-            produceUnminedBlocks [outputBlockToBlock newBlock]
-            $logInfoS "addBlock/unmined" "stateRoot has been filled in"
-            return newBlock
-          else do
-            when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
-                $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
-                error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
-            return b
+    b' <- do
+      when (blockDataStateRoot (obBlockData b) /= MP.stateRoot db) $ do
+          $logInfoS "addBlock/mined" . T.pack $ "newStateRoot: " ++ format (MP.stateRoot db)
+          error $ "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format (blockDataStateRoot $ obBlockData b)
+      return b
 
-    valid <- checkValidity isUnmined (blockIsHomestead $ blockDataNumber bd) bSum b'
+    valid <- checkValidity (blockIsHomestead $ blockDataNumber bd) bSum b'
     case valid of
         Right _ -> tick ctr_vm_blocks_valid
         Left  _ -> tick ctr_vm_blocks_invalid -- error err -- todo: i dont think we ACTUALLY need to error here
 
-    tick $ if isUnmined
-           then ctr_vm_blocks_unmined
-           else ctr_vm_blocks_mined
+    tick ctr_vm_blocks_mined
     tick ctr_vm_blocks_processed
     $logInfoS "addBlock" .  T.pack $ "Inserted block became #" ++ show (blockDataNumber $ obBlockData b') ++ " (" ++ format (outputBlockHash b') ++ ")."
     return ()
 
-addTransactions :: Bool -> BlockData -> Integer -> [OutputTx] -> ContextM Integer
-addTransactions _ _ remGas [] = return remGas
-addTransactions isUnmined b blockGas (t:rest) = do
+addTransactions :: BlockData -> Integer -> [OutputTx] -> ContextM Integer
+addTransactions _ remGas [] = return remGas
+addTransactions b blockGas (t:rest) = do
   beforeMap <- getAddressStateDBMap
   !(deltaT, result) <- timeIt $ runEitherT $ addTransaction False b blockGas t
   afterMap <- getAddressStateDBMap
@@ -323,15 +300,14 @@ addTransactions isUnmined b blockGas (t:rest) = do
   printTransactionMessage t result deltaT
   time deltaT time_vm_tx_mined
 
-  unless isUnmined $
-    outputTransactionResult b t result deltaT beforeMap afterMap
+  outputTransactionResult b t result deltaT beforeMap afterMap
 
   let remainingBlockGas =
         case result of
          Left _           -> blockGas
          Right execResult -> erRemainingBlockGas execResult
 
-  addTransactions isUnmined b remainingBlockGas rest
+  addTransactions b remainingBlockGas rest
 
 data TxMiningResult = TxMiningResult { tmrFailure  :: Maybe TransactionFailureCause
                                      , tmrRanTxs   :: [OutputTx]
