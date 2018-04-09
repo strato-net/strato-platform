@@ -65,7 +65,7 @@ pipeline {
     stage('Testing') {
       steps {
         parallel (
-          'Apex tests':
+          'Apex tests': {
             sh '''#!/bin/bash -le
               set -x
               echo "Running apex unit tests"
@@ -74,7 +74,7 @@ pipeline {
             '''
           },
 
-          'E2E-Test':
+          'E2E-Test': {
             sh '''#!/bin/bash -le
               set -x
               echo 'Running BlockApps BA deploy script and tests'
