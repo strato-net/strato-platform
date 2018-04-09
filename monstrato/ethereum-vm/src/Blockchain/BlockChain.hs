@@ -213,36 +213,33 @@ timeit message timer f = do
 
 addBlocks :: [OutputBlock] -> ContextM ()
 addBlocks [] = return ()
-addBlocks blocks = addBlocks_new
-    where addBlocks_new :: ContextM ()
-          addBlocks_new = do
-              let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
-              lift $ $logInfoS "addBlocks_new" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
-                                                     (show . blockDataNumber . obBlockData $ head blocks))
-              ContextBestBlockInfo (_, oldHeader, _, _, _) <- getContextBestBlockInfo
-              let oldStateRoot = blockDataStateRoot oldHeader
-              didReplaceBest <- liftIO (newIORef False)
-              replacedBest   <- liftIO (newIORef undefined)
-              forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
-                  addBlock block
-                  (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
-                  when didReplaceThisTime . liftIO $ do
-                      writeIORef didReplaceBest True
-                      writeIORef replacedBest (block, replacedBits)
-              didReplaceBest' <- liftIO (readIORef didReplaceBest)
-              void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
-              when didReplaceBest' $ do
-                  $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
-                  (theBlock, nbb) <- liftIO (readIORef replacedBest)
-                  void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
-                  let b = obBlockData theBlock
-                      isHomestead = blockIsHomestead $ blockDataNumber b
-                      addressSource = getSource False b
-                      addressContractName = getContractName False b
-                  calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource) (Just addressContractName)
+addBlocks blocks = do
+  let blocks' = filter ((/= 0) . blockDataNumber . obBlockData) blocks
+  lift $ $logInfoS "addBlocks_new" $ T.pack ("Inserting " ++ show (length blocks) ++ " block starting with " ++
+                                         (show . blockDataNumber . obBlockData $ head blocks))
+  ContextBestBlockInfo (_, oldHeader, _, _, _) <- getContextBestBlockInfo
+  let oldStateRoot = blockDataStateRoot oldHeader
+  didReplaceBest <- liftIO (newIORef False)
+  replacedBest   <- liftIO (newIORef undefined)
+  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
+      addBlock block
+      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
+      when didReplaceThisTime . liftIO $ do
+          writeIORef didReplaceBest True
+          writeIORef replacedBest (block, replacedBits)
+  didReplaceBest' <- liftIO (readIORef didReplaceBest)
+  void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
+  when didReplaceBest' $ do
+      $logInfoS "addBlocks_new" "done inserting, now will emit stateDiff if necessary"
+      (theBlock, nbb) <- liftIO (readIORef replacedBest)
+      void . withKafkaViolently $ writeIndexEvents [NewBestBlock nbb]
+      let b = obBlockData theBlock
+          addressSource = getSource False b
+          addressContractName = getContractName False b
+      calculateAndEmitStateDiffs theBlock oldStateRoot (Just addressSource) (Just addresContractName)
 
-
-          timerToUse = Just time_vm_block_insertion_mined
+  where
+    timerToUse = Just time_vm_block_insertion_mined
 
 setTitle :: String -> IO()
 setTitle value = putStr $ "\ESC]0;" ++ value ++ "\007"
