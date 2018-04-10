@@ -6,7 +6,7 @@ import {
   fromUsernameChange,
   toUsernameChange
 } from './sendTokens.actions';
-import { fetchAccounts, fetchUserAddresses } from '../../accounts.actions';
+import { fetchAccounts, fetchUserAddresses, fetchBalanceRequest } from '../../accounts.actions';
 import { Button, Dialog } from '@blueprintjs/core';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
@@ -75,6 +75,7 @@ class SendTokens extends Component {
       <div className="smd-pad-16">
         <Button onClick={() => {
           mixpanelWrapper.track("send_ether_open_click");
+          this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
           this.props.sendTokensOpenModal()
         }} className="pt-intent-primary pt-icon-add"
           text="Send Tokens" />
@@ -156,7 +157,7 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <Field
-                    id="input-b"
+                    id="password"
                     className="form-width pt-input"
                     placeholder="Password"
                     name="password"
@@ -214,7 +215,7 @@ class SendTokens extends Component {
                 </div>
                 <div className="col-sm-8 smd-pad-4">
                   <Field
-                    id="input-b"
+                    id="address"
                     className="form-width pt-input"
                     placeholder="address"
                     name="address"
@@ -295,6 +296,7 @@ class SendTokens extends Component {
                   <div className="form-width">
                     <Field
                       name="value"
+                      balance={this.props.balance}
                       component={ValueInput}
                       required
                     />
@@ -346,7 +348,8 @@ export function mapStateToProps(state) {
     initialValues: {
       from: state.user.currentUser.username,
       fromAddress: state.user.currentUser.accountAddress
-    }
+    },
+    balance: state.accounts.currentUserBalance
   };
 }
 
@@ -358,7 +361,8 @@ const connected = connect(mapStateToProps, {
   fetchAccounts,
   fetchUserAddresses,
   fromUsernameChange,
-  toUsernameChange
+  toUsernameChange,
+  fetchBalanceRequest
 })(formed);
 
 export default withRouter(connected);
