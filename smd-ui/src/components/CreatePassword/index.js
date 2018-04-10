@@ -46,10 +46,10 @@ class CreatePassword extends Component {
           <div className="pt-dialog-body">
             <div className="pt-form-group">
               <div className="pt-form-group pt-intent-danger">
-                <label className="pt-label" htmlFor="input-a">
+                <label className="pt-label items-center-75" htmlFor="input-a">
                   Password
                   </label>
-                <div className="pt-form-content">
+                <div className="pt-form-content items-center-75">
                   <Field
                     name="password"
                     className="pt-input form-width smd-full-width"
@@ -63,10 +63,10 @@ class CreatePassword extends Component {
               </div>
 
               <div className="pt-form-group pt-intent-danger">
-                <label className="pt-label" htmlFor="input-b">
+                <label className="pt-label items-center-75" htmlFor="input-b">
                   Confirm Password
                   </label>
-                <div className="pt-form-content">
+                <div className="pt-form-content items-center-75">
                   <Field
                     name="confirmPassword"
                     className="pt-input form-width"

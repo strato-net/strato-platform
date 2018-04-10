@@ -46,20 +46,20 @@ class VerifyAccount extends Component {
             <div className="pt-form-group">
               <center><h5 style={{color: '#00AE52'}}> A temporary password has been sent to your email address </h5></center>
               <div className="pt-form-group pt-intent-danger">
-                <label className="pt-label" htmlFor="input-a">
+                <label className="pt-label items-center-75" htmlFor="input-a">
                   Enter temporary password
-                  </label>
-                <div className="pt-form-content">
-                  <Field
-                    name="tempPassword"
-                    className="pt-input form-width smd-full-width"
-                    placeholder="Your temporary password"
-                    component="input"
-                    type="password"
-                    required
-                  /> <br />
-                  <span className="error-text">{this.errorMessageFor('tempPassword')}</span>
-                </div>
+                </label>
+                  <div className="pt-form-content items-center-75">
+                    <Field
+                      name="tempPassword"
+                      className="pt-input form-width smd-full-width"
+                      placeholder="Your temporary password"
+                      component="input"
+                      type="password"
+                      required
+                    /> <br />
+                    <span className="error-text">{this.errorMessageFor('tempPassword')}</span>
+                  </div>
               </div>
             </div>
           </div>

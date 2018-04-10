@@ -47,7 +47,7 @@ class Applications extends Component {
       <div className="container-fluid pt-dark">
         <div className="row smd-pad-12">
           <div className="col-sm-6">
-            <h3>My Apps</h3>
+            <h3>Apps</h3>
           </div>
           <div className="col-sm-6 text-right">
             {this.props.isLoggedIn &&

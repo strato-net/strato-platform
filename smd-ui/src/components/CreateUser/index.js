@@ -58,7 +58,7 @@ class CreateUser extends Component {
         </div>
         <div className="pt-dialog-body">
           <div className="pt-form-group create-user-form">
-            <div className="pt-form-group pt-intent-danger">
+            <div className="pt-form-group pt-intent-danger email-section">
               <label className="pt-label" htmlFor="input-a">
                 Email Address
               </label>
