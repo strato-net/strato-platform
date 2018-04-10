@@ -591,34 +591,33 @@ replaceBestIfBetter :: OutputBlock -> ContextM (Bool, Maybe OutputBlock, (SHA, I
 replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
-    let newNumber     = blockDataNumber bd
-        newStateRoot  = blockDataStateRoot bd
-        newTxCount    = fromIntegral $ length txs
-        newUncleCount = fromIntegral $ length uncles
-        oldNumber     = blockDataNumber oldBestBlock
-        oldStateRoot  = blockDataStateRoot oldBestBlock
-        bH            = outputBlockHash b
-        bTHs          = otHash <$> txs
+    case getBestBlockInList obs of
+      Nothing -> return (false, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
+      Just b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} -> do
 
-    let shouldReplace =     newNumber == 0
-                        || (newNumber > oldNumber)
-                        || ((newNumber == oldNumber) && (td > oldBestDifficulty))
-                        || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+        let newNumber     = blockDataNumber bd
+            newStateRoot  = blockDataStateRoot bd
+            newTxCount    = fromIntegral $ length txs
+            newUncleCount = fromIntegral $ length uncles
+            oldNumber     = blockDataNumber oldBestBlock
+            oldStateRoot  = blockDataStateRoot oldBestBlock
+            bH            = outputBlockHash b/
+            bTHs          = otHash <$> txs
 
-    $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
+        let shouldReplace =     newNumber == 0
+                            || (newNumber > oldNumber)
+                            || ((newNumber == oldNumber) && (td > oldBestDifficulty))
+                            || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
 
-    when shouldReplace $ do
-        Bagger.processNewBestBlock bH bd bTHs
-        putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
+        $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
-    -- we're replaying SeqEvents, and need to notify the mempool
-    when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
-        Bagger.processNewBestBlock bH bd bTHs
+        when shouldReplace $ do
+            Bagger.processNewBestBlock bH bd bTHs
+            putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
 
-    let bestBlockInfo = (bestSha, bestNum, bestTdiff)
-        bestSha       = if shouldReplace then bH        else oldBestSha
-        bestNum       = if shouldReplace then newNumber else oldNumber
-        bestTdiff     = if shouldReplace then td        else oldBestDifficulty
+        -- we're replaying SeqEvents, and need to notify the mempool
+        when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
+            Bagger.processNewBestBlock bH bd bTHs
 
     return (shouldReplace, Just b, bestBlockInfo)
 
