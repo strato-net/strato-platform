@@ -74,10 +74,10 @@ class Dashboard extends Component {
           title="DApps"
           actions={
             <div>
-              <Button raised onClick={() => { window.location.href = `${window.location.protocol}//${window.location.hostname}/dashboard/#/apps?developer`;}} className="developers-button">For Developers</Button>
-              <Button icon onClick={() => this.navigate('/profile')}><FontIcon iconClassName="fa fa-user-circle" /></Button>
+              <Button raised onClick={() => { window.location.href = `${window.location.protocol}//${window.location.hostname}/dashboard/#/apps?developer`; }} className="developers-button">For Developers</Button>
+              <Button icon onClick={() => this.checkAuth() ? this.navigate('/profile') : this.navigate('/login')}><FontIcon iconClassName="fa fa-user-circle" /></Button>
             </div>
-          }
+         }
         />
         <div>
           {children}
