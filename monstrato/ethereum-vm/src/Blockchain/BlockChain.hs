@@ -221,12 +221,11 @@ addBlocks blocks = do
   let oldStateRoot = blockDataStateRoot oldHeader
   didReplaceBest <- liftIO (newIORef False)
   replacedBest   <- liftIO (newIORef undefined)
-  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ do
-      addBlock block
-      (didReplaceThisTime, replacedBits) <- replaceBestIfBetter block False
-      when didReplaceThisTime . liftIO $ do
-          writeIORef didReplaceBest True
-          writeIORef replacedBest (block, replacedBits)
+  forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ addBlock block
+  (didReplaceThisTime, replacedBits) <- replaceBestIfBetter blocks'
+  when didReplaceThisTime . liftIO $ do
+      writeIORef didReplaceBest True
+      writeIORef replacedBest (block, replacedBits)
   didReplaceBest' <- liftIO (readIORef didReplaceBest)
   void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
   when didReplaceBest' $ do
@@ -563,40 +562,60 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-replaceBestIfBetter :: OutputBlock -> ContextM (Bool, (SHA, Integer, Integer))
-replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} = do
+getBestBlockInList :: [OutputBlock] -> ContextM (Maybe OutputBlock)
+getBestBlockInList [] = return Nothing
+getBestBlockInList (b:bs) = Just <$> foldl' compareBlocks b bs
+  where compareBlocks b1 b2 =
+          if ((blockDataNumber $ obBlockData b1) /= (blockDataNumber $ obBlockData b2))
+            then if ((blockDataNumber $ obBlockData b1) > (blockDataNumber $ obBlockData b2))
+                    then b1
+                    else b2
+            else if (obTotalDifficulty b1 /= obTotalDifficulty b2)
+                    then if (obTotalDifficulty b1 > obTotalDifficulty b2)
+                            then b1
+                            else b2
+                    else if ((length $ obReceiptTransactions b1) >= (length $ obReceiptTransactions b2))
+                            then b1
+                            else b2
+
+replaceBestIfBetter :: [OutputBlock] -> ContextM (Bool, (SHA, Integer, Integer))
+replaceBestIfBetter obs = do
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
-    let newNumber     = blockDataNumber bd
-        newStateRoot  = blockDataStateRoot bd
-        newTxCount    = fromIntegral $ length txs
-        newUncleCount = fromIntegral $ length uncles
-        oldNumber     = blockDataNumber oldBestBlock
-        oldStateRoot  = blockDataStateRoot oldBestBlock
-        bH            = outputBlockHash b
-        bTHs          = otHash <$> txs
+    case getBestBlockInList obs of
+      Nothing -> return (false, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
+      Just b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} -> do
 
-    let shouldReplace =     newNumber == 0
-                        || (newNumber > oldNumber)
-                        || ((newNumber == oldNumber) && (td > oldBestDifficulty))
-                        || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
+        let newNumber     = blockDataNumber bd
+            newStateRoot  = blockDataStateRoot bd
+            newTxCount    = fromIntegral $ length txs
+            newUncleCount = fromIntegral $ length uncles
+            oldNumber     = blockDataNumber oldBestBlock
+            oldStateRoot  = blockDataStateRoot oldBestBlock
+            bH            = outputBlockHash b/
+            bTHs          = otHash <$> txs
 
-    $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
+        let shouldReplace =     newNumber == 0
+                            || (newNumber > oldNumber)
+                            || ((newNumber == oldNumber) && (td > oldBestDifficulty))
+                            || ((newNumber == oldNumber) && (td == oldBestDifficulty) && (newTxCount > oldTxCount))
 
-    when shouldReplace $ do
-        Bagger.processNewBestBlock bH bd bTHs
-        putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
+        $logInfoS "replaceBestIfBetter" . T.pack $ "shouldReplace = " ++ show shouldReplace ++ ", newNumber = " ++ show newNumber ++ ", oldBestNumber = " ++ show (blockDataNumber oldBestBlock)
 
-    -- we're replaying SeqEvents, and need to notify the mempool
-    when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
-        Bagger.processNewBestBlock bH bd bTHs
+        when shouldReplace $ do
+            Bagger.processNewBestBlock bH bd bTHs
+            putContextBestBlockInfo $ ContextBestBlockInfo (bH, bd, td, newTxCount, newUncleCount) -- this used to only happen `when flags_sqlDiff`... what the actual fuck?
 
-    let bestBlockInfo = (bestSha, bestNum, bestTdiff)
-        bestSha       = if shouldReplace then bH        else oldBestSha
-        bestNum       = if shouldReplace then newNumber else oldNumber
-        bestTdiff     = if shouldReplace then td        else oldBestDifficulty
+        -- we're replaying SeqEvents, and need to notify the mempool
+        when (not shouldReplace && (newNumber == oldNumber) && (oldStateRoot == newStateRoot)) $
+            Bagger.processNewBestBlock bH bd bTHs
 
-    return (shouldReplace, bestBlockInfo)
+        let bestBlockInfo = (bestSha, bestNum, bestTdiff)
+            bestSha       = if shouldReplace then bH        else oldBestSha
+            bestNum       = if shouldReplace then newNumber else oldNumber
+            bestTdiff     = if shouldReplace then td        else oldBestDifficulty
+
+        return (shouldReplace, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b
