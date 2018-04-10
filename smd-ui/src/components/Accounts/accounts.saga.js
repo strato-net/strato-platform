@@ -9,6 +9,7 @@ import {
   FETCH_ACCOUNTS,
   FETCH_ACCOUNT_ADDRESS_REQUEST,
   FETCH_ACCOUNT_DETAIL_REQUEST,
+  GET_BALANCE,
   fetchAccountsSuccess,
   fetchAccountsFailure,
   fetchUserAddresses,
@@ -19,7 +20,9 @@ import {
   fetchAccountDetailFailure,
   FAUCET_REQUEST,
   faucetSuccess,
-  faucetFailure
+  faucetFailure,
+  fetchBalanceSuccess,
+  fetchBalanceFailure
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -155,11 +158,22 @@ export function* faucetAccount(action) {
   }
 }
 
+export function* getBalance(action) {
+  try {
+    const response = yield call(getAccountDetailApi, action.address);
+    yield put(fetchBalanceSuccess(response['0']));
+  }
+  catch (err) {
+    yield put(fetchBalanceFailure(err));
+  }
+}
+
 export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
     takeEvery(FETCH_ACCOUNT_ADDRESS_REQUEST, getUserAddresses),
     takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
-    takeLatest(FAUCET_REQUEST, faucetAccount)
+    takeLatest(FAUCET_REQUEST, faucetAccount),
+    takeEvery(GET_BALANCE, getBalance)
   ];
 }

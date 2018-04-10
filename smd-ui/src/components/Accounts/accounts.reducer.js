@@ -7,7 +7,9 @@ import {
   FETCH_USER_ADDRESSES_FAILED,
   FETCH_ACCOUNT_DETAIL_SUCCESS,
   FETCH_ACCOUNT_DETAIL_FAILURE,
-  RESET_ACCOUNT_ADDRESS
+  RESET_ACCOUNT_ADDRESS,
+  BALANCE_SUCCESS,
+  BALANCE_FAILURE
 } from './accounts.actions';
 
 const initialState = {
@@ -23,6 +25,7 @@ const reducer = function (state = initialState, action) {
         accounts: state.accounts,
         filter: state.filter,
         error: null,
+        currentUserBalance: state.currentUserBalance
       };
     case FETCH_ACCOUNTS_SUCCESSFULL:
       const accounts = action.accounts.reduce(function(result, item){
@@ -59,7 +62,8 @@ const reducer = function (state = initialState, action) {
           [action.name]: addresses
         },
         filter: state.filter,
-        error: state.error
+        error: state.error,
+        currentUserBalance: state.currentUserBalance
       }
     case FETCH_USER_ADDRESSES_FAILED:
       return {
@@ -70,7 +74,8 @@ const reducer = function (state = initialState, action) {
           }
         },
         filter: state.filter,
-        error: state.error
+        error: state.error,
+        currentUserBalance: state.currentUserBalance
       }
     case FETCH_ACCOUNT_DETAIL_SUCCESS:
       return {
@@ -85,7 +90,8 @@ const reducer = function (state = initialState, action) {
           }
         },
         filter: state.filter,
-        error: state.error
+        error: state.error,
+        currentUserBalance: state.currentUserBalance
       }
     case RESET_ACCOUNT_ADDRESS: 
       return {
@@ -108,7 +114,18 @@ const reducer = function (state = initialState, action) {
           }
         },
         filter: state.filter,
-        error: state.error
+        error: state.error,
+        currentUserBalance: state.currentUserBalance
+      }
+    case BALANCE_SUCCESS:
+      return {
+        ...state,
+        currentUserBalance: action.detail.balance
+      }
+    case BALANCE_FAILURE:
+      return {
+        ...state,
+        currentUserBalance: null
       }
     default:
       return state;

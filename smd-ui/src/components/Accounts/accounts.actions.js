@@ -12,6 +12,9 @@ export const FAUCET_REQUEST = "FAUCET_REQUEST";
 export const FAUCET_SUCCESS = "FAUCET_SUCCESS";
 export const FAUCET_FAILURE = "FAUCET_FAILURE";
 export const RESET_ACCOUNT_ADDRESS = 'RESET_ACCOUNT_ADDRESS';
+export const GET_BALANCE = 'GET_BALANCE';
+export const BALANCE_SUCCESS = 'BALANCE_SUCCESS';
+export const BALANCE_FAILURE = 'BALANCE_FAILURE';
 
 export const fetchAccounts = function (loadAddresses, loadBalances) {
   return {
@@ -116,5 +119,26 @@ export const faucetFailure = function(err) {
   return {
     type: FAUCET_FAILURE,
     error: err
+  }
+};
+
+export const fetchBalanceRequest = function(address) {
+  return {
+    type: GET_BALANCE,
+    address
+  }
+}
+
+export const fetchBalanceSuccess = function(detail) {
+  return {
+    type: BALANCE_SUCCESS,
+    detail
+  }
+};
+
+export const fetchBalanceFailure = function(error) {
+  return {
+    type: BALANCE_FAILURE,
+    error
   }
 };
