@@ -592,7 +592,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
     case getBestBlockInList obs of
-      Nothing -> return (false, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
+      Nothing -> return (False, Nothing, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
       Just b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} -> do
 
         let newNumber     = blockDataNumber bd
@@ -601,7 +601,7 @@ replaceBestIfBetter b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obRe
             newUncleCount = fromIntegral $ length uncles
             oldNumber     = blockDataNumber oldBestBlock
             oldStateRoot  = blockDataStateRoot oldBestBlock
-            bH            = outputBlockHash b/
+            bH            = outputBlockHash b
             bTHs          = otHash <$> txs
 
         let shouldReplace =     newNumber == 0
