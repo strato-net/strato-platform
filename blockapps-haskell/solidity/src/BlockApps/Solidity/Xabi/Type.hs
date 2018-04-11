@@ -74,10 +74,10 @@ instance ToSchema IndexedType where
 
 data VarType =
   VarType
-  { varTypeAtBytes :: Int32
-  , varTypePublic  :: Maybe Bool
-  , varTypeValue   :: Maybe String
-  , varTypeType    :: Type
+  { varTypeAtBytes        :: Int32
+  , varTypePublic         :: Maybe Bool
+  , varTypeInitialValue   :: Maybe String
+  , varTypeType           :: Type
   } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
@@ -85,19 +85,19 @@ instance FromJSON VarType where
     withObject "xabi" $ \v -> do
       atBytes <-  v .: "atBytes"
       public <- v .:? "public"
-      value <- v .:? "value"
+      value <- v .:? "initialValue"
       theType <- parseJSON $ Object $ HashMap.insertWith (const id) "type" "Contract" v
       return $ VarType atBytes public value theType
 
 instance ToJSON VarType where
-  toJSON (VarType varTypeAtBytes varTypePublic varTypeValue theType) =
+  toJSON (VarType varTypeAtBytes varTypePublic varTypeInitialValue theType) =
     let
       Object theMap = toJSON theType
     in
      Object $
      HashMap.insert "atBytes" (toJSON varTypeAtBytes) $
      HashMap.insert "public" (toJSON varTypePublic) $
-     HashMap.insert "value" (toJSON varTypeValue)
+     HashMap.insert "initialValue" (toJSON varTypeInitialValue)
      theMap
 
 instance ToSchema VarType where

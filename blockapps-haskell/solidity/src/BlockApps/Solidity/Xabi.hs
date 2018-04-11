@@ -77,7 +77,7 @@ instance ToSchema Xabi where
                          })
           ]
         , xabiConstr = Map.fromList []
-        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         }
@@ -245,7 +245,7 @@ instance ToSchema ContractDetails where
                          })
           ]
         , xabiConstr = Map.fromList []
-        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
+        , xabiVars = Map.fromList [("storedData",Xabi.VarType {varTypeAtBytes = 0, varTypePublic = Just False, varTypeInitialValue = Nothing, varTypeType = Xabi.Int {signed = Just False, bytes = Just 32}})]
         , xabiTypes = Map.fromList [("SimpleStorage", Xabi.Enum {bytes = 0, names = ["SUCCESS", "ERROR"]})]
         , xabiModifiers = Map.fromList [("onlyOwner", Modifier {modifierArgs = Map.fromList [], modifierSelector="onlyOwner", modifierVals=Map.fromList [], modifierContents = Just "if (msg.sender != owner) throw; _;"})]
         }

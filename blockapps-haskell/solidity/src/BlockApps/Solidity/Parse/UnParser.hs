@@ -52,6 +52,10 @@ unparseVar (name, theType) =
         Just False -> "private "
      )
   <> Text.unpack name
+  <> (case varTypeInitialValue theType of 
+        Nothing -> ""
+        Just value -> "=" ++ value
+     )
   <> ";"
 
 unparseVarType :: Type -> String

@@ -114,7 +114,6 @@ structDeclaration = do
   structName <- identifier
   structFields <- braces $ many1 $ do
     (fieldName, VariableDeclaration decl _ _) <- simpleVariableDeclaration
-    semi
     return (fieldName, decl)
   return
     (
