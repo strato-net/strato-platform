@@ -504,7 +504,7 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
       let ranBlockHash = blockHeaderHash b
           mkLogEntry Log{..} = LogDB ranBlockHash theHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
       enqueueLogEntries $ mkLogEntry <$> theLogs
-      enqueueTransactionResult $
+      enqueueInsertTransactionResult $
              TransactionResult { transactionResultBlockHash        = ranBlockHash
                                , transactionResultTransactionHash  = theHash
                                , transactionResultMessage          = message

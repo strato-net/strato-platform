@@ -16,12 +16,17 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.DB.SQLDB
 
 class (Monad m) => HasMemTXResultDB m where
-  enqueueTransactionResults :: [TransactionResult] -> m ()
-  flushTransactionResults   :: m ()
+  enqueueInsertTransactionResults :: [TransactionResult] -> m ()
+  enqueueUpdateTransactionResults :: [TransactionResult] -> m ()
+  flushInsertTransactionResults   :: m ()
+  flushUpdateTransactionResults   :: m ()
+  flushTransactionResults :: m ()
 
-  enqueueTransactionResult :: TransactionResult -> m ()
-  enqueueTransactionResult = enqueueTransactionResults . pure
+  enqueueInsertTransactionResult :: TransactionResult -> m ()
+  enqueueInsertTransactionResult = enqueueInsertTransactionResults . pure
 
+  enqueueUpdateTransactionResult :: TransactionResult -> m ()
+  enqueueUpdateTransactionResult = enqueueUpdateTransactionResults . pure
 
 putTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
                      => TransactionResult
