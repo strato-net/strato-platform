@@ -13,6 +13,7 @@ import           Control.Monad.Trans.Either
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.State
 import qualified Data.ByteString                    as B
+import           Data.Maybe                         (fromMaybe)
 import qualified Data.Set                           as S
 
 import           Blockchain.Data.Address
@@ -180,6 +181,9 @@ getCallDepth = lift $ fmap callDepth $ get
 
 getGasRemaining::VMM Integer
 getGasRemaining = lift $ fmap vmGasRemaining $ get
+
+getReturnVal :: VMM B.ByteString
+getReturnVal = (fromMaybe B.empty . returnVal) <$> lift get
 
 setDone::Bool->VMM ()
 setDone done' = do

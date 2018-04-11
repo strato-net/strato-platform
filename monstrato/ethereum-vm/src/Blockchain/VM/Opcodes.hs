@@ -12,13 +12,11 @@ import           Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
 
 import           Blockchain.Util
 
---import Debug.Trace
-
 data Operation =
     STOP | ADD | MUL | SUB | DIV | SDIV | MOD | SMOD | ADDMOD | MULMOD | EXP | SIGNEXTEND | NEG |
     LT | GT | SLT | SGT | EQ | ISZERO | NOT | AND | OR | XOR | BYTE |
     SHA3 |
-    ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY |
+    ADDRESS | BALANCE | ORIGIN | CALLER | CALLVALUE | CALLDATALOAD | CALLDATASIZE | CALLDATACOPY | CODESIZE | CODECOPY | GASPRICE | EXTCODESIZE | EXTCODECOPY | RETURNDATASIZE | RETURNDATACOPY |
     BLOCKHASH | COINBASE | TIMESTAMP | NUMBER | DIFFICULTY | GASLIMIT |
     POP | MLOAD | MSTORE | MSTORE8 | SLOAD | SSTORE | JUMP | JUMPI | PC | MSIZE | GAS | JUMPDEST |
     PUSH [Word8] |
@@ -92,6 +90,9 @@ opDatas =
     OPData 0x3a GASPRICE 0 1 "Get price of gas in current environment.",
     OPData 0x3b EXTCODESIZE 0 1 "Get size of an account's code.",
     OPData 0x3c EXTCODECOPY 0 4 "Copy an account’s code to memory",
+    OPData 0x3d RETURNDATASIZE 0 1 "Get size of output data from previous call\
+                                   \ from the current environment",
+    OPData 0x3e RETURNDATACOPY 3 0 "Copy output data from the previous call to memory.",
 
     OPData 0x40 BLOCKHASH 0 1 "Get hash of most recent complete block.",
     OPData 0x41 COINBASE 0 1 "Get the block’s coinbase address.",
