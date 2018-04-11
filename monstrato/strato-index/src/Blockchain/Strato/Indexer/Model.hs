@@ -20,6 +20,7 @@ instance Binary LogDB
 instance Binary TransactionResult
 instance Binary TransactionFailureType
 instance Binary TransactionResultStatus
+instance Binary TransactionResultMiningStatus
 
 instance Binary IndexEvent where
     get = do

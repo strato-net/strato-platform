@@ -117,6 +117,7 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
+    miningStatus TransactionResultMiningStatus
     deriving Eq Read Show Generic
 
 UserN json

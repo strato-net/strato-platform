@@ -179,6 +179,7 @@ instance Bagger.MonadBagger ContextM where
                                        , transactionResultNewStorage       = ""
                                        , transactionResultDeletedStorage   = ""
                                        , transactionResultStatus           = Just (txRejectionToAPIFailureCause rejection)
+                                       , transactionResultMiningStatus     = Unmined
                                        }
 
 baggerRejectionToTransactionResultBits :: Bagger.TxRejection -> (String, Bagger.BaggerStage, Bagger.BaggerTxQueue, SHA) -- pretty, queue, txHash
@@ -518,6 +519,7 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
                                , transactionResultStatus           = Just txrStatus
+                               , transactionResultMiningStatus     = Mined
                                }
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()
