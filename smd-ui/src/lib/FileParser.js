@@ -1,6 +1,7 @@
 export function getImportStatements(source) {
     const splittedSource = source.split("\n")
-    const newImports = splittedSource.filter((item) => item.includes('import '))
+    // TODO: This does not guard against multiline strings or comments
+    const newImports = splittedSource.filter((line) => /^\s*import /.test(line))
     const newFileList = []
     newImports.map((item) => {
         const splittedItem = item.split(' ')
