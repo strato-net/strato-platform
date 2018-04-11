@@ -222,10 +222,11 @@ addBlocks blocks = do
   didReplaceBest <- liftIO (newIORef False)
   replacedBest   <- liftIO (newIORef undefined)
   forM_ blocks' $ \block -> timeit "Block insertion" timerToUse $ addBlock block
-  (didReplaceThisTime, replacedBits) <- replaceBestIfBetter blocks'
+  (didReplaceThisTime, newBestBlock, replacedBits) <- replaceBestIfBetter blocks'
   when didReplaceThisTime . liftIO $ do
+      let Just nbb = newBestBlock
       writeIORef didReplaceBest True
-      writeIORef replacedBest (block, replacedBits)
+      writeIORef replacedBest (nbb, replacedBits)
   didReplaceBest' <- liftIO (readIORef didReplaceBest)
   void . withKafkaViolently $ writeIndexEvents (RanBlock <$> blocks')
   when didReplaceBest' $ do
@@ -562,9 +563,9 @@ formatAddress (Address x) = BC.unpack $ B16.encode $ B.pack $ word160ToBytes x
 
 ----------------
 
-getBestBlockInList :: [OutputBlock] -> ContextM (Maybe OutputBlock)
-getBestBlockInList [] = return Nothing
-getBestBlockInList (b:bs) = Just <$> foldl' compareBlocks b bs
+getBestBlockInList :: [OutputBlock] -> Maybe OutputBlock
+getBestBlockInList [] = Nothing
+getBestBlockInList (b:bs) = Just $ foldl' compareBlocks b bs
   where compareBlocks b1 b2 =
           if ((blockDataNumber $ obBlockData b1) /= (blockDataNumber $ obBlockData b2))
             then if ((blockDataNumber $ obBlockData b1) > (blockDataNumber $ obBlockData b2))
@@ -578,12 +579,12 @@ getBestBlockInList (b:bs) = Just <$> foldl' compareBlocks b bs
                             then b1
                             else b2
 
-replaceBestIfBetter :: [OutputBlock] -> ContextM (Bool, (SHA, Integer, Integer))
+replaceBestIfBetter :: [OutputBlock] -> ContextM (Bool, Maybe OutputBlock, (SHA, Integer, Integer))
 replaceBestIfBetter obs = do
     ContextBestBlockInfo(oldBestSha, oldBestBlock, oldBestDifficulty, oldTxCount, _) <- getContextBestBlockInfo
 
     case getBestBlockInList obs of
-      Nothing -> return (false, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
+      Nothing -> return (False, Nothing, (oldBestSha, blockDataNumber oldBestBlock, oldBestDifficulty))
       Just b@OutputBlock{obBlockData = bd, obTotalDifficulty = td, obReceiptTransactions=txs, obBlockUncles=uncles} -> do
 
         let newNumber     = blockDataNumber bd
@@ -592,7 +593,7 @@ replaceBestIfBetter obs = do
             newUncleCount = fromIntegral $ length uncles
             oldNumber     = blockDataNumber oldBestBlock
             oldStateRoot  = blockDataStateRoot oldBestBlock
-            bH            = outputBlockHash b/
+            bH            = outputBlockHash b
             bTHs          = otHash <$> txs
 
         let shouldReplace =     newNumber == 0
@@ -615,7 +616,7 @@ replaceBestIfBetter obs = do
             bestNum       = if shouldReplace then newNumber else oldNumber
             bestTdiff     = if shouldReplace then td        else oldBestDifficulty
 
-        return (shouldReplace, bestBlockInfo)
+        return (shouldReplace, Just b, bestBlockInfo)
 
 calculateAndEmitStateDiffs :: (TransactionLike t, Format b, BlockLike BlockData t b) -- todo: generalize commitSqlDiffs etc. to take all BlockHeaderLikes
                            => b

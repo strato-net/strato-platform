@@ -80,7 +80,7 @@ ethereumVM = void . execContextM $ do
                 txCount = length . obReceiptTransactions $ b
             $logDebugS "evm/loop" . T.pack $ "Received block number " ++ show number ++ " with " ++ show txCount ++ " transactions from seqEvents"
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
-        addBlocks False blocks
+        addBlocks blocks
 
         -- todo: is this the best place to put this?
         flushLogEntries
