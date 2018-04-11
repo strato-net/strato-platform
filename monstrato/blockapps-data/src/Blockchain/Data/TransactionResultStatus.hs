@@ -51,3 +51,9 @@ instance ToJSON   TransactionResultStatus where
 
 instance FromJSON TransactionFailureType
 instance ToJSON   TransactionFailureType
+
+data TransactionResultMiningStatus = Unmined | Mined
+  deriving (Eq, Ord, Enum, Read, Show, Generic)
+
+instance FromJSON TransactionResultMiningStatus
+instance ToJSON TransactionResultMiningStatus
