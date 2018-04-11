@@ -93,7 +93,7 @@ instance HasMemTXResultDB ContextM where
   flushTransactionResults = do
     ctx <- get
     let toWrite = contextTxResultQueue ctx
-    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.TxResult <$> toWrite)
+    _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.InsertTxResult <$> toWrite)
     put $ ctx { contextTxResultQueue = [] }
 
 instance HasMemLogDB ContextM where

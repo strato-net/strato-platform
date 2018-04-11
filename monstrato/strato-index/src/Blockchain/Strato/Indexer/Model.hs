@@ -13,7 +13,8 @@ import           Data.Binary
 data IndexEvent = RanBlock OutputBlock
                 | NewBestBlock (SHA, Integer, Integer)
                 | LogDBEntry LogDB
-                | TxResult TransactionResult
+                | InsertTxResult TransactionResult
+                | UpdateTxResult TransactionResult
                 deriving (Eq, Read, Show)
 
 instance Binary LogDB
@@ -29,10 +30,12 @@ instance Binary IndexEvent where
             0 -> RanBlock <$> get
             1 -> NewBestBlock <$> get
             2 -> LogDBEntry <$> get
-            3 -> TxResult <$> get
+            3 -> InsertTxResult <$> get
+            4 -> UpdateTxResult <$> get
             x -> error $ "Unknown IndexEvent tag in decode `" ++ show x ++ "`"
 
-    put (RanBlock b)     = putWord8 0 >> put b
-    put (NewBestBlock n) = putWord8 1 >> put n
-    put (LogDBEntry e)   = putWord8 2 >> put e
-    put (TxResult r)     = putWord8 3 >> put r
+    put (RanBlock b)       = putWord8 0 >> put b
+    put (NewBestBlock n)   = putWord8 1 >> put n
+    put (LogDBEntry e)     = putWord8 2 >> put e
+    put (InsertTxResult r) = putWord8 3 >> put r
+    put (UpdateTxResult r) = putWord8 4 >> put r

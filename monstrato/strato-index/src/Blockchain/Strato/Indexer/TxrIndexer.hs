@@ -33,7 +33,7 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
             LogDBEntry l -> do
                 $logInfoS "txrIndexer" . T.pack $ "Inserting LogDB entry for tx: " ++ format (logDBTransactionHash l) ++ " at block " ++ format (logDBBlockHash l)
                 void $ LogDB.putLogDB l
-            TxResult r -> do
+            InsertTxResult r -> do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
                 void $ TxrDB.putTransactionResult r
