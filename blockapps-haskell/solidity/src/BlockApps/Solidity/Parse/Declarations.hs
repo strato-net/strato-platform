@@ -62,8 +62,8 @@ solidityContract = do
                -- maybe Map.empty Xabi.funcArgs (Map.lookup (Text.pack contractName') allFunctions)
            , xabiVars =
                 Map.fromList $
-                zipWith (\(v, isPublic) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing)) v)
-                [ ((Text.pack n, v), isPublic) | (n, VariableDeclaration v isPublic) <- declarations]
+                zipWith (\(v, isPublic, value) i -> fmap (Xabitype.VarType i (if isPublic then Just True else Nothing) value) v)
+                [ ((Text.pack n, v), isPublic, value) | (n, VariableDeclaration v isPublic value) <- declarations]
                 [0, 32..]
            , xabiTypes =
              Map.fromList $
@@ -90,7 +90,7 @@ data Declaration =
   | EnumDeclaration Xabi.Def
   | UsingDeclaration Xabi.Using
   | EventDeclaration Xabi.Event
-  | VariableDeclaration Xabitype.Type Bool
+  | VariableDeclaration Xabitype.Type Bool (Maybe String)
   deriving Show
 
 -- | Parses anything that a contract can declare at the top level: new types,
@@ -113,7 +113,7 @@ structDeclaration = do
   reserved "struct"
   structName <- identifier
   structFields <- braces $ many1 $ do
-    (fieldName, VariableDeclaration decl _) <- simpleVariableDeclaration
+    (fieldName, VariableDeclaration decl _ _) <- simpleVariableDeclaration
     semi
     return (fieldName, decl)
   return
@@ -169,10 +169,6 @@ usingDeclaration = do
 variableDeclaration :: SolidityParser (String, Declaration)
 variableDeclaration = do
   vDecl <- simpleVariableDeclaration
-  _ <- optionMaybe $ do
-    reservedOp "="
-    many $ noneOf ";"
-  semi
   return vDecl
 
 -- | Parses the declaration part of a variable definition, which is
@@ -194,12 +190,16 @@ simpleVariableDeclaration = do
                      (reserved "private" >> return (False, False)) <|>
                      (reserved "internal" >> return (False, False))
   variableName <- identifier
+  value <- optionMaybe $ do
+    reservedOp "="
+    many $ noneOf ";"
+  semi
 --  let objValueType' =
 --        if variableVisible
 --        then SingleValue variableType
 --        else NoValue
 
-  return (variableName, VariableDeclaration variableType variableIsPublic)
+  return (variableName, VariableDeclaration variableType variableIsPublic value)
 
 --  ObjDef{
 --    objName = variableName,

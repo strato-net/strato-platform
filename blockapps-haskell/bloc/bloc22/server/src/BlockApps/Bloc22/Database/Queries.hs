@@ -812,18 +812,18 @@ WHERE XV.contract_metadata_id = $1;
 getXabiVariablesQuery :: Int32 -> Bloc (Map Text Xabi.VarType)
 getXabiVariablesQuery cmId = do
   varsWithIds <- fmap Map.fromList . blocQuery $ proc () -> do
-    (_,cmid,typeid,name,atbytes,ispublic)
+    (_,cmid,typeid,name,atbytes,ispublic,value)
       <- queryTable xabiVariablesTable -< ()
     restrict -< cmid .== constant cmId
-    returnA -< (name,(atbytes,ispublic,typeid))
-  for varsWithIds $ \ (atbytes,ispublic,typeid) -> do
+    returnA -< (name,(atbytes,ispublic,value,typeid))
+  for varsWithIds $ \ (atbytes,ispublic,value,typeid) -> do
     ty <- getXabiType typeid
-    return $ Xabi.VarType atbytes (Just ispublic) ty
+    return $ Xabi.VarType atbytes (Just ispublic) value ty
 
 
 getXabiVariableNamesQuery :: Int32 -> Query ( Column PGText )
 getXabiVariableNamesQuery metadataId = proc () -> do
-  (_,cmid,_,varName,_,_) <-
+  (_,cmid,_,varName,_,_,_) <-
     queryTable xabiVariablesTable -< ()
   restrict -< cmid .== constant metadataId
   returnA -< varName
@@ -968,16 +968,16 @@ insertXabiVariables
   -> Map Text Xabi.VarType
   -> Bloc Int64
 insertXabiVariables metadataId vars = do
-  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic xt) -> do
+  varsWithIds <- for (Map.toList vars) $ \ (name,Xabi.VarType atBytes ispublic value xt) -> do
     varIds :: [Int32] <- blocQuery $ proc () -> do
-      (vId,cmId,_,vname,_,_) <- queryTable xabiVariablesTable -< ()
+      (vId,cmId,_,vname,_,_,_) <- queryTable xabiVariablesTable -< ()
       restrict -< cmId .== constant metadataId
         .&& vname .== constant name
       returnA -< vId
     if null varIds
     then do
       xtid <- insertXabiType xt
-      return $ Just (name,atBytes,ispublic,xtid)
+      return $ Just (name,atBytes,ispublic,value,xtid)
     else
       return Nothing
   blocModify $ \conn ->
@@ -988,8 +988,9 @@ insertXabiVariables metadataId vars = do
         , constant name
         , constant atBytes
         , constant (fromMaybe False ispublic)
+        , constant value
         )
-      | Just (name,atBytes,ispublic,xtid) <- varsWithIds
+      | Just (name,atBytes,ispublic, value, xtid) <- varsWithIds
       ]
 
 {- |
