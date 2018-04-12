@@ -31,7 +31,8 @@ describe('SendTokens: index', () => {
         initialValues: {
           from: '',
           fromAddress: ''
-        }
+        },
+        balance: undefined
       };
 
       const wrapper = shallow(
@@ -57,7 +58,8 @@ describe('SendTokens: index', () => {
         initialValues: {
           from: 'Admin_1177_49507',
           fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
-        }
+        },
+        balance: 10000000000
       };
 
       const wrapper = shallow(
@@ -82,6 +84,7 @@ describe('SendTokens: index', () => {
       sendTokensCloseModal: jest.fn(),
       sendTokens: jest.fn(),
       fetchAccounts: jest.fn(),
+      fetchBalanceRequest: jest.fn(),
       initialValues: {
         from: 'Admin_1177_49507',
         fromAddress: '0bdd9ade6477ba753650cc5d9ce40a17c42246c1'
@@ -95,6 +98,7 @@ describe('SendTokens: index', () => {
     );
 
     wrapper.find('Button').simulate('click');
+    expect(props.fetchBalanceRequest).toHaveBeenCalledWith(props.initialValues.fromAddress);
     expect(props.sendTokensOpenModal).toHaveBeenCalled();
   });
 
@@ -187,7 +191,8 @@ describe('SendTokens: index', () => {
         result: 'On success we get result'
       },
       accounts: {
-        accounts: indexAccountsMock
+        accounts: indexAccountsMock,
+        currentUserBalance: 10000000000
       },
       user: {
         currentUser: {
