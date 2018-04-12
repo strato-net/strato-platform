@@ -91,7 +91,7 @@ class CreatePassword extends Component {
   }
 }
 
-function mapStateToProps(state) {
+export function mapStateToProps(state) {
   return {
     serverError: state.createUser.error,
     email: state.user.firstTimeUser
