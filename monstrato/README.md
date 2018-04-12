@@ -38,10 +38,7 @@ On Ubuntu, you might also need to change some configuration in `/etc/postgresql/
 At the time of writing this the latest version is 1.19.
 ### MacOSX
 ```
-> brew install snappy
-> git clone https://github.com/google/leveldb.git
-> git leveldb
-> make
+> brew install snappy leveldb
 ```
 ### Ubuntu
 ```
@@ -62,7 +59,7 @@ Again, you can use `brew search *` to figure out if the version you're looking f
 Consult the https://github.com/blockapps/kafka-packager for a rough approximation of how to install kafka.
 To build the docker image for it:
 ```
-> sudo BASIL_BUILD_TAG=your_tag make -f Basilbuild
+> sudo BASIL_BUILD_TAG=your_tag make
 ```
 If instead you want a system installation, the `Dockerfile.build` has references to the appropriate package versions and where to acquire them.
 This does it for dependencies. At the top level of the `monstrato` repo you should be able to run `stack install`.

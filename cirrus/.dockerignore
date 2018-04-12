@@ -2,6 +2,6 @@ pkg/
 .git/
 .gitignore
 .gitattributes
-Basilbuild
+Makefile
 Dockerfile
 node_modules/
