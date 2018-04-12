@@ -10,10 +10,18 @@ describe('MenuBar: index', () => {
   let store = createStore(combineReducers({ form: formReducer }));
 
   test('render component', () => {
+    const props = {
+      isLoggedIn: true,
+      currentUser: { username: 'tanuj44' },
+      openWalkThroughOverlay: jest.fn(),
+      location: {
+        search: '?developer'
+      }
+    }
     let wrapper = shallow(
       <Provider store={store}>
         <MemoryRouter>
-          <MenuBar.WrappedComponent isLoggedIn={true} currentUser={{ username: 'tanuj44' }} />
+          <MenuBar.WrappedComponent {...props}/>
         </MemoryRouter>
       </Provider>
     ).dive().dive().dive();
@@ -29,7 +37,11 @@ describe('MenuBar: index', () => {
         isLoggedIn: true,
         openOverlay: jest.fn(),
         openLoginOverlay: jest.fn(),
-        logout: jest.fn()
+        logout: jest.fn(),
+        openWalkThroughOverlay: jest.fn(),
+        location: {
+          search: '?developer'
+        }
       }
 
       let wrapper = shallow(
@@ -50,7 +62,11 @@ describe('MenuBar: index', () => {
         isLoggedIn: true,
         openOverlay: jest.fn(),
         openLoginOverlay: jest.fn(),
-        logout: jest.fn()
+        logout: jest.fn(),
+        openWalkThroughOverlay: jest.fn(),
+        location: {
+          search: "?developer"
+        }
       }
 
       let wrapper = shallow(
@@ -71,7 +87,11 @@ describe('MenuBar: index', () => {
         isLoggedIn: true,
         openOverlay: jest.fn(),
         openLoginOverlay: jest.fn(),
-        logout: jest.fn()
+        logout: jest.fn(),
+        openWalkThroughOverlay: jest.fn(),
+        location: {
+          search: "?developer"
+        }
       }
 
       let wrapper = shallow(
@@ -92,7 +112,10 @@ describe('MenuBar: index', () => {
         currentUser: { username: 'tanuj44' },
         isLoggedIn: false,
         openLoginOverlay: jest.fn(),
-        openWalkThroughOverlay: jest.fn()
+        openWalkThroughOverlay: jest.fn(),
+        location: {
+          search: "?developer"
+        }
       }
 
       let wrapper = shallow(
