@@ -13,4 +13,4 @@ data Log =
     bloom   :: Word512,
     logData :: B.ByteString,
     topics  :: [Word256]
-    } deriving (Show, Eq)
+    } deriving (Eq, Read, Show)

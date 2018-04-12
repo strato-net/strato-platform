@@ -59,7 +59,6 @@ library
                  , statsdi
     exposed-modules:
                      Blockchain.BlockChain
-                     Blockchain.Data.ExecResults
                      Blockchain.TheDAOFork
                      Blockchain.VMContext
                      Blockchain.VMOptions

@@ -7,6 +7,7 @@ import           Control.Applicative                (Alternative, empty)
 import qualified Data.Map.Strict                    as M
 import           Data.Time.Clock
 
+import           Blockchain.Bagger.Transactions
 import           Blockchain.Bagger.TransactionList
 import           Blockchain.Sequencer.Event         (OutputTx (..))
 
@@ -25,7 +26,7 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , bestBlockTxHashes     :: [SHA]
                                , lastExecutedStateRoot :: StateRoot
                                , remainingGas          :: Integer
-                               , lastExecutedTxs       :: [OutputTx]
+                               , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
                                , startTimestamp        :: UTCTime
                                } deriving (Show)

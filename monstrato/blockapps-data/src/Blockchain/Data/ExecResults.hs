@@ -1,4 +1,3 @@
-
 module Blockchain.Data.ExecResults (
   ExecResults(..)
   ) where
@@ -18,4 +17,4 @@ data ExecResults =
     erLogs               :: [Log],
     erNewContractAddress :: Maybe Address,
     erException          :: Maybe VMException
-    }
+    } deriving (Eq, Read, Show)

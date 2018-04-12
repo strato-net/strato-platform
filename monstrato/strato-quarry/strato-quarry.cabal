@@ -31,7 +31,8 @@ library
                        strato-sequencer,
                        extra
   exposed-modules:     Blockchain.Bagger
-                       Blockchain.Bagger.BaggerState
+                       Blockchain.Bagger.BaggerState,
+                       Blockchain.Bagger.Transactions
   other-modules:       Blockchain.Bagger.TransactionList
   ghc-options:         -Wall -O2 -fno-warn-unused-do-bind
   hs-source-dirs:      src

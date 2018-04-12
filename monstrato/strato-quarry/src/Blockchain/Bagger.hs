@@ -19,6 +19,7 @@ import           Blockchain.DB.MemAddressStateDB
 import           Blockchain.DB.StateDB
 
 import qualified Blockchain.Bagger.BaggerState      as B
+import           Blockchain.Bagger.Transactions
 import           Blockchain.Data.Address
 import qualified Blockchain.Data.BlockDB            as BDB
 import qualified Blockchain.Data.DataDefs           as DD
@@ -31,60 +32,10 @@ import           Blockchain.Sequencer.Event         (OutputBlock (..), OutputTx 
 import           Blockchain.SHA                     hiding (hash)
 import qualified Blockchain.Verification            as V
 
-data RunAttemptState = RunAttemptState { rasRanTxs    :: [OutputTx]
-                                       , rasUnranTxs  :: [OutputTx]
-                                       , rasStateRoot :: StateRoot
-                                       , rasRemGas    :: Integer
-                                       } deriving (Eq, Read, Show)
-
-data RunAttemptError = CantFindStateRoot
-                     | GasLimitReached [OutputTx] [OutputTx] StateRoot Integer    -- ran, unran, new stateroot, remgas
-                     | RecoverableFailure TxRejection [OutputTx] [OutputTx] StateRoot Integer -- this means the culprit can be dropped from the pool and the block can continue
-                     deriving (Eq, Read, Show)                                                -- same order of args
-
-data BaggerTxQueue = Incoming | Pending | Queued deriving (Eq, Read, Show)
-
-data TxRejection = NonceTooLow    BaggerStage BaggerTxQueue Integer OutputTx -- integers: needed nonce
-                 | BalanceTooLow  BaggerStage BaggerTxQueue Integer Integer OutputTx -- integers: needed balance, actual balance
-                 | GasLimitTooLow BaggerStage BaggerTxQueue Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
-                 | LessLucrative  BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
-                 deriving (Eq, Read, Show)
-
-rejectedTx :: TxRejection -> OutputTx
-rejectedTx (NonceTooLow _ _ _ t)     = t
-rejectedTx (BalanceTooLow _ _ _ _ t) = t
-rejectedTx (GasLimitTooLow _ _ _ t)  = t
-rejectedTx (LessLucrative _ _ _ t)   = t
-
-
-data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
-
-instance Format TxRejection where
-    format (NonceTooLow    stage queue actual o@OutputTx{otHash=hash}) =
-        "NonceTooLow at stage "    ++ show stage ++ " in queue " ++ show queue ++
-        "\n\tactual nonce "     ++ show actual ++
-        "\n\ttx hash " ++ format hash ++
-        "\n" ++ format o
-    format (BalanceTooLow  stage queue needed actual o@OutputTx{otHash=hash}) =
-        "BalanceTooLow at stage "  ++ show stage ++ " in queue " ++ show queue ++
-        "\n\tneeded balance "  ++ show needed ++
-        "\n\tavailable balance " ++ show actual ++
-        "\n\ttx hash " ++ format hash ++
-        "\n" ++ format o
-    format (GasLimitTooLow stage queue actual o@OutputTx{otHash=hash}) =
-        "GasLimitTooLow at stage " ++ show stage ++ " in queue " ++ show queue ++
-        "\n\tactual gas limit " ++ show actual ++
-        "\n\ttx hash " ++ format hash ++
-        "\n" ++ format o
-    format (LessLucrative stage queue superior inferior) =
-            "LessLucrative at stage " ++ show stage ++ " in queue " ++ show queue ++
-            "\n++++superior transaction:++++\n" ++ format superior ++
-            "\n----inferior transaction:----\n" ++ format inferior
-
 class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, MonadLogger m) => MonadBagger m where
     getBaggerState     :: m B.BaggerState
     putBaggerState     :: B.BaggerState -> m ()
-    runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, Integer))
+    runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
@@ -140,7 +91,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
         let cache       = B.miningCache state
         let lastExec    = B.lastExecutedTxs cache
         let lastExecLen = length lastExec
-        let lastExecGuardLen = length [t | t  <- lastExec, otHash t `M.member` seen']
+        let lastExecGuardLen = length [t | t  <- lastExec, otHash (trrTransaction t) `M.member` seen']
         let noCachedTxsCulled = lastExecLen == lastExecGuardLen
         if noCachedTxsCulled then do
             $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = True"
@@ -161,7 +112,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
                     (newSR, newGas, newExec, newUnexec) <- case run of
-                            Right (newSR', newGas') -> return (newSR', newGas', lastExec ++ promoted, [])
+                            Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
                             Left e -> do
                                 logRAE e
                                 case e of
@@ -404,7 +355,7 @@ buildFromMiningCache = do
     let parentHash   = B.bestBlockSHA cache
     let parentHeader = B.bestBlockHeader cache
     let stateRoot    = B.lastExecutedStateRoot cache
-    let txs          = B.lastExecutedTxs cache
+    let txs          = trrTransaction <$> B.lastExecutedTxs cache
     let parentNum    = DD.blockDataNumber parentHeader
     let parentDiff   = DD.blockDataDifficulty parentHeader
     let parentTS     = DD.blockDataTimestamp parentHeader
