@@ -15,6 +15,7 @@ module Blockchain.BlockChain
     , addBlocks
     , addTransaction
     , addTransactions
+    , outputTransactionResult
     , runCodeForTransaction
     , calculateIntrinsicGas'
   ) where
@@ -33,7 +34,6 @@ import           Data.IORef                              (newIORef, readIORef, w
 import           Data.List
 import qualified Data.Map                                as M
 import           Data.Maybe
-import           Data.Ord                                (comparing)
 import qualified Data.Set                                as S
 import qualified Data.Text                               as T
 import           Data.Time.Clock
@@ -67,7 +67,6 @@ import           Blockchain.DB.StorageDB
 import           Blockchain.ExtWord
 import           Blockchain.Format
 import           Blockchain.Sequencer.Event
-import           Blockchain.Stream.UnminedBlock
 import           Blockchain.TheDAOFork
 import           Blockchain.Verifier
 import           Blockchain.VM
@@ -91,7 +90,6 @@ import           Blockchain.Strato.StateDiff.Kafka
 
 import           Blockchain.Strato.Indexer.Kafka         (writeIndexEvents)
 import           Blockchain.Strato.Indexer.Model         (IndexEvent (..))
-import           Executable.EVMFlags
 
 -- has to be here unfortunately, or else BlockChain.hs puts a circular dependency on VMContext.hs
 instance Bagger.MonadBagger ContextM where
@@ -272,7 +270,7 @@ addTransactions b blockGas (t:rest) = do
   printTransactionMessage t result deltaT
   time deltaT time_vm_tx_mined
 
-  outputTransactionResult b t result deltaT beforeMap afterMap
+  outputTransactionResult b Mined $ TxRunResult t result deltaT beforeMap afterMap
 
   let remainingBlockGas =
         case result of
@@ -436,13 +434,10 @@ intrinsicGas isHomestead t@OutputTx{otBaseTx=bt} = gTXDATAZERO * zeroLen + gTXDA
 
 --outputTransactionMessage::IO ()
 outputTransactionResult :: BlockData
-                        -> OutputTx
-                        -> Either TransactionFailureCause ExecResults
-                        -> NominalDiffTime
-                        -> M.Map Address AddressStateModification
-                        -> M.Map Address AddressStateModification
+                        -> MiningStatus
+                        -> TxRunResult
                         -> ContextM ()
-outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap = do
+outputTransactionResult b mined (TxRunResult OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} result deltaT beforeMap afterMap) = do
   let
     (txrStatus, message, gasRemaining) =
       case result of
@@ -496,7 +491,7 @@ outputTransactionResult b OutputTx{otHash=theHash, otBaseTx=t, otSigner=_} resul
                                , transactionResultNewStorage       = ""
                                , transactionResultDeletedStorage   = ""
                                , transactionResultStatus           = Just txrStatus
-                               , transactionResultMiningStatus     = Mined
+                               , transactionResultMiningStatus     = mined
                                }
 
 logWithBox :: MonadLogger m => T.Text -> Int -> [String] -> m ()

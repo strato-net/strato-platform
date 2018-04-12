@@ -21,6 +21,7 @@ import           Blockchain.BlockChain
 import           Blockchain.Data.DataDefs              (blockDataNumber)
 import           Blockchain.Data.BlockSummary
 import           Blockchain.Data.LogDB
+import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResult
 import           Blockchain.DB.BlockSummaryDB
 import           Blockchain.EthConf
@@ -82,10 +83,6 @@ ethereumVM = void . execContextM $ do
             putBSum (outputBlockHash b) (blockHeaderToBSum (obBlockData b) (obTotalDifficulty b) (fromIntegral $ length $ obReceiptTransactions b))
         addBlocks blocks
 
-        -- todo: is this the best place to put this?
-        flushLogEntries
-        flushTransactionResults
-
         -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
         -- todo: which may fail
         isCaughtUp <- shouldProcessNewTransactions
@@ -97,8 +94,14 @@ ethereumVM = void . execContextM $ do
         when shouldOutputBlocks $ do
             $logInfoS "evm/loop/newBlock" "calling Bagger.makeNewBlock"
             newBlock <- Bagger.makeNewBlock
+            trrs <- B.lastExecutedTxs . B.miningCache <$> Bagger.getBaggerState
+            forM_ trrs $ outputTransactionResult (obBlockData newBlock) Unmined
             $logInfoS "evm/loop/newBlock" "calling produceUnminedBlocksM"
             K.withKafkaViolently (produceUnminedBlocksM [outputBlockToBlock newBlock])
+
+        -- todo: is this the best place to put this?
+        flushLogEntries
+        flushTransactionResults
 
         let newOffset = cpOffset + fromIntegral (length seqEvents)
         setCheckpointNoMetadata newOffset
