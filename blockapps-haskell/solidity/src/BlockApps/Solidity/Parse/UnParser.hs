@@ -54,7 +54,7 @@ unparseVar (name, theType) =
   <> Text.unpack name
   <> (case varTypeInitialValue theType of 
         Nothing -> ""
-        Just value -> "=" ++ value
+        Just value -> " = " ++ value
      )
   <> ";"
 
