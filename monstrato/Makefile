@@ -1,34 +1,106 @@
-.PHONY: test test-suite vm-tests multinode
+ifeq ($(BASIL_DOCKER_TAG),)
+  $(error BASIL_DOCKER_TAG is not set)
+endif
 
-vm-tests:
-	echo "running vm tests"
-	if [ -d "test-suite/tests" ]; then \
-          echo ".. tests already exists"; \
-        else \
-          git clone https://github.com/ethereum/tests.git test-suite/tests; \
-        fi
-	docker cp test-suite/tests strato_strato_1:/var/lib/strato/tests
-	docker cp test-suite/.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/vm-tests/vm-tests strato_strato_1:/usr/bin
-	docker exec -t strato_strato_1 bash -c "cd /var/lib/strato; vm-tests"
+ifneq ($(USE_DOCKER_BUILD_ENV),)
+ifeq ($(BASIL_HOME),)
+  $(error USE_DOCKER_BUILD_ENV is set, but BASIL_HOME is not)
+endif
+endif
 
-integration:
-	echo "running integration tests"
-	docker cp test-suite/.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/test-suite/test-suite strato_strato_1:/usr/bin
-	-docker exec strato_strato_1 bash -c "kill $(pidof ethereum-vm)"
-	-stack test strato-redis-blockdb
-	docker exec -t strato_strato_1 bash -c "cd /var/lib/strato; test-suite"
+BASILWORK=.basil-work
+BASILWORK_ABS=$(shell pwd)/$(BASILWORK)
+STACKWORK=$(BASILWORK)/stack
+SOLCWORK=$(BASILWORK)/solc
+NPMWORK=$(BASILWORK)/npm
+FAKEROOT=$(BASILWORK)/fakeroot
+STRATOHOME=$(FAKEROOT)/var/lib/strato
+LIBHOME=$(FAKEROOT)/var/lib
+BUILDER_HOME=$(BASIL_HOME)/blockapps/builder_home
+DOCKER_FAKEROOT=/workspace/.basil-work/fakeroot
+DOCKER_SHELL=docker run -i --rm --ulimit nofile=65535 -v $(shell pwd):/workspace -v $(BUILDER_HOME):/root strato-buildbase:latest bash -c
 
-multinode:
-	echo "testing multinode tests"
-	if [ -d "multinode-test" ]; then \
-	  echo "... multinode already checked out"; \
-	else \
-	  git clone https://github.com/blockapps/multinode-test multinode-test; \
-	fi
-	cd multinode-test/ && npm install && ./node_modules/mocha/bin/mocha test/ --reporter mochawesome
+SOLCBRANCH=0.4.8-no-md
+SOLCREPOSITORY=https://github.com/blockapps/solidity.git
+SOLCBUILDDIR=$(SOLCWORK)/solidity/build
+SOLCMAKEFLAGS=-j4
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+SOLCCMAKE=cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(shell pwd)/$(FAKEROOT)/usr .. && make $(SOLCMAKEFLAGS) solc
+else
+SOLCCMAKE=$(DOCKER_SHELL) "cd $(SOLCBUILDDIR) && cd .. && git submodule update && cd build && cmake -DCMAKE_INSTALL_PREFIX=$(DOCKER_FAKEROOT)/usr .."
+endif
+SOLCMAKEINSTALL=make $(SOLCMAKEFLAGS) -C $(SOLCBUILDDIR) install
 
-unit:
-	echo "testing unit tests"
-	stack test ethereum-discovery solidity-abi strato-p2p strato-api blockapps-data
+EXTRADEPS=doit.sh mkCoinbase
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+STACKFLAGS=
+else
+STACKFLAGS=--allow-different-user
+endif
+BUILD_HASKELL=stack setup $(STACKFLAGS) && stack install $(STACKFLAGS) --local-bin-path=$(FAKEROOT)/usr/bin && stack test --no-run-tests test-suite \
+    # --profile --ghc-options="-fprof-auto -rtsopts"
+all: build_docker
 
-test: unit test-suite vm-tests multinode
+prebuild:
+	mkdir -p $(BASILWORK)
+	mkdir -p $(STACKWORK)
+	mkdir -p $(SOLCWORK)
+	mkdir -p $(NPMWORK)
+	mkdir -p $(FAKEROOT)/usr/lib
+	mkdir -p $(FAKEROOT)/usr/bin
+	mkdir -p $(STRATOHOME)
+	mkdir -p /tmp/docker-dummy
+
+build_solidity: prebuild build_buildbase
+ifneq ("$(wildcard $(SOLCBUILDDIR)/Makefile)","")
+	echo "$(SOLCBUILDDIR)/Makefile already exists, so solc was probably already cmake'd. Not cmake-ing."
+else
+ifneq ("$(wildcard $(SOLCWORK)/solidity/.git)","")
+	echo "solidity already cloned, will skip"
+else
+	git -C $(SOLCWORK) clone --recursive --branch $(SOLCBRANCH) $(SOLCREPOSITORY)
+endif
+	mkdir -p $(SOLCBUILDDIR)
+	$(SOLCCMAKE)
+endif
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	$(SOLCMAKEINSTALL)
+else
+	$(DOCKER_SHELL) "$(SOLCMAKEINSTALL)"
+endif
+
+build_haskell: build_buildbase prebuild
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	$(BUILD_HASKELL)
+else
+	$(DOCKER_SHELL) "$(BUILD_HASKELL)"
+endif
+
+build_deploybase: prebuild
+	cp -f Dockerfile.deploybase /tmp/docker-dummy
+	docker build -t strato-deploybase:latest -f /tmp/docker-dummy/Dockerfile.deploybase /tmp/docker-dummy
+	rm -f /tmp/docker-dummy/Dockerfile.deploybase
+
+build_buildbase: build_deploybase prebuild
+ifeq ($(USE_DOCKER_BUILD_ENV),)
+	echo "USE_DOCKER_BUILD_ENV not set, not building buildbase" ;
+else
+	cp -f Dockerfile.buildbase stack.yaml /tmp/docker-dummy
+	docker build -t strato-buildbase:latest -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy
+	rm -f /tmp/docker-dummy/Dockerfile.buildbase /tmp/docker-dummy/stack.yaml
+	mkdir -p $(BUILDER_HOME)
+	$(DOCKER_SHELL) "chown root:root /root" || true
+endif
+
+pull_blockapps_js: prebuild
+	( \
+		cd $(NPMWORK)                        && \
+		mkdir -p node_modules                && \
+		npm install blockapps-js yaml-parser    \
+	)
+
+build_docker: build_deploybase build_haskell build_solidity pull_blockapps_js
+	cp -f Dockerfile $(FAKEROOT)
+	cp -f $(EXTRADEPS) $(LIBHOME)
+	rm -rf $(STRATOHOME/node_modules) && cp -R $(NPMWORK)/node_modules $(LIBHOME)/node_modules
+	docker build -t $(BASIL_DOCKER_TAG) $(FAKEROOT)

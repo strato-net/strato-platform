@@ -34,39 +34,39 @@ build_all: apex bloc docs cirrus dappstore strato nginx postgrest smd
 
 apex:
 	@echo Now building apex...
-	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}apex:${VERSION} make --directory=apex/
 
 bloc:
 	@echo Now building bloc...
-	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}bloc:${VERSION} make --directory=blockapps-haskell/
 
 docs:
 	@echo Now building docs...
-	BASIL_DOCKER_TAG=${REPO_URL}docs:${VERSION} make --directory=blockapps-swagger/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}docs:${VERSION} make --directory=blockapps-swagger/
 
 cirrus:
 	@echo Now building cirrus...
-	BASIL_DOCKER_TAG=${REPO_URL}cirrus:${VERSION} make --directory=cirrus/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}cirrus:${VERSION} make --directory=cirrus/
 
 dappstore:
 	@echo Now building dappstore...
-	BASIL_DOCKER_TAG=${REPO_URL}dappstore:${VERSION} make --directory=dapp-store/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}dappstore:${VERSION} make --directory=dapp-store/
 
 strato:
 	@echo Now building strato...
-	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=monstrato/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}strato:${VERSION} make --directory=monstrato/
 
 nginx:
 	@echo Now building nginx...
-	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} make --directory=nginx-packager/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} make --directory=nginx-packager/
 
 postgrest:
 	@echo Now building postgrest...
-	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} make --directory=postgrest-packager/ --file=Basilbuild
+	BASIL_DOCKER_TAG=$(REPO_URL)postgrest:${VERSION} make --directory=postgrest-packager/
 
 smd:
 	@echo building smd...
-	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/ --file=Basilbuild
+	BASIL_DOCKER_TAG=${REPO_URL}smd:${VERSION} make --directory=smd-ui/
 
 docker-compose:
 	@echo Now generating docker-compose yml files...
