@@ -65,12 +65,12 @@ describe('ApplicationCard: index', () => {
       },
       launchApp: jest.fn(),
       isLoggedIn: false,
-      openLoginOverlay: jest.fn(),
+      openWalkThroughOverlay: jest.fn(),
       selectApp: jest.fn(),
     }
     const wrapper = shallow(<ApplicationCard.WrappedComponent {...props} />)
     wrapper.find('Button').simulate('click')
-    expect(props.openLoginOverlay).toHaveBeenCalled()
+    expect(props.openWalkThroughOverlay).toHaveBeenCalled()
     expect(props.selectApp).toHaveBeenCalled()
   })
 
