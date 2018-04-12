@@ -1,6 +1,4 @@
 import {
-  openOverlay,
-  closeOverlay,
   createUser,
   createUserSuccess,
   createUserFailure
@@ -8,14 +6,6 @@ import {
 import { formData, mockResponse, error } from './createUserMock';
 
 describe('CreateUser: action', () => {
-
-  test('open overlay', () => {
-    expect(openOverlay()).toMatchSnapshot();
-  });
-
-  test('close overlay', () => {
-    expect(closeOverlay()).toMatchSnapshot();
-  });
 
   describe('create user', () => {
 
