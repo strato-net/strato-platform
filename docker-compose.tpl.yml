@@ -64,6 +64,7 @@ services:
     - postgres
     environment:
     - cirrusHost=cirrus:3333
+    - loglevel=${loglevel}
     - postgres_user=postgres
     - postgres_host=postgres
     - postgres_password=${postgres_password:-api}
