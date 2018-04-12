@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
-import { createUser } from './createUser.actions';
-import { openLoginOverlay, firstTimeLogin } from '../User/user.actions';
+import { openLoginOverlay, firstTimeLogin, resetError } from '../User/user.actions';
 import { Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
@@ -8,14 +7,14 @@ import { withRouter } from 'react-router-dom';
 
 import './CreateUser.css';
 import mixpanelWrapper from '../../lib/mixpanelWrapper';
-import { openWalkThroughOverlay, closeWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
+import { closeWalkThroughOverlay } from '../WalkThrough/walkThrough.actions';
 import { toasts } from "../Toasts";
 
 class CreateUser extends Component {
 
   constructor() {
     super();
-    this.state = { serverError: null, errors: null }
+    this.state = { errors: null }
   }
 
   componentDidMount() {
@@ -23,9 +22,10 @@ class CreateUser extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.serverError && this.state.serverError !== nextProps.serverError) {
+    if (nextProps.serverError) {
       toasts.show({ message: nextProps.serverError });
       this.setState({ serverError: nextProps.serverError })
+      this.props.resetError();
     }
   }
 
@@ -108,10 +108,7 @@ class CreateUser extends Component {
 
 export function mapStateToProps(state) {
   return {
-    isOpen: state.createUser.isOpen,
-    isLoggedIn: state.user.isLoggedIn,
-    serverError: state.createUser.error,
-    spinning: state.createUser.spinning
+    spinning: state.user.spinning
   };
 }
 
@@ -130,11 +127,10 @@ const formed = reduxForm({ form: 'create-user' })(CreateUser);
 const connected = connect(
   mapStateToProps,
   {
-    createUser,
-    openWalkThroughOverlay,
     closeWalkThroughOverlay,
     openLoginOverlay,
-    firstTimeLogin
+    firstTimeLogin,
+    resetError,
   }
 )(formed);
 
