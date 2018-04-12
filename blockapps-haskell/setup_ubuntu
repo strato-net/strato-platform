@@ -1,3 +1,0 @@
-#!/bin/bash
-
-sudo apt-get install autoconf libtool libblas-dev liblapack-dev libsodium-dev postgresql-9.6 postgresql-server-dev-9.6
