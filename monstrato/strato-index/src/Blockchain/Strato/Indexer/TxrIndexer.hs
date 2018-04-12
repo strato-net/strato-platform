@@ -36,7 +36,11 @@ txrIndexer = runIContextM "strato-txr-indexer" . forever $ do
             InsertTxResult r -> do
                 $logInfoS "txrIndexer" . T.pack $
                     "Inserting TXResult for tx " ++ format (transactionResultTransactionHash r) ++ " at block " ++ format (transactionResultBlockHash r)
-                void $ TxrDB.putTransactionResult r
+                void $ TxrDB.putInsertTransactionResult r
+            UpdateTxResult u -> do
+                $logInfoS "txrIndexer" . T.pack $
+                    "Updating unmined TXResults for block hash " ++ format (fst u) ++ " with block hash " ++ format (snd u)
+                void $ TxrDB.putUpdateTransactionResult u
             _ -> return ()
         setKafkaCheckpoint nextIdx
 

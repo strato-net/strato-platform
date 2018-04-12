@@ -73,7 +73,7 @@ data Context = Context { contextStateDB             :: MP.MPDB
                        , contextBestBlockInfo       :: ContextBestBlockInfo
                        , contextRedisPool           :: Redis.Connection
                        , contextInsertTxResultQueue :: [TransactionResult]
-                       , contextUpdateTxResultQueue :: [TransactionResult]
+                       , contextUpdateTxResultQueue :: [(SHA,SHA)]
                        , contextLogDBQueue          :: [LogDB]
                        }
 
@@ -97,10 +97,10 @@ instance HasMemTXResultDB ContextM where
     _ <- K.withKafkaViolently $ IK.writeIndexEvents (IM.InsertTxResult <$> toWrite)
     put $ ctx { contextInsertTxResultQueue = [] }
 
-  enqueueUpdateTransactionResults txrs = do
+  enqueueUpdateTransactionResults sss = do
     ctx <- get
     let q = contextUpdateTxResultQueue ctx
-    put $ ctx { contextUpdateTxResultQueue = (q ++ txrs) }
+    put $ ctx { contextUpdateTxResultQueue = (q ++ sss) }
 
   flushUpdateTransactionResults = do
     ctx <- get

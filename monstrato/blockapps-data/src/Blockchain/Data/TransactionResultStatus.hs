@@ -26,12 +26,8 @@ data TransactionFailureType = IncorrectNonce
                             | ExecutionFailure String
                             deriving (Eq, Read, Show, Generic)
 
-data TransactionResultMiningStatus = Unmined | Mined
-  deriving (Eq, Ord, Enum, Read, Show, Generic)
-
 derivePersistField "TransactionResultStatus"
 derivePersistField "TransactionFailureType"
-derivePersistField "TransactionResultMiningStatus"
 
 instance FromJSON TransactionResultStatus where
     parseJSON (String "success") = pure Success
@@ -55,6 +51,3 @@ instance ToJSON   TransactionResultStatus where
 
 instance FromJSON TransactionFailureType
 instance ToJSON   TransactionFailureType
-
-instance FromJSON TransactionResultMiningStatus
-instance ToJSON TransactionResultMiningStatus

@@ -2,10 +2,13 @@
 
 module Blockchain.Data.TransactionResult
     ( HasMemTXResultDB(..)
-    , putTransactionResult
-    , putTransactionResults
+    , putInsertTransactionResult
+    , putInsertTransactionResults
+    , putUpdateTransactionResult
+    , putUpdateTransactionResults
     ) where
 
+import qualified Database.Esqueleto           as E
 import           Database.Persist             hiding (get)
 import qualified Database.Persist.Postgresql  as SQL
 
@@ -13,11 +16,13 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Resource
 
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.MiningStatus
 import           Blockchain.DB.SQLDB
+import           Blockchain.Strato.Model.SHA
 
 class (Monad m) => HasMemTXResultDB m where
   enqueueInsertTransactionResults :: [TransactionResult] -> m ()
-  enqueueUpdateTransactionResults :: [TransactionResult] -> m ()
+  enqueueUpdateTransactionResults :: [(SHA,SHA)] -> m ()
   flushInsertTransactionResults   :: m ()
   flushUpdateTransactionResults   :: m ()
   flushTransactionResults :: m ()
@@ -25,15 +30,30 @@ class (Monad m) => HasMemTXResultDB m where
   enqueueInsertTransactionResult :: TransactionResult -> m ()
   enqueueInsertTransactionResult = enqueueInsertTransactionResults . pure
 
-  enqueueUpdateTransactionResult :: TransactionResult -> m ()
+  enqueueUpdateTransactionResult :: (SHA,SHA) -> m ()
   enqueueUpdateTransactionResult = enqueueUpdateTransactionResults . pure
 
-putTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
-                     => TransactionResult
-                     -> m (Key TransactionResult)
-putTransactionResult = fmap head . putTransactionResults . pure
+putInsertTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+                           => TransactionResult
+                           -> m (Key TransactionResult)
+putInsertTransactionResult = fmap head . putInsertTransactionResults . pure
 
-putTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
-                      => [TransactionResult]
-                      -> m [Key TransactionResult]
-putTransactionResults trs = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany trs)
+putInsertTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+                            => [TransactionResult]
+                            -> m [Key TransactionResult]
+putInsertTransactionResults trs = getSQLDB >>= runResourceT . (SQL.runSqlPool $ SQL.insertMany trs)
+
+putUpdateTransactionResult :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+                           => (SHA,SHA)
+                           -> m ()
+putUpdateTransactionResult (unmined,mined) = do
+  sqldb <- getSQLDB
+  runResourceT $ flip SQL.runSqlPool sqldb $ do
+    E.update $ \tr -> do
+      E.set tr [ TransactionResultBlockHash E.=. E.val mined , TransactionResultMiningStatus E.=. E.val Mined]
+      E.where_ (tr E.^. TransactionResultBlockHash E.==. E.val unmined E.&&. tr E.^. TransactionResultMiningStatus E.==. E.val Unmined)
+
+putUpdateTransactionResults :: (HasSQLDB m, MonadIO m, MonadBaseControl IO m)
+                            => [(SHA,SHA)]
+                            -> m ()
+putUpdateTransactionResults = mapM_ putUpdateTransactionResult

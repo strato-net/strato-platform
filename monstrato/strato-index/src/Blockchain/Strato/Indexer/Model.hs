@@ -5,6 +5,7 @@ module Blockchain.Strato.Indexer.Model
     ) where
 
 import           Blockchain.Data.DataDefs                (LogDB, TransactionResult)
+import           Blockchain.Data.MiningStatus
 import           Blockchain.Data.TransactionResultStatus
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Model.SHA
@@ -14,14 +15,14 @@ data IndexEvent = RanBlock OutputBlock
                 | NewBestBlock (SHA, Integer, Integer)
                 | LogDBEntry LogDB
                 | InsertTxResult TransactionResult
-                | UpdateTxResult TransactionResult
+                | UpdateTxResult (SHA, SHA)
                 deriving (Eq, Read, Show)
 
 instance Binary LogDB
 instance Binary TransactionResult
 instance Binary TransactionFailureType
 instance Binary TransactionResultStatus
-instance Binary TransactionResultMiningStatus
+instance Binary MiningStatus
 
 instance Binary IndexEvent where
     get = do
@@ -38,4 +39,4 @@ instance Binary IndexEvent where
     put (NewBestBlock n)   = putWord8 1 >> put n
     put (LogDBEntry e)     = putWord8 2 >> put e
     put (InsertTxResult r) = putWord8 3 >> put r
-    put (UpdateTxResult r) = putWord8 4 >> put r
+    put (UpdateTxResult s) = putWord8 4 >> put s
