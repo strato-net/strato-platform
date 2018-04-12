@@ -232,6 +232,7 @@ xabiVariablesTable :: Table
   , Column PGText
   , Column PGInt4
   , Column PGBool
+  , Column (Nullable PGText)
   )
   ( Column PGInt4
   , Column PGInt4
@@ -239,14 +240,16 @@ xabiVariablesTable :: Table
   , Column PGText
   , Column PGInt4
   , Column PGBool
+  , Column (Nullable PGText)
   )
-xabiVariablesTable = Table "xabi_variables" $ p6
+xabiVariablesTable = Table "xabi_variables" $ p7
   ( optional "id"
   , required "contract_metadata_id"
   , required "type_id"
   , required "name"
   , required "at_bytes"
   , required "is_public"
+  , required "value"
   )
 
 xabiTypeDefsTable :: Table

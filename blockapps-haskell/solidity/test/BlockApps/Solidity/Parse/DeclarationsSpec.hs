@@ -100,6 +100,7 @@ spec = do
       let Right (rets, _, _, _, _) = eRes
           expected = [("",Label "ErrorCodes"),("",Label "ProjectState")]
       rets `shouldBe` expected
+
   describe "Declarations - structDeclaration" $ do
     it "should parse and unparse a struct with two fields" $ do
       let structString = "struct SampleStruct {\n      uint _field1;\n      string _field2;\n    }"

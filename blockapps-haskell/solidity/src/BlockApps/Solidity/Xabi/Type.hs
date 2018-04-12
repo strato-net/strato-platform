@@ -74,9 +74,10 @@ instance ToSchema IndexedType where
 
 data VarType =
   VarType
-  { varTypeAtBytes :: Int32
-  , varTypePublic  :: Maybe Bool
-  , varTypeType    :: Type
+  { varTypeAtBytes        :: Int32
+  , varTypePublic         :: Maybe Bool
+  , varTypeInitialValue   :: Maybe String
+  , varTypeType           :: Type
   } deriving (Eq, Show, Generic)
 
 instance FromJSON VarType where
@@ -84,25 +85,26 @@ instance FromJSON VarType where
     withObject "xabi" $ \v -> do
       atBytes <-  v .: "atBytes"
       public <- v .:? "public"
+      value <- v .:? "initialValue"
       theType <- parseJSON $ Object $ HashMap.insertWith (const id) "type" "Contract" v
-      return $ VarType atBytes public
-        theType
+      return $ VarType atBytes public value theType
 
 instance ToJSON VarType where
-  toJSON (VarType varTypeAtBytes varTypePublic theType) =
+  toJSON (VarType varTypeAtBytes varTypePublic varTypeInitialValue theType) =
     let
       Object theMap = toJSON theType
     in
      Object $
      HashMap.insert "atBytes" (toJSON varTypeAtBytes) $
-     HashMap.insert "public" (toJSON varTypePublic)
+     HashMap.insert "public" (toJSON varTypePublic) $
+     HashMap.insert "initialValue" (toJSON varTypeInitialValue)
      theMap
 
 instance ToSchema VarType where
   declareNamedSchema proxy = genericDeclareNamedSchema defaultSchemaOptions proxy
     & mapped.name ?~ "VarType"
     & mapped.schema.description ?~ "Represents a Solidity Variable"
-    & mapped.schema.example ?~ toJSON (VarType 16 (Just True) Address)
+    & mapped.schema.example ?~ toJSON (VarType 16 (Just True) (Just "6120418de8a7a0ce3c3a0e3fe907e1351ceb4fe7") Address)
 
 
 instance Arbitrary VarType where arbitrary = genericArbitrary uniform
