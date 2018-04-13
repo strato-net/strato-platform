@@ -39,7 +39,7 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
     newTxRanCallback :: [TxRunResult] -> DD.BlockData -> m ()
-    updateTxCallback :: [TxRunResult] -> DD.BlockData -> DD.BlockData -> MiningStatus -> m ()
+    updateTxCallback :: [TxRunResult] -> SHA -> SHA -> MiningStatus -> m ()
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, newTxRanCallback, updateTxCallback, txsDroppedCallback #-}
 
@@ -137,7 +137,10 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     setStateDBStateRoot existingStateDbStateRoot
                     !build <- buildFromMiningCache
                     newTxRanCallback newTxs (obBlockData build)
-                    updateTxCallback newUpdates tempBlockHeader (obBlockData build) Unmined
+                    updateTxCallback newUpdates
+                                     (BDB.blockHeaderHash tempBlockHeader)
+                                     (BDB.blockHeaderHash $ obBlockData build)
+                                     Unmined
                     return build
         else do -- some transactions which were cached have been evicted, need to recalculate entire block cache
             $logDebugS "Bagger.makeNewBlock" "noCachedTxsCulled = False"

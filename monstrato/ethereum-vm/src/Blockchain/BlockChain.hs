@@ -130,7 +130,7 @@ instance Bagger.MonadBagger ContextM where
 
     newTxRanCallback inserts bd = mapM_ (outputTransactionResult bd Unmined) inserts
 
-    updateTxCallback updates oldBd newBd miningStatus = undefined
+    updateTxCallback updates o n m = enqueueUpdateTransactionResults $ map (\h -> ((otHash $ trrTransaction h), o, n, m)) updates
 
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
