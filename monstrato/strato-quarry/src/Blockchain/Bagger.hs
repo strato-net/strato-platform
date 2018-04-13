@@ -37,6 +37,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
     putBaggerState     :: B.BaggerState -> m ()
     runFromStateRoot   :: StateRoot -> Integer -> DD.BlockData -> [OutputTx] -> m (Either RunAttemptError (StateRoot, [TxRunResult], Integer))
     rewardCoinbases    :: StateRoot -> Address -> [DD.BlockData] -> Integer -> m StateRoot -- miner coinbase -> known uncles -> this block number -> stateRoot
+    -- newTxRanCallback :: SomeStuff -> m ()
+    -- updateTxCallback :: SomeOtherStuff -> m ()
     txsDroppedCallback :: [TxRejection] -> [SHA] -> m () -- called when a Tx is dropped from/rejected by the pool
     {-# MINIMAL getBaggerState, putBaggerState, runFromStateRoot, rewardCoinbases, txsDroppedCallback #-}
 
@@ -76,6 +78,8 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                            , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
                                            , B.lastExecutedTxs       = []
                                            , B.promotedTransactions  = []
+                                           , B.newExecutedTxs        = []
+                                           , B.updateExecutedTxs     = []
                                            , B.startTimestamp        = time
                                            }
         putBaggerState $ state { B.miningCache = newMiningCache }
@@ -111,23 +115,25 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                     let remGas          = B.remainingGas cache
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
                     !run <- runFromStateRoot lastSR remGas tempBlockHeader promoted
-                    (newSR, newGas, newExec, newUnexec) <- case run of
-                            Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [])
+                    (newSR, newGas, newExec, newUnexec, newTxs, newUpdates) <- case run of
+                            Right (newSR', newRR', newGas') -> return (newSR', newGas', lastExec ++ newRR', [], newRR', lastExec)
                             Left e -> do
                                 logRAE e
                                 case e of
-                                    (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx)
+                                    (GasLimitReached rtx urtx nsr nbg)      -> return (nsr, nbg, lastExec ++ rtx, urtx, rtx, lastExec)
                                     (RecoverableFailure f rtx urtx nsr nbg) -> do
                                         txsDroppedCallback [f] []
                                         let theRejectedTx = rejectedTx f
                                         purgeFromPending theRejectedTx
-                                        return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx)
+                                        return (nsr, nbg, lastExec ++ rtx, filter (/= theRejectedTx) urtx, rtx, lastExec)
                                     x                                       -> error (show x)
 
                     let !newMiningCache = cache { B.lastExecutedStateRoot = newSR
                                                 , B.remainingGas          = newGas
                                                 , B.lastExecutedTxs       = newExec
                                                 , B.promotedTransactions  = newUnexec
+                                                , B.newExecutedTxs        = newTxs
+                                                , B.updateExecutedTxs     = newUpdates
                                                 }
                     $logDebugS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
                     updateBaggerState (\s -> s { B.miningCache = newMiningCache })
