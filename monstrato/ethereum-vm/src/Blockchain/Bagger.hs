@@ -81,8 +81,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                            , B.remainingGas          = nextGasLimit $ DD.blockDataGasLimit bd
                                            , B.lastExecutedTxs       = []
                                            , B.promotedTransactions  = []
-                                           , B.newExecutedTxs        = []
-                                           , B.updateExecutedTxs     = []
                                            , B.startTimestamp        = time
                                            }
         putBaggerState $ state { B.miningCache = newMiningCache }
@@ -135,8 +133,6 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
                                                 , B.remainingGas          = newGas
                                                 , B.lastExecutedTxs       = newExec
                                                 , B.promotedTransactions  = newUnexec
-                                                , B.newExecutedTxs        = newTxs
-                                                , B.updateExecutedTxs     = newUpdates
                                                 }
                     $logInfoS "Bagger.makeNewBlock" . T.pack $ "post-incremental run :: (" ++ show newGas ++ ", " ++ format newSR ++ ")"
                     updateBaggerState (\s -> s { B.miningCache = newMiningCache })
@@ -164,6 +160,9 @@ class (Monad m, MonadIO m, HasHashDB m, HasStateDB m, HasMemAddressStateDB m, Mo
 
     setCalculateIntrinsicGas :: (Integer -> OutputTx -> Integer) -> m ()
     setCalculateIntrinsicGas cig = putBaggerState =<< (\s -> s { B.calculateIntrinsicGas = cig }) <$> getBaggerState
+
+partialHash :: DD.BlockData -> SHA
+partialHash _ = SHA 0
 
 logRAE :: (MonadLogger m) => RunAttemptError -> m ()
 logRAE rae = do
