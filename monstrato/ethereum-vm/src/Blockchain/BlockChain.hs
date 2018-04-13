@@ -128,6 +128,9 @@ instance Bagger.MonadBagger ContextM where
         setStateDBStateRoot startingStateRoot
         return newStateRoot
 
+    newTxRanCallback _ = undefined
+    updateTxCallback _ _ _ _ = undefined
+
     -- todo batch insert results
     txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> do
         let (message, _, _, theHash) = baggerRejectionToTransactionResultBits rejection

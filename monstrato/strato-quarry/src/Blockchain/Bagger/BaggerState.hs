@@ -28,8 +28,6 @@ data MiningCache = MiningCache { bestBlockSHA          :: SHA
                                , remainingGas          :: Integer
                                , lastExecutedTxs       :: [TxRunResult]
                                , promotedTransactions  :: [OutputTx]
-                               , newExecutedTxs        :: [TxRunResult]
-                               , updateExecutedTxs     :: [TxRunResult]
                                , startTimestamp        :: UTCTime
                                } deriving (Show)
 
@@ -66,8 +64,6 @@ defaultMiningCache  = MiningCache { bestBlockSHA          = SHA 0
                                   , remainingGas          = 0
                                   , lastExecutedTxs       = []
                                   , promotedTransactions  = []
-                                  , newExecutedTxs        = []
-                                  , updateExecutedTxs     = []
                                   , startTimestamp        = error "reached defaultMiningCache"
                                   }
 
