@@ -1,5 +1,24 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Test createUser index Component: errorMessageFor method 1`] = `"must have password"`;
+
+exports[`Test createUser index Component: errorMessageFor method 2`] = `null`;
+
+exports[`Test createUser index Form simulate fields 1`] = `
+Object {
+  "registeredFields": Object {
+    "email": Object {
+      "count": 1,
+      "name": "email",
+      "type": "Field",
+    },
+  },
+  "values": Object {
+    "email": "no-reply@blockapps.com",
+  },
+}
+`;
+
 exports[`Test createUser index mapStateToProps with default state 1`] = `
 Object {
   "spinning": false,
@@ -1166,17 +1185,3 @@ ShallowWrapper {
   },
 }
 `;
-
-exports[`Test createUser index validate when email has invalid format 1`] = `
-Object {
-  "email": "Please enter a valid email address",
-}
-`;
-
-exports[`Test createUser index validate with empty values 1`] = `
-Object {
-  "email": "Please enter a email address",
-}
-`;
-
-exports[`Test createUser index validate with values 1`] = `Object {}`;

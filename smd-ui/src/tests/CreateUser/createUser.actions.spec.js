@@ -1,7 +1,8 @@
 import {
   createUser,
   createUserSuccess,
-  createUserFailure
+  createUserFailure,
+  resetError
 } from '../../components/CreateUser/createUser.actions';
 import { formData, mockResponse, error } from './createUserMock';
 
@@ -21,6 +22,10 @@ describe('CreateUser: action', () => {
       expect(createUserFailure(error)).toMatchSnapshot();
     });
 
-  })
+  });
+
+  test('reset error', () => {
+    expect(resetError('error')).toMatchSnapshot();
+  });
 
 });

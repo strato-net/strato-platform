@@ -24,3 +24,9 @@ Object {
   "type": "CREATE_USER_SUCCESS",
 }
 `;
+
+exports[`CreateUser: action reset error 1`] = `
+Object {
+  "type": "RESET_ERROR",
+}
+`;

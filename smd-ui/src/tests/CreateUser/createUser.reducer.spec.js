@@ -3,6 +3,7 @@ import {
   createUser,
   createUserSuccess,
   createUserFailure,
+  resetError,
 } from '../../components/CreateUser/createUser.actions';
 import { initialState, formData, mockResponse, error } from './createUserMock';
 
@@ -33,6 +34,11 @@ describe('CreateUser: reducer', () => {
       expect(reducer(initialState, action)).toMatchSnapshot();
     });
 
-  })
+  });
+
+  test('reset error', () => {
+    const action = resetError('error');
+    expect(reducer(initialState, action)).toMatchSnapshot();
+  });
 
 });
